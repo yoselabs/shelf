@@ -45,8 +45,14 @@ the apps, never down out of them. Enforced by [tests/test_boundary.py](tests/tes
 make check   # ruff check + ruff format --check + ty + pytest — whole-repo, no carve-outs
 ```
 
+## Changes
+
+Every change goes through **OpenSpec** (`openspec/`): `openspec propose` → design → tasks →
+apply → `openspec archive`. Project context for the AI lives in
+[openspec/config.yaml](openspec/config.yaml); specs land in `openspec/specs/`, in-flight work in
+`openspec/changes/`. See [AGENTS.md](AGENTS.md) §4.
+
 ## Still open (see the exploration doc for full context)
 
-- `openspec init` here (docs-as-system built; openspec not wired yet).
 - Dev-loop override — an uncommitted `uv.toml` path source for co-editing shelf + a consumer.
 - Onboarding runbook + `catalog`/`onboard` skill (captured in `docs/missions/`).

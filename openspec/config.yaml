@@ -1,0 +1,31 @@
+schema: spec-driven
+
+# Project context — shown to the AI when creating OpenSpec artifacts.
+context: |
+  The shelf: a home for small, ownable, composable, contract-guaranteed software
+  pieces ("micro-software"), reused across separate apps (a2kay, a2web, ...) via
+  git+tag pins rather than re-written. Read CLAUDE.md → docs/doctrine.md →
+  docs/constitution.md → docs/glossary.md before proposing.
+
+  Tech stack: Python 3.11, uv workspace (packages/*), pytest, ruff (strict select
+  set + format), ty. `make check` is the whole-repo Definition of Done — no carve-outs.
+
+  Load-bearing rules (docs/constitution.md):
+    - Files are truth; every index/catalog is DERIVED, never hand-edited.
+    - One concept per file (one use case, one contract, one primitive).
+    - Append over mutate. A new file beats editing a shared list.
+    - Protection is EARNED: a contract is born `candidate` (inert) until a live
+      consumer demonstrably breaks without it. Never protect on fear.
+    - Reach for the shelf first; adopt only if DEEP · STABLE · WINS; else duplicate.
+    - Promotion, not publication: a piece graduates when a 2nd consumer pulls it.
+    - Decay is mandatory: unreused past TTL → deprecate. Deletion is a virtue.
+
+  The one invariant: a shelf package NEVER imports a consumer app (a2kay, a2web,
+  ...). The dependency arrow points UP into the apps. Enforced by tests/test_boundary.py.
+
+  Versions are namespaced git tags (`anyllm-v0.2.0`); never delete an old tag.
+
+# Per-artifact rules (optional). Example:
+#   rules:
+#     proposal:
+#       - Always include a "Non-goals" section
