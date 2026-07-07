@@ -15,7 +15,9 @@ This file is the map. Everything the shelf knows about itself is in this repo �
 ## Consuming & contributing
 
 - **[docs/consuming-the-shelf.md](docs/consuming-the-shelf.md)** — how a project onboards as a consumer
-  (depend by git+tag, paste the directive into its own `AGENTS.md`/`CLAUDE.md`).
+  (depend by git+tag, install the commit guard, paste the resolver block into its `AGENTS.md`/`CLAUDE.md`).
+- **[docs/agent-loop.md](docs/agent-loop.md)** — the standing loop every consumer's agent self-applies:
+  fetch cadence, adopt gate, nominate-vs-promote, the promote procedure, the guarded editable escape hatch.
 - **Contribute back** via *promotion, not publication*: a piece graduates when a **2nd** consumer pulls
   it. Read [docs/constitution.md](docs/constitution.md) (Articles VI–VIII) first.
 
@@ -54,5 +56,8 @@ apply → `openspec archive`. Project context for the AI lives in
 
 ## Still open (see the exploration doc for full context)
 
-- Dev-loop override — an uncommitted `uv.toml` path source for co-editing shelf + a consumer.
 - Onboarding runbook + `catalog`/`onboard` skill (captured in `docs/missions/`).
+
+_(Resolved: the multi-consumer co-development model — git-mediated steady state, worktree-isolated
+promotion, and a shipped commit guard against editable-source leaks — is now `docs/agent-loop.md` +
+`docs/consuming-the-shelf.md` §2 + `tools/hooks/`.)_

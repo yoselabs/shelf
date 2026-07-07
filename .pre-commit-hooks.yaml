@@ -1,0 +1,16 @@
+# Hooks the shelf ships for its consumers. Add to a consumer's .pre-commit-config.yaml:
+#
+#   - repo: https://github.com/yoselabs/shelf
+#     rev: <a shelf commit or tag>
+#     hooks:
+#       - id: no-local-shelf-source
+#
+# See docs/consuming-the-shelf.md §2 (and the native-git-hook fallback for repos
+# that do not use the pre-commit framework).
+- id: no-local-shelf-source
+  name: forbid committing a local shelf source
+  description: Rejects a committed path/editable [tool.uv.sources] override of a shelf package.
+  entry: tools/hooks/forbid-local-shelf-source.py
+  language: script
+  files: ^(pyproject\.toml|uv\.lock)$
+  pass_filenames: false
