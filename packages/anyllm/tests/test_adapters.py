@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import dataclass, field
 
 import httpx
 import pytest
@@ -14,20 +15,26 @@ def _ok_response() -> httpx.Response:
     return httpx.Response(200, json={"content": [{"type": "text", "text": "ok"}]})
 
 
-def _install_sequence(monkeypatch: pytest.MonkeyPatch, responses: list) -> dict:
+@dataclass
+class _Sequence:
+    calls: int = 0
+    sleeps: list[float] = field(default_factory=list)
+
+
+def _install_sequence(monkeypatch: pytest.MonkeyPatch, responses: list) -> _Sequence:
     """Patch httpx.post to yield each item in order (an Exception is raised, a Response returned)."""
-    state = {"calls": 0, "sleeps": []}
+    state = _Sequence()
 
     def fake_post(*_a, **_k) -> httpx.Response:
-        i = state["calls"]
-        state["calls"] += 1
+        i = state.calls
+        state.calls += 1
         item = responses[i]
         if isinstance(item, Exception):
             raise item
         return item
 
     def record_sleep(seconds: float) -> None:
-        state["sleeps"].append(seconds)
+        state.sleeps.append(seconds)
 
     monkeypatch.setattr(anthropic_api.httpx, "post", fake_post)
     monkeypatch.setattr(anthropic_api, "_sleep", record_sleep)
@@ -37,21 +44,21 @@ def _install_sequence(monkeypatch: pytest.MonkeyPatch, responses: list) -> dict:
 def test_retries_network_error_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
     state = _install_sequence(monkeypatch, [httpx.ConnectError("boom"), _ok_response()])
     assert AnthropicApiAdapter(api_key="k").complete("hi") == "ok"
-    assert state["calls"] == 2
-    assert len(state["sleeps"]) == 1  # one backoff between attempts
+    assert state.calls == 2
+    assert len(state.sleeps) == 1  # one backoff between attempts
 
 
 def test_retries_retryable_status_then_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
     state = _install_sequence(monkeypatch, [httpx.Response(503, text="overloaded"), _ok_response()])
     assert AnthropicApiAdapter(api_key="k").complete("hi") == "ok"
-    assert state["calls"] == 2
+    assert state.calls == 2
 
 
 def test_does_not_retry_non_retryable_status(monkeypatch: pytest.MonkeyPatch) -> None:
     state = _install_sequence(monkeypatch, [httpx.Response(401, text="bad key"), _ok_response()])
     with pytest.raises(AnyLLMError):
         AnthropicApiAdapter(api_key="k").complete("hi")
-    assert state["calls"] == 1  # 401 is not retried
+    assert state.calls == 1  # 401 is not retried
 
 
 def test_raises_after_exhausting_budget(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -59,7 +66,7 @@ def test_raises_after_exhausting_budget(monkeypatch: pytest.MonkeyPatch) -> None
     state = _install_sequence(monkeypatch, seq)
     with pytest.raises(AnyLLMError) as exc:
         AnthropicApiAdapter(api_key="k").complete("hi")
-    assert state["calls"] == anthropic_api._MAX_ATTEMPTS
+    assert state.calls == anthropic_api._MAX_ATTEMPTS
     assert exc.value.retryable is True
 
 
@@ -69,7 +76,7 @@ def test_honors_retry_after_header(monkeypatch: pytest.MonkeyPatch) -> None:
         [httpx.Response(503, headers={"retry-after": "1.5"}, text="slow down"), _ok_response()],
     )
     assert AnthropicApiAdapter(api_key="k").complete("hi") == "ok"
-    assert state["sleeps"] == [1.5]
+    assert state.sleeps == [1.5]
 
 
 def test_argv_has_json_format_and_model_no_bare() -> None:
