@@ -15,25 +15,28 @@ anyllm = { git = "https://github.com/yoselabs/shelf", subdirectory = "packages/a
 source — it ties the project to one filesystem. (For local co-development of shelf + a consumer, use an
 *uncommitted* override; see [`agent-loop.md`](agent-loop.md) §6.)
 
-## 2. Install the commit guard (structure, not discipline)
+## 2. Install the commit guard (one command — required per clone)
 
-The shelf ships a hook that **refuses to commit a local `path=`/editable shelf source** — so the
-co-development override can never leak into a commit and break CI or another checkout. Install it once.
+The shelf ships a guard that **refuses to commit a local `path=`/editable shelf source**, so a
+co-development override can never leak into a commit and break CI or another checkout. Git hooks are
+**per-clone and cannot be committed** — so installing the guard is a **required onboarding step in every
+clone** (a fresh clone is unguarded until you run it):
 
-**Pre-commit framework** — add to `.pre-commit-config.yaml`:
+```bash
+python "$SHELF_HOME/tools/hooks/install.py"   # run in the consumer repo root
+```
+
+Idempotent; it resolves the shelf via `$SHELF_HOME → ../shelf → ~/Workspaces/shelf`, writes a native
+pre-commit hook, and refuses to clobber a foreign one. **Verify:** stage a `path=`/editable shelf source
+and try to commit — it must be blocked.
+
+**Using the pre-commit framework instead?** add to `.pre-commit-config.yaml` (skips the installer):
 
 ```yaml
 - repo: https://github.com/yoselabs/shelf
   rev: <a shelf commit or tag>
   hooks:
     - id: no-local-shelf-source
-```
-
-**Native git hook** (no pre-commit framework) — point at the shelf clone's script:
-
-```bash
-printf '#!/bin/sh\nexec python3 "$SHELF_HOME/tools/hooks/forbid-local-shelf-source.py"\n' \
-  > .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
 ## 3. Paste this resolver block into the project's `AGENTS.md` / `CLAUDE.md`

@@ -14,8 +14,9 @@ is a smoke alarm.
 - [ ] **Promote → tag → repoint → opt-in upgrade, for one real package.** The 4 packages were
   bootstrapped, not promoted through the loop; the cycle is theory until one package walks it.
   (`agent-loop.md` §4–5.)
-- [ ] **Pre-commit-*framework* path.** Only the native git hook + script logic are tested; the
-  `.pre-commit-hooks.yaml` `rev:` wiring has never been resolved by a real consumer.
+- [ ] **Pre-commit-*framework* path.** The one-command installer (native hook) is tested and is the
+  onboarding default; the `.pre-commit-hooks.yaml` `rev:` wiring (the framework alternative) has never
+  been resolved by a real consumer.
 
 ## Build — designed, unbuilt, gated (do NOT build on spec)
 
@@ -46,6 +47,7 @@ is a smoke alarm.
 
 ## Gaps
 
-- [ ] **Guard enforcement is per-clone.** The `no-local-shelf-source` hook is a native git hook installed
-  per consumer clone; a fresh clone is unguarded until installed. Durable option: enforce in CI or fold
-  a working-tree check into `make check`. (Decide when a 2nd consumer/machine appears.)
+- [ ] **Guard enforcement is per-clone.** Onboarding now installs the hook in one command
+  (`tools/hooks/install.py`, §2), but git hooks can't be committed, so a fresh clone is still unguarded
+  until someone runs it. Durable backstop: enforce in CI or fold a working-tree check into `make check`.
+  (Decide when a 2nd consumer/machine appears.)
