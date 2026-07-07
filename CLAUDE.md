@@ -54,10 +54,7 @@ apply → `openspec archive`. Project context for the AI lives in
 [openspec/config.yaml](openspec/config.yaml); specs land in `openspec/specs/`, in-flight work in
 `openspec/changes/`. See [AGENTS.md](AGENTS.md) §4.
 
-## Still open (see the exploration doc for full context)
+## Backlog
 
-- Onboarding runbook + `catalog`/`onboard` skill (captured in `docs/missions/`).
-
-_(Resolved: the multi-consumer co-development model — git-mediated steady state, worktree-isolated
-promotion, and a shipped commit guard against editable-source leaks — is now `docs/agent-loop.md` +
-`docs/consuming-the-shelf.md` §2 + `tools/hooks/`.)_
+**[docs/backlog.md](docs/backlog.md)** — the single curated view of what's left: traces to verify,
+gated builds, open decisions, parked items. Prune lines as they close; the git log is the record.
