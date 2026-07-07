@@ -38,6 +38,13 @@ Raised by Denis. Four distinct entry paths, one shared lifecycle gate.
 - **The evaluation-harness** (R3 / glossary `Implementation`) turns "should we adopt this OSS lib?"
   into "run it against the contract's tests — did it go green?"
 
+## The consumer half (DONE — the first slice of this mission)
+
+Onboarding also has a *consumer* side: a project must (1) depend on the shelf by git+tag and (2) carry
+the shelf directive in its own `AGENTS.md`/`CLAUDE.md` so every agent reaches for the shelf, contributes
+back, and thinks micro-software. The canonical directive + steps live in `../consuming-the-shelf.md`;
+a2kay is onboarded as the first consumer (its `AGENTS.md` §3).
+
 ## Deliverable sketch (when built)
 
 - `docs/runbooks/onboard-<kind>.md` — the deterministic checklist per entry path (1–4 above).
