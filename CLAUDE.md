@@ -36,6 +36,14 @@ This file is the map. Everything the shelf knows about itself is in this repo �
 `packages/` — the software (uv-workspace members), versioned by **git tag** (`anyllm-v0.1.0`).
 Today: `anyllm`, `anyembed`, `convert-md`, `git-porcelain`.
 
+## The ontology (flat files — [resolution 0003](docs/resolutions/0003-ontology-lives-as-flat-files.md))
+
+Instance data, projected into READMEs by `make catalog` (never hand-edit the READMEs):
+- `catalog/` — one manifest per MicroSoftware (supply). `catalog/README.md` is derived.
+- `use-cases/` — one file per (consumer × software): each consumer **publishes** why it depends and
+  what it needs. Consumers on the catalog are *derived* from these; zero active ⇒ orphaned (Article VIII).
+- `ledger/` — the append-only fitness record (request → delivery → verdict → cost).
+
 ## The one invariant
 
 A shelf package **never imports a consumer app** (a2kay, a2web, …). The dependency arrow points UP into

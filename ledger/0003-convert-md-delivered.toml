@@ -1,0 +1,10 @@
+seq = 3
+date = "2026-07-07"
+event = "delivery"
+software = "convert-md"
+release = "convert-md-v0.1.0"
+actor = "Denis Tomilin"
+consumer = ""
+verdict = ""
+cost = "bootstrap (untracked)"
+note = "Bootstrapped directly in the shelf (founding set), not promoted through the loop."

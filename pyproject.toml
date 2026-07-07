@@ -110,6 +110,9 @@ builtins-allowed-modules = ["types"]
 "packages/*/tests/**" = ["ANN", "ARG", "D", "S101", "S607", "PLR2004", "PLR0915", "SLF", "INP"]
 # the boundary fitness test walks the tree; it needs paths + prints.
 "tests/lib/**" = ["ANN", "D", "T20", "S101"]
+# tools are CLI scripts: printing is their job, `git`/`opa` on PATH is deliberate,
+# and a module docstring is enough (no per-function D).
+"tools/**" = ["T201", "S607", "D103", "D100"]
 
 [tool.pytest.ini_options]
 # testpaths lists the shelf's own fitness tests + every package's tests.

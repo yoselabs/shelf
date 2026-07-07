@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "anyembed"
+kind = "any-lib"
+tier = "T1"
+release = "anyembed-v0.1.0"
+capability = "Stop caring which embedding backend is underneath."
+implementation = "hybrid-adapter"
+status = "active"
+owner = "Denis Tomilin"
+notes = "Neutral Embedder interface; local transformers (BGE) backend, swappable."

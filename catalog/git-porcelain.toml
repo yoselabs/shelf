@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "git-porcelain"
+kind = "any-lib"
+tier = "T1"
+release = "git-porcelain-v0.1.0"
+capability = "Stop caring about git subprocess plumbing and credential fidelity."
+implementation = "ours"          # pure surface over the git binary; no third-party lib to swap
+status = "active"
+owner = "Denis Tomilin"
+notes = "A pure, fail-loud surface over the git binary, preserving the user's credential/config fidelity."

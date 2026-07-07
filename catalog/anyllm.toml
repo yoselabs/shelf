@@ -1,0 +1,12 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+# The catalog holds instances; the glossary holds types. Files are truth
+# (constitution I); catalog/README.md is DERIVED — run `make catalog`.
+name = "anyllm"
+kind = "any-lib"                 # primitive | any-lib | composite | cli | framework | config-preset
+tier = "T1"                      # T0 primitive · T1 any-* · T2 composite
+release = "anyllm-v0.1.0"        # current git tag
+capability = "Stop caring which LLM provider is underneath."
+implementation = "hybrid-adapter"  # ours | third-party | hybrid-adapter
+status = "active"                # candidate | active | deprecated | retired
+owner = "Denis Tomilin"
+notes = "Neutral completion interface; claude-code-cli + anthropic-api backends behind one Capability."

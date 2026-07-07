@@ -1,0 +1,10 @@
+seq = 8
+date = "2026-07-08"
+event = "verdict"
+software = "git-porcelain"
+release = "git-porcelain-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "kept"
+cost = "n/a"
+note = "a2kay repointed from an editable path to the git-tag pin; adopter verdict: kept."

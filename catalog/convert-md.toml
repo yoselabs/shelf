@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "convert-md"
+kind = "composite"               # composes multiple third-party engines behind one surface
+tier = "T2"
+release = "convert-md-v0.1.0"
+capability = "Stop caring which engine converts which document format to markdown."
+implementation = "hybrid-adapter"
+status = "active"
+owner = "Denis Tomilin"
+notes = "Per-format fallback chains (docling/pandoc/markitdown/trafilatura) + a model-free fidelity grade."

@@ -4,17 +4,17 @@
 # This is the reference toolchain every consumer of the shelf inherits (resolution 0004).
 # Each target is one linter doing one job; `check` is the gate.
 
-.PHONY: check lint format typecheck spell deps test cov sync
+.PHONY: check lint format typecheck spell deps test cov catalog sync
 
 # The gate. Fast, deterministic tools first; tests last.
 check: lint typecheck spell deps test
 
 lint:
-	uv run ruff check packages tests
-	uv run ruff format --check packages tests
+	uv run ruff check packages tests tools
+	uv run ruff format --check packages tests tools
 
 format:
-	uv run ruff format packages tests
+	uv run ruff format packages tests tools
 
 # --error-on-warning: a type warning fails the build. No slow rot.
 typecheck:
@@ -22,7 +22,7 @@ typecheck:
 
 # typos in code, docstrings, and docs.
 spell:
-	uv run codespell packages tests docs README.md AGENTS.md CLAUDE.md
+	uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md CLAUDE.md
 
 # dependency hygiene per package (unused / missing / transitive). deptry reads each
 # package's own pyproject from its dir; --known-first-party (the src import name)
@@ -43,6 +43,12 @@ test:
 # coverage report only (human view).
 cov:
 	uv run pytest --cov --cov-report=term-missing
+
+# regenerate the derived ontology indexes (catalog/ledger/use-cases READMEs).
+# The files are truth; the READMEs are projected (constitution I). A freshness
+# test in `make test` fails if they drift.
+catalog:
+	uv run python tools/catalog.py
 
 sync:
 	uv sync
