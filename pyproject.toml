@@ -1,0 +1,54 @@
+# shelf — the shared home of small, ownable, contract-guaranteed software pieces.
+#
+# Virtual uv workspace root: there is NO root package. The members ARE the
+# software (packages/*). Consumers (a2kay, a2web, …) live in their OWN repos and
+# pin each package by git tag; they are never workspace members here.
+#
+# Working name only — branding is deliberately deferred.
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+# Dev tooling as a PEP 735 dependency-group (NOT an optional-extra): `uv sync`
+# always installs it, so the venv carries the linters and `uv run` can never fall
+# back to a global tool. The repo stays hermetic. (Inherited from a2kay.)
+[dependency-groups]
+dev = [
+    "pytest>=8,<9",
+    "ruff>=0.7,<1",
+    "ty>=0.0.1a8",
+]
+
+# ── The strict linter preset (lifted from a2kay; the shelf's baseline) ─────────
+[tool.ruff]
+target-version = "py311"
+line-length = 140
+output-format = "concise"
+
+[tool.ruff.lint]
+select = [
+    "F", "E", "W", "I", "N", "UP", "B", "C4", "PIE", "PTH", "RUF",
+    "SIM", "ARG", "PERF", "RET", "TID", "PL",
+    "ANN",  # full annotation enforcement — everything typed
+    "A",    # flake8-builtins — enforces the builtin-named-concept convention
+]
+ignore = [
+    "ANN401",   # allow Any in *args-style
+    "PLR0913",  # arg count
+    "PLR2004",  # magic values
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN", "ARG", "PLR2004", "S101", "PLR0915"]
+"packages/*/tests/**" = ["ANN", "ARG", "PLR2004", "S101", "PLR0915"]
+
+[tool.pytest.ini_options]
+# testpaths lists the shelf's own fitness tests + every package's tests.
+testpaths = [
+    "tests",
+    "packages/anyllm/tests",
+    "packages/anyembed/tests",
+    "packages/convert-md/tests",
+    "packages/git-porcelain/tests",
+]
+addopts = "-ra --strict-markers"
