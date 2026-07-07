@@ -18,8 +18,8 @@ is a smoke alarm.
 ## Build — designed, unbuilt, gated (do NOT build on spec)
 
 - [ ] **Contract layer + `Implementation` build-vs-adopt harness (the crown insight).** No contract
-  files exist. Deepest value; inert until a real 2nd consumer / contract need appears. **Home it as a
-  mission** so it stops living only in the thoughts doc. (R2/R3, glossary.)
+  files exist. Deepest value; inert until a real 2nd consumer / contract need appears.
+  [mission](missions/contract-and-implementation-harness.md). (R2/R3, glossary.)
 - [ ] **Catalog / manifest + request-ledger.** The derived projection + the one new datum
   (who-requested). Build when a 2nd consumer makes promotion real. (R5.)
 - [ ] **Linter preset as shelf micro-software.** Only `tests/lib/boundary.py` exists; the a2lint-derived
