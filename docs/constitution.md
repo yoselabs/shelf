@@ -17,8 +17,13 @@ many things append to, you have found a bug in the design, not a chore.
 Two agents working in parallel must touch disjoint files *by design*. Each ADDS a file; git merges
 disjoint adds cleanly. No locks, no concurrency control, no coordination.
 
-### III. Append over mutate.
-A new file beats editing a shared list. Prefer additive change; let derivation (Article I) reassemble.
+### III. Parallel-safe coordination, not accumulation.
+Shared coordination surfaces (indexes, ledgers, catalogs) take *additive, one-concept-per-file* writes
+so parallel sessions never conflict (Articles I–II) — a concurrency tactic, **not** a license to let
+code pile up. In the code itself the default is the opposite: **leave it smaller than you found it** —
+remove dead lines, collapse duplication, delete the unused, every time you build. Accumulation without
+consolidation is drift. Deletion is the virtue (Article VIII); a growing file that no one prunes is a
+smoke alarm (Article IV), not progress.
 
 ### IV. Structure controls size, not caps.
 A large file is a **smoke alarm** that a structural boundary is missing — a pattern un-applied, two

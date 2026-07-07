@@ -9,6 +9,22 @@ The whole design is **structure over discipline**: the rules below are enforced 
 guard, not by an agent remembering to be careful. Many agent sessions run in parallel across many
 consumer repos — none of them can corrupt the shelf or a consumer by forgetting a step.
 
+**Leave it smaller.** Every time you build, remove dead code and collapse duplication — do not
+accumulate. Append-only discipline applies *only* to parallel-safe coordination surfaces (constitution
+III), never to the code itself; a growing file no one prunes is a smoke alarm, not progress.
+
+**One shelf, per-project worktrees.** There is one shelf clone at the conventional path
+(`$SHELF_HOME` → `~/Workspaces/shelf`). You **never edit the shelf in that main checkout.** Each
+consuming project gets its own shelf **worktree named after the project's GitHub repo**:
+
+```
+git -C <shelf> worktree add ../shelf-<project> -b work/<project>   # isolated dir, shared objects
+```
+
+All shelf edits (promote, co-dev) for that project happen in `../shelf-<project>`. Two projects working
+the shelf at once are on different worktrees + branches → they cannot collide. `git worktree remove`
+it when the work has merged.
+
 ## 1. Fetch cadence — protect tokens
 
 - **Do NOT fetch to start a session or to write code.** The shelf clone on disk is enough to read this
@@ -36,32 +52,34 @@ You are trusted to *notice* when substrate should become micro-software. But the
 acts** with different bars — this split is what lets many parallel agents act freely without flooding
 the shelf with half-baked packages:
 
-- **Nominate — cheap, do it freely.** You wrote substrate that smells reusable. Record it: append a
-  one-line candidate note where your repo tracks candidates (a2kay: `docs/design/primitive-shelf.md`, a
-  rule-of-three sighting count; if your repo has no such ledger, append to `docs/shelf-candidates.md`).
-  **Append-only → conflict-free across parallel sessions.** No package is created.
+- **Nominate — cheap, and self-consolidating.** You wrote substrate that smells reusable. Record it
+  where your repo tracks reuse candidates (a2kay: `docs/design/primitive-shelf.md`, a rule-of-three
+  *sighting count*). **Increment an existing entry if the pattern is already listed; add one only if
+  genuinely new; delete an entry once it is promoted or abandoned.** This is not an append log — you
+  prune it as you go, so it never becomes a pile someone must reconcile later. No package is created.
 - **Promote — gated.** Turn a candidate into a real package + tag **only** when a **second** consumer
   actually wants it (Article VII, rule-of-three). One consumer is n=1 → nominate, don't promote.
   *Promotion, not publication.*
 
 ## 4. PROMOTE — the procedure (only when the gate is met)
 
-Isolate on a **worktree** so concurrent promotions never collide on the shared clone:
+Work in **your project's shelf worktree** (`../shelf-<project>`, see "One shelf, per-project worktrees"
+above) so concurrent promotions from different projects never collide:
 
-1. `git -C <shelf> worktree add ../shelf-<name> -b promote-<name>` — isolated working dir, shared objects.
+1. In `../shelf-<project>` on branch `work/<project>` (create it if absent).
 2. Extract the code into `packages/<name>/` behind a stable **Capability**, with:
    - the **boundary test** — the piece must not import any consumer app (the one invariant);
    - a **Contract** born `candidate` (inert until a live consumer breaks without it);
    - the package `pyproject.toml`.
 3. `make check` green **in the worktree**.
-4. Tag namespaced and push: `git tag <name>-vX.Y.Z && git push origin promote-<name> --tags`.
+4. Tag namespaced and push: `git tag <name>-vX.Y.Z && git push origin work/<project> --tags`.
    **Never delete an old tag** — that is what makes every consumer's upgrade opt-in.
 5. **Repoint the origin consumer:** add the git+tag source, delete the in-repo copy, keep its tests green.
 6. A **breaking change ships its migration in the same change**.
-7. `git -C <shelf> worktree remove ../shelf-<name>` when merged.
+7. `git -C <shelf> worktree remove ../shelf-<project>` when the work has merged.
 
 Push rejected (non-fast-forward, another session got there first)? `pull --rebase`, resolve, retry —
-append-only + one-concept-per-file make textual conflicts rare by construction.
+one-concept-per-file keeps textual conflicts rare by construction.
 
 ## 5. RECEIVE updates — opt-in, never forced
 
@@ -73,11 +91,15 @@ never silently break you** — every upgrade is a deliberate choice.
 
 Only when you must live-edit a shelf package and exercise it inside a consumer in the same loop:
 
-- Override the source to a local path (or a `git worktree` checkout) that is **uncommitted**. Revert to
-  the git+tag pin **before** committing.
-- You **physically cannot commit it**: the shelf's pre-commit guard (installed per
-  `consuming-the-shelf.md` §2) rejects any commit carrying a local `path=` / editable shelf source. This
-  is a wall, not a convention — so no parallel session can poison a consumer by forgetting to revert.
+- Point the consumer's source at your project's shelf worktree (`../shelf-<project>/packages/<name>`),
+  and **keep that pyproject change unstaged** — `git add` everything *except* `pyproject.toml`. uv reads
+  the working-tree file, so co-dev stays live; your other commits carry the committed git+tag pin and
+  sail through. Flip back to a tag only when you actually want to commit the dependency change itself.
+- The guard is per-repo and **staged-only**: it inspects *this repo's* staged `pyproject.toml` and
+  rejects a local `path=`/editable shelf source there. It never touches another repo, never blocks a
+  push, and never forces you to revert to commit unrelated work — so it cannot disturb a parallel
+  session in another project (different file, different hook). It is a wall exactly where you want one:
+  the moment you try to *commit* the override.
 
 ## 7. What is NOT in this loop
 
