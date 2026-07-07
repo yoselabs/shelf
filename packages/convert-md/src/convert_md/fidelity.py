@@ -17,8 +17,10 @@ real OCR-confidence path is reserved for opt-in VLM engines.
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
-from convert_md.base import Fidelity
+if TYPE_CHECKING:
+    from convert_md.base import Fidelity
 
 _GARBAGE_RE = re.compile(r"[�\x00-\x08\x0b\x0c\x0e-\x1f]")
 _TABLE_RE = re.compile(r"^\s*\|.*\|\s*$", re.MULTILINE)

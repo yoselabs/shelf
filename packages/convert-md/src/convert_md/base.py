@@ -34,7 +34,9 @@ class ConversionEngine(Protocol):
 
     name: str
 
-    def convert(self, path: Path) -> ConversionResult: ...
+    def convert(self, path: Path) -> ConversionResult:
+        """Convert the file at ``path`` to Markdown and return the graded result."""
+        ...
 
 
 class ConversionError(RuntimeError):

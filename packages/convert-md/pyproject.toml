@@ -12,7 +12,6 @@ dependencies = [
     "markitdown>=0.0.2",
     "python-pptx>=1.0.2",
     "trafilatura>=1.9.0",
-    "readability-lxml>=0.8.4.1",
     "html2text>=2025.4.15",
     "openpyxl>=3.1.5",
 ]

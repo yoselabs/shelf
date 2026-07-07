@@ -38,7 +38,8 @@ def _git_env() -> dict[str, str]:
 def run_git(vault: Path, *args: str, check: bool = True) -> str:
     """Run ``git -C <vault> <args>`` fail-loud; return stdout."""
     if shutil.which(_GIT) is None:
-        raise GitError("git not found on PATH", retryable=False, hint="install git or disable sync")
+        msg = "git not found on PATH"
+        raise GitError(msg, retryable=False, hint="install git or disable sync")
     try:
         proc = subprocess.run(
             [_GIT, "-C", str(vault), *args],
@@ -48,13 +49,16 @@ def run_git(vault: Path, *args: str, check: bool = True) -> str:
             env=_git_env(),
         )
     except OSError as exc:  # pragma: no cover - exec failure
-        raise GitError(f"failed to invoke git: {exc}", retryable=False) from exc
+        msg = f"failed to invoke git: {exc}"
+        raise GitError(msg, retryable=False) from exc
     if check and proc.returncode != 0:
-        raise GitError(f"git {args[0] if args else ''} exited {proc.returncode}: {proc.stderr.strip()[:300]}", retryable=False)
+        msg = f"git {args[0] if args else ''} exited {proc.returncode}: {proc.stderr.strip()[:300]}"
+        raise GitError(msg, retryable=False)
     return proc.stdout
 
 
 def is_repo(vault: Path) -> bool:
+    """Return True if ``vault`` is inside a git work tree (False if git is missing)."""
     if shutil.which(_GIT) is None:
         return False
     out = run_git(vault, "rev-parse", "--is-inside-work-tree", check=False).strip()
@@ -62,11 +66,13 @@ def is_repo(vault: Path) -> bool:
 
 
 def has_upstream(vault: Path) -> bool:
+    """Return True if the current branch has an upstream tracking branch configured."""
     out = run_git(vault, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}", check=False)
     return bool(out.strip()) and "fatal" not in out.lower()
 
 
 def merge_in_progress(vault: Path) -> bool:
+    """Return True if a merge is in progress (a ``MERGE_HEAD`` exists in the git dir)."""
     git_dir = run_git(vault, "rev-parse", "--git-dir", check=False).strip()
     if not git_dir:
         return False
@@ -116,11 +122,13 @@ def readiness(vault: Path, *, check_push: bool = True) -> dict[str, Any]:
 
 
 def unmerged_paths(vault: Path) -> list[str]:
+    """Return the repo-relative paths that are currently unmerged (conflicted)."""
     out = run_git(vault, "diff", "--name-only", "--diff-filter=U", check=False)
     return [ln.strip() for ln in out.splitlines() if ln.strip()]
 
 
 def has_conflict_markers(path: Path) -> bool:
+    """Return True if ``path`` contains git conflict markers (unreadable files are False)."""
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -134,6 +142,7 @@ def show_stage(vault: Path, stage: int, rel: str) -> str:
 
 
 def dirty_rels(vault: Path) -> list[str]:
+    """Return the repo-relative paths of all changed and untracked files."""
     # -uall lists each untracked FILE (git otherwise collapses an untracked dir).
     out = run_git(vault, "status", "--porcelain", "-uall", check=False)
     return [ln[3:].strip() for ln in out.splitlines() if ln.strip()]

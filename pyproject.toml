@@ -15,11 +15,20 @@ members = ["packages/*"]
 [dependency-groups]
 dev = [
     "pytest>=8,<9",
-    "ruff>=0.7,<1",
-    "ty>=0.0.1a8",
+    "pytest-cov>=6,<8",       # coverage measurement + floor
+    "ruff>=0.7,<1",           # lint + format
+    "ty>=0.0.1a8",            # type checking (Astral)
+    "codespell>=2.3,<3",      # typos in code, docstrings, and docs
+    "deptry>=0.20,<1",        # dependency hygiene: unused / missing / transitive
 ]
 
-# ── The strict linter preset (lifted from a2kay; the shelf's baseline) ─────────
+# ── The reference linter preset ───────────────────────────────────────────────
+# This is the canonical "how things are done" for every consumer of the shelf: a
+# new project inherits THIS setup (resolution 0004 — a config-preset, not a CLI).
+# Curated-broad on purpose: an explicit, grouped select reads as a reference far
+# better than `ALL` minus a wall of ignores, and it does not silently break on a
+# ruff upgrade that adds a rule. Every family below earns its place; every ignore
+# below states why. Keep it legible — this file teaches the convention.
 [tool.ruff]
 target-version = "py311"
 line-length = 140
@@ -27,20 +36,80 @@ output-format = "concise"
 
 [tool.ruff.lint]
 select = [
-    "F", "E", "W", "I", "N", "UP", "B", "C4", "PIE", "PTH", "RUF",
-    "SIM", "ARG", "PERF", "RET", "TID", "PL",
+    # correctness & the core
+    "F",    # pyflakes — real bugs (undefined names, unused imports)
+    "E", "W",  # pycodestyle
+    "PLC", "PLE", "PLR", "PLW",  # pylint — the useful quarter of it
+    "B",    # bugbear — likely-wrong constructs
+    "BLE",  # no blind `except:` / `except Exception` swallowing
+    "TRY",  # tryceratops — exception antipatterns
+    "RSE",  # raise — no needless parens on re-raise
+    "EM",   # exception messages assigned to a var (clean tracebacks)
+    "RET",  # return-branch hygiene
+    "SIM",  # simplifiable constructs
+    "C4",   # comprehension quality
+    "C90",  # mccabe — cyclomatic complexity ceiling
+    "PIE",  # misc lints
+    "FURB", # refurb — modernizations
+    "FLY",  # f-string over str.join
+    # typing & annotations
     "ANN",  # full annotation enforcement — everything typed
-    "A",    # flake8-builtins — enforces the builtin-named-concept convention
+    "UP",   # pyupgrade — modern syntax for the target version
+    "FA",   # future annotations where needed
+    "TC",   # type-checking-only imports go under TYPE_CHECKING
+    "PYI",  # stub/typing hygiene
+    # imports & structure
+    "I",    # isort
+    "TID",  # tidy-imports (no relative parent imports)
+    "ICN",  # import-convention (np, pd, …)
+    "INP",  # no implicit-namespace packages (missing __init__)
+    "A",    # flake8-builtins — the builtin-named-concept convention
+    "N",    # pep8-naming
+    "SLF",  # no private-member access across boundaries
+    # safety & correctness of effects
+    "S",    # bandit — security (subprocess, eval, tmp, etc.)
+    "DTZ",  # timezone-aware datetimes only
+    "LOG", "G",  # logging done right (no f-strings in log calls)
+    "T10",  # no leftover breakpoint()/pdb
+    "T20",  # no stray print() in library code
+    "ASYNC",# async pitfalls
+    "PTH",  # pathlib over os.path
+    "FBT",  # no boolean-trap positional args
+    "ISC",  # implicit string concat (ISC001 off — formatter owns it)
+    # docs & rot
+    "D",    # pydocstyle — public surface is documented (google convention)
+    "ERA",  # no commented-out code (leave it smaller, constitution III/VIII)
+    "ARG",  # no unused arguments
+    "PERF", # obvious performance footguns
+    "RUF",  # ruff's own rules (RUF100 catches stale noqa)
 ]
 ignore = [
-    "ANN401",   # allow Any in *args-style
-    "PLR0913",  # arg count
-    "PLR2004",  # magic values
+    "ANN401",  # allow `Any` in genuinely-variadic *args/**kwargs
+    "PLR0913", # arg count — deep functions legitimately take many args
+    "PLR2004", # magic values — too noisy at this scale; revisit if it bites
+    "ISC001",  # single-line implicit concat — the formatter owns this; would conflict
+    "TRY003",  # long messages in raise — EM handles the real concern; TRY003 over-fires
+    "D105",    # magic-method docstrings — signature is the doc
+    "D107",    # __init__ docstring — the class docstring covers it
+    "S603",    # subprocess call w/ shell=False — the whole point of git-porcelain; audited by design
 ]
 
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.flake8-builtins]
+# our modules are named for the concept they own; that is the convention, not a clash.
+builtins-allowed-modules = ["types"]
+
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["ANN", "ARG", "PLR2004", "S101", "PLR0915"]
-"packages/*/tests/**" = ["ANN", "ARG", "PLR2004", "S101", "PLR0915"]
+# tests may be undocumented, use asserts/magic numbers/partial-path subprocs, and re-bind fixtures.
+"tests/**" = ["ANN", "ARG", "D", "S101", "S607", "PLR2004", "PLR0915", "SLF", "INP"]
+"packages/*/tests/**" = ["ANN", "ARG", "D", "S101", "S607", "PLR2004", "PLR0915", "SLF", "INP"]
+# the boundary fitness test walks the tree; it needs paths + prints.
+"tests/lib/**" = ["ANN", "D", "T20", "S101"]
 
 [tool.pytest.ini_options]
 # testpaths lists the shelf's own fitness tests + every package's tests.
@@ -52,3 +121,30 @@ testpaths = [
     "packages/git-porcelain/tests",
 ]
 addopts = "-ra --strict-markers"
+
+# ── codespell — typos across code, docstrings, and docs ───────────────────────
+[tool.codespell]
+skip = "uv.lock,.venv,.git,*.pyc,.ruff_cache,.pytest_cache,docs/thoughts/*"
+# doctrine/glossary coinages the dictionary flags but we mean on purpose.
+ignore-words-list = "wins,ontology,noqa,crate,ba,te,alls"
+check-filenames = ""
+
+# deptry is configured PER PACKAGE (it reads each package's own pyproject when run
+# from that dir) and invoked via `make deps` with `--known-first-party`. No root
+# [tool.deptry] block: it would never be read from the package working directory.
+
+# ── coverage — measured on every `make test`; floor enforced (no silent rot) ───
+[tool.coverage.run]
+branch = true
+source = ["packages"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",  # protocol/abstract stubs
+]

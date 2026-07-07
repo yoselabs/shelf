@@ -75,10 +75,7 @@ def test_html_converts_via_trafilatura_or_fallback(tmp_path: Path) -> None:
     html = tmp_path / "page.html"
     html.write_text(
         "<html><body><article><h1>Heading</h1>"
-        + "<p>"
-        + ("This is a substantial paragraph of article content. " * 8)
-        + "</p>"
-        + "</article></body></html>",
+        "<p>" + ("This is a substantial paragraph of article content. " * 8) + "</p>" + "</article></body></html>",
         encoding="utf-8",
     )
     result = convert(html)

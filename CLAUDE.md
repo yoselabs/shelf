@@ -44,8 +44,11 @@ the apps, never down out of them. Enforced by [tests/test_boundary.py](tests/tes
 ## Quality gate
 
 ```
-make check   # ruff check + ruff format --check + ty + pytest — whole-repo, no carve-outs
+make check   # ruff + ty + codespell + deptry + pytest/coverage — whole-repo, no carve-outs
 ```
+
+The full toolchain and how a consumer inherits it: **[docs/linting.md](docs/linting.md)** (a
+config-preset, not a CLI — [resolution 0004](docs/resolutions/0004-linters-are-a-config-preset.md)).
 
 ## Changes
 

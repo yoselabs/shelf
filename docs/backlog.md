@@ -21,18 +21,20 @@ is a smoke alarm.
   files exist. Deepest value; inert until a real 2nd consumer / contract need appears.
   [mission](missions/contract-and-implementation-harness.md). (R2/R3, glossary.)
 - [ ] **Catalog / manifest + request-ledger.** The derived projection + the one new datum
-  (who-requested). Build when a 2nd consumer makes promotion real. (R5.)
-- [ ] **Linter preset as shelf micro-software.** Only `tests/lib/boundary.py` exists; the a2lint-derived
-  AST rules (AK200 layer-DAG · import discipline · AK214 no-`dict[str,Any]`) are un-reimplemented.
-  Reimplement (do NOT depend on a2lint). (R9.)
+  (who-requested). *Being instantiated now* per resolution 0003 (flat files); evaluate in use. (R5.)
+- [ ] **Architectural / AST rules** (body-dup · private-name-collision · dep-upper-bound · layer-DAG ·
+  no-`dict[str,Any]`). Exist in a2kit as **Rego/OPA** policies. **Decision first (resolution 0005,
+  pending):** migrate as Rego (bring OPA in) vs reimplement intent as native Python fitness tests. My
+  lean: native — OPA is non-hermetic substrate the shelf sheds; `test_boundary.py` is the model. (R9.)
 
 ## Decide — open forks (a decision, not a build)
 
-- [ ] **Ontology fork:** model the ontology as a2kay EntityTypes vs flat manifest files. (R§6.3 —
-  "worth one more explore pass".)
-- [ ] **Linter preset shape:** config-preset vs CLI. (R§6.5.)
-- [ ] **release-please** adoption timing — defer until release cadence hurts. (R§6.5.)
-- [ ] **Branding** — deferred on purpose; a separate pass, no throwaway names. (R11.)
+- [ ] **AST rules: Rego/OPA vs native fitness tests** — resolution 0005, pending (see Build above). This
+  is the live decision; it also settles the duplication-linter question (a2kit's `body_dup.rego`).
+- [ ] **release-please** adoption timing. **Trigger:** the *first* tag/changelog bookkeeping mistake, OR
+  a 2nd human contributor. Until then manual `git tag` at n=4 packages is fine. (R§6.5.)
+- [ ] **Branding** — parked on purpose (user: dislikes both "shelf" and "microsoftware"; rename later).
+  A separate pass, no throwaway names. (R11.)
 
 ## Parked — gated, do not touch yet
 
@@ -40,11 +42,10 @@ is a smoke alarm.
   when a 2nd consumer pulls them (Article VII).
 - **Onboarding runbook + `catalog`/`onboard` skill** — [mission](missions/onboarding-new-micro-software.md)
   captured; "do not build yet".
-- **LedgerEntry** (R154 fitness record) — later.
 
 ## Gaps
 
-- [ ] **Guard enforcement is per-clone.** Onboarding now installs the hook in one command
-  (`tools/hooks/install.py`, §2), but git hooks can't be committed, so a fresh clone is still unguarded
-  until someone runs it. Durable backstop: enforce in CI or fold a working-tree check into `make check`.
-  (Decide when a 2nd consumer/machine appears.)
+- [ ] **Guard enforcement is per-clone.** Onboarding installs the hook in one command
+  (`tools/hooks/install.py`, §2), but git hooks can't be committed, so a fresh clone is unguarded until
+  someone runs it. **Trigger:** a 2nd machine/clone, OR the first leaked override — then fold a
+  working-tree check into `make check` (or enforce in CI).

@@ -10,7 +10,10 @@ Pure ``ast``, zero third-party dependencies, so it runs even before ``uv sync``.
 from __future__ import annotations
 
 import ast
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 #: Top-level modules that are CONSUMERS of the shelf. A shelf package importing any of these has
 #: inverted the dependency arrow. Extend as new consumer apps appear.

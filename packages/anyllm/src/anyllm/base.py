@@ -11,7 +11,9 @@ class LLMAdapter(Protocol):
 
     name: str
 
-    def complete(self, prompt: str, *, model: str | None = None) -> str: ...
+    def complete(self, prompt: str, *, model: str | None = None) -> str:
+        """Return the model's completion for ``prompt``, optionally on a named model."""
+        ...
 
     def available(self) -> bool:
         """Cheap probe: is this provider usable on this machine right now?"""

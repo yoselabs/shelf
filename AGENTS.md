@@ -6,11 +6,12 @@ A task is **done** only when the full quality gate passes across the **entire re
 not just the files the task touched:
 
 ```bash
-make check    # ruff check + ruff format --check + ty + pytest
+make check    # ruff check + ruff format + ty (--error-on-warning) + codespell + deptry + pytest/coverage
 ```
 
 **No carve-outs.** "Pre-existing drift", "unrelated file", or "that's a separate change"
-do **not** satisfy Done. If `make check` is red for any reason, the task is not finished.
+do **not** satisfy Done. If `make check` is red for any reason, the task is not finished. This
+toolchain is the **reference every consumer inherits** (`docs/linting.md`, resolution 0004).
 
 ## §2. The constitution governs
 

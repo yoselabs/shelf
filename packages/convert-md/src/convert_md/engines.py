@@ -44,6 +44,7 @@ class DoclingEngine:
     name = f"docling@{_ver('docling')}"
 
     def convert(self, path: Path) -> ConversionResult:
+        """Convert a PDF to Markdown via docling, forcing CPU inference."""
         try:
             from docling.datamodel.base_models import InputFormat  # noqa: PLC0415 — lazy heavy import
             from docling.datamodel.pipeline_options import (  # noqa: PLC0415
@@ -53,7 +54,8 @@ class DoclingEngine:
             )
             from docling.document_converter import DocumentConverter, PdfFormatOption  # noqa: PLC0415
         except ImportError as exc:  # pragma: no cover - dep is a hard dep
-            raise ConversionError(f"docling unavailable: {exc}") from exc
+            msg = f"docling unavailable: {exc}"
+            raise ConversionError(msg) from exc
         # Force CPU: the default MPS (Apple Metal) device crashes the rt_detr_v2
         # layout model on float64, and headless/CPU is the typical deploy target anyway.
         opts = PdfPipelineOptions()
@@ -63,7 +65,8 @@ class DoclingEngine:
             result = converter.convert(str(path))
             markdown = result.document.export_to_markdown()
         except Exception as exc:  # docling raises a variety of errors on bad PDFs
-            raise ConversionError(f"docling failed on {path.name}: {exc}") from exc
+            msg = f"docling failed on {path.name}: {exc}"
+            raise ConversionError(msg) from exc
         return _result(markdown, self.name, path.stat().st_size, check_yield=False)
 
 
@@ -73,10 +76,12 @@ class PandocEngine:
     name = f"pandoc@{_ver('pypandoc-binary')}"
 
     def convert(self, path: Path) -> ConversionResult:
+        """Convert a DOCX to GitHub-flavored Markdown via pandoc, keeping tracked changes."""
         try:
             import pypandoc  # noqa: PLC0415 — lazy heavy import
         except ImportError as exc:  # pragma: no cover
-            raise ConversionError(f"pypandoc unavailable: {exc}") from exc
+            msg = f"pypandoc unavailable: {exc}"
+            raise ConversionError(msg) from exc
         try:
             engine = f"pandoc@{pypandoc.get_pandoc_version()}"
             markdown = pypandoc.convert_file(
@@ -85,7 +90,8 @@ class PandocEngine:
                 extra_args=["--track-changes=all", "--wrap=none"],
             )
         except Exception as exc:
-            raise ConversionError(f"pandoc failed on {path.name}: {exc}") from exc
+            msg = f"pandoc failed on {path.name}: {exc}"
+            raise ConversionError(msg) from exc
         return _result(markdown, engine, path.stat().st_size, check_yield=False)
 
 
@@ -95,14 +101,17 @@ class MarkitdownEngine:
     name = f"markitdown@{_ver('markitdown')}"
 
     def convert(self, path: Path) -> ConversionResult:
+        """Convert a PPTX/XLSX/generic file to Markdown via markitdown, appending PPTX speaker notes."""
         try:
             from markitdown import MarkItDown  # noqa: PLC0415 — lazy heavy import
         except ImportError as exc:  # pragma: no cover
-            raise ConversionError(f"markitdown unavailable: {exc}") from exc
+            msg = f"markitdown unavailable: {exc}"
+            raise ConversionError(msg) from exc
         try:
             markdown = MarkItDown().convert(str(path)).text_content
         except Exception as exc:
-            raise ConversionError(f"markitdown failed on {path.name}: {exc}") from exc
+            msg = f"markitdown failed on {path.name}: {exc}"
+            raise ConversionError(msg) from exc
         if path.suffix.lower() == ".pptx":
             notes = _pptx_notes(path)
             if notes:
@@ -116,10 +125,12 @@ class OpenpyxlEngine:
     name = f"openpyxl@{_ver('openpyxl')}"
 
     def convert(self, path: Path) -> ConversionResult:
+        """Convert an XLSX to Markdown tables via openpyxl, one section per worksheet."""
         try:
             from openpyxl import load_workbook  # noqa: PLC0415 — lazy import
         except ImportError as exc:  # pragma: no cover
-            raise ConversionError(f"openpyxl unavailable: {exc}") from exc
+            msg = f"openpyxl unavailable: {exc}"
+            raise ConversionError(msg) from exc
         try:
             wb = load_workbook(path, read_only=True, data_only=True)
             parts: list[str] = []
@@ -129,7 +140,8 @@ class OpenpyxlEngine:
                 parts.extend(_rows_to_markdown(rows))
             markdown = "\n".join(parts)
         except Exception as exc:
-            raise ConversionError(f"openpyxl failed on {path.name}: {exc}") from exc
+            msg = f"openpyxl failed on {path.name}: {exc}"
+            raise ConversionError(msg) from exc
         return _result(markdown, self.name, path.stat().st_size, check_yield=False)
 
 
@@ -139,14 +151,17 @@ class TrafilaturaEngine:
     name = f"trafilatura@{_ver('trafilatura')}"
 
     def convert(self, path: Path) -> ConversionResult:
+        """Convert an HTML file to Markdown via trafilatura, stripping boilerplate."""
         try:
             import trafilatura  # noqa: PLC0415 — lazy import
         except ImportError as exc:  # pragma: no cover
-            raise ConversionError(f"trafilatura unavailable: {exc}") from exc
+            msg = f"trafilatura unavailable: {exc}"
+            raise ConversionError(msg) from exc
         html = path.read_text(encoding="utf-8", errors="replace")
         markdown = trafilatura.extract(html, output_format="markdown", include_tables=True)
         if not markdown:
-            raise ConversionError(f"trafilatura extracted nothing from {path.name}")
+            msg = f"trafilatura extracted nothing from {path.name}"
+            raise ConversionError(msg)
         return _result(markdown, self.name, path.stat().st_size)
 
 
@@ -156,10 +171,12 @@ class Html2TextEngine:
     name = f"html2text@{_ver('html2text')}"
 
     def convert(self, path: Path) -> ConversionResult:
+        """Convert an HTML file to Markdown via html2text (unbounded line width)."""
         try:
             import html2text  # noqa: PLC0415 — lazy import
         except ImportError as exc:  # pragma: no cover
-            raise ConversionError(f"html2text unavailable: {exc}") from exc
+            msg = f"html2text unavailable: {exc}"
+            raise ConversionError(msg) from exc
         html = path.read_text(encoding="utf-8", errors="replace")
         converter = html2text.HTML2Text()
         converter.body_width = 0
@@ -178,7 +195,7 @@ def _pptx_notes(path: Path) -> str:
         return ""
     try:
         prs = Presentation(str(path))
-    except Exception:
+    except Exception:  # noqa: BLE001  -- fallback chain: any engine failure falls through to the next engine
         return ""
     chunks: list[str] = []
     for i, slide in enumerate(prs.slides, start=1):

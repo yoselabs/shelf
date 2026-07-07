@@ -64,3 +64,10 @@ adopt/promote — never just to start a session.
 
 The **DEEP · STABLE · WINS** gate is deliberate: it keeps "reach for the shelf" from degrading into
 "add a dependency for everything." Reuse is encouraged; the wrong abstraction is not.
+
+## 4. Inherit the linter reference (copy, then own)
+
+The shelf's quality bar is a **config-preset**, not a CLI ([resolution 0004](resolutions/0004-linters-are-a-config-preset.md)):
+copy the `[tool.ruff|codespell|coverage]` blocks + the `Makefile` targets + the `dev` dependency-group
+from this repo into yours, then override anything you genuinely need to. Full toolchain and the exact
+copy list: **[linting.md](linting.md)**. `make check` green (whole-repo, no carve-outs) is the bar.

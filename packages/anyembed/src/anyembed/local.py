@@ -64,7 +64,9 @@ class LocalEmbedder:
 
         self._ensure_model()
         tok, model = self._tokenizer, self._model
-        assert tok is not None and model is not None  # _ensure_model guarantees this
+        if tok is None or model is None:  # pragma: no cover -- _ensure_model guarantees load
+            msg = "tokenizer/model not initialised after _ensure_model()"
+            raise AnyEmbedError(msg)
         out: list[np.ndarray] = []
         with torch.no_grad():
             for i in range(0, len(texts), self._batch):

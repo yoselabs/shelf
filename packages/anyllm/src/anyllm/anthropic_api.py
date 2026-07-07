@@ -38,6 +38,8 @@ def _backoff(attempt: int, resp: httpx.Response | None) -> float:
 
 
 class AnthropicApiAdapter:
+    """LLM adapter calling the Anthropic Messages API over httpx with bounded retries."""
+
     name = "anthropic-api"
 
     def __init__(self, *, api_key_env: str = "ANTHROPIC_API_KEY", api_key: str | None = None, max_tokens: int = 4096) -> None:
@@ -49,13 +51,16 @@ class AnthropicApiAdapter:
         return self._api_key or os.environ.get(self._api_key_env)
 
     def available(self) -> bool:
+        """Report whether an API key is resolvable (literal or from the env var)."""
         return bool(self._key())
 
     def complete(self, prompt: str, *, model: str | None = None) -> str:
+        """Send the prompt to the Messages API and return the concatenated text response."""
         key = self._key()
         if not key:
+            msg = f"no Anthropic API key (env {self._api_key_env})"
             raise AnyLLMError(
-                f"no Anthropic API key (env {self._api_key_env})",
+                msg,
                 retryable=False,
                 hint="set the key or configure another provider",
             )
@@ -71,7 +76,8 @@ class AnthropicApiAdapter:
                 resp = httpx.post(_API_URL, headers=headers, json=body, timeout=120.0)
             except httpx.HTTPError as exc:
                 if last:
-                    raise AnyLLMError(f"Anthropic API request failed: {exc}", retryable=True) from exc
+                    msg = f"Anthropic API request failed: {exc}"
+                    raise AnyLLMError(msg, retryable=True) from exc
                 _sleep(_backoff(attempt, None))
                 continue
             if resp.status_code == 200:
@@ -80,9 +86,11 @@ class AnthropicApiAdapter:
             if retryable and not last:
                 _sleep(_backoff(attempt, resp))
                 continue
-            raise AnyLLMError(f"Anthropic API {resp.status_code}: {resp.text[:300]}", retryable=retryable)
+            msg = f"Anthropic API {resp.status_code}: {resp.text[:300]}"
+            raise AnyLLMError(msg, retryable=retryable)
         # unreachable: the loop either returns or raises on the final attempt
-        raise AnyLLMError("Anthropic API: retry budget exhausted", retryable=True)
+        msg = "Anthropic API: retry budget exhausted"
+        raise AnyLLMError(msg, retryable=True)
 
 
 def _extract_text(payload: dict) -> str:
