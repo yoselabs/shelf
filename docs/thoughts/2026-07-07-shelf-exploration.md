@@ -6,8 +6,9 @@
 > K skill + 5 read-only adversary agents (topology · contract-governance · reuse-directive ·
 > catalog-build-vs-adopt · a2kay-inheritance mining).
 >
-> **Homes when instantiated:** doctrine + ontology → **Kay** (knowledge). Operational
-> constitution + glossary + linter preset + boundary test → **shelf/docs** (repo governance).
+> **Homes when instantiated:** ~~doctrine + ontology → Kay~~ — **superseded by [resolution 0002]
+> (../resolutions/0002-doctrine-homes-in-the-shelf.md): everything homes in the shelf; consumers
+> reference it, if necessary. Kay is not a runtime dependency.**
 
 ---
 
