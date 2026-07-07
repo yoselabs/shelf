@@ -32,9 +32,10 @@ registry (discovery downstream of trade between strangers). A single shared repo
 strangers and no publication incentive, so that failure mode is structurally absent. Central-and-
 constrained is the smaller, correct instrument here; R154's doctrine is unchanged.
 
-## Known-open
+## Resolved (2026-07-08)
 
-The local side-by-side dev-loop ergonomics (path source when both repos are checked out; flip to
-git-tag for commit/CI) is the one thing still to smoke-test. At bootstrap, a2kay consumes shelf via a
-**local path source** (`{ path = "../shelf/packages/…", editable = true }`); the git-tag form is the
-production shape once shelf is pushed to GitHub and tags are cut.
+The side-by-side dev-loop is **verified end-to-end**: one shelf clone + a per-project `git worktree`
+(`shelf-<project>`), an editable path override kept **unstaged** — uv reads the working tree, while the
+commit guard reads *staged*, so unrelated commits pass and only a staged override is blocked. a2kay now
+consumes via the production **git-tag** form. Mechanics: `agent-loop.md` §6; onboarding:
+`consuming-the-shelf.md`.

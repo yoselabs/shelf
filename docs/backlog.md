@@ -8,9 +8,6 @@ is a smoke alarm.
 
 ## Verify — designed & shipped, never triggered end-to-end (highest risk)
 
-- [ ] **Co-dev worktree loop, end-to-end.** Create `shelf-<project>` worktree → unstaged editable
-  override in the consumer → edit a shelf pkg → see it live → revert → commit. The R1 ⚠ smoke-test in
-  its final form. (`agent-loop.md` §6, `resolution 0001` known-open.)
 - [ ] **Promote → tag → repoint → opt-in upgrade, for one real package.** The 4 packages were
   bootstrapped, not promoted through the loop; the cycle is theory until one package walks it.
   (`agent-loop.md` §4–5.)
