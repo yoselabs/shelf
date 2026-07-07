@@ -7,13 +7,13 @@ requires-python = ">=3.11"
 license = "Apache-2.0"
 keywords = ["markdown", "conversion", "docling", "pandoc", "pdf", "docx"]
 dependencies = [
-    "docling>=2",
-    "pypandoc-binary>=1.17",
-    "markitdown>=0.0.2",
-    "python-pptx>=1.0.2",
-    "trafilatura>=1.9.0",
-    "html2text>=2025.4.15",
-    "openpyxl>=3.1.5",
+    "docling>=2,<3",
+    "pypandoc-binary>=1.17,<2",
+    "markitdown>=0.0.2,<1",
+    "python-pptx>=1.0.2,<2",
+    "trafilatura>=1.9.0,<3",
+    "html2text>=2025.4.15",   # date-versioned; allowlisted in tests/arch_allowlist.toml (no semver bound)
+    "openpyxl>=3.1.5,<4",
 ]
 
 [build-system]

@@ -51,9 +51,15 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
 Then **own it**: override any rule your project genuinely needs to, on purpose. Divergence is a local
 choice, visible in your own `pyproject`. The shelf is the baseline you converge back toward, not a lock.
 
-## Not in here (yet)
+## Architectural fitness rules (native, not OPA — resolution 0005)
 
-Architectural / AST rules — cross-file body-duplication, private-name-collision, dependency
-upper-bounds, layer-DAG, no-`dict[str,Any]` — exist in a2kit as **Rego/OPA** policies. Bringing their
-*intent* into the shelf as native Python fitness tests (the way `tests/test_boundary.py` enforces the
-one invariant) is a separate, gated decision — see the backlog and resolution 0005 (pending).
+Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest (like
+`tests/test_boundary.py`), reimplementing a2kit's Rego policies without dragging OPA in:
+
+- **`tests/test_arch_rules.py`** (blocking, via `tools/arch_rules.py`): dependency **upper-bounds**;
+  **body-duplication** and **private-name-collision** *within* a package. Suppress with a reasoned entry
+  in `tests/arch_allowlist.toml`.
+- **`make advisory`** (non-blocking): *cross-package* duplication — a T0-primitive candidate, not a
+  violation (constitution VI values some duplication).
+
+Still un-ported (add when a real violation appears): the import layer-DAG and the `dict[str,Any]`-ban.

@@ -4,7 +4,7 @@
 # This is the reference toolchain every consumer of the shelf inherits (resolution 0004).
 # Each target is one linter doing one job; `check` is the gate.
 
-.PHONY: check lint format typecheck spell deps test cov catalog sync
+.PHONY: check lint format typecheck spell deps test cov catalog advisory sync
 
 # The gate. Fast, deterministic tools first; tests last.
 check: lint typecheck spell deps test
@@ -49,6 +49,11 @@ cov:
 # test in `make test` fails if they drift.
 catalog:
 	uv run python tools/catalog.py
+
+# cross-package duplication / name-collision signals (T0-primitive candidates).
+# NON-blocking on purpose — constitution VI values some duplication. Not in `check`.
+advisory:
+	uv run python tools/arch_advisory.py
 
 sync:
 	uv sync

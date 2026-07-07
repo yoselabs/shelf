@@ -91,7 +91,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "numpy", specifier = ">=1.24,<3" },
-    { name = "torch", specifier = ">=2.4" },
+    { name = "torch", specifier = ">=2.4,<3" },
     { name = "transformers", specifier = ">=4.40,<6" },
 ]
 
@@ -304,13 +304,13 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "docling", specifier = ">=2" },
+    { name = "docling", specifier = ">=2,<3" },
     { name = "html2text", specifier = ">=2025.4.15" },
-    { name = "markitdown", specifier = ">=0.0.2" },
-    { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "pypandoc-binary", specifier = ">=1.17" },
-    { name = "python-pptx", specifier = ">=1.0.2" },
-    { name = "trafilatura", specifier = ">=1.9.0" },
+    { name = "markitdown", specifier = ">=0.0.2,<1" },
+    { name = "openpyxl", specifier = ">=3.1.5,<4" },
+    { name = "pypandoc-binary", specifier = ">=1.17,<2" },
+    { name = "python-pptx", specifier = ">=1.0.2,<2" },
+    { name = "trafilatura", specifier = ">=1.9.0,<3" },
 ]
 
 [[package]]

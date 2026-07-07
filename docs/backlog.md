@@ -22,15 +22,13 @@ is a smoke alarm.
   [mission](missions/contract-and-implementation-harness.md). (R2/R3, glossary.)
 - [ ] **Catalog / manifest + request-ledger.** The derived projection + the one new datum
   (who-requested). *Being instantiated now* per resolution 0003 (flat files); evaluate in use. (R5.)
-- [ ] **Architectural / AST rules** (body-dup · private-name-collision · dep-upper-bound · layer-DAG ·
-  no-`dict[str,Any]`). Exist in a2kit as **Rego/OPA** policies. **Decision first (resolution 0005,
-  pending):** migrate as Rego (bring OPA in) vs reimplement intent as native Python fitness tests. My
-  lean: native — OPA is non-hermetic substrate the shelf sheds; `test_boundary.py` is the model. (R9.)
+- [ ] **Remaining architectural rules: layer-DAG + no-`dict[str,Any]`.** The core trio (body-dup,
+  private-name-collision, dep-upper-bound) is **built native** (resolution 0005, `tools/arch_rules.py`).
+  Still un-ported from a2kit: the import layer-DAG and the `dict[str,Any]`-ban. Add as fitness tests
+  when a real layering/typing violation appears (do not build on spec). (R9.)
 
 ## Decide — open forks (a decision, not a build)
 
-- [ ] **AST rules: Rego/OPA vs native fitness tests** — resolution 0005, pending (see Build above). This
-  is the live decision; it also settles the duplication-linter question (a2kit's `body_dup.rego`).
 - [ ] **release-please** adoption timing. **Trigger:** the *first* tag/changelog bookkeeping mistake, OR
   a 2nd human contributor. Until then manual `git tag` at n=4 packages is fine. (R§6.5.)
 - [ ] **Branding** — parked on purpose (user: dislikes both "shelf" and "microsoftware"; rename later).

@@ -1,0 +1,17 @@
+# Architectural-rule allowlist. Every entry MUST carry a non-empty reason (RG003) —
+# the reason is the point: a suppression without a rationale is how rules rot.
+#
+# Sections:
+#   [dep_upper_bound]   name  = "reason"        — a runtime dep allowed with no upper bound
+#   [name_collision]    name  = "reason"        — a private helper name allowed to recur across files
+#   [[body_dup]]        names = [...], reason   — a pair of functions allowed to share a body
+
+[dep_upper_bound]
+html2text = "Date-versioned upstream (YYYY.M.D releases); no semver upper bound is meaningful."
+
+[name_collision]
+# _example_helper = "why this convergence is by design"
+
+# [[body_dup]]
+# names = ["_foo", "_bar"]
+# reason = "why these two may share a body"
