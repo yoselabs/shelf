@@ -1,0 +1,10 @@
+seq = 30
+date = "2026-07-08"
+event = "delivery"
+software = "convert-md"
+release = "convert-md-v0.3.0"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "evolve (worktree ../shelf-a2web)"
+note = "EVOLVE: split the heavy document engines (docling/pypandoc/markitdown/pptx/openpyxl) out of base deps into the [documents] extra; base = the light HTML path (trafilatura + html2text). Forced by a2web adoption — docling's typer<0.13 pin hard-conflicts with a2kit's Typer CLI, so an HTML-only consumer could not resolve convert-md at all. Additive + non-breaking: a2kay stays correct on convert-md-v0.1.0. RECONCILIATION DEFERRED (Article VIII): when a2kay next adopts convert-md it must pin convert-md[documents] to keep the PDF/office engines."

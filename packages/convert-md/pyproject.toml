@@ -1,18 +1,31 @@
 [project]
 name = "convert-md"
-version = "0.2.0"
+version = "0.3.0"
 description = "Opinionated document→markdown conversion: multi-engine per-format fallback chains + a model-free fidelity grade."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 keywords = ["markdown", "conversion", "docling", "pandoc", "pdf", "docx"]
+# Base = the LIGHT HTML path only (trafilatura + html2text): convert_html and the
+# .html/.htm fallback chain resolve with just these, so a consumer that only needs
+# web-page conversion (a2web) does not pull docling/torch. The heavy document
+# engines live behind the [documents] extra (v0.3.0). Each engine lazily imports
+# its lib and raises ConversionError when absent, so the dispatcher degrades to the
+# next engine / a `failed` result — never an ImportError at module load.
 dependencies = [
+    "trafilatura>=1.9.0,<3",
+    "html2text>=2025.4.15",   # date-versioned; allowlisted in tests/arch_allowlist.toml (no semver bound)
+]
+
+[project.optional-dependencies]
+# The document-format engines (PDF/docx/pptx/xlsx). Install with
+# `convert-md[documents]` when you need convert(path) for office/PDF formats;
+# omit for the HTML-only convert_html path. a2kay adopts this extra; a2web does not.
+documents = [
     "docling>=2,<3",
     "pypandoc-binary>=1.17,<2",
     "markitdown>=0.0.2,<1",
     "python-pptx>=1.0.2,<2",
-    "trafilatura>=1.9.0,<3",
-    "html2text>=2025.4.15",   # date-versioned; allowlisted in tests/arch_allowlist.toml (no semver bound)
     "openpyxl>=3.1.5,<4",
 ]
 

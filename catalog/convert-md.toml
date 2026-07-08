@@ -2,9 +2,9 @@
 name = "convert-md"
 kind = "composite"               # composes multiple third-party engines behind one surface
 tier = "T2"
-release = "convert-md-v0.2.0"
-capability = "Stop caring which engine converts which document format to markdown — from a file path OR an in-memory HTML string."
+release = "convert-md-v0.3.0"
+capability = "Stop caring which engine converts which document format to markdown — from a file path OR an in-memory HTML string; heavy document engines behind an extra."
 implementation = "hybrid-adapter"
 status = "active"
 owner = "Denis Tomilin"
-notes = "Per-format fallback chains (docling/pandoc/markitdown/trafilatura) + a model-free fidelity grade. v0.2.0 grows convert_html(html, *, url) — a url-aware in-memory HTML string door (trafilatura-first, html2text fallback, never-raises) for consumers that already hold the page in memory (a2web). Additive; convert(path) unchanged, so a2kay is unaffected on v0.1.0."
+notes = "Per-format fallback chains (docling/pandoc/markitdown/trafilatura) + a model-free fidelity grade. v0.2.0 grew convert_html(html, *, url) — a url-aware in-memory HTML string door (trafilatura-first, html2text fallback, never-raises). v0.3.0 splits the heavy document engines (docling/pypandoc/markitdown/pptx/openpyxl) into the [documents] extra; base = the light HTML path (trafilatura + html2text) so an HTML-only consumer (a2web) does not pull docling/torch. Engines lazy-import + degrade, so base-only installs never ImportError. Additive; a2kay stays correct on its v0.1.0 pin and re-pins convert-md[documents]-v0.3.0 when it adopts."

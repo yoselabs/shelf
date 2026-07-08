@@ -38,6 +38,7 @@ members = [
 dev = [
     { name = "browser-cookie3", specifier = ">=0.20,<1" },
     { name = "codespell", specifier = ">=2.3,<3" },
+    { name = "convert-md", extras = ["documents"], editable = "packages/convert-md" },
     { name = "deptry", specifier = ">=0.20,<1" },
     { name = "pytest", specifier = ">=8,<9" },
     { name = "pytest-asyncio", specifier = ">=0.24,<1" },
@@ -454,29 +455,34 @@ requires-dist = [
 
 [[package]]
 name = "convert-md"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/convert-md" }
 dependencies = [
+    { name = "html2text" },
+    { name = "trafilatura" },
+]
+
+[package.optional-dependencies]
+documents = [
     { name = "docling", version = "2.99.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'darwin'" },
     { name = "docling", version = "2.110.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
-    { name = "html2text" },
     { name = "markitdown" },
     { name = "openpyxl" },
     { name = "pypandoc-binary" },
     { name = "python-pptx" },
-    { name = "trafilatura" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "docling", specifier = ">=2,<3" },
+    { name = "docling", marker = "extra == 'documents'", specifier = ">=2,<3" },
     { name = "html2text", specifier = ">=2025.4.15" },
-    { name = "markitdown", specifier = ">=0.0.2,<1" },
-    { name = "openpyxl", specifier = ">=3.1.5,<4" },
-    { name = "pypandoc-binary", specifier = ">=1.17,<2" },
-    { name = "python-pptx", specifier = ">=1.0.2,<2" },
+    { name = "markitdown", marker = "extra == 'documents'", specifier = ">=0.0.2,<1" },
+    { name = "openpyxl", marker = "extra == 'documents'", specifier = ">=3.1.5,<4" },
+    { name = "pypandoc-binary", marker = "extra == 'documents'", specifier = ">=1.17,<2" },
+    { name = "python-pptx", marker = "extra == 'documents'", specifier = ">=1.0.2,<2" },
     { name = "trafilatura", specifier = ">=1.9.0,<3" },
 ]
+provides-extras = ["documents"]
 
 [[package]]
 name = "courlan"

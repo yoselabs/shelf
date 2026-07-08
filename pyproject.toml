@@ -9,6 +9,11 @@
 [tool.uv.workspace]
 members = ["packages/*"]
 
+# The dev group references convert-md's [documents] extra (so its engine tests run);
+# resolve it from the workspace, not PyPI.
+[tool.uv.sources]
+convert-md = { workspace = true }
+
 # Dev tooling as a PEP 735 dependency-group (NOT an optional-extra): `uv sync`
 # always installs it, so the venv carries the linters and `uv run` can never fall
 # back to a global tool. The repo stays hermetic. (Inherited from a2kay.)
@@ -22,6 +27,7 @@ dev = [
     "deptry>=0.20,<1",        # dependency hygiene: unused / missing / transitive
     "pytest-asyncio>=0.24,<1",  # async test support (the first async packages: sqlite-resource, http-*)
     "browser-cookie3>=0.20,<1",  # browser-cookies' optional [read] engine — installed here so its tests exercise the real reader path (the package itself keeps it optional/lazy)
+    "convert-md[documents]",     # convert-md's heavy document engines (docling/pandoc/office) — moved to the [documents] extra in v0.3.0; installed here so convert-md's dispatch tests still exercise the real engines (base stays HTML-only)
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
