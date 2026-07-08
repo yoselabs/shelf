@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "browser-cookies"
+kind = "primitive"
+tier = "T1"
+release = "browser-cookies-v0.1.0"
+capability = "Stop caring how each browser stores its cookies — read the local machine's Chrome/Chromium/Brave/Edge/Firefox/Safari/etc cookie store into a uniform CookieRow, cross-platform."
+implementation = "adopts"        # a thin adapter over browser-cookie3 (optional [read] extra); the boundary shape is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (its packages/cookie_store). Thin adapter over browser-cookie3, declared as the optional [read] extra + lazily imported so the package imports (and degrades to CookieAccessError) even when the library is absent — the consumer keeps it baseline while the reader lib stays optional. Boundary types CookieRow / SameSite / CookieSource; ChromeCookieAccessError is a historical alias subclass. Born candidate."

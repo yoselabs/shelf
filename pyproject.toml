@@ -21,6 +21,7 @@ dev = [
     "codespell>=2.3,<3",      # typos in code, docstrings, and docs
     "deptry>=0.20,<1",        # dependency hygiene: unused / missing / transitive
     "pytest-asyncio>=0.24,<1",  # async test support (the first async packages: sqlite-resource, http-*)
+    "browser-cookie3>=0.20,<1",  # browser-cookies' optional [read] engine — installed here so its tests exercise the real reader path (the package itself keeps it optional/lazy)
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
@@ -129,6 +130,7 @@ testpaths = [
     "packages/json-in-html/tests",
     "packages/html-fragment/tests",
     "packages/record-mine/tests",
+    "packages/browser-cookies/tests",
 ]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"

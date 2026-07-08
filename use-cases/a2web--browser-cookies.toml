@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "browser-cookies"
+why = "a2web can mirror the local browser's cookies so a fetch presents the user's logged-in session (the cookies_refresh tool). Reading each browser's on-disk cookie store — Chrome's Keychain-encrypted AES-GCM, Firefox's plaintext sqlite — is generic OS substrate. a2web keeps this optional/local-only (server containers have no browser); the package's optional [read] extra + lazy import match that: baseline-importable, degrades loudly when browser-cookie3 is absent."
+needs = "read_cookies(source) -> list[CookieRow], the CookieRow / SameSite / CookieSource boundary types, and CookieAccessError / ChromeCookieAccessError for the degrade path — with browser-cookie3 as an optional, lazily-imported engine."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired

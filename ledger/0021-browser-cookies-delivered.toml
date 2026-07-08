@@ -1,0 +1,10 @@
+seq = 21
+date = "2026-07-08"
+event = "delivery"
+software = "browser-cookies"
+release = "browser-cookies-v0.1.0"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "promotion (worktree ../shelf-a2web)"
+note = "Promoted from a2web's packages/cookie_store during the catch-up sweep (resolution 0006). Thin adapter over browser-cookie3 (optional [read] extra, lazy import). Born candidate."

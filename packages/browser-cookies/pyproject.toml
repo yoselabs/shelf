@@ -1,0 +1,36 @@
+[project]
+name = "browser-cookies"
+version = "0.1.0"
+description = "Read the local machine's browser cookie store (Chrome/Chromium/Brave/Edge/Firefox/Safari/Vivaldi/Opera) as typed rows — a thin, cross-platform adapter over browser-cookie3."
+readme = "README.md"
+authors = [{ name = "Denis Tomilin" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+keywords = ["cookies", "browser", "chrome", "firefox", "safari", "browser-cookie3"]
+# No runtime dependencies: the underlying reader is OPTIONAL and imported lazily
+# (see `store._dispatch`). The package imports fine without it; the lib is only
+# needed at call time. Consumers keep `browser-cookies` in baseline deps and pull
+# `browser-cookie3` in via the `[read]` extra only where local cookie reads run.
+dependencies = []
+
+[project.optional-dependencies]
+# The actual per-browser reader. Optional + lazily imported so a slim/server
+# install can omit it entirely; when absent, `read_cookies` degrades to a loud
+# `CookieAccessError` ("install browser-cookies[read]") instead of crashing.
+read = ["browser-cookie3>=0.20,<1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/browser_cookies"]
+
+# deptry: `browser_cookie3` is a lazy, optional import (declared under the `[read]`
+# extra, imported inside `store._dispatch`, degrading to CookieAccessError when
+# absent). deptry's static AST sees the deferred `import browser_cookie3` but,
+# depending on whether the extra is installed in the run env, may report it as a
+# missing dependency (DEP001). It is intentionally not a hard runtime dep, so
+# ignore that one rule for that one module with the reason recorded here.
+[tool.deptry.per_rule_ignores]
+DEP001 = ["browser_cookie3"]
