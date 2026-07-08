@@ -1,0 +1,10 @@
+seq = 13
+date = "2026-07-08"
+event = "verdict"
+software = "sqlite-resource"
+release = "sqlite-resource-v0.1.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "n/a"
+note = "a2web repointed its cache/extraction/cookie sqlite lifecycle to the git-tag pin via a thin domain seam (src/a2web/cache.py: default-path policy + cache schema on_open + the (url, profile_hash) accessor), deleted packages/http_cache, kept tests green."

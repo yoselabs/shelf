@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "http-cache"
+why = "a2web caches fetched pages for conditional revalidation: ETag/Last-Modified round-trips, gzip-compressed bodies, TTL expiry, and a per-proxy-profile cache key so one URL caches differently per request profile. The cache mechanics are generic; the gate policy (a block page must never enter cache) stays in a2web."
+needs = "CacheRow + free functions apply_schema / cache_get(conn, url, variant) / cache_put(conn, url, variant, *, ...) / conditional_headers(row), used against a2web's shared sqlite connection (so cache + extraction + cookie tables coexist in one file)."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired

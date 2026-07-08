@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "http-cache"
+kind = "primitive"
+tier = "T1"
+release = "http-cache-v0.1.0"
+capability = "Stop caring about HTTP conditional-GET cache mechanics — content-hash dedup, gzip body column, TTL expiry, ETag/Last-Modified headers, and a (url, variant) key for per-profile caching."
+implementation = "ours"          # cache policy over sqlite-resource; the schema + conditional-GET shape is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (its sqlite-backed conditional-GET cache). Composes sqlite-resource for the connection lifecycle (schema via its on_open hook). Ships free functions + a CacheRow + a thin HttpCache composite; a2web uses the free functions against a shared connection. The 'variant' key generalizes a2web's proxy profile_hash. Born candidate."

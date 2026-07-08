@@ -1,0 +1,10 @@
+seq = 11
+date = "2026-07-08"
+event = "delivery"
+software = "sqlite-resource"
+release = "sqlite-resource-v0.1.0"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "promotion (worktree ../shelf-a2web)"
+note = "Promoted from a2web's packages/http_cache (the SqliteResource lifecycle half) during the onboarding catch-up sweep (resolution 0006). Born candidate. http-cache composes it."

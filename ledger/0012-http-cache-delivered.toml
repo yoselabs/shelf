@@ -1,0 +1,10 @@
+seq = 12
+date = "2026-07-08"
+event = "delivery"
+software = "http-cache"
+release = "http-cache-v0.1.0"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "promotion (worktree ../shelf-a2web)"
+note = "Promoted from a2web's packages/http_cache (the cache half: CacheRow + conditional-GET + gzip). Born candidate. Composes sqlite-resource; a2web's proxy profile_hash generalized to the 'variant' key."

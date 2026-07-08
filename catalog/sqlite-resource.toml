@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "sqlite-resource"
+kind = "primitive"
+tier = "T0"
+release = "sqlite-resource-v0.1.0"
+capability = "Stop caring about aiosqlite open/close plumbing — a lazily-opened connection with a double-checked lock, caller-supplied pragmas + schema hook, idempotent close, and the async-CM protocol."
+implementation = "ours"          # thin lifecycle over aiosqlite; the lazy-lock + on_open seam is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (its cache/extraction/cookie sqlite lifecycle). Domain-free: it manages a connection, never what tables live inside it — schema + pragmas are caller-supplied via on_open. http-cache composes it. Born candidate."

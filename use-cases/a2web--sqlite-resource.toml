@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "sqlite-resource"
+why = "a2web keeps its HTTP cache, its LLM-extraction answer cache, and its cookie mirror in ONE sqlite file behind a single lazily-opened connection — warmed on app lifespan, but never opened by a test that doesn't touch the DB. The connection lifecycle (lazy double-checked lock, WAL pragma, idempotent close, async-CM) is generic substrate, not a2web's fetching domain."
+needs = "SqliteResource(db_path, *, pragmas, on_open) with ensure() / conn / close() / async-CM; schema applied caller-side via on_open so the primitive stays domain-free."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired
