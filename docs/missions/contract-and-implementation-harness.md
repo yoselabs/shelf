@@ -1,7 +1,7 @@
 # Mission — the contract layer + the `Implementation` build-vs-adopt harness
 
 - **Status:** captured (2026-07-08), not yet built. The deepest idea in the design; **inert until a real
-  contract need or a second consumer appears** — do not build on spec.
+  contract need appears** — the first live one is `convert-md`'s string-input capability (res 0006 / backlog).
 - **Track:** governance / the unit of selection
 - **Shape:** a file format (`<pkg>/contracts/*.yml`) + a test-runner convention that turns "should we
   adopt this dependency?" into "did it pass the contract's tests?".
@@ -39,7 +39,7 @@ dissolving into a thin adapter over a qualifying dependency.
   `AcceptanceScenario` (visible) · `HoldoutScenario` (hidden, consumer-side) · `Implementation`
   (swappable) · `UseCase`/`Sponsor`/`Owner`/`Requester` (the two hats).
 - **Constitution V** (earned protection), **VI** (adopt only on GREEN, never on hope), **VII**
-  (promotion-not-publication) are the gates.
+  (promote aggressively — capitalize proven generic substrate), **VIII** (reconcile with hindsight).
 - **The `micro-software` K skill** supplies the judgment (deep-module guardrail, build-vs-adopt gate).
 
 ## Deliverable sketch (when built)
@@ -50,4 +50,4 @@ dissolving into a thin adapter over a qualifying dependency.
 - The holdout mechanism: consumer-repo scenarios vs the published artifact, unseen by the refactor agent.
 
 *(Do not build yet. Homed here so the crown insight is not stranded in a non-authoritative thoughts doc.
-Trigger: the first real contract need, or a second consumer that makes a promotion's guarantee matter.)*
+Trigger: the first real contract need — the live candidate is `convert-md`'s `convert_html(str, url)`.)*

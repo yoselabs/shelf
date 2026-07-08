@@ -1,12 +1,16 @@
-# Runbook — onboard a full consumer + the whole-codebase adoption sweep
+# Runbook — onboard a consumer + the whole-codebase catch-up sweep
 
-The **heavy, deliberately-invoked** operation (agent-loop.md §7): bring a project in as a shelf consumer
-*and* audit its whole codebase for micro-software — what to **adopt**, what to **duplicate**, and what to
-**promote** so that **multiple consumers shrink**. Distinct from the light standing loop; run it in a
-dedicated session, not mid-feature.
+The **heavy, deliberately-invoked** operation: bring a project in as a shelf consumer *and* audit a
+codebase that **predates the shelf** for generic substrate it hand-rolled before it could promote in the
+moment. This is the **post-facto catch-up** for the aggressive promotion doctrine (resolution 0006) — for
+*new* code, promotion happens at writing time (agent-loop.md §3), not here. Run it in a dedicated session,
+not mid-feature.
 
-The prize is not "this project uses the shelf." It is: **where two consumers hand-roll the same
-substrate, promote one shared piece and delete it from both** — total code goes *down*.
+**The prize is not "existing code shrinks."** It is **capitalizing every generic helper this codebase
+hand-rolled into the shelf**, so the *next* project writes less custom code. A candidate qualifies on its
+own merits — *generic substrate the catalog lacks* — **not** on whether a second consumer also has it.
+Cross-consumer overlap is a nice confirmation, never a requirement. Promoting *grows* the shelf; that is
+the point, and it never bloats a thin consumer (it keeps its own subset usage).
 
 ---
 
@@ -34,32 +38,36 @@ K skill):
 3. Record surface shape: is it Path-based? string-based? sync/async? what does it return (bare value vs a
    rich result with accounting)? — this is what decides fit later.
 
-## Phase C — cross-reference (the multi-consumer core)
+## Phase C — classify each candidate against the CATALOG (not against other consumers)
 
-For each substrate candidate, check **three** places — this is where "satisfy both, reduce both" happens:
+For each substrate candidate, compare it to **the shelf catalog** (`<shelf>/catalog/README.md` + packages)
+and make one call: **is this generic substrate, or this app's business logic / product moat?**
 
-1. **The shelf catalog** (`<shelf>/catalog/README.md`): does a package already provide this Capability?
-2. **The other consumers** (e.g. `~/Workspaces/a2kay`, `~/Workspaces/a2web`): do they hand-roll the *same*
-   substrate? Use the arch engine cross-repo:
-   `uv run python <shelf>/tools/arch_advisory.py` is intra-shelf; for cross-repo, run the same
-   `arch_rules` fact extractor over both consumers' `src/` and look for shared body-hashes / helper names.
-3. **The richer implementation wins the design.** If two consumers both have an abstraction and one is a
-   *superset* (async, cost accounting, more backends), that superset — not the thinner one — is the promote
-   candidate. (Live example: a2web's `llm_extract.Provider` is richer than `anyllm`; the arrow may **reverse**.)
+- **Generic substrate** = helpers, utilities, patterns + their safety wrappers, adapters over awkward
+  stdlib/library APIs, env/config loaders, a service's supporting functions. → a promote/adopt candidate.
+- **Product** = the thing this app is *for* (a2web: bot-wall detection, proxy routing, browser stealth;
+  a2kay: the vault model). → leave it. Rejecting product is correct, not a miss.
 
-## Phase D — the per-candidate verdict (DEEP · STABLE · WINS)
+Cross-consumer overlap is **optional confirmation**, not a gate: if another consumer (`~/Workspaces/a2kay`,
+etc.) hand-rolls the same thing, that only *raises confidence* it's generic. Where two consumers both have
+an abstraction and one is a **superset** (async, cost accounting, more backends), promote the superset —
+the arrow can **reverse** (a2web's `llm_extract.Provider` is richer than `anyllm`). But a lone n=1 generic
+helper is a promote candidate on its own.
+
+## Phase D — the per-candidate verdict
 
 | Situation | Verdict | Action |
 |---|---|---|
-| Shelf already provides it **and** it passes DEEP·STABLE·WINS for *this* consumer's real surface | **ADOPT** | git+tag source, `uv lock`, delete the hand-roll, publish a `use-cases/<consumer>--<sw>.toml`, add a ledger `verdict` entry. |
-| Shelf provides it but the **contract shape is wrong** (Path vs string, sync vs async, drops data the consumer needs) | **DON'T ADOPT** | Duplicate locally (constitution VI). Record a *field signal* in `<shelf>/docs/backlog.md` — the contract gap is a future evolution, not a today-build. |
-| **Two+ consumers** hand-roll the same substrate and no shelf piece exists (or the shelf piece is a subset) | **PROMOTE** | Promote the *superset* to the shelf (Phase E), then both consumers adopt and delete their copies. This is the win. |
-| One consumer only (n=1), reusable-smelling | **NOMINATE** | Record in the consumer's own reuse ledger (rule-of-three sighting). Do not promote (Article VII). |
+| Generic substrate the shelf **lacks** (even at n=1) | **PROMOTE** | Extract to the shelf (Phase E), born `candidate`. The default for anything generic. Growth of the catalog is the goal. |
+| Shelf already provides it **and** it passes DEEP·STABLE·WINS for this consumer's real surface | **ADOPT** | git+tag source, `uv lock`, delete the hand-roll, publish `use-cases/<consumer>--<sw>.toml`, add a ledger entry. |
+| Shelf provides it but the **contract shape is wrong** (Path vs string, sync vs async, drops needed data) | **EXTEND then adopt** | The friction *is* the promotion signal (constitution VII): grow the shelf piece a new capability (`convert_html(str,url)`), then adopt. If that's out of scope now, duplicate locally + log the gap. |
+| The app's **business logic / product moat** | **KEEP** | Leave it. Not substrate. |
 
-Never adopt on hope. Duplication is cheaper than the wrong abstraction — the eval saying *don't adopt* is a
-success, not a miss.
+Promote is the **cheap default** for generic substrate — over-promotion is fixed later at reconciliation
+(agent-loop §5b), a lost extraction moment is not. Only *adopting a dep* is conservative (DEEP·STABLE·WINS);
+*promoting your own generic code into the shelf* is aggressive.
 
-## Phase E — promote (only when Phase D says PROMOTE; the gate is met)
+## Phase E — promote / extend (when Phase D says PROMOTE or EXTEND)
 
 Follow **agent-loop.md §4** exactly, in the project's shelf worktree `../shelf-<project>`:
 extract behind a Capability + boundary test + `candidate` Contract; `make check` green in the worktree;
@@ -71,8 +79,11 @@ the old package is `deprecated` (not deleted — Article VIII) with a migration 
 
 - **Publish use-cases**: one `use-cases/<consumer>--<sw>.toml` per adopted piece (why + what — the retention claim).
 - **Ledger**: append a `<seq>-<consumer>-<sw>-<event>.toml` per delivery/verdict; `make catalog`.
-- **Adoption report**: a table of every candidate → verdict → action, plus the net line-count delta across
-  all touched repos. If it did not make at least one codebase *smaller*, question whether the abstraction was real.
+- **Report**: a table of every candidate → verdict → action, plus **what the shelf gained** — packages
+  promoted / capabilities extended, i.e. generic substrate now available to the *next* project. The success
+  metric is **future-code-avoided (catalog coverage), NOT existing-repo shrink.** A sweep that promotes a
+  dozen helpers and shrinks no existing app by a line is a *success* — it just made the next app smaller.
+  (A promoted piece may leave its origin app the same size until the app later adopts it back; that's fine.)
 
 ## Guardrails
 

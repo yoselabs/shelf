@@ -22,7 +22,8 @@ Raised by Denis. Four distinct entry paths, one shared lifecycle gate.
    - How to **scan for easy cases** — the "this is really a shelf piece" detector during normal work.
 
 3. **Promote something already built into micro-software and replace it.**
-   - When in-app code earns graduation (Article VII: a 2nd consumer pulls it; rule-of-three).
+   - When in-app code is generic substrate — promote it in the moment (res 0006, no 2nd consumer needed);
+     for codebases predating the shelf, the catch-up sweep (`../runbooks/onboard-a-consumer.md`) does it.
    - The replace procedure: extract behind the contract, repoint the origin app, keep the tests.
 
 4. **Create new micro-software that wraps / becomes third-party open source.**
@@ -33,8 +34,8 @@ Raised by Denis. Four distinct entry paths, one shared lifecycle gate.
 
 ## Design anchors (already decided — this mission composes them, doesn't re-derive)
 
-- **Constitution** Articles V–VIII (earned protection · shelf-first adopt · promotion-not-publication ·
-  mandatory decay) are the gates every onboarding path passes through.
+- **Constitution** Articles V–VIII (earned protection · conservative adopt · aggressive promote ·
+  decay + reconciliation) are the gates every onboarding path passes through.
 - **The `micro-software` K skill** is the decision framework (litmus, deep-module guardrail,
   build-vs-adopt hard gate, tier model, rule-of-three shelf).
 - **The evaluation-harness** (R3 / glossary `Implementation`) turns "should we adopt this OSS lib?"

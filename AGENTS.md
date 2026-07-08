@@ -22,9 +22,11 @@ Read `docs/constitution.md` before changing anything. The load-bearing rules:
 - **Structure controls size, not caps.** A big file = a missing boundary, not a lint failure.
 - **Protection is earned.** A contract is born `candidate` (inert) until a live consumer breaks
   without it. Do NOT protect on fear.
-- **Reach for the shelf first; adopt only if DEEP · STABLE · WINS; else duplicate.**
-- **Promotion, not publication.** A piece graduates only when a 2nd consumer pulls it.
-- **Decay is mandatory.** Unreused past TTL → deprecate. Deletion is a virtue.
+- **Adopt conservatively, promote aggressively** (res 0006). *Pulling* a shelf dep: only if
+  DEEP·STABLE·WINS, else duplicate. *Writing* generic substrate: promote it to the shelf in the moment
+  (extracted, never invented) — a self-assessed "feels reusable" is enough, no 2nd consumer needed.
+- **Decay + reconciliation are mandatory.** Unreused past TTL → deprecate. A recurring reconciliation pass
+  merges/splits/deletes/demotes the aggressively-promoted catalog with hindsight. Deletion is a virtue.
 
 ## §3. The one invariant
 

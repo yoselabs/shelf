@@ -34,34 +34,39 @@ it when the work has merged.
   **and** this loop.
 - Cheaper freshness peek (no working-tree change): `git -C <shelf> fetch --tags -q`. One call, cached.
 
-## 2. ADOPT — before you hand-roll substrate
+## 2. ADOPT vs PROMOTE — before you hand-roll substrate
 
-**Trigger:** you are about to write a helper, wrapper, adapter, or any substrate glue (LLM / DB /
-embedding / git / file / format / config).
+**Trigger:** you are about to write a helper, wrapper, adapter, or any substrate glue — LLM / DB /
+embedding / git / file / format / config / datetime / collections / a wrapper over an awkward stdlib
+or third-party API.
 
-1. **Look first:** scan `<shelf>/docs/glossary.md` + `<shelf>/packages/`.
-2. **Adopt only if it WINS the three-gate:** **DEEP** (hides real complexity, not a restatement) ·
-   **STABLE** (settled API) · **WINS** (lighter than what you'd write). Any gate fails → **duplicate
-   locally**. Duplication beats the wrong abstraction.
-3. **Adopt =** add the git+tag source (`consuming-the-shelf.md` §1), `uv lock`, import. **Never** a
-   committed local path.
+1. **Compare against the CATALOG** (`<shelf>/catalog/README.md` + `<shelf>/packages/` + `glossary.md`) —
+   **never** against another consumer. You cannot see what else is being built; the catalog is the frame.
+2. **If the shelf HAS it → adopt, but conservatively:** only if **DEEP** (hides real complexity) ·
+   **STABLE** (settled API) · **WINS** (lighter than you'd write). Any gate fails → **duplicate locally**.
+   Adopt = add the git+tag source (`consuming-the-shelf.md` §1), `uv lock`, import. **Never** a committed
+   local path.
+3. **If the shelf LACKS it and it is generic substrate → PROMOTE it now (§3)**, don't just write it
+   inline. This is the cheap moment (constitution VII); once it is wired into your app the chance is lost.
 
-## 3. PRODUCE — nominate vs promote (you may decide this yourself)
+## 3. PRODUCE — promote aggressively, at writing time (resolution 0006)
 
-You are trusted to *notice* when substrate should become micro-software. But there are **two distinct
-acts** with different bars — this split is what lets many parallel agents act freely without flooding
-the shelf with half-baked packages:
+You are trusted to *notice* when substrate should become micro-software, and to **promote it in the
+moment** — no second consumer required. The default for anything generic is **promote**, not defer:
 
-- **Nominate — cheap, and self-consolidating.** You wrote substrate that smells reusable. Record it
-  where your repo tracks reuse candidates (a2kay: `docs/design/primitive-shelf.md`, a rule-of-three
-  *sighting count*). **Increment an existing entry if the pattern is already listed; add one only if
-  genuinely new; delete an entry once it is promoted or abandoned.** This is not an append log — you
-  prune it as you go, so it never becomes a pile someone must reconcile later. No package is created.
-- **Promote — gated.** Turn a candidate into a real package + tag **only** when a **second** consumer
-  actually wants it (Article VII, rule-of-three). One consumer is n=1 → nominate, don't promote.
-  *Promotion, not publication.*
+- **Promote — the cheap default for generic substrate.** You are writing a helper, a pattern + its
+  safety wrapper, a datetime/collection util, or an abstraction over an awkward API — and it smells
+  reusable. Promote it to the shelf now (§4). A self-assessed "this feels reusable" is enough. The bar
+  is only the two guards: it is **extracted** (real code your app needs, never an empty package), and it
+  is **generic** (substrate, not your app's business logic / product moat).
+- **Nominate — only when you're genuinely unsure it's generic.** Borderline? Jot a one-line sighting
+  where your repo tracks candidates (a2kay: `docs/design/primitive-shelf.md`) and move on; prune it when
+  resolved. This is now the *exception*, not the main path — do not hoard candidates you could promote.
+- **Do NOT hand-roll silently.** The one thing to avoid is writing generic substrate inline and moving
+  on — that is the extraction moment lost. Over-promotion is cheap to fix at reconciliation (§5b);
+  a lost moment is not.
 
-## 4. PROMOTE — the procedure (only when the gate is met)
+## 4. PROMOTE — the procedure (whenever you extract generic substrate)
 
 Work in **your project's shelf worktree** (`../shelf-<project>`, see "One shelf, per-project worktrees"
 above) so concurrent promotions from different projects never collide:
@@ -86,6 +91,21 @@ one-concept-per-file keeps textual conflicts rare by construction.
 At your lazy checkpoint pull, if a piece you pin has a **newer tag**, surface it and consider upgrading.
 Upgrade = point at the newer tag + `uv lock`. Because old tags are never deleted, **a shelf change can
 never silently break you** — every upgrade is a deliberate choice.
+
+## 5b. RECONCILE — the other half of aggressive promotion (Article VIII, resolution 0006)
+
+Aggressive promotion (§3) is only healthy if the catalog is **garbage-collected with hindsight**. This is
+not per-feature work; it is a deliberate, recurring pass (invoke it, or run it during an onboarding
+catch-up). Walk `<shelf>/catalog/README.md` and ask, per piece:
+
+- **Overlap?** Two packages doing almost the same thing → **merge** (lineage `merged-with` / `absorbed-into`).
+- **Kitchen-sink?** One package accreted unrelated concerns → **split** into coherent pieces.
+- **Unused?** No active use-case past its TTL → **deprecate → delete** (decay is a virtue).
+- **Over-promoted?** Turned out too niche / the wrong shape → **demote**: duplicate it back into its one
+  consumer and retire the package. Over-promotion is *expected* and cheap to undo here — that is the deal.
+
+This is where "was that the right abstraction?" is finally answered — empirically, not by an upfront gate.
+Never delete a *tag* (§4); retiring a package means marking it `deprecated` and stopping new adoption.
 
 ## 6. The editable escape hatch — rare, structurally guarded
 

@@ -17,9 +17,10 @@ This file is the map. Everything the shelf knows about itself is in this repo �
 - **[docs/consuming-the-shelf.md](docs/consuming-the-shelf.md)** — how a project onboards as a consumer
   (depend by git+tag, install the commit guard, paste the resolver block into its `AGENTS.md`/`CLAUDE.md`).
 - **[docs/agent-loop.md](docs/agent-loop.md)** — the standing loop every consumer's agent self-applies:
-  fetch cadence, adopt gate, nominate-vs-promote, the promote procedure, the guarded editable escape hatch.
-- **Contribute back** via *promotion, not publication*: a piece graduates when a **2nd** consumer pulls
-  it. Read [docs/constitution.md](docs/constitution.md) (Articles VI–VIII) first.
+  fetch cadence, adopt-vs-promote, promote-in-the-moment, the promote procedure, RECONCILE, the escape hatch.
+- **Contribute back** by **promoting aggressively** ([res 0006](docs/resolutions/0006-aggressive-capitalization-reconcile-later.md)):
+  the moment you write generic substrate, home it in the shelf (extracted, never invented) — no 2nd consumer
+  needed; reconcile later. Read [docs/constitution.md](docs/constitution.md) (Articles VI–VIII) first.
 
 ## Decisions & open work
 

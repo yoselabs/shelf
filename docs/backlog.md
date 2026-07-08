@@ -18,14 +18,18 @@ is a smoke alarm.
 ## Build — designed, unbuilt, gated (do NOT build on spec)
 
 - [ ] **Contract layer + `Implementation` build-vs-adopt harness (the crown insight).** No contract
-  files exist. Deepest value; inert until a real 2nd consumer / contract need appears.
+  files exist. Deepest value; inert until a real contract need appears — the first live one is
+  `convert-md`'s string-input capability (see Promote below).
   [mission](missions/contract-and-implementation-harness.md). (R2/R3, glossary.)
-- [ ] **Catalog / manifest + request-ledger.** The derived projection + the one new datum
-  (who-requested). *Being instantiated now* per resolution 0003 (flat files); evaluate in use. (R5.)
+- [ ] **Reconciliation-pass tooling.** Aggressive promotion (res 0006) makes reconciliation load-bearing
+  (constitution VIII, agent-loop §5b): merge/split/delete/demote the catalog with hindsight. Today it is
+  a manual walk of `catalog/README.md` + `make advisory`; a `make reconcile` that flags overlap
+  (cross-package body-dup), zero-use pieces, and kitchen-sinks would make it routine. Build once the
+  catalog is large enough to need it.
 - [ ] **Remaining architectural rules: layer-DAG + no-`dict[str,Any]`.** The core trio (body-dup,
   private-name-collision, dep-upper-bound) is **built native** (resolution 0005, `tools/arch_rules.py`).
   Still un-ported from a2kit: the import layer-DAG and the `dict[str,Any]`-ban. Add as fitness tests
-  when a real layering/typing violation appears (do not build on spec). (R9.)
+  when a real layering/typing violation appears. (R9.)
 
 ## Decide — open forks (a decision, not a build)
 
@@ -34,25 +38,26 @@ is a smoke alarm.
 - [ ] **Branding** — parked on purpose (user: dislikes both "shelf" and "microsoftware"; rename later).
   A separate pass, no throwaway names. (R11.)
 
-## Parked — gated, do not touch yet
+## Promote — generic substrate to capitalize (res 0006; done in each app's catch-up sweep)
 
-- **T0 primitives** (`atomic_io`, `duckdb_sidecar`, `managed_region`) — stay in a2kay at n=1; promote
-  when a 2nd consumer pulls them (Article VII).
-- **Onboarding runbook + `catalog`/`onboard` skill** — [mission](missions/onboarding-new-micro-software.md)
-  captured; "do not build yet".
+Under aggressive promotion these are no longer "wait for a 2nd consumer" — they are generic substrate to
+extract now, in the origin app's session (worktree `../shelf-<app>`), born `candidate`:
 
-## Field signals — observed, NOT yet actionable (2026-07-08 a2web adopt-eval)
+- **a2kay's T0 primitives** `atomic_io`, `duckdb_sidecar`, `managed_region` — generic substrate, promote
+  in a2kay's catch-up. (Was parked at n=1; res 0006 removes that gate.)
+- **a2web's `llm_extract.Provider`** → promote as `anyllm`'s async/structured tier (superset: async,
+  token/cost/latency accounting, prompt-cache breakpoints). a2kay keeps its thin `anyllm` tier, upgrades
+  opt-in. The arrow *reverses* here — the richer consumer implementation is the one promoted.
+- **a2web's generic utilities** — env/YAML settings loader, sqlite conditional-GET cache shell,
+  cookie-store matrix, collection/JSON helpers. Promote the generic ones; **leave the product moat**
+  (bot-wall detection, proxy routing, browser backends) in a2web.
+- **`convert-md` → add a `convert_html(str, *, url) -> ConversionResult` capability** — the first real
+  friction-driven contract evolution (a2web holds HTML in memory, not on disk). Extend, then a2web adopts.
 
-A read-only adopt-evaluation of a2web against `convert-md` + `anyllm` returned **no-go on both**
-(DEEP·STABLE·WINS correctly said *duplicate*). It surfaced two contract signals worth remembering — do
-**not** build on them (a2web is not adopting; that would be building on spec):
+## Parked — captured, build later
 
-- **`convert-md` is file-path-only.** a2web needs in-memory `html(str) + url → markdown + metadata`.
-  If a *second* consumer wants string-input html→markdown, that is the first real
-  [contract-driven evolution](missions/contract-and-implementation-harness.md) — a `convert_html` capability.
-- **`anyllm`'s contract is thinner than a2web's `llm_extract.Provider`** (which has async, token/cost/latency
-  accounting, prompt-cache breakpoints). The promotion arrow may **reverse** for the LLM concern: if a 3rd
-  project needs rich LLM-with-accounting, promote *a2web's* Provider, don't widen anyllm on spec.
+- **Onboarding `catalog`/`onboard` skill** — the judgment layer; runbook is built
+  ([mission](missions/onboarding-new-micro-software.md)), the skill is not.
 
 ## Gaps
 

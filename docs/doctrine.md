@@ -27,12 +27,19 @@ better foundations later. Improving one piece improves every consumer at once.
    *dissolving into a thin adapter* over a qualifying dep (what `anyllm` did for LLM providers). You
    adopt on GREEN, never on hope.
 
-3. **Reach for the shelf first — but adopt only if DEEP · STABLE · WINS.** Reuse is encouraged; the
-   wrong abstraction is not. Duplication beats a shallow or churning dependency. The three gates pick
-   candidates; a contract's tests adjudicate them.
+3. **Adopt conservatively — only if DEEP · STABLE · WINS.** *Pulling a shelf dep into a consumer* is the
+   cautious act: reuse is encouraged, the wrong abstraction is not, and duplication beats a shallow or
+   churning dependency. The three gates pick candidates; a contract's tests adjudicate them.
 
-4. **Promotion, not publication.** A piece graduates into the catalog when a *second* consumer pulls
-   it — never on a guess. (This is why the T0 primitives stayed in a2kay at bootstrap: n=1, unearned.)
+4. **Promote aggressively — capitalize generic substrate at writing time; reconcile later** (resolution
+   0006). The opposite posture from adopt: the moment you write a generic helper, a pattern wrapper, or an
+   abstraction over an awkward stdlib/library API, home it in the shelf *then* — a self-assessed "this
+   feels reusable" is enough; no second consumer required. The goal is that every app is mostly *business
+   logic + dependencies*. Two guards keep this from becoming a junk drawer: it is always **extracted, never
+   invented** (real code a real app needed — never an empty package to look complete), and **reconciliation
+   is mandatory** (merge / split / delete / demote, with hindsight). The flexibility-vs-reuse balance is
+   found at reconcile time, not guessed upfront. *Aggressive promote + conservative adopt + mandatory
+   decay is self-correcting.*
 
 5. **Structure controls size, not caps.** A large file is a smoke alarm for a missing boundary, not a
    lint failure. Good decomposition makes files small; arbitrary caps manufacture the wrong abstraction.

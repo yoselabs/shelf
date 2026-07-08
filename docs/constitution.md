@@ -36,17 +36,25 @@ A contract is born `candidate` (inert — it cannot block a refactor). It become
 ONLY when a live consumer demonstrably breaks without it. Protecting on fear calcifies the API and
 freezes the evolution the shelf exists to enable. Protection is budgeted and expiring.
 
-### VI. Reach for the shelf first; adopt only if DEEP · STABLE · WINS.
-Before hand-rolling a helper, grep the shelf. Adopt an existing piece only if it hides real complexity
-(deep, not a restatement), has a settled API (you are not the first to stress it), and wins the
-weight-vs-saved trade. Any gate fails → duplicate locally. Duplication is far cheaper than the wrong
-abstraction. (The three gates pick candidates; a contract's tests adjudicate them — see the ontology.)
+### VI. Adopt conservatively — reach for the shelf first, pull only if DEEP · STABLE · WINS.
+*Pulling a shelf dep into a consumer* is the cautious act. Grep the shelf first; adopt an existing piece
+only if it hides real complexity (deep, not a restatement), has a settled API, and wins the
+weight-vs-saved trade. Any gate fails → duplicate locally; duplication is cheaper than the wrong
+abstraction. If the shelf *lacks* the piece and it is generic substrate, don't just duplicate — **promote
+it** (Article VII).
 
-### VII. Promotion, not publication.
-A piece enters the catalog (gets a manifest) only when a **second** consumer pulls it. Nothing is
-published to look complete. This is why the 3 T0 primitives stayed in a2kay at bootstrap: n=1 there,
-unearned here.
+### VII. Promote aggressively — capitalize generic substrate at writing time; reconcile later.
+The opposite posture from adopt (resolution 0006). The moment you write a generic helper, a pattern +
+its safety wrapper, or an abstraction over an awkward stdlib/library API, home it in the shelf **then** —
+a self-assessed "this feels reusable" is enough; **no second consumer required**. The aim is that every
+app is mostly *business logic + dependencies*. Two guards, not a gate: it is always **extracted, never
+invented** (real code a real app needed — never an empty package to look complete), and it is answerable
+at **reconciliation** (Article VIII). Aggressive promote + conservative adopt is self-correcting.
 
-### VIII. Decay is mandatory.
-Every piece carries a TTL. Unreused past it → deprecate → retire. No immortal entries. Deletion is a
-virtue, not a failure; a smaller shelf is a healthier one.
+### VIII. Decay and reconciliation are mandatory.
+Every piece carries a TTL; unreused past it → deprecate → retire. And a recurring **reconciliation** pass
+adjudicates the aggressively-promoted catalog *with hindsight* — **merge** overlaps, **split** a
+kitchen-sink, **delete** the unused, **demote / duplicate back** an over-promotion (lineage arcs record
+it). This is where "was that the right abstraction?" is answered. Deletion is a virtue; a smaller shelf is
+a healthier one. Neglect reconciliation and aggressive promotion rots the catalog — it is the load-bearing
+other half, not optional garnish.
