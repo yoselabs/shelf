@@ -1,0 +1,10 @@
+seq = 32
+date = "2026-07-08"
+event = "delivery"
+software = "anyllm"
+release = "anyllm-v0.2.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "evolution (worktree ../shelf-anyllm) + resolution 0007"
+note = "Evolved anyllm from the v0.1 sync `complete(prompt)->str` to an async, structured superset returning a rich Completion (token/cost/latency) with fail-loud AnyLLMError. a2web's rich Provider tier was PROMOTED IN, not split as a sibling, per resolution 0007 (the monotonicity test: the merged contract only expands exposure — rich return, loud failure — so converge). Four backends: claude-code-cli (stdlib), claude-code-sdk, anthropic-api, openai-compatible (each SDK an opt-in extra). anyllm-v0.1.0 stays tagged; a2kay remains on it and reconciles to v0.2.0 when it next touches its LLM seam. Reconcile-later notes surfaced by the a2web adoption (green on branch work/adopt-anyllm-v0.2.0, verdict pending merge): (1) adapter .name strings (anthropic-api/claude-code-sdk/openai-compatible) now differ from a2web's registry ids (anthropic/claude-code/openai_compatible) by design; (2) the [openai] extra pins openai <2, a version ceiling the shelf now imposes on consumers; (3) LLMProvider requires a new available() member and adapters no longer raise on construction (the surface-state split) — duck-typed consumer mocks must add available(); (4) the cache-tier token->cost accounting + PromptParts ride inside anyllm — extract as a shared T0 only if a non-LLM holder ever wants them."
