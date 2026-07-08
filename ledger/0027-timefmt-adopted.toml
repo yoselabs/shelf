@@ -1,0 +1,10 @@
+seq = 27
+date = "2026-07-08"
+event = "verdict"
+software = "timefmt"
+release = "timefmt-v0.1.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "n/a"
+note = "a2web repointed utils/time + fetcher_response to the timefmt git-tag pin, deleted the local fmt_dur, kept tests green."

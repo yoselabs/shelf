@@ -1,0 +1,10 @@
+seq = 26
+date = "2026-07-08"
+event = "delivery"
+software = "timefmt"
+release = "timefmt-v0.1.0"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "promotion (worktree ../shelf-a2web)"
+note = "Promoted from a2web's utils/time.fmt_dur during the catch-up sweep (resolution 0006). Zero-dep pure function. Folded here rather than cut as a standalone 17-LOC package. Born candidate."

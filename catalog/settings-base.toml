@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "settings-base"
+kind = "primitive"
+tier = "T1"
+release = "settings-base-v0.1.0"
+capability = "Stop caring about the env/YAML plumbing under a pydantic-settings config — ${VAR} expansion, a secret-stripping YAML source (secrets stay env-only), and file-existence-gated config-path resolution."
+implementation = "ours"          # thin machinery over pydantic-settings; the secret-stripping source + env-ref shape is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Extracted from a2web's settings.py (the generic loader machinery only — the AppSettings schema, its secret-field set, and its path defaults stay in a2web). resolve_env_refs + resolve_config_path + SecretStrippingYamlSource(exclude=...). Born candidate."

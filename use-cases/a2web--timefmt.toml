@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "timefmt"
+why = "a2web's response envelope reports timings (tier durations, total_ms) as human-readable strings, and its spec mandates ONE formatting site so durations render consistently everywhere. That adaptive ms→s→m:ss rule is generic substrate, not a2web's fetching domain."
+needs = "fmt_dur(ms: int) -> str with the four-tier magnitude rule (integer ms under 1s, one-decimal s under 7s, integer s under 60s, m:ss above)."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired

@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "timefmt"
+kind = "primitive"
+tier = "T0"
+release = "timefmt-v0.1.0"
+capability = "Stop caring how to render a duration — one adaptive formatter whose units match magnitude (ms → 1-decimal s → integer s → m:ss), no wasted precision."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (its utils/time.fmt_dur — the single place durations were formatted). Zero-dependency pure function, four-tier rule. Born candidate."

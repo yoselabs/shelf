@@ -132,6 +132,8 @@ testpaths = [
     "packages/record-mine/tests",
     "packages/browser-cookies/tests",
     "packages/content-extract/tests",
+    "packages/timefmt/tests",
+    "packages/settings-base/tests",
 ]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"

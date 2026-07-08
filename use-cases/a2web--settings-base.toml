@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "settings-base"
+why = "a2web configures from A2WEB_* env vars plus an optional YAML file, with ${ENV_VAR} references inside the YAML resolved at load and secrets (jina_key, tokens, signing keys) forced to env-only so they never live in a config file. That env/YAML plumbing is generic; a2web keeps its own AppSettings schema, its secret-field set, and its ~/.a2web/config.yaml path policy."
+needs = "resolve_env_refs(value) for ${VAR} expansion, resolve_config_path(env_var, default) for the file-gated path, and SecretStrippingYamlSource(exclude=...) to drop the caller-named secret fields from the YAML layer."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired
