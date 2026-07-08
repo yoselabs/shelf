@@ -26,6 +26,7 @@ members = [
     "http-cache",
     "http-fetch",
     "json-in-html",
+    "record-mine",
     "sqlite-resource",
 ]
 
@@ -2779,6 +2780,17 @@ dependencies = [
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/23/e8d7251c53137b5b66d89e85cb0bc3e6bcfaec9527f29b477ec04389c8b2/rapidocr-3.9.1-py3-none-any.whl", hash = "sha256:600885e4e94e0b427abad394fccb0ec1d3c9118a215ca435bf7680aeae0e292b", size = 27274755, upload-time = "2026-07-02T13:37:00.827Z" },
 ]
+
+[[package]]
+name = "record-mine"
+version = "0.1.0"
+source = { editable = "packages/record-mine" }
+dependencies = [
+    { name = "lxml" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "lxml", specifier = ">=5,<7" }]
 
 [[package]]
 name = "referencing"

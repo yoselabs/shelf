@@ -128,6 +128,7 @@ testpaths = [
     "packages/http-fetch/tests",
     "packages/json-in-html/tests",
     "packages/html-fragment/tests",
+    "packages/record-mine/tests",
 ]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"

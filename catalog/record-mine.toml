@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "record-mine"
+kind = "primitive"
+tier = "T1"
+release = "record-mine-v0.1.0"
+capability = "Stop caring that a listing / index / threaded-discussion page is N repeated records, not one article — locate the dominant repeated-record region a boilerplate-stripper discards, and render it to depth-aware, link-preserving markdown."
+implementation = "ours"          # tree-aware repeated-region detector + depth renderer; the whole shape is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (its packages/record_extract). A tree-aware detector finds the dominant repeated-signature region; a depth-aware renderer emits it. Boundary types Record + RecordSet (is_threaded, to_markdown). lxml-backed, pure. Born candidate."

@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "record-mine"
+why = "On a listing / search-results / forum-thread page, the answer is the repeated records (products, results, comments), which trafilatura discards as boilerplate. a2web recovers them: it mines the dominant repeated region and renders it to markdown so the caller sees the option space (feeding next_links / try_url). The detection + rendering is generic HTML substrate; which records answer the question is a2web's policy — and a2web never crowns a pick (ADR-0012)."
+needs = "extract_records(html, base_url) -> RecordSet | None; Record (text, links, heading_text, heading_link, depth, markdown) and RecordSet (records, container, child_signature, max_depth; is_threaded; to_markdown())."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired
