@@ -1,0 +1,10 @@
+seq = 17
+date = "2026-07-08"
+event = "delivery"
+software = "html-fragment"
+release = "html-fragment-v0.1.0"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "promotion (worktree ../shelf-a2web)"
+note = "Promoted from a2web's packages/html_fragment during the catch-up sweep (resolution 0006). Behavior-preserving lift. Born candidate."

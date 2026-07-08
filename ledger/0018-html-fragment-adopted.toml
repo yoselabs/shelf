@@ -1,0 +1,10 @@
+seq = 18
+date = "2026-07-08"
+event = "verdict"
+software = "html-fragment"
+release = "html-fragment-v0.1.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "n/a"
+note = "a2web repointed its Discourse/Habr/V2EX/HN/Reddit handlers + zyte tier from packages/html_fragment to the git-tag pin, deleted the copy, kept tests green."

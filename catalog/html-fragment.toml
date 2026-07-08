@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "html-fragment"
+kind = "primitive"
+tier = "T1"
+release = "html-fragment-v0.1.0"
+capability = "Stop caring how a server-supplied HTML fragment becomes text — convert a comment body / cooked / rendered-html blob into link-preserving markdown or plain text, entity-decoded."
+implementation = "ours"          # lxml-backed rendering; the markdown emission shape is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (its packages/html_fragment). Two functions: to_markdown(html, *, base_url) and to_text(html). lxml-backed, entity-decoded, absolute-izes relative hrefs. Pure — fragment in, text out. Born candidate."

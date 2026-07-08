@@ -127,6 +127,7 @@ testpaths = [
     "packages/http-cache/tests",
     "packages/http-fetch/tests",
     "packages/json-in-html/tests",
+    "packages/html-fragment/tests",
 ]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"

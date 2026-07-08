@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "html-fragment"
+why = "Several a2web site handlers receive content as a pre-rendered HTML fragment inside a JSON API response — Discourse `cooked`, Habr `textHtml`, V2EX `content_rendered`, HN Algolia comment text, Reddit comment HTML. That fragment must become link-preserving markdown (or plain text) without a full-page extraction pass. The conversion is generic HTML substrate; which field carries the fragment is each handler's knowledge."
+needs = "to_markdown(html, *, base_url) -> str and to_text(html) -> str; link-preserving, entity-decoded, relative hrefs absolutized against base_url."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired

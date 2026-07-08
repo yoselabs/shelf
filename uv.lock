@@ -22,6 +22,7 @@ members = [
     "anyllm",
     "convert-md",
     "git-porcelain",
+    "html-fragment",
     "http-cache",
     "http-fetch",
     "json-in-html",
@@ -1138,6 +1139,17 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/b6/20f99cfe97cc663a711f7b33cc21d4793e51968e9a26125b4afcd77315ba/hf_xet-1.5.1-cp37-abi3-win_amd64.whl", hash = "sha256:f7b3002f95d1c13e24bcb4537baa8f0eb3838957067c91bb4959bc004a6435f5", size = 4026419, upload-time = "2026-06-08T23:02:50.829Z" },
     { url = "https://files.pythonhosted.org/packages/f9/fa/77453694888f03e5a8c8852d1514a0894d8e81c622d39edbaf308ea0dcf4/hf_xet-1.5.1-cp37-abi3-win_arm64.whl", hash = "sha256:93d090b57b211133f6c0dab0205ef5cb6d89162979ba75a74845045cc3063b8e", size = 3855178, upload-time = "2026-06-08T23:02:52.452Z" },
 ]
+
+[[package]]
+name = "html-fragment"
+version = "0.1.0"
+source = { editable = "packages/html-fragment" }
+dependencies = [
+    { name = "lxml" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "lxml", specifier = ">=5,<7" }]
 
 [[package]]
 name = "html2text"
