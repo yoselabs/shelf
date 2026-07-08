@@ -1,0 +1,10 @@
+seq = 15
+date = "2026-07-08"
+event = "delivery"
+software = "json-in-html"
+release = "json-in-html-v0.1.0"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "promotion (worktree ../shelf-a2web)"
+note = "Promoted from a2web's packages/json_in_script during the catch-up sweep (resolution 0006). Behavior-preserving lift; refactored only to pass the strict shelf preset. Born candidate."

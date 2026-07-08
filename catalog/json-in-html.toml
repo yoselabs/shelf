@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "json-in-html"
+kind = "primitive"
+tier = "T1"
+release = "json-in-html-v0.1.0"
+capability = "Stop caring how a page smuggles its structured data — pull LD-JSON, microdata, OpenGraph, window.__X__ var assignments, and raw JSON bodies out of HTML, ranked by answer-bearing strength."
+implementation = "ours"          # selectolax-backed detectors + ranking; the extraction shape is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (its packages/json_in_script). One detector per embedding convention, a JsonPayload boundary type carrying (source, data, script_id, byte_size), and rank_payloads to prefer commerce/editorial schemas. Pure — HTML in, payloads out; no domain policy. Born candidate."

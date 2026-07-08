@@ -1,0 +1,10 @@
+seq = 16
+date = "2026-07-08"
+event = "verdict"
+software = "json-in-html"
+release = "json-in-html-v0.1.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "n/a"
+note = "a2web repointed fetcher/domain/tiers.raw from packages/json_in_script to the json_in_html git-tag pin, deleted the copy, kept tests green."

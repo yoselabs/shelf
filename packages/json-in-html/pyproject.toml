@@ -1,0 +1,18 @@
+[project]
+name = "json-in-html"
+version = "0.1.0"
+description = "Extract structured JSON embedded in HTML — LD-JSON, microdata, OpenGraph, framework app-state (__NEXT_DATA__/__NUXT_DATA__), window.<var> assignments, and raw JSON response bodies."
+readme = "README.md"
+authors = [{ name = "Denis Tomilin" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+    "selectolax>=0.3,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/json_in_html"]

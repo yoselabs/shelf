@@ -126,6 +126,7 @@ testpaths = [
     "packages/sqlite-resource/tests",
     "packages/http-cache/tests",
     "packages/http-fetch/tests",
+    "packages/json-in-html/tests",
 ]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"
