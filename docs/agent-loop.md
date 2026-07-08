@@ -50,7 +50,14 @@ Then take **one of four directions**:
 2. **EVOLVE** — a piece *almost* fits but is not flexible enough → **grow its contract to serve both
    cases** (§4, on the existing package: add the capability + tests, cut a new tag), then adopt it. One
    evolving piece beats two near-identical ones — *when the generalization stays coherent*. This is the
-   `convert-md → convert_html` move.
+   `convert-md → convert_html` move. **When the candidate is a richer superset of a package that already
+   exists, evolve to the superset — do not grow a sibling and promise to merge later** (resolution 0007,
+   the monotonicity test): decide each axis of the merged contract by whether the new shape **exposes more
+   and removes nothing** (rich return over bare value; fail-loud over errors-as-values, since raising
+   *surfaces* the failure). If it does → converge everyone onto it; the thin caller ignores the extra. Keep
+   a narrower contract **only** where a consumer has a *stated, specific requirement* for it — otherwise a
+   second contract is just quirk. A breaking evolution of an `active` package ships as a new tag with a
+   migration note; the old tag stays (opt-in upgrade) and lagging consumers reconcile on their own clock.
 3. **PROMOTE** — nothing covers it and it is generic → capitalize it now (§3). The cheap moment; once it
    is wired into your app the chance is lost.
 4. **DUPLICATE / SKIP** — evolving would distort the piece (serve two masters badly), or your need is too

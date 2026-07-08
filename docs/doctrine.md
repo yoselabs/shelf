@@ -39,7 +39,10 @@ better foundations later. Improving one piece improves every consumer at once.
    invented** (real code a real app needed — never an empty package to look complete), and **reconciliation
    is mandatory** (merge / split / delete / demote, with hindsight). The flexibility-vs-reuse balance is
    found at reconcile time, not guessed upfront. *Aggressive promote + conservative adopt + mandatory
-   decay is self-correcting.*
+   decay is self-correcting.* When a candidate is a **richer superset of a package that already exists,
+   evolve to the superset rather than growing a sibling** (resolution 0007, the *monotonicity test*): if the
+   merged contract **exposes more and removes nothing** — rich return over bare value, fail-loud over
+   errors-as-values — converge everyone onto it; keep a narrower contract only for a *stated* requirement.
 
 5. **Structure controls size, not caps.** A large file is a smoke alarm for a missing boundary, not a
    lint failure. Good decomposition makes files small; arbitrary caps manufacture the wrong abstraction.
