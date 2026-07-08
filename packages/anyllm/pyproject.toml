@@ -1,14 +1,20 @@
 [project]
 name = "anyllm"
-version = "0.1.0"
-description = "Stop caring which LLM provider is underneath — a neutral completion interface with claude-code-cli + anthropic-api backends."
+version = "0.2.0"
+description = "Stop caring which LLM provider is underneath — one async completion contract with token/cost accounting and four backends (claude-code-cli/-sdk, anthropic-api, openai-compatible)."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
 requires-python = ">=3.11"
 license = "Apache-2.0"
-dependencies = [
-    "httpx>=0.27,<1",
-]
+# Base install is featherweight: the claude-code-cli backend is stdlib-only
+# (subprocess). Each SDK-backed backend is an opt-in extra so a consumer pulls
+# only the provider libraries it uses (mirrors convert-md's [documents] split).
+dependencies = []
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40,<1"]
+openai = ["openai>=1.50,<2"]
+claude-code-sdk = ["claude-agent-sdk>=0.1.80,<1"]
 
 [build-system]
 requires = ["hatchling"]

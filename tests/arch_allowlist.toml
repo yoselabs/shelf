@@ -13,6 +13,7 @@ convert-md = "Intra-shelf workspace dependency (content-extract composes its con
 
 [name_collision]
 # _example_helper = "why this convergence is by design"
+_client = "anyllm: each SDK provider's lazy client-builder method (anthropic vs openai). Same intent, genuinely different bodies — a convergence of concept, not a re-implementation."
 
 # [[body_dup]]
 # names = ["_foo", "_bar"]

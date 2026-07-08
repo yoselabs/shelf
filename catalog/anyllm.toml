@@ -4,9 +4,9 @@
 name = "anyllm"
 kind = "any-lib"                 # primitive | any-lib | composite | cli | framework | config-preset
 tier = "T1"                      # T0 primitive · T1 any-* · T2 composite
-release = "anyllm-v0.1.0"        # current git tag
+release = "anyllm-v0.2.0"        # current git tag (v0.1.0 stays tagged for un-upgraded consumers)
 capability = "Stop caring which LLM provider is underneath."
 implementation = "hybrid-adapter"  # ours | third-party | hybrid-adapter
 status = "active"                # candidate | active | deprecated | retired
 owner = "Denis Tomilin"
-notes = "Neutral completion interface; claude-code-cli + anthropic-api backends behind one Capability."
+notes = "One async, structured completion contract (LLMProvider) → a rich Completion (text + token/cost/latency); fail-loud AnyLLMError. Four backends behind one Capability: claude-code-cli (stdlib), claude-code-sdk, anthropic-api, openai-compatible (each SDK an opt-in extra). v0.2.0 evolved the v0.1 sync str contract to this superset per resolution 0007 (the monotonicity test) — the a2web Provider tier promoted in, not split off as a sibling. Cache-tier token→cost accounting rides inside; extract as a shared T0 only if a non-LLM holder wants it (reconcile-later)."
