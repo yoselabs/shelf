@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "content-extract"
+kind = "composite"               # composes convert-md's convert_html + trafilatura metadata + selectolax
+tier = "T2"
+release = "content-extract-v0.1.0"
+capability = "Stop caring how a web page becomes structured content — main-body markdown (via convert-md's convert_html), plus title / byline / date metadata and role-classified headings + links, in one ExtractedContent."
+implementation = "ours"          # composes convert_html for the body; the structural extraction is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (its packages/content_extract). Composes convert-md's convert_html string door for the body markdown, keeps trafilatura.extract_metadata for title/byline/date and selectolax for headings/links. Boundary types ExtractedContent / ExtractedHeading / ExtractedLink. Born candidate."

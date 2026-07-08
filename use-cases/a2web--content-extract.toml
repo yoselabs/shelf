@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "content-extract"
+why = "For a normal article page, a2web wants the main content as markdown plus the structural facts a caller reasons over: title, byline, publish date, the heading outline, and the outbound links with a role (content vs nav vs boilerplate). This is generic page-to-structure substrate; which parts answer the question is a2web's policy. The body conversion is delegated to convert-md's convert_html so the trafilatura call is not hand-rolled twice."
+needs = "extract_markdown(html, url) -> ExtractedContent (async) and parse_metadata(html) -> dict; ExtractedContent / ExtractedHeading / ExtractedLink boundary types; body markdown sourced from convert_html so it stays consistent with the shelf's conversion mechanism."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired

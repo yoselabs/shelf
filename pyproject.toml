@@ -131,6 +131,7 @@ testpaths = [
     "packages/html-fragment/tests",
     "packages/record-mine/tests",
     "packages/browser-cookies/tests",
+    "packages/content-extract/tests",
 ]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"
