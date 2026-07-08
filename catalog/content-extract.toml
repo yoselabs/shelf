@@ -2,7 +2,7 @@
 name = "content-extract"
 kind = "composite"               # composes convert-md's convert_html + trafilatura metadata + selectolax
 tier = "T2"
-release = "content-extract-v0.1.0"
+release = "content-extract-v0.1.1"
 capability = "Stop caring how a web page becomes structured content — main-body markdown (via convert-md's convert_html), plus title / byline / date metadata and role-classified headings + links, in one ExtractedContent."
 implementation = "ours"          # composes convert_html for the body; the structural extraction is ours
 status = "candidate"

@@ -1,0 +1,10 @@
+seq = 31
+date = "2026-07-08"
+event = "delivery"
+software = "content-extract"
+release = "content-extract-v0.1.1"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "re-cut (worktree ../shelf-a2web)"
+note = "Re-cut at the commit where the sibling convert-md is v0.3.0 (engines split). content-extract's in-repo `convert-md = {workspace = true}` source resolves convert-md from its OWN commit's tree, so the v0.1.0 tag (predating the split) still dragged docling into a consumer's lock and collided with a2kit's typer. v0.1.1 resolves the light base convert-md — a2web locks clean. Package code unchanged."
