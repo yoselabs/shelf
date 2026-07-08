@@ -438,7 +438,7 @@ wheels = [
 
 [[package]]
 name = "content-extract"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/content-extract" }
 dependencies = [
     { name = "convert-md" },
