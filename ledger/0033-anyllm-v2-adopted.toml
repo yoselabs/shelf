@@ -1,0 +1,10 @@
+seq = 33
+date = "2026-07-09"
+event = "adopted"
+software = "anyllm"
+release = "anyllm-v0.2.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "merged branch work/adopt-anyllm-v0.2.0"
+note = "a2web deleted its local llm_extract/providers and pinned anyllm-v0.2.0. Green: 986 passed, 89.81% coverage. Extractor/Judge catch AnyLLMError at their own seam to degrade to an empty Completion, keeping anyllm's fail-loud contract intact while a2web's degrade-to-raw path fires unchanged. Follow-up landed on the shelf side: the openai extra's <2 ceiling was lifted (openai>=1.50, verified against 2.44.0, 36/36 anyllm tests green) since it was a defensive pin with no code dependency on the 1.x line."

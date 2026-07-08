@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2web"
+software = "anyllm"
+why = "a2web's extraction/judge pipeline needs a metered, fail-loud LLM contract (tokens/cost/latency) across multiple backends, not a bare string."
+needs = "The async Completion-returning complete() surface, fail-loud AnyLLMError (caught locally at Extractor/Judge to degrade to raw), and available()-gated backend selection."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired
