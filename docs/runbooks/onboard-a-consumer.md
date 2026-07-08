@@ -54,18 +54,21 @@ an abstraction and one is a **superset** (async, cost accounting, more backends)
 the arrow can **reverse** (a2web's `llm_extract.Provider` is richer than `anyllm`). But a lone n=1 generic
 helper is a promote candidate on its own.
 
-## Phase D — the per-candidate verdict
+## Phase D — the four directions (the per-candidate verdict)
 
-| Situation | Verdict | Action |
+The same four directions as the standing loop (agent-loop §2), applied per candidate:
+
+| Direction | When | Action |
 |---|---|---|
-| Generic substrate the shelf **lacks** (even at n=1) | **PROMOTE** | Extract to the shelf (Phase E), born `candidate`. The default for anything generic. Growth of the catalog is the goal. |
-| Shelf already provides it **and** it passes DEEP·STABLE·WINS for this consumer's real surface | **ADOPT** | git+tag source, `uv lock`, delete the hand-roll, publish `use-cases/<consumer>--<sw>.toml`, add a ledger entry. |
-| Shelf provides it but the **contract shape is wrong** (Path vs string, sync vs async, drops needed data) | **EXTEND then adopt** | The friction *is* the promotion signal (constitution VII): grow the shelf piece a new capability (`convert_html(str,url)`), then adopt. If that's out of scope now, duplicate locally + log the gap. |
-| The app's **business logic / product moat** | **KEEP** | Leave it. Not substrate. |
+| **PROMOTE** | Generic substrate the shelf **lacks** (even at n=1); its shape is proven by this app's real use | Extract to the shelf (Phase E), born `candidate`. The default for anything generic; catalog growth is the goal. |
+| **ADOPT** | The shelf already provides it **and** it passes DEEP·STABLE·WINS for this consumer's real surface | git+tag source, `uv lock`, delete the hand-roll, publish `use-cases/<consumer>--<sw>.toml`, ledger entry. |
+| **EVOLVE** | A shelf piece **almost** fits but isn't flexible enough | Grow its contract to serve **both** cases (e.g. `convert-md` gains `convert_html(str, url)`), then adopt. Valid **even if this consumer keeps a richer variant** — the evolved core still serves the next holder, and this app's richer piece can *compose* on it (`content-extract` = `convert_html` + metadata). |
+| **KEEP** | The app's **business logic / product moat** — OR evolving a shelf piece would **distort** it | Leave it local. Not substrate, or too niche to reuse without bloating the piece. |
 
-Promote is the **cheap default** for generic substrate — over-promotion is fixed later at reconciliation
-(agent-loop §5b), a lost extraction moment is not. Only *adopting a dep* is conservative (DEEP·STABLE·WINS);
-*promoting your own generic code into the shelf* is aggressive.
+**EVOLVE vs KEEP is the flexibility call:** does generalizing make the piece serve both *coherently*
+(→ evolve) or *distort* it into a serve-two-masters kitchen-sink (→ keep local)? Promote/evolve is the
+**cheap default** for anything generic — over-reach is fixed at reconciliation (agent-loop §5b), a lost
+extraction moment is not. Only *adopting a dep* stays conservative (DEEP·STABLE·WINS).
 
 ## Phase E — promote / extend (when Phase D says PROMOTE or EXTEND)
 

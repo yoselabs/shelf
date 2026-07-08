@@ -34,20 +34,27 @@ it when the work has merged.
   **and** this loop.
 - Cheaper freshness peek (no working-tree change): `git -C <shelf> fetch --tags -q`. One call, cached.
 
-## 2. ADOPT vs PROMOTE — before you hand-roll substrate
+## 2. At a seam — the four directions (before you hand-roll substrate)
 
 **Trigger:** you are about to write a helper, wrapper, adapter, or any substrate glue — LLM / DB /
 embedding / git / file / format / config / datetime / collections / a wrapper over an awkward stdlib
 or third-party API.
 
-1. **Compare against the CATALOG** (`<shelf>/catalog/README.md` + `<shelf>/packages/` + `glossary.md`) —
-   **never** against another consumer. You cannot see what else is being built; the catalog is the frame.
-2. **If the shelf HAS it → adopt, but conservatively:** only if **DEEP** (hides real complexity) ·
-   **STABLE** (settled API) · **WINS** (lighter than you'd write). Any gate fails → **duplicate locally**.
-   Adopt = add the git+tag source (`consuming-the-shelf.md` §1), `uv lock`, import. **Never** a committed
-   local path.
-3. **If the shelf LACKS it and it is generic substrate → PROMOTE it now (§3)**, don't just write it
-   inline. This is the cheap moment (constitution VII); once it is wired into your app the chance is lost.
+**Compare against the CATALOG** (`<shelf>/catalog/README.md` + `<shelf>/packages/` + `glossary.md`) —
+**never** against another consumer; you cannot see what else is being built, so the catalog is the frame.
+Then take **one of four directions**:
+
+1. **ADOPT** — a piece fits as-is: **DEEP** (hides real complexity) · **STABLE** (settled API) · **WINS**
+   (lighter than you'd write). Add the git+tag source (`consuming-the-shelf.md` §1), `uv lock`, import.
+   **Never** a committed local path.
+2. **EVOLVE** — a piece *almost* fits but is not flexible enough → **grow its contract to serve both
+   cases** (§4, on the existing package: add the capability + tests, cut a new tag), then adopt it. One
+   evolving piece beats two near-identical ones — *when the generalization stays coherent*. This is the
+   `convert-md → convert_html` move.
+3. **PROMOTE** — nothing covers it and it is generic → capitalize it now (§3). The cheap moment; once it
+   is wired into your app the chance is lost.
+4. **DUPLICATE / SKIP** — evolving would distort the piece (serve two masters badly), or your need is too
+   niche → write it locally, don't force reuse. The call is revisited at reconciliation (§5b).
 
 ## 3. PRODUCE — promote aggressively, at writing time (resolution 0006)
 

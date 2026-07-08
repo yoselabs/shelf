@@ -47,9 +47,15 @@ it** (Article VII).
 The opposite posture from adopt (resolution 0006). The moment you write a generic helper, a pattern +
 its safety wrapper, or an abstraction over an awkward stdlib/library API, home it in the shelf **then** —
 a self-assessed "this feels reusable" is enough; **no second consumer required**. The aim is that every
-app is mostly *business logic + dependencies*. Two guards, not a gate: it is always **extracted, never
-invented** (real code a real app needed — never an empty package to look complete), and it is answerable
-at **reconciliation** (Article VIII). Aggressive promote + conservative adopt is self-correcting.
+app is mostly *business logic + dependencies*. Two guards, not a gate: it must be **shape-proven, not
+shape-guessed** (the interface is validated by real use — the *consumer* may be future, the *shape* may
+not be a guess), and it is answerable at **reconciliation** (Article VIII).
+
+At a **seam** (substrate that looks like shelf material) there are **four directions**, not one verdict:
+**adopt** (a piece fits), **evolve** (a piece *almost* fits → grow its contract to serve both cases —
+one evolving piece beats two similar ones, when it stays coherent), **promote** (nothing covers it →
+capitalize), **duplicate/skip** (evolving would distort the piece, or yours is too niche → keep it
+local). Aggressive promote + conservative adopt is self-correcting.
 
 ### VIII. Decay and reconciliation are mandatory.
 Every piece carries a TTL; unreused past it → deprecate → retire. And a recurring **reconciliation** pass

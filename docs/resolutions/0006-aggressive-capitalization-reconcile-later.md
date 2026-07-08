@@ -39,14 +39,37 @@ APIs, a service's supporting helper functions — belongs in shared shelf librar
 
 **The two guards that keep aggression from becoming a junk drawer:**
 
-1. **Extracted, never invented.** You only promote code a real app actually needed (n=1 *real use*). You
-   never publish an empty package to look complete. This is the surviving thread of the old
-   "promotion, not publication" — the code is always used; only its *future* reuse is speculative.
+1. **Shape-proven, not shape-guessed.** Promote a capability whose *interface* is validated by real use —
+   never one you are guessing at. The **consumer may be future**; the **shape may not be a guess**. (This
+   sharpens the earlier "extracted, never invented": the point was never "must already have a puller" —
+   `convert_html(str, url)` is a fine promotion because a2web's real trafilatura calls prove its exact
+   surface, even though a2web itself keeps its metadata-richer extractor. What is forbidden is *inventing*
+   an interface no real code has pressured.)
 2. **Reconciliation is mandatory.** A recurring, deliberate pass over the catalog: **merge** overlapping
    packages, **split** a kitchen-sink, **delete** the unused (Article VIII decay), **demote / duplicate
    back** an over-promotion. This is where "was this the right abstraction?" gets answered — *with
    hindsight, not by an upfront gate*. Lineage arcs (`absorbed-into`, `merged-with`, `supersedes`)
    record it.
+
+## The four directions at a seam
+
+When you find substrate that looks like shelf material (a "seam"), there is not one verdict — there are
+four, and choosing among them *is* the daily work:
+
+1. **ADOPT** — a shelf piece fits as-is (DEEP·STABLE·WINS). Pin it, delete your copy.
+2. **EVOLVE** — a shelf piece *almost* fits but is not flexible enough. **Grow its contract to serve both
+   cases** rather than duplicate. `convert-md` gaining `convert_html(str, url)` is the exemplar: the file
+   piece grows a string door, and `content-extract` composes on it (core → +metadata). One evolving piece
+   beats two near-identical ones — *as long as the generalization stays coherent* (doctrine #1: the shape
+   grows while the promise holds).
+3. **PROMOTE** — nothing in the shelf covers it and it is generic → capitalize it (shape-proven, now).
+4. **DUPLICATE / SKIP** — evolving the shelf piece would **distort** it (serve two masters badly, become a
+   kitchen-sink), or your need is genuinely too niche → keep it local, do not force reuse. A future app
+   may make it worth promoting; that is fine.
+
+The **EVOLVE-vs-SKIP** call is the flexibility trade-off named directly: does generalizing make the piece
+serve both **coherently** (evolve) or **distort** it (skip)? That judgment is the point — it is not
+mechanical, and it is revisited at reconciliation.
 
 ## Why this is self-correcting (the answer to "how do we find the balance?")
 
