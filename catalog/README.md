@@ -9,7 +9,7 @@ One row per `catalog/*.toml`. Types live in [`docs/glossary.md`](../docs/glossar
 | anyembed | any-lib | T1 | anyembed-v0.1.0 | active | hybrid-adapter | a2kay | Stop caring which embedding backend is underneath. |
 | anyllm | any-lib | T1 | anyllm-v0.1.0 | active | hybrid-adapter | a2kay | Stop caring which LLM provider is underneath. |
 | browser-cookies | primitive | T1 | browser-cookies-v0.1.0 | candidate | adopts | a2web | Stop caring how each browser stores its cookies — read the local machine's Chrome/Chromium/Brave/Edge/Firefox/Safari/etc cookie store into a uniform CookieRow, cross-platform. |
-| convert-md | composite | T2 | convert-md-v0.1.0 | active | hybrid-adapter | a2kay | Stop caring which engine converts which document format to markdown. |
+| convert-md | composite | T2 | convert-md-v0.2.0 | active | hybrid-adapter | a2kay | Stop caring which engine converts which document format to markdown — from a file path OR an in-memory HTML string. |
 | git-porcelain | any-lib | T1 | git-porcelain-v0.1.0 | active | ours | a2kay | Stop caring about git subprocess plumbing and credential fidelity. |
 | html-fragment | primitive | T1 | html-fragment-v0.1.0 | candidate | ours | a2web | Stop caring how a server-supplied HTML fragment becomes text — convert a comment body / cooked / rendered-html blob into link-preserving markdown or plain text, entity-decoded. |
 | http-cache | primitive | T1 | http-cache-v0.1.0 | candidate | ours | a2web | Stop caring about HTTP conditional-GET cache mechanics — content-hash dedup, gzip body column, TTL expiry, ETag/Last-Modified headers, and a (url, variant) key for per-profile caching. |

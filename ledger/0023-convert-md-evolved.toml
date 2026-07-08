@@ -1,0 +1,10 @@
+seq = 23
+date = "2026-07-08"
+event = "delivery"
+software = "convert-md"
+release = "convert-md-v0.2.0"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "evolve (worktree ../shelf-a2web)"
+note = "EVOLVE: grew convert_html(html, *, url) -> ConversionResult, a url-aware in-memory HTML string door (trafilatura-first, html2text fallback, never-raises) — the string companion to convert(path). Requested by a2web so content-extract can compose it. Additive; convert(path) + engine surface unchanged, a2kay unaffected on the v0.1.0 pin."

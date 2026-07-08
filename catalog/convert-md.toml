@@ -2,9 +2,9 @@
 name = "convert-md"
 kind = "composite"               # composes multiple third-party engines behind one surface
 tier = "T2"
-release = "convert-md-v0.1.0"
-capability = "Stop caring which engine converts which document format to markdown."
+release = "convert-md-v0.2.0"
+capability = "Stop caring which engine converts which document format to markdown — from a file path OR an in-memory HTML string."
 implementation = "hybrid-adapter"
 status = "active"
 owner = "Denis Tomilin"
-notes = "Per-format fallback chains (docling/pandoc/markitdown/trafilatura) + a model-free fidelity grade."
+notes = "Per-format fallback chains (docling/pandoc/markitdown/trafilatura) + a model-free fidelity grade. v0.2.0 grows convert_html(html, *, url) — a url-aware in-memory HTML string door (trafilatura-first, html2text fallback, never-raises) for consumers that already hold the page in memory (a2web). Additive; convert(path) unchanged, so a2kay is unaffected on v0.1.0."

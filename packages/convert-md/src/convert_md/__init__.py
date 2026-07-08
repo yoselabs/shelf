@@ -21,6 +21,7 @@ from convert_md.engines import (
     TrafilaturaEngine,
 )
 from convert_md.fidelity import grade
+from convert_md.html import convert_html
 
 __all__ = [
     "ConversionEngine",
@@ -34,6 +35,7 @@ __all__ = [
     "PandocEngine",
     "TrafilaturaEngine",
     "convert",
+    "convert_html",
     "fallback_chain_for",
     "grade",
     "select_engine",
