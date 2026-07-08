@@ -14,3 +14,5 @@ One row per `ledger/*.toml`: request → delivery → verdict → cost (R154). A
 | 6 | 2026-07-08 | verdict | anyembed | anyembed-v0.1.0 | a2kay | kept | a2kay repointed from an editable path to the git-tag pin; adopter verdict: kept. |
 | 7 | 2026-07-08 | verdict | convert-md | convert-md-v0.1.0 | a2kay | kept | a2kay repointed from an editable path to the git-tag pin; adopter verdict: kept. |
 | 8 | 2026-07-08 | verdict | git-porcelain | git-porcelain-v0.1.0 | a2kay | kept | a2kay repointed from an editable path to the git-tag pin; adopter verdict: kept. |
+| 9 | 2026-07-08 | delivery | http-fetch | http-fetch-v0.1.0 | a2web |  | Promoted from a2web's packages/http_fetch during the onboarding catch-up sweep (resolution 0006). Born candidate. |
+| 10 | 2026-07-08 | verdict | http-fetch | http-fetch-v0.1.0 | a2web | adopted | a2web repointed from its in-repo packages/http_fetch to the git-tag pin, deleted the copy, kept tests green — the round-trip that proves the promote→adopt loop. |

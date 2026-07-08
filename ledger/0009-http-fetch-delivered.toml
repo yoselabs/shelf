@@ -1,0 +1,10 @@
+seq = 9
+date = "2026-07-08"
+event = "delivery"
+software = "http-fetch"
+release = "http-fetch-v0.1.0"
+actor = "a2web"
+consumer = ""
+verdict = ""
+cost = "promotion (worktree ../shelf-a2web)"
+note = "Promoted from a2web's packages/http_fetch during the onboarding catch-up sweep (resolution 0006). Born candidate."

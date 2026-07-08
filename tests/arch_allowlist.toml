@@ -8,6 +8,7 @@
 
 [dep_upper_bound]
 html2text = "Date-versioned upstream (YYYY.M.D releases); no semver upper bound is meaningful."
+sqlite-resource = "Intra-shelf workspace dependency (http-cache composes it); pinned by git tag at adoption, not a PyPI range."
 
 [name_collision]
 # _example_helper = "why this convergence is by design"

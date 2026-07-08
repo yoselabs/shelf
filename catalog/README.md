@@ -10,3 +10,4 @@ One row per `catalog/*.toml`. Types live in [`docs/glossary.md`](../docs/glossar
 | anyllm | any-lib | T1 | anyllm-v0.1.0 | active | hybrid-adapter | a2kay | Stop caring which LLM provider is underneath. |
 | convert-md | composite | T2 | convert-md-v0.1.0 | active | hybrid-adapter | a2kay | Stop caring which engine converts which document format to markdown. |
 | git-porcelain | any-lib | T1 | git-porcelain-v0.1.0 | active | ours | a2kay | Stop caring about git subprocess plumbing and credential fidelity. |
+| http-fetch | primitive | T1 | http-fetch-v0.1.0 | candidate | ours | a2web | Stop caring about curl_cffi session plumbing — one GET with browser TLS impersonation, conditional GET, and closed-verdict error mapping. |

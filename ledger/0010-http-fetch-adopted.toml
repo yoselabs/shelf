@@ -1,0 +1,10 @@
+seq = 10
+date = "2026-07-08"
+event = "verdict"
+software = "http-fetch"
+release = "http-fetch-v0.1.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "n/a"
+note = "a2web repointed from its in-repo packages/http_fetch to the git-tag pin, deleted the copy, kept tests green — the round-trip that proves the promote→adopt loop."

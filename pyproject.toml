@@ -20,6 +20,7 @@ dev = [
     "ty>=0.0.1a8",            # type checking (Astral)
     "codespell>=2.3,<3",      # typos in code, docstrings, and docs
     "deptry>=0.20,<1",        # dependency hygiene: unused / missing / transitive
+    "pytest-asyncio>=0.24,<1",  # async test support (the first async packages: sqlite-resource, http-*)
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
@@ -122,8 +123,12 @@ testpaths = [
     "packages/anyembed/tests",
     "packages/convert-md/tests",
     "packages/git-porcelain/tests",
+    "packages/sqlite-resource/tests",
+    "packages/http-cache/tests",
+    "packages/http-fetch/tests",
 ]
 addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
 
 # ── codespell — typos across code, docstrings, and docs ───────────────────────
 [tool.codespell]

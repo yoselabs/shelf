@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "http-fetch"
+kind = "primitive"
+tier = "T1"
+release = "http-fetch-v0.1.0"
+capability = "Stop caring about curl_cffi session plumbing — one GET with browser TLS impersonation, conditional GET, and closed-verdict error mapping."
+implementation = "ours"          # a thin surface over curl_cffi; the impersonation + verdict mapping is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (its shared tier/handler HTTP primitive). Never raises on routine failure; proxy + circuit breaker are injected, so routing/stealth policy stays in the consumer. Born candidate."

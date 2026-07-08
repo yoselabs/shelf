@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "http-fetch"
+why = "a2web's tiers (raw, archive) and every site handler perform HTTP GETs that must impersonate a browser TLS fingerprint, route through a proxy, ride a per-host circuit breaker, and never raise — mapping every outcome to a closed verdict. This was a2web's shared transport primitive; it is generic substrate, not the anti-bot moat."
+needs = "One async fetch_bytes(url, *, proxy_url, cookies, conditional_extras, impersonate, breaker) -> FetchOutcome with a closed FetchVerdict; injected proxy + breaker so routing/stealth policy stays in a2web."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired
