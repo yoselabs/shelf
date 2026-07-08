@@ -41,6 +41,19 @@ is a smoke alarm.
 - **Onboarding runbook + `catalog`/`onboard` skill** — [mission](missions/onboarding-new-micro-software.md)
   captured; "do not build yet".
 
+## Field signals — observed, NOT yet actionable (2026-07-08 a2web adopt-eval)
+
+A read-only adopt-evaluation of a2web against `convert-md` + `anyllm` returned **no-go on both**
+(DEEP·STABLE·WINS correctly said *duplicate*). It surfaced two contract signals worth remembering — do
+**not** build on them (a2web is not adopting; that would be building on spec):
+
+- **`convert-md` is file-path-only.** a2web needs in-memory `html(str) + url → markdown + metadata`.
+  If a *second* consumer wants string-input html→markdown, that is the first real
+  [contract-driven evolution](missions/contract-and-implementation-harness.md) — a `convert_html` capability.
+- **`anyllm`'s contract is thinner than a2web's `llm_extract.Provider`** (which has async, token/cost/latency
+  accounting, prompt-cache breakpoints). The promotion arrow may **reverse** for the LLM concern: if a 3rd
+  project needs rich LLM-with-accounting, promote *a2web's* Provider, don't widen anyllm on spec.
+
 ## Gaps
 
 - [ ] **Guard enforcement is per-clone.** Onboarding installs the hook in one command
