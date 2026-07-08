@@ -1,6 +1,8 @@
 # Mission — onboarding new micro-software
 
-- **Status:** captured (2026-07-08), not yet built. Revisit near the end of the bootstrap arc.
+- **Status:** the **runbook** is built — `../runbooks/onboard-a-consumer.md` (triggered by onboarding
+  a2web as the 2nd consumer, 2026-07-08). The **skill** (`catalog`/`onboard`, the judgment layer) is
+  still to author. Paths 1 & 4 (new-from-scratch, wrap-OSS) remain sketch.
 - **Track:** governance / catalog
 - **Shape:** a **runbook** (the deterministic procedure) + a **skill** (`catalog`/`onboard` — the judgment).
 

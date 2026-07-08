@@ -104,5 +104,6 @@ Only when you must live-edit a shelf package and exercise it inside a consumer i
 ## 7. What is NOT in this loop
 
 The **whole-codebase adoption sweep** — auditing an entire app for micro-software candidates and
-researching which shelf pieces to adopt or modernize — is a separate, **deliberately-invoked** operation.
-Do not start it mid-feature. See `docs/missions/onboarding-new-micro-software.md`.
+researching which shelf pieces to adopt / promote / modernize so multiple consumers shrink — is a
+separate, **deliberately-invoked** operation. Do not start it mid-feature. The procedure is
+`docs/runbooks/onboard-a-consumer.md`.
