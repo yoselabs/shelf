@@ -43,11 +43,28 @@ is a smoke alarm.
   a 2nd human contributor. Until then manual `git tag` at n=4 packages is fine. (R§6.5.)
 - [ ] **Branding** — parked on purpose (user: dislikes both "shelf" and "microsoftware"; rename later).
   A separate pass, no throwaway names. (R11.)
-- [ ] **a2web's provider vocabulary vs. `anyllm.ProviderName`.** `anyllm-v0.3.0` (ledger 0037) added a
-  `StrEnum` on the shelf side, but a2web's plugin-registry keys (`"anthropic"`, `"claude-code"`) and its
-  `ProviderMode` Literal are a *different* string set, not the same vocabulary under different names —
-  collapsing onto anyllm's values would rename a2web's public config surface, a breaking change. Undecided
-  whether that rename is worth it; surfaced 2026-07-09.
+- [ ] **a2web adopts `anyllm.ProviderName` (decided direction, unbuilt).** `anyllm-v0.3.0` (ledger 0037)
+  added a `StrEnum` on the shelf side; a2web's plugin-registry keys (`"anthropic"`, `"claude-code"`) and
+  `ProviderMode` Literal (`settings.py:30`) are a *different* string set — not cosmetic drift, so this
+  isn't a mechanical rename. Decided 2026-07-09: **adopt, not just align** — that's the only way to get
+  drift-safety on future anyllm releases. Reasoning, for the a2web session that picks this up:
+  - Bumping anyllm's pin alone can't force a2web to notice a new provider — `build_adapter(provider: str,
+    ...)` stays loosely typed *on purpose* (it's a config-ingestion boundary; YAML/env are always
+    strings, so `ty` can't help there, and the function already validates at runtime). Static
+    drift-detection has to live in the *consumer's* typed code, not the library's boundary function.
+  - The fix: a2web parses its config string into `ProviderName` **once**, at the settings field itself —
+    `ProviderMode = Literal[...]` → `provider: ProviderName` on the `pydantic_settings.BaseSettings`
+    field. `StrEnum` is natively a pydantic validator; no custom `field_validator` needed. Everything
+    downstream in a2web becomes `ProviderName`-typed for free.
+  - Payoff: an exhaustive `match`/`case` (`assert_never` on the fallback, no wildcard) anywhere
+    downstream then gets `ty`-checked — a future anyllm provider added without a matching a2web branch
+    fails typecheck on `make check`, not silently at runtime.
+  - The one real design decision buried in the rename: a2web's plugin registry currently has **one**
+    `"claude-code"` plugin where anyllm distinguishes `CLAUDE_CODE_CLI` vs `CLAUDE_CODE_SDK` — decide
+    whether a2web wants both exposed as separate plugins or deliberately collapses them, don't let the
+    rename paper over that.
+  - `PluginManifest.name` is a public lookup key (`registry["anthropic"]`) — ships as a breaking change,
+    per `RECEIVE` step 4 ("migrate to the new idiom, not the smallest diff... delete compat shims").
 
 ## Promote — generic substrate to capitalize (res 0006; done in each app's catch-up sweep)
 
