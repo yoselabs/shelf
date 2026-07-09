@@ -102,6 +102,12 @@ STEPS:
    **not** branch position — a worktree opened days ago can silently be behind `main`.
 2. On branch `work/<project>` (create if absent).
 3. Extract the code into `packages/<name>/` behind a stable **Capability**, with:
+   - **`<name>` names the deliverable, not the origin** (resolution 0008): read it as a consumer who
+     has never seen this app — does it say what the package does? If it only makes sense with
+     origin-app context (a codename, internal jargon, a name that only disambiguated within that
+     app's own module tree), rename it now — this is free before the first tag, breaking after.
+     Keeping the origin module/folder name verbatim is fine *when it already passes that test*, not
+     as the default.
    - the **boundary test** — must not import any consumer app (the one invariant);
    - a **Contract** born `candidate` (inert until a live consumer breaks without it);
    - the package `pyproject.toml`.
