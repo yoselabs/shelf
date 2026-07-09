@@ -54,4 +54,4 @@
 - [x] 6.2 Re-read the rewritten `agent-loop.md` top to bottom as if a fresh consumer session —
       confirm every workflow is self-contained (trigger, steps, output) with no forward references
       to prose that no longer exists
-- [ ] 6.3 Commit and push (per user's no-PR convention for this repo)
+- [x] 6.3 Commit and push (per user's no-PR convention for this repo)
