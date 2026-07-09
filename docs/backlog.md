@@ -20,8 +20,10 @@ is a smoke alarm.
 ## Build — designed, unbuilt, gated (do NOT build on spec)
 
 - [ ] **Contract layer + `Implementation` build-vs-adopt harness (the crown insight).** No contract
-  files exist. Deepest value; inert until a real contract need appears — the first live one is
-  `convert-md`'s string-input capability (see Promote below).
+  files exist. Deepest value; still inert — its previously-cited trigger (`convert-md`'s `convert_html`
+  string-input capability) has already shipped and been adopted by a2web (2026-07-09 check) *without*
+  a contract file, so that trigger fired and passed with nothing built. Needs a fresh, concrete trigger
+  before starting — do not build on the old citation alone.
   [mission](missions/contract-and-implementation-harness.md). (R2/R3, glossary.)
 - [ ] **Reconciliation-pass tooling.** Aggressive promotion (res 0006) makes reconciliation load-bearing
   (constitution VIII, agent-loop §5b): merge/split/delete/demote the catalog with hindsight. Today it is
@@ -76,8 +78,6 @@ extract now, in the origin app's session (worktree `../shelf-<app>`), born `cand
 - **a2web's generic utilities** — env/YAML settings loader, sqlite conditional-GET cache shell,
   cookie-store matrix, collection/JSON helpers. Promote the generic ones; **leave the product moat**
   (bot-wall detection, proxy routing, browser backends) in a2web.
-- **`convert-md` → add a `convert_html(str, *, url) -> ConversionResult` capability** — the first real
-  friction-driven contract evolution (a2web holds HTML in memory, not on disk). Extend, then a2web adopts.
 
 ## Parked — captured, build later
 
