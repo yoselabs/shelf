@@ -104,6 +104,36 @@ def test_fidelity_grade_partial_on_garbage() -> None:
     assert any("garbage" in w for w in warnings)
 
 
+def test_fidelity_grade_partial_on_cid_glyph_leak() -> None:
+    # A raw PDF font's ToUnicode mapping failing to resolve leaks literal
+    # (cid:N) tokens into the text — calibrated 2026-07-09 against real
+    # markitdown/CJK bench output (bench/results/2026-07-09-findings.md).
+    lines = [f"real text line {i}" if i % 3 else f"(cid:{1000 + i})" for i in range(30)]
+    fidelity, lost, warnings = grade(markdown="\n".join(lines), source_size=2000)
+    assert fidelity == "partial"
+    assert "encoding" in lost
+    assert any("cid_glyph_leak" in w for w in warnings)
+
+
+def test_fidelity_grade_partial_on_shattered_table() -> None:
+    # An engine that drops pipe/row syntax entirely and emits one cell per
+    # line — calibrated against unstructured's real shattered-table output
+    # (0.562 numeric-line fraction vs. 0.260 for the highest legitimate case).
+    lines = [str(1000 + i) if i % 2 else f"label {i}" for i in range(30)]
+    fidelity, lost, warnings = grade(markdown="\n".join(lines), source_size=2000)
+    assert fidelity == "partial"
+    assert "table_structure" in lost
+    assert any("shattered_table" in w for w in warnings)
+
+
+def test_fidelity_grade_high_on_real_markdown_table_despite_numeric_density() -> None:
+    # A genuine markdown table is numeric-dense by nature but every cell sits
+    # inside `| … |` syntax — must not trip the shattered-table check.
+    rows = "\n".join(f"| {i} | {i * 2} | {i * 3} |" for i in range(20))
+    fidelity, _lost, _warnings = grade(markdown=f"| a | b | c |\n|---|---|---|\n{rows}\n", source_size=2000)
+    assert fidelity == "high"
+
+
 def test_fidelity_grade_high_on_clean_text() -> None:
     fidelity, _lost, _warnings = grade(markdown="# Clean\n\nA fine document.\n", source_size=120)
     assert fidelity == "high"

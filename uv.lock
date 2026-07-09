@@ -469,7 +469,7 @@ requires-dist = [
 
 [[package]]
 name = "convert-md"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "packages/convert-md" }
 dependencies = [
     { name = "html2text" },

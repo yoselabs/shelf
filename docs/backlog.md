@@ -14,6 +14,11 @@ is a smoke alarm.
 - [ ] **Pre-commit-*framework* path.** The one-command installer (native hook) is tested and is the
   onboarding default; the `.pre-commit-hooks.yaml` `rev:` wiring (the framework alternative) has never
   been resolved by a real consumer.
+- [ ] **`convert-md`'s docx engine choice (pandoc over markitdown) is reasoned, not verified.** Kept for
+  one concrete reason — pandoc's `--track-changes=all` preserves tracked-changes/redline metadata,
+  which markitdown's plain-text extraction can't replicate — but unlike PDF (bench/results/
+  2026-07-09-findings.md), no docx corpus exists in `bench/` to actually test it. Surfaced 2026-07-09
+  during the PDF-engine work. Build the same evidence-backed treatment if/when it matters.
 
 ## Build — designed, unbuilt, gated (do NOT build on spec)
 
