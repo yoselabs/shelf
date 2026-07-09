@@ -3,6 +3,7 @@
 - **Status:** decided (2026-07-07)
 - **Expires:** 2027-01-07 (re-justify at the half-year)
 - **Track:** topology
+- **Distilled into:** N/A — self-enforcing via the repo layout itself (packages/, catalog/, use-cases/, ledger/ existing as directories)
 
 ## Decision
 

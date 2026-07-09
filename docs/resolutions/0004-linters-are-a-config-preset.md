@@ -3,6 +3,7 @@
 - **Status:** decided (2026-07-08)
 - **Expires:** 2027-01-08 (re-justify at the half-year)
 - **Track:** tooling / how-things-are-done
+- **Distilled into:** N/A — self-enforcing via docs/linting.md + Makefile
 
 ## The fork
 

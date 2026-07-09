@@ -30,6 +30,18 @@ is a smoke alarm.
   private-name-collision, dep-upper-bound) is **built native** (resolution 0005, `tools/arch_rules.py`).
   Still un-ported from a2kit: the import layer-DAG and the `dict[str,Any]`-ban. Add as fitness tests
   when a real layering/typing violation appears. (R9.)
+- [ ] **`anyllm.ProviderName` enum — one source of truth for backend names.** `.name` strings
+  (`"anthropic-api"`, `"claude-code-sdk"`, …) live only as bare `str` on each adapter; a2web
+  independently invented its own vocabulary for the same four backends
+  (`"anthropic"`, `"claude-code"`, …) before anyllm existed — two vocabularies, same four things,
+  never unified. Fix: a `StrEnum` in `anyllm.base`, adapters typed against it, a2web imports it
+  instead of its own strings. **Trigger:** fold into a2web's planned dependency-upgrade sweep
+  (surfaced 2026-07-09, openai `<2` pin already lifted in that sweep's spirit) — don't do it
+  standalone.
+- [ ] **Expired-resolution advisory check.** `docs/resolutions/*.md` frontmatter already carries an
+  `Expires:` date; nothing reads it. Extend `make advisory` (non-blocking, like the cross-package
+  duplication check) to flag resolutions past their expiry at a reconciliation pass. Not
+  commit-blocking — date-triggered, not diff-triggered.
 
 ## Decide — open forks (a decision, not a build)
 
@@ -37,6 +49,10 @@ is a smoke alarm.
   a 2nd human contributor. Until then manual `git tag` at n=4 packages is fine. (R§6.5.)
 - [ ] **Branding** — parked on purpose (user: dislikes both "shelf" and "microsoftware"; rename later).
   A separate pass, no throwaway names. (R11.)
+- [ ] **`docs/resolutions/` → `docs/adr/` rename?** They're already ADR-shaped (README calls them
+  "ADR-style"), plus extra machinery (`Expires:`, `Track:` lineage) a vanilla ADR doesn't carry.
+  Pure rename cost (~7 files' cross-links) for a label change — only worth it if there's a concrete
+  driver (tooling expecting a literal `adr/` folder convention). Surfaced 2026-07-09, undecided.
 
 ## Promote — generic substrate to capitalize (res 0006; done in each app's catch-up sweep)
 
@@ -45,9 +61,6 @@ extract now, in the origin app's session (worktree `../shelf-<app>`), born `cand
 
 - **a2kay's T0 primitives** `atomic_io`, `duckdb_sidecar`, `managed_region` — generic substrate, promote
   in a2kay's catch-up. (Was parked at n=1; res 0006 removes that gate.)
-- **a2web's `llm_extract.Provider`** → promote as `anyllm`'s async/structured tier (superset: async,
-  token/cost/latency accounting, prompt-cache breakpoints). a2kay keeps its thin `anyllm` tier, upgrades
-  opt-in. The arrow *reverses* here — the richer consumer implementation is the one promoted.
 - **a2web's generic utilities** — env/YAML settings loader, sqlite conditional-GET cache shell,
   cookie-store matrix, collection/JSON helpers. Promote the generic ones; **leave the product moat**
   (bot-wall detection, proxy routing, browser backends) in a2web.

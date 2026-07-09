@@ -3,6 +3,7 @@
 - **Status:** decided (2026-07-08) — refines the EVOLVE-vs-sibling call in the four directions (agent-loop §2).
 - **Expires:** 2027-01-08 (re-justify at the half-year — especially whether any consumer ever needed the escape valve).
 - **Track:** governance / the promotion model. Follows [0006](0006-aggressive-capitalization-reconcile-later.md).
+- **Distilled into:** agent-loop.md WORKFLOW: SEAM (EVOLVE direction)
 
 ## The question this answers
 

@@ -3,6 +3,7 @@
 - **Status:** decided (2026-07-08)
 - **Expires:** 2027-01-08 (re-justify at the half-year)
 - **Track:** governance
+- **Distilled into:** N/A — self-enforcing via CLAUDE.md's read order
 
 ## Decision
 

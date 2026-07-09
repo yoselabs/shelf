@@ -3,6 +3,7 @@
 - **Status:** decided (2026-07-08)
 - **Expires:** 2027-01-08 (re-justify at the half-year)
 - **Track:** tooling / architecture fitness
+- **Distilled into:** N/A — self-enforcing via tests/test_arch_rules.py
 
 ## The fork
 

@@ -3,6 +3,7 @@
 - **Status:** decided (2026-07-08) — supersedes the "rule-of-three / 2nd-consumer-pull" promotion gate.
 - **Expires:** 2027-01-08 (re-justify at the half-year — especially the reconciliation cost)
 - **Track:** governance / the promotion model
+- **Distilled into:** agent-loop.md WORKFLOW: SEAM (PROMOTE direction) and WORKFLOW: RECONCILE
 
 ## The correction
 
