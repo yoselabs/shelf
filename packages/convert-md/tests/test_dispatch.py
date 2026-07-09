@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pypandoc
-import pytest
 from convert_md import (
-    DoclingEngine,
     Html2TextEngine,
     MarkitdownEngine,
     OpenpyxlEngine,
     PandocEngine,
+    PymupdfLlmEngine,
     TrafilaturaEngine,
     convert,
     fallback_chain_for,
@@ -23,7 +21,7 @@ from openpyxl import Workbook
 
 
 def test_dispatch_table_primary_engines() -> None:
-    assert select_engine(Path("x.pdf")) is DoclingEngine
+    assert select_engine(Path("x.pdf")) is PymupdfLlmEngine
     assert select_engine(Path("x.docx")) is PandocEngine
     assert select_engine(Path("x.pptx")) is MarkitdownEngine
     assert select_engine(Path("x.xlsx")) is MarkitdownEngine
@@ -31,6 +29,7 @@ def test_dispatch_table_primary_engines() -> None:
 
 
 def test_fallback_chains() -> None:
+    assert fallback_chain_for(Path("x.pdf")) == [PymupdfLlmEngine]
     assert fallback_chain_for(Path("x.docx")) == [PandocEngine, MarkitdownEngine]
     assert fallback_chain_for(Path("x.xlsx")) == [MarkitdownEngine, OpenpyxlEngine]
     assert fallback_chain_for(Path("x.html")) == [TrafilaturaEngine, Html2TextEngine]
@@ -110,10 +109,9 @@ def test_fidelity_grade_high_on_clean_text() -> None:
     assert fidelity == "high"
 
 
-def test_pdf_routes_to_docling_engine() -> None:
-    # A full docling PDF conversion downloads models, so we only assert routing
-    # here; the real round-trip is the opt-in test below.
-    assert select_engine(Path("paper.pdf")) is DoclingEngine
+def test_pdf_routes_to_pymupdf4llm_only() -> None:
+    assert select_engine(Path("paper.pdf")) is PymupdfLlmEngine
+    assert fallback_chain_for(Path("paper.pdf")) == [PymupdfLlmEngine]
 
 
 def _minimal_pdf() -> bytes:
@@ -137,12 +135,11 @@ def _minimal_pdf() -> bytes:
     return out
 
 
-@pytest.mark.skipif(not os.environ.get("A2KAY_DOCLING_E2E"), reason="opt-in: docling PDF round-trip downloads ML models")
-def test_docling_pdf_round_trip(tmp_path: Path) -> None:
-    """docling 2.x converts a real PDF on CPU (typer override + torch>=2.4 + CPU device)."""
+def test_pdf_round_trip_via_pymupdf4llm(tmp_path: Path) -> None:
+    """pymupdf4llm (the only `.pdf` engine as of v0.5.0) converts a real PDF through the real dispatch chain."""
     pdf = tmp_path / "hello.pdf"
     pdf.write_bytes(_minimal_pdf())
     result = convert(pdf)
-    assert result.engine.startswith("docling@2")
+    assert result.engine.startswith("pymupdf4llm@")
     assert result.fidelity == "high"
     assert "Hello docling two" in result.body_markdown

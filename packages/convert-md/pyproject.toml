@@ -1,32 +1,43 @@
 [project]
 name = "convert-md"
-version = "0.3.0"
+version = "0.5.0"
 description = "Opinionated document→markdown conversion: multi-engine per-format fallback chains + a model-free fidelity grade."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
-keywords = ["markdown", "conversion", "docling", "pandoc", "pdf", "docx"]
+keywords = ["markdown", "conversion", "pandoc", "pdf", "docx"]
 # Base = the LIGHT HTML path only (trafilatura + html2text): convert_html and the
 # .html/.htm fallback chain resolve with just these, so a consumer that only needs
-# web-page conversion (a2web) does not pull docling/torch. The heavy document
-# engines live behind the [documents] extra (v0.3.0). Each engine lazily imports
-# its lib and raises ConversionError when absent, so the dispatcher degrades to the
-# next engine / a `failed` result — never an ImportError at module load.
+# web-page conversion (a2web) does not pull the heavier document engines. The heavy
+# document engines live behind the [documents] extra (v0.3.0). Each engine lazily
+# imports its lib and raises ConversionError when absent, so the dispatcher degrades
+# to the next engine / a `failed` result — never an ImportError at module load.
 dependencies = [
     "trafilatura>=1.9.0,<3",
     "html2text>=2025.4.15",   # date-versioned; allowlisted in tests/arch_allowlist.toml (no semver bound)
 ]
 
 [project.optional-dependencies]
-# The document-format engines (PDF/docx/pptx/xlsx). Install with
-# `convert-md[documents]` when you need convert(path) for office/PDF formats;
-# omit for the HTML-only convert_html path. a2kay adopts this extra; a2web does not.
+# `pdf` — the PDF path, via pymupdf4llm: no ML/GPU deps, no typer conflict.
+# Same engine convert-md uses everywhere PDF appears (v0.5.0: it's the only
+# PDF engine now, not just the lean-install option) — see bench/results/
+# 2026-07-09-findings.md + design.md D5 for why docling was dropped entirely.
+pdf = [
+    "pymupdf4llm>=0.0.17,<1",
+]
+# `documents` — the full document-format engine set (PDF/docx/pptx/xlsx).
+# Install with `convert-md[documents]` when you need convert(path) across all
+# office/PDF formats; omit for the HTML-only convert_html path. As of v0.5.0
+# this no longer pulls docling — `.pdf` is pymupdf4llm-only, same as the
+# lean `pdf` extra above (design.md D5: docling had a total, unrecoverable
+# semantic failure mode on math-heavy content that pymupdf4llm doesn't
+# share, and its `typer<0.25` pin no longer exists anywhere in this package).
 documents = [
-    "docling>=2,<3",
     "pypandoc-binary>=1.17,<2",
     "markitdown>=0.0.2,<1",
     "python-pptx>=1.0.2,<2",
     "openpyxl>=3.1.5,<4",
+    "pymupdf4llm>=0.0.17,<1",
 ]
 
 [build-system]
@@ -35,3 +46,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/convert_md"]
+
+[tool.deptry]
+# bench/ (D4: the pdf-engine comparison harness) deliberately imports engines
+# that are NEVER declared dependencies of this package — marker/unstructured
+# run isolated via `uv run --with <pkg>` at bench time by design, so DEP001
+# ("missing from dependency definitions") would be a false positive here, not
+# a real dependency-hygiene gap. `extend_exclude`, not `exclude` — the latter
+# overrides deptry's own default excludes (which cover `tests/`, etc.).
+extend_exclude = ["bench"]

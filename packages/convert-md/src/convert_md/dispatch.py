@@ -18,17 +18,25 @@ from pathlib import Path
 
 from convert_md.base import ConversionError, ConversionResult
 from convert_md.engines import (
-    DoclingEngine,
     Html2TextEngine,
     MarkitdownEngine,
     OpenpyxlEngine,
     PandocEngine,
+    PymupdfLlmEngine,
     TrafilaturaEngine,
 )
 
-# Primary → fallback, per extension (R142 verdict table).
+# Primary → fallback, per extension (R142 verdict table; PDF chain revised
+# in v0.5.0 per bench/results/2026-07-09-findings.md + design.md D5 —
+# docling dropped entirely, not just demoted: re-scored for LLM-semantic-
+# recoverability rather than visual fidelity, docling has one total,
+# unrecoverable failure (drops 100% of formulas on math-heavy content) that
+# pymupdf4llm doesn't share (its own defects are all cosmetic under that
+# lens). No corpus file needed docling to recover content pymupdf4llm
+# couldn't already deliver, so there was nothing left for the fallback slot
+# to earn.
 _CHAINS: dict[str, list[type]] = {
-    ".pdf": [DoclingEngine],
+    ".pdf": [PymupdfLlmEngine],
     ".docx": [PandocEngine, MarkitdownEngine],
     ".pptx": [MarkitdownEngine],
     ".xlsx": [MarkitdownEngine, OpenpyxlEngine],

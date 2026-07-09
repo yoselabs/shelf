@@ -1,0 +1,10 @@
+seq = 34
+date = "2026-07-09"
+event = "delivery"
+software = "convert-md"
+release = "convert-md-v0.4.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "pdf-engine-verification (bench/ harness, packages/convert-md/bench/)"
+note = "EVOLVE: swapped the `.pdf` chain's primary engine from docling to pymupdf4llm (docling kept as fallback, not dropped). Forced by the pdf-engine-verification change (openspec/changes/2026-07-09-pdf-engine-verification): a live-run comparison harness (docling, pymupdf4llm, markitdown[pdf], unstructured[pdf], each isolated/transient per D4 except docling+markitdown which are real [documents] deps) against a 4-category public-domain-ish corpus found docling and pymupdf4llm tied on table structure, heading hierarchy, and reading order (bench/results/2026-07-09-findings.md) -- markitdown and unstructured both scored meaningfully worse (scrambled reading order, false-positive/missing headings, fabricated or absent tables). Since there was no clear docling fidelity margin, D3's rule (tax only earned with a margin) resolves to: no margin, no tax owed. New `convert-md[pdf]` extra ships pymupdf4llm alone (no ML/GPU, no docling, no typer conflict) -- the conflict-free path a2web-shaped consumers can actually install; `[documents]` keeps docling as the PDF fallback for the office-format superset. Also fixed a real platform bug hit along the way: docling's default MPS (Apple Silicon) device crashes on a float64 op in this docling/torch combo -- CPU device now forced in DoclingEngine. Additive extras, no breaking API change; a2kay on convert-md-v0.1.0/v0.3.0 unaffected until it next reconciles."

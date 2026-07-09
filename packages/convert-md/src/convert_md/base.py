@@ -2,7 +2,7 @@
 
 Engines convert one binary to Markdown and self-report fidelity. The result is
 what the attachment pipeline writes into a stub's ``conversion`` frontmatter
-block (ADR 0021). Engines keep their heavy imports (docling/torch, pandoc,
+block (ADR 0021). Engines keep their heavy imports (pymupdf4llm, pandoc,
 markitdown) inside ``convert`` so importing this package stays cheap.
 """
 

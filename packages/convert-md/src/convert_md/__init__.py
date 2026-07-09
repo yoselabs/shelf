@@ -13,11 +13,11 @@ from __future__ import annotations
 from convert_md.base import ConversionEngine, ConversionError, ConversionResult, Fidelity
 from convert_md.dispatch import convert, fallback_chain_for, select_engine
 from convert_md.engines import (
-    DoclingEngine,
     Html2TextEngine,
     MarkitdownEngine,
     OpenpyxlEngine,
     PandocEngine,
+    PymupdfLlmEngine,
     TrafilaturaEngine,
 )
 from convert_md.fidelity import grade
@@ -27,12 +27,12 @@ __all__ = [
     "ConversionEngine",
     "ConversionError",
     "ConversionResult",
-    "DoclingEngine",
     "Fidelity",
     "Html2TextEngine",
     "MarkitdownEngine",
     "OpenpyxlEngine",
     "PandocEngine",
+    "PymupdfLlmEngine",
     "TrafilaturaEngine",
     "convert",
     "convert_html",

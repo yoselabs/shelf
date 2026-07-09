@@ -34,38 +34,31 @@ def _result(markdown: str, engine: str, source_size: int, *, check_yield: bool =
     return ConversionResult(body_markdown=markdown, engine=engine, fidelity=fidelity, lost=lost, warnings=warnings)
 
 
-class DoclingEngine:
-    """PDF → Markdown via docling 2.x (MIT, local, best-in-class tables).
+class PymupdfLlmEngine:
+    """PDF → Markdown via pymupdf4llm (AGPL-3.0-via-PyMuPDF, no ML/GPU deps).
 
-    docling 2.x's typer cap is overridden in pyproject (uv ``override-dependencies``)
-    so it coexists with a2kit's CLI on typer 0.26 — we use only the library API.
+    Sole `.pdf` engine as of convert-md v0.5.0 (bench/results/2026-07-09-findings.md,
+    design.md D5): docling was dropped entirely, not just demoted to fallback — the
+    deciding evidence was a semantic-recoverability re-scoring (can an LLM recover
+    the facts regardless of formatting), under which docling has a total,
+    unrecoverable failure (drops 100% of formulas on math-heavy content) that this
+    engine doesn't share. Also conflict-free: none of docling's unconditional
+    ``typer<0.25`` pin, for every consumer, not just ones that can absorb the tax.
     """
 
-    name = f"docling@{_ver('docling')}"
+    name = f"pymupdf4llm@{_ver('pymupdf4llm')}"
 
     def convert(self, path: Path) -> ConversionResult:
-        """Convert a PDF to Markdown via docling, forcing CPU inference."""
+        """Convert a PDF to Markdown via pymupdf4llm."""
         try:
-            from docling.datamodel.base_models import InputFormat  # noqa: PLC0415 — lazy heavy import
-            from docling.datamodel.pipeline_options import (  # noqa: PLC0415
-                AcceleratorDevice,
-                AcceleratorOptions,
-                PdfPipelineOptions,
-            )
-            from docling.document_converter import DocumentConverter, PdfFormatOption  # noqa: PLC0415
-        except ImportError as exc:  # pragma: no cover - dep is a hard dep
-            msg = f"docling unavailable: {exc}"
+            import pymupdf4llm  # noqa: PLC0415 — lazy heavy import
+        except ImportError as exc:  # pragma: no cover
+            msg = f"pymupdf4llm unavailable: {exc}"
             raise ConversionError(msg) from exc
-        # Force CPU: the default MPS (Apple Metal) device crashes the rt_detr_v2
-        # layout model on float64, and headless/CPU is the typical deploy target anyway.
-        opts = PdfPipelineOptions()
-        opts.accelerator_options = AcceleratorOptions(device=AcceleratorDevice.CPU)
-        converter = DocumentConverter(format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)})
         try:
-            result = converter.convert(str(path))
-            markdown = result.document.export_to_markdown()
-        except Exception as exc:  # docling raises a variety of errors on bad PDFs
-            msg = f"docling failed on {path.name}: {exc}"
+            markdown = pymupdf4llm.to_markdown(str(path))
+        except Exception as exc:
+            msg = f"pymupdf4llm failed on {path.name}: {exc}"
             raise ConversionError(msg) from exc
         return _result(markdown, self.name, path.stat().st_size, check_yield=False)
 
@@ -223,10 +216,10 @@ def _cell(value: object) -> str:
 
 
 __all__ = [
-    "DoclingEngine",
     "Html2TextEngine",
     "MarkitdownEngine",
     "OpenpyxlEngine",
     "PandocEngine",
+    "PymupdfLlmEngine",
     "TrafilaturaEngine",
 ]
