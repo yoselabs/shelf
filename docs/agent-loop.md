@@ -122,13 +122,26 @@ STEPS:
      job). AI-facing only: it exists so `RECEIVE` can answer "what do I change" without reading
      source. Example: `LLMAdapter.complete(prompt) -> str  ⇒  LLMProvider.complete(*, user, ...) -> Completion`.
      Only gets an entry on contract-shape changes — most releases add zero lines.
-8. `git -C <shelf> worktree remove ../shelf-<project>` when the work has merged.
+8. **Close the loop** (resolution 0009) — the change isn't done when the code is right, it's done
+   when the shelf's shared surfaces agree with it and `main` carries it:
+   - `make catalog` if `catalog/*.toml` or `use-cases/*.toml` changed — a stale derived README lies.
+   - Append a `ledger/00NN-<slug>.toml` **`delivery`** row (grep `ledger/*.toml` for `^event` for
+     the existing vocabulary — don't invent a new one). If the same session also completes the
+     repoint (step 6) and it holds, append a **separate** `verdict` row (`adopted`/`kept`) — two
+     events, two rows, never one row wearing both hats.
+   - If this closed a `docs/backlog.md` line, delete it in the same change; if only partially
+     closed, edit it to say what remains.
+   - `make check` green, **then merge `work/<project>` into `main` and push** — a promotion that
+     never reaches `main` never happened, from any other session's point of view.
+9. `git -C <shelf> worktree remove ../shelf-<project>` once step 8's merge landed; delete the
+   remote work branch too if it merged cleanly (a merged branch left behind is dead weight, not a
+   safety net — the commit lives on in `main`).
 
 Push rejected (non-fast-forward, another session got there first)? `pull --rebase`, resolve, retry —
 one-concept-per-file keeps textual conflicts rare by construction.
 
-OUTPUT: a tagged, catalog-listed package; the origin consumer repointed at it; a `CHANGELOG.md`
-entry if the change was breaking.
+OUTPUT: a tagged, catalog-listed package on `main`; the origin consumer repointed at it; a
+`CHANGELOG.md` entry if the change was breaking; a ledger row; no dangling worktree or branch.
 
 ---
 
@@ -147,8 +160,14 @@ STEPS:
    boundary just to avoid touching call sites — that reintroduces the exact quirk the evolution
    removed.
 5. Tests green.
+6. **Close the loop** (resolution 0009) — this is a shelf write even though you're in the
+   consumer's repo: in `../shelf-<project>` (create it if this session doesn't have one yet),
+   append a `verdict` ledger row (`adopted`/`kept`/`rejected`), `make catalog` if warranted, commit,
+   push. Small and append-only — doesn't need `PROMOTE`'s full worktree ceremony, but does need the
+   worktree, not a stray edit against the shared clone.
 
-OUTPUT: pin upgraded, call sites idiomatic to the new contract, nothing straddling both shapes.
+OUTPUT: pin upgraded, call sites idiomatic to the new contract, nothing straddling both shapes, a
+ledger `verdict` row recording the outcome.
 
 ---
 
@@ -168,8 +187,12 @@ STEPS: walk `<shelf>/catalog/README.md`, ask per piece:
 Never delete a *tag* (`PROMOTE` step 5); retiring a package means marking it `deprecated` and
 stopping new adoption.
 
+**Close the loop** (resolution 0009), same shape as `PROMOTE` step 8: `make catalog`, a `verdict`
+ledger row per action taken (merge/split/delete/demote, against the affected package(s)), `make
+check` green, merge + push to `main`.
+
 OUTPUT: catalog garbage-collected with hindsight — "was that the right abstraction?" answered
-empirically, not by an upfront gate.
+empirically, not by an upfront gate — and `main` carries the verdict.
 
 ---
 

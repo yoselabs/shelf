@@ -1,0 +1,10 @@
+seq = 40
+date = "2026-07-09"
+event = "verdict"
+software = "atomic-io, duckdb-sidecar, managed-region"
+release = "atomic-io-v0.1.0, duckdb-sidecar-v0.1.0, managed-region-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "adopted"
+cost = ""
+note = "a2kay repointed its 7 call sites (frontmatter_io, ontology_store, graph_store, audit_store, search/index, jobs/history, projection) from core/{atomic_io,duckdb_sidecar,managed_region}.py to the git-tag pins, deleted the in-repo copies + their tests, added the three packages to policies/data.json's rego upper-bound allowlist. Two test-only fixes needed to clear the shelf's stricter make check that a2kay's own weaker lint config had missed: an EM101 (raise from a variable, not a literal) and three ty not-subscriptable errors (duckdb's fetchone() returns tuple | None; bound + asserted not-None before indexing). make check green: 866 passed, 2 skipped. Pushed to a2kay main."
