@@ -24,7 +24,7 @@ monotonicity test); v0.1.0 stays tagged for consumers that have not upgraded.
 from __future__ import annotations
 
 from anyllm.accounting import anthropic_cost_usd, extract_token_counts
-from anyllm.base import Completion, LLMProvider, PromptParts
+from anyllm.base import Completion, LLMProvider, PromptParts, ProviderName
 from anyllm.errors import AnyLLMError
 from anyllm.providers import (
     AnthropicApiAdapter,
@@ -46,6 +46,7 @@ __all__ = [
     "LLMProvider",
     "OpenAICompatibleAdapter",
     "PromptParts",
+    "ProviderName",
     "anthropic_cost_usd",
     "build_adapter",
     "build_argv",

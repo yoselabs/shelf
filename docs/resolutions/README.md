@@ -10,6 +10,11 @@ resolutions/  decided things (ADR-style: the fork, the choice, the why, an expir
 Thoughts feed tracks; tracks spawn missions; missions close into **resolutions**. A resolution with an
 `expires:` date is a *belief with an expiry* — it must re-justify itself or decay.
 
+**Why not `docs/adr/`?** These are ADR-shaped (fork, choice, why, expiry) but not renamed to match —
+decided 2026-07-09, no rename. The name carries the pipeline stage (thoughts → tracks → missions →
+**resolutions**), which a generic "adr" label would flatten; no tooling expects a literal `adr/`
+folder. Revisit only if a concrete driver shows up (e.g. tooling that hard-codes the ADR convention).
+
 The founding thinking (11 resolutions R1–R11, the full ontology, the adversary verdicts) lives in
 `../thoughts/2026-07-07-shelf-exploration.md`. The resolutions here are the durable extract.
 

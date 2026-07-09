@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from anyllm.base import ProviderName
 from anyllm.errors import AnyLLMError
 from anyllm.providers import (
     AnthropicApiAdapter,
@@ -21,29 +22,32 @@ from anyllm.providers import (
 if TYPE_CHECKING:
     from anyllm.base import LLMProvider
 
-DEFAULT_PROVIDER = "claude-code-cli"
+DEFAULT_PROVIDER = ProviderName.CLAUDE_CODE_CLI
 
-_KNOWN = ("claude-code-cli", "claude-code-sdk", "anthropic-api", "openai-compatible")
+_KNOWN = tuple(ProviderName)
 
 
 def build_adapter(provider: str, config: dict | None = None) -> LLMProvider:
     """Return the configured backend, or raise :class:`AnyLLMError` if it is unusable.
 
+    ``provider`` is any of :class:`~anyllm.base.ProviderName`'s values — callers may pass
+    the enum member or the equivalent plain string (a ``StrEnum`` compares equal to its
+    value), since config commonly arrives as a bare string from a registry file or env.
     ``config`` holds the provider's options (e.g.
     ``{"anthropic_api": {"api_key_env": ...}}`` or
     ``{"openai_compatible": {"base_url": ..., "default_model": ...}}``). Raises if
     the name is unknown, or if the built backend is not available on this machine.
     """
     cfg = config or {}
-    if provider == "claude-code-cli":
+    if provider == ProviderName.CLAUDE_CODE_CLI:
         adapter: LLMProvider = ClaudeCodeCliAdapter()
-    elif provider == "claude-code-sdk":
+    elif provider == ProviderName.CLAUDE_CODE_SDK:
         adapter = ClaudeCodeSdkAdapter()
-    elif provider == "anthropic-api":
+    elif provider == ProviderName.ANTHROPIC_API:
         raw = cfg.get("anthropic_api")
         api_cfg: dict = raw if isinstance(raw, dict) else {}
         adapter = AnthropicApiAdapter(api_key_env=str(api_cfg.get("api_key_env", "ANTHROPIC_API_KEY")))
-    elif provider == "openai-compatible":
+    elif provider == ProviderName.OPENAI_COMPATIBLE:
         raw = cfg.get("openai_compatible")
         oai_cfg: dict = raw if isinstance(raw, dict) else {}
         adapter = OpenAICompatibleAdapter(

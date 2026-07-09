@@ -13,7 +13,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from anyllm.accounting import anthropic_cost_usd, extract_token_counts
-from anyllm.base import Completion
+from anyllm.base import Completion, ProviderName
 from anyllm.errors import AnyLLMError
 from anyllm.providers._prompt import resolve_system
 
@@ -27,7 +27,7 @@ _RETRYABLE_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504, 529})
 class AnthropicApiAdapter:
     """Completion backend calling the Anthropic Messages API (async SDK)."""
 
-    name = "anthropic-api"
+    name = ProviderName.ANTHROPIC_API
 
     def __init__(self, *, api_key_env: str = "ANTHROPIC_API_KEY", api_key: str | None = None, max_retries: int = 2) -> None:
         self._api_key_env = api_key_env

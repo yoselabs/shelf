@@ -1,0 +1,10 @@
+seq = 38
+date = "2026-07-09"
+event = "verification"
+software = "shelf"
+release = ""
+actor = "shelf"
+consumer = ""
+verdict = "pass"
+cost = ""
+note = "VERIFY: closed docs/backlog.md's 'Pre-commit-framework path' Verify item -- the `.pre-commit-hooks.yaml` `rev:` wiring (the pre-commit-framework alternative to the native-hook installer, documented in docs/consuming-the-shelf.md §2) had never been exercised by a real consumer. Built a scratch consumer repo, wired `.pre-commit-config.yaml` in the exact documented form (`repo: <shelf>`, `rev: <commit sha>`, `hooks: [id: no-local-shelf-source]`) against a real local clone of this repo at HEAD (2a1976d), ran `pre-commit install` for the real git hook (not `try-repo`, which only validates the manifest), then issued two real `git commit` invocations: one with an offending `[tool.uv.sources]` local/editable shelf override (blocked, exit 1, correct error message) and one with a clean git+tag pin (passed, exit 0, commit created). Both outcomes matched the native-hook installer's known-good behavior. No code changes needed -- the manifest and hook script were already correct; only the absence of a test was the gap. Scratch repos deleted after verification."

@@ -13,7 +13,7 @@ import os
 import time
 from typing import TYPE_CHECKING, Any
 
-from anyllm.base import Completion
+from anyllm.base import Completion, ProviderName
 from anyllm.errors import AnyLLMError
 from anyllm.providers._prompt import flat_system, flat_user
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 class OpenAICompatibleAdapter:
     """Backend using the ``openai`` SDK against a configured ``base_url``."""
 
-    name = "openai-compatible"
+    name = ProviderName.OPENAI_COMPATIBLE
 
     def __init__(
         self,

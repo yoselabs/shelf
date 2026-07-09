@@ -17,7 +17,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from anyllm.accounting import extract_token_counts
-from anyllm.base import Completion
+from anyllm.base import Completion, ProviderName
 from anyllm.errors import AnyLLMError
 from anyllm.providers._prompt import flat_system, flat_user
 
@@ -30,7 +30,7 @@ _SDK_MODULE = "claude_agent_sdk"
 class ClaudeCodeSdkAdapter:
     """Backend running prompts through the user's Claude Code OS session."""
 
-    name = "claude-code-sdk"
+    name = ProviderName.CLAUDE_CODE_SDK
 
     def available(self) -> bool:
         """Report whether ``claude-agent-sdk`` is importable (cheap ``find_spec``, no heavy import)."""

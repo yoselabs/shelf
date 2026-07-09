@@ -19,7 +19,24 @@ v0.2.0 (resolution 0007, the monotonicity test) evolved this from the v0.1
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
+
+
+class ProviderName(StrEnum):
+    """One source of truth for backend names — every adapter's ``.name`` is one of these.
+
+    Added v0.3.0 after two independent vocabularies for the same four backends drifted
+    apart (anyllm's own bare ``str`` values here vs. a2web's separately-invented plugin
+    names, e.g. ``"claude-code-sdk"`` vs. ``"claude-code"``). A ``StrEnum`` member compares
+    equal to its string value, so this is additive — no caller comparing against the
+    literal string breaks.
+    """
+
+    CLAUDE_CODE_CLI = "claude-code-cli"
+    CLAUDE_CODE_SDK = "claude-code-sdk"
+    ANTHROPIC_API = "anthropic-api"
+    OPENAI_COMPATIBLE = "openai-compatible"
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +79,7 @@ class Completion:
 class LLMProvider(Protocol):
     """A completion backend. Implementations fail loud, never silent."""
 
-    name: str
+    name: ProviderName
 
     async def complete(
         self,
@@ -92,4 +109,4 @@ class LLMProvider(Protocol):
         ...
 
 
-__all__ = ["Completion", "LLMProvider", "PromptParts"]
+__all__ = ["Completion", "LLMProvider", "PromptParts", "ProviderName"]

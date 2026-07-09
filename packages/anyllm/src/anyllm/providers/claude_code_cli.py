@@ -18,7 +18,7 @@ import time
 from typing import TYPE_CHECKING
 
 from anyllm.accounting import extract_token_counts
-from anyllm.base import Completion
+from anyllm.base import Completion, ProviderName
 from anyllm.errors import AnyLLMError
 from anyllm.providers._prompt import flat_system, flat_user
 
@@ -48,7 +48,7 @@ def child_env(base_env: dict[str, str] | None = None) -> dict[str, str]:
 class ClaudeCodeCliAdapter:
     """Backend shelling out to subscription-billed ``claude -p``, never the API."""
 
-    name = "claude-code-cli"
+    name = ProviderName.CLAUDE_CODE_CLI
 
     def available(self) -> bool:
         """Report whether the ``claude`` CLI is present on PATH."""

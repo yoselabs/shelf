@@ -1,0 +1,10 @@
+seq = 37
+date = "2026-07-09"
+event = "delivery"
+software = "anyllm"
+release = "anyllm-v0.3.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = ""
+note = "EVOLVE: closed docs/backlog.md's 'anyllm.ProviderName enum' Build item, standalone rather than deferred to a2web's dependency-upgrade sweep (the item's stated trigger) -- the shelf-side half was self-contained and didn't need to wait. Added anyllm.base.ProviderName, a StrEnum with the four existing adapter-name values (claude-code-cli, claude-code-sdk, anthropic-api, openai-compatible). Typed LLMProvider.name and every adapter's `name` class attribute against it; select.py's DEFAULT_PROVIDER/_KNOWN/build_adapter's branch dispatch now compare against enum members instead of bare-string literals. Purely additive: a StrEnum member equals its string value, so every existing caller comparing against or passing the literal string (build_adapter('anthropic-api'), adapter.name == 'anthropic-api') keeps working unchanged -- verified via the pre-existing test_adapters.py assertions, no test edits needed. Investigated the backlog item's other stated half -- 'a2web imports it instead of its own strings' -- against a2web's actual source (checked out locally): a2web's own vocabulary (settings.py's ProviderMode Literal and each _manifests/llm_providers/*.py's PluginManifest name) is NOT the same string set as anyllm's. anyllm has claude-code-sdk; a2web's plugin key is claude-code (no separate CLI variant registered). anyllm has anthropic-api; a2web's key is anthropic. These are a2web's own plugin-registry lookup keys (`registry[\"anthropic\"]`), a public surface a caller can already depend on -- collapsing them onto anyllm.ProviderName's values would rename that surface, a breaking change for a2web, not a free unification. Left a2web untouched; this is now its own separate, explicit decision if/when it's wanted, not silently bundled into this delivery. `make check` green (312 passed, 88.77% cov)."
