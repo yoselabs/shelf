@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "managed-region"
+why = "a2kay's projection layer writes machine-owned sentinel blocks (HTML-comment-delimited) into otherwise human-edited files and must never disturb the human prose around them."
+needs = "An idempotent replace-between-markers primitive, marker-agnostic, with a caller-supplied escape hook so untrusted/converted content can't smuggle in a corrupting second marker pair."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

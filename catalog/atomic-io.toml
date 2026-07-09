@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "atomic-io"
+kind = "primitive"
+tier = "T0"
+release = "atomic-io-v0.1.0"
+capability = "Stop caring how to write a text file crash-safely — tempfile + fsync + os.replace, so a crash or a concurrent reader never observes a partial write."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (its core/atomic_io.py, a T0 primitive). Zero-dependency pure stdlib. Born candidate."

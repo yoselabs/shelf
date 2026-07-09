@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "managed-region"
+kind = "primitive"
+tier = "T0"
+release = "managed-region-v0.1.0"
+capability = "Stop caring how to keep a machine-owned block idempotent inside a human-edited document — replace content between a marker pair, prose outside untouched, marker-agnostic."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (its core/managed_region.py, the direnv/terraform managed-block pattern). Structure only -- caller owns markers + escape policy. Born candidate."

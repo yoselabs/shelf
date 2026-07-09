@@ -1,0 +1,15 @@
+[project]
+name = "atomic-io"
+version = "0.1.0"
+description = "Atomic text write — tempfile + fsync + os.replace, so a crash or a concurrent reader never sees a partial file."
+readme = "README.md"
+authors = [{ name = "Denis Tomilin" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/atomic_io"]

@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "duckdb-sidecar"
+why = "a2kay's derived state (graph, audit, search, job history) lives in four separate per-concern DuckDB sidecar files, each opened the same way -- without a shared helper the connection dance drifts apart store by store."
+needs = "One connect(path) that normalizes the target, creates the parent directory for a file target, and supports the :memory: passthrough, leaving schema/migrations/queries to each store."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "atomic-io"
+why = "a2kay's frontmatter and ontology-store writes must be crash-safe -- a partial write must never corrupt a vault file a human or another process might read concurrently."
+needs = "A tempfile+fsync+os.replace write so a crash or concurrent reader never sees a truncated file, and a failed write never destroys a pre-existing target."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

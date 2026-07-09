@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "duckdb-sidecar"
+kind = "primitive"
+tier = "T0"
+release = "duckdb-sidecar-v0.1.0"
+capability = "Stop caring how to open a DuckDB sidecar connection — normalize the target, create the parent directory for a file target, support the :memory: passthrough, connect."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (its core/duckdb_sidecar.py, shared by graph/audit/search/job-history stores). Connection acquisition only, not a lifecycle base class. Born candidate."
