@@ -8,9 +8,6 @@ is a smoke alarm.
 
 ## Verify — designed & shipped, never triggered end-to-end (highest risk)
 
-- [ ] **Promote → tag → repoint → opt-in upgrade, for one real package.** The 4 packages were
-  bootstrapped, not promoted through the loop; the cycle is theory until one package walks it.
-  (`agent-loop.md` §4–5.)
 - [ ] **`convert-md`'s docx engine choice (pandoc over markitdown) is reasoned, not verified.** Kept for
   one concrete reason — pandoc's `--track-changes=all` preserves tracked-changes/redline metadata,
   which markitdown's plain-text extraction can't replicate — but unlike PDF (bench/results/
@@ -67,17 +64,6 @@ is a smoke alarm.
     rename paper over that.
   - `PluginManifest.name` is a public lookup key (`registry["anthropic"]`) — ships as a breaking change,
     per `RECEIVE` step 4 ("migrate to the new idiom, not the smallest diff... delete compat shims").
-
-## Promote — generic substrate to capitalize (res 0006; done in each app's catch-up sweep)
-
-Under aggressive promotion these are no longer "wait for a 2nd consumer" — they are generic substrate to
-extract now, in the origin app's session (worktree `../shelf-<app>`), born `candidate`:
-
-- **a2kay's T0 primitives** `atomic_io`, `duckdb_sidecar`, `managed_region` — generic substrate, promote
-  in a2kay's catch-up. (Was parked at n=1; res 0006 removes that gate.)
-- **a2web's generic utilities** — env/YAML settings loader, sqlite conditional-GET cache shell,
-  cookie-store matrix, collection/JSON helpers. Promote the generic ones; **leave the product moat**
-  (bot-wall detection, proxy routing, browser backends) in a2web.
 
 ## Parked — captured, build later
 
