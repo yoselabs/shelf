@@ -162,6 +162,23 @@ async def test_generic_request_exception_returns_connection_error(monkeypatch: A
     assert (await fetch_bytes("https://example.com/")).verdict is FetchVerdict.connection_error
 
 
+async def test_dns_error_without_proxy_returns_dns_error(monkeypatch: Any) -> None:
+    # A genuine target NXDOMAIN — distinct from a generic connection_error so the
+    # caller can treat it as terminal (a real browser cannot resolve it either).
+    _patch_session(monkeypatch, ce.DNSError("Could not resolve host: nope.invalid"))
+    result = await fetch_bytes("https://nope.invalid/")
+    assert result.verdict is FetchVerdict.dns_error
+    assert result.status_code == 0
+
+
+async def test_dns_error_with_proxy_returns_proxy_unavailable(monkeypatch: Any) -> None:
+    # With a proxy set the target host is resolved by the proxy; a local DNS
+    # failure is the proxy host failing to resolve, not the target domain.
+    _patch_session(monkeypatch, ce.DNSError("Could not resolve proxy: bad-proxy.invalid"))
+    result = await fetch_bytes("https://example.com/", proxy_url="http://bad-proxy.invalid:8080")
+    assert result.verdict is FetchVerdict.proxy_unavailable
+
+
 async def test_proxy_error_with_proxy_url_returns_proxy_unavailable(monkeypatch: Any) -> None:
     _patch_session(monkeypatch, ce.RequestException("SOCKS5 proxy refused"))
     result = await fetch_bytes("https://example.com/", proxy_url="socks5://localhost:1080")

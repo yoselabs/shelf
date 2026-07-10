@@ -1,0 +1,10 @@
+seq = 42
+date = "2026-07-10"
+event = "delivery"
+software = "http-fetch"
+release = "http-fetch-v0.2.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "packages/http-fetch/{src/http_fetch/models.py,src/http_fetch/fetch.py,tests/test_http_fetch.py,CHANGELOG.md,pyproject.toml}"
+note = "PROMOTE/EVOLVE: split a genuine DNS-resolution failure out of the generic connection_error verdict. curl_cffi already raises a distinct ce.DNSError ('Could not resolve') -- a ConnectionError subclass -- but fetch_bytes collapsed it into FetchVerdict.connection_error alongside plain connection drops and TLS failures, discarding a distinction it already computed for free (no extra round-trip). Added FetchVerdict.dns_error and an `except ce.DNSError` branch BEFORE the generic RequestException catch (subclass ordering load-bearing). Proxy-aware: a DNS failure WITH a proxy set is the proxy host failing to resolve (the target is resolved by the proxy), so it stays proxy_unavailable; only a proxy-less DNS failure is a genuine target NXDOMAIN -> dns_error. WHY: the origin consumer (a2web) needs to tell a genuinely-unresolvable domain (terminal -- a real browser resolves the same name identically, escalation cannot help) apart from a network/connection drop or TLS-fingerprint block (ambiguous -- worth escalating to a real browser); without the split, an escalate-on-transport-wall policy either wastes a capped browser+paid attempt on every dead domain or cannot escalate network blocks at all. Breaking evolution (a DNS failure that was connection_error is now dns_error): shipped as a new tag with a CHANGELOG arrow-note + migration line, old tag http-fetch-v0.1.0 left intact (opt-in upgrade). Minor bump 0.1.0 -> 0.2.0. make check green (318 passed, 88.71% cov; fetch.py + models.py 100%)."

@@ -113,6 +113,16 @@ async def fetch_bytes(
                 response = await session.get(url, **request_kwargs)
             except ce.Timeout:
                 return _failure(url, FetchVerdict.timeout)
+            except ce.DNSError:
+                # A DNS-resolution failure. With a proxy set, the target host is
+                # resolved by the proxy, so a local DNS failure is the proxy host
+                # failing to resolve — a proxy failure, not a dead target. Without
+                # a proxy it is a genuine target NXDOMAIN: distinct and terminal
+                # (a real browser resolves the same name identically — no retry,
+                # no escalation helps it). Must precede the generic
+                # `RequestException` catch — `DNSError` is a `ConnectionError`
+                # subclass, so ordering is load-bearing.
+                return _failure(url, FetchVerdict.proxy_unavailable if proxy_url else FetchVerdict.dns_error)
             except ce.RequestException as exc:
                 if proxy_url and _is_proxy_error(exc):
                     return _failure(url, FetchVerdict.proxy_unavailable)

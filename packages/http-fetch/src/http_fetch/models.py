@@ -17,6 +17,7 @@ class FetchVerdict(StrEnum):
     not_found = "not_found"
     rate_limited = "rate_limited"
     connection_error = "connection_error"
+    dns_error = "dns_error"
     timeout = "timeout"
     proxy_unavailable = "proxy_unavailable"
 
