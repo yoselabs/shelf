@@ -8,3 +8,9 @@ dist/
 build/
 *.egg-info/
 uv.lock.*
+
+# Agent config: track shared commands/skills; ignore personal/local state.
+.claude/settings.local.json
+.claude/**/*.local.*
+.codex/settings.local.json
+.codex/**/*.local.*
