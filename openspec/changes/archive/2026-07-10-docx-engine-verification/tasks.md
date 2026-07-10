@@ -86,5 +86,5 @@
       a2kay's follow-up).
 - [x] 8.2 Prune the `docs/backlog.md` "Verify — convert-md's docx engine
       choice" line (this change *is* that verification).
-- [ ] 8.3 `make check` green; work merged to `main` and pushed; no dangling
+- [x] 8.3 `make check` green; work merged to `main` and pushed; no dangling
       worktree/branch. `openspec archive docx-engine-verification`.
