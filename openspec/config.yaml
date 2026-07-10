@@ -4,7 +4,7 @@ schema: spec-driven
 context: |
   The shelf: a home for small, ownable, composable, contract-guaranteed software
   pieces ("micro-software"), reused across separate apps (a2kay, a2web, ...) via
-  git+tag pins rather than re-written. Read CLAUDE.md → docs/doctrine.md →
+  git+tag pins rather than re-written. Read AGENTS.md → docs/doctrine.md →
   docs/constitution.md → docs/glossary.md before proposing.
 
   Tech stack: Python 3.11, uv workspace (packages/*), pytest, ruff (strict select
