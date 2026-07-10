@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pypandoc
+import docx as docx_writer
 from convert_md import (
     Html2TextEngine,
+    MammothEngine,
     MarkitdownEngine,
     OpenpyxlEngine,
-    PandocEngine,
     PymupdfLlmEngine,
     TrafilaturaEngine,
     convert,
@@ -22,7 +22,7 @@ from openpyxl import Workbook
 
 def test_dispatch_table_primary_engines() -> None:
     assert select_engine(Path("x.pdf")) is PymupdfLlmEngine
-    assert select_engine(Path("x.docx")) is PandocEngine
+    assert select_engine(Path("x.docx")) is MammothEngine
     assert select_engine(Path("x.pptx")) is MarkitdownEngine
     assert select_engine(Path("x.xlsx")) is MarkitdownEngine
     assert select_engine(Path("x.html")) is TrafilaturaEngine
@@ -30,7 +30,7 @@ def test_dispatch_table_primary_engines() -> None:
 
 def test_fallback_chains() -> None:
     assert fallback_chain_for(Path("x.pdf")) == [PymupdfLlmEngine]
-    assert fallback_chain_for(Path("x.docx")) == [PandocEngine, MarkitdownEngine]
+    assert fallback_chain_for(Path("x.docx")) == [MammothEngine, MarkitdownEngine]
     assert fallback_chain_for(Path("x.xlsx")) == [MarkitdownEngine, OpenpyxlEngine]
     assert fallback_chain_for(Path("x.html")) == [TrafilaturaEngine, Html2TextEngine]
 
@@ -41,18 +41,23 @@ def test_unsupported_format_returns_failed() -> None:
     assert any("unsupported_format" in w for w in result.warnings)
 
 
-def test_docx_round_trips_via_pandoc(tmp_path: Path) -> None:
+def test_docx_round_trips_via_mammoth(tmp_path: Path) -> None:
+    doc = docx_writer.Document()
+    doc.add_heading("Title", level=1)
+    p = doc.add_paragraph("Body paragraph with ")
+    p.add_run("bold").bold = True
+    p.add_run(".")
+    table = doc.add_table(rows=2, cols=2)
+    table.rows[0].cells[0].text, table.rows[0].cells[1].text = "a", "b"
+    table.rows[1].cells[0].text, table.rows[1].cells[1].text = "1", "2"
     docx = tmp_path / "doc.docx"
-    pypandoc.convert_text(
-        "# Title\n\nBody paragraph with **bold**.\n\n| a | b |\n|---|---|\n| 1 | 2 |\n",
-        "docx",
-        format="gfm",
-        outputfile=str(docx),
-    )
+    doc.save(str(docx))
+
     result = convert(docx)
-    assert result.engine.startswith("pandoc@")
+    assert result.engine.startswith("mammoth@")  # mammoth front-end, then the render engine
     assert result.fidelity == "high"
     assert "Title" in result.body_markdown
+    assert "**bold**" in result.body_markdown  # emphasis preserved
     assert "|" in result.body_markdown  # table preserved
 
 
@@ -83,12 +88,12 @@ def test_html_converts_via_trafilatura_or_fallback(tmp_path: Path) -> None:
 
 
 def test_corrupt_docx_walks_to_fallback_engine(tmp_path: Path) -> None:
-    # pandoc rejects a non-zip .docx; the dispatcher must walk to the markitdown
+    # mammoth rejects a non-zip .docx; the dispatcher must walk to the markitdown
     # fallback rather than failing outright (chain-walk-on-failure).
     bad = tmp_path / "broken.docx"
     bad.write_bytes(b"this is not a real docx zip but has readable text")
     result = convert(bad)
-    assert result.engine.startswith("markitdown@")  # primary (pandoc) was skipped
+    assert result.engine.startswith("markitdown@")  # primary (mammoth) was skipped
 
 
 def test_fidelity_grade_failed_on_empty() -> None:

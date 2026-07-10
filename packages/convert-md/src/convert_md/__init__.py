@@ -14,14 +14,14 @@ from convert_md.base import ConversionEngine, ConversionError, ConversionResult,
 from convert_md.dispatch import convert, fallback_chain_for, select_engine
 from convert_md.engines import (
     Html2TextEngine,
+    MammothEngine,
     MarkitdownEngine,
     OpenpyxlEngine,
-    PandocEngine,
     PymupdfLlmEngine,
     TrafilaturaEngine,
 )
 from convert_md.fidelity import grade
-from convert_md.html import convert_html
+from convert_md.html import SourceKind, convert_html
 
 __all__ = [
     "ConversionEngine",
@@ -29,10 +29,11 @@ __all__ = [
     "ConversionResult",
     "Fidelity",
     "Html2TextEngine",
+    "MammothEngine",
     "MarkitdownEngine",
     "OpenpyxlEngine",
-    "PandocEngine",
     "PymupdfLlmEngine",
+    "SourceKind",
     "TrafilaturaEngine",
     "convert",
     "convert_html",

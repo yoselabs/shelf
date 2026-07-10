@@ -15,9 +15,15 @@ result.engine          # "<engine>@<version>"
 ```
 
 Engines wrapped: pymupdf4llm, no fallback (pdf, revised v0.5.0 — docling dropped entirely, see
-`bench/results/2026-07-09-findings.md` and design.md D5), pandoc (docx), markitdown (pptx/xlsx), trafilatura +
-html2text (html), openpyxl (xlsx fallback). Engine choice is a code-level default (R142), not a
-config file.
+`bench/results/2026-07-09-findings.md` and design.md D5), mammoth (docx, revised v0.7.0 — pandoc
+dropped, see `bench/results/2026-07-10-docx-findings.md`), markitdown (pptx/xlsx + docx fallback),
+trafilatura + html2text (html), openpyxl (xlsx fallback). Engine choice is a code-level default
+(R142), not a config file.
+
+HTML is handled by *source kind*, not MIME type: `convert_html(html, source_kind="web_page")`
+(default) extracts main content from a boilerplate-bearing page (trafilatura); `source_kind="clean"`
+faithfully renders already-clean HTML (html2text), and is what the docx path uses after mammoth. See
+`convert_md/html.py` for why crossing them damages the output.
 
 PDF support ships as two extras with the same engine either way: `convert-md[pdf]` (just
 pymupdf4llm — no ML/GPU deps, conflict-free for any consumer) and `convert-md[documents]` (the

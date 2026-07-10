@@ -1,4 +1,4 @@
-"""convert_html: the in-memory HTML string door — trafilatura-first, never raises."""
+"""convert_html: the in-memory HTML string door — by source kind, never raises."""
 
 from __future__ import annotations
 
@@ -45,3 +45,15 @@ def test_unextractable_markup_degrades_to_failed() -> None:
     result = convert_html("<div></div>")
     assert isinstance(result, ConversionResult)
     assert result.fidelity in {"failed", "partial", "high"}  # never an exception
+
+
+def test_clean_source_kind_bypasses_the_web_extractor() -> None:
+    # A clean fragment (e.g. rendered from docx): source_kind="clean" must render
+    # it faithfully via html2text and NOT route through trafilatura, whose web
+    # content-detection strips headings/tables when there is no page structure.
+    fragment = "<h1>Heading</h1><table><tr><td>a</td><td>b</td></tr><tr><td>1</td><td>2</td></tr></table>"
+
+    clean = convert_html(fragment, source_kind="clean")
+    assert clean.engine.startswith("html2text@")  # never trafilatura
+    assert "# Heading" in clean.body_markdown
+    assert "|" in clean.body_markdown  # table survives as a table

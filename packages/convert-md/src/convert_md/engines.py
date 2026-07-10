@@ -2,7 +2,7 @@
 
 Each engine wraps one library, normalizes the output to Markdown, and grades
 fidelity via :mod:`convert_md.fidelity`. Heavy imports (docling/torch,
-pandoc, markitdown) live inside ``convert`` so importing this module is cheap —
+mammoth, markitdown) live inside ``convert`` so importing this module is cheap —
 only the engine actually selected pays the import cost.
 
 Engines raise :class:`ConversionError` on failure so the dispatcher can walk
@@ -63,29 +63,46 @@ class PymupdfLlmEngine:
         return _result(markdown, self.name, path.stat().st_size, check_yield=False)
 
 
-class PandocEngine:
-    """DOCX → Markdown via pandoc, preserving tracked changes."""
+class MammothEngine:
+    """DOCX → Markdown via mammoth, rendered through the clean-HTML path.
 
-    name = f"pandoc@{_ver('pypandoc-binary')}"
+    Chosen over pandoc (docx-engine-verification, design.md D3/D7): mammoth is
+    featherweight (its only dependency is ``cobble``) and routes through
+    convert-md's own ``source_kind="clean"`` HTML render path (html2text) — one
+    HTML→markdown renderer shared with the web path, not a third opinion. Renders
+    the accepted final text; it does not surface tracked-changes markup (pandoc
+    emitted that as HTML-span redline noise, the wrong content for a vault).
+    """
+
+    name = f"mammoth@{_ver('mammoth')}"
 
     def convert(self, path: Path) -> ConversionResult:
-        """Convert a DOCX to GitHub-flavored Markdown via pandoc, keeping tracked changes."""
+        """Convert a DOCX to Markdown via mammoth → the clean-HTML render path."""
         try:
-            import pypandoc  # noqa: PLC0415 — lazy heavy import
+            import mammoth  # noqa: PLC0415 — lazy heavy import
         except ImportError as exc:  # pragma: no cover
-            msg = f"pypandoc unavailable: {exc}"
+            msg = f"mammoth unavailable: {exc}"
             raise ConversionError(msg) from exc
+        from convert_md.html import convert_html  # noqa: PLC0415 — avoid html<->engines import cycle
+
         try:
-            engine = f"pandoc@{pypandoc.get_pandoc_version()}"
-            markdown = pypandoc.convert_file(
-                str(path),
-                "gfm",
-                extra_args=["--track-changes=all", "--wrap=none"],
-            )
+            with path.open("rb") as fh:
+                html = mammoth.convert_to_html(fh).value
         except Exception as exc:
-            msg = f"pandoc failed on {path.name}: {exc}"
+            msg = f"mammoth failed on {path.name}: {exc}"
             raise ConversionError(msg) from exc
-        return _result(markdown, engine, path.stat().st_size, check_yield=False)
+        result = convert_html(html, source_kind="clean")
+        if result.fidelity == "failed":
+            msg = f"mammoth produced no content from {path.name}"
+            raise ConversionError(msg)
+        # Relabel to reflect the docx front-end while keeping the render engine's version.
+        return ConversionResult(
+            body_markdown=result.body_markdown,
+            engine=f"{self.name}+{result.engine}",
+            fidelity=result.fidelity,
+            lost=result.lost,
+            warnings=result.warnings,
+        )
 
 
 class MarkitdownEngine:
@@ -217,9 +234,9 @@ def _cell(value: object) -> str:
 
 __all__ = [
     "Html2TextEngine",
+    "MammothEngine",
     "MarkitdownEngine",
     "OpenpyxlEngine",
-    "PandocEngine",
     "PymupdfLlmEngine",
     "TrafilaturaEngine",
 ]

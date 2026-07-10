@@ -28,7 +28,8 @@ dev = [
     "deptry>=0.20,<1",        # dependency hygiene: unused / missing / transitive
     "pytest-asyncio>=0.24,<1",  # async test support (the first async packages: sqlite-resource, http-*)
     "browser-cookie3>=0.20,<1",  # browser-cookies' optional [read] engine — installed here so its tests exercise the real reader path (the package itself keeps it optional/lazy)
-    "convert-md[documents]",     # convert-md's heavy document engines (pandoc/office; docling dropped in v0.5.0, see design.md D5) — moved to the [documents] extra in v0.3.0; installed here so convert-md's dispatch tests still exercise the real engines (base stays HTML-only)
+    "python-docx>=1.1,<2",       # docx WRITER for convert-md's dispatch tests (build a .docx fixture in-test); convert-md itself only READS docx, never writes — so this is test-only, not a package dep
+    "convert-md[documents]",     # convert-md's heavy document engines (mammoth/office; docling dropped v0.5.0, pandoc dropped v0.7.0) — moved to the [documents] extra in v0.3.0; installed here so convert-md's dispatch tests still exercise the real engines (base stays HTML-only)
     "anyllm[anthropic,openai,claude-code-sdk]",  # anyllm's SDK-backed provider extras — installed here so the anthropic/openai/claude-code-sdk backends' imports resolve for tests + deptry (base anyllm stays SDK-free; each backend is opt-in)
 ]
 
@@ -123,11 +124,12 @@ builtins-allowed-modules = ["types"]
 # tools are CLI scripts: printing is their job, `git`/`opa` on PATH is deliberate,
 # and a module docstring is enough (no per-function D).
 "tools/**" = ["T201", "S607", "D103", "D100"]
-# package benches (convert-md's pdf-engine comparison harness, D4): throwaway CLI
-# probe scripts, not shipped library code — same shape as tools/**, plus INP001
-# (deliberately not a package) and PLC0415 (isolated engines import lazily by
-# design, same pattern as engines.py, just without per-line noqa here).
-"packages/*/bench/**" = ["T201", "S607", "D103", "D100", "INP001", "PLC0415"]
+# package benches (convert-md's engine-comparison harnesses, D4): throwaway CLI
+# probe scripts + fixture generators, not shipped library code — same shape as
+# tools/**, plus INP001 (deliberately not a package), PLC0415 (isolated engines
+# import lazily by design), full D (docstrings not policed in throwaway code, as
+# in tests), and SLF (the docx fixture generator does low-level oxml surgery).
+"packages/*/bench/**" = ["T201", "S607", "D", "INP001", "PLC0415", "SLF"]
 
 [tool.pytest.ini_options]
 # testpaths lists the shelf's own fitness tests + every package's tests.
@@ -159,12 +161,18 @@ asyncio_mode = "auto"
 # structurally unresolvable here, not a type error. docling joined this list
 # in v0.5.0 when it was dropped from convert-md[documents] entirely (design.md
 # D5) — it used to be a real dependency and was checked normally before that.
-# markitdown/pymupdf4llm probes stay checked; they're real (or resolvable)
-# deps in the shared venv.
+# markitdown/pymupdf4llm/mammoth probes stay checked; they're real (or
+# resolvable) deps in the shared venv. run_pandoc joined the list in v0.7.0 when
+# pypandoc-binary was dropped from convert-md[documents] (docx-findings.md) — it
+# is now isolated-only, same as the others. The docx fixture generator does
+# low-level oxml surgery and runs isolated (`uv run --with python-docx`); its
+# `docx.Document` factory annotations aren't a real type error.
 exclude = [
     "packages/convert-md/bench/engines/run_docling.py",
     "packages/convert-md/bench/engines/run_marker.py",
     "packages/convert-md/bench/engines/run_unstructured.py",
+    "packages/convert-md/bench/engines/run_pandoc.py",
+    "packages/convert-md/bench/corpus/docx/_generate.py",
 ]
 
 # ── codespell — typos across code, docstrings, and docs ───────────────────────

@@ -41,3 +41,27 @@ anyone, not private data) even though they fail strict public-domain status.
 Flagging this explicitly rather than silently reinterpreting the rule;
 revisit if this corpus is ever redistributed rather than used as a private,
 local bench fixture.
+
+## docx corpus (`docx/`) — synthesized, one capability per file
+
+Unlike the PDF corpus (real documents, isolated *by selection*), the docx
+fixtures are **synthesized, isolated by *synthesis*** — one docx capability
+each, otherwise-minimal body (docx-engine-verification design.md D2). docx is
+semantic OOXML, so a hand-authored single-feature file loses no realism the
+bench cares about, and gives clean failure attribution. Generated
+deterministically by `docx/_generate.py` (python-docx, run isolated:
+`uv run --no-project --with python-docx python3 _generate.py`). None is a user
+document.
+
+| File | Isolated capability |
+|---|---|
+| `clean_baseline.docx` | Headings (h1/h2/h3) + bold/italic — the convergent common case |
+| `table_nested.docx` | A 3-column table (unmarked header row — the case that splits markdownify vs html2text) |
+| `list_nested.docx` | Nested bullet + numbered lists (named-style nesting; see findings caveat) |
+| `footnote.docx` | One real footnote reference + footnotes part |
+| `tracked_changes.docx` | One `w:ins` + one `w:del` revision — pandoc's sole differentiator |
+| `image_embedded.docx` | One embedded PNG — image handling (extract / inline / drop) |
+
+Findings: `bench/results/2026-07-10-docx-findings.md`. Open axes not yet in the
+corpus: OMML equations (synthesis-weak, D2 exception) and a marked-header table
+variant.

@@ -19,9 +19,9 @@ from pathlib import Path
 from convert_md.base import ConversionError, ConversionResult
 from convert_md.engines import (
     Html2TextEngine,
+    MammothEngine,
     MarkitdownEngine,
     OpenpyxlEngine,
-    PandocEngine,
     PymupdfLlmEngine,
     TrafilaturaEngine,
 )
@@ -35,9 +35,16 @@ from convert_md.engines import (
 # lens). No corpus file needed docling to recover content pymupdf4llm
 # couldn't already deliver, so there was nothing left for the fallback slot
 # to earn.
+#
+# .docx chain revised in v0.7.0 per bench/results/2026-07-10-docx-findings.md +
+# design.md D3/D7 — pandoc dropped entirely (its `--track-changes=all` emitted
+# HTML-span redline noise, the wrong content for a vault, and it left dangling
+# image refs). Mammoth renders clean semantic HTML through convert-md's own
+# `source_kind="clean"` render path; markitdown stays as the cheap already-a-dep
+# fallback if mammoth ever fails.
 _CHAINS: dict[str, list[type]] = {
     ".pdf": [PymupdfLlmEngine],
-    ".docx": [PandocEngine, MarkitdownEngine],
+    ".docx": [MammothEngine, MarkitdownEngine],
     ".pptx": [MarkitdownEngine],
     ".xlsx": [MarkitdownEngine, OpenpyxlEngine],
     ".html": [TrafilaturaEngine, Html2TextEngine],
