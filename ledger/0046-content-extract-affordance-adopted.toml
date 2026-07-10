@@ -1,0 +1,10 @@
+seq = 46
+date = "2026-07-11"
+event = "verdict"
+software = "content-extract"
+release = "content-extract-v0.2.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "a2web/pyproject.toml (pin content-extract-v0.1.1 -> v0.2.0), a2web/uv.lock"
+note = "a2web repointed at content-extract-v0.2.0 in the same session as the promote (ledger 0045). Label-less mailto:/tel: retention is live immediately with zero a2web code change — the selectolax pass now feeds those contacts into fc.links -> the link digest. `include_links=True` (in-body markdown links) is available but NOT yet flipped on a2web's extract path: it changes content_md shape and is gated behind `make bench` (a2web task 7.1). Adoption held: uv lock resolved v0.2.0 (+ convert-md v0.8.0 transitively), uv sync swapped both, a smoke shows label-less mailto now flows, and 227 a2web extraction/package tests pass green."
