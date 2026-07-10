@@ -108,6 +108,75 @@ async def test_link_unclassified_defaults_primary() -> None:
     assert result.links[0].role == "primary"
 
 
+# --------------------------------------------------------------------- #
+# include_links — in-body anchors survive as markdown (opt-in)
+# --------------------------------------------------------------------- #
+
+
+# Realistic prose so trafilatura keeps the block as main content (a single short
+# sentence is collapsed and the anchor lost — a content-detection quirk, not a
+# link-handling one).
+_LINK_PARA = (
+    "This is a substantial paragraph of real prose that comfortably survives "
+    "trafilatura's boilerplate and yield heuristics, describing the subject in "
+    "enough depth that the extractor treats it as genuine main content. "
+)
+_LINKED_HTML = f"""<html><head><title>Widget</title></head><body><article>
+    <h1>The Widget Roundup</h1>
+    <p>{_LINK_PARA}</p>
+    <p>{_LINK_PARA} For details, read the <a href="https://x/reviews">customer
+    reviews</a> covering durability. {_LINK_PARA}</p>
+    <p>{_LINK_PARA}{_LINK_PARA}</p>
+</article></body></html>"""
+
+
+@pytest.mark.asyncio
+async def test_include_links_preserves_in_body_anchor() -> None:
+    with_links = await extract_markdown(_LINKED_HTML, "https://x/p", include_links=True)
+    assert "https://x/reviews" in with_links.content_md
+
+
+@pytest.mark.asyncio
+async def test_default_flattens_in_body_anchor() -> None:
+    default = await extract_markdown(_LINKED_HTML, "https://x/p")
+    assert "https://x/reviews" not in default.content_md
+    assert "customer" in default.content_md
+
+
+# --------------------------------------------------------------------- #
+# Label-less contact anchors retained with a derived label
+# --------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_labelless_mailto_retained_with_derived_label() -> None:
+    html = """<html><body>
+        <footer><a href="mailto:support@x.com"></a></footer>
+    </body></html>"""
+    result = await extract_markdown(html, "https://x/")
+    assert len(result.links) == 1
+    assert result.links[0].href == "mailto:support@x.com"
+    assert result.links[0].anchor == "support@x.com"
+
+
+@pytest.mark.asyncio
+async def test_labelless_tel_retained() -> None:
+    html = """<html><body>
+        <a href="tel:+900000000"></a>
+    </body></html>"""
+    result = await extract_markdown(html, "https://x/")
+    assert result.links[0].anchor == "+900000000"
+
+
+@pytest.mark.asyncio
+async def test_labelless_non_contact_still_dropped() -> None:
+    html = """<html><body>
+        <a href="https://x/icon"><img src="i.png"/></a>
+    </body></html>"""
+    result = await extract_markdown(html, "https://x/")
+    assert result.links == []
+
+
 @pytest.mark.asyncio
 async def test_link_nested_inner_role_wins() -> None:
     """Closest ancestor wins — anchor in <nav> inside <article> is nav."""

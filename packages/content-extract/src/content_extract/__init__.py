@@ -16,6 +16,7 @@ import asyncio
 import json
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from functools import partial
 from typing import Any
 
 import trafilatura
@@ -117,6 +118,20 @@ def _classify_link_role(node: Any) -> str:
     return "primary"
 
 
+def _contact_label(href: str) -> str | None:
+    """Derive a label for a label-less contact anchor, or ``None`` if not one.
+
+    ``mailto:support@x.com`` → ``support@x.com``; ``tel:+900000`` → ``+900000``.
+    Any other scheme returns ``None`` (the anchor stays dropped).
+    """
+    lowered = href.lower()
+    for scheme in ("mailto:", "tel:"):
+        if lowered.startswith(scheme):
+            value = href[len(scheme):].split("?", 1)[0].strip()
+            return value or None
+    return None
+
+
 def _parse_date(value: str | None) -> date | None:
     """Parse trafilatura's date field (``YYYY-MM-DD`` or ISO timestamp) → ``date``.
 
@@ -134,17 +149,19 @@ def _parse_date(value: str | None) -> date | None:
         return None
 
 
-def _extract_sync(html: str, url: str) -> ExtractedContent:
+def _extract_sync(html: str, url: str, *, include_links: bool = False) -> ExtractedContent:
     """Blocking extraction — never call from async paths directly.
 
     Args:
         html: The raw HTML document text.
         url: The page's source URL (for relative-link resolution).
+        include_links: pass through to :func:`convert_md.convert_html` so
+            in-body anchors survive as ``[label](url)`` in ``content_md``.
 
     Returns:
         The assembled :class:`ExtractedContent`.
     """
-    result = convert_html(html, url=url)
+    result = convert_html(html, url=url, include_links=include_links)
     content_md = result.body_markdown
 
     title: str | None = None
@@ -168,9 +185,19 @@ def _extract_sync(html: str, url: str) -> ExtractedContent:
         for a in tree.css("a[href]"):
             href = a.attributes.get("href") or ""
             anchor = (a.text() or "").strip()
-            if href and anchor:
-                role = _classify_link_role(a)
-                links.append(ExtractedLink(anchor=anchor, href=href, role=role))
+            if not href:
+                continue
+            if not anchor:
+                # A label-less anchor is normally chrome (an icon link) and is
+                # dropped. The exception is a contact link (``mailto:`` /
+                # ``tel:``) whose href IS the datum the caller wants — keep it,
+                # deriving a label from the scheme's value so it is not empty.
+                derived = _contact_label(href)
+                if derived is None:
+                    continue
+                anchor = derived
+            role = _classify_link_role(a)
+            links.append(ExtractedLink(anchor=anchor, href=href, role=role))
     except Exception:  # noqa: BLE001, S110 — selectolax parse errors are non-fatal; content_md is the primary output
         pass
 
@@ -185,7 +212,7 @@ def _extract_sync(html: str, url: str) -> ExtractedContent:
     )
 
 
-async def extract_markdown(html: str, url: str) -> ExtractedContent:
+async def extract_markdown(html: str, url: str, *, include_links: bool = False) -> ExtractedContent:
     """Extract page content + metadata, off-thread.
 
     The only public async entry point. Punts the blocking extraction to a worker
@@ -194,11 +221,13 @@ async def extract_markdown(html: str, url: str) -> ExtractedContent:
     Args:
         html: The raw HTML document text.
         url: The page's source URL (for relative-link resolution).
+        include_links: keep in-body anchors as ``[label](url)`` in ``content_md``
+            (passed through to :func:`convert_md.convert_html`). Off by default.
 
     Returns:
         The assembled :class:`ExtractedContent`.
     """
-    return await asyncio.to_thread(_extract_sync, html, url)
+    return await asyncio.to_thread(partial(_extract_sync, html, url, include_links=include_links))
 
 
 # --------------------------------------------------------------------- #

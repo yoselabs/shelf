@@ -33,7 +33,13 @@ from convert_md.engines import _result, _ver
 SourceKind = Literal["web_page", "clean"]
 
 
-def convert_html(html: str, *, url: str | None = None, source_kind: SourceKind = "web_page") -> ConversionResult:
+def convert_html(
+    html: str,
+    *,
+    url: str | None = None,
+    source_kind: SourceKind = "web_page",
+    include_links: bool = False,
+) -> ConversionResult:
     """Convert an in-memory HTML string to Markdown, by source kind.
 
     Args:
@@ -44,6 +50,12 @@ def convert_html(html: str, *, url: str | None = None, source_kind: SourceKind =
             boilerplate-bearing page (trafilatura → html2text). ``"clean"``
             faithfully renders already-clean HTML (html2text only), skipping the
             web extractor which would damage it.
+        include_links: when ``True`` and the trafilatura path runs, in-body
+            anchors survive as ``[label](url)`` Markdown instead of being
+            flattened to their text. Off by default (link-free prose is the
+            common case); a consumer that reasons over the anchor graph opts in.
+            Only affects ``source_kind="web_page"`` (the html2text path always
+            preserves links).
 
     Returns:
         A graded :class:`ConversionResult`. Never raises: if the chain extracts
@@ -53,7 +65,7 @@ def convert_html(html: str, *, url: str | None = None, source_kind: SourceKind =
     source_size = len(html.encode("utf-8", errors="replace"))
 
     if source_kind == "web_page":
-        markdown = _extract_trafilatura(html, url=url)
+        markdown = _extract_trafilatura(html, url=url, include_links=include_links)
         if markdown.strip():
             return _result(markdown, f"trafilatura@{_ver('trafilatura')}", source_size)
 
@@ -70,7 +82,7 @@ def convert_html(html: str, *, url: str | None = None, source_kind: SourceKind =
     )
 
 
-def _extract_trafilatura(html: str, *, url: str | None) -> str:
+def _extract_trafilatura(html: str, *, url: str | None, include_links: bool = False) -> str:
     """Run trafilatura on the HTML string (boilerplate-stripped, tables kept)."""
     try:
         import trafilatura  # noqa: PLC0415 — lazy import keeps package import cheap
@@ -83,6 +95,7 @@ def _extract_trafilatura(html: str, *, url: str | None) -> str:
             output_format="markdown",
             include_tables=True,
             include_comments=False,
+            include_links=include_links,
         )
         or ""
     )

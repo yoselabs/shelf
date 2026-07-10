@@ -1,6 +1,6 @@
 [project]
 name = "content-extract"
-version = "0.1.1"
+version = "0.2.0"
 description = "Extract a web page's main content to Markdown plus structured metadata (title, byline, date), headings, and role-classified links."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]

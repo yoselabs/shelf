@@ -1,0 +1,7 @@
+seq = 44
+date = "2026-07-11"
+event = "delivery"
+software = "convert-md"
+release = "convert-md-v0.8.0"
+actor = "a2web"
+note = "EVOLVE: convert_html grew an `include_links=False` param, passed to trafilatura.extract so in-body anchors survive as `[label](url)` on the web_page path. Additive (resolution 0007 monotonicity: exposes more, removes nothing) — default keeps link-free prose. Requested by a2web (link-affordances) so the extractor can reason over the anchor graph."

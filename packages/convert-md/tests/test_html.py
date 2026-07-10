@@ -57,3 +57,33 @@ def test_clean_source_kind_bypasses_the_web_extractor() -> None:
     assert clean.engine.startswith("html2text@")  # never trafilatura
     assert "# Heading" in clean.body_markdown
     assert "|" in clean.body_markdown  # table survives as a table
+
+
+# Realistic prose so trafilatura's yield heuristic keeps the block as main
+# content (a single short sentence gets collapsed and the anchor lost — not a
+# link-handling issue but a content-detection one).
+_PARA = (
+    "This is a substantial paragraph of real prose that comfortably survives "
+    "trafilatura's boilerplate and yield heuristics, describing the subject in "
+    "enough depth that the extractor treats it as genuine main content. "
+)
+_LINKED = f"""
+<html><head><title>Widget</title></head><body><article>
+<h1>The Widget Roundup</h1>
+<p>{_PARA}</p>
+<p>{_PARA} For the details, read the <a href="https://example.com/reviews">customer
+reviews</a> which cover durability and value. {_PARA}</p>
+<p>{_PARA}{_PARA}</p>
+</article></body></html>
+"""
+
+
+def test_include_links_keeps_in_body_anchor() -> None:
+    result = convert_html(_LINKED, url="https://example.com/p", include_links=True)
+    assert "https://example.com/reviews" in result.body_markdown
+
+
+def test_default_omits_link_target() -> None:
+    result = convert_html(_LINKED, url="https://example.com/p")
+    assert "https://example.com/reviews" not in result.body_markdown
+    assert "customer" in result.body_markdown

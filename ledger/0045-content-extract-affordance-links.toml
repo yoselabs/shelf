@@ -1,0 +1,7 @@
+seq = 45
+date = "2026-07-11"
+event = "delivery"
+software = "content-extract"
+release = "content-extract-v0.2.0"
+actor = "a2web"
+note = "EVOLVE (two additive changes): (1) extract_markdown gained `include_links=False`, threaded to convert_html v0.8.0 for in-body markdown links. (2) the selectolax link gate `if href and anchor` was relaxed so label-less `mailto:`/`tel:` anchors are retained with an href-derived label (were silently dropped) — the href IS the datum. Both monotonic. Requested by a2web (link-affordances / surface-page-links-to-extractor)."
