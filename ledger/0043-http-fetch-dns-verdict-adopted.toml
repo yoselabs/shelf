@@ -1,0 +1,10 @@
+seq = 43
+date = "2026-07-10"
+event = "verdict"
+software = "http-fetch"
+release = "http-fetch-v0.2.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "a2web/pyproject.toml (pin http-fetch-v0.1.0 -> v0.2.0), a2web/uv.lock"
+note = "a2web repointed at http-fetch-v0.2.0 in the same session as the promote (ledger 0042). The dns_error split is purely additive at adoption time -- a2web does not yet BRANCH on dns_error (that lands in the a2web change escalate-on-status-derived-walls / Step 2, which needs the distinct terminal verdict to escalate every transport wall EXCEPT a genuine NXDOMAIN). Adoption held: `uv lock` resolved the new tag, `uv sync --all-extras` swapped 0.1.0 -> 0.2.0, `from http_fetch import FetchVerdict` shows dns_error present, and 194 a2web transport/tier/cascade tests pass green with the new pin. No a2web call sites changed yet (the new verdict is consumed by the pending Step 2 planner rules)."
