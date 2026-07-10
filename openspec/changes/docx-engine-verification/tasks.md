@@ -59,32 +59,32 @@
 
 ## 6. Extract shelf primitive: generic-first, specific-second (D5)
 
-- [ ] 6.1 Write `docs/resolutions/00NN-generic-first-specific-second.md`
+- [x] 6.1 Write `docs/resolutions/00NN-generic-first-specific-second.md`
       (Status/Expires/Track/Distilled-into), stating the rule + the corollary
       (never scope a package's capability grid to one consumer's diet).
-- [ ] 6.2 Distill it into `agent-loop.md` (the package-reasoning discipline) in
+- [x] 6.2 Distill it into `agent-loop.md` (the package-reasoning discipline) in
       the **same commit** — `tests/test_resolution_distillation.py` enforces
       the coupling. This change is the resolution's cited worked example.
 
 ## 7. Extract shelf primitive: WORKFLOW: BENCH (D6)
 
-- [ ] 7.1 Draft the `WORKFLOW: BENCH` skeleton in `agent-loop.md` at the start
+- [x] 7.1 Draft the `WORKFLOW: BENCH` skeleton in `agent-loop.md` at the start
       of the bench (the 6-step shape in design.md D6).
-- [ ] 7.2 Finalize it *from* the completed docx run — reconcile every step
+- [x] 7.2 Finalize it *from* the completed docx run — reconcile every step
       against what actually happened across BOTH the PDF and docx benches
       (extracted, not invented). Decide the open question: peer workflow vs
       sub-procedure. Add its `OUTPUT` + close-the-loop step (resolution 0009).
-- [ ] 7.3 If it warrants a resolution of its own (a new named workflow is a
+- [x] 7.3 If it warrants a resolution of its own (a new named workflow is a
       governance fact), write it and distil in the same commit; else fold the
       citation into the existing workflow set.
 
 ## 8. Close the loop (resolution 0009)
 
-- [ ] 8.1 `make catalog` if `catalog/*.toml` / `use-cases/*.toml` changed;
+- [x] 8.1 `make catalog` if `catalog/*.toml` / `use-cases/*.toml` changed;
       ledger rows written (delivery for the convert-md re-cut; verdict only if
       a consumer repoint actually lands in this change — it won't, that's
       a2kay's follow-up).
-- [ ] 8.2 Prune the `docs/backlog.md` "Verify — convert-md's docx engine
+- [x] 8.2 Prune the `docs/backlog.md` "Verify — convert-md's docx engine
       choice" line (this change *is* that verification).
 - [ ] 8.3 `make check` green; work merged to `main` and pushed; no dangling
       worktree/branch. `openspec archive docx-engine-verification`.

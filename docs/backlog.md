@@ -8,11 +8,14 @@ is a smoke alarm.
 
 ## Verify — designed & shipped, never triggered end-to-end (highest risk)
 
-- [ ] **`convert-md`'s docx engine choice (pandoc over markitdown) is reasoned, not verified.** Kept for
-  one concrete reason — pandoc's `--track-changes=all` preserves tracked-changes/redline metadata,
-  which markitdown's plain-text extraction can't replicate — but unlike PDF (bench/results/
-  2026-07-09-findings.md), no docx corpus exists in `bench/` to actually test it. Surfaced 2026-07-09
-  during the PDF-engine work. Build the same evidence-backed treatment if/when it matters.
+- [ ] **`convert-md`'s HTML render path is one converter, unverified across real pages.** The docx
+  work (docx-engine-verification, design.md D7) established that `convert_html`'s `web_page` kind
+  uses trafilatura (extraction) and `clean` uses html2text (faithful render). Only html2text's clean
+  path is now exercised widely (via docx). Whether trafilatura is the *best* web extractor, and
+  whether html2text vs markdownify is the *right* canonical clean renderer, is untested on a real
+  web corpus — and it touches a2web's live path. A `WORKFLOW: BENCH` run (resolution 0011) with a
+  real-web corpus is the proper treatment; build when it matters. (docx-verify itself: closed
+  2026-07-10, bench/results/2026-07-10-docx-findings.md — pandoc dropped for mammoth.)
 
 ## Build — designed, unbuilt, gated (do NOT build on spec)
 

@@ -59,10 +59,15 @@ stdlib or third-party API.
 STEPS:
 1. Compare against the **CATALOG** (`<shelf>/catalog/README.md` + `<shelf>/packages/` +
    `glossary.md`) — never against another consumer; you cannot see what else is being built, so
-   the catalog is the frame.
+   the catalog is the frame. **Reason generic-first, weight consumer-second** (resolution 0010):
+   define what the capability needs across the *class* of inputs at large, then use your live
+   consumer only to *rank* common (→ default path) vs rare (→ opt-in / graceful degradation) — never
+   to scope the capability down to one consumer's current diet. A capability the class has but your
+   consumer skips becomes an opt-in or a documented gap, not an amputation.
 2. Pick one direction:
    - **ADOPT** — a piece fits as-is: **DEEP** (hides real complexity) · **STABLE** (settled API) ·
-     **WINS** (lighter than you'd write). Add the git+tag source (`consuming-the-shelf.md` §1),
+     **WINS** (lighter than you'd write — if the win is *contested* on a capability that matters,
+     `BENCH` it rather than assert it). Add the git+tag source (`consuming-the-shelf.md` §1),
      `uv lock`, import. **Never** a committed local path.
    - **EVOLVE** — a piece *almost* fits but isn't flexible enough → grow its contract to serve both
      cases (`PROMOTE` workflow, on the existing package), then adopt. One evolving piece beats two
@@ -183,6 +188,8 @@ STEPS: walk `<shelf>/catalog/README.md`, ask per piece:
 3. **Unused?** No active use-case past its TTL → **deprecate → delete** (decay is a virtue).
 4. **Over-promoted?** Turned out too niche / wrong shape → **demote**: duplicate back into its one
    consumer, retire the package. Expected and cheap to undo here — that's the deal.
+5. **Inherited choice unproven?** A package carries an engine/tool/dep chosen on reputation or
+   carried over from an earlier decision, never tested → `BENCH` it (below) and record the verdict.
 
 Never delete a *tag* (`PROMOTE` step 5); retiring a package means marking it `deprecated` and
 stopping new adoption.
@@ -193,6 +200,37 @@ check` green, merge + push to `main`.
 
 OUTPUT: catalog garbage-collected with hindsight — "was that the right abstraction?" answered
 empirically, not by an upfront gate — and `main` carries the verdict.
+
+---
+
+## WORKFLOW: BENCH — evidence-backed tool comparison
+
+TRIGGER: a keep-vs-replace or build-vs-adopt decision between substrate tools (conversion engines,
+parsers, client libraries) where reputation or inheritance isn't enough — you're about to pick or
+defend a tool and can't cite evidence. Invoked from `SEAM` (ADOPT's "WINS", when contested) or
+`RECONCILE` (re-checking an inherited choice). Resolution 0011.
+
+STEPS:
+1. **Frame** as keep/replace on a *specific capability*, not "which tool is best" abstractly — name
+   the axis that actually decides it (the docx bench: tracked-changes fidelity; the PDF bench:
+   LLM-semantic-recoverability).
+2. **Corpus by isolation** — one capability per fixture. The transferable asymmetry: **synthesize**
+   for semantic formats (docx/pptx/xlsx — authoring a single-feature file loses no realism the bench
+   cares about) and **select real documents** for lossy formats (PDF/scans — a synthetic file is
+   easier than reality and hides the divergence). Never the user's own data; document each fixture's
+   axis.
+3. **Transient isolated installs** — run each tool via `uv run --with <tool>`, never a declared
+   dependency of the package just to bench it. A crash/timeout is a recorded result, not a run
+   failure.
+4. **Model-free grade** — human-judge each output on the named axes, quote evidence from the
+   outputs; not LLM-judged. Score the incumbent too — "no difference" is a decisive result.
+5. **Dated findings doc** under `bench/results/`, committed as an artifact — re-runnable against
+   future tool versions.
+6. **Decide → ledger row**, then close the loop (resolution 0009). The bench answers "which tool";
+   a separate call answers "is it worth it."
+
+OUTPUT: an evidence-backed keep/replace decision, a committed re-runnable bench + dated findings, and
+a ledger row — the choice is defensible by evidence, not reputation, and re-verifiable later.
 
 ---
 
