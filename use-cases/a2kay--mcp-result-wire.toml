@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "mcp-result-wire"
+why = "a2kay composes its MCP server directly on FastMCP (no a2kit App); it needs the generic result-formatting + list-projection middlewares that a2kit's server used to install, driven by a2kay's own per-tool plans."
+needs = "FormatRoutingMiddleware(plans, consumer) to compress agent-facing content via page-tsv, and ListViewMiddleware(settings) for field-projection/pagination on list verbs."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

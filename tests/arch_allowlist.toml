@@ -11,6 +11,7 @@ html2text = "Date-versioned upstream (YYYY.M.D releases); no semver upper bound 
 sqlite-resource = "Intra-shelf workspace dependency (http-cache composes it); pinned by git tag at adoption, not a PyPI range."
 convert-md = "Intra-shelf workspace dependency (content-extract composes its convert_html string door); pinned by git tag at adoption, not a PyPI range."
 lean-wire = "Intra-shelf workspace dependency (page-tsv composes its TSV codec + pruning); pinned by git tag at adoption, not a PyPI range."
+page-tsv = "Intra-shelf workspace dependency (mcp-result-wire composes its render_plain + EncodingPlan); pinned by git tag at adoption, not a PyPI range."
 
 [name_collision]
 # _example_helper = "why this convergence is by design"

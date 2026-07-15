@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "mcp-result-wire"
+kind = "any-*"
+tier = "T2"
+release = ""
+capability = "Stop caring how to wire token-lean, projected tool output into a FastMCP server — two middlewares that re-derive the content channel from a per-tool encoding plan (page-tsv) and project/paginate list results, driven by explicit registries not framework metadata."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kit's packages/mcp (format_routing.py + listview.py) during a2kay's a2kit sunset (a2kay openspec/changes/sunset-a2kit-dependency, Phase 3). Composes page-tsv; depends on fastmcp (the first FastMCP-coupled shelf package). Generalized from the a2kit original: ListView takes an explicit settings registry instead of sniffing tool.meta['a2kit'], so it is framework-neutral. Co-developed on the work/a2kay worktree; tag cut at end of the sunset spine swap. Born candidate."
