@@ -39,6 +39,37 @@ is a smoke alarm.
   duplication check) to flag resolutions past their expiry at a reconciliation pass. Not
   commit-blocking — date-triggered, not diff-triggered.
 
+### From a2kay's a2kit sunset (composition locked — promote per phase, not on spec)
+
+Six packages are the agreed decomposition of a2kay's a2kit dependency. Authoritative home:
+a2kay `openspec/changes/sunset-a2kit-dependency/` (design.md = the tiered tree). a2kay is the
+pilot; a2web is the near-certain 2nd consumer that validates each shape → keep them **pre-1.0**.
+Each promotes when its code becomes real at the named a2kay phase (**do not build ahead**).
+
+- [ ] **`lean-wire`** — TSV codec + `PruneEmpty`: token-lean agent-facing wire payloads. T0 leaf
+  (`pydantic`+stdlib). **Fix the newline bug on extraction** (`QUOTE_MINIMAL` + no cell sanitization →
+  a `\n`/`\t` in a cell breaks line-oriented readers); escape `\n`/`\t`, ship golden-bytes tests inside;
+  semver = wire-format version. 2nd consumer: a2web (`encode_tsv`/`PruneEmpty`). Trigger: sunset Phase 2.
+- [ ] **`page-tsv`** — `Page[T]` + return-annotation format inference + consumer-aware
+  `render(value, *, consumer, plan)`. On `lean-wire`. The **whole** wire format in one owner so it
+  can't drift; `consumer` (llm/code/machine) is a caller parameter, never sniffed. `is_basemodel` rides
+  along. T1. Trigger: Phase 2.
+- [ ] **`mcp-result-wire`** — generic FastMCP result middleware: format-routing (drives `page-tsv`) +
+  field-projection/pagination. On `page-tsv`. T2. Trigger: Phase 3 (a2kay keeps only its policy
+  middlewares: contamination guard, principal→leases bridge, error→`ToolResult`).
+- [ ] **`scoped-log`** — structured async logging + condensed-line / ambient-scope / `elapsed_ms`
+  telemetry (the house wire-style, better than raw `structlog`). MCP-specific fields
+  (tool/surface/principal) **parameterized** by the caller, not baked in; excise the `fastmcp` sniff.
+  On `timefmt`. Consumers: a2kay + a2web. Trigger: Phase 4.
+- [ ] **`uds-transport`** — Unix-domain-socket serve + connect, with `0700` dir / `0600` node / token
+  security defaults baked in (simple·secure·isolated); FastMCP ships no UDS. Also the transport base for
+  the a2kay local-owner bridge (its singleton-election core rides on top later). Rename the borrowed
+  `X-A2kit-Token` header. Trigger: Phase 5.
+- [ ] **`a2effect`** — promote a2kay's `AppError` base **out of the a2kit repo** (it lives there today,
+  so "zero a2kit" is false until it moves). Decide the raises-lint's fate + whether `translate.py` is
+  package or doctrine; coordinate with the un-ported rego lint engine (two lint engines, one decision).
+  Trigger: prerequisite for a2kay zero-a2kit.
+
 ## Decide — open forks (a decision, not a build)
 
 - [ ] **release-please** adoption timing. **Trigger:** the *first* tag/changelog bookkeeping mistake, OR
