@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "lean-wire"
+kind = "primitive"
+tier = "T0"
+release = ""
+capability = "Stop caring how to serialize agent-facing rows without wasting tokens or tearing records — a truly line-oriented TSV codec (a cell never holds a raw tab/newline, unlike stdlib csv) plus opt-in empty-field pruning that keeps informative falsy values."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kit's packages/formatter (tsv.py + prune.py) during a2kay's a2kit sunset (a2kay openspec/changes/sunset-a2kit-dependency). Fixes the origin's newline bug: stdlib csv QUOTE_MINIMAL left raw \\n inside quoted cells, breaking line-oriented agent readers — lean-wire escapes \\/\\t/\\n/\\r per cell instead. pydantic + stdlib leaf (T0). page-tsv composes it. Co-developed on the work/a2kay worktree; tag cut at end of the sunset spine swap. Born candidate."

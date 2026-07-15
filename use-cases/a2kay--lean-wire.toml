@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "lean-wire"
+why = "a2kay serves a knowledge base over MCP; agent-facing list/page results must be token-lean and line-oriented so a model reads rows, not quoted-newline noise."
+needs = "encode_tsv (line-oriented TSV, cells never hold a raw tab/newline) + PruneEmpty/prune_dict/dump_model_for_wire for empty-field pruning on the wire."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

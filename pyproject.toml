@@ -14,6 +14,8 @@ members = ["packages/*"]
 [tool.uv.sources]
 convert-md = { workspace = true }
 anyllm = { workspace = true }
+# page-tsv composes lean-wire; resolve the sibling from the workspace, not PyPI.
+lean-wire = { workspace = true }
 
 # Dev tooling as a PEP 735 dependency-group (NOT an optional-extra): `uv sync`
 # always installs it, so the venv carries the linters and `uv run` can never fall
