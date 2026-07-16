@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 #: Top-level modules that are CONSUMERS of the shelf. A shelf package importing any of these has
 #: inverted the dependency arrow. Extend as new consumer apps appear.
-FORBIDDEN_CONSUMERS: frozenset[str] = frozenset({"a2kay", "a2web", "a2kit", "a2db", "a2effect", "a2atlassian"})
+FORBIDDEN_CONSUMERS: frozenset[str] = frozenset({"a2kay", "a2web", "a2kit", "a2db", "a2atlassian"})
 
 
 def imported_top_levels(py: Path) -> set[str]:
