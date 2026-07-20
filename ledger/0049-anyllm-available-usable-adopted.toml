@@ -1,0 +1,10 @@
+seq = 49
+date = "2026-07-20"
+event = "verdict"
+software = "anyllm"
+release = "anyllm-v0.4.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "a2web/pyproject.toml (tag anyllm-v0.2.0 -> v0.4.0), a2web/uv.lock, _manifests/llm_providers/claude_code.py, packages/llm_cost_guard.py, tests, README"
+note = "a2web repointed at anyllm-v0.4.0 in the same session as the promote (ledger 0048), and DELETED its own local probe as a result. a2web had shipped a stopgap that gated the claude-code rung on `shutil.which('claude')`. That produced the right container outcome for the wrong reason: the SDK bundles its own `claude` binary, so a container HAS a runnable CLI -- `shutil.which` merely never sees it (bundled path is not on PATH), and it would equally have missed a legitimate install under ~/.claude/local. The stopgap disagreed with what the SDK actually does, which is the same class of bug it was fixing; the honest probe belongs next to the code that spawns the process, hence the promote. a2web now consumes `available()` and keeps only its own selection policy (an explicitly configured OPENAI_* gateway leads the `auto` order), so two independent guards hold with no duplicated probing. Crossing v0.2.0 -> v0.4.0 also picked up the untagged 0.3.0 `ProviderName` narrowing, which surfaced a real `ty` error in a2web's `_GuardedProvider` wrapper (its `name` was plain `str`); annotated + mirrored from the wrapped provider -- exactly the migration the new CHANGELOG 0.3.0 line exists to warn about, caught by the type checker rather than at runtime. Adoption held: uv lock resolved v0.4.0, `available()` correctly reports True on a Keychain-backed macOS dev host, and a2web `make check` is green (1166 passed, 90% cov)."
