@@ -127,7 +127,7 @@ def _contact_label(href: str) -> str | None:
     lowered = href.lower()
     for scheme in ("mailto:", "tel:"):
         if lowered.startswith(scheme):
-            value = href[len(scheme):].split("?", 1)[0].strip()
+            value = href[len(scheme) :].split("?", 1)[0].strip()
             return value or None
     return None
 
