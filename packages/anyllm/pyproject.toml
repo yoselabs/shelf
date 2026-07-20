@@ -1,6 +1,6 @@
 [project]
 name = "anyllm"
-version = "0.3.0"
+version = "0.4.0"
 description = "Stop caring which LLM provider is underneath — one async completion contract with token/cost accounting and four backends (claude-code-cli/-sdk, anthropic-api, openai-compatible)."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
