@@ -26,6 +26,104 @@ if TYPE_CHECKING:
 
 _SDK_MODULE = "claude_agent_sdk"
 
+# Fallback locations the SDK itself searches after `PATH`, mirrored so that
+# `available()` agrees with what `complete()` will actually find. Kept in the
+# SDK's own order (`_internal/transport/subprocess_cli.py::_find_cli`).
+_CLI_FALLBACK_DIRS = (
+    "~/.npm-global/bin",
+    "/usr/local/bin",
+    "~/.local/bin",
+    "~/node_modules/.bin",
+    "~/.yarn/bin",
+    "~/.claude/local",
+)
+
+
+def _cli_name() -> str:
+    import platform  # noqa: PLC0415 — lazy: only needed on the availability path
+
+    return "claude.exe" if platform.system() == "Windows" else "claude"
+
+
+def _find_cli() -> str | None:
+    """Locate the Claude Code CLI the SDK would spawn, or None.
+
+    Mirrors the SDK's own resolution order — bundled binary, then ``PATH``, then
+    its fixed fallback list — so this probe cannot disagree with what
+    ``complete()`` goes on to do. Filesystem-only: no SDK import, no process
+    spawn, no network.
+    """
+    import importlib.util  # noqa: PLC0415 — lazy: cheap find_spec, avoids importing the ~210MB SDK
+    import shutil  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    name = _cli_name()
+
+    # 1. Bundled CLI, shipped inside the SDK package itself. Located via the
+    #    module spec rather than an import so the ~210MB package stays unloaded.
+    spec = importlib.util.find_spec(_SDK_MODULE)
+    if spec is None:
+        return None
+    for root in spec.submodule_search_locations or ():
+        bundled = Path(root) / "_bundled" / name
+        if bundled.is_file():
+            return str(bundled)
+
+    # 2. PATH.
+    if found := shutil.which(name):
+        return found
+
+    # 3. The SDK's fixed fallback locations.
+    for raw in _CLI_FALLBACK_DIRS:
+        candidate = Path(raw).expanduser() / name
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+# Where the CLI keeps an OAuth session, by platform. macOS uses the Keychain;
+# Linux (and every container) writes this file.
+_CREDENTIALS_FILE = "~/.claude/.credentials.json"
+_KEYCHAIN_SERVICE = "Claude Code-credentials"
+_OAUTH_TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN"  # noqa: S105 — an env var NAME, not a secret
+
+
+def _session_credentials_present() -> bool:
+    """Whether a Claude Code session's credentials exist, without reading them.
+
+    Never decrypts, never prompts, never spawns the CLI. The Keychain branch
+    uses a metadata lookup (no ``-w``), which returns an exit code only — asking
+    *whether* an item exists is not a secret read, so no auth dialog appears.
+    """
+    import os  # noqa: PLC0415 — lazy: availability path only
+    import platform  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
+
+    if os.environ.get(_OAUTH_TOKEN_ENV, "").strip():
+        return True
+    if Path(_CREDENTIALS_FILE).expanduser().is_file():
+        return True
+    if platform.system() == "Darwin":
+        import shutil  # noqa: PLC0415
+        import subprocess  # noqa: PLC0415
+
+        security = shutil.which("security")
+        if not security:
+            return False
+        try:
+            return (
+                subprocess.run(  # fixed argv, no shell, no user input
+                    [security, "find-generic-password", "-s", _KEYCHAIN_SERVICE],
+                    capture_output=True,
+                    timeout=5,
+                    check=False,
+                ).returncode
+                == 0
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+    return False
+
 
 class ClaudeCodeSdkAdapter:
     """Backend running prompts through the user's Claude Code OS session."""
@@ -33,10 +131,28 @@ class ClaudeCodeSdkAdapter:
     name = ProviderName.CLAUDE_CODE_SDK
 
     def available(self) -> bool:
-        """Report whether ``claude-agent-sdk`` is importable (cheap ``find_spec``, no heavy import)."""
-        import importlib.util  # noqa: PLC0415 — lazy: cheap find_spec, avoids importing the ~210MB SDK
+        """Report whether this backend is usable: a CLI plus a session for it.
 
-        return importlib.util.find_spec(_SDK_MODULE) is not None
+        Importability alone is not usability. The SDK is a thin wrapper that
+        shells out to the ``claude`` binary, and — crucially — recent versions
+        **bundle that binary inside the package**, so installing the extra
+        installs a runnable CLI. A container therefore has both the package and
+        the CLI while having no logged-in session, and every completion comes
+        back empty. A caller that ranks backends by ``available()`` would select
+        this one forever and never fall through to one that works.
+
+        So the discriminator is authentication, checked without decrypting
+        anything: an explicit token, the on-disk credential file (Linux, and any
+        container), or the macOS Keychain item's *existence* (a metadata query —
+        it does not read the secret and does not prompt). Absence of all three
+        with a CLI present is the container shape: unavailable.
+
+        False-negative posture: if a host stores credentials somewhere none of
+        these see, this reports unavailable and the caller picks another backend
+        — degraded, not broken. That is the safe direction, because the opposite
+        error silently shadows every working backend.
+        """
+        return _find_cli() is not None and _session_credentials_present()
 
     async def complete(
         self,
@@ -51,8 +167,16 @@ class ClaudeCodeSdkAdapter:
     ) -> Completion:
         """Run one prompt through the OS session and return a :class:`Completion`."""
         if not self.available():
-            msg = "claude-agent-sdk is not installed"
-            raise AnyLLMError(msg, retryable=False, hint="install anyllm[claude-code-sdk] or use another backend")
+            # Name which precondition failed. "Not installed" was the only story
+            # this could tell before availability included the session, and it
+            # sent operators to reinstall a package that was already present.
+            if _find_cli() is None:
+                msg = "claude-agent-sdk: no `claude` CLI found to run"
+                hint = "install anyllm[claude-code-sdk] (it bundles the CLI), or use another backend"
+            else:
+                msg = "claude-agent-sdk: a `claude` CLI is present but no logged-in session was found"
+                hint = "run `claude` once to log in, set CLAUDE_CODE_OAUTH_TOKEN, or use another backend"
+            raise AnyLLMError(msg, retryable=False, hint=hint)
         from claude_agent_sdk import (  # noqa: PLC0415 — lazy: claude-agent-sdk is the optional [claude-code-sdk] extra
             AssistantMessage,
             ClaudeAgentOptions,

@@ -8,9 +8,14 @@ point of these tests is the *contract* — fail-loud on failure, a rich
 from __future__ import annotations
 
 import asyncio
+import importlib.util
+import platform
+import shutil
+import types
 from typing import Any
 
 import anthropic
+import anyllm.providers.claude_code_sdk as _cc
 import openai
 import pytest
 from anyllm import (
@@ -335,3 +340,84 @@ def test_build_adapter_returns_available(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_all_backends_satisfy_protocol() -> None:
     for adapter in (ClaudeCodeCliAdapter(), ClaudeCodeSdkAdapter(), AnthropicApiAdapter(), OpenAICompatibleAdapter()):
         assert isinstance(adapter, LLMProvider)
+
+
+# --------------------------------------------------------------------- #
+# ClaudeCodeSdkAdapter.available() — usable, not merely importable
+#
+# The SDK shells out to the `claude` binary on every completion, so package
+# importability alone is a false positive: a container that installs the Python
+# extra without the CLI would be selected by an availability-ranked chooser and
+# then fail every call, never falling through to a backend that works.
+# --------------------------------------------------------------------- #
+
+
+def test_claude_code_available_needs_cli_and_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_cc, "_find_cli", lambda: "/usr/local/bin/claude")
+    monkeypatch.setattr(_cc, "_session_credentials_present", lambda: True)
+    assert ClaudeCodeSdkAdapter().available() is True
+
+
+def test_claude_code_unavailable_when_cli_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(_cc, "_find_cli", lambda: None)
+    monkeypatch.setattr(_cc, "_session_credentials_present", lambda: True)
+    assert ClaudeCodeSdkAdapter().available() is False
+
+
+def test_claude_code_unavailable_when_cli_bundled_but_no_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The container shape. The SDK bundles a runnable `claude`, so a CLI IS
+    present -- only the absent session distinguishes it from a working host."""
+    monkeypatch.setattr(_cc, "_find_cli", lambda: "/site-packages/claude_agent_sdk/_bundled/claude")
+    monkeypatch.setattr(_cc, "_session_credentials_present", lambda: False)
+    assert ClaudeCodeSdkAdapter().available() is False
+
+
+def test_session_credentials_from_env_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
+    assert _cc._session_credentials_present() is True
+
+
+def test_session_credentials_from_file(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+    creds = tmp_path / "creds.json"
+    creds.write_text("{}")
+    monkeypatch.setattr(_cc, "_CREDENTIALS_FILE", str(creds))
+    assert _cc._session_credentials_present() is True
+
+
+def test_session_credentials_absent_on_linux_container(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    """No token, no credential file, non-Darwin -> no session."""
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+    monkeypatch.setattr(_cc, "_CREDENTIALS_FILE", str(tmp_path / "nope.json"))
+    monkeypatch.setattr(platform, "system", lambda: "Linux")
+    assert _cc._session_credentials_present() is False
+
+
+def test_find_cli_returns_none_when_sdk_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No SDK -> no bundled binary to find, and nothing to spawn."""
+    monkeypatch.setattr(importlib.util, "find_spec", lambda *a, **k: None)
+    monkeypatch.setattr(shutil, "which", lambda _n: None)
+    assert _cc._find_cli() is None
+
+
+def _no_bundled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hide the SDK's bundled CLI so PATH/fallback ordering can be tested."""
+    monkeypatch.setattr(importlib.util, "find_spec", lambda *a, **k: types.SimpleNamespace(submodule_search_locations=[]))
+
+
+def test_find_cli_prefers_path_over_fallback_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    _no_bundled(monkeypatch)
+    monkeypatch.setattr(shutil, "which", lambda _n: "/from/path/claude")
+    monkeypatch.setattr(_cc, "_CLI_FALLBACK_DIRS", (str(tmp_path),))
+    (tmp_path / "claude").write_text("#!/bin/sh\n")
+    assert _cc._find_cli() == "/from/path/claude"
+
+
+def test_find_cli_uses_fallback_dirs_when_not_on_path(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    """A CLI outside PATH (e.g. ~/.claude/local) is still found."""
+    _no_bundled(monkeypatch)
+    monkeypatch.setattr(shutil, "which", lambda _n: None)
+    monkeypatch.setattr(_cc, "_CLI_FALLBACK_DIRS", (str(tmp_path),))
+    fallback = tmp_path / "claude"
+    fallback.write_text("#!/bin/sh\n")
+    assert _cc._find_cli() == str(fallback)
