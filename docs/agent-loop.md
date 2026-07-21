@@ -52,9 +52,15 @@ OUTPUT: a current local clone; this file and the catalog are guaranteed fresh fo
 
 ## WORKFLOW: SEAM — the four directions
 
-TRIGGER: you are about to write a helper, wrapper, adapter, or any substrate glue — LLM / DB /
-embedding / git / file / format / config / datetime / collections / a wrapper over an awkward
-stdlib or third-party API.
+TRIGGER (either one fires this workflow):
+- **About to write** a helper, wrapper, adapter, or any substrate glue — LLM / DB / embedding / git
+  / file / format / config / datetime / collections / a wrapper over an awkward stdlib or
+  third-party API.
+- **Just fixed a bug** whose root cause was a *dependency's* behaviour rather than your own logic
+  (resolution 0012). This trigger exists because the first one never fires here: at the moment you
+  write it, a **sharp edge** looks like a bugfix, not like substrate — the code is trivial and the
+  discovery was expensive, and it is the *discovery* the shelf amortizes. See PROMOTE below for the
+  one-question test.
 
 STEPS:
 1. Compare against the **CATALOG** (`<shelf>/catalog/README.md` + `<shelf>/packages/` +
@@ -88,6 +94,19 @@ STEPS:
      candidates and move on — the exception, not the main path. Do **not** hand-roll silently and
      move on — that's the extraction moment lost; over-promotion is cheap to fix at `RECONCILE`, a
      lost moment is not. → run `PROMOTE`.
+
+     **Arriving from the bugfix trigger (a sharp edge)?** One question decides it: **did we learn
+     this from a bug, or from the docs?** From the docs → ordinary work, just write it (or fix it
+     upstream). From a bug → the dependency was *correct and documented* and a competent user still
+     got hurt; reading harder would not have saved the next consumer either, so the lesson promotes.
+     A second, greppable tell: **a production symbol whose only caller is a test** (a
+     `_reset_registry()`, a module global that exists to be monkeypatched) is a sharp edge worked
+     *around* rather than solved. **Sizing rule — a sharp edge is normally a *feature of* a
+     capability package, never a package of its own.** Naming one after the library it patches
+     (`logging-extra`, `httpx-utils`) is resolution 0008's disease from the other direction; if no
+     capability package exists to host it, ask what capability you are actually building. And if the
+     sharp edge belongs to something *we own*, fix it there — don't package a patch around your own
+     house.
    - **DUPLICATE / SKIP** — evolving would distort the piece (serve two masters badly), or your need
      is too niche → write it locally, don't force reuse. Revisited at `RECONCILE`.
 

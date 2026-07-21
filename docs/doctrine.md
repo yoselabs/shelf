@@ -34,8 +34,12 @@ better foundations later. Improving one piece improves every consumer at once.
 4. **Promote aggressively — capitalize generic substrate at writing time; reconcile later** (resolution
    0006). The opposite posture from adopt: the moment you write a generic helper, a pattern wrapper, or an
    abstraction over an awkward stdlib/library API, home it in the shelf *then* — a self-assessed "this
-   feels reusable" is enough; no second consumer required. The goal is that every app is mostly *business
-   logic + dependencies*. Two guards keep this from becoming a junk drawer: it is always **extracted, never
+   feels reusable" is enough; no second consumer required. **But "the moment you write" is not the only
+   moment** (resolution 0012): a **sharp edge** — a dependency that is correct, documented, and correctly
+   used, which still hurt a competent engineer — is discovered while *debugging*, and at that moment it
+   looks like a bugfix rather than substrate. There the code is trivial and the discovery was expensive,
+   so what the shelf capitalizes is the **lesson**, not the lines. The goal is that every app is mostly
+   *business logic + dependencies*. Two guards keep this from becoming a junk drawer: it is always **extracted, never
    invented** (real code a real app needed — never an empty package to look complete), and **reconciliation
    is mandatory** (merge / split / delete / demote, with hindsight). The flexibility-vs-reuse balance is
    found at reconcile time, not guessed upfront. *Aggressive promote + conservative adopt + mandatory
