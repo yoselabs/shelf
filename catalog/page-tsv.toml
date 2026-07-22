@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "page-tsv"
+kind = "any-*"
+tier = "T1"
+release = ""
+capability = "Stop caring how to render a tool result for different readers — Page[T] + a render(value, *, consumer) seam that routes by return type and compresses scalar tables to lean-wire TSV for an LLM while staying plain JSON for code/machine, all from one owner so the formats can't drift."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kit's packages/formatter (response/inference/page/render/hint/formats) during a2kay's a2kit sunset (a2kay openspec/changes/sunset-a2kit-dependency). Composes lean-wire for the codec + pruning. Design fix locked in: `consumer` is a caller PARAMETER, never sniffed from context — the whole wire format lives in one package so an LLM renderer and a code/machine renderer cannot diverge. Co-developed on the work/a2kay worktree; tag cut at end of the sunset spine swap. Born candidate."

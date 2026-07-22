@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "page-tsv"
+why = "a2kay's MCP verbs return typed results (Page[T], lists, envelopes) that must render differently for an LLM caller than for a code/machine caller, from one owner so the two can't drift."
+needs = "Page[T] + render(value, consumer, *, plan) (consumer is a parameter) + build_encoding_plan/infer_format_hint for type routing + the render_plain/encode_page_tsv_dict after-the-fact encoders for the result middleware."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired
