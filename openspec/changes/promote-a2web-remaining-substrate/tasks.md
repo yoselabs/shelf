@@ -15,9 +15,9 @@ Per-package cycle = PROMOTE workflow (agent-loop.md): extract behind a Capabilit
 - [x] 1.2 README + pyproject (zero deps, stdlib only).
 - [x] 1.3 Port acceptance suite (`tests/` + `_fixture_surface/`, consumer-free `object()` context; cover logger injection, priority sort, wrong-type branch).
 - [x] 1.4 Boundary test (`test_boundary_plugin_surface.py`).
-- [ ] 1.5 Foreign-soil install gate (D6). `make check` green in worktree.
-- [ ] 1.6 Tag `plugin-surface-v0.1.0`; push.
-- [ ] 1.7 Repoint a2web (imports `a2web._plugin` → `plugin_surface`; pass `logger=` at 6 call sites).
+- [x] 1.5 Foreign-soil install gate (D6) PASS (clean venv, built artifact, 9/9). `make check` green in worktree (339 passed, 88.47%).
+- [x] 1.6 Tagged `plugin-surface-v0.1.0`; pushed.
+- [x] 1.7 Repointed a2web (imports → `plugin_surface`; `logger=get_logger()` at 6 sites; committed a2web `9ce0711`, gate green 1243/90.26%).
 
 ## 2. llm-wobble
 - [ ] 2.1 Extract `packages/llm_extract/wobble/`; parameterize the `getLogger("a2kit")` (D2). Do NOT carry any back-compat shim.
