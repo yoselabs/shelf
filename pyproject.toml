@@ -155,6 +155,7 @@ testpaths = [
     "packages/settings-base/tests",
     "packages/plugin-surface/tests",
     "packages/llm-wobble/tests",
+    "packages/llm-cache/tests",
 ]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"
