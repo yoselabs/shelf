@@ -19,11 +19,21 @@ Per-package cycle = PROMOTE workflow (agent-loop.md): extract behind a Capabilit
 - [x] 1.6 Tagged `plugin-surface-v0.1.0`; pushed.
 - [x] 1.7 Repointed a2web (imports → `plugin_surface`; `logger=get_logger()` at 6 sites; committed a2web `9ce0711`, gate green 1243/90.26%).
 
-## 2. llm-wobble
-- [ ] 2.1 Extract `packages/llm_extract/wobble/`; parameterize the `getLogger("a2kit")` (D2). Do NOT carry any back-compat shim.
-- [ ] 2.2 Leave `_policies.py` tables in a2web (product).
-- [ ] 2.3 Port `tests/packages/llm_extract/test_wobble.py`; boundary test; D6 gate.
-- [ ] 2.4 `make check` green; tag `llm-wobble-v0.1.0`; push; repoint a2web.
+## 2. llm-wobble  ✅ DONE 2026-07-26 (tag llm-wobble-v0.1.0)
+- [x] 2.1 Extracted `packages/llm_extract/wobble/_internal.py` → `packages/llm-wobble/`.
+      D2 note was stale (code emitted on `getLogger("a2web")`, not `"a2kit"`): the real
+      fix is logger INJECTION (default `getLogger("llm_wobble")`, `logger=` override),
+      matching plugin-surface. Dropped the `apply_policy` back-compat shim; the suite
+      exercises the real funnel (STRICT miss → `ParseError`, `WobbleSkip` propagates).
+- [x] 2.2 `_policies.py` stays in a2web (product); now imports `WobblePolicy`/
+      `WobbleTolerance` from `llm_wobble`.
+- [x] 2.3 Acceptance suite ported (`test_llm_wobble.py`, 17 assertions) + boundary
+      test. **D6 foreign-soil gate PASS**: 17/17 against the installed wheel in a
+      clean venv (no repo deps).
+- [x] 2.4 `make check` green (367 passed, 88.63% — also fixed a real gap: neither
+      plugin-surface NOR llm-wobble was in pytest `testpaths`, so promotion #1's
+      tests never ran under the gate; both registered now). Tagged, pushed, a2web
+      repointed (`5fd4467`; gate 1237 passed / 90.22% / 39 arch tests).
 
 ## 3. anyllm.cost  (EVOLVE)
 - [ ] 3.1 Add `anyllm.cost` (`CostPolicy`, `assert_within_budget`, `with_cost_guard`, `CostViolation`), keyed on `anyllm.ProviderName` (D4).
