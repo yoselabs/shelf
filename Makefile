@@ -4,7 +4,7 @@
 # This is the reference toolchain every consumer of the shelf inherits (resolution 0004).
 # Each target is one linter doing one job; `check` is the gate.
 
-.PHONY: check lint format typecheck spell deps test cov catalog advisory sync
+.PHONY: check lint format typecheck spell deps test test-browser cov catalog advisory sync
 
 # The gate. Fast, deterministic tools first; tests last.
 check: lint typecheck spell deps test
@@ -39,6 +39,15 @@ deps:
 # so the floor is a rot-guard, not a vanity number. Raise it as coverage climbs.
 test:
 	uv run pytest --cov --cov-report=term-missing --cov-fail-under=65
+
+# The real-launch browser gate (any-browser), deselected from the default `test`.
+# Launches each real engine against a local JS page and asserts a render. CI runs
+# this with SHELF_REQUIRE_BROWSER=1 (after installing Chromium: `patchright
+# install --with-deps chromium`), where a non-launching engine is a hard FAILURE
+# rather than a skip — the one environment obligated to prove the browser starts.
+# The trailing `-m browser` overrides the pyproject `-m "not browser"` default.
+test-browser:
+	uv run pytest packages/any-browser/tests -m browser -p no:cacheprovider
 
 # coverage report only (human view).
 cov:

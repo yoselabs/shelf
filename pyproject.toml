@@ -35,6 +35,7 @@ dev = [
     "python-docx>=1.1,<2",       # docx WRITER for convert-md's dispatch tests (build a .docx fixture in-test); convert-md itself only READS docx, never writes — so this is test-only, not a package dep
     "convert-md[documents]",     # convert-md's heavy document engines (mammoth/office; docling dropped v0.5.0, pandoc dropped v0.7.0) — moved to the [documents] extra in v0.3.0; installed here so convert-md's dispatch tests still exercise the real engines (base stays HTML-only)
     "anyllm[anthropic,openai,claude-code-sdk]",  # anyllm's SDK-backed provider extras — installed here so the anthropic/openai/claude-code-sdk backends' imports resolve for tests + deptry (base anyllm stays SDK-free; each backend is opt-in)
+    "zendriver>=0.15,<1",  # any-browser's CDP engine — installed here (NOT patchright, whose vendored Chromium is heavy) so its fake-fidelity contract (`test_fake_config_matches_real_add_argument`) checks the fake against the REAL Config every commit instead of importorskip-ing away. patchright + the browser binaries are installed only in the `make test-browser` lane.
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
@@ -134,6 +135,14 @@ builtins-allowed-modules = ["types"]
 # import lazily by design), full D (docstrings not policed in throwaway code, as
 # in tests), and SLF (the docx fixture generator does low-level oxml surgery).
 "packages/*/bench/**" = ["T201", "S607", "D", "INP001", "PLC0415", "SLF"]
+# any-browser's two engine adapters are DEFINED by "render never raises for a
+# routine failure" (the base.py BrowserBackend contract): every driver / CDP /
+# telemetry quirk is caught and turned into a RenderOutcome or a best-effort
+# no-op, so a broad `except Exception` is the design, not a swallowed bug. Scoped
+# to exactly the two driver modules — the seam (base.py) and launchers raise no
+# such thing.
+"packages/any-browser/src/any_browser/playwright.py" = ["BLE001"]
+"packages/any-browser/src/any_browser/zendriver.py" = ["BLE001"]
 
 [tool.pytest.ini_options]
 # testpaths lists the shelf's own fitness tests + every package's tests.
@@ -156,8 +165,16 @@ testpaths = [
     "packages/plugin-surface/tests",
     "packages/llm-wobble/tests",
     "packages/llm-cache/tests",
+    "packages/any-browser/tests",
 ]
-addopts = "-ra --strict-markers"
+# `-m "not browser"` deselects the real-launch smoke by default: nothing in the
+# ordinary gate launches a real engine (that needs a Chromium binary). The
+# `make test-browser` lane re-includes it via `-m browser`, and CI runs that
+# lane with SHELF_REQUIRE_BROWSER=1 where a non-launching engine is a hard fail.
+addopts = '-ra --strict-markers -m "not browser"'
+markers = [
+    "browser: real-browser test that launches a headless engine (any-browser); opt-in, excluded from the default run and `make check`; `make test-browser` runs it, and CI runs it with SHELF_REQUIRE_BROWSER=1 where a missing engine FAILS instead of skipping",
+]
 asyncio_mode = "auto"
 
 # ── ty — type checking ─────────────────────────────────────────────────────
