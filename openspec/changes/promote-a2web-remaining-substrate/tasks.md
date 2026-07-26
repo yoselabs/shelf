@@ -35,11 +35,27 @@ Per-package cycle = PROMOTE workflow (agent-loop.md): extract behind a Capabilit
       tests never ran under the gate; both registered now). Tagged, pushed, a2web
       repointed (`5fd4467`; gate 1237 passed / 90.22% / 39 arch tests).
 
-## 3. anyllm.cost  (EVOLVE)
-- [ ] 3.1 Add `anyllm.cost` (`CostPolicy`, `assert_within_budget`, `with_cost_guard`, `CostViolation`), keyed on `anyllm.ProviderName` (D4).
-- [ ] 3.2 Monotonicity check (resolution 0007): exposes more, removes nothing.
-- [ ] 3.3 Port `tests/packages/test_llm_cost_guard.py`; D6 gate.
-- [ ] 3.4 `make check`; tag `anyllm-vX.Y.0` (minor bump, additive); push; repoint a2web.
+## 3. anyllm.cost  ✅ DONE 2026-07-26 (tag anyllm-v0.5.0)
+- [x] 3.1 Added `anyllm.cost` (`CostPolicy`, `assert_within_budget`, `with_cost_guard`,
+      `CostViolation`, `DEFAULT_COST_POLICY`), keyed on `ProviderName` (D4). Verified
+      with foreign evidence that a2web's three providers ARE anyllm adapters carrying a
+      canonical `ProviderName` as `.name` (anthropic→anthropic-api, claude-code→
+      claude-code-sdk, openai_compatible→openai-compatible) — so `with_cost_guard`
+      reads `provider.name` and drops the separate manifest-id arg. The old a2web
+      "`.name` can vary" comment was stale (pre-v0.3.0 enum union). The subscription-vs-
+      metered distinction is a property of the BACKEND, so the enum is the right key.
+- [x] 3.2 Monotonicity (resolution 0007): v0.4.0→v0.5.0, purely additive — new `cost`
+      submodule + 5 top-level re-exports, removed nothing. (Also: `FBT` added to
+      `packages/*/tests` per-file-ignores — boolean parametrize params are test noise.)
+- [x] 3.3 Ported the acceptance suite (`tests/test_cost.py`, 16 assertions incl.
+      StrEnum-value equality + unknown-provider deny). Boundary auto-covered by the
+      existing `test_anyllm_boundary.py` walk. **D6 foreign-soil gate PASS**: 16/16
+      against the installed wheel in a clean venv (only anyllm present, no SDK extras).
+- [x] 3.4 `make check` green (383 passed, 88.71%). Tagged `anyllm-v0.5.0`, pushed.
+      a2web repointed: imports from `anyllm` directly (no binding needed — the guard has
+      no logger/policy injection); `packages/llm_cost_guard.py` removed; a2web keeps a
+      BINDING test that its provider names map onto the default policy. a2web gate 1226
+      passed / 90.19% / 39 arch tests.
 
 ## 4. llm-cache
 - [ ] 4.1 Extract `packages/llm_extract/cache.py` on `sqlite-resource` + `anyllm`; return `anyllm.Completion` (D3).
