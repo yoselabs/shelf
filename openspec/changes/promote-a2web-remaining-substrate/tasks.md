@@ -57,10 +57,25 @@ Per-package cycle = PROMOTE workflow (agent-loop.md): extract behind a Capabilit
       BINDING test that its provider names map onto the default policy. a2web gate 1226
       passed / 90.19% / 39 arch tests.
 
-## 4. llm-cache
-- [ ] 4.1 Extract `packages/llm_extract/cache.py` on `sqlite-resource` + `anyllm`; return `anyllm.Completion` (D3).
-- [ ] 4.2 Boundary test; acceptance suite; D6 gate.
-- [ ] 4.3 `make check`; tag `llm-cache-v0.1.0`; push; repoint a2web.
+## 4. llm-cache  ✅ DONE 2026-07-26 (tag llm-cache-v0.1.1)
+- [x] 4.1 Extracted `packages/llm_extract/cache.py` → `packages/llm-cache/`. D3: `get`/`put`
+      speak `anyllm.Completion` (a hit is a drop-in for a call — original cost/tokens/latency
+      ride along). Generalised the key: a2web's 4-part composite (content_hash, ask_hash,
+      model_id, template_name) collapses to an opaque `(key, model)` — the package is
+      policy-free, the caller computes the key via `make_key(*parts)`. Connection-injected
+      (`aiosqlite.Connection`, from `sqlite-resource`'s `.conn`); owns only its table.
+- [x] 4.2 Boundary test (`test_boundary_llm_cache.py`) + acceptance suite (`test_llm_cache.py`,
+      the cache-primitives half of a2web's old test, adapted). **D6 gate PASS**: 7/7 against
+      the installed wheels in a clean venv (llm-cache + anyllm + aiosqlite only).
+- [x] 4.3 `make check` green (392 passed, 88.95%). Tagged; pushed; a2web repointed.
+      **v0.1.1 hotfix**: dropped the package's dev-only `[tool.uv.sources]` (a published
+      package's uv.sources leaks into the consumer's resolution). Registered
+      `packages/llm-cache/tests` in root testpaths (the gate-gap pattern).
+      a2web adoption surfaced a WORKSPACE-SOURCE LEAK (documented in a2web's pyproject +
+      §6.5 report): the shelf root force-sources anyllm (dev group needs it) and uv applies
+      that to git consumers, colliding with a2web's own anyllm pin. Fix on a2web's side —
+      it sources anyllm THROUGH the shelf workspace at the llm-cache tag rather than pinning
+      it independently. a2web gate 1220 passed / 90.12% / 39 arch.
 
 ## 5. any-browser  (SEAM + drivers + gate, resolution 0013 / D5)
 - [ ] 5.1 Extract seam (`BrowserBackend`, `RenderedPage`, `BackendCookie`, `RenderOutcome`) + both drivers + launchers.
