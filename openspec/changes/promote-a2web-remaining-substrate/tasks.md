@@ -77,12 +77,41 @@ Per-package cycle = PROMOTE workflow (agent-loop.md): extract behind a Capabilit
       it sources anyllm THROUGH the shelf workspace at the llm-cache tag rather than pinning
       it independently. a2web gate 1220 passed / 90.12% / 39 arch.
 
-## 5. any-browser  (SEAM + drivers + gate, resolution 0013 / D5)
-- [ ] 5.1 Extract seam (`BrowserBackend`, `RenderedPage`, `BackendCookie`, `RenderOutcome`) + both drivers + launchers.
-- [ ] 5.2 Keep `subresource_blocks`; rewrite docstring to the observation, not a2web's conclusion (D5).
-- [ ] 5.3 **Port the skip-forbidden real-launch gate** into shelf CI (both engines launch a real page, assert render; missing binary FAILS). Port a2web's `browser-gate` pattern, don't reinvent.
-- [ ] 5.4 Carry the standing fake-fidelity contract (`test_fake_config_matches_real_add_argument`).
-- [ ] 5.5 Boundary test; D6 gate; `make check`; tag `any-browser-v0.1.0`; push; repoint a2web (keep `select_backend*` + mapping home).
+## 5. any-browser  ✅ DONE 2026-07-26 (tag any-browser-v0.1.0)
+- [x] 5.1 Extracted seam (`BrowserBackend`, `RenderedPage`, `BackendCookie`,
+      `RenderOutcome`) + BOTH drivers (`PlaywrightBackend`, `ZendriverBackend`) +
+      launchers (`patchright_launcher`, `camoufox_launcher`, `chromium_launch`).
+      Engines are optional extras (`[patchright]`, `[zendriver]`); a missing one
+      degrades to `RenderOutcome.unavailable`, never an import crash.
+- [x] 5.2 Kept `subresource_blocks`; docstring reworded to the OBSERVATION
+      (subresources returning a challenge status during render) — the "walled-API
+      fake-empty" CONCLUSION stays in a2web's `actions/terminal.py` + `empty.py` (D5).
+      Also: logger INJECTED (default `getLogger("any_browser")`) per D1/D2; the
+      a2web-named `A2WEB_BROWSER_EXECUTABLE_PATH` override renamed to the neutral
+      `ANY_BROWSER_EXECUTABLE_PATH` (consumer-name leak).
+- [x] 5.3 Ported the skip-forbidden real-launch gate: `browser`-marked
+      `test_browser_smoke.py` launches each real engine against a local JS page and
+      asserts a render; the pure skip→fail policy (`browser_unavailable_policy`) is
+      pinned in the DEFAULT gate by `test_browser_gate_policy.py`; `make test-browser`
+      + `SHELF_REQUIRE_BROWSER=1` make a non-launching engine a hard FAIL. Marker
+      registered; `-m "not browser"` deselects it by default. (5.2c note: no
+      zendriver-diagnose-or-drop was needed — the fidelity contract + the ported
+      launch gate + the diagnostic probe already cover the dead-rung failure mode;
+      the a2web correlated-witness workaround was NOT carried over.)
+- [x] 5.4 Carried the fake-fidelity contract (`test_fake_config_matches_real_add_argument`):
+      re-checks the hand-written zendriver `Config` fake against the REAL installed
+      lib every commit. Added `zendriver` to the shelf dev group so it RUNS (not
+      importorskip-away); patchright stays out (heavy vendored Chromium — only the
+      browser lane installs it).
+- [x] 5.5 Boundary test (`test_boundary_any_browser.py`); **D6 foreign-soil gate
+      PASS** (47/47 against the installed wheel in a clean isolated venv, zendriver +
+      pytest only, `any_browser` from site-packages); `make check` green (441 passed,
+      86.09%). Tagged, pushed. a2web repointed: `packages/browser_backends/` deleted,
+      imports → `any_browser`, both driver test files moved to the shelf acceptance
+      suite, `select_backend*`/manifests/rung-split/mapping kept home, patchright
+      manifest injects `get_logger()`, `[browser]` extra pulls
+      `any-browser[patchright,zendriver]`, `tach.toml` module dropped. a2web gate
+      1173 passed / 90.49% / 37 arch.
 
 ## 6. Close the loop (resolution 0009)
 - [ ] 6.1 `use-cases/a2web--<pkg>.toml` per promotion.
