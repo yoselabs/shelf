@@ -1,6 +1,6 @@
 [project]
 name = "llm-cache"
-version = "0.1.1"
+version = "0.1.2"
 description = "A sqlite-backed TTL cache for LLM completions, keyed on (key, model) and speaking anyllm.Completion."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
