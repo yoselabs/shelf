@@ -1,6 +1,6 @@
 [project]
 name = "llm-cache"
-version = "0.1.0"
+version = "0.1.1"
 description = "A sqlite-backed TTL cache for LLM completions, keyed on (key, model) and speaking anyllm.Completion."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
@@ -17,9 +17,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/llm_cache"]
-
-[tool.uv.sources]
-anyllm = { workspace = true }
 
 [tool.deptry.per_rule_ignores]
 # aiosqlite is a genuine contract dependency — the connection type in LlmCache's

@@ -1621,7 +1621,7 @@ requires-dist = [{ name = "pydantic", specifier = ">=2,<3" }]
 
 [[package]]
 name = "llm-cache"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/llm-cache" }
 dependencies = [
     { name = "aiosqlite" },
