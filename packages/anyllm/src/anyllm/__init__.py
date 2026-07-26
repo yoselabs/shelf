@@ -19,12 +19,21 @@ silently degrading.
 
 Evolved from v0.1's sync ``complete(prompt) -> str`` per resolution 0007 (the
 monotonicity test); v0.1.0 stays tagged for consumers that have not upgraded.
+v0.5.0 adds :mod:`anyllm.cost` (a :class:`CostPolicy` + :func:`with_cost_guard`
+that refuse expensive/metered spend before the call) — purely additive.
 """
 
 from __future__ import annotations
 
 from anyllm.accounting import anthropic_cost_usd, extract_token_counts
 from anyllm.base import Completion, LLMProvider, PromptParts, ProviderName
+from anyllm.cost import (
+    DEFAULT_COST_POLICY,
+    CostPolicy,
+    CostViolation,
+    assert_within_budget,
+    with_cost_guard,
+)
 from anyllm.errors import AnyLLMError
 from anyllm.providers import (
     AnthropicApiAdapter,
@@ -37,19 +46,24 @@ from anyllm.providers import (
 from anyllm.select import DEFAULT_PROVIDER, build_adapter
 
 __all__ = [
+    "DEFAULT_COST_POLICY",
     "DEFAULT_PROVIDER",
     "AnthropicApiAdapter",
     "AnyLLMError",
     "ClaudeCodeCliAdapter",
     "ClaudeCodeSdkAdapter",
     "Completion",
+    "CostPolicy",
+    "CostViolation",
     "LLMProvider",
     "OpenAICompatibleAdapter",
     "PromptParts",
     "ProviderName",
     "anthropic_cost_usd",
+    "assert_within_budget",
     "build_adapter",
     "build_argv",
     "child_env",
     "extract_token_counts",
+    "with_cost_guard",
 ]

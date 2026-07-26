@@ -60,6 +60,31 @@ class LLMProvider(Protocol):
 raises `AnyLLMError` if the provider is unknown or unavailable. *Where* the config
 comes from (a file, env, a settings object) is the host's business.
 
+## Cost guard (`anyllm.cost`)
+
+Refuse expensive model spend *before* the call is issued. A `CostPolicy` is an
+allowlist over `(provider, model-glob)` pairs keyed on `ProviderName`;
+`with_cost_guard` wraps any provider so every `complete()` asserts the resolved
+`(provider.name, model)` pair first — a denied pair raises `CostViolation` and no
+network call happens. Because the guarded provider is the only handle you hold,
+there is no un-guarded completion path: billing a disallowed model by accident is
+impossible, not merely discouraged.
+
+```python
+from anyllm import build_adapter, with_cost_guard
+
+provider = with_cost_guard(build_adapter("anthropic-api"))   # DEFAULT_COST_POLICY
+await provider.complete(user="hi", model="claude-haiku-4-5")   # ok — Haiku is cheap
+await provider.complete(user="hi", model="claude-sonnet-4-6")  # raises CostViolation
+```
+
+The default policy encodes *"expensive models only via subscription, never
+metered"*: the subscription backends (`claude-code-cli` / `-sdk`) allow any model,
+metered `anthropic-api` allows Haiku-class only, `openai-compatible` a conservative
+cheap allowlist, and any pair not in the table is denied (opt in deliberately).
+Pass your own `CostPolicy` to change the rules; the guard raises `CostViolation`,
+which the host translates at its own seam if it wants a domain error.
+
 ## Migrating v0.1 → v0.2 (breaking)
 
 v0.2.0 evolved the contract to a superset (resolution 0007, the *monotonicity
