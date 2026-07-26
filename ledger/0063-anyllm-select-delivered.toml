@@ -1,0 +1,10 @@
+seq = 63
+date = "2026-07-27"
+event = "delivery"
+software = "anyllm"
+release = "anyllm-v0.6.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "worktree ../shelf-a2web; packages/anyllm/src/anyllm/select.py (resolve_provider + DEFAULT_ORDER + _FallbackProvider) + tests/test_select.py (11 cases, fake-provider verification lane); __init__ exports + catalog/anyllm.toml. make check green (452 passed, 86.21%)."
+note = "EVOLVE of anyllm.select (had build_adapter for single-provider construction, lacked the ordered walk). Purely additive per resolution 0007 — no CHANGELOG contract-shape line, old tags untouched. resolve_provider(order, config, *, wrap, fallback) walks a priority order, drops the unbuildable/unavailable (skip on AnyLLMError), and folds survivors into: None / the bare provider / a runtime-fallback provider. _FallbackProvider.complete advances to the next backend only on a RETRYABLE AnyLLMError; anything else propagates. Spend-safety is STRUCTURAL, not a special case: CostViolation is a RuntimeError (not an AnyLLMError), so a budget refusal falls straight through the fallback rather than rolling onto a metered backend to 'recover' — the ADR-0016/no-metered rule holds by construction, no custom predicate. The three-layer split that motivated this (a2web's provider design fork): IDENTITY = ProviderName (adopt), MECHANISM = build_adapter + this ordered walk (shelf), POLICY = the order + a2web's gateway-first conditional (stays in the host, passed as `order`). 'auto' is a selection OUTCOME, never a ProviderName member — you resolve an order into a concrete provider. wrap is applied per-candidate BEFORE composition so the cost guard keys on each real backend id, not the fallback's primary-name proxy. Verification lane is fake-provider (pure orchestration over the LLMProvider protocol — no live LLM needed; real-backend construction is already covered by test_adapters). a2web adoption (repoint + shed its select_provider walk + manifest build duplication + ProviderName-typed settings field + assert_never) is the pending verdict row."

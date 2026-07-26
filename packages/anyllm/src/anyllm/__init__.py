@@ -21,6 +21,11 @@ Evolved from v0.1's sync ``complete(prompt) -> str`` per resolution 0007 (the
 monotonicity test); v0.1.0 stays tagged for consumers that have not upgraded.
 v0.5.0 adds :mod:`anyllm.cost` (a :class:`CostPolicy` + :func:`with_cost_guard`
 that refuse expensive/metered spend before the call) — purely additive.
+v0.6.0 adds :func:`resolve_provider` + :data:`DEFAULT_ORDER` (ordered
+auto-selection with runtime fallback: walk a priority order, keep the usable
+backends, fold them into one provider that advances to the next on a *retryable*
+failure — a ``CostViolation`` propagates instead, never spending to recover) —
+also purely additive.
 """
 
 from __future__ import annotations
@@ -43,10 +48,11 @@ from anyllm.providers import (
     build_argv,
     child_env,
 )
-from anyllm.select import DEFAULT_PROVIDER, build_adapter
+from anyllm.select import DEFAULT_ORDER, DEFAULT_PROVIDER, build_adapter, resolve_provider
 
 __all__ = [
     "DEFAULT_COST_POLICY",
+    "DEFAULT_ORDER",
     "DEFAULT_PROVIDER",
     "AnthropicApiAdapter",
     "AnyLLMError",
@@ -65,5 +71,6 @@ __all__ = [
     "build_argv",
     "child_env",
     "extract_token_counts",
+    "resolve_provider",
     "with_cost_guard",
 ]
