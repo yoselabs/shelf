@@ -1,0 +1,10 @@
+seq = 53
+date = "2026-07-26"
+event = "delivery"
+software = "plugin-surface"
+release = "plugin-surface-v0.1.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "worktree ../shelf-a2web; packages/plugin-surface/ (src + tests + _fixture_surface)"
+note = "Promotion #1 of the a2web remaining-substrate sweep. Extracted a2web's _plugin.py — the declarative PluginManifest[T] + Unavailable + load_surface/load_surface_sorted loader (ADR-0001 Pattern 2). Zero deps, stdlib only. Dropped a2web's settings_prefix coupling (config-reading is the consumer's job, not the loader's); logger INJECTED (default getLogger('plugin_surface'), logger= override) per D1. Acceptance suite uses a consumer-free object() context and covers logger injection, priority sort, and the wrong-type branch. D6 foreign-soil install gate PASS: 9/9 against the built wheel in a clean venv, no repo deps. make check green in worktree (339 passed, 88.47%)."

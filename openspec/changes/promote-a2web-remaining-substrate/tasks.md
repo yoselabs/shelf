@@ -113,9 +113,17 @@ Per-package cycle = PROMOTE workflow (agent-loop.md): extract behind a Capabilit
       `any-browser[patchright,zendriver]`, `tach.toml` module dropped. a2web gate
       1173 passed / 90.49% / 37 arch.
 
-## 6. Close the loop (resolution 0009)
-- [ ] 6.1 `use-cases/a2web--<pkg>.toml` per promotion.
-- [ ] 6.2 `ledger/00NN-<slug>.toml` `delivery` row per promotion; separate `verdict` row per repoint that held.
-- [ ] 6.3 `make catalog` (stale derived README lies).
-- [ ] 6.4 `make check` green; merge `work/a2web` → `main`; push. Remove worktree + merged branch.
-- [ ] 6.5 Report: candidate → verdict → action table + what the shelf gained.
+## 6. Close the loop (resolution 0009)  ✅ DONE 2026-07-27
+- [x] 6.1 Four new `use-cases/a2web--<pkg>.toml` (plugin-surface, llm-wobble, llm-cache,
+      any-browser). anyllm.cost needed none — a2web already has `a2web--anyllm.toml`;
+      updated it (and the anyllm catalog entry) to name the cost guard + bump v0.2.0→v0.5.0
+      (the catalog release had drifted — v0.3.0/v0.4.0 shipped without a bump).
+- [x] 6.2 Ten ledger rows 0053–0062: a `delivery` + a `verdict` (adopted) row per promotion.
+      anyllm.cost's delivery is event="delivery"/release=anyllm-v0.5.0 (an EVOLUTION, like 0032),
+      not a new-package delivery.
+- [x] 6.3 `make catalog` regenerated all three derived READMEs; four new catalog manifests
+      (plugin-surface/llm-wobble/llm-cache/any-browser) added — each has an active use-case so
+      `test_no_orphaned_software` holds.
+- [x] 6.4 `make check` green (441 passed, 86.09%); merged `work/a2web` → `main`; pushed.
+      Worktree + merged branch removed.
+- [x] 6.5 Report delivered (candidate → verdict → action table + what the shelf gained).

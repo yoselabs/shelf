@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "any-browser"
+why = "a2web's browser tier is a JS-capable rendered fetch that must not care whether patchright (fast rung) or zendriver (robust CDP rung) is underneath, and must degrade — not crash — when an engine is absent or fails to launch. Driving a headless browser (context pooling, cookie translation, scroll-to-stable, driver-stderr capture, launch budgets, challenged-subresource observation) is pure substrate. a2web keeps only the product tail: which backend to select, the rung split, and the RenderOutcome -> Verdict/OperatorHint mapping."
+needs = "The BrowserBackend protocol, RenderedPage + RenderOutcome + BackendCookie boundary types, the PlaywrightBackend and ZendriverBackend drivers with their launchers, the injected logger + stderr_sink, and the subresource_blocks observation — engines pulled as optional [patchright]/[zendriver] extras so a server without a browser stays importable and degrades to RenderOutcome.unavailable."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired

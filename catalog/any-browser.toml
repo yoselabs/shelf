@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "any-browser"
+kind = "any-lib"                 # T1 "stop caring WHICH backend" — value concentrates here
+tier = "T1"
+release = "any-browser-v0.1.0"
+capability = "Stop caring which headless engine renders a JS page — one BrowserBackend protocol returning a uniform RenderedPage (carrying a RenderOutcome), backed by Playwright-API (patchright / camoufox) or raw-CDP (zendriver); a missing engine degrades to RenderOutcome.unavailable, never an import crash."
+implementation = "hybrid-adapter"  # neutral seam + per-driver translation over patchright/zendriver
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (packages/browser_backends) WHOLE — seam + BOTH drivers (PlaywrightBackend, ZendriverBackend) + launchers (patchright_launcher, camoufox_launcher, chromium_launch) — per resolution 0013 (promote to be challenged: verifiability travels WITH the code, it is not a promotion gate). The any-* state-boundary law: render NEVER raises for a routine failure — it returns a RenderedPage carrying the matching RenderOutcome (ok / timeout / error / unavailable). subresource_blocks kept but its docstring reworded to the OBSERVATION (a subresource returning a challenge status during render); the 'walled-API fake-empty' CONCLUSION stays in a2web's actions/terminal.py + empty.py (D5). Logger INJECTED (default getLogger('any_browser')); the a2web-named A2WEB_BROWSER_EXECUTABLE_PATH override renamed to the neutral ANY_BROWSER_EXECUTABLE_PATH. Engines are optional extras ([patchright], [zendriver]). Carries the skip-forbidden real-launch gate (SHELF_REQUIRE_BROWSER + make test-browser make a non-launching engine a hard fail) and the fake-fidelity contract (the hand-written zendriver Config fake is re-checked against the REAL installed lib every commit). Born candidate."

@@ -1,0 +1,10 @@
+seq = 62
+date = "2026-07-26"
+event = "verdict"
+software = "any-browser"
+release = "any-browser-v0.1.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "a2web: DELETED packages/browser_backends/; imports → any_browser across state/fetcher/components/tiers/browser + manifests; both driver test files moved to the shelf acceptance suite; [browser] extra → any-browser[patchright,zendriver]; tach module dropped; commit 7f8e31e"
+note = "ADOPT. a2web deleted packages/browser_backends/ entirely and repointed imports to any_browser. Kept the PRODUCT half home: select_backend* in state.py, manifest gating in _manifests/browser_backends/ (camoufox stays gated on juggler #625), the fast/robust rung split, and the RenderOutcome→Verdict/OperatorHint mapping in tiers/browser.py. The patchright manifest injects get_logger() so scroll/render events keep landing on a2web's logger. BackendCookie/RenderedPage dropped off a2web's boundary-frozen list — their freeze is now the shelf's invariant. a2web gate green: 1173 passed / 90.49% / 37 arch."

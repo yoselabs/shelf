@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "llm-wobble"
+why = "Every a2web site that parses LLM JSON (judge, bench_judge, extractor, router-payload projection) must survive a wobbly model that omits a field, fat-fingers a type, or wraps the object in prose. a2web wants ONE funnel that owns json.loads and applies a per-field tolerance policy, returning an opaque type a hand-rolled payload cannot forge — so no other site re-invents tolerant parsing or bypasses the guard."
+needs = "parse_with_policy / parse_list_with_policy, the WobblePolicy (STRICT/DERIVE/DEFAULT/SKIP) + WobbleTolerance enums, the opaque Wobbled NewType, and ParseError / WobbleSkip — with the logger injected so recovered-wobble events land on a2web's logger. a2web keeps its product policy tables (_policies.py)."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired

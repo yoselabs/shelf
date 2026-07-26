@@ -1,0 +1,10 @@
+seq = 61
+date = "2026-07-26"
+event = "delivery"
+software = "any-browser"
+release = "any-browser-v0.1.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "worktree ../shelf-a2web; packages/any-browser/ (seam + both drivers + launchers + acceptance suite + browser gate); commit d3fc816"
+note = "Promotion #5 of the sweep — the big one. Extracted a2web's packages/browser_backends WHOLE (seam BrowserBackend/RenderedPage/BackendCookie/RenderOutcome + BOTH drivers PlaywrightBackend/ZendriverBackend + launchers patchright/camoufox/chromium) per resolution 0013 (promote to be challenged: the hold-the-drivers plan conflated is-the-shape-right — needs a 2nd consumer, which needs it ON the shelf — with is-it-verified, an obligation that travels WITH the code). any-* state-boundary law upheld: render NEVER raises for a routine failure, returns a RenderedPage with the matching RenderOutcome. D5: subresource_blocks kept, docstring reworded to the OBSERVATION (challenged subresource during render) — the walled-API fake-empty CONCLUSION stays in a2web. Logger injected; A2WEB_BROWSER_EXECUTABLE_PATH renamed to neutral ANY_BROWSER_EXECUTABLE_PATH (verified nothing in a2web's deploy sets it). Ported the SKIP-FORBIDDEN real-launch gate (browser-marked smoke + browser_unavailable_policy pinned in the default gate + SHELF_REQUIRE_BROWSER + make test-browser make a non-launching engine a hard fail) and the fake-fidelity contract (hand-written zendriver Config fake re-checked against the REAL installed lib — zendriver added to the shelf dev group so it RUNS, not importorskip-away; patchright stays out, heavy vendored Chromium). D6 foreign-soil gate PASS: 47/47 against the installed wheel in a clean isolated venv (zendriver + pytest only, any_browser from site-packages). make check green (441 passed, 86.09%)."

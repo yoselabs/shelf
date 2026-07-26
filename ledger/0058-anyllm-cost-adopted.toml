@@ -1,0 +1,10 @@
+seq = 58
+date = "2026-07-26"
+event = "verdict"
+software = "anyllm"
+release = "anyllm-v0.5.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "a2web: imports from anyllm directly; DELETED packages/llm_cost_guard.py; kept a BINDING test that a2web provider names map onto DEFAULT_COST_POLICY"
+note = "ADOPT. No binding needed at the seam — the guard has no logger/policy injection, so a2web imports the cost helpers straight from anyllm and removed its own packages/llm_cost_guard.py. a2web KEEPS a binding test asserting its provider names resolve against the default policy (the ADR-0016 $20-regression guard: metered anthropic allows Haiku only, claude-code allows any model, unknown pairs raise CostViolation before spending) — the one thing a2web must own is that its names still map onto the shelf's policy. a2web gate green: 1226 passed / 90.19% / 39 arch tests."

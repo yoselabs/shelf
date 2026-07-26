@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "plugin-surface"
+kind = "framework"               # primitive | any-lib | composite | cli | framework | config-preset
+tier = "T0"                      # zero-dep stdlib plumbing; framework-shaped (loader calls your factory)
+release = "plugin-surface-v0.1.0"
+capability = "Stop caring how pluggable backends are declared, discovered, and loaded — one declarative PluginManifest[T] + a load_surface loader that constructs the available plugins and drops Unavailable ones silently."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (_plugin.py) during the remaining-substrate sweep. Zero deps, stdlib only. Dropped a2web's settings_prefix coupling; the logger is INJECTED (default getLogger('plugin_surface'), logger= override) rather than hardcoded to a consumer name. Surface: PluginManifest[T] + Unavailable + load_surface / load_surface_sorted; a plugin is a no-side-effects module declaring MANIFEST. a2web keeps its own _manifests/ surfaces (llm_providers, handlers, tiers, sinks, eval_systems) on top and injects get_logger() at 6 sites. Born candidate."

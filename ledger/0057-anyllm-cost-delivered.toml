@@ -1,0 +1,10 @@
+seq = 57
+date = "2026-07-26"
+event = "delivery"
+software = "anyllm"
+release = "anyllm-v0.5.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "worktree ../shelf-a2web; packages/anyllm/ new cost submodule + 5 top-level re-exports"
+note = "Promotion #3 of the sweep — an EVOLUTION of anyllm, not a new package. Added anyllm.cost (CostPolicy, assert_within_budget, with_cost_guard, CostViolation, DEFAULT_COST_POLICY), keyed on ProviderName (D4): the subscription-vs-metered distinction is a property of the BACKEND, so the enum is the right key. Verified with foreign evidence that a2web's three providers ARE anyllm adapters carrying a canonical ProviderName as .name (anthropic→anthropic-api, claude-code→claude-code-sdk, openai_compatible→openai-compatible) — so with_cost_guard reads provider.name and drops the separate manifest-id arg; a2web's old '.name can vary' comment was stale (pre-v0.3.0 enum union). v0.4.0→v0.5.0 purely additive (resolution 0007 monotonicity): new submodule + re-exports, removed nothing. D6 foreign-soil gate PASS: 16/16 against the installed wheel in a clean venv (only anyllm, no SDK extras). make check green (383 passed, 88.71%)."

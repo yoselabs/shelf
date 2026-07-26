@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "plugin-surface"
+why = "a2web's every extension surface (LLM providers, site handlers, tiers, OTel sinks, eval systems) converges on one declarative manifest + graceful-absence loader (ADR-0001 Pattern 2): drop a no-side-effects module declaring MANIFEST and the loader discovers it at boot, dropping Unavailable returns silently. This is generic plugin plumbing — a2web wants to stop caring how a surface is enumerated and how an unavailable plugin is skipped."
+needs = "PluginManifest[T], Unavailable, and load_surface / load_surface_sorted, with the logger injected (a2web passes get_logger()) so discovery events land on a2web's logger. a2web keeps its own product _manifests/ surfaces on top."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired

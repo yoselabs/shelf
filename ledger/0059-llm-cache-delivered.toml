@@ -1,0 +1,10 @@
+seq = 59
+date = "2026-07-26"
+event = "delivery"
+software = "llm-cache"
+release = "llm-cache-v0.1.1"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "worktree ../shelf-a2web; packages/llm-cache/ (src + tests); v0.1.0 then v0.1.1 hotfix"
+note = "Promotion #4 of the sweep. Extracted a2web's packages/llm_extract/cache.py. D3: get/put speak anyllm.Completion so a hit is a drop-in for a call (original cost/tokens/latency ride along). Generalised the key — a2web's 4-part composite (content_hash, ask_hash, model_id, template_name) collapses to an opaque (key, model); the package is policy-free, the caller computes the key via make_key(*parts). Connection-injected (aiosqlite.Connection from sqlite-resource's .conn); owns only its own table. v0.1.1 hotfix: dropped the package's dev-only [tool.uv.sources] — a published package's uv.sources leaks into the consumer's resolution. Registered packages/llm-cache/tests in root testpaths (the gate-gap pattern). D6 gate PASS: 7/7 against the installed wheels in a clean venv (llm-cache + anyllm + aiosqlite only). make check green (392 passed, 88.95%)."

@@ -1,0 +1,10 @@
+seq = 60
+date = "2026-07-26"
+event = "verdict"
+software = "llm-cache"
+release = "llm-cache-v0.1.1"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "a2web: cache seam repointed to the llm_cache pin; DELETED the in-tree cache; pyproject workspace-source note"
+note = "ADOPT, and it surfaced a WORKSPACE-SOURCE LEAK worth recording for RECONCILE: the shelf ROOT force-sources anyllm (its dev group needs it), and uv applies that [tool.uv.sources] to git consumers, colliding with a2web's own independent anyllm pin. Fix on a2web's side — a2web now sources anyllm THROUGH the shelf workspace at the llm-cache tag rather than pinning it independently (documented in a2web's pyproject). The lesson generalizes: a shelf package that itself depends on another shelf package can drag the root's dev-time sources into a consumer's resolution; the consumer resolves the transitive shelf dep through the same workspace rather than double-pinning. a2web gate green: 1220 passed / 90.12% / 39 arch."

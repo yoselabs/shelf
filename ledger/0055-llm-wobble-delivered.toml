@@ -1,0 +1,10 @@
+seq = 55
+date = "2026-07-26"
+event = "delivery"
+software = "llm-wobble"
+release = "llm-wobble-v0.1.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "worktree ../shelf-a2web; packages/llm-wobble/ (src + tests)"
+note = "Promotion #2 of the sweep. Extracted a2web's packages/llm_extract/wobble/_internal.py — the single funnel owning json.loads that returns an opaque Wobbled NewType a payload fabricated outside cannot forge. Surface: parse_with_policy (object envelopes) + parse_list_with_policy (JSON-array envelopes); STRICT miss → ParseError, WobbleSkip propagates, recovered wobbles fire a structured log key. The D2 note was STALE (a2web emitted on getLogger('a2web'), not the alleged 'a2kit') — the real fix is logger INJECTION (default getLogger('llm_wobble')), matching plugin-surface. Dropped the apply_policy back-compat shim so the suite exercises the real funnel. Also fixed a gate gap: neither plugin-surface NOR llm-wobble was in pytest testpaths, so #1's tests had never run under the gate — both registered now. D6 foreign-soil gate PASS: 17/17 against the installed wheel in a clean venv. make check green (367 passed, 88.63%)."

@@ -1,0 +1,10 @@
+seq = 54
+date = "2026-07-26"
+event = "verdict"
+software = "plugin-surface"
+release = "plugin-surface-v0.1.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "a2web: imports → plugin_surface across _manifests/ + _plugin seam; logger=get_logger() injected at 6 sites; DELETED src/a2web/_plugin.py; commit 9ce0711"
+note = "ADOPT. a2web repointed every extension surface (llm_providers, handlers, tiers, sinks, eval_systems) to the git-tag pin and deleted its in-tree _plugin.py. The settings_prefix drop landed cleanly — a2web's manifests already read AppSettings inside their factory bodies, so the loader never needed the prefix. a2web gate green: 1243 passed / 90.26%."
