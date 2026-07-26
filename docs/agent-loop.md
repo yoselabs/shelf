@@ -70,7 +70,13 @@ STEPS:
    consumer only to *rank* common (→ default path) vs rare (→ opt-in / graceful degradation) — never
    to scope the capability down to one consumer's current diet. A capability the class has but your
    consumer skips becomes an opt-in or a documented gap, not an amputation.
-2. Pick one direction:
+2. Pick one direction. **You are usually the abstraction's *second* consumer here, and that makes
+   you its first real challenge** (resolution 0013): a piece that fit its origin app perfectly is
+   *over-fit* until something else bends it. So treat a shape that feels *almost* right as a prompt
+   to EVOLVE it universal, not to quietly work around it; and treat *your own* not-yet-verifiable or
+   unsure-of-the-shape extraction as a reason to PROMOTE **sooner** (it only gets challenged once it
+   is on the shelf), never as a reason to hold. Shape-certainty is not a gate — the second adoption
+   is *how* the shape is discovered.
    - **ADOPT** — a piece fits as-is: **DEEP** (hides real complexity) · **STABLE** (settled API) ·
      **WINS** (lighter than you'd write — if the win is *contested* on a capability that matters,
      `BENCH` it rather than assert it). Add the git+tag source (`consuming-the-shelf.md` §1),
@@ -94,6 +100,17 @@ STEPS:
      candidates and move on — the exception, not the main path. Do **not** hand-roll silently and
      move on — that's the extraction moment lost; over-promotion is cheap to fix at `RECONCILE`, a
      lost moment is not. → run `PROMOTE`.
+
+     **Not-yet-verifiable is NOT a reason to hold** (resolution 0013). "I can't prove this is the
+     right shape / can't fully test it yet" *feels* like conscientiousness and is the more dangerous
+     deferral, because holding forfeits the second-consumer challenge that would have told you the
+     shape — and the shelf makes a wrong guess cheap (RECONCILE demote, immutable tags, opt-in
+     evolution) while it makes a forfeited challenge un-recoverable. So shape-uncertainty is a reason
+     to promote *sooner*. The one thing that must travel *with* the promotion is its **verification
+     lane**: if the piece needs real substrate to be trusted (a browser launch, a container boot, a
+     live call), port that lane into the shelf's CI **in the same change** — a skip-forbidden
+     real-substrate gate, not a TODO. Promote-and-walk-away (the gate left as a promise) is the one
+     move this does not license — that ships a blind spot to every consumer.
 
      **Arriving from the bugfix trigger (a sharp edge)?** One question decides it: **did we learn
      this from a bug, or from the docs?** From the docs → ordinary work, just write it (or fix it
