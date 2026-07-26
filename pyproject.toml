@@ -153,6 +153,8 @@ testpaths = [
     "packages/content-extract/tests",
     "packages/timefmt/tests",
     "packages/settings-base/tests",
+    "packages/plugin-surface/tests",
+    "packages/llm-wobble/tests",
 ]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"

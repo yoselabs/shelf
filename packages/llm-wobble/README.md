@@ -1,0 +1,64 @@
+# llm-wobble
+
+**Stop caring that an LLM's JSON envelope arrives fenced, prose-wrapped, or with
+fields dropped.** Ask a model for JSON and you get ```` ```json ```` fences, a
+trailing prose sentence, a second fence after the object, or a required field
+simply missing. `llm-wobble` is the one funnel that decodes it, recovers each
+field against a declared per-field policy, logs every recovery, and hands back a
+typed value that a hand-rolled parse cannot forge.
+
+```python
+from llm_wobble import parse_with_policy, unwrap, WobblePolicy, WobbleTolerance
+
+policies = {
+    "answer": WobblePolicy(WobbleTolerance.STRICT),                     # missing → ParseError
+    "sources": WobblePolicy(WobbleTolerance.DEFAULT, default=[]),       # missing → [] + one log event
+    "score": WobblePolicy(WobbleTolerance.DERIVE, derive=lambda d: 0),  # missing → derived + one log event
+}
+
+wobbled = parse_with_policy(
+    raw_model_output,               # fenced / prose-wrapped / partial — all handled
+    policies=policies,
+    into=lambda d: MyPayload(**d),  # your typed constructor
+    boundary="my_call",            # names the site in log events
+    model="claude-...",
+)
+payload = unwrap(wobbled)           # MyPayload
+```
+
+## The contract
+
+- **`json.loads` lives here and nowhere else.** With decode funnelled through one
+  module, a consumer can ban `json.loads` across the rest of its LLM code (a
+  simple AST test) and know no path skips the policy.
+- **`Wobbled` is opaque.** Its only constructor is the funnel. Downstream code
+  typed as `Wobbled` cannot accept a dict fabricated outside it — the bypass
+  becomes a deliberate `type: ignore`, not an accident.
+- **Recovery is per-field and declared, not ad hoc.** `STRICT` raises `ParseError`
+  on a miss; `DERIVE` computes from the rest of the payload; `DEFAULT` substitutes
+  a constant; `SKIP` raises `WobbleSkip` so the caller can short-circuit. Every
+  non-STRICT recovery fires exactly one `llm_wobble` log event.
+- **Arrays too.** `parse_list_with_policy` expects a JSON array and filters entries
+  through `item(dict) -> T | None`; malformed entries are dropped inside the funnel
+  (one event names the dropped indices), never in caller code.
+- **Recovery is visible.** `recovered_fields(wobbled)` names every field that fell
+  back, so a caller can downgrade confidence or surface a hint.
+
+## Logging is injected
+
+Recoveries emit on the `llm_wobble` logger by default. Pass `logger=` to route
+them onto a host's own managed channel:
+
+```python
+parse_with_policy(..., logger=my_app_logger)
+```
+
+The record is `message="llm_wobble"` with a `fields` payload on `record.fields`
+(`boundary`, `field`, `tolerance`, `model`, `raw` — the raw excerpt is bounded to
+200 chars). The package never names a consumer's logger.
+
+## What stays with the consumer
+
+The **policy tables** — which fields a given envelope requires and how each
+recovers — are product, not mechanism. They live with the consumer that owns the
+envelope shape. `llm-wobble` owns only how a policy is *applied*.
