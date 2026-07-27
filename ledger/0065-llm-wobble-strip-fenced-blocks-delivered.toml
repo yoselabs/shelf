@@ -1,0 +1,10 @@
+seq = 65
+date = "2026-07-27"
+event = "delivery"
+software = "llm-wobble"
+release = "llm-wobble-v0.2.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "worktree ../shelf-a2web; packages/llm-wobble/src/llm_wobble/__init__.py (strip_fenced_blocks + _FENCED_BLOCK_RE, ~20 lines) + 8 tests in tests/test_llm_wobble.py. make check green (460 passed, 86.26%)."
+note = "EVOLVE of llm-wobble, purely additive per resolution 0007 — exposes more, removes nothing; no CHANGELOG contract-shape line, old tags untouched. `strip_fenced_blocks(text, *, json_only=True) -> str` is the INVERSE of the parse funnel: `parse_with_policy` keeps the JSON and discards the prose, this keeps the prose and discards the JSON. Both halves need to know what a fence looks like, which is why the syntax now lives in ONE place instead of being re-derived per caller. Origin (a2web `fix-routing-fence-and-jina-404-launder`): a2web's `query` shipped an `answer` containing a whole ```next_links fenced JSON array because the router prompt and the next-links suffix requested two contradictory output contracts and the routing branch never stripped the fence; the ParseError path returned the RAW model response as the answer. a2web hand-rolled a local `strip_answer_fences` to fix it. The tell that it belonged here: writing it required routing AROUND the host's own `json.loads`-funnel architecture ban — needing to dodge that rule is the signal the logic sits next to the funnel's responsibility. `json_only=True` (default) drops only blocks whose body OPENS as `[`/`{`, so genuine code samples in an answer survive. It is a SHAPE check, not a parse, and deliberately so: the payload is being DISCARDED, so validity is irrelevant, and requiring valid JSON would silently KEEP the malformed blocks — which are exactly as unwelcome in prose as the well-formed ones. `json_only=False` drops every fenced block. Verification lane is pure-string (no live LLM needed); one test asserts the two halves against ONE payload so the inverse relationship cannot silently drift. a2web repoint (delete the local copy, import from the shelf) is the pending verdict row."

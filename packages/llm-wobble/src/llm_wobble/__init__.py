@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Generic, NewType, TypeVar
@@ -105,6 +106,43 @@ def _strip_fences(text: str) -> str:
     if "```" in body:
         body = body.split("```", 1)[0]
     return body.strip()
+
+
+_FENCED_BLOCK_RE = re.compile(r"```[a-zA-Z0-9_-]*[ \t]*\n(?P<body>.*?)\n[ \t]*```", re.DOTALL)
+
+
+def strip_fenced_blocks(text: str, *, json_only: bool = True) -> str:
+    """Remove fenced blocks from prose, keeping the prose.
+
+    The INVERSE of what the parse funnel does. `parse_with_policy` keeps the JSON
+    and discards the prose around it; this keeps the prose and discards the JSON.
+    Both need to know what a fence looks like, which is why fence syntax lives
+    here rather than being re-derived by every caller.
+
+    Use it when a model was asked for prose and emitted an output-contract
+    artifact alongside it — a `next_links` array, a stray `json` block — and that
+    artifact must not reach a prose-typed field. A fenced block in a field callers
+    parse as text inflates tokens, breaks rendering, and puts structured data in a
+    channel not reserved for it.
+
+    `json_only=True` (default) drops only blocks whose body opens as JSON
+    (`[` or `{`), so genuine code samples in an answer survive. It is a SHAPE
+    check, not a parse: the payload is being discarded, so whether it is
+    well-formed is irrelevant — a malformed array is exactly as unwelcome in
+    prose as a valid one, and requiring validity would silently keep the broken
+    ones. `json_only=False` drops every fenced block regardless of content.
+
+    Returns the text with matched blocks removed and surrounding whitespace
+    collapsed at the ends. Text with no fences is returned stripped, unchanged.
+    """
+
+    def _replace(match: re.Match[str]) -> str:
+        if not json_only:
+            return ""
+        body = match.group("body").strip()
+        return "" if body[:1] in ("[", "{") else match.group(0)
+
+    return _FENCED_BLOCK_RE.sub(_replace, text).strip()
 
 
 def _first_json_object(text: str) -> str | None:
@@ -321,5 +359,6 @@ __all__ = (
     "parse_list_with_policy",
     "parse_with_policy",
     "recovered_fields",
+    "strip_fenced_blocks",
     "unwrap",
 )

@@ -1,6 +1,6 @@
 [project]
 name = "llm-wobble"
-version = "0.1.0"
+version = "0.2.0"
 description = "Stop caring that an LLM's JSON envelope arrives fenced, prose-wrapped, or missing fields — one funnel decodes it, applies a per-field recovery policy, logs every recovery, and returns a token no hand-rolled parse can forge."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
