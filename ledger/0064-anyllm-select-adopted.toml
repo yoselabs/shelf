@@ -1,0 +1,10 @@
+seq = 64
+date = "2026-07-27"
+event = "verdict"
+software = "anyllm"
+release = "anyllm-v0.6.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "a2web: select_provider → anyllm.resolve_provider (ordered walk + runtime fallback); DELETED _manifests/llm_providers/ (3 manifests + package); settings ProviderMode → ProviderName|Literal['auto']; _config_for exhaustive match + assert_never; picked up via llm-cache-v0.1.2 bump. Gate green 1167 passed / 90.47% / arch clean; commit ee2452c."
+note = "ADOPT — and the 2nd-consumer challenge (resolution 0013) improved the shape at delivery time, not after. a2web builds providers with its OWN policy (a curated OpenAI model recommendation, a gateway-first reorder, a preference order encoding ADR-0016 cost priorities), which build_adapter does not own — so resolve_provider was shipped taking the ORDER + CONFIG from the host and owning only the mechanism (build → drop-unavailable → fold into runtime fallback). The a2web-adoption question 'why keep the manifests at all?' resolved to: don't. The _manifests/llm_providers surface was pure scar tissue anyllm outgrew — claude-code's CLI+session probe is anyllm's available() since v0.4.0, and the rich Unavailable messages never reached the operator (build_selected_provider surfaced a generic error). a2web kept only genuine policy in llm_resource: the order, the gateway-first switch, the OpenAI RECOMMENDED_BACKENDS table, the cost guard (bench-only). 'auto' stays an a2web sentinel (union with ProviderName), never a ProviderName member — a selection outcome, not a backend identity. BREAKING for a2web's own A2WEB_LLM_PROVIDER env (old anthropic/claude-code/openai_compatible → anthropic-api/claude-code-sdk/openai-compatible); a shelf-internal concern, not an anyllm contract break (anyllm-v0.6.0 is purely additive)."
