@@ -19,6 +19,7 @@ from llm_wobble import (
     WobbleSkip,
     WobbleTolerance,
     _first_json_object,
+    bind,
     emit_wobble,
     parse_list_with_policy,
     parse_with_policy,
@@ -131,6 +132,58 @@ def test_optional_absence_is_not_a_recovered_field() -> None:
         model="m",
     )
     assert recovered_fields(wobbled) == ("c",)
+
+
+def test_bind_routes_events_to_the_bound_logger(caplog: pytest.LogCaptureFixture) -> None:
+    funnel = bind(_TEST_LOGGER)
+    with caplog.at_level(logging.WARNING):
+        funnel.parse_with_policy(
+            json.dumps({}),
+            policies={"x": WobblePolicy(WobbleTolerance.DEFAULT, default=1)},
+            into=dict,
+            boundary="test",
+            model="m",
+        )
+    rec = next(r for r in caplog.records if r.getMessage() == "llm_wobble")
+    assert rec.name == _TEST_LOGGER.name
+
+
+def test_bind_lets_an_explicit_logger_win() -> None:
+    """The binding is a default, not a capture — a call site may still redirect."""
+    other = logging.getLogger("llm_wobble_other")
+    funnel = bind(_TEST_LOGGER)
+    seen: list[logging.LogRecord] = []
+
+    class _Collect(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            seen.append(record)
+
+    handler = _Collect()
+    other.addHandler(handler)
+    try:
+        funnel.emit_wobble(boundary="test", field="x", tolerance=WobbleTolerance.DEFAULT, model="m", raw_excerpt="", logger=other)
+    finally:
+        other.removeHandler(handler)
+    assert [r.name for r in seen] == [other.name]
+
+
+def test_bind_forwards_parameters_it_never_names() -> None:
+    """The reason `bind` exists at all.
+
+    A hand-written wrapper restates the signature it wraps, so a parameter added
+    here silently stops reaching the consumer. `partial` forwards whatever the
+    underlying function accepts — asserted on a parameter the binding does not
+    mention, which is exactly the class that goes missing.
+    """
+    funnel = bind(_TEST_LOGGER)
+    wobbled = funnel.parse_list_with_policy(
+        '[{"a": 1}]',
+        item=dict,
+        boundary="test",
+        model="m",
+        strip_fences=False,  # never named by `bind`; must still arrive
+    )
+    assert unwrap(wobbled) == [{"a": 1}]
 
 
 def test_null_value_treated_as_missing() -> None:

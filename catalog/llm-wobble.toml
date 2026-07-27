@@ -2,7 +2,7 @@
 name = "llm-wobble"
 kind = "primitive"
 tier = "T1"
-release = "llm-wobble-v0.3.0"
+release = "llm-wobble-v0.4.0"
 capability = "Stop caring how to parse untrusted LLM JSON safely — the single funnel that owns json.loads, applies a per-field WobblePolicy (STRICT / DERIVE / DEFAULT / OPTIONAL / SKIP), and returns an opaque Wobbled type a payload fabricated outside the funnel cannot forge."
 implementation = "ours"
 status = "candidate"

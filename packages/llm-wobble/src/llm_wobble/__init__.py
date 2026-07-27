@@ -32,6 +32,7 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import partial
 from typing import TYPE_CHECKING, Any, Generic, NewType, TypeVar
 
 if TYPE_CHECKING:
@@ -367,12 +368,52 @@ def parse_list_with_policy(
     return Wobbled(_Parsed(value=out, recovered_fields=tuple(dropped)))
 
 
+@dataclass(frozen=True, slots=True)
+class BoundFunnel:
+    """The funnel's three logging entry points, pre-bound to one logger.
+
+    Returned by `bind`. Every other argument is still the caller's; an explicit
+    `logger=` at the call site overrides the binding.
+    """
+
+    parse_with_policy: Callable[..., Wobbled]
+    parse_list_with_policy: Callable[..., Wobbled]
+    emit_wobble: Callable[..., None]
+
+
+def bind(logger: logging.Logger) -> BoundFunnel:
+    """Bind the logging entry points to a host's managed logger.
+
+    A consumer that keeps ONE process logger — because its transport cannot
+    tolerate a stray record on stdout, say — needs `logger=` on every call.
+    Doing that by hand means writing wrapper functions, and a hand-written
+    wrapper RESTATES the signature it wraps. When this module grows a parameter,
+    the consumer's copy silently drops it and the call quietly stops doing what
+    its name says.
+
+    That is not hypothetical. It is how a consumer's replay harness stopped
+    passing a field it existed to reproduce, which routed every replayed case
+    down a degraded branch while still reporting success.
+
+    So the binding lives here, built from `functools.partial`: there is no
+    second signature to fall behind, and a new parameter reaches every bound
+    caller as soon as they upgrade.
+    """
+    return BoundFunnel(
+        parse_with_policy=partial(parse_with_policy, logger=logger),
+        parse_list_with_policy=partial(parse_list_with_policy, logger=logger),
+        emit_wobble=partial(emit_wobble, logger=logger),
+    )
+
+
 __all__ = (
+    "BoundFunnel",
     "ParseError",
     "WobblePolicy",
     "WobbleSkip",
     "WobbleTolerance",
     "Wobbled",
+    "bind",
     "emit_wobble",
     "parse_list_with_policy",
     "parse_with_policy",

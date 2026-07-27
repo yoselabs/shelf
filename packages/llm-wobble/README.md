@@ -61,6 +61,19 @@ them onto a host's own managed channel:
 parse_with_policy(..., logger=my_app_logger)
 ```
 
+A host that routes *everything* through one logger binds once instead of
+repeating the kwarg:
+
+```python
+funnel = llm_wobble.bind(my_app_logger)
+funnel.parse_with_policy(raw, policies=..., into=..., boundary=..., model=...)
+```
+
+Use `bind` rather than hand-rolling wrappers. A hand-written wrapper restates
+the signature it wraps, so a parameter added here silently stops reaching your
+call sites — `bind` is `functools.partial` underneath and has no second
+signature to fall behind. An explicit `logger=` at the call site still wins.
+
 The record is `message="llm_wobble"` with a `fields` payload on `record.fields`
 (`boundary`, `field`, `tolerance`, `model`, `raw` — the raw excerpt is bounded to
 200 chars). The package never names a consumer's logger.
