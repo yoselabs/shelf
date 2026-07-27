@@ -1,0 +1,10 @@
+seq = 66
+date = "2026-07-27"
+event = "verdict"
+software = "llm-wobble"
+release = "llm-wobble-v0.2.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "pyproject pin v0.1.0 -> v0.2.0 + uv lock; deleted a2web's local `strip_answer_fences` + `_JSON_FENCE_RE` + `_drop_if_json_shaped` (~25 lines) from packages/llm_extract/extractor.py; re-exported `strip_fenced_blocks` through a2web's wobble binding so the extractor imports it from the binding rather than llm_wobble directly (packages-boundary discipline). make check green (1176 passed, 90%)."
+note = "Repoint of the same session's delivery (row 65) — the origin consumer now imports the shelf copy and carries none of its own. Net -25 lines in a2web with identical behaviour; the three call sites (non-routing branch, the routing ParseError path, and the routing success path) are unchanged apart from the symbol. Shape held on the second consumer without evolution: a2web needed exactly `json_only=True` semantics, which is what the package shipped, so no contract bend was required. Worth recording for RECONCILE: `strip_fenced_blocks` currently has ONE consumer, so it sits below the rule-of-three bar on adoption count alone — it was promoted on the knowledge-duplication argument (fence syntax was about to exist in two places, and the local copy could only be written by routing around a2web's own json.loads-funnel ban) rather than on a second live caller. If no second consumer appears, this is a legitimate demote candidate; the counter-argument is that the funnel and its inverse belong together regardless of caller count, since splitting them is what lets the two halves drift."
