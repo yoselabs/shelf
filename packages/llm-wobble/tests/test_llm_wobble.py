@@ -89,6 +89,50 @@ def test_skip_raises_wobbleskip_and_logs(caplog: pytest.LogCaptureFixture) -> No
     assert events[0].fields["tolerance"] == "skip"  # ty: ignore[unresolved-attribute]
 
 
+def test_optional_substitutes_without_logging(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING, logger=_TEST_LOGGER.name):
+        out = _resolve({}, "x", WobblePolicy(WobbleTolerance.OPTIONAL, default=()))
+    assert out == ()
+    assert _events(caplog) == []
+
+
+def test_optional_and_default_differ_on_the_same_absent_field(caplog: pytest.LogCaptureFixture) -> None:
+    """The whole point of the split, on one field, in one test.
+
+    Both substitute the same value for the same absence. Only DEFAULT reports
+    it — because only DEFAULT is claiming something was repaired.
+    """
+    absent: dict[str, object] = {}
+    with caplog.at_level(logging.WARNING, logger=_TEST_LOGGER.name):
+        lenient = _resolve(absent, "x", WobblePolicy(WobbleTolerance.OPTIONAL, default="empty"))
+        quiet_events = len(_events(caplog))
+        loud = _resolve(absent, "x", WobblePolicy(WobbleTolerance.DEFAULT, default="empty"))
+    assert lenient == loud == "empty"
+    assert quiet_events == 0
+    assert len(_events(caplog)) == 1
+
+
+def test_optional_present_value_wins_over_the_default() -> None:
+    """OPTIONAL is about absence only — a supplied value is never overwritten."""
+    assert _resolve({"x": ["a"]}, "x", WobblePolicy(WobbleTolerance.OPTIONAL, default=())) == ["a"]
+
+
+def test_optional_absence_is_not_a_recovered_field() -> None:
+    """`recovered_fields` means 'repaired'. An honoured optional repaired nothing."""
+    wobbled = parse_with_policy(
+        json.dumps({"a": 1}),
+        policies={
+            "a": WobblePolicy(WobbleTolerance.STRICT),
+            "b": WobblePolicy(WobbleTolerance.OPTIONAL, default=None),
+            "c": WobblePolicy(WobbleTolerance.DEFAULT, default=0),
+        },
+        into=dict,
+        boundary="test",
+        model="m",
+    )
+    assert recovered_fields(wobbled) == ("c",)
+
+
 def test_null_value_treated_as_missing() -> None:
     """Explicit null is the same wobble as omission — recover via the policy."""
     assert _resolve({"x": None}, "x", WobblePolicy(WobbleTolerance.DEFAULT, default="ok")) == "ok"

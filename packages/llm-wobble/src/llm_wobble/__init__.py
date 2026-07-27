@@ -9,7 +9,9 @@ Every site that consumes such output SHOULD funnel through `parse_with_policy`
   2. Calls `json.loads` — the single decode site a consumer can then ban
      everywhere else, so no hand-rolled parse can bypass the policy.
   3. Applies a per-field `WobblePolicy` (STRICT raises, DERIVE/DEFAULT/SKIP
-     recover, each recovery firing one structured `llm_wobble` log event).
+     recover, each recovery firing one structured `llm_wobble` log event;
+     OPTIONAL substitutes silently, because an absent optional field is the
+     contract being honoured rather than a wobble being repaired).
   4. Constructs the typed payload and wraps it in `Wobbled`.
 
 `Wobbled` is an opaque `NewType` whose only constructor is the funnel — code
@@ -43,11 +45,23 @@ T = TypeVar("T")
 
 
 class WobbleTolerance(StrEnum):
-    """Per-field policy for what to do when an LLM drops a JSON field."""
+    """Per-field policy for what to do when an LLM drops a JSON field.
+
+    `OPTIONAL` vs `DEFAULT` is the distinction between *"absent is normal"* and
+    *"absent is a wobble I repaired"*. Both substitute `policy.default`; only
+    `DEFAULT` reports it. The funnel cannot infer which one applies — whether a
+    field is genuinely optional is a fact about the *contract*, known only to
+    the caller declaring the policy — so the vocabulary has to carry it.
+
+    Getting this wrong is why the split exists: an envelope whose optional
+    fields are declared `DEFAULT` emits an `llm_wobble` on every healthy call,
+    and a log key that fires 100% of the time cannot detect anything.
+    """
 
     STRICT = "strict"
     DERIVE = "derive"
     DEFAULT = "default"
+    OPTIONAL = "optional"
     SKIP = "skip"
 
 
@@ -55,7 +69,7 @@ class WobbleTolerance(StrEnum):
 class WobblePolicy:
     """One field's wobble-tolerance policy.
 
-    `default` is meaningful only when `tolerance == DEFAULT`.
+    `default` is meaningful when `tolerance` is `DEFAULT` or `OPTIONAL`.
     `derive` is meaningful only when `tolerance == DERIVE`.
     """
 
@@ -231,6 +245,10 @@ def _apply_field(
         value = policy.derive(parsed)
         emit_wobble(boundary=boundary, field=field, tolerance=policy.tolerance, model=model, raw_excerpt=raw_excerpt, logger=logger)
         return value, True
+    if policy.tolerance is WobbleTolerance.OPTIONAL:
+        # Absent is the contract, not a wobble: substitute silently, and do NOT
+        # report it as recovered — nothing was repaired.
+        return policy.default, False
     if policy.tolerance is WobbleTolerance.DEFAULT:
         emit_wobble(boundary=boundary, field=field, tolerance=policy.tolerance, model=model, raw_excerpt=raw_excerpt, logger=logger)
         return policy.default, True

@@ -14,6 +14,7 @@ policies = {
     "answer": WobblePolicy(WobbleTolerance.STRICT),                     # missing → ParseError
     "sources": WobblePolicy(WobbleTolerance.DEFAULT, default=[]),       # missing → [] + one log event
     "score": WobblePolicy(WobbleTolerance.DERIVE, derive=lambda d: 0),  # missing → derived + one log event
+    "note": WobblePolicy(WobbleTolerance.OPTIONAL, default=None),       # missing → None, silently
 }
 
 wobbled = parse_with_policy(
@@ -36,8 +37,15 @@ payload = unwrap(wobbled)           # MyPayload
   becomes a deliberate `type: ignore`, not an accident.
 - **Recovery is per-field and declared, not ad hoc.** `STRICT` raises `ParseError`
   on a miss; `DERIVE` computes from the rest of the payload; `DEFAULT` substitutes
-  a constant; `SKIP` raises `WobbleSkip` so the caller can short-circuit. Every
-  non-STRICT recovery fires exactly one `llm_wobble` log event.
+  a constant; `SKIP` raises `WobbleSkip` so the caller can short-circuit. Each of
+  those fires exactly one `llm_wobble` log event.
+- **`OPTIONAL` is the field the contract said could be absent.** It substitutes
+  like `DEFAULT` but emits nothing and is not listed in `recovered_fields` —
+  because nothing was repaired. Only the caller knows which fields its prompt
+  marked optional, so the vocabulary carries it rather than the funnel guessing.
+  Declaring an optional field `DEFAULT` is not a harmless over-report: a log key
+  that fires on every healthy call cannot detect anything, and that is how the
+  distinction was found.
 - **Arrays too.** `parse_list_with_policy` expects a JSON array and filters entries
   through `item(dict) -> T | None`; malformed entries are dropped inside the funnel
   (one event names the dropped indices), never in caller code.
