@@ -1,0 +1,10 @@
+seq = 70
+date = "2026-07-27"
+event = "verdict"
+software = "llm-wobble"
+release = "llm-wobble-v0.4.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+cost = "pin repointed v0.3.0 -> v0.4.0 + uv lock; src/a2web/packages/llm_extract/wobble/__init__.py 112 -> 73 lines (three hand-written wrapper functions became three assignments). a2web make check green (1206 passed), make arch green (47 passed), zero wire goldens moved."
+note = "The origin consumer repointed and the wrapper layer is deleted, not kept alongside — which is the whole point: a compat shim here would have preserved exactly the drifting signature the evolution removes. `_funnel = bind(logging.getLogger('a2web'))` then three module-level assignments; every existing `from .wobble import parse_with_policy` call site is unchanged. Boundary invariant holds — the logger is still resolved BY NAME via stdlib logging, so `packages/` never imports `a2web.<domain>` (tach.toml + the independence test). Confirms the shape is right on its second use: the binding needed no per-consumer accommodation, and an explicit `logger=` still overrides at the call site. DELIBERATELY NOT PROMOTED, recorded so a later RECONCILE does not revisit it as an oversight: a2web's `_policies.py` policy tables. They classify each field against what a2web's own prompt literally says ('(required)' -> DEFAULT, '(optional) ... OMIT' -> OPTIONAL), so every entry's justification is only checkable next to `prompts.py`. Moving them to the shelf would separate the claim from its evidence and dress product knowledge as substrate — the exact over-promotion RECONCILE exists to undo."
