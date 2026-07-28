@@ -1,0 +1,17 @@
+seq = 71
+date = "2026-07-28"
+event = "delivery"
+software = "dom-schema"
+release = "dom-schema-v0.1.0"
+actor = "a2web"
+consumer = "a2web"
+cost = "new package, 3 modules (~150 lines) + 14 tests, 2 captured fixtures (109 KB). selectolax dependency, already transitively present via a2web. No existing package changed."
+note = """Promoted after finding TWO site parsers silently dead on the same day in a2web: the arXiv listing regex returned 0 entries against a live page holding 47, and wikipedia's wikilink regex returned 0 against 1066 `rel="mw:WikiLink"` anchors. Both had GREEN test suites — over hand-written fixtures encoding the same assumption as the parser they tested, so they could only confirm the parser agreed with itself. The live handler probe passed both too: it asserts content came back, and content had; the INDEX was what died.
+
+The package is not "parse HTML" — the shelf already has content-extract, record-mine, json-in-html, html-fragment. It is the YIELD CONTRACT: a bare `list[Row]` cannot distinguish an empty page from a schema that stopped matching, so every caller reads both as "nothing here" and a rotted scraper answers that indefinitely. `Schema` is TWO-level (container + row) precisely so the two are separable, and `extract` returns OK / EMPTY (a fact about the PAGE) / ROT (a fact about the SCHEMA). A flat selector cannot supply that distinction, which is why `container` is required rather than optional. ROT also covers the half-broken middle — structural rows present, every field selector missing — where reporting EMPTY would blame the page for the schema's failure.
+
+EVOLVE of record-mine was tested and rejected rather than waved off (the loop flags sibling-growth as anti-pattern 0007). Two reasons: (1) not a container-location problem — handed arXiv's `<dl>` fragment ALONE, record-mine still returns None, so the obvious monotonic evolution (an optional container hint) does not help; (2) not monotonic — record-mine INFERS generic records from an UNKNOWN page, a declared schema NAMES fields for a KNOWN one; naming exposes more but requiring a selector removes working on unknown pages, failing monotonicity in the removal direction. Two capabilities, not one contract.
+
+Three in-repo consumers before promotion (arxiv, wikipedia, handlers/_reddit_html which already hand-rolls declared-CSS-to-named-fields), so the second-consumer challenge is satisfied at promotion time rather than deferred.
+
+VERIFICATION LANE SHIPS WITH IT, and for this package the lane IS the point: tests/fixtures/ holds real pages fetched and committed, and tests/test_captured_pages.py runs every schema against them. Proven to be genuine witnesses rather than decoration — a2web's OLD parsers return 0 rows on these exact captured bytes while the new schemas return full rows. A hand-written fixture here would reproduce the precise defect the package exists to prevent, which is why the README states the captured-not-hand-written rule as a package invariant."""

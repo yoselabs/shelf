@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "dom-schema"
+kind = "primitive"
+tier = "T1"
+release = "dom-schema-v0.1.0"
+capability = "Stop caring whether your site selectors still match — declared CSS extraction that reports WHY it yielded nothing, separating an empty page from a schema that stopped matching, so a rotted scraper fails loudly instead of answering 'nothing here' forever."
+implementation = "ours"          # two-level schema + three-way yield verdict; the shape is ours
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web after two parsers were found silently dead on the same day (arXiv listing 47->0, wikipedia wikilinks 1066->0), both behind GREEN suites over hand-written fixtures. The three-way verdict (OK / EMPTY = a fact about the page / ROT = a fact about the schema) is the package; a bare row list cannot express it, which is why the Schema is two-level (container + row). Sibling to record-mine, not a superset: record-mine INFERS records on an unknown page, dom-schema takes a DECLARED shape for a known one. Fixtures are captured, never hand-written. Born candidate."

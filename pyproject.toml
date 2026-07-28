@@ -204,7 +204,12 @@ exclude = [
 # bench/corpus (source PDFs, binary) + bench/outputs (raw engine output, incl.
 # scanned-page OCR text) are generated/fixture data, not authored content —
 # real typos there are the engines' problem, not this repo's.
-skip = "uv.lock,.venv,.git,*.pyc,.ruff_cache,.pytest_cache,docs/thoughts/*,packages/*/bench/corpus/*,packages/*/bench/outputs/*"
+#
+# tests/fixtures/*.html likewise: those are pages CAPTURED VERBATIM from live
+# sites. Editing one to satisfy a spellchecker would make it a hand-written
+# approximation — the precise defect dom-schema exists to prevent — so the
+# fixture is authoritative and the linter yields to it, never the reverse.
+skip = "uv.lock,.venv,.git,*.pyc,.ruff_cache,.pytest_cache,docs/thoughts/*,packages/*/bench/corpus/*,packages/*/bench/outputs/*,packages/*/tests/fixtures/*.html"
 # doctrine/glossary coinages the dictionary flags but we mean on purpose.
 ignore-words-list = "wins,ontology,noqa,crate,ba,te,alls"
 check-filenames = ""
