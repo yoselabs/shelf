@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2web"
+software = "dom-schema"
+why = "a2web's site handlers scrape known pages, and two of them were found silently dead on the same day — returning zero rows against live pages holding 47 entries and 1066 links — because a bare row list cannot say WHY it is empty, so nothing could tell rot from a quiet day."
+needs = "extract(html, Schema) and the three-way Yield verdict: ROT must reach the tier cascade as a non-ok verdict, EMPTY must stay a legitimate answer about the page. Plus the captured-fixture discipline the package encodes."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired
