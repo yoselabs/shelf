@@ -1,0 +1,20 @@
+seq = 74
+date = "2026-07-30"
+event = "verdict"
+software = "record-mine"
+release = "record-mine-v0.2.0"
+actor = "a2web"
+consumer = "a2web"
+verdict = "adopted"
+note = """Repoint held in the same session as the delivery (0073). a2web moved `record-mine-v0.1.0` -> `v0.2.0` in `pyproject.toml`, `make check` green (1273 passed, 90.7% coverage, 69 architecture guards, tach clean), no call-site change required — the evolution is additive and the surface is unchanged.
+
+The adoption is verified by BEHAVIOUR, not by the build going green. On the live page that motivated the promotion:
+
+  before   items_loaded None  items_total None  operator_hints []
+  after    items_loaded 50    items_total 450   operator_hints [listing_partial]
+
+That is a2web's sufficiency axis switching back on for a whole population: `record_count is None` was disabling `_maybe_flag_partial_listing` for ANY listing shape the detector missed, so each recovered shape re-enables the capability broadly rather than for one URL.
+
+a2web keeps a consumer-side pin (`test_definition_list_listing_yields_records_for_the_sufficiency_axis`) asserting `extract_records` returns a region for the captured definition-list page. Deliberately an assertion about the SHELF capability rather than about a2web's own wiring: the failure mode being guarded is silent — a downgrade or an upstream regression would restore `record_count is None`, and nothing else in a2web's suite would notice, which is precisely how the original defect survived. The pin makes that loud.
+
+One honest bound recorded with the adoption, not hidden: `_MAX_RECORDS` is 50 and arXiv renders 50 per page, so the exactness of `items_loaded=50` is coincidental. On a listing rendering more than 50 records the consumer reads the cap, so its reported shortfall is larger than reality. The signal's direction is always correct (there IS more); its precision is bounded by the cap. Not a blocker for either side, and not a reason to raise the cap without a case that needs it."""
