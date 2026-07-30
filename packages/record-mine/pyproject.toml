@@ -1,6 +1,6 @@
 [project]
 name = "record-mine"
-version = "0.1.0"
+version = "0.2.0"
 description = "Locate the dominant repeated-record region on a listing / index / threaded-discussion page (which article extractors discard as boilerplate) and render it to link-preserving markdown."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]

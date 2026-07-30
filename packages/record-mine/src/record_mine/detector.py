@@ -17,10 +17,18 @@ same-signature child-records).
 
 A signature must clear three guards to be a candidate — non-empty class
 token, parent-signature consistency, heading presence — and an ancestor
-tie-break resolves a near-tie in favour of the outer wrapper. The detector
-self-gates: when no signature clears the guards, `extract_records` returns
-`None` and the caller falls through (an article, a near-empty JS shell, a
-reference doc — none is a record region).
+tie-break resolves a near-tie in favour of the outer wrapper.
+
+One shape is invisible to those guards and has its own path: a **definition
+list**. `<dt>`/`<dd>` are classless and heading-less in every real listing, so
+guards (a) and (c) reject them — yet a `<dl>` is an association list by
+specification, which is the very thing those guards try to infer from class
+soup. `_definition_list_region` runs as a FALLBACK after signature detection
+finds nothing, so no page that already yields a region changes what it yields.
+
+The detector self-gates: when neither path finds a region, `extract_records`
+returns `None` and the caller falls through (an article, a near-empty JS shell,
+a reference doc — none is a record region).
 """
 
 from __future__ import annotations
@@ -365,6 +373,115 @@ def _build_record_set(chosen: _Candidate) -> RecordSet:
     )
 
 
+# A `<dd>`'s own-scope signature. Classless by construction in the shape this
+# path exists for; used so a NESTED definition list's records are pruned from
+# their parent's scope exactly as the signature path prunes its own.
+_DD_SIG: _Signature = ("dd", "")
+
+
+def _definition_pairs(dl: lxml.html.HtmlElement) -> list[tuple[lxml.html.HtmlElement, lxml.html.HtmlElement]]:
+    """Pair each `<dd>` with its nearest preceding `<dt>` inside one `<dl>`.
+
+    Per the HTML spec a `<dl>` is an association list: `<dt>` names a term,
+    `<dd>` describes it. Multiple `<dd>`s may follow one `<dt>`; each is paired
+    with that term, which is why the term is not consumed on first use.
+    """
+    pairs: list[tuple[lxml.html.HtmlElement, lxml.html.HtmlElement]] = []
+    term: lxml.html.HtmlElement | None = None
+    for child in dl:
+        if not isinstance(child.tag, str):
+            continue
+        if child.tag == "dt":
+            term = child
+        elif child.tag == "dd" and term is not None:
+            pairs.append((term, child))
+    return pairs
+
+
+def _definition_list_region(
+    tree: lxml.html.HtmlElement,
+) -> tuple[list[tuple[lxml.html.HtmlElement, lxml.html.HtmlElement]], lxml.html.HtmlElement] | None:
+    """Locate the largest content-bearing `<dl>` record region, or `None`.
+
+    Why this is not just another signature: BOTH signature guards are blind to
+    this shape, and both for the same reason. `<dt>`/`<dd>` are classless in
+    every real definition listing, so guard (a) rejects `("dd", "")`; and they
+    carry no `h1`-`h6`, so guard (c) rejects them on heading presence. Those
+    guards are PROXIES for "this element is a record" — inferred, because in
+    `<div>`/`<li>` soup nothing states it. A `<dl>` states it outright, so the
+    proxies are not merely unnecessary here, they are actively wrong.
+
+    The content floors still apply, and are what keep a two-item glossary beside
+    an article from hijacking the page: `_MIN_RECORDS` pairs, each with more than
+    `_MIN_RECORD_TEXT` chars of own-scope description, and a link SOMEWHERE IN
+    THE PAIR — the term commonly carries it (`<dt><a href=…>`), so requiring one
+    in the description alone would reject the shape this exists for.
+    """
+    best: tuple[list[tuple[lxml.html.HtmlElement, lxml.html.HtmlElement]], lxml.html.HtmlElement] | None = None
+    for dl in tree.iter("dl"):
+        kept = [
+            (term, desc)
+            for term, desc in _definition_pairs(dl)
+            if len(_collapse(_own_text(desc, _DD_SIG))) > _MIN_RECORD_TEXT and (_own_links(desc, _DD_SIG) or _own_links(term, _DD_SIG))
+        ]
+        if len(kept) >= _MIN_RECORDS and (best is None or len(kept) > len(best[0])):
+            best = (kept, dl)
+    return best
+
+
+def _build_definition_record(
+    term: lxml.html.HtmlElement,
+    desc: lxml.html.HtmlElement,
+    depth: int,
+) -> Record:
+    """Build one record from a `<dt>`/`<dd>` pair.
+
+    The term IS the heading — that is what `<dt>` means — so it is used directly
+    rather than searched for among `h1`-`h6`. Links from both halves reach the
+    consumer, term-first, because the term's link is the record's own address
+    (an `/abs/…` id) while the description's links are incidental.
+    """
+    text = _collapse(_own_text(desc, _DD_SIG))
+    term_links = _own_links(term, _DD_SIG)
+    links = (*term_links, *(link for link in _own_links(desc, _DD_SIG) if link not in term_links))
+    heading_text = _collapse(_own_text(term, _DD_SIG)) or None
+    heading_link = term_links[0] if term_links else (links[0] if links else None)
+    return Record(
+        text=text,
+        links=links,
+        heading_text=heading_text,
+        heading_link=heading_link,
+        depth=depth,
+        markdown=render_record(
+            text,
+            links,
+            depth,
+            heading_text=heading_text,
+            heading_link=heading_link,
+        ),
+    )
+
+
+def _build_definition_record_set(
+    pairs: list[tuple[lxml.html.HtmlElement, lxml.html.HtmlElement]],
+    container: lxml.html.HtmlElement,
+) -> RecordSet:
+    """Build the `RecordSet` for a located definition-list region."""
+    kept = pairs[:_MAX_RECORDS]
+    records: list[Record] = []
+    max_depth = 0
+    for term, desc in kept:
+        depth = _depth(desc, _DD_SIG)
+        max_depth = max(max_depth, depth)
+        records.append(_build_definition_record(term, desc, depth))
+    return RecordSet(
+        records=tuple(records),
+        container=_el_label(container),
+        child_signature="dt/dd",
+        max_depth=max_depth,
+    )
+
+
 def extract_records(html: str, base_url: str = "") -> RecordSet | None:
     """Locate the dominant repeated record region and extract its records.
 
@@ -394,6 +511,14 @@ def extract_records(html: str, base_url: str = "") -> RecordSet | None:
 
     chosen = _select(candidates)
     if chosen is None:
+        # Signature detection found nothing. Before falling through, try the one
+        # shape it is structurally unable to see: a definition list. Ordered as a
+        # FALLBACK, not a competing candidate, so no page that already yields a
+        # region can change what it yields — a class-based listing on a page that
+        # also carries a `<dl>` glossary still wins, which is correct.
+        region = _definition_list_region(tree)
+        if region is not None:
+            return _build_definition_record_set(*region)
         return None
 
     return _build_record_set(chosen)

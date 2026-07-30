@@ -7,6 +7,8 @@ parent-signature consistency, and heading presence.
 
 from __future__ import annotations
 
+import pathlib
+
 from record_mine import extract_records
 
 
@@ -211,3 +213,75 @@ def test_to_markdown_labels_flat_vs_threaded() -> None:
     assert flat is not None and threaded is not None
     assert flat.to_markdown().startswith("### Listing (8 records)")
     assert threaded.to_markdown().startswith("### Discussion (6 comments)")
+
+
+# --------------------------------------------------------------------- #
+# Definition-list record regions (<dl>/<dt>/<dd>)
+# --------------------------------------------------------------------- #
+
+_FIXTURES = pathlib.Path(__file__).parent / "fixtures"
+
+
+def _definition_listing(n: int) -> str:
+    """A `<dl>` listing in the shape real ones take: classless `dt`/`dd`, the
+    term carrying the record's link, the description carrying its prose.
+
+    Synthetic here on purpose — it controls the record COUNT, which the captured
+    fixture cannot (it is a snapshot of one day's page). The captured fixture is
+    what witnesses that this shape is real; this one exercises the threshold.
+    """
+    rows = "".join(
+        f"<dt><a href='/abs/26{i:02d}.0001'>arXiv:26{i:02d}.0001</a></dt>"
+        f"<dd><div class='meta'><span>Title: Record number {i} on some subject</span>"
+        f"<span>Authors: A. Author, B. Author</span>"
+        f"<p>An abstract-like description of record {i}, long enough to be content-bearing.</p>"
+        "</div></dd>"
+        for i in range(n)
+    )
+    return f"<html><body><dl id='articles'>{rows}</dl></body></html>"
+
+
+def test_definition_list_listing_is_a_record_region() -> None:
+    """A `<dl>` of `dt`/`dd` pairs is N records, not one article.
+
+    The two signature guards cannot see this shape: `dt`/`dd` carry no class
+    attribute (guard (a) rejects `("dd", "")`) and carry no `h1`-`h6` (guard (c)
+    rejects them on heading presence). Both guards are PROXIES for "this element
+    is a record" — and a `<dl>` states it outright: the HTML spec defines it as
+    an association list, with `<dt>` the term and `<dd>` its description.
+    """
+    rs = extract_records(_definition_listing(12))
+
+    assert rs is not None, "a 12-record definition list read as no record region"
+    assert len(rs.records) == 12
+    # The `dt` is the term — it is the record's heading, and its link.
+    assert rs.records[0].heading_text
+    assert rs.records[0].heading_link
+    assert "/abs/2600.0001" in rs.records[0].heading_link[1]
+
+
+def test_definition_list_below_the_floor_is_not_a_region() -> None:
+    """The `_MIN_RECORDS` floor applies to this shape too — a two-item glossary
+    beside an article must not hijack the page."""
+    assert extract_records(_definition_listing(2)) is None
+
+
+def test_captured_arxiv_listing_yields_its_records() -> None:
+    """CAPTURED witness: a real arXiv listing, 50 `dt`/`dd` pairs.
+
+    This is the page that exposed the gap. `extract_records` returned `None` on
+    it, so a2web's `record_count` stayed `None`, so its partial-listing
+    detection never ran and a 50-of-445 listing was reported as complete.
+
+    A synthetic fixture could not have witnessed this: it would have been
+    written from the same assumption as the detector.
+    """
+    html = (_FIXTURES / "arxiv_list_cs_CL_recent.html").read_text()
+
+    rs = extract_records(html, base_url="https://arxiv.org/list/cs.CL/recent")
+
+    assert rs is not None, "the captured arXiv listing read as no record region"
+    # 50 pairs in the committed file, counted by inspection; the detector caps at 50.
+    assert len(rs.records) >= 25
+    joined = " ".join(r.markdown for r in rs.records)
+    assert "arxiv.org/abs/" in joined or "/abs/" in joined

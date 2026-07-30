@@ -27,6 +27,12 @@ if rs is not None:
 - **Self-gating** — three guards (non-empty class token, parent-signature consistency,
   heading presence) mean an article, a near-empty JS shell, or a reference doc yields
   `None`, and the caller falls through to another extraction source.
+- **Definition lists** — a `<dl>` of `<dt>`/`<dd>` pairs is N records too, and it is the
+  one shape the guards above cannot see: real definition listings are classless and
+  heading-less, so guards (a) and (c) reject them. A `<dl>` is an association list *by
+  specification* — the very thing those guards infer from class soup — so it gets its own
+  detection path, with `<dt>` as each record's heading and link. Runs only when signature
+  detection finds nothing, so no page that already yields a region changes.
 - **Pure** — HTML string in, records out; it never fetches, and the *policy* for what to
   do with the region lives above this primitive.
 
