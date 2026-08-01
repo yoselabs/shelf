@@ -1,0 +1,23 @@
+seq = 77
+date = "2026-08-01"
+event = "verification"
+software = "shelf"
+release = ""
+actor = "a2web"
+consumer = ""
+verdict = "pass"
+cost = ""
+note = """`make check` was not running 8 of 26 package test suites. Found by accident, while promoting 0076: six new `lean-wire` tests collected fine when that directory was targeted (22 tests) and the ROOT collection count did not move (472/474) with or without them.
+
+Root cause: `testpaths` in the root `pyproject.toml` is a hand-maintained list, and pytest is silent about a package that is simply not in it. Absent: a2effect (12 test files), atomic-io, dom-schema, duckdb-sidecar, lean-wire, managed-region, mcp-result-wire, page-tsv. **174 tests running in no gate at all.**
+
+Measured impact of the fix, which is the honest size of what was invisible:
+
+  gate           472 passed  ->  649 passed
+  coverage base  2610 stmts  ->  3544 stmts   (934 statements were outside the measurement entirely)
+
+All 174 pass, so nothing had shipped broken — the loss was that nothing would have told us, and a green `make check` was being read as evidence over a third of the tree it never touched. Note this includes `page-tsv`, whose four encoder guards were landed and tagged one commit earlier (0075): they were correct, and they were also not being run by the gate that declared them green.
+
+The list stays hand-maintained (pytest wants literal paths) and is now guarded by `tests/test_gate_covers_every_package.py`, in both directions: a suite on disk but absent from `testpaths`, and a `testpaths` entry naming a directory that no longer exists — pytest is quiet about that one too, and a stale entry makes the list look longer than the coverage it buys. Carries a `_MIN_PACKAGES_WITH_TESTS` floor so the walk cannot pass by finding nothing, and verified by reversion: dropping the two newly-added entries fails it by name.
+
+Same shape as a2web's own `tach.toml` finding — a hand-maintained list of what to check, where a missing entry silently means no contract rather than a failure. Worth watching for a third instance before deciding whether the pattern needs a general answer."""

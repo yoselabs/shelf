@@ -146,26 +146,39 @@ builtins-allowed-modules = ["types"]
 
 [tool.pytest.ini_options]
 # testpaths lists the shelf's own fitness tests + every package's tests.
+# HAND-MAINTAINED, and therefore guarded: `tests/test_gate_covers_every_package.py`
+# asserts this list is exactly the set of `packages/*/tests` on disk. It went
+# stale silently once — 8 of 26 suites (174 tests, a2effect's 12 files among
+# them) ran in NO gate, so a package could ship a green `make check` while its
+# own tests were never executed. A missing entry now fails the gate itself.
 testpaths = [
     "tests",
-    "packages/anyllm/tests",
+    "packages/a2effect/tests",
+    "packages/any-browser/tests",
     "packages/anyembed/tests",
+    "packages/anyllm/tests",
+    "packages/atomic-io/tests",
+    "packages/browser-cookies/tests",
+    "packages/content-extract/tests",
     "packages/convert-md/tests",
+    "packages/dom-schema/tests",
+    "packages/duckdb-sidecar/tests",
     "packages/git-porcelain/tests",
-    "packages/sqlite-resource/tests",
+    "packages/html-fragment/tests",
     "packages/http-cache/tests",
     "packages/http-fetch/tests",
     "packages/json-in-html/tests",
-    "packages/html-fragment/tests",
-    "packages/record-mine/tests",
-    "packages/browser-cookies/tests",
-    "packages/content-extract/tests",
-    "packages/timefmt/tests",
-    "packages/settings-base/tests",
-    "packages/plugin-surface/tests",
-    "packages/llm-wobble/tests",
+    "packages/lean-wire/tests",
     "packages/llm-cache/tests",
-    "packages/any-browser/tests",
+    "packages/llm-wobble/tests",
+    "packages/managed-region/tests",
+    "packages/mcp-result-wire/tests",
+    "packages/page-tsv/tests",
+    "packages/plugin-surface/tests",
+    "packages/record-mine/tests",
+    "packages/settings-base/tests",
+    "packages/sqlite-resource/tests",
+    "packages/timefmt/tests",
 ]
 # `-m "not browser"` deselects the real-launch smoke by default: nothing in the
 # ordinary gate launches a real engine (that needs a Chromium binary). The

@@ -125,3 +125,28 @@ Each is pinned by a test named for the HARM in `tests/test_envelope_guards.py`, 
 **Correcting the record on the consumer claim.** a2web's own backlog said this debt "affects a2kay today". Verified false: a2kay imports `page_tsv.Page` as a TYPE in three routers and nothing else — its CLI renders compact JSON explicitly, and its docstring says "Token-lean `page-tsv`/TSV type-routing is a later enhancement". No a2kay code path reaches the defective encoder, so nothing shipped wrong. What was true is that a2kay is PRIMED to turn it on, and these four are exactly what would have bitten at that moment.
 
 Bytes change, so a consumer with golden wire fixtures must re-capture — see `packages/page-tsv/CHANGELOG.md` for the per-change migration. Every change removes output that was wrong; nothing previously correct is dropped. |
+| 76 | 2026-08-01 | delivery | lean-wire | lean-wire-v0.2.0 | a2web |  | The root cause under 0075, promoted one level down to its right owner.
+
+`encode_tsv(rows, *, columns)` made the header the CALLER's problem. Three callers took it up — `page_tsv.render._derive_columns`, `page_tsv.page._item_columns`'s fallback, and `a2web.wire._derive_columns` — and all three shipped the same bug: they read `rows[0]` as the schema. Rule of three, on a defect rather than a shape.
+
+That is the SEAM loop's bugfix trigger, and it passes the one-question test cleanly. The docs did not mislead anyone; `columns` is documented exactly right. Three competent callers got hurt anyway, because the signature asks a question ("what are the columns?") whose only correct general answer the codec is better placed to give than any caller: rows are heterogeneous by construction the moment a producer prunes empties, so the header must be the UNION of every row's keys, and nothing but the encoder sees all the rows at once. Reading harder would not have saved the fourth consumer either. So the lesson promotes.
+
+`columns` stays, and stays authoritative when passed — the type-driven caller has a real, stated requirement for declared field order over a set of rows that may not populate every field (`Page[T]` resolving `T.model_fields`). Narrowing that away would have been the amputation the loop warns about. What changes is the DEFAULT: omit it and get the union.
+
+Verified by execution in both directions. Reverting `derive_columns`'s body to `rows[0]` — a targeted patch, asserted present before applying, so the reversion could not be a silent no-op — fails 7 tests across BOTH packages. That is the real evidence: page-tsv's own guards now depend on lean-wire's implementation, so there is one source of truth rather than two agreeing by coincidence.
+
+page-tsv-v0.2.1 rides along: three hand-rolled derivations deleted, dependency floor `lean-wire` -> `lean-wire>=0.2`. No byte change on that side; 0075 already fixed the behaviour, this removes the duplication. |
+| 77 | 2026-08-01 | verification | shelf |  | a2web | pass | `make check` was not running 8 of 26 package test suites. Found by accident, while promoting 0076: six new `lean-wire` tests collected fine when that directory was targeted (22 tests) and the ROOT collection count did not move (472/474) with or without them.
+
+Root cause: `testpaths` in the root `pyproject.toml` is a hand-maintained list, and pytest is silent about a package that is simply not in it. Absent: a2effect (12 test files), atomic-io, dom-schema, duckdb-sidecar, lean-wire, managed-region, mcp-result-wire, page-tsv. **174 tests running in no gate at all.**
+
+Measured impact of the fix, which is the honest size of what was invisible:
+
+  gate           472 passed  ->  649 passed
+  coverage base  2610 stmts  ->  3544 stmts   (934 statements were outside the measurement entirely)
+
+All 174 pass, so nothing had shipped broken — the loss was that nothing would have told us, and a green `make check` was being read as evidence over a third of the tree it never touched. Note this includes `page-tsv`, whose four encoder guards were landed and tagged one commit earlier (0075): they were correct, and they were also not being run by the gate that declared them green.
+
+The list stays hand-maintained (pytest wants literal paths) and is now guarded by `tests/test_gate_covers_every_package.py`, in both directions: a suite on disk but absent from `testpaths`, and a `testpaths` entry naming a directory that no longer exists — pytest is quiet about that one too, and a stale entry makes the list look longer than the coverage it buys. Carries a `_MIN_PACKAGES_WITH_TESTS` floor so the walk cannot pass by finding nothing, and verified by reversion: dropping the two newly-added entries fails it by name.
+
+Same shape as a2web's own `tach.toml` finding — a hand-maintained list of what to check, where a missing entry silently means no contract rather than a failure. Worth watching for a third instance before deciding whether the pattern needs a general answer. |
