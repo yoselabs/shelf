@@ -1,6 +1,6 @@
 [project]
 name = "page-tsv"
-version = "0.1.0"
+version = "0.2.0"
 description = "Type-driven, consumer-aware rendering of tool results — Page[T] + a render(value, *, consumer) seam that compresses scalar tables to lean-wire TSV for an LLM and stays plain JSON for code/machine callers."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]

@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 def _item_columns(page: Page) -> list[str]:
     """Pull the TSV header columns from the resolved item type's ``model_fields``.
 
-    Falls back to the keys of the first item's dump when the type isn't statically
-    resolvable (rare under the type-driven dispatch).
+    Falls back to the UNION of every item's dump keys when the type isn't
+    statically resolvable (rare under the type-driven dispatch).
     """
     items_field = type(page).model_fields.get("items")
     if items_field is not None:
@@ -35,13 +35,18 @@ def _item_columns(page: Page) -> list[str]:
                 if fields is not None:
                     return list(fields.keys())
 
-    # Fallback: read the first item's dump keys.
-    if page.items:
-        first = page.items[0]
-        if hasattr(first, "model_dump"):
-            return list(first.model_dump(mode="json").keys())
-        if isinstance(first, dict):
-            return [str(k) for k in first]
+    # Fallback: the UNION of every item's keys, first-seen order. NOT the first
+    # item's — a serializer that prunes empties emits heterogeneous rows, and
+    # reading one of them as the schema silently deletes the keys it lacked.
+    # See `render._derive_columns` for what that cost in production.
+    columns: dict[str, None] = {}
+    for item in page.items:
+        if hasattr(item, "model_dump"):
+            columns.update(dict.fromkeys(item.model_dump(mode="json")))
+        elif isinstance(item, dict):
+            columns.update(dict.fromkeys(str(k) for k in item))
+    if columns:
+        return list(columns)
     return []
 
 

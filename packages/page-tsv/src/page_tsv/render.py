@@ -64,26 +64,54 @@ def _to_plain(value: Any) -> Any:
 
 
 def _derive_columns(rows: list[Any]) -> list[str]:
-    """Derive TSV header columns from the first row.
+    """TSV header columns: the UNION of every row's keys, in first-seen order.
 
-    Declared model-field order for a ``BaseModel``, key order for a ``dict``.
+    **Not ``rows[0]``.** Rows are heterogeneous by construction — any model that
+    prunes empties (``PruneEmpty``) or elides a field at its default emits rows
+    with different key sets. Deriving the header from the first row alone
+    silently DELETES every key that row happened to lack: no error, no short
+    row, nothing about the output looks wrong. The live case was a severity
+    field elided at ``info`` and present at ``critical``; an info row sorted
+    first produced a table with no severity column, so the loudest signal in the
+    system reached the agent unmarked.
+
+    A ``BaseModel`` row contributes its declared field order (its dump preserves
+    it), so the common all-models case is unchanged. ``encode_tsv`` fills a
+    missing key with an empty cell, so widening never shifts a sparse row.
     """
-    if not rows:
-        return []
-    first = rows[0]
-    if isinstance(first, BaseModel):
-        return list(type(first).model_fields.keys())
-    if isinstance(first, dict):
-        return [str(k) for k in first]
-    return []
+    columns: dict[str, None] = {}  # dict, not set — insertion order is the contract
+    for row in rows:
+        if isinstance(row, BaseModel):
+            columns.update(dict.fromkeys(type(row).model_fields))
+        elif isinstance(row, dict):
+            columns.update(dict.fromkeys(str(k) for k in row))
+    return list(columns)
+
+
+def _is_tsv_shaped(rows: list[Any]) -> bool:
+    """Can ``rows`` become a table at all? Only model- or dict-shaped rows can.
+
+    ``encode_tsv`` raises ``TypeError`` on anything else — the correct contract
+    for a codec, and the reason :func:`encode_envelope` has to ask first.
+    """
+    return bool(rows) and all(isinstance(row, (BaseModel, dict)) for row in rows)
 
 
 def encode_envelope(value: Any, tsv_fields: tuple[str, ...]) -> str:
     """Encode a ``BaseModel`` envelope as JSON with embedded TSV strings.
 
-    Every field stays JSON except those named in ``tsv_fields`` — each of those
-    becomes a single TSV string with a ``_<field>_format = "tsv"`` discriminator
-    alongside it, mirroring the page-tsv shape one level up.
+    Every field named in ``tsv_fields`` becomes a single TSV string with a
+    ``_<field>_format = "tsv"`` discriminator alongside it, mirroring the
+    page-tsv shape one level up. Every other field stays JSON.
+
+    Three things the loop must NOT do, each a defect measured in a live consumer
+    and pinned by ``tests/test_envelope_guards.py``:
+
+    - **resurrect a pruned field** — the tuple is static, the payload is not;
+    - **overwrite an already-encoded string** — a producer may hand over
+      finished TSV;
+    - **let one untabulatable field void the whole envelope** — ``encode_tsv``
+      raises, and unguarded that raise costs every OTHER field its encoding.
     """
     if isinstance(value, BaseModel):
         envelope: dict[str, Any] = dump_model_for_wire(value)
@@ -94,8 +122,28 @@ def encode_envelope(value: Any, tsv_fields: tuple[str, ...]) -> str:
         return _encode_json(value)
 
     for name in tsv_fields:
-        raw = envelope.get(name)
+        if name not in envelope:
+            # PRESENCE GUARD. A conditional the model omitted stays omitted.
+            # Encoding it anyway hands back the bare "\n" marker plus a dead
+            # sidecar key, turning "there is nothing here" into two keys of
+            # noise — once per pruned field, on every healthy response.
+            continue
+        raw = envelope[name]
+        if isinstance(raw, str):
+            # ALREADY-A-STRING GUARD. A producer whose own serializer renders
+            # this field to TSV hands over a finished string, not rows. Falling
+            # through to `[]` replaces populated content with the empty marker,
+            # so the caller is told "we looked and found nothing" about
+            # something that WAS found and encoded one layer down.
+            envelope[f"_{name}_format"] = "tsv"
+            continue
         rows = list(raw) if isinstance(raw, (list, tuple)) else []
+        if rows and not _is_tsv_shaped(rows):
+            # SHAPE GUARD. Leaving a non-tabular field as JSON is the honest
+            # outcome — a list of `[level, text]` pairs is already lean and a
+            # table would need invented positional column names. The point is
+            # that it no longer takes the rest of the envelope down with it.
+            continue
         envelope[name] = encode_tsv(rows, columns=_derive_columns(rows))
         envelope[f"_{name}_format"] = "tsv"
 
