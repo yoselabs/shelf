@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from lean_wire import PruneEmpty, dump_model_for_wire, encode_tsv, prune_dict
+from lean_wire import PruneEmpty, derive_columns, dump_model_for_wire, encode_tsv, prune_dict
 from pydantic import BaseModel, Field
 
 
@@ -119,3 +119,54 @@ def test_dump_model_for_wire_is_json_mode() -> None:
         amount: Decimal
 
     assert dump_model_for_wire(M(amount=Decimal("1.5"))) == {"amount": "1.5"}
+
+
+# --- derive_columns: the header is the union, never one row -------------------
+
+
+def test_derive_columns_unions_every_rows_keys() -> None:
+    """THE defect this function exists to remove.
+
+    Rows are heterogeneous by construction whenever a producer prunes empties,
+    so `rows[0]` is not the schema. Three separate callers hand-rolled this and
+    all three read the first row, silently deleting every key it lacked — no
+    error, no short row, nothing about the output looking wrong.
+    """
+    rows = [{"code": "quiet"}, {"code": "loud", "severity": "critical"}]
+
+    assert derive_columns(rows) == ["code", "severity"]
+
+
+def test_derive_columns_is_first_seen_order_not_sorted() -> None:
+    """Declared field order is the contract; a later row's new key appends."""
+    assert derive_columns([{"b": 1, "a": 2}, {"c": 3, "b": 4}]) == ["b", "a", "c"]
+
+
+def test_derive_columns_of_a_model_row_is_its_declared_order() -> None:
+    """The all-models case is unchanged — a dump preserves declared order, and
+    the union across rows of one type IS that order."""
+
+    class Row(BaseModel):
+        id: int
+        title: str
+
+    assert derive_columns([Row(id=1, title="a"), Row(id=2, title="b")]) == ["id", "title"]
+
+
+def test_derive_columns_of_no_rows_is_empty() -> None:
+    assert derive_columns([]) == []
+
+
+def test_omitting_columns_derives_them_and_widens_sparse_rows() -> None:
+    """A column no row carries renders empty, so widening never shifts values."""
+    rows = [{"code": "quiet"}, {"code": "loud", "severity": "critical"}]
+
+    assert encode_tsv(rows) == "code\tseverity\nquiet\t\nloud\tcritical\n"
+
+
+def test_explicit_columns_still_win_over_the_derived_union() -> None:
+    """The type-driven caller keeps its declared order, including a field every
+    row elided — that is what `columns=` is for and it stays authoritative."""
+    rows = [{"title": "a"}]
+
+    assert encode_tsv(rows, columns=["id", "title"]) == "id\ttitle\n\ta\n"

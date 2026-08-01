@@ -2,7 +2,7 @@ r"""lean-wire — token-lean agent-facing wire payloads.
 
 Two mechanisms, one job (stop a model reading noise instead of data):
 
-- ``encode_tsv(rows, *, columns)`` — a **truly line-oriented** TSV codec. Unlike a
+- ``encode_tsv(rows, *, columns=None)`` — a **truly line-oriented** TSV codec. Unlike a
   stdlib ``csv`` writer, a cell never contains a raw tab or newline, so an agent
   can split the payload on ``\\n`` without a multi-line value tearing one record
   into several (see ``_tsv`` for the escaping contract).
@@ -18,10 +18,11 @@ emits is a breaking (major) change.
 from __future__ import annotations
 
 from lean_wire._prune import PruneEmpty, dump_model_for_wire, prune_dict
-from lean_wire._tsv import encode_tsv
+from lean_wire._tsv import derive_columns, encode_tsv
 
 __all__ = [
     "PruneEmpty",
+    "derive_columns",
     "dump_model_for_wire",
     "encode_tsv",
     "prune_dict",

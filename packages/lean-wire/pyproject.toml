@@ -1,6 +1,6 @@
 [project]
 name = "lean-wire"
-version = "0.1.0"
+version = "0.2.0"
 description = "Token-lean agent-facing wire payloads — a truly line-oriented TSV codec + opt-in empty-field pruning, so a model reads data not noise."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]

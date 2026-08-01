@@ -58,18 +58,59 @@ def _row_cells(row: Any, columns: list[str]) -> list[str]:
     return [_cell(dumped.get(col)) for col in columns]
 
 
-def encode_tsv(rows: list[Any], *, columns: list[str]) -> str:
+def derive_columns(rows: list[Any]) -> list[str]:
+    """TSV header columns for ``rows``: the UNION of their keys, first-seen order.
+
+    **Not ``rows[0]``'s keys.** Rows are heterogeneous by construction whenever a
+    producer prunes empties (:class:`~lean_wire.PruneEmpty`) or elides a field at
+    its default — which key sets a row carries is a property of its *data*, not
+    of its type. Reading one row as the schema therefore silently DELETES every
+    key that row happened to lack: no error, no short row, nothing about the
+    output looks wrong.
+
+    That is not hypothetical. Three separate callers derived columns by hand,
+    all three read ``rows[0]``, and the live symptom was an operator hint eliding
+    ``severity`` at ``info`` and carrying it at ``critical``: an info hint sorted
+    first produced a table with NO severity column, so the loudest signal in the
+    system reached the agent unmarked. The rule lives here now because deriving
+    it is not the caller's job — :func:`encode_tsv` is the only party that knows
+    what a header has to promise.
+
+    A ``BaseModel`` row contributes its declared field order (its dump preserves
+    it), so the all-models case is exactly the declared order it always was.
+    Rows that are neither model nor dict contribute nothing here — they raise in
+    :func:`encode_tsv`, which is where that belongs.
+    """
+    columns: dict[str, None] = {}  # dict, not set — insertion order is the contract
+    for row in rows:
+        if isinstance(row, BaseModel):
+            columns.update(dict.fromkeys(type(row).model_fields))
+        elif isinstance(row, dict):
+            columns.update(dict.fromkeys(str(k) for k in row))
+    return list(columns)
+
+
+def encode_tsv(rows: list[Any], *, columns: list[str] | None = None) -> str:
     r"""Encode ``rows`` as line-oriented TSV with ``columns`` as the header.
 
     ``rows`` items may be pydantic ``BaseModel`` instances or plain dicts.
-    ``columns`` SHOULD come from ``Model.model_fields.keys()`` (declared order)
-    when the caller is type-driven; alphabetical sorting would defeat the point.
-    Output is a header line followed by one line per row, each terminated by
-    ``\\n`` — cells never contain a raw tab or newline (see module docstring).
+
+    Omit ``columns`` to take :func:`derive_columns` — the union of every row's
+    keys, which is what a header has to promise and what a hand-rolled
+    derivation reliably gets wrong. Pass it explicitly when you are type-driven
+    and want the declared field order of a type the rows may not fully populate
+    (``Model.model_fields.keys()``); alphabetical sorting would defeat the point
+    either way.
+
+    A column no row carries renders as an empty cell, so a wider header never
+    shifts a sparse row's values. Output is a header line followed by one line
+    per row, each terminated by ``\\n`` — cells never contain a raw tab or
+    newline (see module docstring).
     """
-    lines = [_COL.join(_escape(c) for c in columns)]
-    lines += [_COL.join(_row_cells(row, columns)) for row in rows]
+    header = derive_columns(rows) if columns is None else columns
+    lines = [_COL.join(_escape(c) for c in header)]
+    lines += [_COL.join(_row_cells(row, header)) for row in rows]
     return _ROW.join(lines) + _ROW
 
 
-__all__ = ["encode_tsv"]
+__all__ = ["derive_columns", "encode_tsv"]

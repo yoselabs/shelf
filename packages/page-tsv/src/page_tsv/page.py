@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
-from lean_wire import encode_tsv
+from lean_wire import derive_columns, encode_tsv
 
 if TYPE_CHECKING:
     from page_tsv.response import Page
@@ -35,19 +35,9 @@ def _item_columns(page: Page) -> list[str]:
                 if fields is not None:
                     return list(fields.keys())
 
-    # Fallback: the UNION of every item's keys, first-seen order. NOT the first
-    # item's — a serializer that prunes empties emits heterogeneous rows, and
-    # reading one of them as the schema silently deletes the keys it lacked.
-    # See `render._derive_columns` for what that cost in production.
-    columns: dict[str, None] = {}
-    for item in page.items:
-        if hasattr(item, "model_dump"):
-            columns.update(dict.fromkeys(item.model_dump(mode="json")))
-        elif isinstance(item, dict):
-            columns.update(dict.fromkeys(str(k) for k in item))
-    if columns:
-        return list(columns)
-    return []
+    # Fallback: `derive_columns` — the union of every item's keys. NOT the first
+    # item's; see its docstring for what reading one row as the schema cost.
+    return derive_columns(list(page.items))
 
 
 def assemble_page_envelope(envelope_no_items: dict[str, Any], rows: list[Any], columns: list[str]) -> str:

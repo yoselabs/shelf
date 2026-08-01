@@ -2,7 +2,7 @@
 name = "page-tsv"
 kind = "any-*"
 tier = "T1"
-release = "page-tsv-v0.2.0"
+release = "page-tsv-v0.2.1"
 capability = "Stop caring how to render a tool result for different readers — Page[T] + a render(value, *, consumer) seam that routes by return type and compresses scalar tables to lean-wire TSV for an LLM while staying plain JSON for code/machine, all from one owner so the formats can't drift."
 implementation = "ours"
 status = "candidate"

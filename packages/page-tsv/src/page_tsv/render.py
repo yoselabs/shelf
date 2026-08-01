@@ -12,7 +12,7 @@ import dataclasses
 import json
 from typing import TYPE_CHECKING, Any, Literal
 
-from lean_wire import dump_model_for_wire, encode_tsv
+from lean_wire import derive_columns, dump_model_for_wire, encode_tsv
 from pydantic import BaseModel
 
 from page_tsv.inference import EncodingPlan, build_encoding_plan
@@ -61,31 +61,6 @@ def _to_plain(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [_to_plain(v) for v in value]
     return value
-
-
-def _derive_columns(rows: list[Any]) -> list[str]:
-    """TSV header columns: the UNION of every row's keys, in first-seen order.
-
-    **Not ``rows[0]``.** Rows are heterogeneous by construction — any model that
-    prunes empties (``PruneEmpty``) or elides a field at its default emits rows
-    with different key sets. Deriving the header from the first row alone
-    silently DELETES every key that row happened to lack: no error, no short
-    row, nothing about the output looks wrong. The live case was a severity
-    field elided at ``info`` and present at ``critical``; an info row sorted
-    first produced a table with no severity column, so the loudest signal in the
-    system reached the agent unmarked.
-
-    A ``BaseModel`` row contributes its declared field order (its dump preserves
-    it), so the common all-models case is unchanged. ``encode_tsv`` fills a
-    missing key with an empty cell, so widening never shifts a sparse row.
-    """
-    columns: dict[str, None] = {}  # dict, not set — insertion order is the contract
-    for row in rows:
-        if isinstance(row, BaseModel):
-            columns.update(dict.fromkeys(type(row).model_fields))
-        elif isinstance(row, dict):
-            columns.update(dict.fromkeys(str(k) for k in row))
-    return list(columns)
 
 
 def _is_tsv_shaped(rows: list[Any]) -> bool:
@@ -144,7 +119,7 @@ def encode_envelope(value: Any, tsv_fields: tuple[str, ...]) -> str:
             # table would need invented positional column names. The point is
             # that it no longer takes the rest of the envelope down with it.
             continue
-        envelope[name] = encode_tsv(rows, columns=_derive_columns(rows))
+        envelope[name] = encode_tsv(rows)
         envelope[f"_{name}_format"] = "tsv"
 
     return _encode_json(envelope)
@@ -161,7 +136,7 @@ def encode_page_tsv_dict(payload: dict[str, Any]) -> str:
     items = payload.get("items")
     rows = list(items) if isinstance(items, (list, tuple)) else []
     envelope_no_items = {k: v for k, v in payload.items() if k != "items"}
-    return assemble_page_envelope(envelope_no_items, rows, _derive_columns(rows))
+    return assemble_page_envelope(envelope_no_items, rows, derive_columns(rows))
 
 
 def render_plain(payload: Any, plan: EncodingPlan) -> str:
@@ -172,7 +147,7 @@ def render_plain(payload: Any, plan: EncodingPlan) -> str:
     """
     if plan.kind == "tsv":
         rows = list(payload) if isinstance(payload, (list, tuple)) else []
-        return encode_tsv(rows, columns=_derive_columns(rows))
+        return encode_tsv(rows)
     if plan.kind == "page-tsv":
         if isinstance(payload, dict):
             return encode_page_tsv_dict(payload)
@@ -225,7 +200,7 @@ def render(value: Any, consumer: Consumer, *, plan: EncodingPlan | None = None) 
 
     if plan.kind == "tsv":
         rows = list(value) if isinstance(value, (list, tuple)) else []
-        return Rendered(encode_tsv(rows, columns=_derive_columns(rows)), "tsv", value)
+        return Rendered(encode_tsv(rows), "tsv", value)
 
     if plan.kind == "page-tsv":
         if not isinstance(value, Page):
@@ -260,7 +235,7 @@ def render_execute(value: Any) -> Rendered:
     if isinstance(structured, (list, tuple)) and structured and _is_flat_record(structured[0]):
         try:
             rows = list(structured)
-            text = encode_tsv(rows, columns=_derive_columns(rows))
+            text = encode_tsv(rows)
             return Rendered(text, "tsv", value, structured=structured)
         except Exception:  # noqa: BLE001, S110 -- non-uniform past the head → JSON fallback
             pass

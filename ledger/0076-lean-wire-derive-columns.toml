@@ -1,0 +1,17 @@
+seq = 76
+date = "2026-08-01"
+event = "delivery"
+software = "lean-wire"
+release = "lean-wire-v0.2.0"
+actor = "a2web"
+note = """The root cause under 0075, promoted one level down to its right owner.
+
+`encode_tsv(rows, *, columns)` made the header the CALLER's problem. Three callers took it up — `page_tsv.render._derive_columns`, `page_tsv.page._item_columns`'s fallback, and `a2web.wire._derive_columns` — and all three shipped the same bug: they read `rows[0]` as the schema. Rule of three, on a defect rather than a shape.
+
+That is the SEAM loop's bugfix trigger, and it passes the one-question test cleanly. The docs did not mislead anyone; `columns` is documented exactly right. Three competent callers got hurt anyway, because the signature asks a question ("what are the columns?") whose only correct general answer the codec is better placed to give than any caller: rows are heterogeneous by construction the moment a producer prunes empties, so the header must be the UNION of every row's keys, and nothing but the encoder sees all the rows at once. Reading harder would not have saved the fourth consumer either. So the lesson promotes.
+
+`columns` stays, and stays authoritative when passed — the type-driven caller has a real, stated requirement for declared field order over a set of rows that may not populate every field (`Page[T]` resolving `T.model_fields`). Narrowing that away would have been the amputation the loop warns about. What changes is the DEFAULT: omit it and get the union.
+
+Verified by execution in both directions. Reverting `derive_columns`'s body to `rows[0]` — a targeted patch, asserted present before applying, so the reversion could not be a silent no-op — fails 7 tests across BOTH packages. That is the real evidence: page-tsv's own guards now depend on lean-wire's implementation, so there is one source of truth rather than two agreeing by coincidence.
+
+page-tsv-v0.2.1 rides along: three hand-rolled derivations deleted, dependency floor `lean-wire` -> `lean-wire>=0.2`. No byte change on that side; 0075 already fixed the behaviour, this removes the duplication."""

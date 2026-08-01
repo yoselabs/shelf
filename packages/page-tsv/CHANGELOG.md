@@ -2,6 +2,15 @@
 
 Arrow-notation, AI-facing: `old shape ⇒ new shape`. One line per contract-shape change.
 
+## page-tsv-v0.2.1
+
+No contract-shape change and no byte change — recorded because the dependency
+floor moved. The union-columns rule promoted one level down to its right owner:
+`lean-wire` is the only party that knows what a TSV header has to promise, and
+three callers here derived it by hand.
+
+- internal — `render._derive_columns` and `page._item_columns`'s fallback ⇒ `lean_wire.derive_columns`. Dependency floor `lean-wire` ⇒ `lean-wire>=0.2`.
+
 ## page-tsv-v0.2.0
 
 Four encoder corrections. Signatures are unchanged; **the emitted bytes change**, so

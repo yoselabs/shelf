@@ -1757,7 +1757,7 @@ wheels = [
 
 [[package]]
 name = "lean-wire"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/lean-wire" }
 dependencies = [
     { name = "pydantic" },
@@ -2630,7 +2630,7 @@ wheels = [
 
 [[package]]
 name = "page-tsv"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/page-tsv" }
 dependencies = [
     { name = "lean-wire" },
