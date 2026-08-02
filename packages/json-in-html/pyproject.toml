@@ -1,6 +1,6 @@
 [project]
 name = "json-in-html"
-version = "0.1.0"
+version = "0.2.0"
 description = "Extract structured JSON embedded in HTML — LD-JSON, microdata, OpenGraph, framework app-state (__NEXT_DATA__/__NUXT_DATA__), window.<var> assignments, and raw JSON response bodies."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]

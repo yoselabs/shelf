@@ -708,12 +708,93 @@ def is_answer_bearing(payload: JsonPayload) -> bool:
     return False
 
 
+def microdata_to_ld(data: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
+    """Flatten a ``microdata`` payload into LD-JSON shape.
+
+    Microdata comes out of the extractor as
+    ``{"type": ["https://schema.org/Product"], "properties": {"name": ...}}``,
+    which is not the shape anything else in the schema.org world speaks. This
+    maps ``type`` to ``@type`` (last URL segment, so ``Product``) and promotes
+    ``properties`` to direct keys, so ONE walker can consume `ld_json` and
+    `microdata` alike.
+
+    **Why this lives here rather than in each consumer.** The package already
+    decodes this shape internally — `rank_payloads` reaches into
+    ``{"type", "properties"}`` to score a microdata payload — so emitting it
+    raw meant shipping a source every consumer had to write a private adapter
+    for before it was usable. A detector that emits a shape only it can read is
+    emitting half a capability.
+
+    Args:
+        data: The value of a ``source="microdata"`` payload — a list of items or
+            a single item dict.
+
+    Returns:
+        LD-JSON-shaped entries. An item with no recognizable ``type`` still
+        yields its properties, so a partially-marked-up page is not dropped.
+    """
+    items: list[dict[str, Any]] = []
+    if isinstance(data, list):
+        items = [it for it in data if isinstance(it, dict)]
+    elif isinstance(data, dict):
+        items = [data]
+
+    out: list[dict[str, Any]] = []
+    for item in items:
+        raw_types = item.get("type") or item.get("@type")
+        type_value: str | list[str] | None = None
+        if isinstance(raw_types, str):
+            type_value = raw_types.rsplit("/", 1)[-1]
+        elif isinstance(raw_types, list):
+            type_value = [t.rsplit("/", 1)[-1] for t in raw_types if isinstance(t, str)]
+        raw_props = item.get("properties")
+        props: dict[str, Any] = raw_props if isinstance(raw_props, dict) else {}
+        entry: dict[str, Any] = {"@type": type_value} if type_value is not None else {}
+        entry.update(props)
+        out.append(entry)
+    return out
+
+
+def ld_entries(data: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
+    """The entity entries in an LD-JSON payload, whatever container it arrived in.
+
+    LD-JSON reaches a consumer as one of three things and a walker that handles
+    only the obvious one silently sees nothing on the other two: a bare entity
+    object, a list of them, or a single object whose real content is under
+    ``@graph`` (which is what a page emitting several linked entities produces,
+    and therefore what the richest pages emit).
+
+    ``@graph`` is the one that bites: the outer object looks like a valid entity
+    — it has keys, it is a dict — so a consumer that does not know to descend
+    finds one contentless entry rather than none, which reads as "this page has
+    little structured data" rather than as a bug.
+
+    Args:
+        data: A parsed LD-JSON payload value.
+
+    Returns:
+        The dict entries, in document order. Non-dict members are dropped.
+    """
+    out: list[dict[str, Any]] = []
+    if isinstance(data, dict):
+        graph = data.get("@graph")
+        if isinstance(graph, list):
+            out.extend(item for item in graph if isinstance(item, dict))
+        else:
+            out.append(data)
+    elif isinstance(data, list):
+        out.extend(item for item in data if isinstance(item, dict))
+    return out
+
+
 __all__ = [
     "JsonPayload",
     "JsonSource",
     "extract_json_payloads",
     "is_answer_bearing",
     "is_json_content_type",
+    "ld_entries",
+    "microdata_to_ld",
     "parse_json_response",
     "rank_payloads",
     "sniff_json_body",

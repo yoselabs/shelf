@@ -2,7 +2,7 @@
 name = "json-in-html"
 kind = "primitive"
 tier = "T1"
-release = "json-in-html-v0.1.0"
+release = "json-in-html-v0.2.0"
 capability = "Stop caring how a page smuggles its structured data — pull LD-JSON, microdata, OpenGraph, window.__X__ var assignments, and raw JSON bodies out of HTML, ranked by answer-bearing strength."
 implementation = "ours"          # selectolax-backed detectors + ranking; the extraction shape is ours
 status = "candidate"

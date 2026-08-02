@@ -13,6 +13,8 @@ from json_in_html import (
     extract_json_payloads,
     is_answer_bearing,
     is_json_content_type,
+    ld_entries,
+    microdata_to_ld,
     parse_json_response,
     rank_payloads,
     sniff_json_body,
@@ -603,3 +605,70 @@ def test_opengraph_irrelevant_meta_tags_skipped() -> None:
 def test_page_with_no_structured_data_returns_empty() -> None:
     html = "<html><body><p>Just text.</p></body></html>"
     assert extract_json_payloads(html) == []
+
+
+# --- normalizers: the shapes a consumer must not have to re-derive ----------
+
+
+def test_microdata_becomes_ld_shape() -> None:
+    payload = [
+        {
+            "type": ["https://schema.org/Product"],
+            "properties": {"name": "Smartmi Fan 3", "offers": {"price": "3690"}},
+        }
+    ]
+    # `@type` stays a LIST for a list input. extruct always emits `type` as a
+    # list, so collapsing a one-element list to a scalar would be this function
+    # inventing a distinction the source does not make — and a consumer
+    # branching on `isinstance(t, str)` would then behave differently for a
+    # one-type page than a two-type one. Scalar in, scalar out; list in, list out.
+    assert microdata_to_ld(payload) == [{"@type": ["Product"], "name": "Smartmi Fan 3", "offers": {"price": "3690"}}]
+
+
+def test_microdata_keeps_a_multi_type_item_as_a_list() -> None:
+    payload = [{"type": ["https://schema.org/Product", "https://schema.org/Offer"], "properties": {"name": "x"}}]
+    assert microdata_to_ld(payload) == [{"@type": ["Product", "Offer"], "name": "x"}]
+
+
+def test_microdata_without_a_type_still_yields_its_properties() -> None:
+    """A partially-marked-up page is not dropped."""
+    assert microdata_to_ld([{"properties": {"name": "x"}}]) == [{"name": "x"}]
+
+
+def test_microdata_accepts_a_single_item_dict() -> None:
+    assert microdata_to_ld({"type": "https://schema.org/Recipe", "properties": {"name": "r"}}) == [{"@type": "Recipe", "name": "r"}]
+
+
+def test_microdata_normalizer_is_not_a_passthrough() -> None:
+    """Anti-vacuity: the raw shape must NOT survive the call.
+
+    Without this, a `microdata_to_ld` that returned its input unchanged would
+    satisfy every "has the right keys" assertion a careless test might make.
+    """
+    raw = {"type": ["https://schema.org/Product"], "properties": {"name": "x"}}
+    (converted,) = microdata_to_ld(raw)
+    assert "type" not in converted
+    assert "properties" not in converted
+
+
+def test_ld_entries_descends_into_at_graph() -> None:
+    """The container that bites.
+
+    The outer object looks like a valid entity, so a consumer that does not
+    descend finds ONE contentless entry rather than none — which reads as "this
+    page has little structured data" rather than as a bug.
+    """
+    data = {"@context": "https://schema.org", "@graph": [{"@type": "Article"}, {"@type": "Person"}]}
+    assert ld_entries(data) == [{"@type": "Article"}, {"@type": "Person"}]
+
+
+def test_ld_entries_passes_a_bare_entity_through() -> None:
+    assert ld_entries({"@type": "Article", "headline": "x"}) == [{"@type": "Article", "headline": "x"}]
+
+
+def test_ld_entries_flattens_a_list() -> None:
+    assert ld_entries([{"@type": "Article"}, {"@type": "Person"}]) == [{"@type": "Article"}, {"@type": "Person"}]
+
+
+def test_ld_entries_drops_non_dict_members() -> None:
+    assert ld_entries([{"@type": "Article"}, "junk", 7]) == [{"@type": "Article"}]
