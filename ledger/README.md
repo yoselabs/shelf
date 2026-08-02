@@ -181,3 +181,14 @@ Guarded by `tests/test_catalog_release_is_current.py`, asserted against `pyproje
 Writing the guard's reverse direction found more. `a2effect` had NO catalog entry — the only package on the shelf a consumer could not discover — despite being tagged v0.1.0 and consumed DIRECTLY by a2web since the a2kit sunset. Cataloguing it then failed the pre-existing orphan guard: it had no use-case either, because before the sunset it arrived transitively through a2kit and nobody wrote one. That is not cosmetic — with no active use-case, Article VIII's retention claim did not cover it, and the orphan guard read it as a decay candidate. Both added.
 
 Four checks, all with population floors: entries >= 20, every entry names a real package, every package has an entry, every release matches its version. |
+| 80 | 2026-08-02 | delivery | lean-wire | lean-wire-v0.3.0 | a2web |  | `_is_empty` made public as `is_empty`. Four lines; the reason is the interesting part.
+
+`prune_dict` is the WHOLE-DICT operation, and some callers need the PREDICATE instead. A serializer that regroups a subset of keys under a nested object, or exempts one field from the rule, cannot express itself as "prune this dict" — so it writes its own emptiness test, right next to the `prune_dict` import it never calls.
+
+a2web had exactly that shape: `models._prune_wire` regroups debug fields and scopes an omit-when-False to `retrieval_incomplete`, so it inlined `value is None or value == "" or value == [] or value == {}` while importing `prune_dict` at `wire.py:64`, re-exporting it at `:74`, and calling it from nowhere in the entire repo. Three answers to "is this field empty?" and nothing comparing them.
+
+They AGREED on a2web's types, and that is the finding rather than a reprieve: nothing compared them, so the day they stopped agreeing there would have been no signal at all. And they were never the same test — `value == []` is an equality against a literal, `is_empty` is isinstance-plus-length, and they diverge on any type with a custom `__eq__`. A latent divergence between two implementations of one rule is the shape, whether or not today's inputs happen to hit it.
+
+Pinned by a test asserting `prune_dict`'s survivors are exactly the non-`is_empty` keys, so the two cannot drift into being two rules — plus the falsy-value cases (`0`, `False`, `frozenset()`, `()` are all NON-empty) that make the marker spec's boundary explicit rather than incidental.
+
+Additive: `_is_empty` had no external callers by construction (leading underscore), so nothing breaks. a2web deletes its inline copy and the dead `prune_dict` re-export in the same session. |

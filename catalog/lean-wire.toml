@@ -2,7 +2,7 @@
 name = "lean-wire"
 kind = "primitive"
 tier = "T0"
-release = "lean-wire-v0.2.0"
+release = "lean-wire-v0.3.0"
 capability = "Stop caring how to serialize agent-facing rows without wasting tokens or tearing records — a truly line-oriented TSV codec (a cell never holds a raw tab/newline, unlike stdlib csv) plus opt-in empty-field pruning that keeps informative falsy values."
 implementation = "ours"
 status = "candidate"

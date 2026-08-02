@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from lean_wire import PruneEmpty, derive_columns, dump_model_for_wire, encode_tsv, prune_dict
+from lean_wire import PruneEmpty, derive_columns, dump_model_for_wire, encode_tsv, is_empty, prune_dict
 from pydantic import BaseModel, Field
 
 
@@ -170,3 +170,34 @@ def test_explicit_columns_still_win_over_the_derived_union() -> None:
     rows = [{"title": "a"}]
 
     assert encode_tsv(rows, columns=["id", "title"]) == "id\ttitle\n\ta\n"
+
+
+def test_is_empty_is_public_and_matches_prune_dict() -> None:
+    """The predicate and the whole-dict operation must not be two rules.
+
+    `is_empty` was promoted from `_is_empty` because a caller that regroups or
+    exempts keys cannot express itself as "prune the dict" and ends up writing
+    its own emptiness test beside the `prune_dict` import — which is exactly
+    what a2web did. This asserts the two stay one rule.
+    """
+    payload = {
+        "none": None,
+        "empty_str": "",
+        "empty_list": [],
+        "empty_dict": {},
+        "zero": 0,
+        "false": False,
+        "empty_frozenset": frozenset(),
+        "text": "x",
+    }
+    survivors = set(prune_dict(payload))
+    assert survivors == {k for k, v in payload.items() if not is_empty(v)}
+
+
+def test_is_empty_keeps_informative_falsy_values() -> None:
+    """`0` and `False` are DATA. Only the four empty containers plus None go."""
+    assert is_empty(None) and is_empty("") and is_empty([]) and is_empty({})
+    assert not is_empty(0)
+    assert not is_empty(False)
+    assert not is_empty(frozenset()), "an empty frozenset is not one of the four literal containers"
+    assert not is_empty(()), "an empty tuple is not one of the four either"

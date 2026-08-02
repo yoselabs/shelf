@@ -25,11 +25,23 @@ from typing import Any
 from pydantic import BaseModel, SerializerFunctionWrapHandler, model_serializer
 
 
-def _is_empty(value: Any) -> bool:
+def is_empty(value: Any) -> bool:
     """Empty per the marker spec: ``None`` / ``""`` / ``[]`` / ``{}``.
 
     Non-empty: ``0``, ``False``, ``Decimal(0)``, empty ``frozenset``, etc. Only
     the four literal empty containers + ``None`` qualify.
+
+    Public because ``prune_dict`` is the whole-dict operation and some callers
+    need the PREDICATE: a serializer that regroups some keys, or exempts one
+    field from the rule, cannot express itself as "prune the dict" and ends up
+    writing its own emptiness test beside the import. a2web had exactly that —
+    ``value is None or value == "" or value == [] or value == {}`` inline, next
+    to a ``prune_dict`` import it never called. The two agreed on that
+    consumer's types, which is the problem: nothing compared them, so the day
+    they stopped agreeing there would have been no signal. Note they were never
+    the same test — ``value == []`` is an equality against a literal, this is an
+    isinstance-plus-length check, and they diverge on any type with a custom
+    ``__eq__``.
     """
     if value is None:
         return True
@@ -38,7 +50,7 @@ def _is_empty(value: Any) -> bool:
 
 def prune_dict(payload: dict[str, Any]) -> dict[str, Any]:
     """Drop empty values from the top level of ``payload``. Non-recursive by design."""
-    return {k: v for k, v in payload.items() if not _is_empty(v)}
+    return {k: v for k, v in payload.items() if not is_empty(v)}
 
 
 class PruneEmpty(BaseModel):
@@ -77,4 +89,4 @@ def dump_model_for_wire(model: BaseModel) -> dict[str, Any]:
     return model.model_dump(mode="json")
 
 
-__all__ = ["PruneEmpty", "dump_model_for_wire", "prune_dict"]
+__all__ = ["PruneEmpty", "dump_model_for_wire", "is_empty", "prune_dict"]
