@@ -274,6 +274,80 @@ async def test_breaker_open_returns_connection_error(monkeypatch: Any) -> None:
     assert result.verdict is FetchVerdict.connection_error
 
 
+class _CountingBreaker:
+    """A breaker that records what its context actually SAW.
+
+    The pre-existing `_FakeBreaker` asserted only that `__aenter__` ran. That is
+    the whole reason the defect survived: entering a breaker is not using one.
+    What decides whether a real breaker ever opens is the exception type reaching
+    `__aexit__`, and nothing looked at it.
+    """
+
+    def __init__(self) -> None:
+        self.failures = 0
+        self.calls = 0
+
+    async def __aenter__(self) -> Self:
+        self.calls += 1
+        return self
+
+    async def __aexit__(self, exc_type: object, *_: object) -> bool:
+        if exc_type is not None:
+            self.failures += 1
+        return False
+
+
+async def test_a_transport_failure_is_recorded_by_the_breaker(monkeypatch: Any) -> None:
+    """The defect. `_do` maps every transport error to a verdict and returns
+    normally, so the breaker context used to exit cleanly and could never open.
+    """
+    _patch_session(monkeypatch, ce.Timeout("slow"))
+    breaker = _CountingBreaker()
+    result = await fetch_bytes("https://example.com/", breaker=breaker)
+    assert result.verdict is FetchVerdict.timeout  # the caller still sees a verdict, not a raise
+    assert breaker.calls == 1
+    assert breaker.failures == 1
+
+
+async def test_a_served_response_is_not_recorded_by_the_breaker(monkeypatch: Any) -> None:
+    """The anti-vacuity half, and a real policy statement.
+
+    A `404` and a `429` are the SERVER ANSWERING — the host is up. Counting them
+    would let one missing URL take a healthy host out of service for every other
+    URL on it, so a breaker that trips on everything is a different bug from a
+    breaker that trips on nothing. Without this test, "raise unconditionally"
+    would pass the test above.
+    """
+    for status, verdict in ((200, FetchVerdict.ok), (404, FetchVerdict.not_found), (429, FetchVerdict.rate_limited)):
+        _patch_session(monkeypatch, _FakeResponse(status_code=status))
+        breaker = _CountingBreaker()
+        result = await fetch_bytes("https://example.com/", breaker=breaker)
+        assert result.verdict is verdict
+        assert breaker.calls == 1
+        assert breaker.failures == 0, f"a {status} must not count against the breaker"
+
+
+async def test_the_sentinel_never_escapes(monkeypatch: Any) -> None:
+    """`fetch_bytes` promises it never raises on a routine failure.
+
+    The fix carries the failure into the breaker by raising, so the contract is
+    only intact if that raise is caught on the way out — including when the
+    breaker's own `__aexit__` re-raises rather than swallowing.
+    """
+
+    class _ReRaising(_CountingBreaker):
+        async def __aexit__(self, exc_type: object, *_: object) -> bool:
+            if exc_type is not None:
+                self.failures += 1
+            return False  # propagate
+
+    _patch_session(monkeypatch, ce.ConnectionError("down"))
+    breaker = _ReRaising()
+    result = await fetch_bytes("https://example.com/", breaker=breaker)
+    assert result.verdict is FetchVerdict.connection_error
+    assert breaker.failures == 1
+
+
 async def test_cookies_not_in_outcome_diagnostic_repr(monkeypatch: Any) -> None:
     _patch_session(monkeypatch, _FakeResponse())
     result = await fetch_bytes("https://example.com/", cookies={"sid": "supersecret"})

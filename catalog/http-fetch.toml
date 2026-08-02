@@ -2,7 +2,7 @@
 name = "http-fetch"
 kind = "primitive"
 tier = "T1"
-release = "http-fetch-v0.2.0"
+release = "http-fetch-v0.3.0"
 capability = "Stop caring about curl_cffi session plumbing — one GET with browser TLS impersonation, conditional GET, and closed-verdict error mapping."
 implementation = "ours"          # a thin surface over curl_cffi; the impersonation + verdict mapping is ours
 status = "candidate"

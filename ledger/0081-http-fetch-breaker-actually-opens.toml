@@ -1,0 +1,21 @@
+seq = 81
+date = "2026-08-02"
+event = "delivery"
+software = "http-fetch"
+release = "http-fetch-v0.3.0"
+actor = "a2web"
+note = """The injected circuit breaker never opened. Not "rarely" — never, since the package was promoted.
+
+`fetch_bytes` runs its work inside `async with breaker`, and a circuit breaker counts what RAISES inside its context. `_do` never raises: its whole contract is that it maps every transport failure to a `FetchVerdict` and returns normally. So the breaker's `__aexit__` saw `exc_type=None` on every single call, closed cleanly, and could not accumulate a failure. Measured against a real `purgatory` breaker rather than reasoned about: five consecutive connection failures against a dead host, `default_threshold=2`, left it `state=closed` `failure_count=0`.
+
+**The two halves each looked right in isolation.** `_do`'s never-raises contract is correct and deliberate — it is why `fetch_bytes` is pleasant to call. The breaker injection is correct and deliberate — routing policy stays in the consumer. The defect lives only in their composition, which is exactly the seam nobody owns: the package author sees a breaker faithfully entered and exited, the consumer sees a `breaker=` parameter accepted. Both are true. The breaker was a decoration.
+
+**What the existing test asserted, and why it could not catch this.** `test_breaker_wraps_fetch` checked `breaker.entered is True`. Entering a breaker is not using one — what decides whether a breaker ever opens is the exception type reaching `__aexit__`, and nothing anywhere looked at it. The fake breaker's `__aexit__` took `*args: object` and returned `None`, discarding the one value that mattered. This is the same shape as the catalog `release` field (ledger 0079) and this repo's `testpaths` (0077): a check that reads green while verifying nothing, because it measures the thing NEXT TO the thing.
+
+Fix: run `_do` inside the breaker and raise a private sentinel when the verdict is a transport failure, caught immediately outside so `fetch_bytes` still never raises. The caller cannot observe the sentinel, including when the breaker's own `__aexit__` propagates rather than swallowing (tested).
+
+**Which verdicts count is a policy decision, stated rather than assumed.** `timeout` / `connection_error` / `dns_error` / `proxy_unavailable` trip it. `not_found` (404) and `rate_limited` (429) do NOT — those are the server ANSWERING, the host is up, and counting them would take a healthy host out of service for every other URL on it because one URL is missing. A breaker that trips on everything is a different bug from a breaker that trips on nothing, so the 404/429 case is a test in its own right: without it, "raise unconditionally" would pass the failure test.
+
+Consumer impact is real and intended: a host that is genuinely down now short-circuits to `connection_error` instead of being re-dialled every call. Nothing changes for callers passing no breaker.
+
+Found while evaluating a2web's `repay-the-shelf-debt` §7.1, whose stated payoff for routing the jina tier through `fetch_bytes` was that it "gains the circuit breaker". Verifying what it would gain is what surfaced that there was nothing to gain. a2web's CLAUDE.md has stated "`purgatory` for circuit breakers (per-host, per-proxy, global)" throughout — a load-bearing claim with, until now, zero enforcement anywhere in either repo."""

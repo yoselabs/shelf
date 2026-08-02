@@ -17,6 +17,7 @@ from curl_cffi.requests import exceptions as ce
 from .models import FetchOutcome, FetchVerdict
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
     from contextlib import AbstractAsyncContextManager
 
 _DEFAULT_IMPERSONATE = "chrome120"
@@ -57,8 +58,70 @@ def _status_to_verdict(status: int) -> FetchVerdict:
     return FetchVerdict.ok
 
 
+class _TransportFailureError(Exception):
+    """Private sentinel — carries a transport failure INTO the breaker context.
+
+    Never escapes `fetch_bytes`; see the comment at the raise site.
+    """
+
+
+#: Verdicts that count as a failure against the injected circuit breaker.
+#:
+#: Transport failures only. A `404` and a `429` are the SERVER ANSWERING — the host
+#: is up and reachable, and tripping a per-host breaker on them would take a healthy
+#: host out of service because one URL is missing. `connection_error` is included
+#: even though `_status_to_verdict` also produces it for a 5xx: a 5xx is exactly the
+#: case a breaker exists for.
+_BREAKER_TRIPPING = frozenset(
+    {
+        FetchVerdict.timeout,
+        FetchVerdict.connection_error,
+        FetchVerdict.dns_error,
+        FetchVerdict.proxy_unavailable,
+    }
+)
+
+
 def _failure(url: str, verdict: FetchVerdict) -> FetchOutcome:
     return FetchOutcome(body=b"", content_type="", status_code=0, final_url=url, headers={}, verdict=verdict)
+
+
+async def _through_breaker(
+    url: str,
+    do: Callable[[], Awaitable[FetchOutcome]],
+    breaker: AbstractAsyncContextManager[object],
+) -> FetchOutcome:
+    """Run `do` inside `breaker`, letting the breaker SEE a transport failure.
+
+    **The breaker only counts what raises inside its context.** `do` never raises
+    — it maps every transport failure to a `FetchVerdict` and returns normally —
+    so before 2026-08-02 the breaker exited cleanly on every call and could not
+    open. Five consecutive connection failures against a dead host, with
+    `default_threshold=2`, left a real `purgatory` breaker `closed` with
+    `failure_count=0`: measured, not reasoned about. Every consumer passing
+    `breaker=` was carrying a decoration.
+
+    Raising a private sentinel is what lets the breaker record the failure
+    without breaking `fetch_bytes`'s never-raises contract: it is caught here and
+    the real `FetchOutcome` is returned. The caller cannot observe it — including
+    when the breaker's own `__aexit__` propagates rather than swallowing.
+    """
+    outcome: FetchOutcome | None = None
+    try:
+        async with breaker:
+            outcome = await do()
+            if outcome.verdict in _BREAKER_TRIPPING:
+                # The raise IS the mechanism here — moving it
+                # into a helper would put it outside the breaker context, which
+                # is exactly the bug being fixed.
+                raise _TransportFailureError  # noqa: TRY301
+    except _TransportFailureError:
+        if outcome is None:  # pragma: no cover — set immediately before the raise
+            return _failure(url, FetchVerdict.connection_error)
+        return outcome
+    except Exception:  # noqa: BLE001 — the breaker is duck-typed; any open/entry error is a connection failure
+        return _failure(url, FetchVerdict.connection_error)
+    return outcome
 
 
 async def fetch_bytes(
@@ -151,9 +214,4 @@ async def fetch_bytes(
 
     if breaker is None:
         return await _do()
-
-    try:
-        async with breaker:
-            return await _do()
-    except Exception:  # noqa: BLE001 — the breaker is duck-typed; any open/entry error is a connection failure
-        return _failure(url, FetchVerdict.connection_error)
+    return await _through_breaker(url, _do, breaker)
