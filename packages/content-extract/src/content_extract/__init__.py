@@ -149,7 +149,14 @@ def _parse_date(value: str | None) -> date | None:
         return None
 
 
-def _extract_sync(html: str, url: str, *, include_links: bool = False) -> ExtractedContent:
+def _extract_sync(
+    html: str,
+    url: str,
+    *,
+    include_links: bool = False,
+    include_comments: bool = False,
+    include_tables: bool = True,
+) -> ExtractedContent:
     """Blocking extraction — never call from async paths directly.
 
     Args:
@@ -157,11 +164,19 @@ def _extract_sync(html: str, url: str, *, include_links: bool = False) -> Extrac
         url: The page's source URL (for relative-link resolution).
         include_links: pass through to :func:`convert_md.convert_html` so
             in-body anchors survive as ``[label](url)`` in ``content_md``.
+        include_comments: pass through — keep the comment/discussion region.
+        include_tables: pass through — keep ``<table>`` content.
 
     Returns:
         The assembled :class:`ExtractedContent`.
     """
-    result = convert_html(html, url=url, include_links=include_links)
+    result = convert_html(
+        html,
+        url=url,
+        include_links=include_links,
+        include_comments=include_comments,
+        include_tables=include_tables,
+    )
     content_md = result.body_markdown
 
     title: str | None = None
@@ -212,7 +227,14 @@ def _extract_sync(html: str, url: str, *, include_links: bool = False) -> Extrac
     )
 
 
-async def extract_markdown(html: str, url: str, *, include_links: bool = False) -> ExtractedContent:
+async def extract_markdown(
+    html: str,
+    url: str,
+    *,
+    include_links: bool = False,
+    include_comments: bool = False,
+    include_tables: bool = True,
+) -> ExtractedContent:
     """Extract page content + metadata, off-thread.
 
     The only public async entry point. Punts the blocking extraction to a worker
@@ -223,11 +245,30 @@ async def extract_markdown(html: str, url: str, *, include_links: bool = False) 
         url: The page's source URL (for relative-link resolution).
         include_links: keep in-body anchors as ``[label](url)`` in ``content_md``
             (passed through to :func:`convert_md.convert_html`). Off by default.
+        include_comments: keep the page's comment/discussion region rather than
+            stripping it as boilerplate. Off by default, which is right for an
+            article and **wrong for a page whose comments ARE the content** — a
+            forum thread, a discussion aggregator, a Q&A answer list. The
+            default there returns the original post alone and silently drops
+            the substance, so a caller reading discussion pages must opt in.
+        include_tables: keep ``<table>`` content. On by default (a data table is
+            usually the answer); a caller that renders its own rows from
+            structured data, or reads pages whose tables are layout, turns it
+            off.
 
     Returns:
         The assembled :class:`ExtractedContent`.
     """
-    return await asyncio.to_thread(partial(_extract_sync, html, url, include_links=include_links))
+    return await asyncio.to_thread(
+        partial(
+            _extract_sync,
+            html,
+            url,
+            include_links=include_links,
+            include_comments=include_comments,
+            include_tables=include_tables,
+        )
+    )
 
 
 # --------------------------------------------------------------------- #

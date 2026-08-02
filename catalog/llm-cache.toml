@@ -2,7 +2,7 @@
 name = "llm-cache"
 kind = "primitive"
 tier = "T1"
-release = "llm-cache-v0.1.1"
+release = "llm-cache-v0.1.2"
 capability = "Stop caring how to cache LLM completions — a sqlite-backed TTL store whose get/put speak anyllm.Completion (a hit is a drop-in for a call: the original cost/tokens/latency ride along), keyed by an opaque (key, model) the caller computes via make_key."
 implementation = "ours"          # cache policy over sqlite-resource + anyllm; the schema + Completion contract is ours
 status = "candidate"

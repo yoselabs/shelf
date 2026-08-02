@@ -227,3 +227,63 @@ def test_malformed_jsonld_is_swallowed() -> None:
     """
     meta = parse_metadata(html)
     assert all(not k.startswith("jsonld[") for k in meta)
+
+
+# --------------------------------------------------------------------- #
+# include_comments / include_tables — pass-through to convert_html
+# --------------------------------------------------------------------- #
+
+
+_COMMENT_PARA = (
+    "The replies here carry the actual answer to the question, going into the "
+    "specific failure mode and how the fix was verified, at enough length that "
+    "the extractor treats the block as genuine content rather than chrome. "
+)
+_THREAD_HTML = f"""
+<html><head><title>Thread</title></head><body><article>
+<h1>Why does the widget stall under load?</h1>
+<p>{_LINK_PARA} I cannot reproduce it locally and would appreciate pointers.</p>
+</article>
+<div class="comments">
+  <div class="comment" id="comment-1"><p>{_COMMENT_PARA} The stall is the
+  connection pool, not the widget.</p></div>
+</div>
+</body></html>
+"""
+
+_TABLE_HTML = f"""
+<html><head><title>Specs</title></head><body><article>
+<h1>Widget Specifications</h1>
+<p>{_LINK_PARA}</p>
+<table><tr><th>Model</th><th>Weight</th></tr><tr><td>A1</td><td>420g</td></tr></table>
+<p>{_LINK_PARA}{_LINK_PARA}</p>
+</article></body></html>
+"""
+
+
+@pytest.mark.asyncio
+async def test_include_comments_reaches_the_extractor() -> None:
+    """A page whose comments ARE the content must be able to keep them.
+
+    Asserted through the async door rather than `convert_html` directly, because
+    the defect this guards against is a knob that exists one layer down and is
+    not plumbed: the caller passes it, nothing rejects it, and the comments are
+    dropped anyway.
+    """
+    kept = await extract_markdown(_THREAD_HTML, "https://x/t", include_comments=True)
+    assert "connection pool" in kept.content_md
+
+
+@pytest.mark.asyncio
+async def test_comments_dropped_by_default() -> None:
+    default = await extract_markdown(_THREAD_HTML, "https://x/t")
+    assert "stall" in default.content_md, "the original post must survive"
+    assert "connection pool" not in default.content_md
+
+
+@pytest.mark.asyncio
+async def test_include_tables_false_reaches_the_extractor() -> None:
+    kept = await extract_markdown(_TABLE_HTML, "https://x/s")
+    assert "420g" in kept.content_md
+    dropped = await extract_markdown(_TABLE_HTML, "https://x/s", include_tables=False)
+    assert "420g" not in dropped.content_md

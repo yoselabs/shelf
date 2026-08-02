@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "a2effect"
+kind = "primitive"
+tier = "T1"
+release = "a2effect-v0.1.0"
+capability = "Stop caring how a failure crosses a process boundary — classify it once as a typed error with a kind, and get a stable wire envelope, a prose rendering, and a translation seam for free."
+implementation = "ours"          # taxonomy + envelope + translate/enrich seams; pydantic-only, framework-free
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Standalone typed-error foundation, adoptable by any framework wanting typed errors on the wire (MCP, FastAPI). Was uncatalogued until 2026-08-02 despite being tagged v0.1.0 and consumed DIRECTLY by a2web since the a2kit sunset — the only package on the shelf a consumer could not discover from the catalog. Found by `tests/test_catalog_release_is_current.py`, added in the same change that introduced it."

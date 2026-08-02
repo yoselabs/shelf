@@ -1,0 +1,17 @@
+seq = 78
+date = "2026-08-02"
+event = "delivery"
+software = "content-extract"
+release = "content-extract-v0.3.0"
+actor = "a2web"
+note = """The shelf gap that had been holding two funnel exemptions open, closed.
+
+a2web bans direct `trafilatura` calls — HTML extraction funnels through this package — with exactly two exemptions, `handlers.reddit` and `handlers.twitter`, whose own table entry read: *"This is a SHELF GAP, not a permanent a2web exception. The fix is to promote the knob into `content_extract` and then delete these entries."* Both handlers pass `include_comments=True`, because on a forum thread or a tweet's reply chain the comments ARE the content, and `extract_markdown` had no such knob. Routing them through the shelf would have dropped the page's substance — a worse regression than the missing links the funnel exists to prevent, which is why the exemptions were honest rather than lazy.
+
+Generic-first, consumer-second (resolution 0010). The knob is not "what reddit needs"; it is that WHICH REGIONS COUNT AS BOILERPLATE IS A PROPERTY OF THE PAGE, not of the extractor. An article's comments are noise; a thread's comments are the answer; a Q&A page's answer list is the entire point. The old default silently returned the original post alone — a question with no answer, presented as the whole page, and indistinguishable to the caller from a thread that genuinely has no replies. `include_tables` is promoted in the same pass for the symmetric reason: both a2web call sites set it False, and a caller that renders its own rows from structured data, or reads pages whose tables are layout rather than data, has the same need.
+
+Two packages, one chain: `convert_md.convert_html` gained both flags (they are trafilatura's own, previously hardcoded at `include_tables=True, include_comments=False`), and `content_extract.extract_markdown` plumbs them through `_extract_sync`. Defaults are unchanged in both, so the change is strictly additive — every existing caller gets identical bytes.
+
+Verified by reversion at BOTH layers, which matters here because a knob that is accepted and not plumbed is the exact defect shape: hardcoding the values back in `convert_md` fails 2 tests; accepting the arguments but dropping them from the `partial(...)` in `content_extract`'s async door fails 2 more. The content-extract tests assert through the async door rather than calling `convert_html` directly, so they cannot pass on a knob that stops one layer short.
+
+Fixtures use the real markup shape trafilatura keys on (a `<div class="comments">` region with id-bearing comment nodes), not an invented one — a synthetic shape the extractor does not recognise would make the tests pass or fail for a reason unrelated to the knob."""

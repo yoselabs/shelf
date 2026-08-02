@@ -150,3 +150,34 @@ All 174 pass, so nothing had shipped broken — the loss was that nothing would 
 The list stays hand-maintained (pytest wants literal paths) and is now guarded by `tests/test_gate_covers_every_package.py`, in both directions: a suite on disk but absent from `testpaths`, and a `testpaths` entry naming a directory that no longer exists — pytest is quiet about that one too, and a stale entry makes the list look longer than the coverage it buys. Carries a `_MIN_PACKAGES_WITH_TESTS` floor so the walk cannot pass by finding nothing, and verified by reversion: dropping the two newly-added entries fails it by name.
 
 Same shape as a2web's own `tach.toml` finding — a hand-maintained list of what to check, where a missing entry silently means no contract rather than a failure. Worth watching for a third instance before deciding whether the pattern needs a general answer. |
+| 78 | 2026-08-02 | delivery | content-extract | content-extract-v0.3.0 | a2web |  | The shelf gap that had been holding two funnel exemptions open, closed.
+
+a2web bans direct `trafilatura` calls — HTML extraction funnels through this package — with exactly two exemptions, `handlers.reddit` and `handlers.twitter`, whose own table entry read: *"This is a SHELF GAP, not a permanent a2web exception. The fix is to promote the knob into `content_extract` and then delete these entries."* Both handlers pass `include_comments=True`, because on a forum thread or a tweet's reply chain the comments ARE the content, and `extract_markdown` had no such knob. Routing them through the shelf would have dropped the page's substance — a worse regression than the missing links the funnel exists to prevent, which is why the exemptions were honest rather than lazy.
+
+Generic-first, consumer-second (resolution 0010). The knob is not "what reddit needs"; it is that WHICH REGIONS COUNT AS BOILERPLATE IS A PROPERTY OF THE PAGE, not of the extractor. An article's comments are noise; a thread's comments are the answer; a Q&A page's answer list is the entire point. The old default silently returned the original post alone — a question with no answer, presented as the whole page, and indistinguishable to the caller from a thread that genuinely has no replies. `include_tables` is promoted in the same pass for the symmetric reason: both a2web call sites set it False, and a caller that renders its own rows from structured data, or reads pages whose tables are layout rather than data, has the same need.
+
+Two packages, one chain: `convert_md.convert_html` gained both flags (they are trafilatura's own, previously hardcoded at `include_tables=True, include_comments=False`), and `content_extract.extract_markdown` plumbs them through `_extract_sync`. Defaults are unchanged in both, so the change is strictly additive — every existing caller gets identical bytes.
+
+Verified by reversion at BOTH layers, which matters here because a knob that is accepted and not plumbed is the exact defect shape: hardcoding the values back in `convert_md` fails 2 tests; accepting the arguments but dropping them from the `partial(...)` in `content_extract`'s async door fails 2 more. The content-extract tests assert through the async door rather than calling `convert_html` directly, so they cannot pass on a knob that stops one layer short.
+
+Fixtures use the real markup shape trafilatura keys on (a `<div class="comments">` region with id-bearing comment nodes), not an invented one — a synthetic shape the extractor does not recognise would make the tests pass or fail for a reason unrelated to the knob. |
+| 79 | 2026-08-02 | verification | shelf |  | a2web |  | The catalog understated six of twenty-six packages, and one was invisible.
+
+Found while bumping `convert-md` for 0078: its catalog `release` said v0.3.0 while v0.8.0 was tagged — five releases behind. Auditing the rest:
+
+    convert-md        catalog v0.3.0   actual v0.8.0
+    content-extract   catalog v0.1.1   actual v0.2.0
+    http-fetch        catalog v0.1.0   actual v0.2.0
+    record-mine       catalog v0.1.0   actual v0.2.0
+    llm-cache         catalog v0.1.1   actual v0.1.2
+    mcp-result-wire   catalog <absent> actual v0.1.0, tagged
+
+The catalog README is the surface a consuming agent reads to decide what to adopt and which tag to pin, so this drifts in one direction and fails quietly: an understated `release` never breaks a build, it just means a consumer pins an older tag, or reads the catalog and concludes a capability it needs does not exist yet. Nobody gets an error; they get an out-of-date shelf. An ABSENT release, as `mcp-result-wire` had, reads exactly like "not released yet".
+
+THIS IS THE THIRD INSTANCE OF ONE SHAPE. First: a2web's `tach.toml` module list — a new package under `packages/` silently gets no boundary contract. Second: this repo's own `testpaths` (ledger 0077) — 8 of 26 package suites ran nowhere. Third: this. At three, the general answer is the rule, not the individual fixes: **a hand-maintained restatement of a fact the repo already knows must be checked against that fact by a test, or it must not be hand-maintained.** All three were one short test away from impossible, and all three survived because the artifact they restate is not the artifact anyone reads.
+
+Guarded by `tests/test_catalog_release_is_current.py`, asserted against `pyproject.toml` rather than `git tag` deliberately: the PROMOTE loop bumps the version and runs `make check` BEFORE tagging (steps 4 then 5), so a tag-based check would fail every release at exactly the moment it must pass, and would be disabled within a week. The version file is the fact; the tag follows it.
+
+Writing the guard's reverse direction found more. `a2effect` had NO catalog entry — the only package on the shelf a consumer could not discover — despite being tagged v0.1.0 and consumed DIRECTLY by a2web since the a2kit sunset. Cataloguing it then failed the pre-existing orphan guard: it had no use-case either, because before the sunset it arrived transitively through a2kit and nobody wrote one. That is not cosmetic — with no active use-case, Article VIII's retention claim did not cover it, and the orphan guard read it as a decay candidate. Both added.
+
+Four checks, all with population floors: entries >= 20, every entry names a real package, every package has an entry, every release matches its version. |

@@ -1,0 +1,26 @@
+seq = 79
+date = "2026-08-02"
+event = "verification"
+software = "shelf"
+release = ""
+actor = "a2web"
+note = """The catalog understated six of twenty-six packages, and one was invisible.
+
+Found while bumping `convert-md` for 0078: its catalog `release` said v0.3.0 while v0.8.0 was tagged — five releases behind. Auditing the rest:
+
+    convert-md        catalog v0.3.0   actual v0.8.0
+    content-extract   catalog v0.1.1   actual v0.2.0
+    http-fetch        catalog v0.1.0   actual v0.2.0
+    record-mine       catalog v0.1.0   actual v0.2.0
+    llm-cache         catalog v0.1.1   actual v0.1.2
+    mcp-result-wire   catalog <absent> actual v0.1.0, tagged
+
+The catalog README is the surface a consuming agent reads to decide what to adopt and which tag to pin, so this drifts in one direction and fails quietly: an understated `release` never breaks a build, it just means a consumer pins an older tag, or reads the catalog and concludes a capability it needs does not exist yet. Nobody gets an error; they get an out-of-date shelf. An ABSENT release, as `mcp-result-wire` had, reads exactly like "not released yet".
+
+THIS IS THE THIRD INSTANCE OF ONE SHAPE. First: a2web's `tach.toml` module list — a new package under `packages/` silently gets no boundary contract. Second: this repo's own `testpaths` (ledger 0077) — 8 of 26 package suites ran nowhere. Third: this. At three, the general answer is the rule, not the individual fixes: **a hand-maintained restatement of a fact the repo already knows must be checked against that fact by a test, or it must not be hand-maintained.** All three were one short test away from impossible, and all three survived because the artifact they restate is not the artifact anyone reads.
+
+Guarded by `tests/test_catalog_release_is_current.py`, asserted against `pyproject.toml` rather than `git tag` deliberately: the PROMOTE loop bumps the version and runs `make check` BEFORE tagging (steps 4 then 5), so a tag-based check would fail every release at exactly the moment it must pass, and would be disabled within a week. The version file is the fact; the tag follows it.
+
+Writing the guard's reverse direction found more. `a2effect` had NO catalog entry — the only package on the shelf a consumer could not discover — despite being tagged v0.1.0 and consumed DIRECTLY by a2web since the a2kit sunset. Cataloguing it then failed the pre-existing orphan guard: it had no use-case either, because before the sunset it arrived transitively through a2kit and nobody wrote one. That is not cosmetic — with no active use-case, Article VIII's retention claim did not cover it, and the orphan guard read it as a decay candidate. Both added.
+
+Four checks, all with population floors: entries >= 20, every entry names a real package, every package has an entry, every release matches its version."""

@@ -2,7 +2,7 @@
 name = "convert-md"
 kind = "composite"               # composes multiple third-party engines behind one surface
 tier = "T2"
-release = "convert-md-v0.3.0"
+release = "convert-md-v0.9.0"
 capability = "Stop caring which engine converts which document format to markdown — from a file path OR an in-memory HTML string; heavy document engines behind an extra."
 implementation = "hybrid-adapter"
 status = "active"

@@ -39,6 +39,8 @@ def convert_html(
     url: str | None = None,
     source_kind: SourceKind = "web_page",
     include_links: bool = False,
+    include_comments: bool = False,
+    include_tables: bool = True,
 ) -> ConversionResult:
     """Convert an in-memory HTML string to Markdown, by source kind.
 
@@ -56,6 +58,18 @@ def convert_html(
             common case); a consumer that reasons over the anchor graph opts in.
             Only affects ``source_kind="web_page"`` (the html2text path always
             preserves links).
+        include_comments: when ``True``, keep the page's comment/discussion
+            region instead of stripping it as boilerplate. Off by default,
+            which is right for an article: comments there are noise. It is
+            **wrong for a page whose comments ARE the content** — a forum
+            thread, a discussion aggregator, a Q&A answer list — where the
+            default silently drops the substance and returns the original post
+            alone. Only affects ``source_kind="web_page"``.
+        include_tables: keep ``<table>`` content in the extracted Markdown. On
+            by default (a data table is usually the answer). A caller renders
+            its own rows from structured data, or is reading a page whose
+            tables are layout rather than data, turns it off. Only affects
+            ``source_kind="web_page"``.
 
     Returns:
         A graded :class:`ConversionResult`. Never raises: if the chain extracts
@@ -65,7 +79,13 @@ def convert_html(
     source_size = len(html.encode("utf-8", errors="replace"))
 
     if source_kind == "web_page":
-        markdown = _extract_trafilatura(html, url=url, include_links=include_links)
+        markdown = _extract_trafilatura(
+            html,
+            url=url,
+            include_links=include_links,
+            include_comments=include_comments,
+            include_tables=include_tables,
+        )
         if markdown.strip():
             return _result(markdown, f"trafilatura@{_ver('trafilatura')}", source_size)
 
@@ -82,8 +102,21 @@ def convert_html(
     )
 
 
-def _extract_trafilatura(html: str, *, url: str | None, include_links: bool = False) -> str:
-    """Run trafilatura on the HTML string (boilerplate-stripped, tables kept)."""
+def _extract_trafilatura(
+    html: str,
+    *,
+    url: str | None,
+    include_links: bool = False,
+    include_comments: bool = False,
+    include_tables: bool = True,
+) -> str:
+    """Run trafilatura on the HTML string, boilerplate-stripped.
+
+    The three ``include_*`` flags are trafilatura's own; they are surfaced
+    rather than fixed because *which* regions count as boilerplate is a
+    property of the page, not of the extractor. The defaults here encode the
+    article case (no comments, keep tables, flatten links).
+    """
     try:
         import trafilatura  # noqa: PLC0415 — lazy import keeps package import cheap
     except ImportError:  # pragma: no cover
@@ -93,8 +126,8 @@ def _extract_trafilatura(html: str, *, url: str | None, include_links: bool = Fa
             html,
             url=url,
             output_format="markdown",
-            include_tables=True,
-            include_comments=False,
+            include_tables=include_tables,
+            include_comments=include_comments,
             include_links=include_links,
         )
         or ""

@@ -2,7 +2,7 @@
 name = "record-mine"
 kind = "primitive"
 tier = "T1"
-release = "record-mine-v0.1.0"
+release = "record-mine-v0.2.0"
 capability = "Stop caring that a listing / index / threaded-discussion page is N repeated records, not one article — locate the dominant repeated-record region a boilerplate-stripper discards, and render it to depth-aware, link-preserving markdown."
 implementation = "ours"          # tree-aware repeated-region detector + depth renderer; the whole shape is ours
 status = "candidate"

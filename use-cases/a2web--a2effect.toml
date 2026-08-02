@@ -1,0 +1,16 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "a2effect"
+why = "a2web must be able to tell a caller WHICH KIND of failure occurred — an unconfigured LLM key is not a bug, and rendering it as one ('Internal error (UnexpectedDefect)') tells an operator to file a report instead of setting a variable. Classifying a failure once and getting a stable wire envelope plus a prose rendering out of it is substrate; a2web keeps only the product half — the tool-boundary conversion in `error_wire.guard_tool` and the middleware that recovers the envelope from `__cause__` on the way out, both of which exist because FastMCP masks a plain exception before middleware can see it."
+needs = "AppError and its `kind` taxonomy, ErrorEnvelope, `quarantine` for turning a non-AppError into a typed UnexpectedDefect, and the translate/enrich seams (`translate.raises_as`, `enrichers.pydantic_validation_error_enricher`) that a2web is evaluating against ~4 hand-written equivalents."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired
+# Was UNRECORDED until 2026-08-02. a2effect became a DIRECT a2web dependency at
+# the a2kit sunset (2026-07-22) — before that it arrived transitively through
+# a2kit, so no use-case was ever written. The consequence was not cosmetic: with
+# no active use-case, Article VIII's retention claim did not cover it, and the
+# orphan guard would have read a2effect as a decay candidate. Surfaced by
+# cataloguing it, which was itself surfaced by the new catalog-release guard.

@@ -606,7 +606,7 @@ wheels = [
 
 [[package]]
 name = "content-extract"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/content-extract" }
 dependencies = [
     { name = "convert-md" },
@@ -623,7 +623,7 @@ requires-dist = [
 
 [[package]]
 name = "convert-md"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/convert-md" }
 dependencies = [
     { name = "html2text" },

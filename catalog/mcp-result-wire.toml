@@ -2,7 +2,7 @@
 name = "mcp-result-wire"
 kind = "any-*"
 tier = "T2"
-release = ""
+release = "mcp-result-wire-v0.1.0"
 capability = "Stop caring how to wire token-lean, projected tool output into a FastMCP server — two middlewares that re-derive the content channel from a per-tool encoding plan (page-tsv) and project/paginate list results, driven by explicit registries not framework metadata."
 implementation = "ours"
 status = "candidate"
