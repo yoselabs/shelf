@@ -207,3 +207,20 @@ Fix: run `_do` inside the breaker and raise a private sentinel when the verdict 
 Consumer impact is real and intended: a host that is genuinely down now short-circuits to `connection_error` instead of being re-dialled every call. Nothing changes for callers passing no breaker.
 
 Found while evaluating a2web's `repay-the-shelf-debt` §7.1, whose stated payoff for routing the jina tier through `fetch_bytes` was that it "gains the circuit breaker". Verifying what it would gain is what surfaced that there was nothing to gain. a2web's CLAUDE.md has stated "`purgatory` for circuit breakers (per-host, per-proxy, global)" throughout — a load-bearing claim with, until now, zero enforcement anywhere in either repo. |
+| 82 | 2026-08-02 | delivery | async-scope | async-scope-v0.1.0 | a2web |  | `ResourceScope` + `memoized` + `lazy` + the `Lazy[T]` alias — promoted from a2web, where they are what survived a2kit's 599-line DI container.
+
+**The assessment said promote ONE of the three candidates a2web offered, and the split is the useful part.**
+
+`scope.py` PROMOTES. Two behaviours that stdlib `AsyncExitStack` deliberately does not have, each stated as a difference rather than a preference: a failing `__aexit__` must not strand the resources beneath it (the stack unwinds through the exception, correct for its contract, wrong when one refusing handle can leak the rest), and `aclose()` must be idempotent (a framework lifespan exit and an explicit teardown path can both fire). Plus the guarantee that is easy to get backwards — record-after-enter — where appending before the await turns a cleanup path into the thing that crashes.
+
+`lazy.py` DECLINES as its own package and rides along inside this one. A `TypeAlias` for `Callable[[], Awaitable[T]]` plus a three-line helper fails DEEP outright: the interface is the same size as the implementation, so a shelf entry would be a name, not a capability. It belongs here because `memoized` RETURNS a `Lazy[T]` — the alias is this package's own vocabulary, not a package.
+
+`cli.field_to_typer_annotation` is a SEPARATE decision, deferred with evidence rather than declined (see below).
+
+**Second-consumer evidence, and it is not hypothetical.** a2kay's `serve.py` hand-rolls the same lifecycle: a `contextlib.AsyncExitStack` for the spoke, then three bare sequential statements — `c.graph.close()`, `c.audit.close()`, `c.search.close()` — outside any try. Read as written, the first one raising strands the other two. That is the exact failure `test_a_failing_close_does_not_strand_the_rest` pins here, and it is the reason this package is not just AsyncExitStack with a different name. Recorded, NOT fixed in this delivery: a2kay's teardown order is a stated invariant ("Invariant D") and re-pointing it at a scope is a change that repo's owner should make deliberately.
+
+**What is deliberately absent.** No registry, no resolution order, no graph. A container exists to resolve an UNKNOWN dependency graph; an application that knows its graph where it writes it — most of them — needed these two behaviours and got a container. If this package ever grows a resolution order, the wrong thing is being solved and the right move is to delete the growth, not to ship v2.
+
+Both load-bearing guarantees reversion-verified: removing the construction lock fails the concurrency test (20 concurrent first-callers, sleep in the factory — an unlocked implementation passes a sequential test, which is why the sleep is there), and moving the append before the await fails the failed-open test.
+
+Caught in passing by the shelf's own gate: `tests/test_gate_covers_every_package.py` (ledger 0077) failed this delivery for a `testpaths` entry the new suite did not have. The guard that exists because 8 of 26 suites once ran nowhere did precisely its job on the first package added after it. |

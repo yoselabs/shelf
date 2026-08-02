@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "a2web"
+software = "async-scope"
+why = "a2web replaced a2kit's 599-line DI container with exactly these two behaviours. Its `Components` graph is six `Lazy[T]` thunks entered into one `ResourceScope` from the FastMCP lifespan, and the cold-start guarantee (`test_cold_start_laziness.py`: a cache-served query resolves neither the browser nor the LLM) is a property of `memoized`, not of a2web. Twenty concurrent cold `query` calls must launch one browser, not twenty."
+needs = "ResourceScope with LIFO teardown, record-after-enter, idempotent aclose, and unwind-past-failure; memoized(factory) -> Lazy[T] with a construction lock; lazy(value) as the test-double seam; the Lazy[T] alias itself."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired

@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "async-scope"
+kind = "primitive"
+tier = "T1"
+release = "async-scope-v0.1.0"
+capability = "Stop hand-rolling async resource teardown — LIFO unwind that never strands what it holds, plus lazy thunks that build at most once under concurrency."
+implementation = "ours"          # stdlib AsyncExitStack is the alternative and is wrong for two named reasons
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2web (`lazy.py` + `scope.py`, what survived a2kit's 599-line DI container). NOT a container: no registry, no resolution order, no graph — if it grows one, the wrong thing is being solved. Second consumer identified in a2kay `serve.py`, which hand-rolls the same lifecycle with AsyncExitStack + three bare `.close()` calls. Born candidate."

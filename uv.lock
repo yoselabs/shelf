@@ -22,6 +22,7 @@ members = [
     "any-browser",
     "anyembed",
     "anyllm",
+    "async-scope",
     "atomic-io",
     "browser-cookies",
     "content-extract",
@@ -214,6 +215,11 @@ requires-dist = [
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.50" },
 ]
 provides-extras = ["anthropic", "openai", "claude-code-sdk"]
+
+[[package]]
+name = "async-scope"
+version = "0.1.0"
+source = { editable = "packages/async-scope" }
 
 [[package]]
 name = "asyncio-atexit"
