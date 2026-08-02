@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pathlib
 
+import pytest
 from record_mine import extract_records
 
 
@@ -285,3 +286,76 @@ def test_captured_arxiv_listing_yields_its_records() -> None:
     assert len(rs.records) >= 25
     joined = " ".join(r.markdown for r in rs.records)
     assert "arxiv.org/abs/" in joined or "/abs/" in joined
+
+
+# --- guard (c): the heading set is `h1`-`h6` OR `[role=heading]` -------------
+#
+# The consumer spec (a2web `openspec/specs/record-extraction/spec.md`, guard
+# (c)) states the set as "`h1`-`h6` or `[role=heading]`". Both spellings have
+# shipped since this package was born, and until now NEITHER was witnessed:
+# deleting the `role` half outright left all 17 tests green.
+#
+# These fixtures are SYNTHETIC on purpose, and the carve-out is narrow. No
+# captured page could be produced: 23 diverse live listing pages were probed
+# (MDN, GOV.UK, Stack Overflow, reddit, HN, W3C WAI, Shopify Polaris, Primer,
+# a11yproject, Apple, GitLab, AWS, Smashing, LinkedIn, Notion, Google
+# Workspace Marketplace, Play, Figma, Mastodon, Google News, DuckDuckGo, Bing,
+# Scholar) and not one carried `role="heading"` on repeated item titles —
+# it is a client-side-framework spelling, so a2web meets it through the
+# BROWSER tier's rendered DOM, not through server HTML. So the synthetic here
+# is not standing in for a live-shape oracle (the captured arXiv listing above
+# holds that job); it controls exactly ONE variable — the heading spelling —
+# against markup shape already proven by `_FLAT_LISTING`.
+#
+# `test_a_non_heading_title_is_rejected` is what makes the above non-vacuous:
+# swap the heading element for a plain `span` and the region disappears, so
+# the parametrised cases are passing BECAUSE of guard (c), not around it.
+
+_NORMATIVE_HEADINGS = (
+    ('<h1 class="t">', "</h1>"),
+    ('<h2 class="t">', "</h2>"),
+    ('<h3 class="t">', "</h3>"),
+    ('<h4 class="t">', "</h4>"),
+    ('<h5 class="t">', "</h5>"),
+    ('<h6 class="t">', "</h6>"),
+    ('<div role="heading" aria-level="2" class="t">', "</div>"),
+)
+
+
+def _card_titled(i: int, open_tag: str, close_tag: str) -> str:
+    return (
+        '<article class="Box-row">'
+        f'<a href="/login?return_to=%2Fowner{i}%2Frepo{i}">Star</a>'
+        f'{open_tag}<a href="/owner{i}/repo{i}">owner{i} / repo{i}</a>{close_tag}'
+        f"<p>A description of repository number {i} explaining what it does.</p>"
+        "</article>"
+    )
+
+
+def _listing_titled(open_tag: str, close_tag: str) -> str:
+    return '<html><body><div class="Box">' + "".join(_card_titled(i, open_tag, close_tag) for i in range(8)) + "</div></body></html>"
+
+
+@pytest.mark.parametrize(("open_tag", "close_tag"), _NORMATIVE_HEADINGS)
+def test_every_normative_heading_spelling_satisfies_the_guard(open_tag: str, close_tag: str) -> None:
+    """Each spelling in the normative set is a heading for guard (c) purposes.
+
+    Dropping one from the implementation drops one of these cases, so the
+    delegated set and the normative set cannot diverge silently.
+    """
+    rs = extract_records(_listing_titled(open_tag, close_tag))
+
+    assert rs is not None, f"{open_tag!r} was not read as a heading"
+    assert len(rs.records) == 8
+    assert rs.records[0].heading_text == "owner0 / repo0"
+    assert rs.records[0].heading_link is not None
+    assert rs.records[0].heading_link[1] == "/owner0/repo0"
+
+
+def test_a_non_heading_title_is_rejected() -> None:
+    """The control. Same markup, same classes, same links — title in a `span`.
+
+    Guard (c) rejects it, which is why the parametrised cases above are
+    evidence: they clear a guard this one cannot.
+    """
+    assert extract_records(_listing_titled('<span class="t">', "</span>")) is None

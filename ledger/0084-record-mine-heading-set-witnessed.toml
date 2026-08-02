@@ -1,0 +1,20 @@
+seq = 84
+date = "2026-08-02"
+event = "verdict"
+software = "record-mine"
+release = "record-mine-v0.2.0"
+actor = "a2web"
+verdict = "kept"
+note = """Guard (c)'s heading set is now witnessed. **No behaviour changed — the reported defect did not exist.**
+
+a2web's `repay-the-shelf-debt` §2 claimed "the shipped detector contradicts a2web's own spec": that `detector.py:62` gates on `h1`-`h6` only, while `openspec/specs/record-extraction/spec.md:15` requires "`h1`-`h6` or `[role=heading]`". Checked before promoting anything, and the claim is false. Line 62 is the `_HEADING_TAGS` **constant**; the **gate** is at `detector.py:183` and `:199`, and both have read `d.tag in _HEADING_TAGS or d.get("role") == "heading"` since the package was born (911a230, 2026-07-08). The task author read the constant and not the call site — the same shape of error as citing a table instead of its consumer.
+
+**What was real is the inverse, and it is worse than the reported bug.** The `role` half was entirely unwitnessed: deleting `or d.get("role") == "heading"` from BOTH sites left all 17 tests green. A capability nothing tests is a capability the next refactor removes for free, and it would have removed it in the direction the a2web spec forbids.
+
+So the delivery is the witness, not the feature: one parametrised case per spelling in the normative set (`h1`-`h6` plus `[role=heading]`), each asserting detection AND the recovered `heading_text`/`heading_link`. Divergence from the normative set now costs a named failing case in each direction — verified by reversion twice: dropping the `role` clause fails exactly the `role` case; dropping `"h4"` from `_HEADING_TAGS` fails exactly the `h4` case (plus three existing tests that use `h4` incidentally).
+
+**The fixtures are synthetic, and the carve-out is narrow enough to state.** No captured page could be produced. 23 diverse live listing pages were probed for `role="heading"` on repeated item titles — MDN, GOV.UK, Stack Overflow, reddit, HN, W3C WAI, Shopify Polaris, Primer, a11yproject, Apple Developer, GitLab, AWS, Smashing, LinkedIn, Notion, Google Workspace Marketplace, Play, Figma, Mastodon, Google News, DuckDuckGo, Bing, Scholar — and **zero** carried it. Two pages carried a single unrelated occurrence. `role="heading"` is a client-side-framework spelling, so a consumer meets it through a BROWSER tier's rendered DOM, essentially never through server HTML. The synthetic therefore is not standing in for a live-shape oracle (the captured arXiv listing already holds that job); it controls exactly one variable — the heading spelling — inside markup shape already proven by `_FLAT_LISTING`.
+
+The non-vacuity control ships with it: the identical listing with the title in a plain `span` yields no region at all, so the parametrised cases pass BECAUSE of guard (c) rather than around it. Without that control the seven cases would be seven ways of asserting that a listing is a listing.
+
+Shelf gate green: 696 passed, 85.90%."""
