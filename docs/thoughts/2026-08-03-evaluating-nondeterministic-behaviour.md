@@ -199,6 +199,39 @@ The decision flipped on that reframing.
 > **Rule: a percentage is meaningless without its denominator. Report the delta
 > against total cost per unit of work.**
 
+**The author violated this rule, in the other direction, four hours after
+writing it.** The competing design — read the page's own JSON-LD instead of
+asking the model to invent an entity block — was reported as costing **"zero
+tokens"**, and that framing survived a findings doc, a commit message and two
+conversation turns.
+
+It is true of *generation* and silent about *transmission*. The declared fields
+land on the wire and the caller, itself an agent paying for context, reads every
+one:
+
+```
+  generation cost   0 tokens
+  wire cost         median 501, mean 704 tokens
+  the answer they accompany   ~155 tokens
+```
+
+So the "free" option was ~4x the answer it rode along with, and on raw
+tokens-per-coverage-point it was WORSE than the LLM block it was beating
+(~280 tokens for +0.152, versus ~704 for +0.083). The correction changed the
+design: the field ships capped, and the cap was then measured
+(coverage saturates at ~20 fields; below that you lose real coverage, above it
+you gain nothing and the bill doubles).
+
+> **Corollary, and it is the sharper half of the rule: name the denominator you
+> are EXCLUDING, not just the one you are using.** "Zero tokens" and "+85%
+> tokens" are the same error — each quotes one stage of a pipeline as though it
+> were the bill. The reliable check is to ask *who pays, and at which stage*, for
+> every stage, before quoting any number.
+
+That this happened to the person who had just written the rule down is the
+argument for the rule being a **checklist item in the workflow** rather than a
+lesson someone is expected to remember.
+
 ### 9. Benefit needs an exchange rate, not a direction
 
 "Does it help?" is unanswerable as a yes/no when the help and the cost are in
