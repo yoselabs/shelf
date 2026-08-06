@@ -116,6 +116,10 @@ Add, as your own section (not inside `bd`'s managed markers):
 
 - The status-mapping table from 1.3, so a future agent doesn't reinvent it per-issue.
 - The `--spec-id` / `--set-metadata` conventions, if adopted.
+- **State the vocabulary plainly: `backlog = kanban = beads`.** A repo that adopts `bd` usually
+  already has "backlog" or "kanban" in its working vocabulary from before — without this line an
+  agent (or a person) goes looking for a separate backlog file or board that doesn't exist, or
+  worse, starts one. One terse line collapses the three terms to the one real mechanism.
 - **An explicit override if the repo does NOT want `bd remember`/`bd prime` for persistent agent
   memory** — `bd init`'s generated block instructs agents to use `bd remember` and NOT use
   memory files, which will conflict with a repo/operator that already has a memory system. State
