@@ -13,7 +13,14 @@ from pathlib import Path
 
 
 def atomic_write_text(path: Path, text: str) -> None:
-    """Atomically write ``text`` to ``path`` (tempfile + fsync + ``os.replace``)."""
+    r"""Atomically write ``text`` to ``path`` (tempfile + fsync + ``os.replace``).
+
+    Bytes on disk are exactly ``text.encode("utf-8")`` — no newline translation happens
+    here. A caller reading the result back with Python's default text mode (e.g.
+    ``path.read_text()``) will still see universal-newline translation applied on
+    *read* (a lone ``\r`` becomes ``\n``); that is standard library behavior, not
+    something this function does or can override.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:

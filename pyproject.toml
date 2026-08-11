@@ -31,6 +31,7 @@ dev = [
     "codespell>=2.3,<3",      # typos in code, docstrings, and docs
     "deptry>=0.20,<1",        # dependency hygiene: unused / missing / transitive
     "pytest-asyncio>=0.24,<1",  # async test support (the first async packages: sqlite-resource, http-*)
+    "hypothesis>=6.100,<7",   # property-based testing — invariant-rich packages get a property suite alongside their example tests, never instead of. See docs/runbooks/property-based-testing.md.
     "browser-cookie3>=0.20,<1",  # browser-cookies' optional [read] engine — installed here so its tests exercise the real reader path (the package itself keeps it optional/lazy)
     "python-docx>=1.1,<2",       # docx WRITER for convert-md's dispatch tests (build a .docx fixture in-test); convert-md itself only READS docx, never writes — so this is test-only, not a package dep
     "convert-md[documents]",     # convert-md's heavy document engines (mammoth/office; docling dropped v0.5.0, pandoc dropped v0.7.0) — moved to the [documents] extra in v0.3.0; installed here so convert-md's dispatch tests still exercise the real engines (base stays HTML-only)
