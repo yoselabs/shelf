@@ -6,27 +6,35 @@ hook paths correctly before anything can depend on its verification.
 Tests-first. `make check` green, whole repo, is Done.
 
 ## 0. Setup
-- [ ] 0.1 Confirm `shelf-efh` has landed and `install.py` verifies liveness.
+- [x] 0.1 Confirm `shelf-efh` has landed and `install.py` verifies liveness. (closed, `db6575f`)
 - [ ] 0.2 Re-scope `shelf-abf` (`bootstrap-target-contract`): `make bootstrap` becomes a caller of
       these operations, not a competing implementation. Update its proposal and its bead's
       dependency direction — it now depends on this change, not the reverse.
 
 ## 1. The operation contract (D3)
-- [ ] 1.1 Failing test per guarantee, against a trivial reference operation, before any real
+- [x] 1.1 Failing test per guarantee, against a trivial reference operation, before any real
       operation exists: idempotent, precondition-checked, effect-asserting, three-outcome,
       non-destructive. The contract is the deliverable here; the operations are instances.
-- [ ] 1.2 Implement the shared operation harness — result type carrying the three outcomes,
+      (`tests/test_onboard_operations.py`)
+- [x] 1.2 Implement the shared operation harness — result type carrying the three outcomes,
       precondition declaration, and the "verified" flag a dependent operation reads.
-- [ ] 1.3 Failing test: an operation whose precondition is *present but unverified* is refused.
+      (`tools/onboard/operations.py`)
+- [x] 1.3 Failing test: an operation whose precondition is *present but unverified* is refused.
       This is the distinction the whole design rests on (D3 guarantee 2 vs 3) — a hook file
-      existing must not satisfy "guard is installed".
+      existing must not satisfy "guard is installed". Landed as
+      `test_present_but_unverified_dependency_still_blocks_the_dependent` — the harness
+      withholds the call entirely rather than trusting each operation to self-check
+      (`test_harness_withholds_the_call_rather_than_trusting_the_operation_to_self_check`).
 
 ## 2. Stack-agnostic operations
-- [ ] 2.1 `guard` — wrap the `shelf-efh` installer as an operation; do not reimplement it.
-- [ ] 2.2 `resolver-block` (D5) — marker-delimited projection into `AGENTS.md`. Failing tests:
+- [x] 2.1 `guard` — wrap the `shelf-efh` installer as an operation; do not reimplement it.
+      (`tools/onboard/guard.py`, subprocess around `tools/hooks/install.py`, exit code ->
+      Outcome mapping; `tests/test_onboard_guard.py`)
+- [x] 2.2 `resolver-block` (D5) — marker-delimited projection into `AGENTS.md`. Failing tests:
       writes when absent; rewrites in place when the source changed; is a no-op when current;
       appends **outside** every pre-existing managed block (bd leaves two in this repo);
       handles a symlinked `CLAUDE.md` without following or clobbering it.
+      (`tools/onboard/resolver_block.py`, `tests/test_onboard_resolver_block.py` — 6 tests)
 - [ ] 2.3 `beads` — `bd init`, config with readback, `bd dolt push` chained outside bd's markers.
       Failing test: refuses to run when `guard` has not completed and verified (landmine 1).
 - [ ] 2.4 Failing test for the config-revert trap (landmine 5): after `bd config set`, a
