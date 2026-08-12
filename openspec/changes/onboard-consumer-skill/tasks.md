@@ -35,10 +35,17 @@ Tests-first. `make check` green, whole repo, is Done.
       appends **outside** every pre-existing managed block (bd leaves two in this repo);
       handles a symlinked `CLAUDE.md` without following or clobbering it.
       (`tools/onboard/resolver_block.py`, `tests/test_onboard_resolver_block.py` — 6 tests)
-- [ ] 2.3 `beads` — `bd init`, config with readback, `bd dolt push` chained outside bd's markers.
+- [x] 2.3 `beads` — `bd init`, config with readback, `bd dolt push` chained outside bd's markers.
       Failing test: refuses to run when `guard` has not completed and verified (landmine 1).
+      (`tools/onboard/beads.py`, `tests/test_onboard_beads.py` — 4 tests against the real `bd`
+      binary, no mocking; skipped when `bd` is absent). Verification is partial and says so in
+      the module docstring: `sh -n` on the appended hook, not a live `bd dolt push` (would need a
+      real Dolt remote and touch the network as an onboarding side effect).
 - [ ] 2.4 Failing test for the config-revert trap (landmine 5): after `bd config set`, a
       `git checkout -- .beads/config.yaml` makes `verify` fail rather than silently pass.
+      (Note: 2.3's readback happens inside the same `run()` call, before any git operation could
+      revert it — this item is about the standalone `verify` operation in §2.5 re-checking a
+      *previously applied* `beads` operation, e.g. on a second onboarding pass after tree-rewinding.)
 - [ ] 2.5 `verify` — assert every applied operation is live; report per-operation, not one
       aggregate boolean.
 
