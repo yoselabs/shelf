@@ -12,6 +12,7 @@ have encoded that same belief and passed.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -197,7 +198,11 @@ def test_content_chained_after_the_guard_actually_executes_when_the_guard_passes
     sentinel = hooks / "chained-ran.txt"
     hook.write_text(hook.read_text() + f"\necho ran > {sentinel}\n")
 
-    ran = subprocess.run([str(hook)], cwd=repo, capture_output=True, text=True, check=False)
+    # SHELF_HOME must be explicit here too (see the sibling test above): without it, an
+    # environment with no ~/Workspaces/shelf hits the guard's fail-open path instead of
+    # actually passing, and this test would pass for the wrong reason.
+    env = {**os.environ, "SHELF_HOME": str(SHELF)}
+    ran = subprocess.run([str(hook)], cwd=repo, capture_output=True, text=True, check=False, env=env)
 
     assert ran.returncode == 0, ran.stdout + ran.stderr
     assert sentinel.exists(), "content chained after the guard never ran"
@@ -273,7 +278,16 @@ def test_verification_does_not_touch_the_repo(repo: Path) -> None:
 
 
 def test_installed_guard_blocks_a_real_commit(repo: Path) -> None:
-    """End-to-end: the property the installer now claims, exercised through git itself."""
+    """End-to-end: the property the installer now claims, exercised through git itself.
+
+    `git commit` here must run with an explicit `SHELF_HOME`, not the ambient
+    environment: the guarded hook's fallback chain (`$SHELF_HOME` -> `../shelf`
+    -> `~/Workspaces/shelf`) resolved only by accident on a developer machine
+    where `~/Workspaces/shelf` happens to be a real clone. CI has neither, so
+    an un-scoped commit found no guard, hit the documented fail-open path, and
+    let the offending commit through -- a test-environment gap, not a guard
+    regression (found for real on the first CI run this repo ever had).
+    """
     _use_hookspath(repo)
     assert _install(repo).returncode == VERIFIED
 
@@ -281,7 +295,8 @@ def test_installed_guard_blocks_a_real_commit(repo: Path) -> None:
         '[project]\nname = "c"\nversion = "0.1.0"\n\n[tool.uv.sources]\nanyllm = { path = "../shelf/packages/anyllm", editable = true }\n'
     )
     _git(repo, "add", "pyproject.toml")
-    committed = subprocess.run(["git", "-C", str(repo), "commit", "-m", "offender"], capture_output=True, text=True, check=False)
+    env = {**os.environ, "SHELF_HOME": str(SHELF)}
+    committed = subprocess.run(["git", "-C", str(repo), "commit", "-m", "offender"], capture_output=True, text=True, check=False, env=env)
 
     assert committed.returncode != 0, "the offending commit was not blocked"
 
