@@ -75,17 +75,43 @@ Tests-first. `make check` green, whole repo, is Done.
       so nothing else in the run is blocked by `linter-preset`'s COULD_NOT_APPLY.)
 
 ## 4. The skill (D4)
-- [ ] 4.1 Decide the skill's location (design open question 2), biased to the cross-tool path.
-- [ ] 4.2 Author the skill: detection, the decision table, invocation, and reporting. Authored via
-      the skill-authoring pipeline, per the onboarding mission's own rule ("never hand-waved").
-- [ ] 4.3 Audit against D4's must-not list — no ordering in the skill text, no verification
-      verdicts of its own, no adding shelf dependencies.
-- [ ] 4.4 Exercise it end to end on a scratch greenfield repo: empty repo → shelf consumer +
+- [x] 4.1 Decide the skill's location (design open question 2), biased to the cross-tool path.
+      `.agents/skills/onboard-consumer/` — same convention `bd` already uses in this repo
+      (`.agents/skills/beads/`); does not assume the consumer's agent runtime.
+- [x] 4.2 Author the skill: detection, the decision table, invocation, and reporting. Authored via
+      the skill-authoring pipeline (`skill-creator`), per the onboarding mission's own rule
+      ("never hand-waved"). Given the proposal/design/spec were already fully written before
+      authoring (an unusually complete spec for a skill-creator draft), the interview stage was
+      skipped in favor of reading those artifacts directly; the full eval/benchmark loop was
+      judged disproportionate for a single-repo internal orchestration skill with a deterministic
+      script and no natural-language trigger-phrasing space to optimize — an end-to-end run
+      against real scratch repos (4.4/4.5 below) substituted for it. Deliverable:
+      `.agents/skills/onboard-consumer/SKILL.md` + `scripts/onboard.py` (the mechanism half —
+      carries no judgment, every input is a flag or an on-disk fact).
+- [x] 4.3 Audit against D4's must-not list — no ordering in the skill text, no verification
+      verdicts of its own, no adding shelf dependencies. Confirmed: SKILL.md explicitly says
+      ordering is enforced by `run_all()` regardless of call order, tells the reader to relay
+      `Result.verified`/`.outcome` rather than re-derive them, and states under "must never do"
+      that adding a shelf dependency is out of scope.
+- [x] 4.4 Exercise it end to end on a scratch greenfield repo: empty repo → shelf consumer +
       beads → `verify` green → a seeded local `path=` source is blocked. This is the acceptance
       test for the whole change; if it does not run clean, nothing else here matters.
-- [ ] 4.5 Exercise the adaptive paths on scratch repos: already has pre-commit framework; already
+      RAN FOR REAL (not simulated): `onboard.py` against a fresh `/tmp` repo — all four
+      operations `applied`/`verified=True`; re-ran a second time — clean idempotent no-op
+      (`linter-preset: already current`); appended a local `path=` shelf source and committed —
+      the guard refused it, `commit exit=1`, exactly the acceptance criterion.
+- [x] 4.5 Exercise the adaptive paths on scratch repos: already has pre-commit framework; already
       has husky; already ran `bd init`; is not Python; is already fully onboarded (expect a clean
-      no-op).
+      no-op). RAN FOR REAL: non-python repo (`.pyproject.toml` absent) — `linter-preset` reports
+      skipped plainly, the other three still apply; husky already owns `.git/hooks/pre-commit` —
+      `guard` refuses and names husky plus its own extension point, `beads` correctly refuses too
+      (its `requires=("guard",)` precondition unmet), `resolver-block` still applies independently
+      (exit 1 overall — correctly signals "not fully onboarded", not a false pass). Already-onboarded
+      re-run: covered by the idempotency check in 4.4. Pre-commit-framework and already-ran-`bd
+      init` paths are exercised by `test_precommit_and_hookspath_contention_is_reported` /
+      `test_reinstall_is_idempotent` (`tests/test_hook_installer.py`) and
+      `test_second_run_is_idempotent` (`tests/test_onboard_beads.py`) at the operation level —
+      not re-run again here since the script is a thin, already-tested pass-through.
 
 ## 5. Documentation collapse
 - [ ] 5.1 `docs/consuming-the-shelf.md` — stays the description of what a consumer *is*; the
