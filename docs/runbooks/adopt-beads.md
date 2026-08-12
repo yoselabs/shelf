@@ -6,6 +6,15 @@ it — bootstrap once, then keep it wired — so the next consumer doesn't re-de
 (a2web hit three of them adopting it, 2026-08-05/06: the status-mapping mismatch below, a personal-
 identifier scan that would have silently narrowed, and the git-sync gap in Phase 2).
 
+**Beads is part of onboarding a shelf consumer, opt-out by default.** The `onboard-consumer` skill
+(`<shelf>/.agents/skills/onboard-consumer/SKILL.md`) runs the `beads` operation
+(`tools/onboard/beads.py`) automatically unless `--no-beads` is passed — `bd init`, config set with
+readback (never trust the success message, see §1.2 below), and the `bd dolt push` chain (§2.2)
+appended after bd's own markers, all in one idempotent pass, and refusing to run before the commit
+guard has verified (§1.2's ordering landmine). This runbook is now that operation's justification:
+every finding below is *why* the operation asserts what it asserts, kept here rather than folded
+silently into the code so the next person hitting a bd surprise can see it was already found once.
+
 ---
 
 ## Phase 1 — Bootstrap (one-time, per repo)

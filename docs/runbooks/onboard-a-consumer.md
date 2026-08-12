@@ -16,13 +16,22 @@ the point, and it never bloats a thin consumer (it keeps its own subset usage).
 
 ## Phase A — mechanical onboarding (fast, mostly reversible)
 
-From `consuming-the-shelf.md`, in the consumer repo root:
+Run the **`onboard-consumer` skill** (`<shelf>/.agents/skills/onboard-consumer/SKILL.md`) in the
+consumer repo root. It installs the commit guard, projects the resolver block, wires beads
+(opt-out — most consumers want it), and — for python+uv targets — copies the linter reference,
+in one adaptive, verified pass:
 
-1. **Guard:** `python "$SHELF_HOME/tools/hooks/install.py"` (per-clone; blocks a committed editable shelf source).
-2. **Resolver block:** paste the block from `consuming-the-shelf.md` §3 into the consumer's `AGENTS.md`/`CLAUDE.md`.
-3. **Inherit the linter reference** (config-preset, resolution 0004): copy the `[tool.ruff|codespell|coverage]`
-   blocks, the `Makefile` targets, and the `dev` group from the shelf; then own the copy. See `docs/linting.md`.
-4. **Deps come later** — do NOT add shelf git+tag sources yet. You add one only when the sweep says *adopt*.
+```bash
+python3 "$SHELF_HOME/.agents/skills/onboard-consumer/scripts/onboard.py" --repo /path/to/consumer
+```
+
+It's idempotent: safe to re-run on an already-onboarded repo to check its current state, and it
+adapts to what it finds (an existing pre-commit/husky/lefthook hook, a non-Python target, beads
+already initialized). See `consuming-the-shelf.md` for what each piece is and why; see the skill
+itself for the mechanics — this runbook does not duplicate them.
+
+**Deps come later** — the skill does NOT add shelf git+tag sources. You add one only when the
+sweep (Phases B–D below) says *adopt*.
 
 Onboarding ≠ adopting. A consumer can be fully onboarded and adopt zero packages if nothing passes the gate.
 

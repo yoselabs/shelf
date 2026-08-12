@@ -45,8 +45,20 @@ Raised by Denis. Four distinct entry paths, one shared lifecycle gate.
 
 Onboarding also has a *consumer* side: a project must (1) depend on the shelf by git+tag and (2) carry
 the shelf directive in its own `AGENTS.md`/`CLAUDE.md` so every agent reaches for the shelf, contributes
-back, and thinks micro-software. The canonical directive + steps live in `../consuming-the-shelf.md`;
-a2kay is onboarded as the first consumer (its `AGENTS.md` §3).
+back, and thinks micro-software. The canonical description lives in `../consuming-the-shelf.md`;
+mechanical onboarding runs via the `onboard-consumer` skill (`.agents/skills/onboard-consumer/`,
+`openspec/changes/onboard-consumer-skill/`); a2kay and a2web were onboarded by an earlier manual path
+and haven't been re-run against the current operations — `shelf-n63`'s tasks.md §6.2 tracks that.
+
+This line originally read simply "DONE" — that claim was **false**: a whole session
+(`fix-guard-hookspath-resolution` + `onboard-consumer-skill`) discovered the guard the consumer
+directive pointed at was silently dead whenever `core.hooksPath` was set (beads/husky/lefthook all
+set it), the resolver block was a manual paste with no drift detection, `.beads/config.yaml` is a
+tracked file an ordinary git operation can silently revert, and nothing verified the finished
+result. "DONE" described the destination (a consumer setup exists) rather than a verified path to
+it. What's actually done now: five idempotent, precondition-checked, effect-asserting operations
+(`tools/onboard/`) plus the skill that orchestrates them — verified end to end against real scratch
+repos, not merely described.
 
 ## Deliverable sketch (when built)
 

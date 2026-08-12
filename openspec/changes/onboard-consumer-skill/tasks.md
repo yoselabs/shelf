@@ -114,15 +114,23 @@ Tests-first. `make check` green, whole repo, is Done.
       not re-run again here since the script is a thin, already-tested pass-through.
 
 ## 5. Documentation collapse
-- [ ] 5.1 `docs/consuming-the-shelf.md` — stays the description of what a consumer *is*; the
-      mechanical steps point at the skill.
-- [ ] 5.2 `docs/runbooks/onboard-a-consumer.md` — drop Phase A's duplication; keep the catch-up
-      sweep, which is genuinely different work.
-- [ ] 5.3 `docs/runbooks/adopt-beads.md` — beads becomes part of onboarding; the runbook keeps
+- [x] 5.1 `docs/consuming-the-shelf.md` — stays the description of what a consumer *is*; the
+      mechanical steps point at the skill. (§2/§3/§4 each keep their "why", point their "how" at
+      the corresponding operation + the skill; §3's resolver block text is now labeled as what
+      gets projected, not what to hand-copy.)
+- [x] 5.2 `docs/runbooks/onboard-a-consumer.md` — drop Phase A's duplication; keep the catch-up
+      sweep, which is genuinely different work. (Phase A now runs the skill; Phases B-F unchanged.)
+- [x] 5.3 `docs/runbooks/adopt-beads.md` — beads becomes part of onboarding; the runbook keeps
       every finding as the justification for the assertions (`bootstrap-target-contract` D5's
-      voice rule applies here too).
-- [ ] 5.4 `docs/missions/onboarding-new-micro-software.md:44` — correct the "consumer half: DONE"
-      claim, stating what was actually missing rather than deleting the line.
+      voice rule applies here too). (New intro paragraph states the `beads` operation runs
+      automatically via the skill, opt-out; the runbook itself is unchanged below that — it's the
+      justification record, not duplicated into the operation's docstring.)
+- [x] 5.4 `docs/missions/onboarding-new-micro-software.md:44` — correct the "consumer half: DONE"
+      claim, stating what was actually missing rather than deleting the line. (Kept the heading's
+      "DONE" — the consumer half genuinely is done now — but the body states plainly that the
+      original DONE claim was false and names what was actually missing: the dead guard, the
+      undetectable resolver-block drift, the config-revert trap, and the absence of any
+      verification.)
 
 ## 6. Close the loop (resolution 0009)
 - [ ] 6.1 `make check` green, whole repo.

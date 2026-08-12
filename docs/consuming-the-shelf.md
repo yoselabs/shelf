@@ -1,8 +1,18 @@
-# Consuming the shelf — how a project onboards
+# Consuming the shelf — what a consumer is
 
-The **canonical consumer setup**. Onboarding any project into the micro-software approach is three
-steps. The full agent behaviour lives in one place — [`agent-loop.md`](agent-loop.md) — and matures
-there; the steps below just wire a project to it.
+The **canonical description** of what it means for a project to consume the shelf: a git+tag
+dependency, a commit guard, a resolver block that reaches the full loop, and (for python+uv
+projects) the linter reference. The full agent behaviour lives in one place —
+[`agent-loop.md`](agent-loop.md) — and matures there; what follows explains each piece and why it
+exists.
+
+**To actually onboard a project, run the `onboard-consumer` skill**
+(`<shelf>/.agents/skills/onboard-consumer/SKILL.md`) rather than following §2–4 by hand — it
+installs the guard, projects the resolver block, wires beads (opt-out), and copies the linter
+reference in one adaptive, verified pass, and it's idempotent (safe to re-run to check a repo's
+current state). This file stays the reference for *what* each piece is and *why*; the skill is the
+mechanism. `docs/runbooks/onboard-a-consumer.md` covers the broader adoption sweep the skill is
+part of.
 
 ## 1. Depend on the shelf (git + tag — distributable, never a local path)
 
@@ -31,7 +41,8 @@ Note what the gate does *not* read: your working tree. An **uncommitted** local 
 supported co-development workflow (§1) and stays legitimate.
 
 **Optionally add the hook for faster feedback** — it catches the mistake at commit time instead of
-at gate time:
+at gate time. The `onboard-consumer` skill installs it as part of onboarding (via the `guard`
+operation, `tools/onboard/guard.py`); to run it standalone:
 
 ```bash
 python "$SHELF_HOME/tools/hooks/install.py"   # run in the consumer repo root
@@ -66,11 +77,19 @@ the "hooks are per-clone and cannot be committed" premise above has that excepti
     - id: no-local-shelf-source
 ```
 
-## 3. Paste this resolver block into the project's `AGENTS.md` / `CLAUDE.md`
+## 3. The resolver block, in the project's `AGENTS.md` / `CLAUDE.md`
 
 This is the only thing duplicated per repo — tiny and stable. It reaches the full loop from the local
 shelf clone (which every contributor has anyway), touching GitHub only on greenfield or a real
 adopt/promote — never just to start a session.
+
+**Projected, not pasted.** `BLOCK_TEXT` in `tools/onboard/resolver_block.py` is the one source; the
+`resolver-block` operation writes it into a marker-delimited region of the target file, appended
+outside every other tool's managed region (this repo's own `AGENTS.md` already carries two from
+`bd`), and re-projects it in place on re-run — so a consumer can be checked for drift instead of
+silently carrying a stale copy-paste. The `onboard-consumer` skill runs this automatically; to
+project it standalone, instantiate `ResolverBlockOperation(repo).run({})`. The text below is what
+gets projected — useful to read, not to hand-copy:
 
 > ### The shelf — shared micro-software you consume
 >
@@ -98,3 +117,9 @@ The shelf's quality bar is a **config-preset**, not a CLI ([resolution 0004](res
 copy the `[tool.ruff|codespell|coverage]` blocks + the `Makefile` targets + the `dev` dependency-group
 from this repo into yours, then override anything you genuinely need to. Full toolchain and the exact
 copy list: **[linting.md](linting.md)**. `make check` green (whole-repo, no carve-outs) is the bar.
+
+The `linter-preset` operation (`tools/onboard/linter_preset.py`, python+uv only) does this copy for
+you, merging per-table/per-target rather than overwriting — a project that already has its own
+`[tool.ruff]` keeps it exactly as written, ruff.lint included. The `onboard-consumer` skill runs it
+automatically when `pyproject.toml` exists, and states plainly when it doesn't apply (non-Python
+targets get the guard/resolver-block/beads pieces only).
