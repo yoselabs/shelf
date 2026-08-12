@@ -1,0 +1,33 @@
+# The Definition of Done (AGENTS.md §1: `make check` green, whole repo, no carve-outs)
+# enforced from outside any one contributor's memory — see shelf-2xb. Deliberately minimal:
+# one job, one command, no browser engines (make test-browser is a separate, opt-in target).
+#
+# HYPOTHESIS_PROFILE=ci: conftest.py's seeding policy. A fixed seed means a property-test
+# failure is reproducible and would have failed on the previous commit too -- it can never
+# spring newly on an unrelated PR. See conftest.py for the full reasoning.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      HYPOTHESIS_PROFILE: ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - run: uv sync
+
+      - run: make check

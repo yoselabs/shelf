@@ -52,11 +52,11 @@ bootstrap:
 bootstrap-verify: bootstrap
 
 lint:
-	uv run ruff check packages tests tools
-	uv run ruff format --check packages tests tools
+	uv run ruff check packages tests tools conftest.py
+	uv run ruff format --check packages tests tools conftest.py
 
 format:
-	uv run ruff format packages tests tools
+	uv run ruff format packages tests tools conftest.py
 
 # --error-on-warning: a type warning fails the build. No slow rot.
 typecheck:
@@ -64,7 +64,7 @@ typecheck:
 
 # typos in code, docstrings, and docs.
 spell:
-	uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md CLAUDE.md
+	uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md CLAUDE.md conftest.py
 
 # dependency hygiene per package (unused / missing / transitive). deptry reads each
 # package's own pyproject from its dir; --known-first-party (the src import name)

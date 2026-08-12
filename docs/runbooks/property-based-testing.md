@@ -123,6 +123,20 @@ nobody has actually checked.
 for i in 1 2 3 4 5 6 7 8; do uv run pytest packages/<pkg>/tests/test_property_<pkg>.py -q; done
 ```
 
+## The CI seeding policy (decided when CI was stood up, `shelf-2xb`)
+
+CI derandomizes (`HYPOTHESIS_PROFILE=ci`, registered in root `conftest.py`, set as an env var
+in `.github/workflows/check.yml`); local runs stay randomized (the default profile, unchanged).
+Rationale: `.hypothesis/`'s example database is self-gitignored, so nothing carries a
+discovered failure between CI runs — left fully randomized, CI could surface a genuinely new
+boundary on any commit's run, including one that never touched the package in question, which
+is indistinguishable from that PR having broken something. A fixed seed makes a CI failure
+reproducible and means it would have failed on the previous commit too — it can never spring
+newly on an unrelated PR. Local runs keep exploring randomly on purpose: that's what the
+rerun-5–8-times workflow above depends on to actually find new boundaries during authoring: a
+found boundary gets pinned as an explicit `@example(...)` (`timefmt`'s `ms=1450` is the worked
+example below) before it ever needs to matter to CI.
+
 ## Confirming the addition is non-breaking
 
 Before considering a package done, run the **whole workspace's default test command**, not
