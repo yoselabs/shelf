@@ -52,6 +52,15 @@ from pathlib import Path
 
 MARKER = "# shelf-guard (no-local-shelf-source)"
 _BEGIN = f"{MARKER} BEGIN — managed by the shelf installer; safe to re-run."
+
+# The pre-BEGIN/END format, live only briefly this session before this fix — but already
+# committed into at least one real consumer's history (a2kay), so a first re-run there hits it
+# for real, not hypothetically. `_OLD_END` was the exec-based template's literal last line;
+# without an explicit END marker of its own, it is the only reliable boundary between the old
+# span and anything a tool chained after it. Kept only for `_rewritten_hook`'s one-time
+# migration path — never written by this version of the installer.
+_OLD_BEGIN = f"{MARKER} — managed by the shelf installer; safe to re-run."
+_OLD_END = "exit 0   # guard unavailable (shelf not cloned) -> do not block"
 _END = f"{MARKER} END"
 
 VERIFIED, REFUSED, COULD_NOT_VERIFY = 0, 1, 2
@@ -206,15 +215,19 @@ def _rewritten_hook(existing: str | None) -> str:
 
     Preserves everything another tool put before or after it, since re-running
     must never clobber a chain another tool built on top of a previously
-    installed guard.
+    installed guard. Also migrates the pre-BEGIN/END format in place (see
+    `_OLD_BEGIN`/`_OLD_END`) rather than falling back to a full overwrite,
+    which would silently repeat the exact loss this format change fixed for
+    anyone whose hook was written before it.
     """
     if existing is None:
         return HOOK
-    start = existing.find(_BEGIN)
-    end = existing.find(_END)
+    start, end, end_len = existing.find(_BEGIN), existing.find(_END), len(_END)
+    if start == -1 or end == -1:
+        start, end, end_len = existing.find(_OLD_BEGIN), existing.find(_OLD_END), len(_OLD_END)
     if start == -1 or end == -1:
         return HOOK
-    return existing[:start] + GUARDED_SPAN + existing[end + len(_END) :].lstrip("\n")
+    return existing[:start] + GUARDED_SPAN + existing[end + end_len :].lstrip("\n")
 
 
 def main() -> int:

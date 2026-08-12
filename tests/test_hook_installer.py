@@ -152,6 +152,38 @@ def test_reinstall_preserves_content_another_tool_chained_after_the_guard(repo: 
     assert "echo chained" in body
 
 
+def test_reinstall_migrates_the_pre_begin_end_format_without_losing_chained_content(repo: Path) -> None:
+    """The pre-BEGIN/END exec-based template was live only briefly this session, but it was
+    already committed into a real consumer's history (a2kay) before this fix landed -- so a
+    fresh clone's first re-run genuinely hits this, not hypothetically. A naive migration that
+    falls back to a full overwrite whenever the new markers aren't found would silently repeat
+    the exact chained-content loss this format change exists to fix.
+    """
+    hooks = _hooks_dir(repo)
+    hooks.mkdir(parents=True, exist_ok=True)
+    hook = hooks / "pre-commit"
+    old_format = (
+        "#!/bin/sh\n"
+        "# shelf-guard (no-local-shelf-source) — managed by the shelf installer; safe to re-run.\n"
+        'SHELF="${SHELF_HOME:-../shelf}"\n'
+        '[ -d "$SHELF" ] || SHELF="$HOME/Workspaces/shelf"\n'
+        'GUARD="$SHELF/tools/hooks/forbid-local-shelf-source.py"\n'
+        '[ -f "$GUARD" ] && exec python3 "$GUARD"\n'
+        "exit 0   # guard unavailable (shelf not cloned) -> do not block\n"
+        "\n# --- BEGIN BEADS INTEGRATION v1.1.2 ---\necho chained\n# --- END BEADS INTEGRATION v1.1.2 ---\n"
+    )
+    hook.write_text(old_format)
+    hook.chmod(0o755)
+
+    result = _install(repo)
+
+    assert result.returncode == VERIFIED
+    body = hook.read_text()
+    assert "BEGIN BEADS INTEGRATION" in body, "migration deleted the chained block"
+    assert "echo chained" in body
+    assert "exec python3" not in body, "migration should replace the old exec-based span, not just prepend"
+
+
 def test_content_chained_after_the_guard_actually_executes_when_the_guard_passes(repo: Path) -> None:
     """The deeper bug behind the one above: the guard body used to end in `exec python3
     "$GUARD"`, which REPLACES the shell process on success -- so anything appended after it in
