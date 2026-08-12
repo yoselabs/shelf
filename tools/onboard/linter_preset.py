@@ -82,10 +82,20 @@ def _missing_toml_blocks(target_text: str) -> str:
     return "".join(blocks)
 
 
-def _missing_make_blocks(target_text: str) -> str:
+def _make_targets_to_copy(target_text: str) -> list[str]:
     shelf_targets = dict(_split_make_targets(_SHELF_MAKEFILE.read_text()))
     target_names = {name for name, _ in _split_make_targets(target_text)}
-    return "".join(shelf_targets[name] for name in _MAKE_TARGETS if name in shelf_targets and name not in target_names)
+
+    to_copy = [name for name in _MAKE_TARGETS if name in shelf_targets and name not in target_names]
+    # `bootstrap-verify: bootstrap` is meaningless on its own: found against a real consumer
+    # (a2kay) that already owned an unrelated `bootstrap:` target of its own (a very common
+    # Make target name) -- `bootstrap` was correctly skipped as owned, but `bootstrap-verify`
+    # was still copied, silently aliasing to the consumer's OWN unrelated target. If `bootstrap`
+    # isn't ours to add (already present under any meaning), its dependent isn't either.
+    if "bootstrap-verify" in to_copy and "bootstrap" in target_names and "bootstrap" not in to_copy:
+        to_copy.remove("bootstrap-verify")
+
+    return to_copy
 
 
 @dataclass
@@ -117,9 +127,10 @@ class LinterPresetOperation:
 
         makefile = self.repo / "Makefile"
         existing_make = makefile.read_text() if makefile.exists() else ""
-        missing_make = _missing_make_blocks(existing_make)
-        if missing_make:
-            new_make = (existing_make.rstrip("\n") + "\n\n" if existing_make else "") + missing_make
+        to_copy = _make_targets_to_copy(existing_make)
+        if to_copy:
+            shelf_targets = dict(_split_make_targets(_SHELF_MAKEFILE.read_text()))
+            new_make = (existing_make.rstrip("\n") + "\n\n" if existing_make else "") + "".join(shelf_targets[name] for name in to_copy)
             makefile.write_text(new_make)
             applied.append("Makefile targets")
 
@@ -132,8 +143,7 @@ class LinterPresetOperation:
             return Result(Outcome.FAILED, verified=False, message=f"{pyproject} is not valid TOML after writing: {exc}")
 
         written_make_names = {name for name, _ in _split_make_targets(makefile.read_text())} if makefile.exists() else set()
-        expected_names = {name for name in _MAKE_TARGETS if name in dict(_split_make_targets(_SHELF_MAKEFILE.read_text()))}
-        missing_after = expected_names - written_make_names
+        missing_after = set(to_copy) - written_make_names
         if missing_after:
             return Result(Outcome.FAILED, verified=False, message=f"Makefile still missing targets after write: {missing_after}")
 

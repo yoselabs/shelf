@@ -90,6 +90,24 @@ def test_copies_missing_makefile_targets_and_leaves_existing_ones_alone(repo: Pa
     assert lint_occurrences == 1, "shelf's lint target was appended even though the consumer already had one"
 
 
+def test_an_unrelated_owned_bootstrap_target_is_not_aliased_by_bootstrap_verify(repo: Path) -> None:
+    """Found against a real consumer (a2kay): it already had its own `bootstrap:` target (a
+    common Make name, unrelated to shelf onboarding). `bootstrap` is correctly left alone as
+    owned -- but `bootstrap-verify: bootstrap` must not be copied either, since on its own it
+    would silently alias to the consumer's unrelated target rather than shelf's onboarding
+    script."""
+    (repo / "pyproject.toml").write_text('[project]\nname = "consumer"\nversion = "0.1.0"\n')
+    (repo / "Makefile").write_text("bootstrap:\n\techo set up my own dev env, nothing to do with the shelf\n")
+
+    result = LinterPresetOperation(repo).run({})
+
+    assert result.outcome == Outcome.APPLIED, result.message
+    make_text = (repo / "Makefile").read_text()
+    assert "echo set up my own dev env" in make_text, "the consumer's own bootstrap target was overwritten"
+    assert "bootstrap-verify" not in make_text, "bootstrap-verify would alias to the consumer's unrelated bootstrap target"
+    assert "guard:" in make_text, "unrelated targets must still be copied"
+
+
 def test_creates_a_makefile_from_scratch_when_absent(repo: Path) -> None:
     (repo / "pyproject.toml").write_text('[project]\nname = "consumer"\nversion = "0.1.0"\n')
 
