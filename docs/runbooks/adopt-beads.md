@@ -281,6 +281,18 @@ and each one that *also* wants `core.hooksPath` will fight bd for it. Fix by cha
 tool's hook body into `.beads/hooks/<name>` **outside** bd's markers, the same way §2.2 chains
 `bd dolt push`.
 
+**The install mode is not stable over the repo's life — bd migrated from one to the other, on its
+own, mid-session.** Observed on shelf, 2026-08-12: `bd init` put the repo in hooksPath mode
+(verified — `core.hooksPath` set, `.git/hooks/` empty but for samples, and a probe hook there did
+not fire). Hours later, `core.hooksPath` was **unset** and `.git/hooks/` held copies of every
+`.beads/hooks/*` file. The migration copied the directory **verbatim, including a non-beads
+addition chained outside the managed markers** (the §2.2 `bd dolt push` block survived byte-identical),
+so nothing was lost — but the *mode you verified at init time is not the mode you will be in later*.
+The trigger was not pinned down; many `bd` invocations happened in between, and any hook self-heal
+could account for it. Two consequences: re-check `git config core.hooksPath` rather than trusting an
+earlier reading, and do not build tooling that assumes either mode — ask
+`git rev-parse --git-path hooks`, which answers correctly in both.
+
 **One genuine upside, easy to miss:** in hooksPath mode the hooks live at `.beads/hooks/`, which
 `bd init` **commits**. Hooks become tracked files that travel with a clone — inverting the usual
 "git hooks are per-clone and cannot be committed" constraint that per-clone-guard runbooks

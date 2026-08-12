@@ -37,12 +37,25 @@ at gate time:
 python "$SHELF_HOME/tools/hooks/install.py"   # run in the consumer repo root
 ```
 
-Idempotent; it resolves the shelf via `$SHELF_HOME → ../shelf → ~/Workspaces/shelf`, writes a native
-pre-commit hook, and refuses to clobber a foreign one. **If your repo also uses beads, install this
-before `bd init`** — `bd init` chains into an existing native hook, but seizes `core.hooksPath` when
-it finds none, which installs the guard dead. **Verify the hook actually fires:** stage a
-`path=`/editable shelf source and try to commit — it must be blocked. A hook that exists is not a
-hook that runs.
+Idempotent. It asks git where hooks live (`git rev-parse --git-path hooks`, which honors
+`core.hooksPath`) rather than assuming `.git/hooks`, then **proves the hook blocks** by running it
+against a throwaway index before reporting success. Three outcomes, deliberately distinct:
+
+| exit | meaning |
+|:--:|---|
+| `0` | installed **and verified live** — it refused a probe |
+| `1` | refused (a foreign hook owns the slot, and the message names which tool and its extension point), or written but **not live** |
+| `2` | **could not verify** — e.g. no shelf clone found, so the hook's fail-open branch is active. Never treat this as installed. |
+
+**If your repo also uses beads, install this before `bd init`.** `bd init` chains into an existing
+native hook, but claims `core.hooksPath` when it finds none — which installs the guard dead.
+
+**Already onboarded before this existed?** Re-run it. A guard installed by the older version may be
+silently dead, and nothing in your repo will tell you; only re-running checks.
+
+**One inversion worth knowing:** where `core.hooksPath` points *inside* the working tree (beads'
+`.beads/hooks`, which `bd init` commits), the hooks are **tracked files that travel with a clone** —
+the "hooks are per-clone and cannot be committed" premise above has that exception.
 
 **Using the pre-commit framework instead?** add to `.pre-commit-config.yaml` (skips the installer):
 
