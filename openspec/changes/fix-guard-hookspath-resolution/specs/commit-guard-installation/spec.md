@@ -61,6 +61,16 @@ point. It SHALL NOT append the guard into a hook owned by another tool.
 - **THEN** the installer refuses and states that the guard is already supported there via
   `.pre-commit-config.yaml` (`no-local-shelf-source`), so no manual chaining is required
 
+#### Scenario: Both the pre-commit framework and beads want the hook slot
+
+- **WHEN** the repo carries a `.pre-commit-config.yaml` **and** `core.hooksPath` is set to a
+  beads-managed directory — a configuration where only one of the two tools can be live
+- **THEN** the installer names which tool currently owns the slot, and warns that
+  `git config --unset-all core.hooksPath` (the hint pre-commit itself prints) would revive
+  pre-commit while silently disabling every beads hook, including the `bd dolt push` chain
+- **AND** it does not choose between them — arbitrating hook ownership is the repo's call,
+  not the installer's
+
 #### Scenario: The resolved hook is hand-written or unrecognized
 
 - **WHEN** the existing hook matches no known manager's marker

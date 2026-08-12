@@ -91,10 +91,35 @@ exists *because* a guard failed open silently, shipping a second silent-failure 
 the fix would be self-defeating. The refusal is correct behavior; only its diagnosis was
 stale.
 
-Note the pre-commit-framework row already works today and is verified (ledger 0038) —
-that path sets `core.hooksPath` too, but the framework runs our hook itself, so the
-guard was never dead there. Worth stating in the message so operators aren't sent
-chasing a non-problem.
+### The pre-commit framework is not just another marker — it is mutually exclusive with beads
+
+The pre-commit framework does **not** use `core.hooksPath`; it writes `.git/hooks/pre-commit`
+directly. So it and beads' hooksPath mode compete for the same slot, and only one can hold
+it. Verified in a scratch repo (2026-08-12):
+
+| order | outcome |
+|---|---|
+| pre-commit installed first, then `bd init` | bd finds a native hook and chains into it — both work |
+| `bd init` first, then `pre-commit install` | pre-commit refuses: `Cowardly refusing to install hooks with core.hooksPath set` |
+| `core.hooksPath` set after pre-commit was installed | pre-commit dies **silently** — a seeded trailing-whitespace violation was committed unblocked |
+
+The dangerous part is pre-commit's own remedy. Its error prints
+`hint: git config --unset-all core.hooksPath`. Following that hint revives pre-commit and
+**kills beads** — every `.beads/hooks/*` shim becomes unreachable, including the
+`bd dolt push` chain from adopt-beads §2.2. Neither tool mentions the other; each one's fix
+is the other's silent disarm. An operator debugging one will reach for exactly the command
+that breaks the other.
+
+This changes what the installer should say when it finds a pre-commit-framework hook. The
+guard itself is fine there and verified (ledger 0038) — the framework runs our hook, so it
+was never dead on that path. But the message must not stop at "no action needed": if the
+repo *also* runs beads, the two are in an unstable configuration and the operator needs to
+know before they hit the hint. Say which tool currently owns the slot and what unsetting
+hooksPath would cost.
+
+Rejected as out of scope: making the installer arbitrate between them. Deciding which tool
+owns `.git/hooks` in a given repo is that repo's call, not the guard installer's. Report the
+conflict precisely; don't resolve it on the operator's behalf.
 
 ## D4 — What this deliberately does not fix
 

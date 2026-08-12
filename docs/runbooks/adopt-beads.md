@@ -286,6 +286,27 @@ tool's hook body into `.beads/hooks/<name>` **outside** bd's markers, the same w
 "git hooks are per-clone and cannot be committed" constraint that per-clone-guard runbooks
 (consuming-the-shelf.md §2) are built around. Anything you chain in there is committable.
 
+**If the repo uses the `pre-commit` framework, read this before running `bd init` — the two are
+mutually exclusive, and each one's official fix silently disarms the other.** `pre-commit` does
+not use `core.hooksPath`; it writes `.git/hooks/pre-commit` directly. So it and bd's hooksPath
+mode compete for one slot. Verified in a scratch repo (2026-08-12):
+
+| order | outcome |
+|---|---|
+| `pre-commit install` **first**, then `bd init` | bd finds a native hook and chains into it — both live. **This is the ordering you want.** |
+| `bd init` first, then `pre-commit install` | pre-commit refuses: `[ERROR] Cowardly refusing to install hooks with core.hooksPath set`. Loud, recoverable. |
+| `core.hooksPath` gets set after pre-commit was installed | pre-commit dies **silently** — a seeded trailing-whitespace violation committed unblocked, no warning anywhere. |
+
+The trap is pre-commit's own hint: `git config --unset-all core.hooksPath`. Following it revives
+pre-commit and **kills every beads hook**, including the `bd dolt push` chain from §2.2 — so the
+beads queue quietly stops syncing to the remote while `git push` keeps succeeding. Neither tool
+knows the other exists.
+
+**So: install `pre-commit` before `bd init`, not after.** If it's already too late, don't unset
+`core.hooksPath` — chain pre-commit's hook body into `.beads/hooks/pre-commit` outside bd's
+markers, the same way §2.2 chains the Dolt push. And when you hit that hint in a terminal six
+months from now, remember what it costs.
+
 ### 2.2 The Dolt-remote-sync gap (verified real, not hypothetical)
 
 `bd` syncs its issue database via `bd dolt push`/`bd dolt pull` against `refs/dolt/data` — a ref
