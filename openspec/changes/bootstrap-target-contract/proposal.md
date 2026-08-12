@@ -1,3 +1,18 @@
+> **Re-scoped 2026-08-12 — read before implementing.** `onboard-consumer-skill` (shelf-n63) has
+> landed: `tools/onboard/` now has five idempotent, precondition-checked, effect-asserting
+> operations (`guard`, `resolver-block`, `beads`, `linter-preset`, `verify`) plus the
+> `onboard-consumer` skill that orchestrates them, all real and tested — not a proposal anymore.
+> `make bootstrap` as scoped below predates that: it assumed it would define the ordering and
+> verification contract from scratch. It doesn't need to now. Its remaining job, per the design
+> doc's own inversion note, is to become **one caller of the existing operations** in a
+> repo-established idiom (a `make` target invoking `tools/onboard/*.py` the way
+> `.agents/skills/onboard-consumer/scripts/onboard.py` already does), not a competing
+> implementation of ordering/verification. The rest of this proposal (the *why*, the
+> content-vs-environment split in D4, the beads-runbook voice rewrite) still holds — re-read it
+> against `tools/onboard/operations.py`'s actual contract before writing `design.md`/`tasks.md`
+> for this change, since the guarantee language below was drafted before that contract existed
+> and may now read as duplicating it rather than depending on it.
+
 ## Why
 
 `docs/runbooks/adopt-beads.md` has been through three adoptions (a2web, homelab, shelf) and

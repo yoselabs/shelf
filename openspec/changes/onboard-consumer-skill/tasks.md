@@ -7,9 +7,13 @@ Tests-first. `make check` green, whole repo, is Done.
 
 ## 0. Setup
 - [x] 0.1 Confirm `shelf-efh` has landed and `install.py` verifies liveness. (closed, `db6575f`)
-- [ ] 0.2 Re-scope `shelf-abf` (`bootstrap-target-contract`): `make bootstrap` becomes a caller of
+- [x] 0.2 Re-scope `shelf-abf` (`bootstrap-target-contract`): `make bootstrap` becomes a caller of
       these operations, not a competing implementation. Update its proposal and its bead's
-      dependency direction — it now depends on this change, not the reverse.
+      dependency direction — it now depends on this change, not the reverse. (Bead dependency
+      already flipped mid-session; `bootstrap-target-contract/proposal.md` now carries an explicit
+      re-scope note pointing at the landed `tools/onboard/` contract, since the guarantee language
+      in that proposal was drafted before the contract existed. Full `design.md`/`tasks.md`
+      rewrite for shelf-abf is that change's own future work, not this one's.)
 
 ## 1. The operation contract (D3)
 - [x] 1.1 Failing test per guarantee, against a trivial reference operation, before any real
@@ -133,8 +137,8 @@ Tests-first. `make check` green, whole repo, is Done.
       verification.)
 
 ## 6. Close the loop (resolution 0009)
-- [ ] 6.1 `make check` green, whole repo.
-- [ ] 6.2 File a bead for re-onboarding a2kay and a2web (design open question 1) — do not do it
-      inside this change.
-- [ ] 6.3 Ledger row.
-- [ ] 6.4 Merge and push.
+- [x] 6.1 `make check` green, whole repo. (806 tests, 86.13% coverage, re-confirmed after every commit.)
+- [x] 6.2 File a bead for re-onboarding a2kay and a2web (design open question 1) — do not do it
+      inside this change. (`shelf-brb`)
+- [x] 6.3 Ledger row. (`ledger/0087-onboard-consumer-operations-and-skill.toml`)
+- [x] 6.4 Merge and push.
