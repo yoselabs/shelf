@@ -32,6 +32,16 @@ Not `--team` or `--contributor` — both are interactive-only wizards and reject
 block appended to an existing `CLAUDE.md` if one exists — verify that with `git show HEAD --stat`
 and `git diff HEAD~1 -- CLAUDE.md` before trusting it blindly on a repo you haven't tested this on.
 
+**If `CLAUDE.md` is a symlink to `AGENTS.md`, `bd init` handles it correctly but leaves a wart.**
+Verified on shelf (2026-08-12), whose `CLAUDE.md` is a symlink: `bd init` detects the symlink,
+prints `Warning: CLAUDE.md is a symlink to AGENTS.md; skipping managed section injection to
+preserve link mode/content`, and does not follow or clobber it. Good. But its *Codex* installer
+writes to `AGENTS.md` unconditionally, and the Claude integration block lands there too — so the
+target file ends up with **two near-duplicate `## Beads Issue Tracker` sections**, one per managed
+marker pair (`BEADS INTEGRATION` and `BEADS CODEX SETUP`). Both are bd-managed; don't hand-merge
+them (a future `bd` upgrade rewrites both). Just know the duplication is bd's doing, not drift, and
+say so in your own section so the next reader doesn't try to "fix" it.
+
 Then enable synchronous export so `.beads/issues.jsonl` never goes stale between writes:
 
 ```sh
@@ -51,6 +61,26 @@ two data points suggest it may depend on install/config details neither adoption
 it for real on your own repo before relying on it: `bd create "..."; ls -la .beads/issues.jsonl`
 (synchronous?) then, if empty, `bd hooks run pre-commit` and re-check (commit-triggered?).
 
+**A third adoption (shelf, 2026-08-12, `bd` 1.1.2) probably resolves the contradiction — and the
+cause is a trap worth knowing on its own. `bd config set` writes to `.beads/config.yaml`, which
+`bd init` **commits**.** It is a *tracked* file, so any ordinary git operation that restores tracked
+state — `git reset --hard`, `git checkout -- .`, `git stash` — silently reverts your `bd config set`
+calls, with no warning from `bd` and no sign in `bd`'s own output. shelf hit exactly this: the two
+`bd config set` calls succeeded and printed `Set export.auto = true (in config.yaml)`, an unrelated
+`git reset --hard HEAD~1` (cleaning up a scratch commit) reverted them, and 13 `bd create` calls
+later `.beads/issues.jsonl` did not exist — *looking exactly like the "export is commit-triggered"
+hypothesis*. `bd config get export.auto` returned `false`. Re-setting it and repeating the test gave
+a **synchronous** export, immediately on the next write, matching a2web. So the likely reading of
+all three data points is: **export is synchronous; a repo that observes otherwise probably has
+`export.auto` not actually in effect.**
+
+Two rules follow, and the second is the general one:
+
+- **Never trust `bd config set`'s success message — confirm with `bd config get <key>`.** The
+  message reports the intent to write, not the surviving state.
+- **Re-check `bd config get` after any git operation that rewinds the working tree.** Config that
+  lives in a tracked file is config that git can revert underneath you.
+
 **`bd create` has no `--status` flag (verified on 1.1.2).** You cannot create an issue directly as
 `deferred` in one call. The working sequence is `bd create "title" ...` followed by `bd defer <id>
 --reason "..."` (or `bd update <id> --status <value>` for any other status). `--spec-id` IS
@@ -67,6 +97,23 @@ on its own; only small text-ish files (`issues.jsonl`, `interactions.jsonl`, `co
 actually occupies on disk. Don't add your own top-level `.gitignore` rules for this preemptively;
 verify with `git ls-files .beads/` after `bd init` instead, and only add rules if something
 unexpected shows up tracked.
+
+**If the repo runs `yamllint` (or any YAML formatter/linter) in pre-commit, `.beads/config.yaml`
+can fail it.** `bd init` writes that file with its own indentation conventions, not the consuming
+repo's house style; a strict `yamllint` config (e.g. 2-space indentation enforced) can reject it on
+the very first commit that touches it. Fix by adding `.beads/config.yaml` to the linter's ignore
+list, not by hand-reformatting a file `bd` itself will rewrite on the next `bd config set`.
+
+**Same pattern for `shellcheck`: `.beads/hooks/*` are bd-generated shell shims, not scripts you
+wrote.** Verified on homelab: `.beads/hooks/pre-commit` fails `shellcheck` (SC2016, a single-quote-
+vs-double-quote info-level warning inside bd's own template) the moment `shellcheck` runs
+repo-wide rather than staged-files-only (`make lint` vs the pre-commit hook's normal staged-diff
+scope). Fix the same way: exclude `.beads/hooks/` from the linter's config, don't hand-edit
+bd-owned shell content. General lesson for adopting any linter-in-pre-commit repo: run the FULL
+repo-wide lint (not just a staged-files check) once after `bd init`, not only after the specific
+files you touched, since bd writes files across several conventionally-linted extensions (`.yaml`,
+`.sh`/shim shell scripts, `.md`) that a staged-diff-scoped check may not exercise the same way a
+full run does.
 
 **Check `bd init`'s injected CLAUDE.md/AGENTS.md block against the consuming repo's own content
 gates before trusting the commit is clean.** If the repo runs any lint/pre-commit rule over the
@@ -191,6 +238,53 @@ bd hooks list
 Expect `pre-commit`, `post-merge`, `pre-push`, `post-checkout`, `prepare-commit-msg` all
 `installed`. **Installed is not the same as correct** — `bd hooks run <name>` executes the hook
 body directly, letting you check what it does without waiting for a real git event to fire it.
+
+**"Installed" can also mean "not actually connected to git" — check this before trusting the
+list.** `bd init`'s default hook install mode (`--beads`) writes shims to `.beads/hooks/`, then
+wires each one into the real `.git/hooks/<name>` **only if it found an existing native hook there
+to chain into**. Verified on homelab (2026-08-12): the repo's pre-commit-framework hook already
+existed at `.git/hooks/pre-commit`, so `bd init` correctly chained into it — but `post-merge`,
+`pre-push`, `post-checkout`, and `prepare-commit-msg` had no pre-existing native hook, and `bd
+init` left them as unconnected shims. `bd hooks list` reported all 5 as `installed` regardless;
+`ls .git/hooks/` told the real story (only `pre-commit` present). `bd hooks run <name>` won't catch
+this either, since it invokes the shim's logic directly, bypassing git entirely. **The only real
+check:** `ls .git/hooks/` and confirm every hook `bd hooks list` claims is installed actually has a
+file there. Fix any gap by copying the matching file from `.beads/hooks/<name>` to
+`.git/hooks/<name>` and `chmod +x` it. This is a per-clone fix, git hooks are never committed
+(consuming-the-shelf.md's own doctrine), so document the fix step for future clones rather than
+assuming one adoption's fix travels with the repo.
+
+**`bd init` has a SECOND hook-install mode, and it can silently disable every other hook in the
+repo.** When `.git/hooks/` has no native hook to chain into, `bd init` does not leave unconnected
+shims — it sets **`git config core.hooksPath = .beads/hooks`**, repointing git's entire hook lookup
+at bd's directory. Verified on shelf (2026-08-12, empty `.git/hooks/`). The consequence: **git stops
+reading `.git/hooks/` altogether**, so any hook another installer wrote there — or writes there
+later — never runs again. Proven, not inferred: a probe hook at `.git/hooks/pre-commit` containing
+`exit 1` did not block a commit; the commit succeeded cleanly. The `.beads/hooks/*` shims contain
+only bd's marker-delimited block and chain through to nothing.
+
+This is the single most dangerous thing `bd init` does, because the victim hook keeps *existing* —
+its installer reports success, the file is on disk, `ls .git/hooks/` shows it, and it is dead. On
+shelf it silently killed the shelf's own `no-local-shelf-source` commit guard
+(`tools/hooks/install.py`, which hardcodes `<git-dir>/hooks` and never consults `core.hooksPath`).
+
+**Check both modes after `bd init`, they are mutually exclusive:**
+
+```sh
+git config core.hooksPath          # empty => chain mode (verify per-hook, see above)
+                                   # set    => hooksPath mode (.git/hooks is now dead)
+```
+
+If it's set, audit every other hook-installing tool the repo uses (`husky`, `lefthook`, the
+`pre-commit` framework, any house installer) — each one that writes to `.git/hooks` is now inert,
+and each one that *also* wants `core.hooksPath` will fight bd for it. Fix by chaining the other
+tool's hook body into `.beads/hooks/<name>` **outside** bd's markers, the same way §2.2 chains
+`bd dolt push`.
+
+**One genuine upside, easy to miss:** in hooksPath mode the hooks live at `.beads/hooks/`, which
+`bd init` **commits**. Hooks become tracked files that travel with a clone — inverting the usual
+"git hooks are per-clone and cannot be committed" constraint that per-clone-guard runbooks
+(consuming-the-shelf.md §2) are built around. Anything you chain in there is committable.
 
 ### 2.2 The Dolt-remote-sync gap (verified real, not hypothetical)
 
