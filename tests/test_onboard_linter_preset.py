@@ -97,5 +97,16 @@ def test_creates_a_makefile_from_scratch_when_absent(repo: Path) -> None:
 
     assert result.outcome == Outcome.APPLIED, result.message
     make_text = (repo / "Makefile").read_text()
-    for target in ("check:", "guard:", "lint:", "format:", "typecheck:", "spell:", "deps:", "test:"):
+    for target in (
+        "check:",
+        "guard:",
+        "bootstrap:",
+        "bootstrap-verify:",
+        "lint:",
+        "format:",
+        "typecheck:",
+        "spell:",
+        "deps:",
+        "test:",
+    ):
         assert target in make_text

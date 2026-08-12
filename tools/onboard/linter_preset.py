@@ -4,7 +4,7 @@ Implements `docs/linting.md`'s own copy list, mechanically:
 
 1. The `[tool.ruff]`, `[tool.ruff.lint]` (+ subtables), `[tool.codespell]`,
    `[tool.coverage.*]` blocks from shelf's `pyproject.toml`.
-2. The `Makefile` targets (`check guard lint format typecheck spell deps test`).
+2. The `Makefile` targets (`check guard bootstrap bootstrap-verify lint format typecheck spell deps test`).
 3. The `dev` dependency-group.
 
 Resolution 0004 — "linters are a config-preset, not a CLI" — means this is a
@@ -37,7 +37,7 @@ _SHELF_MAKEFILE = _SHELF_ROOT / "Makefile"
 
 _TABLE_PREFIXES = ("tool.ruff", "tool.codespell", "tool.coverage")
 _DEV_GROUP_TABLE = "dependency-groups"
-_MAKE_TARGETS = ("check", "guard", "lint", "format", "typecheck", "spell", "deps", "test")
+_MAKE_TARGETS = ("check", "guard", "bootstrap", "bootstrap-verify", "lint", "format", "typecheck", "spell", "deps", "test")
 
 _TOML_HEADER_RE = re.compile(r"^\[([^\]]+)\]\s*$", re.MULTILINE)
 _MAKE_TARGET_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_.-]*):", re.MULTILINE)

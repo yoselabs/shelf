@@ -43,6 +43,11 @@ def _resolve_shelf_home(explicit: str | None) -> Path | None:
 
 
 def _run(shelf_home: Path, repo: Path, *, want_beads: bool) -> int:
+    # GuardOperation shells out to tools/hooks/install.py, which resolves the shelf clone
+    # itself via $SHELF_HOME -- propagate what THIS script resolved so the two never disagree
+    # (an unset SHELF_HOME here previously let that subprocess fall back to a different, often
+    # wrong, shelf clone than the one this script is actually importing operations from).
+    os.environ["SHELF_HOME"] = str(shelf_home)
     sys.path.insert(0, str(shelf_home / "tools"))
     # Deferred: sys.path must carry the shelf clone before these resolve.
     from onboard.beads import BeadsOperation  # noqa: PLC0415
@@ -84,6 +89,11 @@ def main() -> int:
     repo = Path(args.repo).resolve()
     if not repo.is_dir():
         print(f"not a directory: {repo}", file=sys.stderr)
+        return 2
+
+    if repo == shelf_home.resolve():
+        print(f"refusing to onboard {repo} onto itself — it IS the shelf, not a consumer of it", file=sys.stderr)
+        print("(the resolver block would otherwise be projected into the shelf's own AGENTS.md)", file=sys.stderr)
         return 2
 
     return _run(shelf_home, repo, want_beads=not args.no_beads)

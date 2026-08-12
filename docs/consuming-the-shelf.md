@@ -14,6 +14,12 @@ current state). This file stays the reference for *what* each piece is and *why*
 mechanism. `docs/runbooks/onboard-a-consumer.md` covers the broader adoption sweep the skill is
 part of.
 
+**Once §4's Makefile targets are copied, `make bootstrap` is the same skill under one command**
+(`make bootstrap-verify` re-checks without implying first-time setup — mechanically identical,
+see `bootstrap-target-contract`'s design doc for why that's a deliberate, not lazy, choice). Before
+a Makefile exists yet (greenfield, or before §4 is done), invoke the script directly:
+`python3 "$SHELF_HOME/.agents/skills/onboard-consumer/scripts/onboard.py" --repo .`
+
 ## 1. Depend on the shelf (git + tag — distributable, never a local path)
 
 ```toml

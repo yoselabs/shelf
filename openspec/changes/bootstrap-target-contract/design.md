@@ -178,13 +178,64 @@ first would prescribe a pattern with zero working instances — "do NOT build on
 the guard fix first means this change's D3 has something concrete to point at, and its
 `bootstrap-verify` has something real to call rather than a stub.
 
+## Addendum, 2026-08-12 — resolved by `onboard-consumer-skill` (shelf-n63)
+
+D1–D6 above were drafted before `tools/onboard/` existed. It has landed since, and it resolves
+most of this design by already being the thing D1's "one exception" pointed at — re-reading
+D1–D6 against it, line by line, rather than leaving the gap implicit:
+
+- **D1 holds, but the home changed.** "Verification logic with real substance... already has a
+  home: `tools/hooks/`, which `fix-guard-hookspath-resolution` is extending" — replace
+  `tools/hooks/` with `tools/onboard/`. Five operations now exist there
+  (`guard`/`resolver-block`/`beads`/`linter-preset`/`verify`), each satisfying D3's guarantees for
+  real. No `shelf-bootstrap` CLI is needed for the same reason as before: the operations are a
+  scaffold a consumer copies/imports, not a runtime dependency.
+- **D2 is superseded, not merely implemented.** The `deps hooks beads-init beads-config` Make
+  graph this section sketched is no longer the right shape. `tools/onboard/operations.py`'s
+  `run_all()` enforces ordering by checking a prior operation's `Result.satisfied` — outcome AND
+  verified, not just "did the prerequisite target exit 0" — which is strictly stronger than a Make
+  prerequisite graph can express. `make bootstrap` is now a single thin target delegating to the
+  operations (via `.agents/skills/onboard-consumer/scripts/onboard.py`), not a hand-decomposed
+  graph of granular Make targets each doing one piece of `bd init`/hook install by hand.
+- **D3 is already satisfied, concretely.** The assertion table's four rows map onto real,
+  tested code: hook-blocks → `guard.py`'s `_verify_live` (via `tools/hooks/install.py`);
+  config-reads-back → `beads.py`'s set-then-`bd config get` on every call; hooks-reachable-by-git →
+  every operation resolves hooks via `git rev-parse --git-path hooks`, never `<git-dir>/hooks`;
+  slot-contention → `guard.py`/`install.py` names the foreign tool and its own extension point.
+  Nothing new to build here; §2/§3 below just wire the Makefile to what already exists.
+- **D4 is the one section still fully open.** Content assertions are in `make check` already
+  (`shelf-gag`, closed, independent of this change as D4 predicted). Environment assertions
+  (`bootstrap-verify`) are NOT wired anywhere yet — `tools/onboard/verify.py` exists but nothing
+  calls it from a Make target. This is the actual remaining work.
+- **D5 happened differently than sketched, and is done.** Rather than converting every line of
+  `adopt-beads.md` from instruction-voice to assertion-voice, the runbook kept its voice and
+  gained one intro paragraph stating the `beads` operation now performs what it describes
+  automatically (`onboard-consumer-skill` §5.3). The findings stayed exactly as evidence/
+  justification, per D5's own rule that findings about bd's behavior stay prose. Re-litigating
+  this into a full per-line conversion would be busywork against an already-served purpose:
+  a reader still gets the complete, self-contained picture, and the operation's own docstring
+  already states which assertion each finding justifies.
+- **D6 is moot.** Both `fix-guard-hookspath-resolution` and `onboard-consumer-skill` landed
+  before this change resumed.
+- **The first open question below is answered by how `tools/onboard/verify.py` was actually
+  built, and the answer is not what the question assumed.** See below.
+
 ## Open questions for implementation
 
-- **Does `bootstrap` mutate a developer's git config without asking?** Setting
-  `core.hooksPath`, installing hooks, and writing tool config are all local-state changes.
-  Idempotent and expected under an explicit `make bootstrap`, but `make check` depending on
-  `bootstrap-verify` must remain strictly read-only — a gate that silently repairs is a gate
-  that hides drift. Worth stating as a hard rule if implementation agrees.
+- **Resolved (was: does `bootstrap` mutate a developer's git config without asking?).** Yes,
+  under an explicit `make bootstrap` — expected, same category as `bd init` itself.
+  **`bootstrap-verify` is NOT read-only either, and that is a deliberate, already-built decision,
+  not an oversight.** `tools/onboard/verify.py`'s entire design is "re-running an operation IS
+  re-verifying it" — idempotent, effect-asserting operations converge a drifted repo back to
+  correct state on every call rather than merely reporting the drift (concretely: a `bd
+  config.yaml` reverted by an unrelated `git checkout` is caught AND fixed by re-running, not just
+  flagged — see `onboard-consumer-skill` tasks.md §2.4). The two targets differ only in *intent
+  signaled to the caller*, not in side effects: `bootstrap` means "set this repo up",
+  `bootstrap-verify` means "check this repo's state" — mechanically the same call. What the
+  original worry actually protects — `make check` never silently repairing — still holds, because
+  `make check` never calls `bootstrap-verify` at all (D4). A gate that self-heals would hide
+  drift; a `bootstrap-verify` you invoke on purpose, that tells you truthfully what it found and
+  fixed, does not.
 - **Resolved (was: what does bootstrap do in CI?).** Nothing. See D4: CI needs neither beads
   nor hooks, and content assertions in `make check` cover what CI must enforce. No CI mode and
   no skip flags. Kept here as a record of the question, because "CI is a fresh unbootstrapped

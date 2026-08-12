@@ -25,6 +25,9 @@ in one adaptive, verified pass:
 python3 "$SHELF_HOME/.agents/skills/onboard-consumer/scripts/onboard.py" --repo /path/to/consumer
 ```
 
+Once the Makefile targets are copied in (they're part of what this run copies, if it also copies
+the linter reference — see step 3 below), `make bootstrap` is the same call.
+
 It's idempotent: safe to re-run on an already-onboarded repo to check its current state, and it
 adapts to what it finds (an existing pre-commit/husky/lefthook hook, a non-Python target, beads
 already initialized). See `consuming-the-shelf.md` for what each piece is and why; see the skill
