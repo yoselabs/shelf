@@ -26,6 +26,19 @@ database are untouched.
 
 Exit codes: ``0`` verified live · ``1`` refused, or written but NOT live ·
 ``2`` could not verify. A check that could not run is never reported as a pass.
+
+**The guarded span is marker-delimited (BEGIN/END), and never ``exec``s.**
+Found for real, re-onboarding a2kay with ``beads``: ``bd init`` detects this
+guard as a native hook and chains its own pre-commit integration *after* it in
+the same file — exactly the intended "guard before ``bd init``" ordering. But
+the body used to end in ``exec python3 "$GUARD"``, which REPLACES the shell
+process on success — so anything appended after it, including bd's chained
+block, was unreachable dead code from the moment it was chained, independent
+of any reinstall. The body now runs the guard and exits only on failure,
+letting execution fall through to whatever another tool appended. Re-running
+the installer replaces only the text between its own BEGIN/END markers,
+preserving anything before or after — the same non-clobbering discipline
+``beads.py``'s dolt-push chain already applies in the other direction.
 """
 
 from __future__ import annotations
@@ -38,6 +51,8 @@ import tempfile
 from pathlib import Path
 
 MARKER = "# shelf-guard (no-local-shelf-source)"
+_BEGIN = f"{MARKER} BEGIN — managed by the shelf installer; safe to re-run."
+_END = f"{MARKER} END"
 
 VERIFIED, REFUSED, COULD_NOT_VERIFY = 0, 1, 2
 
@@ -83,14 +98,20 @@ _MANAGERS: tuple[tuple[str, str, str], ...] = (
     ),
 )
 
-HOOK = f"""#!/bin/sh
-{MARKER} — managed by the shelf installer; safe to re-run.
+# The guarded span only — no shebang, no trailing `exit 0`. `exit 0` at the end
+# would terminate the script before reaching anything another tool appends
+# after this span, same failure as `exec` would have been.
+GUARDED_SPAN = f"""{_BEGIN}
 SHELF="${{SHELF_HOME:-../shelf}}"
 [ -d "$SHELF" ] || SHELF="$HOME/Workspaces/shelf"
 GUARD="$SHELF/tools/hooks/forbid-local-shelf-source.py"
-[ -f "$GUARD" ] && exec python3 "$GUARD"
-exit 0   # guard unavailable (shelf not cloned) -> do not block
+if [ -f "$GUARD" ]; then
+  python3 "$GUARD" || exit 1
+fi
+{_END}
 """
+
+HOOK = f"#!/bin/sh\n{GUARDED_SPAN}"
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -180,6 +201,22 @@ def _verify_live(repo: Path, hook: Path) -> tuple[bool, str]:
     return True, ""
 
 
+def _rewritten_hook(existing: str | None) -> str:
+    """The hook's new content: fresh (`HOOK`) if absent, `GUARDED_SPAN` spliced back in otherwise.
+
+    Preserves everything another tool put before or after it, since re-running
+    must never clobber a chain another tool built on top of a previously
+    installed guard.
+    """
+    if existing is None:
+        return HOOK
+    start = existing.find(_BEGIN)
+    end = existing.find(_END)
+    if start == -1 or end == -1:
+        return HOOK
+    return existing[:start] + GUARDED_SPAN + existing[end + len(_END) :].lstrip("\n")
+
+
 def main() -> int:
     repo = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path.cwd()
 
@@ -209,7 +246,7 @@ def main() -> int:
             print('    python3 "$SHELF_HOME/tools/hooks/forbid-local-shelf-source.py" || exit 1', file=sys.stderr)
         return REFUSED
 
-    hook.write_text(HOOK)
+    hook.write_text(_rewritten_hook(hook.read_text() if hook.exists() else None))
     hook.chmod(hook.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
     if _resolve_guard(repo) is None:

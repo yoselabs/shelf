@@ -133,6 +133,44 @@ def test_reinstall_is_idempotent(repo: Path) -> None:
     assert (_hooks_dir(repo) / "pre-commit").read_text() == body
 
 
+def test_reinstall_preserves_content_another_tool_chained_after_the_guard(repo: Path) -> None:
+    """Found for real, re-onboarding a2kay with beads: `bd init` detects the guard as a native
+    hook and chains its own pre-commit integration AFTER it in the same file. A naive reinstall
+    that overwrites the whole file the moment MARKER is present would silently delete that
+    chained block on the very next re-run of onboarding — exactly what happened.
+    """
+    assert _install(repo).returncode == VERIFIED
+    hooks = _hooks_dir(repo)
+    hook = hooks / "pre-commit"
+    hook.write_text(hook.read_text() + "\n# --- BEGIN BEADS INTEGRATION v1.1.2 ---\necho chained\n# --- END BEADS INTEGRATION v1.1.2 ---\n")
+
+    result = _install(repo)
+
+    assert result.returncode == VERIFIED
+    body = hook.read_text()
+    assert "BEGIN BEADS INTEGRATION" in body, "reinstall deleted the chained block"
+    assert "echo chained" in body
+
+
+def test_content_chained_after_the_guard_actually_executes_when_the_guard_passes(repo: Path) -> None:
+    """The deeper bug behind the one above: the guard body used to end in `exec python3
+    "$GUARD"`, which REPLACES the shell process on success -- so anything appended after it in
+    the same hook file was unreachable dead code from the moment it was chained, independent of
+    any reinstall. Proven here by actually running the hook (guard passing, nothing offending
+    staged) and checking a file the chained content writes.
+    """
+    assert _install(repo).returncode == VERIFIED
+    hooks = _hooks_dir(repo)
+    hook = hooks / "pre-commit"
+    sentinel = hooks / "chained-ran.txt"
+    hook.write_text(hook.read_text() + f"\necho ran > {sentinel}\n")
+
+    ran = subprocess.run([str(hook)], cwd=repo, capture_output=True, text=True, check=False)
+
+    assert ran.returncode == 0, ran.stdout + ran.stderr
+    assert sentinel.exists(), "content chained after the guard never ran"
+
+
 # --- liveness verification (D2) -------------------------------------------
 
 
