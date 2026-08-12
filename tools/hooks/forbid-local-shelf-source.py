@@ -90,7 +90,15 @@ def main(argv: list[str] | None = None) -> int:
     if content is None:
         return 0
 
-    sources = tomllib.loads(content).get("tool", {}).get("uv", {}).get("sources", {})
+    try:
+        parsed = tomllib.loads(content)
+    except tomllib.TOMLDecodeError as exc:
+        where = "HEAD's" if committed else "the staged"
+        print(f"✖ cannot check for a local shelf source: {where} pyproject.toml is not valid TOML ({exc}).", file=sys.stderr)
+        print("  This is NOT a pass — the guard could not run at all.", file=sys.stderr)
+        return COULD_NOT_CHECK
+
+    sources = parsed.get("tool", {}).get("uv", {}).get("sources", {})
     offenders = [name for name, src in sources.items() if _is_local_shelf_source(src)]
     if not offenders:
         return 0

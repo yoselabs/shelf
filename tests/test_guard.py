@@ -170,3 +170,22 @@ def test_outside_a_git_repo_reports_could_not_check_not_success(tmp_path: Path) 
 
     assert result.returncode == 2
     assert "NOT a pass" in result.stderr
+
+
+def test_malformed_toml_reports_could_not_check_not_a_crash(repo: Path) -> None:
+    """Found for real (shelf-jmm): a duplicate [tool.uv.sources] table is invalid TOML.
+
+    `tomllib.loads` raised uncaught, so this printed a raw Python traceback instead
+    of the guard's own message -- accidentally fail-closed (an uncaught exception
+    exits 1, same as "offenders found"), not fail-open, but unintentional and
+    untested. Malformed content is "could not check", same family as "not a git
+    repository" above -- never a silent pass, and never a crash either.
+    """
+    _commit(repo, '[tool.uv.sources]\nanyllm = { git = "x" }\n\n[tool.uv.sources]\nother = { git = "y" }\n')
+
+    result = _run(repo, "--committed")
+
+    assert result.returncode == 2
+    assert "NOT a pass" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert "not valid TOML" in result.stderr
