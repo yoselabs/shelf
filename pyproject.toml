@@ -248,6 +248,3 @@ exclude_lines = [
     "raise NotImplementedError",
     "\\.\\.\\.",  # protocol/abstract stubs
 ]
-
-[tool.uv.sources]
-bad-shelf-dep = { path = "../shelf", editable = true }
