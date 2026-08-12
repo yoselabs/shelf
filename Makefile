@@ -4,10 +4,30 @@
 # This is the reference toolchain every consumer of the shelf inherits (resolution 0004).
 # Each target is one linter doing one job; `check` is the gate.
 
-.PHONY: check lint format typecheck spell deps test test-browser cov catalog advisory sync
+.PHONY: check guard lint format typecheck spell deps test test-browser cov catalog advisory sync
 
 # The gate. Fast, deterministic tools first; tests last.
-check: lint typecheck spell deps test
+check: guard lint typecheck spell deps test
+
+# The commit guard as a GATE, not only a hook. A pre-commit hook is per-clone and
+# can be silently disabled by anything that claims core.hooksPath -- beads, husky,
+# lefthook -- which happened in this very repo and went unnoticed because the hook
+# file still existed and looked installed. So the hook is FAST FEEDBACK and this is
+# the ENFORCEMENT: it needs no onboarding, no hooks, and holds on any fresh clone.
+#
+# --committed reads HEAD, deliberately not the working tree: an *uncommitted* local
+# override is the supported co-development workflow (docs/consuming-the-shelf.md
+# §1), and a gate that failed on it would break the thing the docs prescribe.
+#
+# Consumers copy this target verbatim -- it finds the guard in-repo (the shelf) or
+# via $SHELF_HOME -> ../shelf -> ~/Workspaces/shelf (a consumer). Exit 2 means the
+# guard could not run, which is never treated as a pass.
+guard:
+	@g=tools/hooks/forbid-local-shelf-source.py; \
+	 [ -f "$$g" ] || g="$${SHELF_HOME:-../shelf}/tools/hooks/forbid-local-shelf-source.py"; \
+	 [ -f "$$g" ] || g="$$HOME/Workspaces/shelf/tools/hooks/forbid-local-shelf-source.py"; \
+	 if [ -f "$$g" ]; then python3 "$$g" --committed; \
+	 else echo "guard: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
 
 lint:
 	uv run ruff check packages tests tools

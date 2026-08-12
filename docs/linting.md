@@ -45,7 +45,11 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
 
 1. The `[tool.ruff]`, `[tool.ruff.lint]`, `[tool.codespell]`, `[tool.coverage.*]` blocks from
    `pyproject.toml`, and each package's `[tool.deptry]` if it needs ignores.
-2. The `Makefile` targets (`check lint format typecheck spell deps test`).
+2. The `Makefile` targets (`check guard lint format typecheck spell deps test`). Copy `guard`
+   **verbatim** — it resolves the shelf clone itself (`$SHELF_HOME` → `../shelf` →
+   `~/Workspaces/shelf`), so it works unchanged in your repo. It is what actually enforces the
+   no-committed-local-shelf-source rule; the pre-commit hook is fast feedback, not enforcement
+   (a hook is per-clone and any tool claiming `core.hooksPath` can disable it silently).
 3. The `dev` dependency-group (pytest, pytest-cov, ruff, ty, codespell, deptry).
 
 Then **own it**: override any rule your project genuinely needs to, on purpose. Divergence is a local

@@ -15,20 +15,34 @@ anyllm = { git = "https://github.com/yoselabs/shelf", subdirectory = "packages/a
 source — it ties the project to one filesystem. (For local co-development of shelf + a consumer, use an
 *uncommitted* override; see [`agent-loop.md`](agent-loop.md) §6.)
 
-## 2. Install the commit guard (one command — required per clone)
+## 2. The commit guard — enforced by `make check`, accelerated by a hook
 
-The shelf ships a guard that **refuses to commit a local `path=`/editable shelf source**, so a
-co-development override can never leak into a commit and break CI or another checkout. Git hooks are
-**per-clone and cannot be committed** — so installing the guard is a **required onboarding step in every
-clone** (a fresh clone is unguarded until you run it):
+The shelf ships a guard that **refuses a local `path=`/editable shelf source**, so a co-development
+override can never leak into a commit and break CI or another checkout.
+
+**Enforcement is the `guard` target in `make check`** (copied with the rest of the preset, §4). It
+reads `HEAD` — committed content — so it holds on any clone, with no hooks, no onboarding, and
+nothing installed. That matters because the alternative does not hold: a git hook is per-clone and
+**any tool that claims `core.hooksPath` silently disables it** — beads, husky, and lefthook all do,
+and the hook file keeps existing and looking installed while git never runs it. That happened in the
+shelf's own repo and went unnoticed. Do not rely on a hook as the enforcement point.
+
+Note what the gate does *not* read: your working tree. An **uncommitted** local override is the
+supported co-development workflow (§1) and stays legitimate.
+
+**Optionally add the hook for faster feedback** — it catches the mistake at commit time instead of
+at gate time:
 
 ```bash
 python "$SHELF_HOME/tools/hooks/install.py"   # run in the consumer repo root
 ```
 
 Idempotent; it resolves the shelf via `$SHELF_HOME → ../shelf → ~/Workspaces/shelf`, writes a native
-pre-commit hook, and refuses to clobber a foreign one. **Verify:** stage a `path=`/editable shelf source
-and try to commit — it must be blocked.
+pre-commit hook, and refuses to clobber a foreign one. **If your repo also uses beads, install this
+before `bd init`** — `bd init` chains into an existing native hook, but seizes `core.hooksPath` when
+it finds none, which installs the guard dead. **Verify the hook actually fires:** stage a
+`path=`/editable shelf source and try to commit — it must be blocked. A hook that exists is not a
+hook that runs.
 
 **Using the pre-commit framework instead?** add to `.pre-commit-config.yaml` (skips the installer):
 
