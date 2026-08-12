@@ -14,10 +14,18 @@
    agent skips step 9                         │  verify = assertions
         │                                     │  idempotent = safe to re-run
         ▼                                     ▼
-   works, until it doesn't,              make bootstrap-verify  ◄── make check
-   silently                                   │
+   works, until it doesn't,              make bootstrap-verify
+   silently                              (environment: is THIS clone wired?)
+                                              │
                                               ▼
-                                        drift fails the build
+                                        a developer learns their
+                                        fast feedback is broken
+
+   separately, and this is the safety net (D4):
+
+        make check ──► content assertions (no local path= source, …)
+                       true on any clone, needs no bootstrap, no hooks,
+                       no CI mode. The gate that actually enforces.
 ```
 
 Prose has no idempotency, no ordering enforcement, and no failure mode. Those three
@@ -82,27 +90,56 @@ Minimum assertions the contract names:
 **Three outcomes, never two.** Live / not-live / could-not-check must stay distinct. Collapsing
 "couldn't check" into a pass is precisely how a dead guard reported `✔`.
 
-## D4 — `make check` depends on `bootstrap-verify` (the contested one)
+## D4 — Split by what is being checked, not by what it costs
 
-**Decision.** Yes — with the cost measured before it lands, not assumed away.
+**Decision.** `make check` always runs **content assertions**. `bootstrap-verify` holds
+**environment assertions** and is *not* a `check` prerequisite.
 
-The argument for: bootstrap correctness *decays*, and every decay mode found this session was
-silent. A `git reset --hard` reverts tracked config. A teammate follows pre-commit's hint and
-unsets `core.hooksPath`. A fresh clone never onboards. A one-shot install cannot notice any of
-these; only a recurring check can. This is also the honest resolution of `shelf-gag` — "guard
-enforcement is per-clone" stops mattering when the gate itself asserts liveness.
+An earlier draft of this design proposed making `check` depend on the whole of
+`bootstrap-verify`, with a fast/slow split decided by measurement if it proved expensive.
+That was wrong, and the question "does CI even need beads and hooks?" is what exposed it. Cost
+is the wrong axis. The right one is **what kind of thing is being asserted:**
 
-The argument against, which is real: `make check` is the inner loop, and it already runs five
-tools. Verification that spawns git subprocesses on every invocation is a tax on every
-developer action, forever.
+| | content assertion | environment assertion |
+|---|---|---|
+| example | no local `path=`/editable shelf source | the pre-commit hook actually blocks; `bd config get` reads back |
+| what it describes | the repo's own files | this working copy's configuration |
+| true on a fresh clone? | yes — needs nothing installed | no — meaningless until bootstrapped |
+| meaningful in CI? | **yes, and it is the point** | no — CI never commits, so hooks are inert |
+| home | `make check` | `make bootstrap-verify` |
 
-**Resolution:** land it, but measure first (task 3.1). If verification costs more than ~1s,
-split it — a fast path in `check` (config readback, path comparison: cheap string work) and
-the expensive behavioral assertions in `bootstrap` and CI only. Do not decide this by intuition;
-the whole change is an argument against trusting intuition over measurement.
+Conflating them produced a bad conclusion: that hook liveness is safety-critical and therefore
+worth taxing every `make check`. It isn't, once the content assertion is in the gate.
 
-Rejected: a git hook instead of `make check`. The thing being verified is partly *whether hooks
-work* — a verifier that runs as a hook cannot report its own absence.
+**The inversion this produces is the real result.** Today `forbid-local-shelf-source.py` is
+invoked by nothing but the pre-commit hook — so a per-clone, silently-disableable artifact is
+the *sole* enforcement path, which is exactly how this repo ended up unguarded without anyone
+noticing. Moving the assertion into `make check` makes the hook *fast feedback* rather than
+enforcement: you learn at commit time instead of at gate time, and a dead hook costs latency,
+not safety.
+
+That reframes the neighbouring work rather than just relocating a check:
+
+- `shelf-gag` stops being a downstream consequence and becomes the **cheapest, highest-value,
+  and first** of the three. It depends on neither of the others. It has been unblocked and
+  re-prioritized to P1.
+- `shelf-efh` (the guard is dead under `core.hooksPath`) stays a real bug — fast feedback that
+  lies is still worth fixing — but it is no longer a safety hole.
+- This change's hook-liveness verification becomes a **convenience**: it tells a developer
+  their fast feedback is broken. Not a gate.
+
+**On CI specifically** (this resolves design open question 2): CI needs neither beads nor
+hooks. Beads has no CI role at all — nothing creates issues or syncs, and
+`.beads/issues.jsonl` is committed and read-only. Hooks are inert where nothing commits. What
+CI needs is `make check`, and with content assertions inside it, that is sufficient. No CI
+mode, no skip flags, no special-casing.
+
+Worth stating plainly: **this repo currently has no CI** (no `.github/workflows/`). `make
+check` is the only gate that exists, which makes putting the assertion there not merely the
+better option but the only one that enforces anything.
+
+Rejected: a git hook as the enforcement point. The thing being verified is partly *whether
+hooks work* — a verifier that runs as a hook cannot report its own absence.
 
 ## D5 — The beads runbook: same findings, different voice
 
@@ -148,6 +185,7 @@ the guard fix first means this change's D3 has something concrete to point at, a
   Idempotent and expected under an explicit `make bootstrap`, but `make check` depending on
   `bootstrap-verify` must remain strictly read-only — a gate that silently repairs is a gate
   that hides drift. Worth stating as a hard rule if implementation agrees.
-- **What does bootstrap do in CI?** A fresh CI clone is unbootstrapped by definition. Either
-  CI runs `bootstrap` first, or `bootstrap-verify` needs a CI mode that skips hook liveness
-  (hooks being irrelevant where nothing commits). Unresolved; decide before D4 lands.
+- **Resolved (was: what does bootstrap do in CI?).** Nothing. See D4: CI needs neither beads
+  nor hooks, and content assertions in `make check` cover what CI must enforce. No CI mode and
+  no skip flags. Kept here as a record of the question, because "CI is a fresh unbootstrapped
+  clone" is a reasonable worry that the content/environment split dissolves rather than answers.

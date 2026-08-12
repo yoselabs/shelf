@@ -92,19 +92,35 @@ reported as a pass.
 - **THEN** the outcome is reported as could-not-verify, distinctly from success, so that an
   unchecked property is never mistaken for a checked one
 
-### Requirement: The standing gate verifies bootstrap state and never repairs it
+### Requirement: Content assertions live in the gate; environment assertions do not
 
-`make check` SHALL depend on verification of bootstrap state, so that decay fails the build.
-That verification SHALL be read-only.
+Assertions about the repository's own content SHALL run as part of `make check`, so that they
+hold on any clone regardless of whether it was bootstrapped. Assertions about a working copy's
+configuration SHALL live in `make bootstrap-verify` and SHALL NOT gate `make check`.
 
-#### Scenario: Bootstrap state decays after onboarding
+#### Scenario: An unbootstrapped clone violates a content rule
 
-- **WHEN** configuration is reverted, a hook is disabled, or a clone was never bootstrapped
-- **THEN** the next `make check` fails and names what is not live — the drift announces itself
-  rather than waiting to be noticed
+- **WHEN** a clone that never ran `make bootstrap` — with no hooks installed and no tooling
+  configured — introduces a local `path=`/editable shelf source
+- **THEN** `make check` fails on it, because the assertion reads the repo's files and depends
+  on nothing that onboarding installs
 
-#### Scenario: The gate encounters a repairable problem
+#### Scenario: A hook is dead but the content is correct
 
-- **WHEN** verification finds state it could fix
-- **THEN** it reports and fails without changing anything, directing the operator to
-  `make bootstrap` — a gate that silently repairs is a gate that hides drift
+- **WHEN** the pre-commit hook has been disabled or is unreachable, and the repo's content
+  violates no rule
+- **THEN** `make check` passes, and the broken hook is reported by `make bootstrap-verify` as a
+  degraded-feedback problem rather than a gate failure
+
+#### Scenario: Verification is asked to run where hooks are meaningless
+
+- **WHEN** the environment never commits — continuous integration, or a container running only
+  the gate
+- **THEN** no hook or issue-tracker state is required, and no CI-specific mode, skip flag, or
+  special case is needed to make the gate pass
+
+#### Scenario: Verification encounters a repairable problem
+
+- **WHEN** `make bootstrap-verify` finds environment state it could fix
+- **THEN** it reports and exits non-zero without changing anything, directing the operator to
+  `make bootstrap` — a check that silently repairs is a check that hides drift

@@ -29,9 +29,9 @@ Tests-first per the working agreement. `make check` green across the whole repo 
       not on invocation order.
 
 ## 3. `make bootstrap-verify`
-- [ ] 3.1 **Measure first** (D4). Time the full verification. Record the number in the change
-      before deciding whether `check` takes all of it or only the fast path. The measurement
-      is the deliverable of this task, not a formality.
+- [ ] 3.1 Wire the **content** assertion into `make check` — but only if `shelf-gag` has not
+      already done it (it should have; it is P1 and unblocked). If it has, verify the wiring
+      matches D4's split and move on rather than duplicating it.
 - [ ] 3.2 Failing test per assertion in D3's table: hook-blocks-offending-state,
       config-reads-back, hooks-reachable-by-git, no-slot-contention. Each must fail for the
       right reason before it passes.
@@ -40,10 +40,10 @@ Tests-first per the working agreement. `make check` green across the whole repo 
 - [ ] 3.4 Failing test: `bootstrap-verify` is read-only — run it against a repo with unrelated
       uncommitted changes and misconfigured hooks; assert it reports failure and that git
       config, the index, and tracked files are byte-identical afterwards.
-- [ ] 3.5 Wire into `make check` per 3.1's measurement. If split, document which assertions
-      live where and why.
-- [ ] 3.6 Resolve design open question 2 (CI behavior) explicitly; record the decision in
-      design.md rather than letting the implementation imply it.
+- [ ] 3.5 Failing test: `make check` passes on a clone with no hooks installed and no tooling
+      configured, provided its content is clean — the gate must not require bootstrap (D4).
+- [ ] 3.6 Confirm `make check` does **not** depend on `bootstrap-verify`, and that no
+      CI-specific mode or skip flag was needed to achieve that.
 
 ## 4. Rewrite the beads runbook (D5)
 - [ ] 4.1 Convert each instruction to an assertion, per D5's table. Work rule by rule; do not
@@ -63,7 +63,7 @@ Tests-first per the working agreement. `make check` green across the whole repo 
 
 ## 6. Close the loop (resolution 0009)
 - [ ] 6.1 `make check` green, whole repo.
-- [ ] 6.2 Close `shelf-gag` if D4 landed as proposed; if the fast/slow split changed what it
-      guarantees, update the bead instead of closing it.
+- [ ] 6.2 Confirm `shelf-gag` closed on its own (it is independent of this change now); if it
+      is still open, this change should not close it.
 - [ ] 6.3 Ledger row.
 - [ ] 6.4 Merge and push.

@@ -46,11 +46,14 @@ fail; a paragraph can only ask. And it converts "the next agent must remember 14
    never collapsed into two). This is a *contract*, not a script: repos differ, and what they
    share is the obligation, not the implementation.
 
-2. **`make bootstrap-verify`, and `make check` depends on it.** Bootstrap correctness decays —
-   a `git reset` reverts config, a teammate unsets `core.hooksPath`, a clone never onboards.
-   A one-shot install cannot notice. Making verification part of the standing gate is what
-   turns silent drift into a failed build. This is also the durable form of `shelf-gag`
-   (guard enforcement is per-clone): an unguarded clone stops being invisible.
+2. **Content assertions move into `make check`; `make bootstrap-verify` holds environment
+   assertions and is not a gate.** These are different kinds of claim and were conflated in an
+   earlier draft (see D4). "No local `path=` shelf source" is a property of the repo's files —
+   true on any clone, needing no hooks, no onboarding, and no CI mode. "The pre-commit hook
+   actually blocks" is a property of one working copy. Today the former is enforced *only* by
+   a pre-commit hook, which is precisely how this repo went unguarded unnoticed. Putting it in
+   the gate makes the hook fast feedback rather than enforcement: a dead hook then costs
+   latency, not safety.
 
 3. **The beads runbook is rewritten in the prescriptive voice, and stays self-contained.**
    Not deleted, not merged into the general one — most repos here will adopt beads, and its
@@ -96,8 +99,12 @@ build on spec" the constitution warns about.
 
 - New: `docs/runbooks/repo-bootstrap.md`, `make bootstrap`, `make bootstrap-verify`.
 - Rewritten in voice, preserved in substance: `docs/runbooks/adopt-beads.md`.
-- `Makefile` — two targets; `check` gains a `bootstrap-verify` prerequisite.
+- `Makefile` — `bootstrap` and `bootstrap-verify` targets; `check` gains a content assertion,
+  and does **not** depend on `bootstrap-verify` (D4).
 - `AGENTS.md`, `docs/consuming-the-shelf.md` — onboarding becomes one command.
-- `make check` gets slower by whatever verification costs. That is the price of the guarantee
-  and should be measured, not assumed negligible (see design D4).
-- Closes `shelf-gag` if D4 lands as proposed.
+- `make check` gains one cheap content assertion, not a verification suite (D4).
+- **`shelf-gag` is no longer downstream of this change.** It is the cheapest and highest-value
+  of the three, depends on neither of the others, and has been unblocked and raised to P1. Do
+  it first; this change assumes it has landed.
+- **This repo has no CI** (no `.github/workflows/`), so `make check` is the only gate that
+  exists — which is what makes the content/environment split decisive rather than stylistic.
