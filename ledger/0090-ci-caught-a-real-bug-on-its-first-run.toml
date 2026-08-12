@@ -1,0 +1,10 @@
+seq = 90
+date = "2026-08-12"
+event = "delivery"
+software = "shelf"
+release = ""
+actor = "shelf"
+consumer = ""
+verdict = "pass"
+cost = ""
+note = "EVOLVE: follow-up to ledger 0089 (shelf-2xb, CI standup). The first real GitHub Actions run went red: test_installed_guard_blocks_a_real_commit failed with 'the offending commit was not blocked'. Not a guard regression -- the test's final `git commit` ran with no explicit env, inheriting the ambient environment. Locally that 'worked' only by coincidence: the guard hook's own fallback chain ($SHELF_HOME -> ../shelf -> ~/Workspaces/shelf) resolved because ~/Workspaces/shelf happens to be a real shelf clone on the machine that authored the test. CI has neither SHELF_HOME nor that directory, so the hook hit its own documented fail-open path and let the commit through -- exactly as designed, just not the path this test meant to exercise. Fixed by passing SHELF_HOME explicitly in both this test and its sibling (content chained after the guard actually runs), rather than relying on the runner's ambient environment. Verified against the actual failure mode before re-pushing: reran locally under HOME=/tmp/fake-home-no-shelf with SHELF_HOME unset, simulating the CI environment for real. Second CI run: green (2m16s). This is exactly the kind of failure shelf-2xb's proposal argued CI would catch that discipline alone couldn't: not a person forgetting to run the gate, but a guarantee (the test suite) that had a hidden environmental dependency nobody had reason to suspect, because it always happened to hold on every machine that had ever run it. make check green, whole repo, both locally and in CI."
