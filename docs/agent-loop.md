@@ -170,8 +170,8 @@ STEPS:
      the existing vocabulary — don't invent a new one). If the same session also completes the
      repoint (step 6) and it holds, append a **separate** `verdict` row (`adopted`/`kept`) — two
      events, two rows, never one row wearing both hats.
-   - If this closed a `docs/backlog.md` line, delete it in the same change; if only partially
-     closed, edit it to say what remains.
+   - If this closed a bead, `bd close <id>` in the same change; if only partially closed,
+     `bd update <id> --append-notes "<what remains>"` instead of closing it.
    - `make check` green, **then merge `work/<project>` into `main` and push** — a promotion that
      never reaches `main` never happened, from any other session's point of view.
 9. `git -C <shelf> worktree remove ../shelf-<project>` once step 8's merge landed; delete the

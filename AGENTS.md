@@ -89,13 +89,44 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
 
 ## Decisions, open work, and the backlog
 
-- **[docs/backlog.md](docs/backlog.md)** — the single curated view of what's left (traces to verify,
-  gated builds, open decisions, parked items). Prune lines as they close; the git log is the record.
+**`backlog` = `kanban` = `beads`.** One mechanism, three names that all mean `bd`. There is no
+backlog file and no board — `docs/backlog.md` was migrated into beads on 2026-08-12 and deleted.
+Don't go looking for it, and don't start a replacement.
+
+- **`bd ready`** — the single curated view of what's actionable (`bd list --all` for everything,
+  including deferred). Close beads as they finish; the git log plus the ledger are the record.
 - **[docs/resolutions/](docs/resolutions/)** — decided things (ADR-style, each with an expiry).
   Start: [0001 — repo topology](docs/resolutions/0001-repo-topology.md). Flow explained in the
   [resolutions README](docs/resolutions/README.md) (thoughts → tracks → missions → resolutions).
 - **[docs/missions/](docs/missions/)** — scoped future objectives.
 - **[docs/thoughts/](docs/thoughts/)** — the origin exploration (kept, not authoritative).
+
+### Beads conventions (this repo's own — not part of bd's managed blocks below)
+
+Two blocks below are generated and maintained by `bd` (one for Claude, one for Codex — near
+duplicates; that's bd's doing, not drift). **These rules override them where they conflict:**
+
+- **Do NOT use `bd remember` / `bd prime` for persistent memory.** The operator already runs a
+  memory system; a fourth one fragments it. bd's blocks say otherwise — this line wins. Use `bd`
+  for *work tracking only*.
+- **Three distinct "not ready" states — don't collapse them** (see
+  [docs/runbooks/adopt-beads.md](docs/runbooks/adopt-beads.md) §1.3):
+
+  | Situation | Mechanism |
+  |---|---|
+  | Waiting on another tracked bead | `bd dep add <id> <blocker> --type blocks` — status stays `open`; surfaced by `bd blocked` |
+  | Deliberately shelved, nothing specific blocking it | `bd defer <id> --reason "<the trigger>"` |
+  | Waiting on something with no bead (external access, a human decision) | `bd update <id> --status blocked` + a comment; find via `bd list --status blocked`, **not** `bd blocked` |
+
+  Never invent a synthetic blocking bead for "not started yet" — that's `deferred`.
+- **Gated work carries its trigger in the defer reason.** This repo's doctrine is "do NOT build on
+  spec" — a deferred bead whose reason doesn't name a concrete trigger is incomplete.
+- **Link a bead to a mission/resolution** with `bd update <id> --spec-id "<path>"` (a native field,
+  not free text). **Branch/commit provenance:** `bd update <id> --set-metadata branch=<name>
+  --set-metadata commit=<sha>` — a convention, not a bd feature. **Supersession:**
+  `bd dep add <new> <old> --type supersedes`, never delete the superseded bead.
+- **`bd config set` edits `.beads/config.yaml`, which is a tracked file.** A `git checkout` or
+  `git reset --hard` silently reverts your config. Always confirm with `bd config get <key>`.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:970c3bf2 -->
 ## Beads Issue Tracker
