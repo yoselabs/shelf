@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-08-12
+goal: The shelf commit guard is either provably live or loudly absent — never
+  silently dead
