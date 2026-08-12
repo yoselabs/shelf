@@ -41,13 +41,20 @@ Tests-first. `make check` green, whole repo, is Done.
       binary, no mocking; skipped when `bd` is absent). Verification is partial and says so in
       the module docstring: `sh -n` on the appended hook, not a live `bd dolt push` (would need a
       real Dolt remote and touch the network as an onboarding side effect).
-- [ ] 2.4 Failing test for the config-revert trap (landmine 5): after `bd config set`, a
+- [x] 2.4 Failing test for the config-revert trap (landmine 5): after `bd config set`, a
       `git checkout -- .beads/config.yaml` makes `verify` fail rather than silently pass.
-      (Note: 2.3's readback happens inside the same `run()` call, before any git operation could
-      revert it — this item is about the standalone `verify` operation in §2.5 re-checking a
-      *previously applied* `beads` operation, e.g. on a second onboarding pass after tree-rewinding.)
-- [ ] 2.5 `verify` — assert every applied operation is live; report per-operation, not one
+      Landed as self-heal-and-report-truthfully rather than a bare FAILED: `verify` re-runs the
+      operation (D3.1 idempotence), which re-executes `bd config set` + `bd config get` from
+      scratch — the revert is caught AND fixed in the same pass, never silently missed. A
+      read-only check would only have reported the drift; this converges past it, which is
+      strictly more useful for an onboarding tool.
+      (`test_config_revert_is_caught_and_self_healed_by_a_second_verify_pass`)
+- [x] 2.5 `verify` — assert every applied operation is live; report per-operation, not one
       aggregate boolean.
+      (`tools/onboard/verify.py`: `verify()` = `run_all()` re-invoked — "re-running IS
+      re-verifying" is the whole mechanism, no separate check path to drift from apply.
+      `all_satisfied()` is an explicit opt-in aggregate, never the default return shape.
+      `tests/test_onboard_verify.py` — 3 tests)
 
 ## 3. Python + uv operations
 - [ ] 3.1 `linter-preset` — ruff/codespell/coverage blocks, Makefile targets, dev group.
