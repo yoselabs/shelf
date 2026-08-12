@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 from timefmt import fmt_dur
 
@@ -36,6 +36,8 @@ def test_property_output_always_matches_exactly_one_tier_shape(ms: int) -> None:
 
 
 @given(ms=st.integers(min_value=0, max_value=10_000_000))
+@example(ms=1450)  # exact half-tick: 1.45s -> "1.4s". Hypothesis found this; its example
+# DB is self-gitignored, so pin the boundary here or it guards only the machine that hit it.
 @settings(max_examples=300)
 def test_property_embedded_number_approximates_ms_independently(ms: int) -> None:
     """Recompute what the embedded number *should* be from first principles (not by
@@ -49,8 +51,11 @@ def test_property_embedded_number_approximates_ms_independently(ms: int) -> None
     if match.group("ms") is not None:
         assert int(match.group("ms")) == ms
     elif match.group("s1") is not None:
-        # tier 2: one-decimal seconds, half-a-tick tolerance for the rounding itself
-        assert abs(float(match.group("s1")) - ms / 1000) < 0.05
+        # tier 2: one-decimal seconds. Half a tick (0.05s) is the *inclusive* bound —
+        # an input landing exactly on a half-tick (ms=1450 -> "1.4s") is correctly
+        # rounded, not an error, so a strict `<` would reject valid output. The epsilon
+        # covers float representation only: abs(1.4 - 1.45) is 0.050000000000000044.
+        assert abs(float(match.group("s1")) - ms / 1000) <= 0.05 + 1e-9
     elif match.group("s2") is not None:
         # tier 3: truncated (not rounded) whole seconds
         shown = int(match.group("s2"))
