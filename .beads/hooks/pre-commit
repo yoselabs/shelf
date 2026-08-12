@@ -31,3 +31,16 @@ if command -v bd >/dev/null 2>&1; then
   if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
 fi
 # --- END BEADS INTEGRATION v1.1.2 ---
+
+# shelf addition (not beads-managed, won't be touched by bd upgrades):
+# bd init put this repo into `core.hooksPath = .beads/hooks` mode (empty
+# .git/hooks/ at init time), which silently disabled the shelf's own
+# no-local-shelf-source commit guard (tools/hooks/install.py normally writes
+# to <git-dir>/hooks/pre-commit, which core.hooksPath causes git to never
+# read). Chained here instead, inside the hook git actually invokes. Fatal
+# by design: this guard is "not overridable by design" per its own script.
+_REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+_GUARD="$_REPO_ROOT/tools/hooks/forbid-local-shelf-source.py"
+if [ -f "$_GUARD" ]; then
+  python3 "$_GUARD" || exit 1
+fi
