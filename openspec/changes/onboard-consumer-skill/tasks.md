@@ -57,13 +57,22 @@ Tests-first. `make check` green, whole repo, is Done.
       `tests/test_onboard_verify.py` — 3 tests)
 
 ## 3. Python + uv operations
-- [ ] 3.1 `linter-preset` — ruff/codespell/coverage blocks, Makefile targets, dev group.
-- [ ] 3.2 Failing test: merges into an existing `pyproject.toml`/`Makefile` rather than
+- [x] 3.1 `linter-preset` — ruff/codespell/coverage blocks, Makefile targets, dev group.
+      (`tools/onboard/linter_preset.py`)
+- [x] 3.2 Failing test: merges into an existing `pyproject.toml`/`Makefile` rather than
       overwriting; a repo with its own ruff config keeps its overrides (resolution 0004's
-      "copy, then own" must survive re-running onboarding).
-- [ ] 3.3 Confirm the stack tag is real: the stack-agnostic operations run to completion against
+      "copy, then own" must survive re-running onboarding). Merge granularity is per-family
+      (owning `[tool.ruff]` at all — even one overridden key — takes the whole ruff namespace
+      off the table, `[tool.ruff.lint]` included; same for `tool.coverage.*`), never per-line —
+      per `docs/linting.md`'s own "own it" framing, line-level reconciliation is the consumer's
+      judgment, not this operation's to make.
+      (`tests/test_onboard_linter_preset.py` — 6 tests)
+- [x] 3.3 Confirm the stack tag is real: the stack-agnostic operations run to completion against
       a target repo with no `pyproject.toml` at all, and `linter-preset` reports
       could-not-apply rather than failing the run.
+      (`test_no_pyproject_is_could_not_apply_not_a_failure`; the stack-agnostic operations
+      (`guard`/`resolver-block`/`beads`/`verify`) have no dependency on `pyproject.toml` at all,
+      so nothing else in the run is blocked by `linter-preset`'s COULD_NOT_APPLY.)
 
 ## 4. The skill (D4)
 - [ ] 4.1 Decide the skill's location (design open question 2), biased to the cross-tool path.
