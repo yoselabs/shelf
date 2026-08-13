@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "mcp-feedback"
+kind = "any-*"
+tier = "T2"
+release = "mcp-feedback-v0.1.0"
+capability = "Stop caring how to mount an agent-invoked feedback tool on a FastMCP server — a fixed-schema report_feedback(subject, note, wanted) tool, OTLP/HTTP-logs transport, exactly two consumer knobs (endpoint/api_key config, one appended line of tool-description guidance)."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Generalized from a2web's archived add-agent-invoked-feedback-tool change (a2web-only, url-scoped). The second FastMCP-coupled shelf package after mcp-result-wire. Correlation is ctx.session_id only — an explicit stopgap pending a native MCP protocol call-linking/feedback mechanism, not a permanent design. a2web's own adoption tracked separately (adopt-shelf-mcp-feedback). Born candidate."

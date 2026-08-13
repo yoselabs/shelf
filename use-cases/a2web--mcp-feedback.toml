@@ -1,0 +1,16 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2web"
+software = "mcp-feedback"
+why = "a2web's own agent-invoked report_feedback tool (archived change add-agent-invoked-feedback-tool) was built a2web-only, scoped around a fetch-specific `url` parameter. Generalizing it here lets a2web drop its local reimplementation and lets any future FastMCP project reuse the same mechanism verbatim."
+needs = "register_feedback_tool(mcp, endpoint, api_key, extra_instructions) mounting the fixed report_feedback(subject, note, wanted) tool a2web already validated the shape of against real drift data (feedback-telemetry's severity attribute)."
+sponsor = "Denis Tomilin"
+requester = "a2web"
+status = "active"          # active | retired
+# a2web's own adoption is tracked in a2web's repo as change `adopt-shelf-mcp-feedback`,
+# blocked on this package shipping a real git tag (a2web forbids a local `path=` shelf
+# pin — tests/architecture/test_no_local_shelf_source.py). This UseCase records the
+# claim now rather than after the pin lands, per shelf doctrine's "promote aggressively,
+# reconcile later."
