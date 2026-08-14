@@ -148,6 +148,29 @@ generic. `scope.name` is fixed to `mcp.feedback.agent` so downstream
 gateways can distinguish this package's reports from anything else on the
 same stream without per-consumer configuration.
 
+### D7 — `request`/`response` added as optional free-text fields (v0.3.0)
+
+**Gap found after real use, not at design time:** the original schema
+(`subject`/`note`/`wanted`) had no field for "what actually came back" —
+arguably the single most useful fact for a human triaging these reports
+later. `note`/`wanted` alone forced the agent to either omit that fact or
+bury it inside `note`'s prose.
+
+**Not the same class of problem D2 already rejected.** D2 rejected a
+*closed* `category` enum, because a fixed vocabulary drifts once real
+callers touch it (direct evidence: `severity` on an unrelated a2web
+attribute arrived in five different casings). `request`/`response` are
+plain free-text fields, same as `note`/`wanted` — no vocabulary to drift.
+Adding them doesn't reopen D2; it extends the same free-text pattern to
+cover a fact the original shape happened to omit.
+
+**Chosen:** two new optional parameters, `request: str | None` (what was
+actually asked/run, with what parameters) and `response: str | None`
+(what actually came back). Both optional, both free text, inserted after
+`note` and before `wanted` in the signature. `subject`/`note` stay the
+only required fields — a report that's just "this concerned X, and Y was
+wrong" remains valid without either.
+
 ## Risks / Trade-offs
 
 - **[Accepted, named] Session-only correlation is weak.** See D5. Not

@@ -1,8 +1,9 @@
 # mcp-feedback
 
 A drop-in, agent-invoked feedback tool for any FastMCP server. Mounts a single
-`report_feedback(subject, note, wanted=None)` tool with a **fixed schema** —
-the whole point is one identical shape everywhere, not a customizable one.
+`report_feedback(subject, note, request=None, response=None, wanted=None)`
+tool with a **fixed schema** — the whole point is one identical shape
+everywhere, not a customizable one. Only `subject` and `note` are required.
 
 ```python
 from fastmcp import FastMCP
@@ -26,8 +27,9 @@ register_feedback_tool(
 - `extra_instructions` — appended to a fixed base tool description, never
   replacing it. One line of domain-specific guidance, nothing more.
 
-Everything else — the tool name, its three parameters (`subject: str`,
-`note: str`, `wanted: str | None`), the absence of any closed category, the
+Everything else — the tool name, its five parameters (`subject: str`,
+`note: str`, `request: str | None`, `response: str | None`,
+`wanted: str | None`), the absence of any closed category, the
 OTLP/HTTP-logs transport, the `sent: bool` result shape — is identical no
 matter who mounts it.
 

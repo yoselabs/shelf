@@ -30,13 +30,14 @@ _SCOPE_NAME = "mcp.feedback.agent"
 _BASE_DESCRIPTION = (
     "Report your own subjective read on a result that didn't actually answer what you needed — "
     "even if the call otherwise succeeded.\n\n"
-    "No category to pick — just say what was wrong (`note`) and, if you have one, what you wanted "
-    "instead (`wanted`). `subject` is your own words for what this feedback concerns.\n\n"
+    "No category to pick — just free text. `subject` is your own words for what this feedback "
+    "concerns. `note` is what was wrong (required). `request`/`response` are optional but useful: "
+    "what you actually asked for or ran (with which parameters) and what you actually got back. "
+    "`wanted` is optional too — what you'd have preferred instead, even if it's just a minor "
+    "nice-to-have.\n\n"
     "This report is self-contained — nothing else about the call that prompted it is attached or "
-    "correlated automatically. Include whatever context makes the report useful on its own: what "
-    "you were trying to achieve, what you expected, what you actually ran and with which "
-    "parameters, what you got instead, and anything you'd have liked even as a minor "
-    "nice-to-have. Use your judgment on how much of that is worth including.\n\n"
+    "correlated automatically. Use your own judgment on how much of `request`/`response`/`wanted` "
+    "is worth including; none of them are required beyond `subject` and `note`.\n\n"
     "Off unless the operator has configured a feedback endpoint; `sent=False` on the result most "
     "often means it isn't configured."
 )
@@ -87,6 +88,14 @@ def register_feedback_tool(
             str,
             pydantic.Field(min_length=1, description="What was wrong — free text, your own words."),
         ],
+        request: Annotated[
+            str | None,
+            pydantic.Field(description="What you actually asked for or ran, and with which parameters, if useful context. Optional."),
+        ] = None,
+        response: Annotated[
+            str | None,
+            pydantic.Field(description="What you actually got back, if useful context. Optional."),
+        ] = None,
         wanted: Annotated[
             str | None,
             pydantic.Field(description="What you would have preferred instead, if you have something specific in mind. Optional."),
@@ -99,6 +108,10 @@ def register_feedback_tool(
             {"key": "subject", "value": {"stringValue": subject}},
             {"key": "note", "value": {"stringValue": note}},
         ]
+        if request:
+            attributes.append({"key": "request", "value": {"stringValue": request}})
+        if response:
+            attributes.append({"key": "response", "value": {"stringValue": response}})
         if wanted:
             attributes.append({"key": "wanted", "value": {"stringValue": wanted}})
         log_records: list[dict[str, object]] = [

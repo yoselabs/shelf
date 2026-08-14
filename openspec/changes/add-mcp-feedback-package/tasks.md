@@ -56,3 +56,15 @@
       consuming a2web change's CLI contract suite to confirm the original
       blocker (Context-requiring tool function breaks a2web's raw-signature
       CLI derivation) is actually resolved, not just theorized.
+
+## 6. `request`/`response` fields (v0.3.0)
+
+- [x] 6.1 Add `request: str | None = None` and `response: str | None =
+      None` to `report_feedback`'s signature (after `note`, before
+      `wanted`), free text, no taxonomy — per design D7.
+- [x] 6.2 Update `_BASE_DESCRIPTION` to name the new fields and clarify
+      only `subject`/`note` are required.
+- [x] 6.3 Update tests: schema now has 5 properties; a report carrying
+      all fields round-trips correctly; `request`/`response` omitted when
+      not supplied.
+- [x] 6.4 `make check` passes; re-tag `mcp-feedback-v0.3.0`, push.

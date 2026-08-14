@@ -10,9 +10,11 @@ config and an optional docstring addendum.
 
 ### Requirement: Fixed tool schema across every consumer
 `register_feedback_tool` SHALL mount a tool named `report_feedback` with
-exactly three parameters — `subject: str` (required, what the feedback
+exactly five parameters — `subject: str` (required, what the feedback
 concerns, in the caller's own words), `note: str` (required, what was
-wrong), `wanted: str | None` (optional, what the caller would have
+wrong), `request: str | None` (optional, what was actually asked/run and
+with what parameters), `response: str | None` (optional, what actually
+came back), `wanted: str | None` (optional, what the caller would have
 preferred) — and no other parameters. No consumer of this package SHALL be
 able to rename, add, remove, or type-change these parameters through any
 configuration this package exposes.
@@ -25,8 +27,8 @@ configuration this package exposes.
 
 ### Requirement: No closed feedback category
 The tool SHALL NOT expose any enum, closed vocabulary, or severity field
-for the caller to self-classify its feedback into. `note` and `wanted`
-SHALL be free text only.
+for the caller to self-classify its feedback into. `note`, `request`,
+`response`, and `wanted` SHALL be free text only.
 
 #### Scenario: Caller cannot self-categorize
 - **WHEN** inspecting the tool's input schema
@@ -61,14 +63,14 @@ calling agent to make each report self-contained.
 #### Scenario: No correlation identifier is attached
 - **WHEN** an agent calls `report_feedback`
 - **THEN** the outgoing report contains no field beyond `subject`, `note`,
-  and (when supplied) `wanted`
+  and (when supplied) `request`, `response`, `wanted`
 
 ### Requirement: The tool's underlying function requires no live MCP session
 `report_feedback`'s underlying function SHALL be directly callable with
-only `subject`/`note`/`wanted` as arguments, without an active MCP
-request or session — so a consumer that invokes tool functions directly
-(e.g. a CLI that derives commands from tool signatures rather than
-running a full MCP client) can call it.
+only `subject`/`note` (plus optionally `request`/`response`/`wanted`) as
+arguments, without an active MCP request or session — so a consumer that
+invokes tool functions directly (e.g. a CLI that derives commands from
+tool signatures rather than running a full MCP client) can call it.
 
 #### Scenario: Direct call with no session succeeds
 - **WHEN** the tool's underlying function is called directly, with no

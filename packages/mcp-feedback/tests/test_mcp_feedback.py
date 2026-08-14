@@ -59,7 +59,7 @@ async def test_no_closed_category_in_schema() -> None:
         tools = await client.list_tools()
 
     props = tools[0].inputSchema["properties"]
-    assert set(props) == {"subject", "note", "wanted"}
+    assert set(props) == {"subject", "note", "request", "response", "wanted"}
     for field in props.values():
         assert "enum" not in field
 
@@ -85,22 +85,44 @@ async def test_extra_instructions_omitted_leaves_only_base_text() -> None:
     assert "No category to pick" in tools[0].description
 
 
-async def test_report_is_sent_and_carries_subject_note_wanted(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_report_is_sent_and_carries_all_fields(monkeypatch: pytest.MonkeyPatch) -> None:
     server, transport = _server_with_recording_transport(monkeypatch, endpoint="https://gateway.test/logs", api_key="secret-key")
 
-    res = await _call(server, {"subject": "https://example.com/x", "note": "wrong item", "wanted": "the RTX 4090 listing"})
+    res = await _call(
+        server,
+        {
+            "subject": "https://example.com/x",
+            "note": "wrong item",
+            "request": "query(url=https://example.com/x, query='RTX 4090 price')",
+            "response": "a listing for used PC parts, not a GPU",
+            "wanted": "the RTX 4090 listing",
+        },
+    )
 
     assert res.structured_content["sent"] is True
     assert len(transport.requests) == 1
-    request = transport.requests[0]
-    assert request.headers["x-api-key"] == "secret-key"
-    body = json.loads(request.content)
+    request_sent = transport.requests[0]
+    assert request_sent.headers["x-api-key"] == "secret-key"
+    body = json.loads(request_sent.content)
     record = body["resourceLogs"][0]["scopeLogs"][0]
     assert record["scope"]["name"] == "mcp.feedback.agent"
     attrs = {a["key"]: a["value"]["stringValue"] for a in record["logRecords"][0]["attributes"]}
     assert attrs["subject"] == "https://example.com/x"
     assert attrs["note"] == "wrong item"
+    assert attrs["request"] == "query(url=https://example.com/x, query='RTX 4090 price')"
+    assert attrs["response"] == "a listing for used PC parts, not a GPU"
     assert attrs["wanted"] == "the RTX 4090 listing"
+
+
+async def test_request_and_response_omitted_when_not_supplied(monkeypatch: pytest.MonkeyPatch) -> None:
+    server, transport = _server_with_recording_transport(monkeypatch, endpoint="https://gateway.test/logs", api_key="k")
+
+    await _call(server, {"subject": "s", "note": "n"})
+
+    body = json.loads(transport.requests[0].content)
+    attrs = {a["key"] for a in body["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]["attributes"]}
+    assert "request" not in attrs
+    assert "response" not in attrs
 
 
 async def test_no_correlation_id_is_attached(monkeypatch: pytest.MonkeyPatch) -> None:
