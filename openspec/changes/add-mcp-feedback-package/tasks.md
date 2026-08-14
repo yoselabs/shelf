@@ -23,8 +23,10 @@
       extra_instructions=None)` mounting `report_feedback(subject, note,
       wanted=None)` with the fixed base docstring + optional appended
       `extra_instructions` per D4.
-- [x] 3.2 Attach `ctx.session_id` to every outgoing report per D5 — no
-      other correlation ID.
+- [x] 3.2 ~~Attach `ctx.session_id` to every outgoing report per D5~~ —
+      **reversed in v0.2.0** (design D5 addendum): no `Context` parameter,
+      no correlation ID at all. Reports are self-contained; the tool's
+      description asks the agent to include what context it needs.
 - [x] 3.3 Gate on `endpoint`/`api_key` both present; `sent=False` no-op
       otherwise.
 
@@ -39,9 +41,18 @@
       `sent=True` still returned; not-configured case returns `sent=False`
       with zero network calls; confirms no `opentelemetry-sdk` import
       anywhere in the package.
-- [x] 4.4 Test that `session_id` is present on every outgoing payload.
+- [x] 4.4 ~~Test that `session_id` is present on every outgoing payload~~ —
+      replaced (v0.2.0) with `test_no_correlation_id_is_attached` (report
+      contains exactly `subject`/`note`/`wanted`, nothing else) and
+      `test_tool_function_callable_without_a_live_mcp_session` (the
+      underlying function runs with no active FastMCP request/session —
+      the actual reason for the reversal).
 
 ## 5. Verification
 
 - [x] 5.1 `make check` passes (lint + ty + test) for the whole shelf repo.
 - [x] 5.2 `openspec validate add-mcp-feedback-package --strict` passes.
+- [x] 5.3 v0.2.0: re-tag `mcp-feedback-v0.2.0`, push, and re-run the
+      consuming a2web change's CLI contract suite to confirm the original
+      blocker (Context-requiring tool function breaks a2web's raw-signature
+      CLI derivation) is actually resolved, not just theorized.

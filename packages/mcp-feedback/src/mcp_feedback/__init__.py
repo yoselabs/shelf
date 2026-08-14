@@ -12,13 +12,17 @@ configuration this package exposes. Exactly two consumer-facing knobs exist:
   replacing it, for one line of consumer-specific guidance (e.g. "subject =
   the URL you fetched").
 
-Reports carry `ctx.session_id` (FastMCP's own per-client-session identifier)
-as their only correlation signal, beyond timestamp proximity. This is an
-explicit stopgap: no MCP-protocol mechanism exists today to link a later
-tool call back to a specific earlier one. This package is meant to be
-migrated off session-only correlation once/if MCP ships a native
-call-linking or feedback mechanism — not extended with a home-grown
-correlation ID scheme in the meantime.
+Reports are deliberately self-contained — no correlation ID, session ID, or
+any other automatic link to the call that prompted the report. Nothing else
+is threaded in, so the tool's own description asks the calling agent to
+include whatever context makes the report useful on its own (what it was
+trying to do, what it expected, what it actually ran and with what
+parameters, what it got instead) — the agent's own judgment decides how
+much of that is worth writing down, not a fixed field this package would
+otherwise have to invent and maintain. (v0.1.0 attached FastMCP's
+`ctx.session_id`; reversed in v0.2.0 — it also made the tool's underlying
+function require a live MCP request/session to run at all, breaking any
+consumer that invokes tool functions directly outside of one, e.g. a CLI.)
 
 Delivery is OTLP/HTTP-logs over a hand-rolled async `httpx` POST — not the
 OTel Logs SDK (`opentelemetry.sdk._logs` is unstable/private in the Python

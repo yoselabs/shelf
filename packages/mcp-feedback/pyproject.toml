@@ -1,6 +1,6 @@
 [project]
 name = "mcp-feedback"
-version = "0.1.0"
+version = "0.2.0"
 description = "A fixed-schema, agent-invoked feedback tool for any FastMCP server — report_feedback(subject, note, wanted), OTLP/HTTP-logs transport, two consumer knobs only."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
@@ -19,3 +19,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mcp_feedback"]
+
+[tool.deptry.per_rule_ignores]
+# `mcp: FastMCP` is the only use of `fastmcp` in this package (v0.2.0 dropped
+# `Context` entirely — design D5 addendum), and it's type-only: the package
+# calls `.tool(...)` on whatever object the consumer passes in, duck-typed at
+# runtime, never constructing or importing FastMCP itself. Still a real,
+# intentional dependency — the type contract IS the API, and it pins a
+# compatible version range for consumers — deptry's static scan just can't
+# see a TYPE_CHECKING-only import as "used."
+DEP002 = ["fastmcp"]

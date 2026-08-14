@@ -31,15 +31,21 @@ Everything else — the tool name, its three parameters (`subject: str`,
 OTLP/HTTP-logs transport, the `sent: bool` result shape — is identical no
 matter who mounts it.
 
-## Correlation is `session_id` only, on purpose
+## Reports are self-contained, on purpose
 
-Every report carries the invoking FastMCP session's `ctx.session_id`. That's
-the only correlation signal beyond timestamp proximity — this package makes
-**no** attempt to link a report back to one specific prior tool call, because
-no MCP-protocol mechanism exists today to do that reliably. This is a named
-stopgap: the plan is to migrate onto MCP's own call-linking/feedback
-mechanism if and when one ships, not to grow a home-grown correlation ID
-scheme in the meantime.
+No correlation ID, no session ID, nothing automatically links a report back
+to the call that prompted it. The tool's own description asks the calling
+agent to write a report that stands on its own — what it was trying to do,
+what it expected, what it actually ran and with which parameters, what it
+got instead, and anything it would have liked even as a minor nice-to-have.
+The agent decides how much of that is worth including; this package doesn't
+force a fixed field for it.
+
+This also means the tool's underlying function needs no live MCP
+request/session to run — v0.1.0 attached FastMCP's `ctx.session_id` for
+correlation, which made the function require one, breaking any consumer
+that calls tool functions directly outside of a real session (a consumer's
+own CLI, concretely). Reversed in v0.2.0.
 
 ## Transport
 

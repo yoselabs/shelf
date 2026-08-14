@@ -103,15 +103,31 @@ async def test_report_is_sent_and_carries_subject_note_wanted(monkeypatch: pytes
     assert attrs["wanted"] == "the RTX 4090 listing"
 
 
-async def test_session_id_is_attached_to_every_report(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_no_correlation_id_is_attached(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reports are self-contained (v0.2.0) — no session_id, no report_id,
+    nothing beyond what the caller explicitly supplied."""
     server, transport = _server_with_recording_transport(monkeypatch, endpoint="https://gateway.test/logs", api_key="k")
 
     await _call(server, {"subject": "s", "note": "n"})
 
     body = json.loads(transport.requests[0].content)
-    attrs = {a["key"]: a["value"]["stringValue"] for a in body["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]["attributes"]}
-    assert "session_id" in attrs
-    assert attrs["session_id"]  # non-empty
+    attrs = {a["key"] for a in body["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]["attributes"]}
+    assert attrs == {"subject", "note"}
+
+
+async def test_tool_function_callable_without_a_live_mcp_session() -> None:
+    """The whole point of dropping Context (v0.2.0): the underlying function
+    must be callable directly, the way a consumer's own CLI would call it —
+    not only through a real MCP request/session."""
+    server = FastMCP("t")
+    register_feedback_tool(server, endpoint="", api_key="")
+    tool = await server.get_tool("report_feedback")
+    fn = getattr(tool, "fn", None)
+    assert fn is not None
+
+    result = await fn(subject="s", note="n")
+
+    assert result.sent is False
 
 
 async def test_wanted_omitted_when_not_supplied(monkeypatch: pytest.MonkeyPatch) -> None:

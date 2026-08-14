@@ -51,17 +51,29 @@ exist.
 - **THEN** the mounted tool's docstring contains only the package's fixed
   base explanation
 
-### Requirement: Session-scoped correlation only
-The tool SHALL attach the invoking FastMCP session's `session_id` to every
-report it sends, and SHALL NOT attempt to correlate a report to any
-specific prior tool call — no call-linking mechanism SHALL be invented by
-this package. This is an explicit, named stopgap pending a native MCP
-protocol mechanism for this.
+### Requirement: No correlation — reports are self-contained
+The tool SHALL NOT attach any correlation identifier (session ID, request
+ID, or otherwise) to a report, and SHALL NOT attempt to correlate a report
+to any specific prior tool call — no call-linking mechanism SHALL be
+invented by this package. The tool's description SHALL instead direct the
+calling agent to make each report self-contained.
 
-#### Scenario: Report carries session_id
-- **WHEN** an agent calls `report_feedback` within an active FastMCP
-  session
-- **THEN** the outgoing report includes that session's `session_id`
+#### Scenario: No correlation identifier is attached
+- **WHEN** an agent calls `report_feedback`
+- **THEN** the outgoing report contains no field beyond `subject`, `note`,
+  and (when supplied) `wanted`
+
+### Requirement: The tool's underlying function requires no live MCP session
+`report_feedback`'s underlying function SHALL be directly callable with
+only `subject`/`note`/`wanted` as arguments, without an active MCP
+request or session — so a consumer that invokes tool functions directly
+(e.g. a CLI that derives commands from tool signatures rather than
+running a full MCP client) can call it.
+
+#### Scenario: Direct call with no session succeeds
+- **WHEN** the tool's underlying function is called directly, with no
+  FastMCP request or session active
+- **THEN** it returns normally instead of raising
 
 ### Requirement: Best-effort, non-blocking delivery
 The tool SHALL report `sent: bool` reflecting whether delivery was

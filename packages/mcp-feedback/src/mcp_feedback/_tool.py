@@ -4,6 +4,12 @@ See the package docstring (`mcp_feedback/__init__.py`) for the full
 rationale. This module is deliberately small: the function signature of
 `register_feedback_tool` IS the enforcement mechanism for "exactly two
 knobs" — there is no third parameter to add without changing this file.
+
+Deliberately takes no `Context` parameter (v0.2.0, reversing v0.1.0's
+`ctx.session_id` correlation): a report is self-contained, and forcing it
+through FastMCP's request/session machinery made the tool unusable from
+any caller that invokes the underlying function directly rather than
+through a live MCP session — a consumer's own CLI, most concretely.
 """
 
 from __future__ import annotations
@@ -12,9 +18,6 @@ import time
 from typing import TYPE_CHECKING, Annotated
 
 import pydantic
-from fastmcp import (
-    Context,  # noqa: TC002 — FastMCP's own get_type_hints() resolves the `ctx: Context` annotation at decoration time; it must stay a real runtime name, not TYPE_CHECKING-only.
-)
 from mcp.types import ToolAnnotations
 
 from mcp_feedback._transport import post_feedback_logs
@@ -29,6 +32,11 @@ _BASE_DESCRIPTION = (
     "even if the call otherwise succeeded.\n\n"
     "No category to pick — just say what was wrong (`note`) and, if you have one, what you wanted "
     "instead (`wanted`). `subject` is your own words for what this feedback concerns.\n\n"
+    "This report is self-contained — nothing else about the call that prompted it is attached or "
+    "correlated automatically. Include whatever context makes the report useful on its own: what "
+    "you were trying to achieve, what you expected, what you actually ran and with which "
+    "parameters, what you got instead, and anything you'd have liked even as a minor "
+    "nice-to-have. Use your judgment on how much of that is worth including.\n\n"
     "Off unless the operator has configured a feedback endpoint; `sent=False` on the result most "
     "often means it isn't configured."
 )
@@ -83,7 +91,6 @@ def register_feedback_tool(
             str | None,
             pydantic.Field(description="What you would have preferred instead, if you have something specific in mind. Optional."),
         ] = None,
-        ctx: Context,
     ) -> FeedbackReportResult:
         resource_attrs: list[dict[str, object]] = [
             {"key": "service.name", "value": {"stringValue": "mcp-feedback"}},
@@ -91,7 +98,6 @@ def register_feedback_tool(
         attributes: list[dict[str, object]] = [
             {"key": "subject", "value": {"stringValue": subject}},
             {"key": "note", "value": {"stringValue": note}},
-            {"key": "session_id", "value": {"stringValue": ctx.session_id}},
         ]
         if wanted:
             attributes.append({"key": "wanted", "value": {"stringValue": wanted}})

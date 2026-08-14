@@ -106,17 +106,34 @@ package's own core promise ("schema should be the same, easily pluggable")
 to hold — a replaceable base invites the same drift D3 rejects for fields,
 just moved into free-text docs instead of a taxonomy field.
 
-### D5 — Correlation: `session_id` only, explicitly a stopgap
+### D5 — Correlation: none — reports are self-contained (REVERSED in v0.2.0)
 
-No `report_id`/`trace_id` minted, no attempt to look up or reference a
-prior tool call. `ctx.session_id` (FastMCP session-scoped, verified this
-session against the real `Context` API) is attached to every report as the
-only correlation signal beyond timestamp proximity. This is a conscious,
-named non-goal (see Goals/Non-Goals) rather than an oversight — the
-proposal's own motivation names MCP's discussed native call-linking
-mechanism as the eventual real answer; this package is meant to be
-migrated off session-only correlation once that ships, not extended with
-a home-grown ID scheme now that would just add migration surface later.
+**Original v0.1.0 decision (superseded):** attach `ctx.session_id`
+(FastMCP session-scoped) to every report as the only correlation signal
+beyond timestamp proximity — no `report_id`/`trace_id` minted, no attempt
+to look up or reference a prior tool call.
+
+**Reversed after the first real adoption attempt found a structural
+problem, not a taste objection:** a2web's own CLI derives each terminal
+command by calling a tool's underlying Python function directly
+(`inspect.signature(fn)` + `fn(**kwargs)`), bypassing FastMCP's
+request/session machinery entirely — that's how a CLI command runs without
+a live MCP client. `Context.session_id` raises `RuntimeError` outside a
+real request/session, so requiring `ctx: Context` in the tool's signature
+made the function itself unusable from any caller that doesn't go through
+a full MCP session — not an a2web quirk, a structural conflict with "a
+FastMCP tool's underlying function should be plainly callable," which this
+package's own README now states as an explicit goal.
+
+**Current decision:** no correlation mechanism at all. The tool's own
+description instead asks the calling agent to make the report
+self-contained — state what it was trying to do, what it expected, what it
+actually ran and with what parameters, what it got instead, and any
+nice-to-have, at the agent's own judgment. This trades "reports are
+automatically linkable to a session" for "the tool's function has zero
+runtime dependency beyond its own arguments" — judged the better trade
+once a real consumer's CLI hit the alternative's cost directly, not
+speculatively.
 
 ### D6 — Transport: hand-rolled OTLP/HTTP-logs POST, own module
 
