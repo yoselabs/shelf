@@ -142,7 +142,9 @@ STEPS:
    (or `pull --ff-only` if the branch has no local commits yet). Worktrees share git objects but
    **not** branch position — a worktree opened days ago can silently be behind `main`.
 2. On branch `work/<project>` (create if absent).
-3. Extract the code into `packages/<name>/` behind a stable **Capability**, with:
+3. Extract into the unit dir the candidate's **Kind** owns — `packages/<name>/` for code,
+   `skills/<name>/` for a general-purpose, auto-triggering skill (resolution 0014) — behind a
+   stable **Capability**, with:
    - **`<name>` names the deliverable, not the origin** (resolution 0008): read it as a consumer who
      has never seen this app — does it say what the package does? If it only makes sense with
      origin-app context (a codename, internal jargon, a name that only disambiguated within that
@@ -151,10 +153,22 @@ STEPS:
      as the default.
    - the **boundary test** — must not import any consumer app (the one invariant);
    - a **Contract** born `candidate` (inert until a live consumer breaks without it);
-   - the package `pyproject.toml`.
-4. `make check` green **in the worktree**.
-5. Tag namespaced and push: `git tag <name>-vX.Y.Z && git push origin work/<project> --tags`.
-   **Never delete an old tag** — that is what makes every consumer's upgrade opt-in.
+   - the package `pyproject.toml`, or for a skill, `SKILL.md` + an `evals/` directory (a skill with
+     no eval coverage stays `candidate`, never `active`).
+   - **Candidate is a `docs/runbooks/*.md` procedure, considered for conversion to a skill?**
+     Conversion is *earned*, not swept (resolution 0014, Article V applied to skill triggers): only
+     proceed with a concrete instance of a live agent demonstrably missing or not following the
+     runbook. "Might get used more" or "would be handy as a skill" is protecting on fear — the
+     runbook stays a runbook. A converted skill also carries a real, measured cost every consumer
+     session pays whether it fires or not (`claude plugin details <name>`) — earn that cost before
+     spending it.
+4. `make check` green **in the worktree**. For a skill: also run `claude plugin details <name>` and
+   record its always-on token figure in the catalog entry's `notes` field before marking it `active`
+   — the measured cost, not a guess, is what the entry asserts (skill-kind capability).
+5. Tag namespaced and push: for a package, `git tag <name>-vX.Y.Z && git push origin work/<project>
+   --tags`; for a skill, `claude plugin tag` (validates `plugin.json` against the marketplace entry
+   before tagging, refusing a mismatch — resolution 0014). **Never delete an old tag** — that is what
+   makes every consumer's upgrade opt-in.
 6. **Repoint the origin consumer:** add the git+tag source, delete the in-repo copy, keep tests green.
 7. **Breaking change?** Ship its migration in the same change, in two places:
    - a prose migration note where the change is announced (README, commit message);

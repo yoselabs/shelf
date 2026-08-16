@@ -19,7 +19,7 @@ by the size of the ontology (~15 concepts, fixed), never by the size of the shel
 ```
 Shelf ─ the repo; the corpus of shared software pieces               (a2kay analogue: Vault)
   └─ MicroSoftware ─ one reusable, ownable unit                       dir = identity
-       ├─ Kind ─ primitive | any-lib | composite | cli | framework | config-preset
+       ├─ Kind ─ primitive | any-lib | composite | cli | framework | config-preset | skill
        ├─ Tier ─ T0 primitive · T1 any-* · T2 composite               (T3 Product is OUT — the apps)
        ├─ Release ─ a git tag; the version                            "anyllm-v0.2.0"
        └─ provides ▸ Capability ─ the stable "stop-caring" promise    what an app no longer must care about

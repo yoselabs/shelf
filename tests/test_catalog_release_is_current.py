@@ -39,6 +39,13 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[1]
 _CATALOG = _ROOT / "catalog"
 _PACKAGES = _ROOT / "packages"
+_SKILLS = _ROOT / "skills"
+
+#: `kind = "skill"` entries live under skills/<name>/, not packages/<name>/ — a
+#: different Kind, a different unit dir (skill-as-shelf-kind). Their release currency
+#: is asserted separately once a real skill exists (skill-kind capability, requirement
+#: "A skill member's always-on token cost is asserted"); this file stays package-only.
+_SKILL_KIND = "skill"
 
 #: Population floor — the catalog is ~26 entries. Without this, a moved or
 #: renamed catalog directory finds zero files to object to and reports green,
@@ -61,10 +68,16 @@ def test_the_walk_found_the_catalog() -> None:
     assert len(entries) >= _MIN_ENTRIES, f"only {len(entries)} catalog entries found under {_CATALOG} — expected at least {_MIN_ENTRIES}"
 
 
-def test_every_catalog_entry_names_a_real_package() -> None:
-    """A catalog entry for a package that does not exist is a dangling promise."""
-    missing = [name for name, _, _ in _entries() if not (_PACKAGES / name / "pyproject.toml").is_file()]
-    assert not missing, f"catalog entries with no package on disk: {missing}"
+def test_every_catalog_entry_names_a_real_package_or_skill() -> None:
+    """A catalog entry for a unit that does not exist on disk is a dangling promise."""
+    missing = [
+        name
+        for name, cfg, _ in _entries()
+        if not (
+            (_SKILLS / name / "SKILL.md").is_file() if cfg.get("kind") == _SKILL_KIND else (_PACKAGES / name / "pyproject.toml").is_file()
+        )
+    ]
+    assert not missing, f"catalog entries with no package/skill on disk: {missing}"
 
 
 def test_every_package_has_a_catalog_entry() -> None:
@@ -85,6 +98,8 @@ def test_catalog_release_matches_the_package_version() -> None:
     """
     drifted: list[str] = []
     for name, cfg, path in _entries():
+        if cfg.get("kind") == _SKILL_KIND:
+            continue  # skill release currency is asserted separately (skill-kind capability)
         version = tomllib.loads((_PACKAGES / name / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
         expected = f"{name}-v{version}"
         actual = cfg.get("release")

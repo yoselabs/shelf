@@ -14,6 +14,13 @@ current state). This file stays the reference for *what* each piece is and *why*
 mechanism. `docs/runbooks/onboard-a-consumer.md` covers the broader adoption sweep the skill is
 part of.
 
+**`onboard-consumer` is deliberately outside the `Kind: skill` catalog** (resolution 0014). It's
+pull-based — invoked by path from `$SHELF_HOME`, zero standing cost, findable only because this file
+tells you where it is — not push-based/auto-triggered like a catalog-registered, plugin-installed
+skill. Don't fold it into `catalog/*.toml` or gate it on `claude plugin details`; that machinery
+governs the other tier (general-purpose skills meant to auto-fire in a consumer's own, unrelated
+sessions), which this one isn't.
+
 **Once §4's Makefile targets are copied, `make bootstrap` is the same skill under one command**
 (`make bootstrap-verify` re-checks without implying first-time setup — mechanically identical,
 see `bootstrap-target-contract`'s design doc for why that's a deliberate, not lazy, choice). Before

@@ -1,0 +1,8 @@
+{
+  "name": "skills",
+  "description": "The shelf's catalogued, general-purpose skills (Kind: skill, resolution 0014) — see catalog/README.md for the current roster.",
+  "version": "0.1.0",
+  "author": {
+    "name": "yoselabs"
+  }
+}
