@@ -1,0 +1,16 @@
+[project]
+name = "yaml-merge"
+version = "0.1.0"
+description = "Stop caring that writing a config back destroys the file its author wrote — carry a payload's values into the existing YAML document, keeping every comment, blank line and key the human put there."
+readme = "README.md"
+authors = [{ name = "Denis Tomilin" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = ["ruamel.yaml>=0.18,<1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yaml_merge"]

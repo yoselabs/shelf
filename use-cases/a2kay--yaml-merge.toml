@@ -1,0 +1,7 @@
+consumer = "a2kay"
+software = "yaml-merge"
+why = "An ontology type round-trips through a pydantic model on every `ontology.register` / `ontology.update`, and the model cannot carry a comment. Without the merge, `_persist` dumps a plain dict over `<type>.yml` and deletes everything the human wrote about their own type — the same loss 81df908 fixed for frontmatter, still live in the ontology store until this."
+needs = "merge_into(existing, payload); identity-matched list entries (a type's `fields` are keyed by `name`); a missing file returning the payload unchanged, since a first write has no document to preserve."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active" # active | retired

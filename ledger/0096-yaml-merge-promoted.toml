@@ -1,0 +1,20 @@
+seq = 96
+date = "2026-09-12"
+event = "delivery"
+software = "yaml-merge"
+release = "yaml-merge-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `core/yaml_merge.py`. Capability: stop caring that writing a config back destroys the file its author wrote.
+
+The split is the asset, not the YAML: the payload is authoritative about VALUES, the existing document about everything else. It applies to one shape — values that round-trip through something which cannot carry a comment (a pydantic model, a dataclass, a plain dict) and have to be put back. It does NOT apply to a reader that stays inside ruamel's CommentedMap end to end; there the comments never left and there is nothing to merge. a2kay has both, and the two fixes look different for that reason.
+
+Surface is one function, `merge_into(existing, payload)`. A non-mapping `existing` (file absent, empty, or holding something else) returns the payload unchanged — a first write has no document to preserve. List entries pair by identity, using the first of `name`/`id`/`key` present on EVERY entry of both lists, before falling back to position: inserting an entry at the top of a list would otherwise shift every comment down one.
+
+Why this is a package and not four lines at a call site — two ruamel behaviours a naive merge gets wrong, both found the hard way and both pinned by tests here. First: a comment ABOVE a key is filed under the PREVIOUS key, so `del doc[key]` removes the key and leaves the paragraph explaining it sitting above whatever comes next, which is worse than no comment because it reads as current; cutting it means splitting the previous key's comment token, whose first line may be that key's own end-of-line comment and must survive. Second: slice assignment on a CommentedSeq clears its comment map wholesale, and that map is keyed by INDEX — so a rebuilt list drops every entry comment, or, restoring the map naively, gives each entry the comment belonging to whatever now sits at its old position.
+
+Article VII's guards: shape-proven, not shape-guessed — every branch was written against a real file with real comments in a2kay's ontology store, and the two ruamel behaviours above were discovered by the output being wrong, not by reading the docs. Resolution 0012's sizing rule was the harder call: this IS a sharp edge in ruamel, and the temptation was `ruamel-extra`. It is named for the deliverable instead (resolution 0008) and scoped to the merge alone, which is the part that is proven.
+
+a2kay repointed in the same session, local copy deleted. make check green: 877 passed, pyrefly 0 errors with no warning tail. 15 tests (14 behaviour + the boundary)."""

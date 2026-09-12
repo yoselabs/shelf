@@ -197,6 +197,7 @@ testpaths = [
     "packages/settings-base/tests",
     "packages/sqlite-resource/tests",
     "packages/timefmt/tests",
+    "packages/yaml-merge/tests",
 ]
 # `-m "not browser"` deselects the real-launch smoke by default: nothing in the
 # ordinary gate launches a real engine (that needs a Chromium binary). The

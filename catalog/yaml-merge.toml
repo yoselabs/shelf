@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "yaml-merge"
+kind = "primitive"
+tier = "T1"
+release = "yaml-merge-v0.1.0"
+capability = "Stop caring that writing a config back destroys the file its author wrote — carry a payload's values into the existing YAML document, so comments, blank lines, key order and quoting survive a round trip through something that cannot carry them."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (core/yaml_merge.py). The capability is the SPLIT, not the YAML: the payload is authoritative about values, the existing document about everything else. Applies to the shape where values round-trip through a pydantic model, a dataclass or a plain dict — NOT to a reader that stays in ruamel's CommentedMap end to end, where the comments never left and there is nothing to merge. Surface: one function, merge_into(existing, payload); a non-mapping `existing` (file absent, empty, or holding something else) returns the payload untouched. List entries pair by identity (first of name/id/key present on EVERY entry of both lists) before position, because inserting an entry at the top of a list otherwise shifts every comment down one. Two ruamel behaviours a naive merge gets wrong are the reason this is a package and not four lines at a call site, and both are pinned by tests: a comment ABOVE a key is filed under the PREVIOUS key, so `del doc[key]` leaves the paragraph explaining it sitting above whatever comes next (and cutting it means splitting a token whose first line may be the neighbour's own end-of-line comment); and slice assignment on a CommentedSeq clears its comment map, which is keyed by INDEX, so a rebuilt list loses every entry comment or — restoring it naively — gives each entry the comment belonging to whatever now sits at its old position. a2kay paid for the comment loss twice before this existed: its frontmatter reader (81df908) and its ontology store. Born candidate."
