@@ -1,0 +1,10 @@
+seq = 92
+date = "2026-09-12"
+event = "delivery"
+software = "llm-wobble"
+release = "llm-wobble-v0.5.0"
+actor = "shelf"
+consumer = "a2kay"
+verdict = ""
+cost = ""
+note = "Added `is_double_escaped(text) -> bool`, an EVOLVE of llm-wobble rather than a new package. a2kay's entity verbs take a document body from an agent over MCP, and an agent that builds its tool call by string-formatting JSON sends a body already encoded and then encoded again — a whole document collapsed onto one line, its line breaks written out as two characters and its quotes as backslash-quote. a2kay was storing those verbatim. Homed here because llm-wobble already owns text arriving from a model that may be malformed: `strip_fenced_blocks` repairs one such shape, this detects another, and the constitution is explicit that a sharp edge is a feature of a capability piece rather than a piece of its own. Deliberately a detector and never a repair — un-escaping would corrupt a document that legitimately contains an escape sequence as text, and nothing in the package can tell the two apart; only the caller knows, so the caller is told. It does not touch the Wobbled construction path, so it cannot be used to forge one. Safe to run unconditionally: it requires NO real line break anywhere alongside two or more literal escape pairs, so prose that documents escape sequences (written across real lines, by definition) is immune — pinned by an example test and by a hypothesis property over escape-dense text. The package gained its first property suite in the same change; a second property pins strip_fenced_blocks's no-fence identity. Two ruff-preset deltas a2kay had proposed alongside this were DROPPED after measuring: S607 fires zero times on the shelf, and TC is clean with no pydantic model annotating a field with an imported type, so both would have been config for a problem that is not here (Article V — no protecting on fear). The TC/pydantic hazard is real but latent, so it went into docs/linting.md as the note to act on the first time a package trips it, with the a2kay run as the evidence. make check green in the work/a2kay worktree."

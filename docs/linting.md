@@ -32,6 +32,21 @@ Run the whole thing with `make check`. Individual targets: `make lint typecheck 
 - **Tests get a lighter bar** (per-file-ignores): no docstrings, asserts allowed, magic numbers fine.
 - **Every suppression is honest.** `# noqa` requires a reason; the only one in the tree today is the
   deliberate multi-engine fallback in `convert-md` (`BLE001`).
+- **`TC` and pydantic — the one autofix that can break working code.** `TC`'s fix moves a type-only
+  import under `TYPE_CHECKING`, which is correct for anything the runtime never evaluates. A pydantic
+  model **does** evaluate its field annotations at runtime, so a moved import leaves it unable to
+  resolve them, and the failure is silent until something instantiates the model. No package here trips
+  it today (`TC` is clean, and the models' field types are local), so there is deliberately no config
+  guarding it — but the moment a package annotates a pydantic field with an imported type, set
+
+  ```toml
+  [tool.ruff.lint.flake8-type-checking]
+  runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+  ```
+
+  *before* running `ruff --fix --unsafe-fixes`, not after. a2kay hit this while adopting `TC` across
+  ~170 sites (2026-09-12) and configured around it first; the same sweep with the guard missing would
+  have moved pydantic imports in its verb-response models.
 
 ## The coverage floor
 

@@ -123,6 +123,38 @@ def _strip_fences(text: str) -> str:
     return body.strip()
 
 
+# Escape sequences a JSON round-trip leaves behind as two literal characters.
+_ESCAPE_SEQUENCES = ("\\n", "\\t", "\\r", '"')
+# One mention of an escape can be prose ("use \n to break a line"); several in a
+# body that never breaks a line is the json.dumps-twice shape.
+_MIN_ESCAPES = 2
+
+
+def is_double_escaped(text: str) -> bool:
+    r"""True when `text` looks like it went through `json.dumps` one time too many.
+
+    Upstream of the funnel, and a different failure from the ones it repairs: not a
+    fence or a dropped field, but a whole document that arrived already encoded and
+    was then encoded again. An agent that builds a tool call by string-formatting
+    JSON produces it routinely, and the result is a body whose line breaks are
+    spelled `\n` as two characters and whose quotes are spelled `\"`.
+
+    The shape: no real newline anywhere, yet several literal escape pairs — a whole
+    document collapsed onto one line with its breaks written out. Prose that
+    *documents* escape sequences is written across real lines, so it fails the first
+    half of the test and is never caught by it.
+
+    Deliberately a detector and never a repair. Un-escaping would corrupt a document
+    that legitimately contains `\n` as text, and nothing here can tell the two apart
+    — only the caller knows, so the caller is the one told. Refuse the write, or ask
+    the agent to send the body as a JSON string rather than as a JSON string of a
+    JSON string; do not quietly rewrite it.
+    """
+    if "\n" in text:
+        return False
+    return sum(text.count(seq) for seq in _ESCAPE_SEQUENCES) >= _MIN_ESCAPES
+
+
 _FENCED_BLOCK_RE = re.compile(r"```[a-zA-Z0-9_-]*[ \t]*\n(?P<body>.*?)\n[ \t]*```", re.DOTALL)
 
 
@@ -415,6 +447,7 @@ __all__ = (
     "Wobbled",
     "bind",
     "emit_wobble",
+    "is_double_escaped",
     "parse_list_with_policy",
     "parse_with_policy",
     "recovered_fields",

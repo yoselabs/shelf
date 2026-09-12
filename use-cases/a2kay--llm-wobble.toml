@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "llm-wobble"
+why = "a2kay's entity verbs take a document body straight from an agent over MCP. An agent that builds its tool call by string-formatting JSON sends a body that was already encoded and then encoded again, and a2kay was storing those verbatim -- a whole document collapsed onto one line, its breaks written out as two characters. Nothing downstream could tell that from a document that legitimately contains an escape sequence as text, so it had to be refused at the write."
+needs = "is_double_escaped(text) -> bool. A pure predicate, safe to run on every body: it requires no real line break anywhere alongside several literal escape pairs, so prose that documents escapes is immune. A detector and never a repair -- un-escaping would corrupt the legitimate case, and only the caller knows which it holds. a2kay keeps the raising wrapper, which carries its own typed error."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

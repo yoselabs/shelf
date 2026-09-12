@@ -78,6 +78,28 @@ The record is `message="llm_wobble"` with a `fields` payload on `record.fields`
 (`boundary`, `field`, `tolerance`, `model`, `raw` — the raw excerpt is bounded to
 200 chars). The package never names a consumer's logger.
 
+## The encode that happened one time too many
+
+Separate from the funnel, and upstream of it. An agent that builds a tool call by
+string-formatting JSON sends a body that was already encoded and then encoded again:
+every line break spelled `\n` as two characters, every quote spelled `\"`, the whole
+document collapsed onto one line.
+
+```python
+from llm_wobble import is_double_escaped
+
+if is_double_escaped(body):
+    raise ValueError("send the body as a JSON string, not as a JSON string of one")
+```
+
+**A detector, never a repair.** Un-escaping would corrupt a document that legitimately
+contains `\n` as text, and nothing here can tell those apart — only the caller knows,
+so the caller is the one told.
+
+Safe to run on every body: it requires *no real newline anywhere* alongside several
+literal escape pairs. Prose that documents escape sequences is written across real
+lines, so it can never be caught, and a property test pins exactly that.
+
 ## What stays with the consumer
 
 The **policy tables** — which fields a given envelope requires and how each

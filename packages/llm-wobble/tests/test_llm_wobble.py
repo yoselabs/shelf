@@ -21,6 +21,7 @@ from llm_wobble import (
     _first_json_object,
     bind,
     emit_wobble,
+    is_double_escaped,
     parse_list_with_policy,
     parse_with_policy,
     recovered_fields,
@@ -390,3 +391,38 @@ def test_strip_fenced_blocks_is_the_inverse_of_the_funnel() -> None:
     )
     assert prose == "The answer is 42."
     assert parsed["value"] == 42
+
+
+# ---------------------------------------------------------------------------
+# is_double_escaped — the encode that happened one time too many
+# ---------------------------------------------------------------------------
+
+
+def test_a_document_collapsed_onto_one_line_is_caught() -> None:
+    """The shape: breaks spelled out as two characters, none of them real."""
+    assert is_double_escaped("# Title\\n\\nA paragraph.\\n\\nAnother one.") is True
+
+
+def test_escaped_quotes_count_too() -> None:
+    assert is_double_escaped('He said \\"yes\\" and left.') is True
+
+
+def test_prose_about_escape_sequences_is_not_caught() -> None:
+    """Documentation of `\\n` is written across real lines, so it fails the first half.
+
+    This is the case that makes the heuristic safe to run on every body: a
+    technical document explaining escapes is exactly what a naive count would
+    reject, and it is precisely what must survive.
+    """
+    text = "Use \\n to break a line.\nUse \\t to indent.\nUse \\r on old systems.\n"
+    assert is_double_escaped(text) is False
+
+
+def test_a_single_escape_is_under_the_threshold() -> None:
+    """One mention is prose. Several, with no real break anywhere, is the machine."""
+    assert is_double_escaped("Write \\n for a newline.") is False
+
+
+def test_empty_and_plain_text_are_not_caught() -> None:
+    assert is_double_escaped("") is False
+    assert is_double_escaped("a single line of ordinary text") is False
