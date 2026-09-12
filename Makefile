@@ -4,10 +4,10 @@
 # This is the reference toolchain every consumer of the shelf inherits (resolution 0004).
 # Each target is one linter doing one job; `check` is the gate.
 
-.PHONY: check guard bootstrap bootstrap-verify lint format typecheck spell deps test test-browser cov catalog advisory sync
+.PHONY: check guard preset bootstrap bootstrap-verify lint format typecheck spell deps test test-browser cov catalog advisory sync
 
 # The gate. Fast, deterministic tools first; tests last.
-check: guard lint typecheck spell deps test
+check: guard preset lint typecheck spell deps test
 
 # The commit guard as a GATE, not only a hook. A pre-commit hook is per-clone and
 # can be silently disabled by anything that claims core.hooksPath -- beads, husky,
@@ -28,6 +28,21 @@ guard:
 	 [ -f "$$g" ] || g="$$HOME/Workspaces/shelf/tools/hooks/forbid-local-shelf-source.py"; \
 	 if [ -f "$$g" ]; then python3 "$$g" --committed; \
 	 else echo "guard: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
+
+# The linter preset, as a GATE. Resolution 0004 makes this repo's config the preset and
+# says drift is "acceptable and visible" -- it was not visible. The onboarding copy is
+# append-only, so it reports "already current" for a repo missing whole rule families.
+# This fails on any difference from the preset that the consumer has not declared, with
+# a reason, in its own [tool.shelf-preset]. Inside the shelf it is a no-op: this repo IS
+# the preset, so there is nothing to compare against.
+#
+# Consumers copy this target verbatim, same resolution order as `guard`.
+preset:
+	@g=tools/preset_drift.py; \
+	 [ -f "$$g" ] || g="$${SHELF_HOME:-../shelf}/tools/preset_drift.py"; \
+	 [ -f "$$g" ] || g="$$HOME/Workspaces/shelf/tools/preset_drift.py"; \
+	 if [ -f "$$g" ]; then python3 "$$g" --repo .; \
+	 else echo "preset: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
 
 # One-time (idempotent, safe to re-run) setup for a CONSUMER repo: wires the commit guard,
 # resolver block, beads (opt-out), and this linter preset via the operations in

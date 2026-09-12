@@ -96,7 +96,11 @@ select = [
     "FBT",  # no boolean-trap positional args
     "ISC",  # implicit string concat (ISC001 off — formatter owns it)
     # docs & rot
-    "D",    # pydocstyle — public surface is documented (google convention)
+    # `D` (pydocstyle) is deliberately absent. Docstrings are written where they carry
+    # a decision — why this exists, what breaks without it — not on every public name.
+    # The full google convention would have a2kay writing 379 of them, 110 of those on
+    # methods whose signature already says everything. Denis's call, 2026-09-12. The
+    # docstrings already written here stay; they just stop being mandatory.
     "ERA",  # no commented-out code (leave it smaller, constitution III/VIII)
     "ARG",  # no unused arguments
     "PERF", # obvious performance footguns
@@ -108,13 +112,13 @@ ignore = [
     "PLR2004", # magic values — too noisy at this scale; revisit if it bites
     "ISC001",  # single-line implicit concat — the formatter owns this; would conflict
     "TRY003",  # long messages in raise — EM handles the real concern; TRY003 over-fires
-    "D105",    # magic-method docstrings — signature is the doc
-    "D107",    # __init__ docstring — the class docstring covers it
     "S603",    # subprocess call w/ shell=False — the whole point of git-porcelain; audited by design
+    # S607 partial path: `git-porcelain` shells out to `git` BY NAME on purpose, and
+    # hardcoding `/usr/bin/git` is wrong on any machine that is not this one. Global
+    # rather than per-file so a consumer that shells out from `src/` inherits the same
+    # answer instead of rediscovering it.
+    "S607",
 ]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
 
 [tool.ruff.lint.mccabe]
 max-complexity = 12
@@ -123,21 +127,30 @@ max-complexity = 12
 # our modules are named for the concept they own; that is the convention, not a clash.
 builtins-allowed-modules = ["types"]
 
+[tool.ruff.lint.flake8-type-checking]
+# Pydantic resolves field annotations at runtime, so a model's imports must NOT move
+# behind `TYPE_CHECKING`. Found in a2kay: `TC --fix` moved them and every model failed
+# to build. Five packages here declare pydantic, so this repo is exposed the same way.
+runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+
 [tool.ruff.lint.per-file-ignores]
-# tests may be undocumented, use asserts/magic numbers/partial-path subprocs, and re-bind fixtures.
-"tests/**" = ["ANN", "ARG", "D", "S101", "S607", "PLR2004", "PLR0915", "SLF", "INP"]
-"packages/*/tests/**" = ["ANN", "ARG", "D", "S101", "S607", "PLR2004", "PLR0915", "SLF", "INP", "FBT"]
+# One relaxation list, shared with every consumer (a2kay carries the same one under its
+# own `tests/**`). A test asserts, uses magic numbers and fake tokens, binds a boolean
+# positionally, reaches into the private of the thing it tests, and prints its report —
+# all of that is what a test is for.
+"tests/**" = ["ANN", "ARG", "S101", "S104", "S105", "S106", "PLR2004", "PLR0915", "PYI034", "TRY300", "TRY301", "FBT001", "SLF", "INP", "T201"]
+"packages/*/tests/**" = ["ANN", "ARG", "S101", "S104", "S105", "S106", "PLR2004", "PLR0915", "PYI034", "TRY300", "TRY301", "FBT001", "SLF", "INP", "T201", "FBT"]
 # the boundary fitness test walks the tree; it needs paths + prints.
-"tests/lib/**" = ["ANN", "D", "T20", "S101"]
+"tests/lib/**" = ["ANN", "T20", "S101"]
 # tools are CLI scripts: printing is their job, `git`/`opa` on PATH is deliberate,
 # and a module docstring is enough (no per-function D).
-"tools/**" = ["T201", "S607", "D103", "D100"]
+"tools/**" = ["T201"]
 # package benches (convert-md's engine-comparison harnesses, D4): throwaway CLI
 # probe scripts + fixture generators, not shipped library code — same shape as
 # tools/**, plus INP001 (deliberately not a package), PLC0415 (isolated engines
 # import lazily by design), full D (docstrings not policed in throwaway code, as
 # in tests), and SLF (the docx fixture generator does low-level oxml surgery).
-"packages/*/bench/**" = ["T201", "S607", "D", "INP001", "PLC0415", "SLF"]
+"packages/*/bench/**" = ["T201", "INP001", "PLC0415", "SLF"]
 # any-browser's two engine adapters are DEFINED by "render never raises for a
 # routine failure" (the base.py BrowserBackend contract): every driver / CDP /
 # telemetry quirk is caught and turned into a RenderOutcome or a best-effort
@@ -235,6 +248,22 @@ unused-ignore = "error"
 unused-type-ignore = "error"
 unnecessary-comparison = "error"
 missing-super-call = "error"
+
+# Considered and rejected — spelled out rather than left to the preset's default, so
+# the next reader sees a decision instead of an omission.
+#
+# `implicit-bool` and `unused-call-result` were SCANNED rather than enforced: a rule
+# earns a gate when a violation is a defect, and for these two it usually is not.
+# `if items:` is how Python is written, and discarding the result of `list.append` or
+# `cursor.execute` is their normal use. a2kay ran the scan over 232 sites and found
+# three real defects; the rest were correct as written. Re-run with
+# `uv run pyrefly check --error implicit-bool` if the code moves enough to warrant it.
+implicit-bool = false
+unused-call-result = false
+#
+# `unknown-argument-type` / `unknown-variable-type` are enabled in a2kay, which has a
+# reflective verb-dispatch surface they catch. Probed here: 41 findings, all in tests,
+# none of them a defect. Declared as a consumer delta rather than adopted.
 
 # `any-browser` degrades when an engine extra is absent rather than import-crashing,
 # which is the whole contract — so the backends' imports are unresolvable on a venv

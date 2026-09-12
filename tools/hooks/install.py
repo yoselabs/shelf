@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
-"""Install the shelf's commit guard as a git pre-commit hook in a consumer repo.
+"""Install the shelf's commit hooks — the source guard and the linter — in a consumer repo.
 
 Fast feedback, not enforcement — enforcement is ``make guard`` in the gate
 (``docs/consuming-the-shelf.md`` §2). This hook catches the mistake at commit
 time instead of at gate time:
 
     python /path/to/shelf/tools/hooks/install.py [repo-root]   # default: cwd
+
+Two independent marker-delimited spans go into the same ``pre-commit`` file:
+
+``shelf-guard``   refuses a committed local shelf source. Verified LIVE — it is
+                  run against a throwaway index and must refuse an offender.
+``shelf-lint``    runs ``ruff check`` and ``ruff format --check`` on the staged
+                  Python files, and the preset-drift check when ``pyproject.toml``
+                  is staged. Reported as installed with ruff RESOLVED, which is a
+                  weaker claim than the guard's and is made in those words.
+
+The linter span reads the **working tree** for the staged paths, not the staged
+content — so a partially staged file is linted whole. That is the usual shape and
+the honest limitation: the hook is fast feedback, `make check` is the enforcement
+(`docs/consuming-the-shelf.md` §2). It fails OPEN when ruff cannot be found,
+loudly, because a machine without ruff must still be able to commit.
 
 Idempotent and marker-guarded: re-running is safe; it refuses to clobber a
 foreign pre-commit hook, naming the tool that owns it and that tool's own
@@ -67,6 +82,10 @@ VERIFIED, REFUSED, COULD_NOT_VERIFY = 0, 1, 2
 
 GUARD_REL = "tools/hooks/forbid-local-shelf-source.py"
 
+_LINT_MARKER = "# shelf-lint (ruff + preset drift)"
+_LINT_BEGIN = f"{_LINT_MARKER} BEGIN — managed by the shelf installer; safe to re-run."
+_LINT_END = f"{_LINT_MARKER} END"
+
 # An offending pyproject, staged only into a throwaway index during verification.
 _OFFENDER = """\
 [project]
@@ -120,7 +139,44 @@ fi
 {_END}
 """
 
-HOOK = f"#!/bin/sh\n{GUARDED_SPAN}"
+# Ruff over the staged Python files, plus the preset-drift check when the config
+# itself is staged. Notes on the shape, since each line is answering something:
+#
+#   -z into a file    a path with a space — or a newline — is still one path, and the
+#                     list is needed twice, so it is materialized once rather than
+#                     re-derived (and re-raced against a concurrent `git add`).
+#   --force-exclude   without it ruff lints a file its own `exclude` covers: naming a
+#                     path explicitly normally overrides exclusion, and this hook names
+#                     every path explicitly.
+#   fail open         a machine without ruff must still be able to commit. `make lint`
+#                     is the enforcement; this is fast feedback.
+LINT_SPAN = f"""{_LINT_BEGIN}
+_shelf_lint_staged=$(mktemp)
+trap 'rm -f "$_shelf_lint_staged"' EXIT
+git diff --cached --name-only --diff-filter=ACM -z -- '*.py' > "$_shelf_lint_staged"
+if [ -s "$_shelf_lint_staged" ]; then
+  _ruff=""
+  for _candidate in "./.venv/bin/ruff" "ruff"; do
+    if command -v "$_candidate" >/dev/null 2>&1; then _ruff="$_candidate"; break; fi
+  done
+  if [ -z "$_ruff" ]; then
+    echo "shelf-lint: ruff not found (no ./.venv/bin/ruff, none on PATH) -- SKIPPED, not a pass" >&2
+  else
+    xargs -0 "$_ruff" check --force-exclude < "$_shelf_lint_staged" || exit 1
+    xargs -0 "$_ruff" format --check --force-exclude < "$_shelf_lint_staged" || exit 1
+  fi
+fi
+if git diff --cached --name-only --diff-filter=ACM | grep -qx 'pyproject.toml'; then
+  SHELF="${{SHELF_HOME:-../shelf}}"
+  [ -d "$SHELF" ] || SHELF="$HOME/Workspaces/shelf"
+  if [ -f "$SHELF/tools/preset_drift.py" ]; then
+    python3 "$SHELF/tools/preset_drift.py" --repo . || exit 1
+  fi
+fi
+{_LINT_END}
+"""
+
+HOOK = f"#!/bin/sh\n{GUARDED_SPAN}\n{LINT_SPAN}"
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -210,24 +266,45 @@ def _verify_live(repo: Path, hook: Path) -> tuple[bool, str]:
     return True, ""
 
 
-def _rewritten_hook(existing: str | None) -> str:
-    """The hook's new content: fresh (`HOOK`) if absent, `GUARDED_SPAN` spliced back in otherwise.
+def _splice(body: str, begin: str, end: str, span: str, end_len: int | None = None) -> str | None:
+    """Replace the `begin`..`end` span in `body`, or `None` when it is not there.
 
-    Preserves everything another tool put before or after it, since re-running
-    must never clobber a chain another tool built on top of a previously
-    installed guard. Also migrates the pre-BEGIN/END format in place (see
-    `_OLD_BEGIN`/`_OLD_END`) rather than falling back to a full overwrite,
-    which would silently repeat the exact loss this format change fixed for
-    anyone whose hook was written before it.
+    Everything before and after the span is preserved: re-running must never clobber
+    a chain another tool built around a previously installed span.
+    """
+    start, stop = body.find(begin), body.find(end)
+    if start == -1 or stop == -1:
+        return None
+    tail = body[stop + (end_len if end_len is not None else len(end)) :].lstrip("\n")
+    # Exactly one blank line before whatever follows — the same separator a fresh
+    # `HOOK` uses, so splicing a hook is byte-identical to writing one and a reinstall
+    # is genuinely idempotent rather than off by a newline each time.
+    return body[:start] + span + (f"\n{tail}" if tail else "")
+
+
+def _rewritten_hook(existing: str | None) -> str:
+    """The hook's new content: fresh (`HOOK`) if absent, each span spliced back in otherwise.
+
+    The two spans are independent. A hook written before the linter span existed has
+    the guard's markers and not the linter's, so the linter is *appended* rather than
+    the whole file overwritten — overwriting would drop whatever another tool chained
+    on, which is the loss the BEGIN/END format was introduced to stop.
+
+    Also migrates the pre-BEGIN/END guard format in place (see `_OLD_BEGIN`/`_OLD_END`).
     """
     if existing is None:
         return HOOK
-    start, end, end_len = existing.find(_BEGIN), existing.find(_END), len(_END)
-    if start == -1 or end == -1:
-        start, end, end_len = existing.find(_OLD_BEGIN), existing.find(_OLD_END), len(_OLD_END)
-    if start == -1 or end == -1:
+
+    spliced = _splice(existing, _BEGIN, _END, GUARDED_SPAN)
+    if spliced is None:
+        spliced = _splice(existing, _OLD_BEGIN, _OLD_END, GUARDED_SPAN, end_len=len(_OLD_END))
+    if spliced is None:
         return HOOK
-    return existing[:start] + GUARDED_SPAN + existing[end + end_len :].lstrip("\n")
+
+    relinted = _splice(spliced, _LINT_BEGIN, _LINT_END, LINT_SPAN)
+    if relinted is not None:
+        return relinted
+    return f"{spliced.rstrip(chr(10))}\n\n{LINT_SPAN}"
 
 
 def main() -> int:

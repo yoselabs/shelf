@@ -4,6 +4,7 @@
 #     rev: <a shelf commit or tag>
 #     hooks:
 #       - id: no-local-shelf-source
+#       - id: shelf-preset-drift
 #
 # See docs/consuming-the-shelf.md §2 (and the native-git-hook fallback for repos
 # that do not use the pre-commit framework).
@@ -13,4 +14,16 @@
   entry: tools/hooks/forbid-local-shelf-source.py
   language: script
   files: ^(pyproject\.toml|uv\.lock)$
+  pass_filenames: false
+
+# Ruff itself is NOT shipped here: a pre-commit user already has astral-sh/ruff-pre-commit,
+# and wrapping someone else's hook in ours would only pin them to our cadence. What they
+# cannot get elsewhere is the preset check — whether their ruff config still matches the
+# shelf's, or says why not.
+- id: shelf-preset-drift
+  name: linter config matches the shelf preset (or declares why not)
+  description: Fails on any ruff/pyrefly/Makefile difference from the shelf not declared in [tool.shelf-preset].
+  entry: tools/preset_drift.py
+  language: script
+  files: ^(pyproject\.toml|Makefile)$
   pass_filenames: false

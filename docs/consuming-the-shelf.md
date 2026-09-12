@@ -61,8 +61,21 @@ operation, `tools/onboard/guard.py`); to run it standalone:
 python "$SHELF_HOME/tools/hooks/install.py"   # run in the consumer repo root
 ```
 
+It writes **two marker-delimited spans** into the same `pre-commit` file:
+
+| span | what it does at commit time |
+|---|---|
+| `shelf-guard` | refuses a committed local shelf source |
+| `shelf-lint` | `ruff check` + `ruff format --check` on the staged Python, and the preset-drift check when `pyproject.toml` is staged |
+
+The spans are independent: a hook installed before `shelf-lint` existed gains it on the next run,
+with anything another tool chained on preserved. `shelf-lint` **fails open** when ruff cannot be
+found (no `./.venv/bin/ruff`, none on `PATH`) — a machine without ruff must still be able to commit —
+and it reads the **working tree** for the staged paths, so a partially staged file is linted whole.
+Both are the same trade the guard makes: the hook is fast feedback, `make check` is the enforcement.
+
 Idempotent. It asks git where hooks live (`git rev-parse --git-path hooks`, which honors
-`core.hooksPath`) rather than assuming `.git/hooks`, then **proves the hook blocks** by running it
+`core.hooksPath`) rather than assuming `.git/hooks`, then **proves the guard blocks** by running it
 against a throwaway index before reporting success. Three outcomes, deliberately distinct:
 
 | exit | meaning |
@@ -88,7 +101,11 @@ the "hooks are per-clone and cannot be committed" premise above has that excepti
   rev: <a shelf commit or tag>
   hooks:
     - id: no-local-shelf-source
+    - id: shelf-preset-drift
 ```
+
+Ruff is not shipped here — use `astral-sh/ruff-pre-commit` for that. What the shelf adds is the
+preset check: whether your ruff and pyrefly config still match this repo's, or declare why not.
 
 ## 3. The resolver block, in the project's `AGENTS.md` / `CLAUDE.md`
 

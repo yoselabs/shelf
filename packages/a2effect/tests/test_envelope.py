@@ -47,7 +47,7 @@ def test_envelope_cause_chain_populated_when_raised_from() -> None:
     err: AppError
     msg = "wrap"
     try:
-        raise _NotFoundError(msg) from original  # noqa: TRY301 - deliberately raising to build a cause chain
+        raise _NotFoundError(msg) from original
     except _NotFoundError as caught:
         err = caught
     env = err.to_envelope()

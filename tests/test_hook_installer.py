@@ -363,3 +363,113 @@ def test_not_a_git_repository_is_reported(tmp_path: Path) -> None:
 
     assert result.returncode != VERIFIED
     assert "not a git repository" in result.stderr.lower()
+
+
+# ── the shelf-lint span ───────────────────────────────────────────────────────
+# The guard span is verified by the installer itself (it must refuse a probe). The
+# linter span cannot be probed that way — it reads the working tree for the staged
+# paths, and the installer's probe is read-only by construction — so its liveness is
+# pinned here instead, by committing against a real repo with a real violation in it.
+
+_DIRTY = "import os\n"  # F401: imported and unused
+_CLEAN = "X = 1\n"
+
+
+def _commit(repo: Path) -> subprocess.CompletedProcess[str]:
+    env = {
+        **os.environ,
+        "SHELF_HOME": str(SHELF),
+        "PATH": f"{SHELF / '.venv' / 'bin'}:{os.environ.get('PATH', '')}",
+    }
+    return subprocess.run(
+        ["git", "-C", str(repo), "commit", "-m", "probe"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+
+
+@pytest.fixture
+def linted_repo(repo: Path) -> Path:
+    """A repo whose hook is installed and whose ruff config is the shelf's own."""
+    assert _install(repo).returncode == VERIFIED
+    (repo / "pyproject.toml").write_text(
+        '[project]\nname = "c"\nversion = "0.1.0"\n\n[tool.ruff]\nline-length = 140\n\n[tool.ruff.lint]\nselect = ["F"]\n'
+    )
+    _git(repo, "add", "pyproject.toml")
+    # Committed, not left staged: a staged `pyproject.toml` fires the preset-drift
+    # check, and a toy repo diverges from the shelf on every axis at once.
+    subprocess.run(
+        ["git", "-C", str(repo), "commit", "-qm", "config", "--no-verify"],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "SHELF_HOME": str(SHELF)},
+    )
+    return repo
+
+
+def test_staging_pyproject_runs_the_preset_drift_check(linted_repo: Path) -> None:
+    """The other half of the span: the config file is where drift happens, so touching
+    it is what should ask whether this repo still matches the shelf."""
+    (linted_repo / "pyproject.toml").write_text(
+        '[project]\nname = "c"\nversion = "0.1.0"\n\n[tool.ruff.lint]\nselect = ["F"]\nignore = ["WOBBLE1"]\n'
+    )
+    _git(linted_repo, "add", "pyproject.toml")
+
+    result = _commit(linted_repo)
+
+    assert result.returncode != 0
+    assert "preset-drift" in result.stdout + result.stderr
+
+
+def test_the_lint_span_refuses_a_staged_python_file_that_fails_ruff(linted_repo: Path) -> None:
+    (linted_repo / "bad.py").write_text(_DIRTY)
+    _git(linted_repo, "add", "bad.py")
+
+    result = _commit(linted_repo)
+
+    assert result.returncode != 0
+    assert "F401" in result.stdout + result.stderr
+
+
+def test_the_lint_span_lets_a_clean_file_through(linted_repo: Path) -> None:
+    (linted_repo / "good.py").write_text(_CLEAN)
+    _git(linted_repo, "add", "good.py")
+
+    assert _commit(linted_repo).returncode == 0
+
+
+def test_the_lint_span_ignores_a_commit_with_no_python_in_it(linted_repo: Path) -> None:
+    (linted_repo / "notes.md").write_text("# notes\n")
+    _git(linted_repo, "add", "notes.md")
+
+    assert _commit(linted_repo).returncode == 0
+
+
+def test_a_path_with_a_space_is_one_path(linted_repo: Path) -> None:
+    """The staged list is NUL-delimited end to end; splitting it on whitespace would
+    hand ruff two nonexistent paths and pass by erroring in the wrong direction."""
+    (linted_repo / "two words.py").write_text(_DIRTY)
+    _git(linted_repo, "add", "two words.py")
+
+    result = _commit(linted_repo)
+
+    assert result.returncode != 0
+    assert "F401" in result.stdout + result.stderr
+
+
+def test_a_hook_written_before_the_lint_span_existed_gains_it(repo: Path) -> None:
+    """Re-running the installer on an older hook appends the new span rather than
+    overwriting the file — the loss the BEGIN/END format exists to prevent."""
+    assert _install(repo).returncode == VERIFIED
+    hook = _hooks_dir(repo) / "pre-commit"
+    without_lint = hook.read_text().split("# shelf-lint")[0].rstrip() + "\n"
+    hook.write_text(without_lint + "\n# --- BEGIN BEADS INTEGRATION ---\ntrue\n")
+
+    assert _install(repo).returncode == VERIFIED
+
+    body = hook.read_text()
+    assert "# shelf-lint (ruff + preset drift) BEGIN" in body
+    assert "BEGIN BEADS INTEGRATION" in body

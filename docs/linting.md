@@ -25,28 +25,35 @@ Run the whole thing with `make check`. Individual targets: `make lint typecheck 
 - **Curated-broad, not `ALL`.** An explicit, grouped `select` reads as a *reference* — it teaches the
   convention — and does not silently break when a ruff upgrade adds a rule. Every family is grouped and
   commented in `pyproject.toml`; every `ignore` states its reason.
-- **The strict families that matter for "no chaos":** `S` (security/bandit), `D` (docstrings on the
-  public surface, google convention), `ERA` (no commented-out code — *leave it smaller*, constitution
-  III/VIII), `EM`/`TRY`/`BLE` (clean exceptions, no blind catches), `ANN` (everything typed),
-  `C90` (complexity ceiling), `PTH` (pathlib), `FBT` (no boolean traps), `TC` (typing-only imports).
-- **Tests get a lighter bar** (per-file-ignores): no docstrings, asserts allowed, magic numbers fine.
+- **The strict families that matter for "no chaos":** `S` (security/bandit), `ERA` (no commented-out
+  code — *leave it smaller*, constitution III/VIII), `EM`/`TRY`/`BLE` (clean exceptions, no blind
+  catches), `ANN` (everything typed), `C90` (complexity ceiling), `PTH` (pathlib), `FBT` (no boolean
+  traps), `TC` (typing-only imports).
+- **`D` (pydocstyle) is deliberately absent**, since 2026-09-12. Docstrings here are written where
+  they carry a decision — why a thing exists, what breaks without it — and most of this repo's do.
+  Mandating one on every public name produces the other kind: a restatement of the signature that
+  ages into a lie. a2kay measured 379 findings, 110 of them on methods whose name already said it.
+  The docstrings already written stay; they are no longer enforced.
+- **Tests get a lighter bar** (per-file-ignores): asserts allowed, magic numbers fine, fake tokens,
+  a boolean bound positionally, and reaching into the private of the thing under test. One list,
+  shared verbatim with every consumer — a test's relaxations are not repo-shaped.
 - **Every suppression is honest.** `# noqa` requires a reason; the only one in the tree today is the
   deliberate multi-engine fallback in `convert-md` (`BLE001`).
 - **`TC` and pydantic — the one autofix that can break working code.** `TC`'s fix moves a type-only
   import under `TYPE_CHECKING`, which is correct for anything the runtime never evaluates. A pydantic
   model **does** evaluate its field annotations at runtime, so a moved import leaves it unable to
   resolve them, and the failure is silent until something instantiates the model. No package here trips
-  it today (`TC` is clean, and the models' field types are local), so there is deliberately no config
-  guarding it — but the moment a package annotates a pydantic field with an imported type, set
+  it today, but five packages here declare pydantic, so the exposure is one annotation away. The
+  guard is now set rather than documented:
 
   ```toml
   [tool.ruff.lint.flake8-type-checking]
   runtime-evaluated-base-classes = ["pydantic.BaseModel"]
   ```
 
-  *before* running `ruff --fix --unsafe-fixes`, not after. a2kay hit this while adopting `TC` across
-  ~170 sites (2026-09-12) and configured around it first; the same sweep with the guard missing would
-  have moved pydantic imports in its verb-response models.
+  Set it *before* running `ruff --fix --unsafe-fixes`, never after. a2kay hit this while adopting
+  `TC` across ~170 sites (2026-09-12) and configured around it first; the same sweep with the guard
+  missing would have moved pydantic imports in its verb-response models.
 
 ## Why the pyrefly config looks the way it does
 
@@ -97,6 +104,31 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
 
 Then **own it**: override any rule your project genuinely needs to, on purpose. Divergence is a local
 choice, visible in your own `pyproject`. The shelf is the baseline you converge back toward, not a lock.
+
+### Making the divergence actually visible — `make preset`
+
+"Visible" was the word resolution 0004 used, and for a year nothing made it so. The onboarding copy
+(`tools/onboard/linter_preset.py`) is append-only by design: it never opens a table a consumer already
+owns, so it reports *"already current"* for a repo missing two whole rule families. Ten repos here
+reached ten rule sets without anyone deciding to.
+
+`tools/preset_drift.py`, wired as `make preset` and copied verbatim like `guard`, compares three axes
+— `[tool.ruff.lint] select`/`ignore`, `[tool.pyrefly.errors]`, and the `Makefile` target set — and
+fails on any difference the consumer has not declared in its own:
+
+```toml
+[tool.shelf-preset]
+ruff-select-omitted = []
+pyrefly-errors-extra = ["unknown-argument-type"]  # reflective verb dispatch, a2kay only
+make-targets-extra = ["archlint"]                 # import-linter contracts, no shelf equivalent
+```
+
+An empty list means "identical here". The tool never edits, never proposes a value, and takes no side
+about which repo is right — a declared difference passes, exactly as 0004 intends. It only refuses to
+let one happen by accident.
+
+Not compared: `per-file-ignores` keys and `sub-config` matches. Those are paths, and a consumer's tree
+is not this one's. A check that fails on every consumer forever teaches everyone to ignore it.
 
 ## Architectural fitness rules (native, not OPA — resolution 0005)
 
