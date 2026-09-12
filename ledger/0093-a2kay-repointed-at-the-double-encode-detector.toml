@@ -1,0 +1,10 @@
+seq = 93
+date = "2026-09-12"
+event = "verdict"
+software = "llm-wobble"
+release = "llm-wobble-v0.5.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = "one dependency line; the local detector deleted"
+note = "a2kay repointed at llm-wobble-v0.5.0 and deleted its in-repo copy of the detector (a2kay 0178e4e). It keeps only reject_double_escaped, the raising wrapper that carries a2kay's own typed error and reason code — product, not substrate. The round trip is what proves the extraction was right: the guard at create/update/write_distilled is unchanged and its seven tests pass against the shelf's version untouched, including the two that pin what must NOT be caught (prose about escape sequences, and a single escape under the threshold). make check green in a2kay: 1239 passed. Separate row from 0092 per resolution 0009 — delivery and verdict are two events."
