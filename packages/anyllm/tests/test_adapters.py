@@ -144,6 +144,8 @@ class _FakeAnthropicClient:
 
 
 class _FakeAnthropicError(anthropic.APIError):
+    # pyrefly: ignore[missing-super-call] — APIError.__init__ demands a request object
+    # this fake has no use for; Exception.__init__ is all the test needs.
     def __init__(self, status: int) -> None:
         self.status_code = status
         Exception.__init__(self, f"status {status}")
@@ -219,6 +221,8 @@ class _FakeOaiClient:
 
 
 class _FakeOaiError(openai.APIError):
+    # pyrefly: ignore[missing-super-call] — APIError.__init__ demands a request object
+    # this fake has no use for; Exception.__init__ is all the test needs.
     def __init__(self, status: int) -> None:
         self.status_code = status
         Exception.__init__(self, f"status {status}")

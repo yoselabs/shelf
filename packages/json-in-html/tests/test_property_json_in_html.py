@@ -77,7 +77,7 @@ def test_property_rank_payloads_is_a_permutation(sources: list[str], sizes: list
     """
     n = min(len(sources), len(sizes))
     payloads = [
-        JsonPayload(source=sources[i], data={}, script_id=None, byte_size=sizes[i])  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+        JsonPayload(source=sources[i], data={}, script_id=None, byte_size=sizes[i])  # type: ignore[arg-type]
         for i in range(n)
     ]
     ranked = rank_payloads(payloads)

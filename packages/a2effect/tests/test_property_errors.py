@@ -53,7 +53,7 @@ def test_property_registering_with_a_non_core_base_always_raises(bad_base: str) 
     as an extension's base raises — not just the one hand-picked bad value.
     """
     with pytest.raises(ValueError, match="extension base must be a core kind"):
-        register_error_kind("pbt_probe_target", base=bad_base)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+        register_error_kind("pbt_probe_target", base=bad_base)  # type: ignore[arg-type]
 
 
 @given(ext_name=_REGISTERED_EXT_NAME, base=st.sampled_from(_CORE), retryable=st.booleans())
@@ -64,7 +64,7 @@ def test_property_a_valid_extension_resolves_to_its_declared_base(ext_name: str,
     base it was registered with, and inherits the extension's retryable default
     when the subclass doesn't override it.
     """
-    register_error_kind(ext_name, base=base, retryable=retryable)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+    register_error_kind(ext_name, base=base, retryable=retryable)  # type: ignore[arg-type]
     assert _resolve_base_kind(ext_name) == base
 
     error_cls = type(f"Err_{ext_name}", (AppError,), {"kind": ext_name})

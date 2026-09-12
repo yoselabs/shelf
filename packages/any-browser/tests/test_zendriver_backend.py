@@ -180,9 +180,9 @@ def _install_fake_zendriver(
             ResponseReceived=object(),  # handler key; the fake dispatches by registration, not key
         )
     )
-    mod.Config = _FakeConfig  # ty: ignore[unresolved-attribute]
-    mod.start = _start  # ty: ignore[unresolved-attribute]
-    mod.cdp = cdp  # ty: ignore[unresolved-attribute]
+    mod.Config = _FakeConfig  # pyrefly: ignore[missing-attribute]
+    mod.start = _start  # pyrefly: ignore[missing-attribute]
+    mod.cdp = cdp  # pyrefly: ignore[missing-attribute]
     monkeypatch.setitem(sys.modules, "zendriver", mod)
     return holder
 
@@ -214,7 +214,7 @@ def test_fake_config_matches_real_add_argument(arg: str) -> None:
 
     def _outcome(cfg: object) -> str:
         try:
-            cfg.add_argument(arg)  # ty: ignore[unresolved-attribute]
+            cfg.add_argument(arg)  # pyrefly: ignore[missing-attribute]
         except ValueError:
             return "rejected"
         else:

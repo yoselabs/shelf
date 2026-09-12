@@ -50,7 +50,7 @@ def test_kind_is_not_per_instance_overridable() -> None:
 
     err = NotFoundError("x")
     with pytest.raises(TypeError, match="kind"):
-        NotFoundError("x", kind="infra")  # ty: ignore[unknown-argument] - deliberately passing an unknown kwarg to assert TypeError
+        NotFoundError("x", kind="infra")  # pyrefly: ignore[unexpected-keyword] — deliberately passing an unknown kwarg to assert TypeError
     assert err.kind == "input"
 
 

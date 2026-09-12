@@ -64,6 +64,7 @@ def test_docx_round_trips_via_mammoth(tmp_path: Path) -> None:
 def test_xlsx_converts_with_sheet_content(tmp_path: Path) -> None:
     wb = Workbook()
     ws = wb.active
+    assert ws is not None, "a fresh Workbook always has an active sheet"
     ws.title = "Numbers"
     ws.append(["name", "value"])
     ws.append(["alpha", 42])

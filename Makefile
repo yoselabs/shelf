@@ -60,7 +60,7 @@ format:
 
 # --error-on-warning: a type warning fails the build. No slow rot.
 typecheck:
-	uv run ty check --error-on-warning packages
+	uv run pyrefly check
 
 # typos in code, docstrings, and docs.
 spell:

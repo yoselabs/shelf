@@ -43,8 +43,8 @@ def test_injected_logger_receives_unavailable_debug(caplog: pytest.LogCaptureFix
     rec = next((r for r in caplog.records if r.getMessage() == "plugin_unavailable"), None)
     assert rec is not None, "expected a plugin_unavailable debug record on the injected logger"
     # Fields ride on record.fields, never splatted onto the record.
-    assert rec.fields["name"] == "gamma"  # ty: ignore[unresolved-attribute] - fields set via logging `extra`
-    assert "capability missing" in rec.fields["reason"]  # ty: ignore[unresolved-attribute]
+    assert rec.fields["name"] == "gamma"  # pyrefly: ignore[missing-attribute] — fields set via logging `extra`
+    assert "capability missing" in rec.fields["reason"]  # pyrefly: ignore[missing-attribute]
 
 
 def test_wrong_type_manifest_is_skipped_and_warned(caplog: pytest.LogCaptureFixture) -> None:
@@ -61,7 +61,7 @@ def test_plugin_manifest_is_frozen() -> None:
 
     m = PluginManifest(name="x", protocol=object, factory=factory)
     with pytest.raises((AttributeError, TypeError)):
-        m.name = "y"  # ty: ignore[invalid-assignment] - asserting the frozen dataclass rejects the write
+        m.name = "y"  # pyrefly: ignore[read-only] — asserting the frozen dataclass rejects the write
 
 
 def test_unavailable_is_named_tuple() -> None:

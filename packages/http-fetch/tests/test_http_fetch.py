@@ -5,7 +5,7 @@ A fake AsyncSession is injected at the package's curl_cffi import path.
 
 from __future__ import annotations
 
-from typing import Any, Self
+from typing import Any, Self, override
 
 from curl_cffi.requests import exceptions as ce
 from http_fetch import FetchOutcome, FetchVerdict, conditional_headers, fetch_bytes
@@ -336,6 +336,7 @@ async def test_the_sentinel_never_escapes(monkeypatch: Any) -> None:
     """
 
     class _ReRaising(_CountingBreaker):
+        @override
         async def __aexit__(self, exc_type: object, *_: object) -> bool:
             if exc_type is not None:
                 self.failures += 1

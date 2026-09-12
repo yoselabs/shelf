@@ -101,7 +101,7 @@ def test_render_llm_compresses_page_to_tsv() -> None:
 def test_render_code_and_machine_never_compress() -> None:
     page = Page[Row](items=[Row(id=1, title="a")])
     for consumer in ("code", "machine"):
-        rendered = render(page, consumer)  # type: ignore[arg-type]
+        rendered = render(page, consumer)
         body = json.loads(rendered.text)
         # plain JSON: items is a list of objects, no TSV blob, no discriminator
         assert isinstance(body["items"], list)

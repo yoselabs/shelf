@@ -7,6 +7,7 @@ from __future__ import annotations
 import ast
 import tomllib
 from pathlib import Path
+from typing import override
 
 import httpx
 import mcp_feedback
@@ -41,6 +42,7 @@ _CONNECTION_REFUSED = "connection refused"
 
 
 class _FailingTransport(httpx.AsyncBaseTransport):
+    @override
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError(_CONNECTION_REFUSED)
 
@@ -56,4 +58,5 @@ async def test_delivery_failure_does_not_raise(monkeypatch: pytest.MonkeyPatch) 
         res = await client.call_tool("report_feedback", {"subject": "s", "note": "n"})
 
     # attempted — delivery failure is swallowed, not surfaced as sent=False or a raised error
+    assert res.structured_content is not None
     assert res.structured_content["sent"] is True

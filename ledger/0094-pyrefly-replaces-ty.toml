@@ -1,0 +1,10 @@
+seq = 94
+date = "2026-09-12"
+event = "delivery"
+software = "shelf"
+release = ""
+actor = "shelf"
+consumer = ""
+verdict = "pass"
+cost = ""
+note = "Replaced ty with pyrefly as the repo's type checker, at preset=strict plus seven correctness opt-ins. Adopted on a2kay's evidence rather than a BENCH (resolution 0011 waived deliberately — the owner's call): at this same preset pyrefly found seven defects in a2kay that ty reported clean, among them three service protocols declaring read-write members a frozen dataclass could never satisfy, and a ctx.list() type divergence that crashed two scheduled jobs in the only path they run in. Result here: 306 findings at -p all, 97 at default, 45 after config — and ZERO in any package's src/. Every finding was in tests or bench. Tests take the lighter annotation bar (implicit-any-* and unannotated-return off under packages/*/tests/), mirroring ruff's existing per-file-ignores, while every check about whether the code under test is called correctly stays on. Config gotchas worth knowing: severity must be spelled \"error\" and not = true, because true means the kind's DEFAULT severity and several default to warn — found, printed as a warning tail, never counted; and only the FIRST matching sub-config applies, so a narrower block must repeat what it shadows. What the swap actually fixed, all of it real: five missing @override; four tests that assigned inside a bare try/except and would have died on an unbound name if the model ever stopped validating, now one pytest.raises helper; four unguarded reads of optional values (a tool description, a structured payload, openpyxl's active sheet) that would have thrown instead of failing; and two protocol fakes declaring ClassVar tools that could not satisfy the read-only property _AppLike declares. Also removed 19 ty-ignore comments by converting them to their pyrefly codes, deleted 12 more that pyrefly does not need, and deleted 7 mypy-style # type: ignore comments that suppress nothing in a repo whose gate has never run mypy. make check green: 844 passed, 86.32% coverage, pyrefly at 0 errors with no warning tail."

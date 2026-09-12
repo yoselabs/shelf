@@ -20,6 +20,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 BENCH_DIR = Path(__file__).parent
 CORPUS_DIR = BENCH_DIR / "corpus"
@@ -62,7 +63,7 @@ _FORMATS: dict[str, list[Engine]] = {
 }
 
 
-def _run_one(engine: Engine, src: Path) -> dict:
+def _run_one(engine: Engine, src: Path) -> dict[str, Any]:
     out_path = OUTPUTS_DIR / f"{engine.name}__{src.stem}.md"
     with_flags: list[str] = []
     for spec in engine.specs:

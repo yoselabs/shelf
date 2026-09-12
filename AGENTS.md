@@ -26,7 +26,7 @@ A task is **done** only when the full quality gate passes across the **entire re
 not just the files the task touched:
 
 ```bash
-make check    # ruff check + ruff format + ty (--error-on-warning) + codespell + deptry + pytest/coverage
+make check    # ruff check + ruff format + pyrefly (strict) + codespell + deptry + pytest/coverage
 ```
 
 **No carve-outs.** "Pre-existing drift", "unrelated file", or "that's a separate change" do **not**

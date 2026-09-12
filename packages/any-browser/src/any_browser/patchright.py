@@ -20,6 +20,6 @@ def patchright_launcher() -> Any:
     the backend reports ``unavailable``.
     """
     # lazy: patchright is the optional [patchright] extra.
-    from patchright.async_api import async_playwright  # noqa: PLC0415  # ty: ignore[unresolved-import]
+    from patchright.async_api import async_playwright  # noqa: PLC0415
 
     return chromium_launch(async_playwright)

@@ -162,6 +162,8 @@ async def test_memoized_does_not_build_until_awaited() -> None:
         return object()
 
     memoized(_factory)
+    # pyrefly: ignore[unnecessary-comparison] — `built` reads as Literal[False] only
+    # because the factory is never called, which IS the assertion: memoized is lazy.
     assert built is False
 
 

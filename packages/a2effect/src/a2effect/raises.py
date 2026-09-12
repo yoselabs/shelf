@@ -58,4 +58,4 @@ class Raises:
                     f"subclass a2effect.AppError or translate via an enricher / raises_as"
                 )
                 raise TypeError(msg)
-        return tuple(collected)  # ty: ignore[invalid-return-type] - each member is issubclass-checked AppError above
+        return tuple(collected)

@@ -53,7 +53,7 @@ def test_quarantine_wraps_keyboard_interrupt() -> None:
 def test_unexpected_defect_cannot_be_subclassed() -> None:
     with pytest.raises(TypeError, match="final"):
 
-        class _Subclass(UnexpectedDefect):  # type: ignore[misc]
+        class _Subclass(UnexpectedDefect):
             pass
 
 

@@ -45,7 +45,7 @@ def camoufox_launcher() -> Any:
     installed) propagates to :meth:`PlaywrightBackend.render`, which reports
     ``unavailable``.
     """
-    from camoufox.async_api import AsyncCamoufox  # noqa: PLC0415  # ty: ignore[unresolved-import] — lazy: camoufox is an optional engine
+    from camoufox.async_api import AsyncCamoufox  # noqa: PLC0415
 
     return AsyncCamoufox(headless=True)
 

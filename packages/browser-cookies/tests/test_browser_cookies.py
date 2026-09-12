@@ -148,7 +148,7 @@ def test_read_cookies_dispatches_to_correct_browser(
     source: str,
     patch_bc3: dict[str, list[tuple[str, str | None]]],
 ) -> None:
-    rows = read_cookies(source)  # ty: ignore[invalid-argument-type]
+    rows = read_cookies(source)  # pyrefly: ignore[bad-argument-type]
     assert len(rows) == 1
     assert source in patch_bc3
     assert patch_bc3[source] == [(source, None)]
@@ -237,7 +237,7 @@ def test_read_cookies_wraps_upstream_exception(monkeypatch: pytest.MonkeyPatch) 
 
 def test_unsupported_source_raises_cookie_access_error() -> None:
     with pytest.raises(CookieAccessError):
-        read_cookies("nope")  # ty: ignore[invalid-argument-type]
+        read_cookies("nope")  # pyrefly: ignore[bad-argument-type]
 
 
 def test_missing_extra_degrades_to_cookie_access_error(monkeypatch: pytest.MonkeyPatch) -> None:

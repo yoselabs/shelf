@@ -12,7 +12,7 @@ The one rule that never bends: **`make check` is green over the WHOLE repo — n
 |------|-----|------------------|:---:|
 | **ruff check** | lint — a broad, curated rule set (correctness, security, docs, dead code, exceptions, typing) | `[tool.ruff.lint]` | ✅ |
 | **ruff format** | formatting — the single formatter; no bikeshedding | `[tool.ruff]` | ✅ |
-| **ty** | type checking (Astral); `--error-on-warning` so a warning fails the build | `make typecheck` | ✅ |
+| **pyrefly** | type checking; `preset = "strict"` plus correctness opt-ins, every severity spelled `"error"` so nothing lands in a warning tail | `[tool.pyrefly]` | ✅ |
 | **codespell** | typos in code, docstrings, and docs | `[tool.codespell]` | ✅ |
 | **deptry** | dependency hygiene per package — unused / missing / transitive | `make deps` (per-pkg) | ✅ |
 | **pytest + coverage** | tests + a coverage floor that guards against regression | `[tool.pytest…]`, `[tool.coverage…]` | ✅ |
@@ -48,6 +48,29 @@ Run the whole thing with `make check`. Individual targets: `make lint typecheck 
   ~170 sites (2026-09-12) and configured around it first; the same sweep with the guard missing would
   have moved pydantic imports in its verb-response models.
 
+## Why the pyrefly config looks the way it does
+
+- **`preset = "strict"`, not `default`.** Strict is the annotation-completeness level: no
+  bare `dict`/`tuple`, no unannotated parameter, no untyped empty container, `@override`
+  required. It is the strictest preset that is still about TYPES; `all` is a style sweep.
+- **Six correctness opt-ins on top**, each a defect class rather than a house style:
+  `deprecated`, `untyped-import`, `unnecessary-type-conversion`, `unannotated-return`,
+  both `no-any-return` kinds, plus `unused-ignore` / `unused-type-ignore` so a stale
+  suppression fails the build instead of quietly outliving what it suppressed.
+- **Severity is spelled `"error"`, never `= true`.** `true` means *this kind's default
+  severity*, and several default to `warn` — set that way they are found, printed as
+  "N warnings not shown", and never counted. A run must end at `0 errors` with no tail.
+- **Tests get the lighter bar**, the same way they do in ruff's per-file-ignores: the
+  `implicit-any-*` family and `unannotated-return` are off under `packages/*/tests/`. A
+  fixture `lambda` carries its meaning in the assertion around it. Everything about
+  whether the code under test is *called correctly* stays on, which is most of the value.
+- **Only the FIRST matching `sub-config` applies.** A narrower block must repeat what it
+  shadows — the `any-browser` and `plugin-surface` test blocks each restate the light bar.
+- **`ty` ran here until 2026-09-12.** The swap was adopted on a2kay's evidence: at this
+  same preset, pyrefly found seven defects in a2kay that `ty` reported clean, including a
+  protocol no frozen dataclass could satisfy and a type divergence that crashed two
+  scheduled jobs. No package `src/` in this repo had a finding.
+
 ## The coverage floor
 
 Set *just below* current total coverage (65% vs 68% today). It is a **regression guard, not a vanity
@@ -70,7 +93,7 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
    `bootstrap-verify` is the same call under a name that signals intent (checking, not setting up)
    — neither is a `check` prerequisite, since they assert this working copy's environment, not
    the repo's committed content.
-3. The `dev` dependency-group (pytest, pytest-cov, ruff, ty, codespell, deptry).
+3. The `dev` dependency-group (pytest, pytest-cov, ruff, pyrefly, codespell, deptry).
 
 Then **own it**: override any rule your project genuinely needs to, on purpose. Divergence is a local
 choice, visible in your own `pyproject`. The shelf is the baseline you converge back toward, not a lock.

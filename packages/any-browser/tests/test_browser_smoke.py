@@ -26,7 +26,7 @@ from __future__ import annotations
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import pytest
 from any_browser import PlaywrightBackend, RenderedPage, RenderOutcome, ZendriverBackend, patchright_launcher
@@ -55,8 +55,8 @@ def browser_unavailable_policy(reason: str, *, required: bool) -> None:
     silently correct-looking while a dead rung shipped.
     """
     if required:
-        pytest.fail(f"SHELF_REQUIRE_BROWSER is set but the engine did not launch: {reason}")  # ty: ignore[invalid-argument-type]
-    pytest.skip(reason)  # ty: ignore[too-many-positional-arguments]
+        pytest.fail(f"SHELF_REQUIRE_BROWSER is set but the engine did not launch: {reason}")
+    pytest.skip(reason)
 
 
 def _browser_unavailable(reason: str) -> None:
@@ -90,7 +90,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def log_message(self, format: str, *args: object) -> None:  # noqa: A002 — matches BaseHTTPRequestHandler's own parameter name
+    @override
+    def log_message(self, format: str, *args: object) -> None:
         return  # silence the dev server
 
 
@@ -100,7 +101,7 @@ def js_fixture_url() -> Iterator[str]:
     server = HTTPServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    host, port = server.server_address  # ty: ignore[invalid-assignment]
+    host, port = server.server_address  # pyrefly: ignore[bad-unpacking]
     try:
         yield f"http://{host}:{port}/"
     finally:
@@ -118,7 +119,7 @@ def _assert_rendered_js(page: RenderedPage) -> None:
 async def test_patchright_playwright_family_executes_js(js_fixture_url: str) -> None:
     """Playwright-API family: real patchright Chromium executes JS."""
     try:
-        import patchright.async_api  # noqa: F401, PLC0415  # ty: ignore[unresolved-import] — presence probe: skip if the engine is absent
+        import patchright.async_api  # noqa: F401, PLC0415
     except ImportError as exc:
         _browser_unavailable(f"patchright not installed: {exc}")
 

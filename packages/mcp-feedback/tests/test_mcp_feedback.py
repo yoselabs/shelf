@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, override
 
 import httpx
 import pytest
@@ -18,6 +18,7 @@ class _RecordingTransport(httpx.AsyncBaseTransport):
         self.requests: list[httpx.Request] = []
         self._response = response
 
+    @override
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
         return self._response
@@ -71,8 +72,10 @@ async def test_extra_instructions_appends_to_base_description() -> None:
     async with Client(server) as client:
         tools = await client.list_tools()
 
-    assert "No category to pick" in tools[0].description  # base text present
-    assert "subject = the URL you fetched." in tools[0].description  # appended text present
+    description = tools[0].description
+    assert description is not None
+    assert "No category to pick" in description  # base text present
+    assert "subject = the URL you fetched." in description  # appended text present
 
 
 async def test_extra_instructions_omitted_leaves_only_base_text() -> None:
@@ -82,7 +85,9 @@ async def test_extra_instructions_omitted_leaves_only_base_text() -> None:
     async with Client(server) as client:
         tools = await client.list_tools()
 
-    assert "No category to pick" in tools[0].description
+    description = tools[0].description
+    assert description is not None
+    assert "No category to pick" in description
 
 
 async def test_report_is_sent_and_carries_all_fields(monkeypatch: pytest.MonkeyPatch) -> None:

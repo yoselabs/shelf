@@ -19,7 +19,7 @@ def test_raises_is_frozen_dataclass_with_types_tuple() -> None:
     marker = Raises(_NotFoundError, _InvalidIdError)
     assert marker.types == (_NotFoundError, _InvalidIdError)
     with pytest.raises((AttributeError, Exception)):
-        marker.types = ()  # ty: ignore[invalid-assignment] - asserting the frozen dataclass rejects the write
+        marker.types = ()  # pyrefly: ignore[read-only] — asserting the frozen dataclass rejects the write
 
 
 def test_flatten_from_callable_with_single_marker() -> None:
@@ -69,7 +69,7 @@ def test_raises_rejects_non_app_error_member_at_flatten() -> None:
     class _NotAppError(Exception):
         pass
 
-    async def bad() -> Annotated[str, Raises(_NotAppError)]:  # type: ignore[arg-type]
+    async def bad() -> Annotated[str, Raises(_NotAppError)]:
         return "ok"
 
     with pytest.raises(TypeError, match="_NotAppError"):

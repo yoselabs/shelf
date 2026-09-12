@@ -15,6 +15,9 @@ def main() -> None:
 
     t0 = time.monotonic()
     md = pymupdf4llm.to_markdown(src)
+    if not isinstance(md, str):  # to_markdown returns page chunks only when asked for them
+        msg = f"pymupdf4llm returned {type(md).__name__}, expected str"
+        raise TypeError(msg)
     elapsed = time.monotonic() - t0
 
     Path(dst).write_text(md)

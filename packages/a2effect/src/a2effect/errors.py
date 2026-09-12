@@ -122,9 +122,9 @@ class AppError(Exception):
         super().__init__(msg)
         self.base_kind = _resolve_base_kind(type(self).kind)
         if retryable is not None:
-            self.retryable = retryable  # ty: ignore[invalid-attribute-access] - deliberate per-instance override of the class default
+            self.retryable = retryable
         if hint is not None:
-            self.hint = hint  # ty: ignore[invalid-attribute-access] - deliberate per-instance override of the class default
+            self.hint = hint
         self.details = details if details is not None else {}
         if cause is not None:
             self.__cause__ = cause

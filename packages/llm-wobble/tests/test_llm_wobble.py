@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import override
 
 import pytest
 from llm_wobble import (
@@ -70,8 +71,8 @@ def test_derive_calls_callable_and_logs(caplog: pytest.LogCaptureFixture) -> Non
     assert out == 6
     events = _events(caplog)
     assert len(events) == 1
-    assert events[0].fields["field"] == "x"  # ty: ignore[unresolved-attribute] - set via logging `extra`
-    assert events[0].fields["tolerance"] == "derive"  # ty: ignore[unresolved-attribute]
+    assert events[0].fields["field"] == "x"  # pyrefly: ignore[missing-attribute] — set via logging `extra`
+    assert events[0].fields["tolerance"] == "derive"  # pyrefly: ignore[missing-attribute]
 
 
 def test_default_substitutes_and_logs(caplog: pytest.LogCaptureFixture) -> None:
@@ -80,7 +81,7 @@ def test_default_substitutes_and_logs(caplog: pytest.LogCaptureFixture) -> None:
     assert out == "fallback"
     events = _events(caplog)
     assert len(events) == 1
-    assert events[0].fields["tolerance"] == "default"  # ty: ignore[unresolved-attribute]
+    assert events[0].fields["tolerance"] == "default"  # pyrefly: ignore[missing-attribute]
 
 
 def test_skip_raises_wobbleskip_and_logs(caplog: pytest.LogCaptureFixture) -> None:
@@ -88,7 +89,7 @@ def test_skip_raises_wobbleskip_and_logs(caplog: pytest.LogCaptureFixture) -> No
         _resolve({}, "x", WobblePolicy(WobbleTolerance.SKIP))
     events = _events(caplog)
     assert len(events) == 1
-    assert events[0].fields["tolerance"] == "skip"  # ty: ignore[unresolved-attribute]
+    assert events[0].fields["tolerance"] == "skip"  # pyrefly: ignore[missing-attribute]
 
 
 def test_optional_substitutes_without_logging(caplog: pytest.LogCaptureFixture) -> None:
@@ -156,6 +157,7 @@ def test_bind_lets_an_explicit_logger_win() -> None:
     seen: list[logging.LogRecord] = []
 
     class _Collect(logging.Handler):
+        @override
         def emit(self, record: logging.LogRecord) -> None:
             seen.append(record)
 
@@ -235,7 +237,7 @@ def test_recovers_first_object_from_trailing_prose(caplog: pytest.LogCaptureFixt
             model="m",
         )
     assert unwrap(wobbled) == 1
-    assert any(r.fields["field"] == "_envelope" for r in _events(caplog))  # ty: ignore[unresolved-attribute]
+    assert any(r.fields["field"] == "_envelope" for r in _events(caplog))  # pyrefly: ignore[missing-attribute]
 
 
 def test_non_object_root_raises() -> None:
@@ -266,7 +268,7 @@ def test_raw_excerpt_bounded_in_log(caplog: pytest.LogCaptureFixture) -> None:
         )
     events = _events(caplog)
     assert len(events) == 1
-    assert len(events[0].fields["raw"]) <= 200  # ty: ignore[unresolved-attribute]
+    assert len(events[0].fields["raw"]) <= 200  # pyrefly: ignore[missing-attribute]
 
 
 # --------------------------------------------------------------------- #

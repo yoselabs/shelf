@@ -94,7 +94,7 @@ async def test_guard_forwards_attributes_and_available() -> None:
 
     # name mirrors the inner provider; default_model forwarded via __getattr__.
     assert guarded.name == ProviderName.ANTHROPIC_API
-    assert guarded.default_model == "claude-haiku-4-5-20251001"  # ty: ignore[unresolved-attribute]  # forwarded via __getattr__, not on the Protocol
+    assert guarded.default_model == "claude-haiku-4-5-20251001"  # pyrefly: ignore[missing-attribute] — # forwarded via __getattr__, not on the Protocol
     assert guarded.available() is True
 
     # With no explicit model, the inner default_model is what gets asserted —

@@ -86,7 +86,7 @@ def test_property_a_resource_that_fails_to_enter_is_never_torn_down(n_success: i
             raise RuntimeError(msg)
 
         async def __aexit__(self, *_: object) -> None:  # pragma: no cover - must never run
-            pytest.fail("a resource that failed to enter must never be exited")  # ty: ignore[invalid-argument-type]
+            pytest.fail("a resource that failed to enter must never be exited")
 
     async def run() -> list[str]:
         log: list[str] = []

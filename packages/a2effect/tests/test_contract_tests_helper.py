@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any
 
 import pytest
 from a2effect import AppError
@@ -44,7 +44,7 @@ def test_contract_tests_envelope_round_trip_passes_for_valid_setup() -> None:
     app = _App(tools=[_Tool("fetch", (_NotFoundError,))])
     tests = contract_tests(app, dead_enricher=False, surface_parity=False)
     # Calling the parametrized test with the case args should pass.
-    tests["test_envelope_round_trip"]("fetch", _NotFoundError)  # type: ignore[attr-defined]
+    tests["test_envelope_round_trip"]("fetch", _NotFoundError)
 
 
 def test_contract_tests_disables_dead_enricher_category() -> None:
@@ -64,7 +64,7 @@ def test_contract_tests_dead_enricher_detects_orphan() -> None:
     tests = contract_tests(app, envelope_round_trip=False, surface_parity=False)
     assert "test_dead_enricher" in tests
     with pytest.raises(AssertionError):
-        tests["test_dead_enricher"]("orphan_enricher", "_InfraError")  # type: ignore[attr-defined]
+        tests["test_dead_enricher"]("orphan_enricher", "_InfraError")
 
 
 def test_contract_tests_dead_enricher_passes_when_all_covered() -> None:
@@ -88,8 +88,12 @@ def test_contract_tests_surface_parity_skipped_when_renderer_absent() -> None:
 
 def test_contract_tests_surface_parity_detects_drift() -> None:
     class _AppWithRenderer:
-        tools: ClassVar = [_Tool("fetch", (_NotFoundError,))]
-        enrichers: ClassVar[list[Any]] = []
+        # Instance attributes, not ClassVar: `_AppLike` declares `tools`/`enrichers` as
+        # read-only properties, and a ClassVar does not satisfy one — a real app holds
+        # its tool list per instance, so the fake should too.
+        def __init__(self) -> None:
+            self.tools = [_Tool("fetch", (_NotFoundError,))]
+            self.enrichers: list[Any] = []
 
         @staticmethod
         def render_envelope_for(surface: str, exc: AppError) -> dict[str, Any]:
@@ -100,17 +104,21 @@ def test_contract_tests_surface_parity_detects_drift() -> None:
 
     tests = contract_tests(_AppWithRenderer(), envelope_round_trip=False, dead_enricher=False)
     with pytest.raises(AssertionError):
-        tests["test_surface_parity"]("fetch", _NotFoundError)  # type: ignore[attr-defined]
+        tests["test_surface_parity"]("fetch", _NotFoundError)
 
 
 def test_contract_tests_surface_parity_passes_when_aligned() -> None:
     class _AppWithRenderer:
-        tools: ClassVar = [_Tool("fetch", (_NotFoundError,))]
-        enrichers: ClassVar[list[Any]] = []
+        # Instance attributes, not ClassVar: `_AppLike` declares `tools`/`enrichers` as
+        # read-only properties, and a ClassVar does not satisfy one — a real app holds
+        # its tool list per instance, so the fake should too.
+        def __init__(self) -> None:
+            self.tools = [_Tool("fetch", (_NotFoundError,))]
+            self.enrichers: list[Any] = []
 
         @staticmethod
         def render_envelope_for(surface: str, exc: AppError) -> dict[str, Any]:
             return exc.to_envelope_dict()
 
     tests = contract_tests(_AppWithRenderer(), envelope_round_trip=False, dead_enricher=False)
-    tests["test_surface_parity"]("fetch", _NotFoundError)  # type: ignore[attr-defined]
+    tests["test_surface_parity"]("fetch", _NotFoundError)
