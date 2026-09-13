@@ -1,6 +1,6 @@
 [project]
 name = "duckdb-sidecar"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shared DuckDB sidecar connection helper — normalize the target, create the parent directory, support :memory:, connect."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]

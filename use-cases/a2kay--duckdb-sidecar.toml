@@ -5,7 +5,7 @@
 consumer = "a2kay"
 software = "duckdb-sidecar"
 why = "a2kay's derived state (graph, audit, search, job history) lives in four separate per-concern DuckDB sidecar files, each opened the same way -- without a shared helper the connection dance drifts apart store by store."
-needs = "One connect(path) that normalizes the target, creates the parent directory for a file target, and supports the :memory: passthrough, leaving schema/migrations/queries to each store."
+needs = "One connect(path) that normalizes the target, creates the parent directory for a file target, and supports the :memory: passthrough, leaving schema/migrations/queries to each store. Since v0.2.0 also: is_lock_conflict(exc), so the single-owner serve check stops string-matching a vendor message itself, and rename_column, so the graph store stops hand-rolling the drop-rename-recreate dance around DuckDB refusing a rename while an index exists."
 sponsor = "Denis Tomilin"
 requester = "a2kay"
 status = "active"          # active | retired
