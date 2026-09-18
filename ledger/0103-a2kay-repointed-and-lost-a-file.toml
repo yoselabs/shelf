@@ -1,0 +1,18 @@
+seq = 103
+date = "2026-09-18"
+event = "verdict"
+software = "any-markdown"
+release = "any-markdown-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Adopted same session. `core/links.py` deleted outright (-102 lines) along with its test module; a2kay's net change is -205/+87 across 8 source files, 1260 tests passing, coverage steady at 93%.
+
+The repoint is what tested the surface, and two things only showed up here.
+
+(1) The object shape paid for itself at the one call site that writes. `admin.resync_link_names` had a `re.Match` closure reaching for `match.group(1).strip()` and `match.group(2)`, with a bare `match.group(0)` as its no-op on four separate branches. Against `WikiLink` those become `link.anchor`, `link.name` and `link.text`, and the function reads as what it is. The free-function shape could not have expressed `name is None` versus `name == ""` at all — it handed back whatever group 2 was, and every caller re-derived the distinction or ignored it.
+
+(2) `canonical_id` moving out revealed where it always belonged. It had lived in `links.py` because wikilinks were where ids got compared, and `routers/graph.py` carried a deferred import with a `# avoid a module-level cycle` noqa to reach it. Moved to `core/uri.py` beside the scheme it actually serves, the cycle is gone and the deferred import with it — the generic/specific split (resolution 0010) improved a2kay's own layering as a side effect, which is not something the audit predicted.
+
+One thing this session got wrong and corrected: the extraction deleted `tests/core/test_links.py` wholesale and wrote a fresh suite in the package. The wikilink cases all had equivalents there, but `canonical_id`'s 13 parametrized cases did not — the function moved and its tests did not follow it. `make check` stayed green at 93% because the coverage floor is a percentage, not a per-symbol claim. Restored into `tests/core/test_uri.py`, plus one new case asserting the builder canonicalizes, which is the reason the two now sit together. Recorded because a promotion that splits a module is exactly where tests get orphaned, and a green gate does not catch it."""
