@@ -1,0 +1,20 @@
+seq = 101
+date = "2026-09-18"
+event = "verdict"
+software = "async-scope"
+release = "async-scope-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "adopted"
+cost = ""
+note = """a2kay repointed in the same session. `src/a2kay/net_transport.py` is deleted; what came back is `mcp_endpoint.py`, holding the endpoint path and the FastMCP client that speaks to it, with `serve_mcp` being `serve_asgi` plus `MCP_PATH`. 19 files, +128/-160.
+
+The adoption is the answer to the sizing question the audit got wrong. `net_transport.py` looked like a package because it was a file nobody else had; reading it, the part worth carrying was never "TCP transport" — a2kay's own content was one string constant and three lines of FastMCP. Everything else was uvicorn refusing to shut down, which is this package's subject.
+
+What the repoint proved, beyond the interface fitting: one of the three lessons was a defect a2kay was still carrying, not a lesson it had learned. Any caller of `serve_over_tcp` whose app failed lifespan startup got a `CancelledError` from its own runner rather than the startup error, because asyncio re-raises a task's `SystemExit` into the loop. Nothing in a2kay's suite covered it, because no test had an app that fails to start. The package now has one.
+
+`sse-starlette` also stopped being one of a2kay's declared dependencies. It was declared because the workaround imported it; the workaround now reaches the module through `sys.modules`, which is the accurate statement of the relationship — the library is not needed, its global is only reset if something else already loaded it. deptry is what forced that question (DEP003 on the import inside the suppressed block), and the answer it forced is better than the code it rejected.
+
+Both gates green. Shelf: 901 passed, the `net` lane included and not deselected. a2kay: 1278 passed, 93% coverage, pyrefly 0 errors, no local shelf source committed.
+
+Not claimed: still one consumer of the asgi submodule. The uvicorn measurements — `force_exit` not returning, ~0.15s clean, ~0.50s cancelled — are against 0.51 on macOS, and the grace default (2.0s) is a judgement rather than a measurement. A consumer whose app has a legitimately slow lifespan shutdown is the one most likely to want it changed, and will find out by seeing teardown cancel work it wanted finished."""
