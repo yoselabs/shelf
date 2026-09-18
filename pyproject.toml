@@ -13,6 +13,9 @@ members = ["packages/*"]
 # their engine/provider tests resolve); resolve both from the workspace, not PyPI.
 [tool.uv.sources]
 convert-md = { workspace = true }
+# Named here only because the dev group installs `async-scope[asgi]` to exercise
+# the real-socket lane; the package itself depends on no sibling.
+async-scope = { workspace = true }
 anyllm = { workspace = true }
 # page-tsv composes lean-wire; mcp-result-wire composes page-tsv. Resolve the
 # siblings from the workspace, not PyPI.
@@ -39,6 +42,9 @@ dev = [
     "zendriver>=0.15,<1",  # any-browser's CDP engine — installed here (NOT patchright, whose vendored Chromium is heavy) so its fake-fidelity contract (`test_fake_config_matches_real_add_argument`) checks the fake against the REAL Config every commit instead of importorskip-ing away. patchright + the browser binaries are installed only in the `make test-browser` lane.
     "pyrefly>=1.3,<2",
     "types-openpyxl>=3.1.5.20260827",
+    "async-scope[asgi]",  # async-scope's uvicorn extra — installed here so the asgi lane serves a REAL server; base async-scope stays dependency-free and imports uvicorn lazily
+    "httpx>=0.27,<1",     # the client half of that lane: a real request over the real socket
+    "sse-starlette>=2,<4",  # NOT an async-scope dependency — the library whose unreset module-global the asgi lane exists to defend against, installed so that defence is actually exercised rather than suppressed away
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
@@ -206,6 +212,7 @@ testpaths = [
 addopts = '-ra --strict-markers -m "not browser"'
 markers = [
     "browser: real-browser test that launches a headless engine (any-browser); opt-in, excluded from the default run and `make check`; `make test-browser` runs it, and CI runs it with SHELF_REQUIRE_BROWSER=1 where a missing engine FAILS instead of skipping",
+    "net: binds a real loopback TCP port and serves HTTP over it (async-scope's asgi lane). Names the slice, does NOT carve one out: it runs in the default gate and in `make check`, because the behaviours it covers are invisible without a real socket and a promotion that ships them unverified ships a blind spot to every consumer. `-m net` runs just this lane.",
 ]
 asyncio_mode = "auto"
 

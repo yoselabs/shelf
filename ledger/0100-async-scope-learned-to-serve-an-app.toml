@@ -1,0 +1,26 @@
+seq = 100
+date = "2026-09-18"
+event = "delivery"
+software = "async-scope"
+release = "async-scope-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, not a new package. a2kay's substrate audit first listed `net_transport.py` as a package of its own; that was wrong twice over. Once on sizing — what is generic in it is not "TCP transport", it is what happens when an ASGI server will not close. And once on placement — async-scope already IS the package about a scope closing cleanly, so a helper whose entire content is three ways that fails belongs inside it, not beside it.
+
+The submodule is `async_scope.asgi`, behind the `asgi` extra with a lazy uvicorn import, so the package root stays dependency-free for every consumer that only wants `ResourceScope`.
+
+Two lessons came from a2kay, dated and paid for.
+
+(1) sse-starlette monkey-patches uvicorn and copies the server's `should_exit` into its module-global `AppStatus.should_exit`, which it never resets. The flag that stopped server #1 is still set when server #2 starts, and aborts that server's first streaming response with "ASGI callable returned without completing response". Serial serves in one process — a suite, a restarted daemon — break, and the traceback accuses the innocent second server. a2kay found it by chasing a flaky suite (commit 7edd21c).
+
+(2) `should_exit` alone asks for a GRACEFUL shutdown, which waits for open connections to drain, and a Streamable-HTTP stream or a request blocked on a subprocess never drains — so the shutdown hangs with no traceback and the listening socket stays held.
+
+(3) is the one the extraction found, and it is the sharpest of the three. uvicorn is written to be a program: an app that raises during lifespan startup ends in `sys.exit(3)`, not an exception. Inside someone else's event loop that is not cosmetic — `Task` special-cases `SystemExit` and `KeyboardInterrupt`, storing them AND re-raising into the loop, which stops the loop and cancels whatever was awaiting. The caller's `except` never runs; what it gets is a `CancelledError` from its own runner, after unwinding has started, with the real cause only in the log. Converting it inside the task, before asyncio ever sees it, is the only place early enough. a2kay has been running with this hole since net_transport.py was written.
+
+And a correction to what a2kay believed. Its comment said `force_exit` skips the drain and the bounded wait mops up. Measured against uvicorn 0.51 with a handler holding an open response, `force_exit` does not get `serve()` to return AT ALL — the wait was doing the entire job, and every such teardown cost the full five-second timeout. Here the wait is a short grace (a clean exit measures ~0.15s) and then the task is cancelled outright: 0.15s clean, 0.50s stuck, port free in both, versus 5.00s always.
+
+Verification lane, per PROMOTE step 3 and the reason this was blocked on a2kay-w33. Every test in the lane binds a real loopback port, runs a real uvicorn and speaks real HTTP over it, because all three behaviours are invisible to a mock — a fake server passes each one while broken. Registered as the `net` marker, which NAMES the slice without carving it out: unlike `browser` it is not deselected, because a promotion that ships an unverified sharp edge ships a blind spot to every consumer, and a loopback socket is cheap and hermetic enough to have no excuse. 13 tests, plus the 16 the package already had.
+
+Article VII: shape-proven. Every branch was written against the real library, and two of the three findings above were discovered by the output being wrong rather than by reading documentation — which is the whole argument for the package existing."""

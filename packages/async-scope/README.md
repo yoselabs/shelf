@@ -48,9 +48,56 @@ container exists to resolve an *unknown* dependency graph; if you know your
 graph where you write it — and most applications do — these two behaviours are
 what you actually needed from one.
 
+## Serving an ASGI app — `async_scope.asgi`
+
+Install `async-scope[asgi]`. Separate module, lazy uvicorn import, so the package
+root stays dependency-free.
+
+```python
+from async_scope.asgi import serve_asgi
+
+async with serve_asgi(app) as base_url:      # http://127.0.0.1:<free port>
+    ...                                       # the server is up before the body runs
+```
+
+It is here rather than in its own package because all three things it knows are
+ways a scope fails to close, which is what the rest of this package is about.
+None of them is a misuse of uvicorn, and every one was paid for.
+
+**A previous serve poisons the next one.** sse-starlette monkey-patches uvicorn
+and copies the server's `should_exit` into its module-global `AppStatus.should_exit`
+— and never resets it. The flag that stopped server #1 is still set when server #2
+starts, and aborts its first streaming response with *"ASGI callable returned
+without completing response"*. Serial serves in one process — a test suite, a
+restarted daemon — break, and the failure points at the innocent second server.
+Cleared before every serve — through `sys.modules`, never an import: sse-starlette is
+not a dependency here and must not become one, and if nothing loaded it there is no
+global to poison.
+
+**`force_exit` is not enough to stop a stuck server.** `should_exit` alone asks for
+a graceful shutdown, which waits for open connections to drain; a server-sent-event
+stream or a request blocked on a subprocess never drains. `force_exit` is documented
+to skip that wait and is set — but measured against uvicorn 0.51 with a handler
+holding an open response, `serve()` does not return at all. So the wait is a short
+grace (`shutdown_grace`, ~0.15s is what a clean exit actually costs) and then the
+task is cancelled outright. Teardown never wedges and never pays an open-ended wait.
+
+**A failed startup is a `SystemExit`, not an exception.** uvicorn is written to be a
+program, so an app that raises during lifespan ends in `sys.exit(3)`. That matters
+inside someone else's event loop: `Task` special-cases `SystemExit`, storing it *and*
+re-raising it into the loop, which stops the loop and cancels whatever was awaiting.
+A caller who wraps the serve in `try/except` therefore gets a `CancelledError` from
+its own runner, after unwinding has started, with the real cause only in the log. It
+is converted to `ServeError` inside the task, which is the only place early enough.
+
+`bind_loopback(host, port=0)` is the port half: ask the kernel for a free one rather
+than picking a number, which is what a fixed port turns into as soon as two tests run
+at once.
+
 ## Surface
 
 - `ResourceScope` — `enter(resource)`, `aclose()`, and async-context-manager use.
 - `memoized(factory) -> Lazy[T]` — build at most once, concurrency-safe.
 - `lazy(value) -> Lazy[T]` — a pre-built value as a thunk.
 - `Lazy[T]` — `Callable[[], Awaitable[T]]`.
+- `async_scope.asgi` (extra `asgi`) — `serve_asgi`, `bind_loopback`, `LOOPBACK`, `ServeError`.
