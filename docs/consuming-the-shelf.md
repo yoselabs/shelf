@@ -127,6 +127,12 @@ gets projected — useful to read, not to hand-copy:
 > contract-guaranteed software pieces, pinned in `pyproject.toml` by git tag. Reach for it before
 > hand-rolling substrate; adopt only if **DEEP · STABLE · WINS**; contribute back by *promotion*.
 >
+> **Three things fire the loop**, not one: substrate glue you are about to write; a bug whose root
+> cause was a *dependency's* behaviour; and — the quiet one — a dependency that worked fine and was
+> merely **verbose**, where you wrote an expression and thought "why isn't this a method?". "Stop
+> caring about X" includes how much you must type to use X. Promote the **thing** a domain has (a type
+> the consumer holds), name it `any-<domain>`, never `<lib>-extra`.
+>
 > **Full behaviour = the shelf loop.** Resolve it **once per session, lazily** — the first time you
 > consider adopting or promoting substrate, never at startup:
 >

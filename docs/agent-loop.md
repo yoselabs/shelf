@@ -61,6 +61,11 @@ TRIGGER (either one fires this workflow):
   write it, a **sharp edge** looks like a bugfix, not like substrate — the code is trivial and the
   discovery was expensive, and it is the *discovery* the shelf amortizes. See PROMOTE below for the
   one-question test.
+- **Just used a dependency correctly and found it verbose** (resolution 0015). Nothing broke,
+  nothing was fought — you wrote an expression and thought *"why isn't this a method?"*, or you
+  reached for the second library because the first one covers only half the domain. That thought
+  is the trigger; it fires no other one, because there is no bug and no glue. "Stop caring about X"
+  includes **how much you must type to use X**.
 
 STEPS:
 1. Compare against the **CATALOG** (`<shelf>/catalog/README.md` + `<shelf>/packages/` +
@@ -112,6 +117,25 @@ STEPS:
      real-substrate gate, not a TODO. Promote-and-walk-away (the gate left as a promise) is the one
      move this does not license — that ships a blind spot to every consumer.
 
+     **Arriving from the ergonomics trigger?** (resolution 0015.) Same PROMOTE path, three
+     differences in what you extract:
+     - **Promote the *thing*, not a drawer of functions over someone else's type.** Where the
+       domain has a noun — a document, a connection, an archive — extract a type the consumer holds
+       and passes around, owning its own lazy reading and its derived values, so `doc.wikilinks`
+       replaces `iter_links(body)` plus four call sites each unpacking a `re.Match`. Stateless and
+       single-purpose stays a function; state worth holding (a lazily-read body, a parsed tree, a
+       cached derivation) is what earns the type.
+     - **Wrap, don't inherit.** Subclassing a third-party type inherits its breaking changes and
+       its surprises (`datetime` arithmetic on a subclass returns base `datetime`). Hold it as an
+       attribute and expose it (`.raw`) as the escape hatch. Inherit only from a library's declared
+       base class.
+     - **Name it `any-<domain>`, and go *more* generic than your case.** `any-markdown`,
+       `any-datetime` — the domain, never the origin library (`markdown-it-extra`, `datetime-utils`
+       are resolution 0008's disease). The `any-` prefix means *the consumer stops caring about
+       this domain*; **one** library underneath earns it as well as five, and fusing two libraries
+       to get the better half of each is `kind = "composite"` (what `convert-md` does). Check the
+       catalog for a piece already holding that domain before minting a sibling.
+
      **Arriving from the bugfix trigger (a sharp edge)?** One question decides it: **did we learn
      this from a bug, or from the docs?** From the docs → ordinary work, just write it (or fix it
      upstream). From a bug → the dependency was *correct and documented* and a competent user still
@@ -151,6 +175,10 @@ STEPS:
      app's own module tree), rename it now — this is free before the first tag, breaking after.
      Keeping the origin module/folder name verbatim is fine *when it already passes that test*, not
      as the default.
+   - the **shape decision** (resolution 0015): does this domain have a *thing* the consumer should
+     hold — a type owning its own state and derivations — or is it genuinely a function? Decide
+     once, here; a module of free functions each re-taking the raw type as argument 1 is the
+     bag-of-functions shape, and it is expensive to convert after the first tag.
    - the **boundary test** — must not import any consumer app (the one invariant);
    - a **Contract** born `candidate` (inert until a live consumer breaks without it);
    - the package `pyproject.toml`, or for a skill, `SKILL.md` + an `evals/` directory (a skill with
@@ -235,10 +263,17 @@ STEPS: walk `<shelf>/catalog/README.md`, ask per piece:
 1. **Overlap?** Two packages doing almost the same thing → **merge** (lineage `merged-with` /
    `absorbed-into`).
 2. **Kitchen-sink?** One package accreted unrelated concerns → **split** into coherent pieces.
-3. **Unused?** No active use-case past its TTL → **deprecate → delete** (decay is a virtue).
-4. **Over-promoted?** Turned out too niche / wrong shape → **demote**: duplicate back into its one
+   *Many methods on one subject is not this* (resolution 0015) — a capability type that grew a
+   method a year, each earned by a consumer, is the shelf working. The test is unrelated concerns
+   fused, never surface size.
+3. **Bag of functions?** A package exposes free functions that each take the same third-party type
+   as their first argument, and consumers pass that raw type around → the domain has a **thing**
+   nobody extracted (resolution 0015). Evolve to the type (monotonic: it exposes more and removes
+   nothing), keep the functions as thin delegates for one release.
+4. **Unused?** No active use-case past its TTL → **deprecate → delete** (decay is a virtue).
+5. **Over-promoted?** Turned out too niche / wrong shape → **demote**: duplicate back into its one
    consumer, retire the package. Expected and cheap to undo here — that's the deal.
-5. **Inherited choice unproven?** A package carries an engine/tool/dep chosen on reputation or
+6. **Inherited choice unproven?** A package carries an engine/tool/dep chosen on reputation or
    carried over from an earlier decision, never tested → `BENCH` it (below) and record the verdict.
 
 Never delete a *tag* (`PROMOTE` step 5); retiring a package means marking it `deprecated` and

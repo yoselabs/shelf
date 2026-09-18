@@ -47,7 +47,9 @@ Read [docs/constitution.md](docs/constitution.md) before changing anything. The 
 - **Adopt conservatively, promote aggressively** ([res 0006](docs/resolutions/0006-aggressive-capitalization-reconcile-later.md)).
   *Pulling* a shelf dep: only if DEEP·STABLE·WINS, else duplicate. *Writing* generic substrate: promote
   it to the shelf in the moment (extracted, never invented) — a self-assessed "feels reusable" is
-  enough, no 2nd consumer needed.
+  enough, no 2nd consumer needed. **Three triggers** ([res 0015](docs/resolutions/0015-ergonomics-is-a-capability.md)):
+  glue you're about to write, a bug rooted in a dependency, and a dependency that merely made you
+  *type too much*. On the third, extract the **thing** the domain has, name it `any-<domain>`.
 - **Decay + reconciliation are mandatory.** Unreused past TTL → deprecate. A recurring reconciliation
   pass merges/splits/deletes/demotes the aggressively-promoted catalog with hindsight. Deletion is a
   virtue.

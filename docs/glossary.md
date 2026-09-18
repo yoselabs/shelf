@@ -48,5 +48,14 @@ Shelf ─ the repo; the corpus of shared software pieces               (a2kay an
 - **Implementation is not the MicroSoftware.** A MicroSoftware is "a Contract + whichever
   Implementation currently wins its tests." Our own code and a qualifying third-party dependency are
   interchangeable Implementations; the winning end-state is often a thin adapter over a dep.
+- **`any-*` is a domain promise, not a backend-swap promise.** The prefix means the consumer stops
+  caring about a whole domain. Several interchangeable Implementations is the most visible way to
+  earn it (`anyllm`), and an *ergonomic* surface over exactly one library earns it too (resolution
+  0015) — the count of implementations is itself a detail the name promises the consumer will stop
+  tracking. Fusing several libraries to take the better half of each is `composite`, not `any-lib`.
+- **A Capability may be a thing, not a verb.** Where a domain has a noun — a document, a connection,
+  an archive — the Shape is a type the consumer holds, owning its lazy reading and its derived
+  values. A module of free functions that each take a third-party type as argument 1 is the
+  bag-of-functions shape: the domain's thing was never extracted (`RECONCILE` step 3).
 - **Owner vs Requester (two hats).** Owner controls Shape and may churn it freely. Requester controls
   Retirement and a use case may not be silently deleted while a Consumer still depends on it.

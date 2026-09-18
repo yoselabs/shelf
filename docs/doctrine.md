@@ -16,6 +16,14 @@ Frameworks and substrate are quirky; agents burn tokens and cognitive load fight
 turns recurring substrate-glue into thin, deep pieces an app can **stop caring about** — bridges now,
 better foundations later. Improving one piece improves every consumer at once.
 
+**The aim it is pointed at: a standard library for the stuff a real app actually needs** — the layer
+you reach for before writing anything, the way you reach for `pathlib` instead of splitting a path
+by hand. That sets the bar at *how little a consumer must type*, not only at *what breaks without
+us*: a domain whose library is correct but verbose is shelf material (resolution 0015). It does not
+relax **extracted, never invented** — a standard library that fills with speculative packages is a
+junk drawer with ambition. Breadth of subject and richness of surface are licensed; guessing that a
+need exists is not.
+
 ## The load-bearing ideas
 
 1. **The contract is the unit of selection, not the code.** Code is a regenerable phenotype; the
@@ -43,7 +51,13 @@ better foundations later. Improving one piece improves every consumer at once.
    invented** (real code a real app needed — never an empty package to look complete), and **reconciliation
    is mandatory** (merge / split / delete / demote, with hindsight). The flexibility-vs-reuse balance is
    found at reconcile time, not guessed upfront. *Aggressive promote + conservative adopt + mandatory
-   decay is self-correcting.* When a candidate is a **richer superset of a package that already exists,
+   decay is self-correcting.* **A third trigger, quieter than both** (resolution 0015): a dependency
+   that is correct and merely *verbose* — you wrote the expression and thought "why isn't this a
+   method?". No bug, no glue, so neither other trigger fires; promote it anyway, and promote the
+   **thing** (a type the consumer holds, owning its lazy reading and its derivations) rather than a
+   drawer of functions over the library's own type. Name it `any-<domain>`, never `<lib>-extra`;
+   one library underneath earns the prefix as well as five, and fusing two to get the better half of
+   each is a `composite`. When a candidate is a **richer superset of a package that already exists,
    evolve to the superset rather than growing a sibling** (resolution 0007, the *monotonicity test*): if the
    merged contract **exposes more and removes nothing** — rich return over bare value, fail-loud over
    errors-as-values — converge everyone onto it; keep a narrower contract only for a *stated* requirement.
