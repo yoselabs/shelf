@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "any-markdown"
+kind = "primitive"
+tier = "T0"
+release = "any-markdown-v0.1.0"
+capability = "Stop caring where markdown hides its code — read and rewrite the [[wikilinks]] a document actually makes, with code blocks and code spans excluded by the CommonMark grammar rather than by a regex that approximates it."
+implementation = "markdown-it-py"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (its core/links.py) under resolution 0015 — the dependency was not wrong, it was absent: no markdown library extracts wikilinks, so the app hand-rolled the CommonMark block scan around them and handed re.Match objects to five call sites. Surface is the deliverable: a Markdown the consumer holds, not a drawer of functions over str. markdown-it-py is held, never subclassed; .tokens is the escape hatch. Measured against a2kay's 8424-file vault before the repoint: 8422 files identical, 2 differ, both because the regex leaked a link out of a fenced block. Born candidate."

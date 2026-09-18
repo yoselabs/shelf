@@ -20,6 +20,7 @@ resolution-markers = [
 members = [
     "a2effect",
     "any-browser",
+    "any-markdown",
     "anyembed",
     "anyllm",
     "async-scope",
@@ -167,6 +168,17 @@ requires-dist = [
     { name = "zendriver", marker = "extra == 'zendriver'", specifier = ">=0.15,<1" },
 ]
 provides-extras = ["patchright", "zendriver"]
+
+[[package]]
+name = "any-markdown"
+version = "0.1.0"
+source = { editable = "packages/any-markdown" }
+dependencies = [
+    { name = "markdown-it-py" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "markdown-it-py", specifier = ">=3,<5" }]
 
 [[package]]
 name = "anyembed"

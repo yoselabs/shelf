@@ -339,3 +339,22 @@ What the repoint proved, beyond the interface fitting: one of the three lessons 
 Both gates green. Shelf: 901 passed, the `net` lane included and not deselected. a2kay: 1278 passed, 93% coverage, pyrefly 0 errors, no local shelf source committed.
 
 Not claimed: still one consumer of the asgi submodule. The uvicorn measurements — `force_exit` not returning, ~0.15s clean, ~0.50s cancelled — are against 0.51 on macOS, and the grace default (2.0s) is a judgement rather than a measurement. A consumer whose app has a legitimately slow lifespan shutdown is the one most likely to want it changed, and will find out by seeing teardown cancel work it wanted finished. |
+| 102 | 2026-09-18 | delivery | any-markdown | any-markdown-v0.1.0 | a2kay | pass | The seeding case for resolution 0015, promoted the same day the resolution landed. No dependency was wrong here and none was fought — the trigger is the third one: the expression was verbose, and nobody ever thought to ask why it was not a method.
+
+What a2kay had was `core/links.py`: one regex for the `[[anchor|name]]` grammar, then ~60 lines hand-rolling CommonMark fenced-block and inline-code range detection so a `[[wikilink]]` written inside a code span is not mistaken for a link — then five call sites each unpacking `re.Match.group(1)` for themselves. The reason it existed is worth recording, because it is the shape of the whole category: wikilinks are NOT CommonMark (they are MediaWiki's spelling, popularized by Obsidian), so no markdown library extracts them — which makes hand-rolling look like the only option, right up to the point where you need to know whether a given `[[x]]` is a link at all.
+
+Two measured defects in the hand-rolled scan, neither of which had ever been noticed:
+
+(1) A four-space indented code block was not skipped at all. The scanner looked for fence MARKER LINES, and an indented block has none, so every link inside one read as real.
+
+(2) A short closing fence closed a longer opening one — ``` terminated a ```` block — so everything after it, still inside the outer fence, leaked out as prose.
+
+And the finding that decided the design: the obvious repair is worse than the bug. "Four spaces means code" breaks indented continuation lines inside a list, which are ordinary wrapped prose and commonly carry real links — a2kay's own vault has three. The only correct answer is the block grammar, so the block scan here is markdown-it-py's. Inline spans are then found only in what the parser left as prose, which is also why a fence's contents can never be re-scanned for backticks.
+
+Held, never subclassed (resolution 0015): the parser is an implementation detail behind `.code_spans`, and `.tokens` is the escape hatch for questions the type has no method for yet.
+
+The surface is the deliverable. `Markdown` owns its own reading (`from_path` defers until asked), its own parse, and its derived values; a caller writes `doc.wikilinks` and gets `WikiLink` objects carrying `.anchor` / `.name` / `.span` / `.text` / `.display`, instead of holding a `re.Match` and knowing that group 1 is the anchor. `name` is `None` when absent and `""` when authored as `[[a|]]` — different things, and the old free-function shape could not express the difference. `replace_wikilinks` is the write-side twin sharing the same exclusion, which is not a nicety: a2kay shipped a bug where display-name resync used the bare regex and would silently rewrite a `[[136|Old Title]]` inside backticks, corrupting a note that documented the link syntax (a2kay-qxw, fixed the same day).
+
+Generic-first, consumer-second (resolution 0010). The grammar, the code-span exclusion and the rewrite are generic and came here. `canonical_id` did NOT: that numeric ids are padding-insensitive so `[[085]]` and `[[85]]` are one identity is a2kay's business logic (its user decision of 2026-07-04, and ADR 0030's ambiguity rules), and it moved to a2kay's own `core/uri.py` beside the URI scheme it serves. A boundary test asserts the package has never heard of `kay://`.
+
+Article VII, shape-proven rather than shape-guessed: before the repoint, both scanners were run over a2kay's real 8424-file vault and diffed. 8422 files identical; 2 differ, in one direction — the regex leaked a `[[links]]` out of a fenced block whose contents included a `---` line. Zero links were lost. The two spec defects above are real but had no instance in that corpus, which is exactly why they had survived: a hand-rolled approximation is wrong in the cases you have not written yet. |

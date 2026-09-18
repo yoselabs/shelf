@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "any-markdown"
+why = "a2kay's vault is markdown, and its graph is built from the [[wikilinks]] in those bodies — while the same vault holds research and decisions ABOUT wikilink conventions, whose code spans are full of literal [[me]] and [[wikilinks]]. Reading one as a link mints a phantom edge; rewriting one edits the user's file."
+needs = "A document type that reports the links actually made — position and display name included — and rewrites them under the same exclusion, so the read path (graph indexing, ref validation) and the write path (display-name resync) can never disagree about what a link is."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired
