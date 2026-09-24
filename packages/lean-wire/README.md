@@ -42,6 +42,14 @@ Empty means `None` / `""` / `[]` / `{}` only — falsy-but-informative values
 schema is unchanged; only the wire payload shrinks. Also exported: `prune_dict`
 (free-function form) and `dump_model_for_wire` (the one wire-dump seam).
 
+**Why it matters, measured.** pydantic writes an unset optional as an explicit
+`null`, so each one costs its key, a colon and four letters in every row. When the
+reader is a model, that is context spent on nothing. a2kay (2026-07-23): three
+optional fields across 18 types in its connect-time manifest cost ~990 chars of
+`"shape":null,...`, which was most of the saving a trim was meant to make. Its
+estimate before building missed exactly this cost. Default serialization is a cost
+model here, not a formatting detail.
+
 ## Versioning
 
 Semver is the **wire-format version**: any change to the bytes `encode_tsv`
