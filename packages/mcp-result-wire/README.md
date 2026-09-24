@@ -47,7 +47,7 @@ Built on [`page-tsv`](../page-tsv) (the encoding) and `fastmcp` (the middleware 
 
 ## Sharp edges around FastMCP and the MCP SDK
 
-Each of these cost a consumer a real outage. None is a FastMCP bug you could have
+Each of these cost a consumer a real outage or a wrong result. None is a FastMCP bug you could have
 read about beforehand.
 
 - **fastmcp 3.3.x cannot build an error result.** `ToolResult(is_error=True)`
@@ -72,6 +72,14 @@ read about beforehand.
   every entity's links on boot) grows with the data, and past ~250 entities the
   client could no longer connect at all. Do O(data) work after serving, or
   incrementally.
+
+- **A resource template loses its MIME type.** Register
+  `@mcp.resource(uri="x://{id}", mime_type="text/markdown")` and return a `str`,
+  and the client reads `text/plain`. A fixed-URI resource keeps its type; a
+  templated one does not (fastmcp 3.4.4). Return
+  `[ResourceContent(content=text, mime_type="text/markdown")]` instead. a2kay
+  missed it because its test double called the handler directly; read through a
+  real `Client` and assert `mimeType`.
 
 Checked and **not** true on fastmcp 3.4.4, though consumer notes once said so:
 `functools.wraps` alone does give the wrapped function's schema; set
