@@ -1,6 +1,6 @@
 [project]
 name = "plugin-surface"
-version = "0.1.0"
+version = "0.2.0"
 description = "Stop caring how an app discovers and wires its plugins — a declarative PluginManifest + directory-walking loader with silent graceful-absence."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]

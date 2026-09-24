@@ -41,6 +41,33 @@ registry = load_surface("myapp.providers", Provider, settings)
 - **`load_surface_sorted(...)`** — same, returning `[(name, instance), …]` by
   descending `priority` for order-sensitive surfaces.
 
+## `describe_directory(dir, *, declaration)` — list plugins without running them
+
+`load_surface` imports every module, so it can only list plugins you already trust.
+When users drop code into a folder, you need the listing *before* that decision.
+`describe_directory` parses each file and never imports it:
+
+```python
+from plugin_surface import describe_directory
+
+# --- jobs/digest.py -----------------------------------------------------------
+__myapp_job__ = {"name": "digest", "schedule": "1d"}
+def run(ctx): ...
+# ------------------------------------------------------------------------------
+
+for d in describe_directory(Path("jobs"), declaration="__myapp_job__"):
+    d.declaration   # {"name": "digest", "schedule": "1d"}, or None
+    d.functions     # frozenset({"run"})
+    d.problem       # None | "unreadable" | "unparsable" | "missing" | "not_literal" | "not_mapping"
+```
+
+- **Total per file.** A bad file comes back with `problem` set; it never raises,
+  because one exception would hide every other plugin in the directory.
+- **Both assignment forms.** `NAME = {...}` and `NAME: dict[str, Any] = {...}`.
+- **Literals only.** A computed value is `not_literal`, never evaluated.
+- Validating the literal is yours. Make that validator total too: drop a value
+  you cannot use and fall back to a default, for the same whole-directory reason.
+
 ## Notes
 
 - **Plugin files must be declaration-only.** Every module under the surface path

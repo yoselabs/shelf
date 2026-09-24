@@ -1,0 +1,14 @@
+seq = 104
+date = "2026-09-24"
+event = "delivery"
+software = "plugin-surface"
+release = "plugin-surface-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, additive: `describe_directory` / `describe_file` list a directory of plugin files by `ast.parse`, never import. `load_surface` imports every module and calls every factory, so it could only enumerate plugins the app was already willing to run; an app whose users drop code into a folder needs the listing before the trust decision. Extracted from a2kay `services/jobs/manifest.py`, where `list_jobs` shows an untrusted vault's jobs before anyone grants trust.
+
+Two consumer lessons ship in the function rather than in a README: (1) total per file — a bad file is a `Described` with `problem` set, never an exception, because a2kay once had one job file with `timeout_seconds: "5m"` hide every job in its directory (a2kay 567297a); (2) both assignment forms — `ast.Assign` and `ast.AnnAssign` — because matching only the first made annotating the declaration silently un-discover the job.
+
+Deliberately NOT promoted with it: validating the literal. a2kay's `JobMeta` is a pydantic model whose validators each drop an unusable value and fall back to a default; that policy is per-field and consumer-typed (a bare scalar is one trigger; `bool` is not a timeout), so the package states the rule — make your validator total too — and leaves the model with the consumer."""

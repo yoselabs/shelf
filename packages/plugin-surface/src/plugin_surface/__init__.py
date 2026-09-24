@@ -20,6 +20,10 @@ your app's own logger (and keep its handler/propagation discipline intact); omit
 it and a package-local ``logging.getLogger("plugin_surface")`` is used. Diagnostic
 fields ride on ``record.fields`` (``extra={"fields": {...}}``), never splatted onto
 the record — a flat splat collides with reserved ``LogRecord`` attribute names.
+
+:func:`describe_directory` is the step before loading: it lists a directory of
+plugin files by parsing them, never importing, so an app can show what is there
+before anyone has agreed to run it (see ``_static``).
 """
 
 from __future__ import annotations
@@ -29,6 +33,8 @@ import logging
 import pkgutil
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
+
+from plugin_surface._static import Described, Problem, describe_directory, describe_file
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -184,4 +190,13 @@ def load_surface_sorted(
     return [(name, inst) for _prio, name, inst in items]
 
 
-__all__ = ("PluginManifest", "Unavailable", "load_surface", "load_surface_sorted")
+__all__ = (
+    "Described",
+    "PluginManifest",
+    "Problem",
+    "Unavailable",
+    "describe_directory",
+    "describe_file",
+    "load_surface",
+    "load_surface_sorted",
+)
