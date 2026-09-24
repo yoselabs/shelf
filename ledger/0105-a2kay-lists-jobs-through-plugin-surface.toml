@@ -1,0 +1,12 @@
+seq = 105
+date = "2026-09-24"
+event = "verdict"
+software = "plugin-surface"
+release = "plugin-surface-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "adopted"
+cost = ""
+note = """Adopted same session (a2kay 777ac6f). `services/jobs/manifest.py` lost its AST walk; `discover` is now `describe_directory` mapped onto a2kay's `JobRecord`, and `JobMeta` stays a2kay's. 1484 tests passing.
+
+The repoint found a live bug the package already fixed. a2kay's reader caught `OSError` and `SyntaxError`; a job file with invalid UTF-8 raises `UnicodeDecodeError` (a `ValueError`), which escaped `discover` and hid every job in the directory, the same failure 567297a fixed for one field. `describe_file` returns `problem="unreadable"` for it. The extraction was the first time the reader's exception list was written out as the whole set of outcomes, and writing it that way is what found the gap."""
