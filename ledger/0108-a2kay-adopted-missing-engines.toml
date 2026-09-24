@@ -1,0 +1,10 @@
+seq = 108
+date = "2026-09-24"
+event = "verdict"
+software = "convert-md"
+release = "convert-md-v0.10.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "adopted"
+cost = ""
+note = """Adopted same session. a2kay's four-way parametrized probe (convert a junk file per format, grep warnings for "unavailable") became one assertion, `missing_engines(DOCUMENT_FORMATS) == {}`; the end-to-end xlsx test stays, since an import check proves nothing about output. 1481 tests passing. The probe had coupled a2kay to the wording of convert-md's error strings; the declaration does not."""
