@@ -657,7 +657,7 @@ requires-dist = [
 
 [[package]]
 name = "convert-md"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/convert-md" }
 dependencies = [
     { name = "html2text" },
@@ -2257,7 +2257,7 @@ requires-dist = [
 
 [[package]]
 name = "mcp-result-wire"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/mcp-result-wire" }
 dependencies = [
     { name = "fastmcp" },
@@ -2267,7 +2267,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fastmcp", specifier = ">=3,<4" },
+    { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "mcp", specifier = ">=1.28,<2" },
     { name = "page-tsv", editable = "packages/page-tsv" },
 ]

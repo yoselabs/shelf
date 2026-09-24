@@ -47,6 +47,8 @@ class PymupdfLlmEngine:
     """
 
     name = f"pymupdf4llm@{_ver('pymupdf4llm')}"
+    #: Top-level modules ``convert`` imports; what :func:`missing_engines` checks.
+    modules: tuple[str, ...] = ("pymupdf4llm",)
 
     def convert(self, path: Path) -> ConversionResult:
         """Convert a PDF to Markdown via pymupdf4llm."""
@@ -75,6 +77,8 @@ class MammothEngine:
     """
 
     name = f"mammoth@{_ver('mammoth')}"
+    #: Top-level modules ``convert`` imports; what :func:`missing_engines` checks.
+    modules: tuple[str, ...] = ("mammoth",)
 
     def convert(self, path: Path) -> ConversionResult:
         """Convert a DOCX to Markdown via mammoth → the clean-HTML render path."""
@@ -109,6 +113,8 @@ class MarkitdownEngine:
     """PPTX/XLSX/generic → Markdown via markitdown."""
 
     name = f"markitdown@{_ver('markitdown')}"
+    #: Top-level modules ``convert`` imports; what :func:`missing_engines` checks.
+    modules: tuple[str, ...] = ("markitdown",)
 
     def convert(self, path: Path) -> ConversionResult:
         """Convert a PPTX/XLSX/generic file to Markdown via markitdown, appending PPTX speaker notes."""
@@ -133,6 +139,8 @@ class OpenpyxlEngine:
     """XLSX → Markdown tables via openpyxl (per-sheet, fallback for markitdown)."""
 
     name = f"openpyxl@{_ver('openpyxl')}"
+    #: Top-level modules ``convert`` imports; what :func:`missing_engines` checks.
+    modules: tuple[str, ...] = ("openpyxl",)
 
     def convert(self, path: Path) -> ConversionResult:
         """Convert an XLSX to Markdown tables via openpyxl, one section per worksheet."""
@@ -159,6 +167,8 @@ class TrafilaturaEngine:
     """HTML → Markdown via trafilatura (best boilerplate removal)."""
 
     name = f"trafilatura@{_ver('trafilatura')}"
+    #: Top-level modules ``convert`` imports; what :func:`missing_engines` checks.
+    modules: tuple[str, ...] = ("trafilatura",)
 
     def convert(self, path: Path) -> ConversionResult:
         """Convert an HTML file to Markdown via trafilatura, stripping boilerplate."""
@@ -179,6 +189,8 @@ class Html2TextEngine:
     """HTML → Markdown via html2text (fallback)."""
 
     name = f"html2text@{_ver('html2text')}"
+    #: Top-level modules ``convert`` imports; what :func:`missing_engines` checks.
+    modules: tuple[str, ...] = ("html2text",)
 
     def convert(self, path: Path) -> ConversionResult:
         """Convert an HTML file to Markdown via html2text (unbounded line width)."""

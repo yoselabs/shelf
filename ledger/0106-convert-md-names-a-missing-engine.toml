@@ -1,0 +1,14 @@
+seq = 106
+date = "2026-09-24"
+event = "delivery"
+software = "convert-md"
+release = "convert-md-v0.10.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, additive: `missing_engines(suffixes)` reports, per format, what would stop it converting: no engine chain, an engine library not installed, or a legacy format with no LibreOffice. Checked with `find_spec`, nothing imported.
+
+Why it belongs here rather than in each consumer: `convert` never raises, which is right for a pipeline and hides packaging drift completely. When v0.3.0 moved the document engines behind `[documents]`, a2kay's bare pin kept installing and importing, and every PDF/docx/pptx/xlsx would have converted to `failed` with nothing raised. a2kay caught it with a hand-written probe test that converted a junk file per format and grepped warnings for "unavailable". That test depended on the text of convert-md's error messages; this one depends on a declaration next to the code.
+
+Each engine class now declares `modules`, and a test parses each class's source and asserts the declaration equals its imports, so the declaration cannot drift from what `convert` loads."""

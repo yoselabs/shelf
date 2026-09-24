@@ -31,5 +31,26 @@ full office+PDF set). A re-runnable fidelity comparison harness lives in `bench/
 `bench/results/` for the dated findings behind pymupdf4llm-only, including why docling (once the
 fidelity ceiling, tried as a fallback) was dropped rather than kept.
 
+## Check your engines are installed: `missing_engines`
+
+`convert` never raises, so a missing engine library does not crash anything. It turns
+every file of that format into `fidelity="failed"`, quietly. That is how a bare
+`convert-md` pin behaved when v0.3.0 moved the document engines behind
+`[documents]`: installs fine, imports fine, converts nothing. Put the formats you
+promise in a test:
+
+```python
+from convert_md import missing_engines
+
+def test_document_engines_are_installed():
+    assert missing_engines([".pdf", ".docx", ".pptx", ".xlsx"]) == {}
+    # else e.g. {".docx": ["MammothEngine: module 'mammoth' not installed"]}
+```
+
+It reports a format with no engine chain, an engine whose library is missing, and a
+legacy format (`.doc`/`.ppt`) with no LibreOffice on `PATH`. Nothing is imported to
+check. It runs against whatever version you have pinned, so it fails at the moment
+you bump the pin, which is when the fix is cheap.
+
 Extracted from a2kay as its first reusable micro-software; the conversion *mechanism* lives here,
 the consumer keeps its own presentation policy. No dependency on a2kay.

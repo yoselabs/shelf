@@ -11,7 +11,7 @@ This is the conversion *mechanism*; a consumer keeps its own presentation policy
 from __future__ import annotations
 
 from convert_md.base import ConversionEngine, ConversionError, ConversionResult, Fidelity
-from convert_md.dispatch import convert, fallback_chain_for, select_engine
+from convert_md.dispatch import convert, fallback_chain_for, missing_engines, select_engine
 from convert_md.engines import (
     Html2TextEngine,
     MammothEngine,
@@ -39,5 +39,6 @@ __all__ = [
     "convert_html",
     "fallback_chain_for",
     "grade",
+    "missing_engines",
     "select_engine",
 ]

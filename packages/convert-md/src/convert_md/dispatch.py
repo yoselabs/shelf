@@ -11,10 +11,12 @@ reconversion is a future migration script, not a runtime knob.
 
 from __future__ import annotations
 
+import importlib.util
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from convert_md.base import ConversionError, ConversionResult
 from convert_md.engines import (
@@ -25,6 +27,9 @@ from convert_md.engines import (
     PymupdfLlmEngine,
     TrafilaturaEngine,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 # Primary → fallback, per extension (R142 verdict table; PDF chain revised
 # in v0.5.0 per bench/results/2026-07-09-findings.md + design.md D5 —
@@ -106,6 +111,46 @@ def convert(path: Path) -> ConversionResult:
     )
 
 
+def missing_engines(suffixes: Iterable[str]) -> dict[str, list[str]]:
+    """What would stop each format converting, checked before any file arrives.
+
+    :func:`convert` never raises: a missing engine library becomes a
+    ``fidelity="failed"`` result at runtime. That is right for a pipeline and wrong
+    for packaging drift. When v0.3.0 moved the document engines behind the
+    ``[documents]`` extra, a consumer with a bare ``convert-md`` pin kept installing
+    and importing cleanly, and every PDF/docx/pptx/xlsx would have converted to
+    ``failed`` with nothing raised anywhere.
+
+    Call this from a test (or at startup) with the formats you promise, and assert
+    it is empty. Returns ``{suffix: [problem, ...]}`` for each suffix with a problem:
+    no engine chain, an engine whose library is not installed, or a legacy format
+    with no LibreOffice on ``PATH``. Checks with ``importlib.util.find_spec``, so no
+    engine library is imported.
+    """
+    problems: dict[str, list[str]] = {}
+    for raw in suffixes:
+        suffix = raw.lower() if raw.startswith(".") else f".{raw.lower()}"
+        found: list[str] = []
+        modern = _LEGACY_TARGET[suffix] if suffix in _LEGACY and suffix not in _CHAINS else suffix
+        if modern != suffix and shutil.which("soffice") is None and shutil.which("libreoffice") is None:
+            found.append("libreoffice not on PATH")
+        chain = _CHAINS.get(modern, [])
+        if not chain:
+            found.append("no engine chain")
+        for engine in chain:
+            found.extend(f"{engine.__name__}: module {m!r} not installed" for m in getattr(engine, "modules", ()) if not _installed(m))
+        if found:
+            problems[suffix] = found
+    return problems
+
+
+def _installed(module: str) -> bool:
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
+
+
 def _convert_legacy(path: Path) -> ConversionResult:
     """Normalize a legacy binary via LibreOffice, then re-dispatch."""
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
@@ -146,4 +191,4 @@ def _convert_legacy(path: Path) -> ConversionResult:
         return convert(normalized)
 
 
-__all__ = ["convert", "fallback_chain_for", "select_engine"]
+__all__ = ["convert", "fallback_chain_for", "missing_engines", "select_engine"]

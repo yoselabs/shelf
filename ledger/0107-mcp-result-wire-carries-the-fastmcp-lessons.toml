@@ -1,0 +1,16 @@
+seq = 107
+date = "2026-09-24"
+event = "delivery"
+software = "mcp-result-wire"
+release = "mcp-result-wire-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Dependency floor fastmcp>=3 -> >=3.4, plus a README section of four consumer-paid FastMCP/MCP SDK sharp edges. The floor is the one lesson that can ship as code: on 3.3.x `ToolResult(is_error=True)` raises TypeError, and in a2kay that crashed every typed-error response and wedged the next write on a held lock (a2kay 6b07d33). Until now that lived only in a commit body and a2kay's own version floor.
+
+The other three are documentation: retry a hung streamable-http handshake on a FRESH event loop and client (same-loop retry does not recover); alias builtin-named parameters (`type_` -> wire `type`); keep O(data) work out of the ~30s `initialize` window.
+
+Two claims from a2kay's audit were checked against fastmcp 3.4.4 and dropped as false: `functools.wraps` alone DOES yield the wrapped schema (setting `__signature__` is only needed to change it), and a parameter removed from the advertised signature IS rejected when sent anyway. Recorded in the README so the next audit does not re-derive them.
+
+Home chosen by elimination: this is the shelf's FastMCP-facing package and the README a FastMCP consumer reads. If a second FastMCP-authoring package appears, the section moves there."""

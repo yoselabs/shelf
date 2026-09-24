@@ -1,6 +1,6 @@
 [project]
 name = "mcp-result-wire"
-version = "0.1.0"
+version = "0.2.0"
 description = "FastMCP result middleware — re-derive a tool's content channel from an encoding plan (token-lean TSV/page-tsv) and project/paginate list results, driven by per-tool registries not framework metadata."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
@@ -8,7 +8,8 @@ requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = [
     "page-tsv",
-    "fastmcp>=3,<4",
+    # >=3.4: `ToolResult(is_error=True)` raises TypeError on 3.3.x (see README, sharp edges).
+    "fastmcp>=3.4,<4",
     "mcp>=1.28,<2",
 ]
 
