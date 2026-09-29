@@ -1,0 +1,12 @@
+seq = 109
+date = "2026-09-29"
+event = "delivery"
+software = "git-porcelain"
+release = "git-porcelain-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, additive: what a program that owns a repo needs to keep every change in history. `commit_paths` commits exactly the named paths (adds, edits, deletions, renames), leaves anything else staged alone, takes author and committer per call so a box with no git identity still commits, and skips hooks. `log_grep` finds commits by a message line (a trailer), newest first with their paths; `show_at` reads a file at a revision. `push`/`fetch` raise `RemoteError` whose `reason` is offline, auth, rejected or other, read from git's stderr; `is_ancestor` answers whether a push would fast-forward. Nothing pulls or merges.
+
+Sharp edge fixed on the way: `dirty_rels` parsed `status --porcelain` without `-z`, so a non-ASCII path came back as git's quoted octal escape and a rename as `old -> new`. It now reads `-z` through the new `status`, which also says whether each path is tracked. a2kay's vault has Cyrillic file names; the old output would have staged nothing for them."""
