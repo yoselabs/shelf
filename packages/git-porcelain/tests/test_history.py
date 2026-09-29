@@ -304,3 +304,34 @@ def test_upstream_is_none_without_tracking(tmp_path: Path) -> None:
     repo = _init(tmp_path / "repo")
     _seed(repo)
     assert git.upstream(repo) is None
+
+
+def test_commit_paths_stages_a_moved_directory_by_its_old_and_new_path(tmp_path: Path) -> None:
+    repo = _init(tmp_path / "repo")
+    _seed(repo)
+    (repo / "Projects" / "p1" / "attachments").mkdir(parents=True)
+    (repo / "Projects" / "p1" / "README.md").write_text("p1\n" * 10, encoding="utf-8")
+    (repo / "Projects" / "p1" / "attachments" / "a.txt").write_text("att\n" * 10, encoding="utf-8")
+    git.commit_paths(repo, ["Projects/p1"], "add", author=ROBIN, committer=BOT)
+    (repo / "Archive").mkdir()
+    (repo / "Projects" / "p1").rename(repo / "Archive" / "p1")
+
+    sha = git.commit_paths(repo, ["Projects/p1", "Archive/p1"], "move", author=ROBIN, committer=BOT)
+
+    assert sha is not None
+    assert git.dirty_rels(repo) == []
+    assert sorted(_git(repo, "ls-files").split()) == ["Archive/p1/README.md", "Archive/p1/attachments/a.txt", "seed.md"]
+
+
+def test_commit_paths_skips_an_ignored_path_it_was_handed(tmp_path: Path) -> None:
+    repo = _init(tmp_path / "repo")
+    _seed(repo)
+    (repo / ".gitignore").write_text("*.distilled.md\n", encoding="utf-8")
+    (repo / "a.md").write_text("a\n", encoding="utf-8")
+    (repo / "a.distilled.md").write_text("derived\n", encoding="utf-8")
+
+    sha = git.commit_paths(repo, ["a.md", "a.distilled.md"], "write", author=ROBIN, committer=BOT)
+
+    assert sha is not None
+    assert _git(repo, "show", "--name-only", "--format=", sha).split() == ["a.md"]
+    assert git.commit_paths(repo, ["a.distilled.md"], "write", author=ROBIN, committer=BOT) is None

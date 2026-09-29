@@ -70,9 +70,19 @@ def _message(subject: str, trailers: Iterable[tuple[str, str]]) -> str:
 
 
 def _known(repo: Path, paths: Sequence[str]) -> list[str]:
-    """The subset of ``paths`` that exists on disk or that git already tracks."""
-    tracked = set(run_git(repo, "ls-files", "-z", "--", *[f":(literal){p}" for p in paths], check=False).split("\0"))
-    return [p for p in paths if p in tracked or (repo / p).exists()]
+    """The subset of ``paths`` git can stage: each exists on disk or is (or holds something)
+    tracked, and is not ignored unless already tracked. A directory counts by its contents,
+    so a moved folder stages from its old path too."""
+    specs = [f":(literal){p}" for p in paths]
+    tracked = [t for t in run_git(repo, "ls-files", "-z", "--", *specs, check=False).split("\0") if t]
+    # check-ignore takes -z only with --stdin; quotePath=false keeps non-ASCII names as written.
+    ignored = set(run_git(repo, "-c", "core.quotePath=false", "check-ignore", "--", *paths, check=False).splitlines())
+
+    def holds_tracked(path: str) -> bool:
+        prefix = path.rstrip("/") + "/"
+        return any(t == path or t.startswith(prefix) for t in tracked)
+
+    return [p for p in paths if holds_tracked(p) or ((repo / p).exists() and p not in ignored)]
 
 
 def commit_paths(
