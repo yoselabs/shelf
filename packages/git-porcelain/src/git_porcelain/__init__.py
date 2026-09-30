@@ -2,7 +2,7 @@
 
 One place to shell out to git. Every function takes a repo path (and git args) and
 returns git data: repo state, porcelain status, ahead/behind, index-stage blobs, and —
-for a program that owns a repo — exact-path commits, history reads and push/fetch. It
+for a program that owns a repo — exact-path commits, history reads, push/fetch and merge. It
 knows nothing about any host's domain model — a caller maps that git data onto its own
 concerns.
 
@@ -21,14 +21,18 @@ from git_porcelain.errors import GitError
 from git_porcelain.history import (
     Commit,
     Identity,
+    MergeResult,
+    MergeState,
     RemoteError,
     RemoteFailure,
     classify_remote_failure,
     commit_paths,
     fetch,
+    finish_merge,
     head,
     is_ancestor,
     log_grep,
+    merge,
     push,
     show_at,
     upstream,
@@ -53,6 +57,8 @@ __all__ = [
     "Commit",
     "GitError",
     "Identity",
+    "MergeResult",
+    "MergeState",
     "RemoteError",
     "RemoteFailure",
     "StatusEntry",
@@ -60,6 +66,7 @@ __all__ = [
     "commit_paths",
     "dirty_rels",
     "fetch",
+    "finish_merge",
     "git_returncode",
     "has_conflict_markers",
     "has_upstream",
@@ -67,6 +74,7 @@ __all__ = [
     "is_ancestor",
     "is_repo",
     "log_grep",
+    "merge",
     "merge_in_progress",
     "push",
     "readiness",

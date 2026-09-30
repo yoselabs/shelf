@@ -335,3 +335,155 @@ def test_commit_paths_skips_an_ignored_path_it_was_handed(tmp_path: Path) -> Non
     assert sha is not None
     assert _git(repo, "show", "--name-only", "--format=", sha).split() == ["a.md"]
     assert git.commit_paths(repo, ["a.distilled.md"], "write", author=ROBIN, committer=BOT) is None
+
+
+# --- merge / finish_merge ----------------------------------------------------------
+
+
+def _pair(tmp_path: Path) -> tuple[Path, Path]:
+    """A repo with an upstream, and a second clone of that upstream that can push to it."""
+    remote = tmp_path / "remote.git"
+    _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(remote))
+    repo = _init(tmp_path / "repo")
+    _seed(repo)
+    _git(repo, "remote", "add", "origin", str(remote))
+    _git(repo, "push", "-q", "-u", "origin", "main")
+    other = tmp_path / "other"
+    _git(tmp_path, "clone", "-q", str(remote), str(other))
+    return repo, other
+
+
+def _write_commit(repo: Path, name: str, text: str) -> None:
+    (repo / name).write_text(text, encoding="utf-8")
+    _git(repo, "add", name)
+    _git(repo, "-c", "user.name=S", "-c", "user.email=s@example.com", "commit", "-qm", f"write {name}")
+
+
+def _publish(other: Path, name: str, text: str) -> None:
+    _write_commit(other, name, text)
+    _git(other, "push", "-q")
+
+
+def _parents(repo: Path) -> list[str]:
+    return _git(repo, "show", "-s", "--format=%P", "HEAD").split()
+
+
+def test_merge_of_an_ancestor_is_up_to_date(tmp_path: Path) -> None:
+    repo, _ = _pair(tmp_path)
+    _write_commit(repo, "a.md", "a\n")
+    git.fetch(repo)
+    result = git.merge(repo, "origin/main", author=ROBIN, committer=BOT)
+    assert result.state == "up_to_date"
+    assert result.changed == ()
+
+
+def test_merge_fast_forwards_when_only_the_remote_moved(tmp_path: Path) -> None:
+    repo, other = _pair(tmp_path)
+    _publish(other, "b.md", "b\n")
+    git.fetch(repo)
+
+    result = git.merge(repo, "origin/main", author=ROBIN, committer=BOT)
+
+    assert result.state == "fast_forward"
+    assert result.changed == ("b.md",)
+    assert (repo / "b.md").read_text(encoding="utf-8") == "b\n"
+    assert len(_parents(repo)) == 1
+
+
+def test_merge_of_disjoint_work_makes_a_merge_commit_with_identity_and_trailers(tmp_path: Path) -> None:
+    repo, other = _pair(tmp_path)
+    _publish(other, "b.md", "b\n")
+    _write_commit(repo, "a.md", "a\n")
+    git.fetch(repo)
+
+    result = git.merge(repo, "origin/main", author=ROBIN, committer=BOT, message="sync", trailers=[("X-Why", "test")])
+
+    assert result.state == "merged"
+    assert result.changed == ("b.md",)
+    assert len(_parents(repo)) == 2
+    assert _git(repo, "show", "-s", "--format=%an|%cn|%s", "HEAD").strip() == "Robin Vale|a2kay|sync"
+    assert "X-Why: test" in _git(repo, "show", "-s", "--format=%B", "HEAD")
+    assert _git(repo, "status", "--porcelain") == ""
+
+
+def test_merge_that_conflicts_leaves_markers_with_the_base_and_names_the_paths(tmp_path: Path) -> None:
+    repo, other = _pair(tmp_path)
+    _publish(other, "seed.md", "theirs\n")
+    _write_commit(repo, "seed.md", "ours\n")
+    git.fetch(repo)
+
+    result = git.merge(repo, "origin/main", author=ROBIN, committer=BOT)
+
+    assert result.state == "conflict"
+    assert result.conflicted == ("seed.md",)
+    assert git.merge_in_progress(repo)
+    text = (repo / "seed.md").read_text(encoding="utf-8")
+    assert "<<<<<<<" in text
+    assert "|||||||" in text  # the common base is shown, so a resolver sees what each side changed
+    assert git.has_conflict_markers(repo / "seed.md")
+
+
+def test_merge_blocked_by_a_local_edit_changes_nothing(tmp_path: Path) -> None:
+    repo, other = _pair(tmp_path)
+    _publish(other, "seed.md", "theirs\n")
+    (repo / "seed.md").write_text("uncommitted\n", encoding="utf-8")
+    git.fetch(repo)
+
+    result = git.merge(repo, "origin/main", author=ROBIN, committer=BOT)
+
+    assert result.state == "blocked"
+    assert result.error
+    assert not git.merge_in_progress(repo)
+    assert (repo / "seed.md").read_text(encoding="utf-8") == "uncommitted\n"
+
+
+def test_merge_skips_hooks(tmp_path: Path) -> None:
+    repo, other = _pair(tmp_path)
+    _publish(other, "b.md", "b\n")
+    _write_commit(repo, "a.md", "a\n")
+    for hook in ("pre-merge-commit", "commit-msg"):
+        path = repo / ".git" / "hooks" / hook
+        path.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        path.chmod(0o755)
+    git.fetch(repo)
+
+    assert git.merge(repo, "origin/main", author=ROBIN, committer=BOT).state == "merged"
+
+
+def test_finish_merge_waits_until_the_markers_are_gone_then_commits(tmp_path: Path) -> None:
+    repo, other = _pair(tmp_path)
+    _publish(other, "seed.md", "theirs\n")
+    _publish(other, "b.md", "b\n")
+    _write_commit(repo, "seed.md", "ours\n")
+    git.fetch(repo)
+    git.merge(repo, "origin/main", author=ROBIN, committer=BOT)
+
+    early = git.finish_merge(repo, ["seed.md"], author=ROBIN, committer=BOT, message="sync")
+    assert early.state == "conflict"
+    assert early.conflicted == ("seed.md",)
+
+    (repo / "seed.md").write_text("ours and theirs\n", encoding="utf-8")  # fixed by hand, never `git add`-ed
+    done = git.finish_merge(repo, ["seed.md"], author=ROBIN, committer=BOT, message="sync")
+
+    assert done.state == "merged"
+    assert sorted(done.changed) == ["b.md", "seed.md"]
+    assert not git.merge_in_progress(repo)
+    assert len(_parents(repo)) == 2
+    assert _git(repo, "status", "--porcelain") == ""
+
+
+def test_finish_merge_accepts_a_file_deleted_to_resolve_it(tmp_path: Path) -> None:
+    repo, other = _pair(tmp_path)
+    _publish(other, "seed.md", "theirs\n")
+    _write_commit(repo, "seed.md", "ours\n")
+    git.fetch(repo)
+    git.merge(repo, "origin/main", author=ROBIN, committer=BOT)
+    (repo / "seed.md").unlink()
+
+    assert git.finish_merge(repo, ["seed.md"], author=ROBIN, committer=BOT).state == "merged"
+    assert "seed.md" not in _git(repo, "ls-files")
+
+
+def test_finish_merge_without_a_merge_in_progress_is_up_to_date(tmp_path: Path) -> None:
+    repo, _ = _pair(tmp_path)
+    assert git.finish_merge(repo, [], author=ROBIN, committer=BOT).state == "up_to_date"

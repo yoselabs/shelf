@@ -6,8 +6,10 @@ swept in. Identity is passed per call, so a machine with no ``user.name`` still 
 and hooks are skipped, so a hook cannot silently stop history. :func:`log_grep` and
 :func:`show_at` read that history back; :func:`push` and :func:`fetch` talk to the remote
 and raise :class:`RemoteError` with a ``reason`` a host can act on (offline, auth,
-rejected). Nothing here pulls or merges: a program that owns a working tree never lets a
-merge write into it.
+rejected). :func:`merge` brings a fetched branch in with the host's identity and no hooks,
+and says plainly what happened (fast-forward, merge commit, conflict, or blocked by a local
+edit); :func:`finish_merge` completes a conflicted merge once a person has removed the
+markers, without making them run ``git add``.
 """
 
 from __future__ import annotations
@@ -18,13 +20,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
 from git_porcelain.errors import GitError
-from git_porcelain.porcelain import git_returncode, run_git
+from git_porcelain.porcelain import _run, git_returncode, has_conflict_markers, merge_in_progress, run_git, unmerged_paths
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
     from pathlib import Path
 
 RemoteFailure = Literal["offline", "auth", "rejected", "other"]
+MergeState = Literal["up_to_date", "fast_forward", "merged", "conflict", "blocked"]
 
 
 @dataclass(frozen=True)
@@ -229,17 +232,102 @@ def fetch(repo: Path, remote: str | None = None, *, timeout: float = 120) -> Non
     _remote(repo, "fetch", "--quiet", *([remote] if remote else []), timeout=timeout)
 
 
+@dataclass(frozen=True)
+class MergeResult:
+    """What :func:`merge` or :func:`finish_merge` did.
+
+    ``changed`` is every path the merge changed in the working tree (what a host re-reads);
+    ``conflicted`` the paths still holding conflict markers; ``error`` git's words when a
+    local edit blocked the merge.
+    """
+
+    state: MergeState
+    changed: tuple[str, ...] = ()
+    conflicted: tuple[str, ...] = ()
+    error: str | None = None
+
+
+def _changed_since(repo: Path, rev: str) -> tuple[str, ...]:
+    out = run_git(repo, "-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", "-z", rev, "HEAD", check=False)
+    return tuple(p for p in out.split("\0") if p)
+
+
+def merge(
+    repo: Path,
+    ref: str,
+    *,
+    author: Identity,
+    committer: Identity,
+    message: str | None = None,
+    trailers: Iterable[tuple[str, str]] = (),
+) -> MergeResult:
+    """Merge ``ref`` into the current branch: fast-forward when it can, a merge commit
+    (by ``author``/``committer``, hooks skipped) when both sides moved.
+
+    A conflict leaves the merge in progress with markers in the files — the common base
+    included (``diff3``), so a resolver sees what each side changed. A local edit that the
+    merge would overwrite blocks it before anything changes (``blocked``).
+    """
+    if is_ancestor(repo, ref, "HEAD"):
+        return MergeResult("up_to_date")
+    before = head(repo)
+    fast_forward = is_ancestor(repo, "HEAD", ref)
+    args = ["-c", "merge.conflictStyle=diff3", "merge", "--no-verify", "--no-edit"]
+    if message is not None:
+        args += ["-m", _message(message, trailers)]
+    proc = _run(repo, (*args, ref), _identity_env(author, committer), None)
+    if proc.returncode != 0:
+        if merge_in_progress(repo):
+            return MergeResult("conflict", changed=_changed_since(repo, before), conflicted=tuple(unmerged_paths(repo)))
+        return MergeResult("blocked", error=(proc.stderr or proc.stdout).strip()[:500])
+    return MergeResult("fast_forward" if fast_forward else "merged", changed=_changed_since(repo, before))
+
+
+def finish_merge(
+    repo: Path,
+    paths: Iterable[str],
+    *,
+    author: Identity,
+    committer: Identity,
+    message: str | None = None,
+    trailers: Iterable[tuple[str, str]] = (),
+) -> MergeResult:
+    """Complete a conflicted merge once every conflicted file is free of markers.
+
+    ``paths`` are the files the merge conflicted on (a host remembers them: a person who
+    ran ``git add`` has cleared git's own list). Each is staged as it now stands — edited,
+    or deleted to resolve it — so nobody needs to run git by hand. While any still holds
+    markers, nothing is staged and the result is ``conflict``.
+    """
+    if not merge_in_progress(repo):
+        return MergeResult("up_to_date")
+    wanted = list(dict.fromkeys([*paths, *unmerged_paths(repo)]))
+    left = tuple(p for p in wanted if (repo / p).exists() and has_conflict_markers(repo / p))
+    if left:
+        return MergeResult("conflict", conflicted=left)
+    if wanted:
+        run_git(repo, "add", "-A", "--", *[f":(literal){p}" for p in wanted])
+    args = ["commit", "--no-verify", "-q"]
+    args += ["--no-edit"] if message is None else ["-m", _message(message, trailers)]
+    run_git(repo, *args, env=_identity_env(author, committer))
+    return MergeResult("merged", changed=_changed_since(repo, "HEAD^1"))
+
+
 __all__ = [
     "Commit",
     "Identity",
+    "MergeResult",
+    "MergeState",
     "RemoteError",
     "RemoteFailure",
     "classify_remote_failure",
     "commit_paths",
     "fetch",
+    "finish_merge",
     "head",
     "is_ancestor",
     "log_grep",
+    "merge",
     "push",
     "show_at",
     "upstream",
