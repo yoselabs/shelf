@@ -37,6 +37,7 @@ from git_porcelain.history import (
     show_at,
     upstream,
 )
+from git_porcelain.lfs import lfs_available, lfs_checkout, lfs_fetch, lfs_paths, lfs_push, lfs_setup
 from git_porcelain.porcelain import (
     StatusEntry,
     dirty_rels,
@@ -73,6 +74,12 @@ __all__ = [
     "head",
     "is_ancestor",
     "is_repo",
+    "lfs_available",
+    "lfs_checkout",
+    "lfs_fetch",
+    "lfs_paths",
+    "lfs_push",
+    "lfs_setup",
     "log_grep",
     "merge",
     "merge_in_progress",

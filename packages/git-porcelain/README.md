@@ -59,11 +59,30 @@ if r.state == "conflict":                                        # markers left,
   re-reads them. `finish_merge` stages the conflicted paths as they now stand (edited or
   deleted) and commits once none holds a marker, so the person resolving never runs git.
 
+## Git LFS
+
+```python
+git.lfs_setup(repo)                         # False when git-lfs is missing; config only
+git.lfs_paths(repo, ["a/scan.png", "a.md"]) # {"a/scan.png"}: the paths the lfs filter owns
+git.lfs_push(repo, "origin", "main"); git.push(repo)            # objects first, then the ref
+git.fetch(repo); git.lfs_fetch(repo, "origin", "origin/main")   # objects before the merge
+git.merge(repo, "origin/main", author=me, committer=me); git.lfs_checkout(repo)
+```
+
+- `lfs_setup` writes the filter into the repo's **local** config with
+  `filter.lfs.required=true`, so a broken git-lfs fails `git add` instead of committing raw
+  bytes. Attributes alone do nothing without a configured filter. It installs **no hooks**,
+  so a caller uploads with `lfs_push` before every push.
+- Download with `lfs_fetch` before a merge. A download failing inside the merge's checkout
+  makes git restore the tree, and that restore can fail too, leaving a dirty tree and no
+  `MERGE_HEAD`. `lfs_checkout` fills pointer files whose objects are already local.
+
 ## Surface
 
 `run_git`, `git_returncode`, `is_repo`, `has_upstream`, `upstream`, `head`,
 `merge_in_progress`, `sync_status`, `readiness`, `status`, `dirty_rels`, `unmerged_paths`,
 `has_conflict_markers`, `show_stage`, `show_at`, `commit_paths`, `log_grep`, `push`,
-`fetch`, `merge`, `finish_merge`, `is_ancestor`, `classify_remote_failure`, and the types
+`fetch`, `merge`, `finish_merge`, `is_ancestor`, `classify_remote_failure`, `lfs_available`,
+`lfs_setup`, `lfs_checkout`, `lfs_paths`, `lfs_push`, `lfs_fetch`, and the types
 `Identity`, `Commit`, `MergeResult`, `StatusEntry`, `GitError`, `RemoteError`. Interpreting the git data (mapping conflicts to
 your domain, etc.) is the caller's job.
