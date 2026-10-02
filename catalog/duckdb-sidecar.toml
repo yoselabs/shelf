@@ -2,7 +2,7 @@
 name = "duckdb-sidecar"
 kind = "primitive"
 tier = "T0"
-release = "duckdb-sidecar-v0.2.0"
+release = "duckdb-sidecar-v0.3.0"
 capability = "Stop caring how to open a DuckDB sidecar connection, and stop rediscovering what DuckDB does not document — the connect dance, the lock-conflict signature, the index dance a column rename needs, and the two writer rules (content-hash write-skip, deferred FTS rebuild) that have no code shape."
 implementation = "ours"
 status = "candidate"

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import duckdb
 import pytest
-from duckdb_sidecar import connect, is_lock_conflict, rename_column
+from duckdb_sidecar import connect, is_index_drift, is_lock_conflict, rename_column
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -260,3 +260,49 @@ def _index_sql(conn: duckdb.DuckDBPyConnection, index_name: str) -> str:
 
 def _column_names(conn: duckdb.DuckDBPyConnection, table: str) -> list[str]:
     return [row[1] for row in conn.execute(f"PRAGMA table_info('{table}')").fetchall()]
+
+
+# --- a replayed WAL keeps its rows in the indexes (duckdb/duckdb#26106) ---------------
+
+
+def _child(code: str) -> None:
+    subprocess.run([sys.executable, "-c", f"import os, duckdb\n{code}"], check=True)
+
+
+def test_rows_replayed_from_a_wal_survive_the_next_close(tmp_path: Path) -> None:
+    """A writer dies with an insert only in the WAL; the next open replays it.
+
+    DuckDB's next checkpoint after a replay — the shutdown one included — writes the
+    index without the replayed rows, and a later delete of them fails. ``connect``
+    checkpoints first, which persists them correctly.
+    """
+    db = str(tmp_path / "store.duckdb")
+    _child(
+        f"con = duckdb.connect({db!r})\n"  # noqa: S608 — a fixed literal passed to a child interpreter
+        "con.execute('CREATE TABLE t(id INTEGER, k VARCHAR)')\n"
+        "con.execute('CREATE INDEX idx_k ON t(k)')\n"
+        "con.execute('CHECKPOINT')\n"
+        "con.execute(\"INSERT INTO t SELECT i, 'k' || i FROM range(500) r(i)\")\n"
+        "os._exit(0)\n"
+    )
+    assert Path(db + ".wal").exists(), "the insert lives only in the WAL"
+
+    connect(db).close()
+
+    conn = duckdb.connect(db)
+    try:
+        row = conn.execute("SELECT count(*) FROM t WHERE k = 'k7'").fetchone()
+        assert row is not None
+        assert row[0] == 1, "the index finds a replayed row"
+        conn.execute("DELETE FROM t")
+    finally:
+        conn.close()
+
+
+def test_index_drift_is_told_apart(tmp_path: Path) -> None:
+
+    drift = duckdb.FatalException("FATAL Error: Invalid Input Error: Failed to delete all rows from index. Only deleted 0 out of 5 rows.")
+    lock = duckdb.IOException('IO Error: Could not set lock on file "x": Conflicting lock is held in python (PID 1)')
+    assert is_index_drift(drift)
+    assert not is_index_drift(lock)
+    assert not is_index_drift(ValueError("Failed to delete all rows from index"))

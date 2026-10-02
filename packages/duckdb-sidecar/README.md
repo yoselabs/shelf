@@ -29,8 +29,8 @@ lifecycle base class.
 
 ## What this package knows
 
-Four things, none of them in DuckDB's documentation, each learned from a failure.
-Two have a code shape here; two are rules about the writer you are about to write.
+Five things, none of them in DuckDB's documentation, each learned from a failure.
+Three have a code shape here; two are rules about the writer you are about to write.
 
 ### 1. A second writer is an `IOException`, same as a missing file
 
@@ -80,7 +80,9 @@ write generates enough index churn, on a large corpus, to trip:
 Failed to delete all rows from index
 ```
 
-That is a fatal, and it is data corruption, not a slow query. Two consequences:
+That is a fatal, and it is data corruption, not a slow query. (The one incident traced
+to the byte, 2026-10-02, was the WAL replay of §5, not churn; churn as a cause on its
+own was never reproduced. The rules below still cost nothing.) Two consequences:
 
 - **Short-circuit on a content hash.** A row whose content is byte-identical to
   what is stored has nothing to gain from redoing the churn. Compare the path too
@@ -102,6 +104,25 @@ Mark the index stale on write and rebuild once, lazily, on the next lexical read
 **Keep the stale flag as a row in the same DuckDB file**, never in instance state:
 a crash between the write and the read would otherwise leave a stale index looking
 fresh, and nothing would ever rebuild it.
+
+### 5. A replayed WAL drops rows from the indexes at the next checkpoint
+
+`connect()` checkpoints on open; `is_index_drift(exc)` recognises what is left
+behind. A process that dies without checkpointing (SIGKILL, a crash on quit, a
+container stop timeout) leaves its last writes in the WAL. The next open replays
+them, and DuckDB's next checkpoint — the one a normal `close()` runs, or an automatic
+one — writes the ART indexes without the replayed rows (duckdb/duckdb#26106, open;
+1.5.0–1.5.5 all affected). Nothing fails until a later `DELETE` of those rows:
+
+```
+FATAL Error: Invalid Input Error: Failed to delete all rows from index.
+```
+
+An explicit `CHECKPOINT` straight after the replay persists the rows correctly, so
+`connect()` runs one before handing the connection back (with no WAL it does
+nothing). A file that already drifted cannot be repaired in place — a PRIMARY KEY or
+UNIQUE index cannot be dropped and rebuilt — so a store holding derived state moves
+the file aside and rebuilds it when `is_index_drift` says so.
 
 ## Boundary
 

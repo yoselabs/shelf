@@ -48,15 +48,25 @@ def connect(path: Path | str) -> duckdb.DuckDBPyConnection:
     """Open a DuckDB connection for a sidecar store.
 
     For a file target, create the parent directory (``parents=True,
-    exist_ok=True``) so a store can be opened under a not-yet-created subtree. The
-    ``":memory:"`` target opens an in-memory connection and touches no filesystem
-    path.
+    exist_ok=True``) so a store can be opened under a not-yet-created subtree, and
+    checkpoint before returning. The ``":memory:"`` target opens an in-memory
+    connection and touches no filesystem path.
+
+    **Why the checkpoint.** A file whose last writer died without checkpointing is
+    opened by replaying its WAL, and DuckDB's next checkpoint after a replay — the
+    one a normal ``close()`` runs, or an automatic one — writes the ART indexes
+    without the replayed rows (duckdb/duckdb#26106). A later delete of those rows
+    then fails with "Failed to delete all rows from index". An explicit checkpoint
+    straight after the replay persists them correctly; with no WAL it does nothing.
     """
     target = str(path)
-    if target != ":memory:":
-        target = str(Path(path))
-        Path(target).parent.mkdir(parents=True, exist_ok=True)
-    return duckdb.connect(target)
+    if target == ":memory:":
+        return duckdb.connect(target)
+    target = str(Path(path))
+    Path(target).parent.mkdir(parents=True, exist_ok=True)
+    conn = duckdb.connect(target)
+    conn.execute("CHECKPOINT")
+    return conn
 
 
 def is_lock_conflict(exc: BaseException) -> bool:
@@ -70,6 +80,22 @@ def is_lock_conflict(exc: BaseException) -> bool:
     a non-``IOException`` never qualifies, whatever its message says.
     """
     return isinstance(exc, duckdb.IOException) and _LOCK_CONFLICT_SIGNATURE in str(exc)
+
+
+#: The stable substring of the failure an index that lost rows raises on delete.
+_INDEX_DRIFT_SIGNATURE = "Failed to delete all rows from index"
+
+
+def is_index_drift(exc: BaseException) -> bool:
+    """True iff ``exc`` is DuckDB's "the index lost rows the table still has" failure.
+
+    Raised on a DELETE (``FatalException`` on 1.5.x) when an ART index is missing
+    entries for rows the table holds — what duckdb/duckdb#26106 leaves on disk. The
+    file cannot be repaired in place (a PRIMARY KEY or UNIQUE index cannot be
+    dropped), so a store holding derived state moves it aside and rebuilds. Narrow by
+    design: a non-DuckDB exception never qualifies, whatever its message says.
+    """
+    return isinstance(exc, duckdb.Error) and _INDEX_DRIFT_SIGNATURE in str(exc)
 
 
 def rename_column(conn: duckdb.DuckDBPyConnection, *, table: str, old: str, new: str) -> bool:
@@ -168,4 +194,4 @@ def _closing_paren(sql: str, start: int) -> int | None:
     return None
 
 
-__all__ = ["connect", "is_lock_conflict", "rename_column"]
+__all__ = ["connect", "is_index_drift", "is_lock_conflict", "rename_column"]
