@@ -11,14 +11,17 @@ from a2effect.testing import contract_tests
 
 class _NotFoundError(AppError):
     kind = "input"
+    code = "not_found"
 
 
 class _InvalidIdError(AppError):
     kind = "input"
+    code = "invalid_id"
 
 
 class _InfraError(AppError):
     kind = "infra"
+    code = "infra"
     retryable = True
 
 

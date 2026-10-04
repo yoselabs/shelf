@@ -17,13 +17,11 @@ def test_unexpected_defect_envelope_does_not_leak_original_type_at_top_level() -
     original = KeyError("foo")
     defect = quarantine(original)
     env = defect.to_envelope()
-    assert env.type == "UnexpectedDefect"
-    assert env.kind == "bug"
+    assert env.code == "internal_error"
     assert env.retryable is False
-    # Original type appears only inside cause.type, never as envelope.type
-    assert env.cause is not None
-    assert "KeyError" in env.cause["type"]
-    assert env.cause["message"] == "'foo'" or "foo" in env.cause["message"]
+    # The original type stays on the chained cause, server-side; it is not on the wire.
+    assert "KeyError" not in env.model_dump_json()
+    assert isinstance(defect.__cause__, KeyError)
 
 
 def test_quarantine_preserves_original_on_cause() -> None:
@@ -35,19 +33,14 @@ def test_quarantine_preserves_original_on_cause() -> None:
 def test_quarantine_wraps_cancelled_error_as_defect() -> None:
     cancelled = asyncio.CancelledError()
     defect = quarantine(cancelled)
-    env = defect.to_envelope()
-    assert env.type == "UnexpectedDefect"
-    assert env.kind == "bug"
-    assert env.cause is not None
-    assert "CancelledError" in env.cause["type"]
+    assert defect.to_envelope().code == "internal_error"
+    assert isinstance(defect.__cause__, asyncio.CancelledError)
 
 
 def test_quarantine_wraps_keyboard_interrupt() -> None:
     defect = quarantine(KeyboardInterrupt())
-    env = defect.to_envelope()
-    assert env.type == "UnexpectedDefect"
-    assert env.cause is not None
-    assert "KeyboardInterrupt" in env.cause["type"]
+    assert defect.to_envelope().code == "internal_error"
+    assert isinstance(defect.__cause__, KeyboardInterrupt)
 
 
 def test_unexpected_defect_cannot_be_subclassed() -> None:
@@ -60,6 +53,7 @@ def test_unexpected_defect_cannot_be_subclassed() -> None:
 def test_quarantine_idempotent_on_app_error() -> None:
     class _NotFoundError(AppError):
         kind = "input"
+        code = "not_found"
 
     original = _NotFoundError("x")
     result = quarantine(original)

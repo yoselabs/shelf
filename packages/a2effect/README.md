@@ -13,14 +13,24 @@ from a2effect import AppError
 
 class NotFound(AppError):
     kind = "input"
+    code = "not_found"
     http_status = 404
     cli_exit_code = 2
     hint = "verify the id is correct"
 
 class UpstreamUnavailable(AppError):
     kind = "infra"
-    # retryable defaults to True for kind=infra
+    code = "upstream_unavailable"
+    retryable = True
 ```
+
+Every concrete class declares a `kind` and a `code` in its own body; a class
+missing either fails at definition. `code` is snake_case and names what went
+wrong — it is what a caller branches on. An intermediate base opts out with
+`class MyAppError(AppError, abstract=True)` and cannot be raised.
+`a2effect.codes(MyAppError)` returns `{code: class}` for the whole hierarchy and
+raises on a duplicate — a catalogue test and a client rehydrating an envelope
+back into its class both use it.
 
 Kinds are `input | auth | policy | infra | bug`. Per-class
 `http_status` / `cli_exit_code` ClassVars override the kind defaults
@@ -87,6 +97,10 @@ every registered enricher is reachable from some tool's declared raise
 set, and the three surfaces agree on the envelope shape.
 
 ## What you get on the wire
+
+The envelope (v2) is `{code, message, hint, retryable, details,
+envelope_version: "2"}`. The class name, the kind and the chained cause stay
+server-side: the kind picks HTTP status and exit code, the cause is for the log.
 
 | Surface | Success | Error |
 |---|---|---|

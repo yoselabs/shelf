@@ -1,19 +1,19 @@
 """BDD scenarios for typed-error-contract / ErrorEnvelope wire schema."""
 
-import uuid
-
 import pytest
 from a2effect import AppError, ErrorEnvelope, register_error_kind
 
 
 class _NotFoundError(AppError):
     kind = "input"
+    code = "not_found"
     hint = "verify the id"
     http_status = 404
 
 
 class _InfraError(AppError):
     kind = "infra"
+    code = "infra"
     retryable = True
 
 
@@ -25,15 +25,14 @@ def test_envelope_round_trips_via_pydantic_json() -> None:
     assert parsed == env
 
 
-def test_envelope_carries_subclass_name_kind_basekind_retryable_hint() -> None:
+def test_envelope_carries_code_message_retryable_hint() -> None:
     err = _NotFoundError("x")
     env = err.to_envelope()
-    assert env.type == "_NotFoundError"
-    assert env.kind == "input"
-    assert env.base_kind == "input"
+    assert env.code == "not_found"
+    assert env.message == "x"
     assert env.retryable is False
     assert env.hint == "verify the id"
-    assert env.envelope_version == "1"
+    assert env.envelope_version == "2"
 
 
 def test_envelope_carries_details_dict() -> None:
@@ -42,7 +41,7 @@ def test_envelope_carries_details_dict() -> None:
     assert env.details == {"id": "abc", "scope": "memory"}
 
 
-def test_envelope_cause_chain_populated_when_raised_from() -> None:
+def test_envelope_never_carries_the_chained_cause() -> None:
     original = ValueError("orig")
     err: AppError
     msg = "wrap"
@@ -50,29 +49,20 @@ def test_envelope_cause_chain_populated_when_raised_from() -> None:
         raise _NotFoundError(msg) from original
     except _NotFoundError as caught:
         err = caught
-    env = err.to_envelope()
-    assert env.cause is not None
-    assert env.cause["type"] == "ValueError"
-    assert env.cause["message"] == "orig"
-    uuid.UUID(env.cause["trace_id"])
+    assert err.__cause__ is original
+    assert "orig" not in err.to_envelope().model_dump_json()
 
 
-def test_envelope_cause_absent_when_no_cause() -> None:
-    err = _NotFoundError("x")
-    env = err.to_envelope()
-    assert env.cause is None
-
-
-def test_envelope_extension_kind_carries_base_kind_fallback() -> None:
+def test_envelope_extension_kind_keeps_its_retryable_default() -> None:
     register_error_kind("token_bucket", base="infra", retryable=True)
 
     class _RateLimitError(AppError):
         kind = "token_bucket"
+        code = "rate_limit"
 
-    env = _RateLimitError("hit").to_envelope()
-    assert env.kind == "token_bucket"
-    assert env.base_kind == "infra"
-    assert env.retryable is True
+    err = _RateLimitError("hit")
+    assert err.base_kind == "infra"
+    assert err.to_envelope().retryable is True
 
 
 def test_to_envelope_dict_matches_model_dump() -> None:
@@ -80,9 +70,9 @@ def test_to_envelope_dict_matches_model_dump() -> None:
     assert err.to_envelope_dict() == err.to_envelope().model_dump()
 
 
-def test_envelope_version_is_locked_to_one() -> None:
+def test_envelope_version_is_locked_to_two() -> None:
     env = _NotFoundError("x").to_envelope()
-    assert env.envelope_version == "1"
+    assert env.envelope_version == "2"
 
 
 def test_envelope_per_instance_retryable_override_propagates() -> None:

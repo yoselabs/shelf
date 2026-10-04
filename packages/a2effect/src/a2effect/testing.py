@@ -83,8 +83,7 @@ def contract_tests(  # noqa: C901 — three independent check categories share o
             def test_envelope_round_trip(tool_name: str, exc_type: type[AppError]) -> None:
                 instance = exc_type("sample")
                 env = instance.to_envelope()
-                assert env.type == exc_type.__name__, f"{tool_name}: type {env.type!r} != {exc_type.__name__!r}"  # noqa: S101
-                assert env.kind == exc_type.kind, f"{tool_name}: kind {env.kind!r} != {exc_type.kind!r}"  # noqa: S101
+                assert env.code == exc_type.code, f"{tool_name}: code {env.code!r} != {exc_type.code!r}"  # noqa: S101
                 assert env.retryable == exc_type.retryable  # noqa: S101
 
             tests["test_envelope_round_trip"] = test_envelope_round_trip
@@ -133,7 +132,7 @@ def contract_tests(  # noqa: C901 — three independent check categories share o
                 instance = exc_type("sample")
                 surfaces = ("mcp", "http", "cli")
                 rendered = {s: renderer(s, instance) for s in surfaces}
-                ref_keys = ("type", "kind", "retryable", "hint")
+                ref_keys = ("code", "retryable", "hint")
                 ref = {k: rendered["mcp"].get(k) for k in ref_keys}
                 for s in surfaces[1:]:
                     actual = {k: rendered[s].get(k) for k in ref_keys}

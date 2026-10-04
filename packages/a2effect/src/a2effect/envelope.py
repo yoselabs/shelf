@@ -2,41 +2,26 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-ENVELOPE_VERSION: Literal["1"] = "1"
+ENVELOPE_VERSION: Literal["2"] = "2"
 
 
 class ErrorEnvelope(BaseModel):
-    """The serialized form of an :class:`~a2effect.errors.AppError` on the wire.
+    """The serialized form of an :class:`~a2effect.errors.AppError` on the wire (v2).
 
-    Carries the error `type`, its `kind`/`base_kind`, `retryable`, an optional `hint`,
-    free-form `details`, an optional `cause`, and the schema `envelope_version` so
-    consumers can self-correct off a stable shape.
+    `code` says what went wrong, `message` is the sentence, `hint` what to do next (or
+    null), `retryable` whether the same call can succeed unchanged or after a re-read, and
+    `details` the facts to act on. The class name, the effect kind and the chained cause
+    are not on the wire: the kind picks HTTP status and exit code, the cause is the
+    server's to log.
     """
 
-    type: str
-    kind: str
-    base_kind: str
-    retryable: bool
+    code: str
+    message: str
     hint: str | None = None
+    retryable: bool
     details: dict[str, Any] = Field(default_factory=dict)
-    cause: dict[str, str] | None = None
-    envelope_version: Literal["1"] = ENVELOPE_VERSION
-
-
-def _extract_cause(exc: BaseException) -> dict[str, str] | None:
-    original = exc.__cause__
-    if original is None:
-        return None
-    type_name = type(original).__name__
-    module = type(original).__module__
-    qualified = f"{module}.{type_name}" if module not in ("builtins", "__main__") else type_name
-    return {
-        "type": qualified,
-        "message": str(original),
-        "trace_id": str(uuid.uuid4()),
-    }
+    envelope_version: Literal["2"] = ENVELOPE_VERSION

@@ -73,7 +73,7 @@ dev = [
 
 [[package]]
 name = "a2effect"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/a2effect" }
 dependencies = [
     { name = "pydantic" },

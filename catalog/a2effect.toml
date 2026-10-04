@@ -2,7 +2,7 @@
 name = "a2effect"
 kind = "primitive"
 tier = "T1"
-release = "a2effect-v0.1.0"
+release = "a2effect-v0.2.0"
 capability = "Stop caring how a failure crosses a process boundary — classify it once as a typed error with a kind, and get a stable wire envelope, a prose rendering, and a translation seam for free."
 implementation = "ours"          # taxonomy + envelope + translate/enrich seams; pydantic-only, framework-free
 status = "candidate"

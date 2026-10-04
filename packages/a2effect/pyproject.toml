@@ -1,6 +1,6 @@
 [project]
 name = "a2effect"
-version = "0.1.0"
+version = "0.2.0"
 description = "Typed-error foundation for Python frameworks. Standalone, pydantic-only, adoptable by any framework wanting typed errors on the wire."
 readme = "README.md"
 authors = [{name = "Denis Tomilin"}]

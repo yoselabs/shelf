@@ -1,17 +1,20 @@
-"""The typed-error base (`AppError`) and the kind taxonomy.
+"""The typed-error base (`AppError`), the kind taxonomy and the error `code`.
 
 Every error a framework puts on the wire subclasses :class:`AppError` and declares a
 `kind` — one of the five core kinds, or an extension registered via
-:func:`register_error_kind`. The kind drives the wire envelope, HTTP status, and CLI
-exit code, so a consumer maps error categories once, not per exception type.
+:func:`register_error_kind` — and a `code`, the snake_case name of what went wrong. The
+kind drives HTTP status and CLI exit code, so a consumer maps error categories once, not
+per exception type; the code is what a caller branches on. An intermediate base declares
+itself ``abstract=True`` and may omit both; it cannot be raised.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, ClassVar, Literal
 
-from a2effect.envelope import ErrorEnvelope, _extract_cause
+from a2effect.envelope import ErrorEnvelope
 
 ErrorKind = Literal["input", "auth", "policy", "infra", "bug"]
 
@@ -61,15 +64,22 @@ def _extension_default_retryable(kind: str) -> bool | None:
     return ext.retryable if ext is not None else None
 
 
+_CODE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
 class AppError(Exception):
     """Base for every typed, wire-serializable application error.
 
-    A subclass MUST declare a class-level `kind`; the base resolves it to a core
-    `base_kind` and exposes the wire envelope (:meth:`to_envelope`), HTTP status, and
-    CLI exit code. Instances carry a message, optional `hint`/`details`, and a `cause`.
+    A concrete subclass MUST declare a class-level `kind` and `code` in its own body (an
+    inherited code would let two classes share one); the base resolves the kind to a core
+    `base_kind` and exposes the wire envelope (:meth:`to_envelope`), HTTP status, and CLI
+    exit code. Instances carry a message, optional `hint`/`details`, and a `cause` that
+    stays server-side. ``class Base(AppError, abstract=True)`` declares an intermediate
+    base that may omit both and cannot be instantiated.
     """
 
     kind: ClassVar[str]
+    code: ClassVar[str]
     retryable: ClassVar[bool] = False
     hint: ClassVar[str | None] = None
     http_status: ClassVar[int | None] = None
@@ -78,30 +88,49 @@ class AppError(Exception):
     #: ``"Authorization denied"`` for an auth-kind subclass that wants
     #: distinct framing from the default ``"Authentication required"``).
     kind_label: ClassVar[str | None] = None
+    #: Set on every subclass from its ``abstract=`` class keyword; read by :meth:`is_abstract`.
+    _abstract: ClassVar[bool] = True
 
     base_kind: str
     details: dict[str, Any]
 
-    def __init_subclass__(cls, **kwargs: Any) -> None:
+    def __init_subclass__(cls, *, abstract: bool = False, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        if "kind" not in cls.__dict__:
+        cls._abstract = abstract
+        own = cls.__dict__
+        if "kind" not in own and not abstract:
             msg = (
                 f"AppError subclass {cls.__name__!r} must declare a class-level `kind` attribute "
                 f"(one of {sorted(_CORE_KINDS)} or a registered extension)"
             )
             raise TypeError(msg)
-        kind = cls.__dict__["kind"]
-        if kind not in _CORE_KINDS and kind not in _KIND_EXTENSIONS:
+        if "kind" in own:
+            kind = own["kind"]
+            if kind not in _CORE_KINDS and kind not in _KIND_EXTENSIONS:
+                msg = (
+                    f"AppError subclass {cls.__name__!r} declares unknown kind {kind!r}; "
+                    f"accepted core kinds: {sorted(_CORE_KINDS)}; "
+                    f"register extensions via a2effect.register_error_kind(name, base=...)"
+                )
+                raise TypeError(msg)
+            if kind not in _CORE_KINDS and "retryable" not in own:
+                ext_default = _extension_default_retryable(kind)
+                if ext_default is not None:
+                    cls.retryable = ext_default
+        if "code" not in own and not abstract:
             msg = (
-                f"AppError subclass {cls.__name__!r} declares unknown kind {kind!r}; "
-                f"accepted core kinds: {sorted(_CORE_KINDS)}; "
-                f"register extensions via a2effect.register_error_kind(name, base=...)"
+                f"AppError subclass {cls.__name__!r} must declare a class-level `code` "
+                f"(snake_case, what went wrong), or be declared abstract=True"
             )
             raise TypeError(msg)
-        if kind not in _CORE_KINDS and "retryable" not in cls.__dict__:
-            ext_default = _extension_default_retryable(kind)
-            if ext_default is not None:
-                cls.retryable = ext_default
+        if "code" in own and not (isinstance(own["code"], str) and _CODE.match(own["code"])):
+            msg = f"AppError subclass {cls.__name__!r} declares code {own['code']!r}; a code is snake_case ({_CODE.pattern})"
+            raise TypeError(msg)
+
+    @classmethod
+    def is_abstract(cls) -> bool:
+        """True for an intermediate base declared ``abstract=True`` (and for `AppError`)."""
+        return cls is AppError or cls.__dict__.get("_abstract", False)
 
     def __init__(
         self,
@@ -112,11 +141,11 @@ class AppError(Exception):
         details: dict[str, Any] | None = None,
         cause: BaseException | None = None,
     ) -> None:
-        if type(self) is AppError or "kind" not in type(self).__dict__:
+        if type(self).is_abstract():
             msg = (
-                "cannot instantiate AppError directly; subclass and declare `kind`"
+                "cannot instantiate AppError directly; subclass and declare `kind` and `code`"
                 if type(self) is AppError
-                else f"{type(self).__name__} missing class-level `kind`"
+                else f"{type(self).__name__} is abstract; raise a concrete subclass"
             )
             raise TypeError(msg)
         super().__init__(msg)
@@ -130,15 +159,13 @@ class AppError(Exception):
             self.__cause__ = cause
 
     def to_envelope(self) -> ErrorEnvelope:
-        """Render this error as its structured wire :class:`ErrorEnvelope`."""
+        """Render this error as its structured wire :class:`ErrorEnvelope` (v2)."""
         return ErrorEnvelope(
-            type=type(self).__name__,
-            kind=type(self).kind,
-            base_kind=self.base_kind,
-            retryable=self.retryable,
+            code=type(self).code,
+            message=str(self),
             hint=self.hint,
+            retryable=self.retryable,
             details=self.details,
-            cause=_extract_cause(self),
         )
 
     def to_envelope_dict(self) -> dict[str, Any]:
@@ -146,7 +173,7 @@ class AppError(Exception):
         return self.to_envelope().model_dump()
 
 
-class InputError(AppError):
+class InputError(AppError, abstract=True):
     """Caller supplied something malformed or missing (HTTP 400 / exit 2)."""
 
     kind = "input"
@@ -154,7 +181,7 @@ class InputError(AppError):
     cli_exit_code = 2
 
 
-class AuthError(AppError):
+class AuthError(AppError, abstract=True):
     """Authentication is required or failed (HTTP 401 / exit 77)."""
 
     kind = "auth"
@@ -162,7 +189,7 @@ class AuthError(AppError):
     cli_exit_code = 77
 
 
-class PolicyError(AppError):
+class PolicyError(AppError, abstract=True):
     """A rule (scope, cardinality, retention) said no (HTTP 403 / exit 77)."""
 
     kind = "policy"
@@ -170,10 +197,36 @@ class PolicyError(AppError):
     cli_exit_code = 77
 
 
-class InfrastructureError(AppError):
+class InfrastructureError(AppError, abstract=True):
     """An IO / engine / external-service failure — retryable (HTTP 503 / exit 75)."""
 
     kind = "infra"
     retryable = True
     http_status = 503
     cli_exit_code = 75
+
+
+def codes(root: type[AppError]) -> dict[str, type[AppError]]:
+    """Every concrete error class under ``root`` (``root`` included), by its code.
+
+    Abstract bases are skipped. Two classes sharing a code is a catalogue defect and
+    raises :class:`ValueError` naming both — this is how a consumer's catalogue test and a
+    rehydrating client look a code up.
+    """
+    found: dict[str, type[AppError]] = {}
+    seen: set[type[AppError]] = set()
+    stack: list[type[AppError]] = [root]
+    while stack:
+        cls = stack.pop()
+        if cls in seen:
+            continue
+        seen.add(cls)
+        stack.extend(cls.__subclasses__())
+        if cls.is_abstract():
+            continue
+        other = found.get(cls.code)
+        if other is not None:
+            msg = f"code {cls.code!r} is declared by both {other.__name__} and {cls.__name__}"
+            raise ValueError(msg)
+        found[cls.code] = cls
+    return found

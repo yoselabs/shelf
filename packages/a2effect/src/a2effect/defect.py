@@ -15,6 +15,7 @@ class UnexpectedDefect(AppError):  # noqa: N818 - deliberate public name (a "def
     """
 
     kind = "bug"
+    code = "internal_error"
     retryable = False
 
     def __init_subclass__(cls, **kwargs: Any) -> None:

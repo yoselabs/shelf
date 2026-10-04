@@ -7,6 +7,7 @@ from a2effect import AppError, register_error_kind
 def test_subclass_with_core_kind_is_created() -> None:
     class NotFoundError(AppError):
         kind = "input"
+        code = "not_found"
 
     err = NotFoundError("x")
     assert err.kind == "input"
@@ -27,6 +28,7 @@ def test_subclass_without_kind_raises_type_error() -> None:
 def test_per_instance_override_of_retryable() -> None:
     class InfrastructureError(AppError):
         kind = "infra"
+        code = "infrastructure"
         retryable = True
 
     err = InfrastructureError("conn refused", retryable=False)
@@ -37,6 +39,7 @@ def test_per_instance_override_of_retryable() -> None:
 def test_per_instance_override_of_hint_and_details() -> None:
     class NotFoundError(AppError):
         kind = "input"
+        code = "not_found"
         hint = "default hint"
 
     err = NotFoundError("x", hint="custom hint", details={"id": "abc"})
@@ -47,6 +50,7 @@ def test_per_instance_override_of_hint_and_details() -> None:
 def test_kind_is_not_per_instance_overridable() -> None:
     class NotFoundError(AppError):
         kind = "input"
+        code = "not_found"
 
     err = NotFoundError("x")
     with pytest.raises(TypeError, match="kind"):
@@ -66,6 +70,7 @@ def test_extended_kind_registers_and_resolves_base_kind() -> None:
 
     class RateLimitError(AppError):
         kind = "rate_limit"
+        code = "rate_limit"
 
     err = RateLimitError("hit")
     assert err.kind == "rate_limit"
@@ -76,6 +81,7 @@ def test_extended_kind_registers_and_resolves_base_kind() -> None:
 def test_class_level_metadata_defaults() -> None:
     class AuthFailedError(AppError):
         kind = "auth"
+        code = "auth_failed"
 
     assert AuthFailedError.retryable is False
     assert AuthFailedError.hint is None
@@ -86,6 +92,7 @@ def test_class_level_metadata_defaults() -> None:
 def test_class_level_http_status_override() -> None:
     class NotFoundError(AppError):
         kind = "input"
+        code = "not_found"
         http_status = 404
 
     assert NotFoundError("x").http_status == 404

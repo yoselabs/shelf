@@ -6,7 +6,7 @@ One row per `catalog/*.toml`. Types live in [`docs/glossary.md`](../docs/glossar
 
 | Software | Kind | Tier | Release | Status | Implementation | Consumers | Capability |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| a2effect | primitive | T1 | a2effect-v0.1.0 | candidate | ours | a2web | Stop caring how a failure crosses a process boundary — classify it once as a typed error with a kind, and get a stable wire envelope, a prose rendering, and a translation seam for free. |
+| a2effect | primitive | T1 | a2effect-v0.2.0 | candidate | ours | a2web | Stop caring how a failure crosses a process boundary — classify it once as a typed error with a kind, and get a stable wire envelope, a prose rendering, and a translation seam for free. |
 | any-browser | any-lib | T1 | any-browser-v0.1.0 | candidate | hybrid-adapter | a2web | Stop caring which headless engine renders a JS page — one BrowserBackend protocol returning a uniform RenderedPage (carrying a RenderOutcome), backed by Playwright-API (patchright / camoufox) or raw-CDP (zendriver); a missing engine degrades to RenderOutcome.unavailable, never an import crash. |
 | any-markdown | primitive | T0 | any-markdown-v0.1.0 | candidate | markdown-it-py | a2kay | Stop caring where markdown hides its code — read and rewrite the [[wikilinks]] a document actually makes, with code blocks and code spans excluded by the CommonMark grammar rather than by a regex that approximates it. |
 | anyembed | any-lib | T1 | anyembed-v0.1.0 | active | hybrid-adapter | a2kay | Stop caring which embedding backend is underneath. |

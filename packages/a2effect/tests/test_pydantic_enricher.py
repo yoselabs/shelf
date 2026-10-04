@@ -1,7 +1,7 @@
 """Default a2effect enricher: translates pydantic ValidationError to InputError."""
 
 import pytest
-from a2effect.enrichers import pydantic_validation_error_enricher
+from a2effect.enrichers import InvalidInputError, pydantic_validation_error_enricher
 from a2effect.errors import AppError, InputError
 from pydantic import BaseModel, Field, ValidationError
 
@@ -29,7 +29,7 @@ def test_enricher_returns_none_for_unrelated_exception() -> None:
 
 
 def test_enricher_returns_none_for_app_error_subclasses() -> None:
-    assert pydantic_validation_error_enricher(InputError("x")) is None
+    assert pydantic_validation_error_enricher(InvalidInputError("x")) is None
 
 
 def test_enricher_translates_validation_error_to_input_error() -> None:
@@ -57,7 +57,7 @@ def test_translated_error_kind_is_input() -> None:
 
 def test_input_error_is_app_error_subclass_with_kind_input() -> None:
     assert InputError.kind == "input"
-    err = InputError("bad")
+    err = InvalidInputError("bad")
     assert err.base_kind == "input"
 
 
@@ -65,6 +65,5 @@ def test_translated_error_envelope_round_trips() -> None:
     translated = _translate_a_rejected_payload()
     assert translated is not None
     env = translated.to_envelope()
-    assert env.type == "InputError"
-    assert env.kind == "input"
+    assert env.code == "invalid_input"
     assert "fields" in env.details

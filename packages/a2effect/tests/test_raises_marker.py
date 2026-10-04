@@ -9,10 +9,12 @@ from a2effect import AppError, Raises
 
 class _NotFoundError(AppError):
     kind = "input"
+    code = "not_found"
 
 
 class _InvalidIdError(AppError):
     kind = "input"
+    code = "invalid_id"
 
 
 def test_raises_is_frozen_dataclass_with_types_tuple() -> None:

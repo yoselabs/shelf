@@ -7,8 +7,15 @@ from pydantic import ValidationError
 from a2effect.errors import AppError, InputError
 
 
+class InvalidInputError(InputError):
+    """A payload failed its schema — what :func:`pydantic_validation_error_enricher` raises."""
+
+    kind = "input"
+    code = "invalid_input"
+
+
 def pydantic_validation_error_enricher(exc: BaseException) -> AppError | None:
-    """Map a pydantic `ValidationError` to an `InputError` carrying its field errors.
+    """Map a pydantic `ValidationError` to :class:`InvalidInputError` carrying its field errors.
 
     Returns ``None`` for an already-typed `AppError` or a non-validation exception, so
     it can sit in an enricher chain.
@@ -18,6 +25,6 @@ def pydantic_validation_error_enricher(exc: BaseException) -> AppError | None:
     if not isinstance(exc, ValidationError):
         return None
     fields = [{"loc": list(err["loc"]), "type": err["type"], "msg": err["msg"]} for err in exc.errors()]
-    translated = InputError("validation failed", details={"fields": fields})
+    translated = InvalidInputError("validation failed", details={"fields": fields})
     translated.__cause__ = exc
     return translated

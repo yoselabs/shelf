@@ -1,0 +1,10 @@
+seq = 110
+date = "2026-10-05"
+event = "delivery"
+software = "a2effect"
+release = "a2effect-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, breaking: a typed error names what went wrong as a `code`, declared on its class and checked at definition like `kind`; the envelope is v2, `{code, message, hint, retryable, details, envelope_version: "2"}`. `type` (a Python class name), `kind`/`base_kind` and `cause` left the wire: an agent deciding whether to fix its input, re-read or give up needs the code and the facts, not the class or the chained exception text (which leaked server internals). `codes(root)` lists a hierarchy's codes and refuses a duplicate, so a consumer's catalogue test and a client that rehydrates an envelope into its class read one table. Intermediate bases declare `abstract=True`. a2kay's error-catalogue change drove it (one class per code, `details.reason` strings gone); a2kit and a2web pin 0.1.0 and move when they choose, at the cost of one `code` per error class."""

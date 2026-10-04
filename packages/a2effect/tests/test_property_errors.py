@@ -67,7 +67,7 @@ def test_property_a_valid_extension_resolves_to_its_declared_base(ext_name: str,
     register_error_kind(ext_name, base=base, retryable=retryable)  # type: ignore[arg-type]
     assert _resolve_base_kind(ext_name) == base
 
-    error_cls = type(f"Err_{ext_name}", (AppError,), {"kind": ext_name})
+    error_cls = type(f"Err_{ext_name}", (AppError,), {"kind": ext_name, "code": "probe"})
     err = error_cls("boom")
     assert err.base_kind == base
     assert err.retryable is retryable
@@ -82,4 +82,4 @@ def test_property_unregistered_kind_always_raises_type_error(ext_name: str) -> N
     """
     error_cls_name = f"Err_unreg_{ext_name}"
     with pytest.raises(TypeError, match="unknown kind"):
-        type(error_cls_name, (AppError,), {"kind": ext_name})
+        type(error_cls_name, (AppError,), {"kind": ext_name, "code": "probe"})
