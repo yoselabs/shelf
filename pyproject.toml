@@ -203,6 +203,7 @@ testpaths = [
     "packages/record-mine/tests",
     "packages/settings-base/tests",
     "packages/sqlite-resource/tests",
+    "packages/sqlite-sidecar/tests",
     "packages/timefmt/tests",
     "packages/yaml-merge/tests",
 ]

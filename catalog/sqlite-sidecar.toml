@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "sqlite-sidecar"
+kind = "primitive"
+tier = "T0"
+release = "sqlite-sidecar-v0.1.0"
+capability = "Stop caring how to open a SQLite sidecar file, and stop rediscovering what SQLite does not warn you about — the WAL/autocommit/extension open, an immediate transaction that nests as a savepoint, busy is not corruption, an integrity check needs a fresh connection, -wal/-shm travel with a file set aside, and a time column that sorts as time."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (services/sqlite_sidecar.py) when its last DuckDB stores moved to SQLite (a2kay sqlite-graph-and-logs): four consumers in one app — two derived indexes that set aside and rebuild (graph, search; search loads sqlite-vec and keeps a writer and a reader connection), two append-only logs that never do (audit, run history). The sibling of duckdb-sidecar, same shape: functions over sqlite3.Connection, not a lifecycle base class. Stdlib only. Born candidate."

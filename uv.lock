@@ -46,6 +46,7 @@ members = [
     "record-mine",
     "settings-base",
     "sqlite-resource",
+    "sqlite-sidecar",
     "timefmt",
     "yaml-merge",
 ]
@@ -3925,6 +3926,11 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "aiosqlite", specifier = ">=0.20,<1" }]
+
+[[package]]
+name = "sqlite-sidecar"
+version = "0.1.0"
+source = { editable = "packages/sqlite-sidecar" }
 
 [[package]]
 name = "sse-starlette"

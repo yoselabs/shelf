@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "sqlite-sidecar"
+why = "a2kay keeps four SQLite sidecar files (graph, search, audit, run history), each opened the same way and each needing the same failure tests; without one helper the open, the transaction and the damage-versus-busy test drift apart store by store, as the DuckDB connect dance did before duckdb-sidecar."
+needs = "connect(target, extensions=, read_only=) with WAL, autocommit and the :memory: passthrough; transaction(conn, lock=) that is BEGIN IMMEDIATE outside and a savepoint inside; to_text/from_text for fixed-width UTC times; is_corruption (never busy or locked), unreadable, integrity_ok on a fresh connection, and set_aside moving -wal/-shm."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired
