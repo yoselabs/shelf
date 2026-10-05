@@ -1,6 +1,6 @@
 [project]
 name = "anyembed"
-version = "0.1.0"
+version = "0.2.0"
 description = "Stop caring which embedding backend is underneath — a neutral Embedder interface with a local transformers (BGE) backend."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
@@ -11,6 +11,12 @@ dependencies = [
     "transformers>=4.40,<6",
     "numpy>=1.24,<3",
 ]
+
+[project.optional-dependencies]
+# The GGUF backend (`LlamaCppEmbedder`). llama-cpp-python builds llama.cpp from source on
+# install (Metal on by default on macOS); `huggingface-hub` finds a repo-named file in the
+# local cache.
+llamacpp = ["llama-cpp-python>=0.3.36,<0.4", "huggingface-hub>=0.24,<2"]
 
 [build-system]
 requires = ["hatchling"]

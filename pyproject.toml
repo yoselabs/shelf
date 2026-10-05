@@ -21,6 +21,8 @@ anyllm = { workspace = true }
 # siblings from the workspace, not PyPI.
 lean-wire = { workspace = true }
 page-tsv = { workspace = true }
+# The dev group installs `anyembed[llamacpp]` so the GGUF backend's import resolves.
+anyembed = { workspace = true }
 
 # Dev tooling as a PEP 735 dependency-group (NOT an optional-extra): `uv sync`
 # always installs it, so the venv carries the linters and `uv run` can never fall
@@ -44,6 +46,7 @@ dev = [
     "types-openpyxl>=3.1.5.20260827",
     "async-scope[asgi]",  # async-scope's uvicorn extra — installed here so the asgi lane serves a REAL server; base async-scope stays dependency-free and imports uvicorn lazily
     "httpx>=0.27,<1",     # the client half of that lane: a real request over the real socket
+    "anyembed[llamacpp]",  # anyembed's GGUF backend extra — installed here so `llama_cpp` resolves for its tests + deptry (base anyembed stays on transformers; the GGUF backend is opt-in)
     "sse-starlette>=2,<4",  # NOT an async-scope dependency — the library whose unreset module-global the asgi lane exists to defend against, installed so that defence is actually exercised rather than suppressed away
 ]
 
