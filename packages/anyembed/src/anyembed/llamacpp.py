@@ -15,11 +15,19 @@ added back around them.
 
 One ``Llama`` context is not safe to share between threads; calls are serialized by a
 lock, so one instance may serve an indexer thread and a query thread at once.
+
+A loaded model is closed at interpreter exit (``atexit``), while ``llama_cpp`` is still
+importable. Left to the garbage collector it is freed during module teardown, after the
+bindings are gone: ``Llama.__del__`` raises, and on Metal ``ggml_metal_device_free`` then
+finds live resource sets and aborts the process (SIGABRT, a non-zero exit after a run that
+otherwise succeeded).
 """
 
 from __future__ import annotations
 
+import atexit
 import threading
+import weakref
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -121,14 +129,23 @@ class LlamaCppEmbedder:
         except Exception as exc:
             msg = f"GGUF model {self.model_id!r} could not be loaded from {path}: {exc}"
             raise AnyEmbedError(msg) from exc
+        atexit.register(_close_at_exit, weakref.ref(self))
         return self._llm
 
+    def close(self) -> None:
+        """Free the model (the next call loads it again)."""
+        with self._lock:
+            llm, self._llm = self._llm, None
+        if llm is not None and hasattr(llm, "close"):
+            llm.close()
+
     def _truncate(self, llm: Any, text: str) -> str:
-        tokens = llm.tokenize(text.encode("utf-8"), add_bos=True)
+        tokens: list[int] = llm.tokenize(text.encode("utf-8"), add_bos=True)
         if len(tokens) <= self._max_tokens:
             return text
         # `tokens` holds the opening and closing special tokens; keep the content between them.
-        return bytes(llm.detokenize(tokens[1 : self._max_tokens - 1])).decode("utf-8", errors="ignore")
+        kept: bytes = llm.detokenize(tokens[1 : self._max_tokens - 1])
+        return kept.decode("utf-8", errors="ignore")
 
     def _vectors(self, texts: list[str]) -> list[list[float]]:
         if not texts:
@@ -136,7 +153,7 @@ class LlamaCppEmbedder:
         with self._lock:
             llm = self._ensure()
             try:
-                vectors = llm.embed([self._truncate(llm, t) for t in texts], normalize=True)
+                vectors: list[list[float]] = llm.embed([self._truncate(llm, t) for t in texts], normalize=True)
             except Exception as exc:
                 msg = f"GGUF model {self.model_id!r} failed to embed: {exc}"
                 raise AnyEmbedError(msg) from exc
@@ -153,6 +170,12 @@ class LlamaCppEmbedder:
     def embed_query(self, text: str) -> list[float]:
         """Embed a search query (the configured query prefix applied)."""
         return self._vectors([self._query_prefix + text])[0]
+
+
+def _close_at_exit(ref: weakref.ref[LlamaCppEmbedder]) -> None:
+    embedder = ref()
+    if embedder is not None:
+        embedder.close()
 
 
 __all__ = ["LlamaCppEmbedder", "Pooling"]

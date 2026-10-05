@@ -21,7 +21,7 @@ import struct
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -68,10 +68,17 @@ class EmbeddingCache:
         with self._lock:
             self._conn.close()
 
+    def _one(self, sql: str, params: Sequence[object] = ()) -> tuple[Any, ...] | None:
+        """One row of ``sql``. Call with the lock held."""
+        return cast("tuple[Any, ...] | None", self._conn.execute(sql, params).fetchone())
+
+    def _count(self) -> int:
+        row = self._one("SELECT count(*) FROM embedding_cache")
+        return int(row[0]) if row is not None else 0
+
     def __len__(self) -> int:
         with self._lock:
-            row = self._conn.execute("SELECT count(*) FROM embedding_cache").fetchone()
-        return int(row[0])
+            return self._count()
 
     def get(self, model_id: str, texts: Sequence[str]) -> list[list[float] | None]:
         """Each text's cached vector under ``model_id``, or ``None``; a hit is marked used now."""
@@ -79,11 +86,9 @@ class EmbeddingCache:
         found: dict[bytes, list[float]] = {}
         with self._lock:
             for h in set(hashes):
-                row = self._conn.execute(
-                    "SELECT dim, vector FROM embedding_cache WHERE model_id = ? AND text_hash = ?", (model_id, h)
-                ).fetchone()
+                row = self._one("SELECT dim, vector FROM embedding_cache WHERE model_id = ? AND text_hash = ?", (model_id, h))
                 if row is not None:
-                    found[h] = _unpack(row[1], int(row[0]))
+                    found[h] = _unpack(bytes(row[1]), int(row[0]))
             if found:
                 now = self._clock()
                 self._conn.executemany(
@@ -104,7 +109,7 @@ class EmbeddingCache:
             self._conn.execute("BEGIN")
             try:
                 self._conn.executemany("INSERT OR REPLACE INTO embedding_cache VALUES (?, ?, ?, ?, ?)", rows)
-                over = int(self._conn.execute("SELECT count(*) FROM embedding_cache").fetchone()[0]) - self._max_rows
+                over = self._count() - self._max_rows
                 if over > 0:
                     self._conn.execute(
                         "DELETE FROM embedding_cache WHERE (model_id, text_hash) IN "

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import subprocess
+import sys
 import threading
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -177,3 +179,27 @@ def test_real_bge_m3_truncates_a_long_text() -> None:
     long = " ".join(["alpha beta gamma delta"] * 400)
     (vector,) = emb.embed_documents([long])
     assert len(vector) == 1024
+
+
+def test_close_frees_the_model_and_the_next_call_loads_it_again(tmp_path: Path) -> None:
+    _FakeLlama.made.clear()
+    emb = _embedder(tmp_path)
+    emb.embed_query("x")
+    emb.close()
+    assert emb._llm is None
+    emb.embed_query("x")
+    assert len(_FakeLlama.made) == 2
+
+
+def test_a_process_that_loaded_the_real_model_exits_cleanly(tmp_path: Path) -> None:
+    _real()
+    script = (
+        "from anyembed import LlamaCppEmbedder\n"
+        "e = LlamaCppEmbedder(model_id='m', dim=1024, repo_id='ggml-org/bge-m3-Q8_0-GGUF', filename='bge-m3-q8_0.gguf')\n"
+        "e.embed_documents(['one', 'two'])\n"
+        "import gc; holder = [e]\n"  # alive at exit: freed by the atexit hook, not by module teardown
+    )
+    done = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=300, check=False)
+    assert done.returncode == 0, done.stderr[-2000:]
+    assert "GGML_ASSERT" not in done.stderr
+    assert "Exception ignored" not in done.stderr
