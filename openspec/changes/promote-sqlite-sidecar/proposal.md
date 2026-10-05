@@ -1,13 +1,14 @@
 ## Why
 
 a2kay moved its last DuckDB stores (graph, audit log, run history) to SQLite, after its search
-index. Four SQLite sidecar files now open the same way and meet the same failures, and the
+index; its audit log then became a JSON-lines file (a2kay lean-logs). Three SQLite sidecar
+files — graph, search, run history — now open the same way and meet the same failures, and the
 code that does it is generic: the WAL/autocommit/extension open, an immediate transaction that
 nests as a savepoint, a fixed-width timestamp codec, and the tests that tell a damaged file from
 a busy one. Each piece was learned from a failure, not from the docs (an FTS5 integrity check
 that lied on a long-lived connection, a busy error caught as corruption, a time column that
-stopped sorting). Shape-proven by four consumers with two lifecycles — derived indexes that set
-aside and rebuild, logs that never do — so it promotes now, beside `duckdb-sidecar`.
+stopped sorting). Shape-proven by three consumers with two lifecycles — derived indexes that set
+aside and rebuild, a log that never does — so it promotes now, beside `duckdb-sidecar`.
 
 ## What Changes
 
@@ -26,5 +27,5 @@ aside and rebuild, logs that never do — so it promotes now, beside `duckdb-sid
 
 ## Impact
 
-`packages/sqlite-sidecar` (`sqlite-sidecar-v0.1.0`). a2kay repoints its four stores from its
+`packages/sqlite-sidecar` (`sqlite-sidecar-v0.1.0`). a2kay repoints its three stores from its
 local module to the tag and deletes the local copy.

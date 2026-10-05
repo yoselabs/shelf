@@ -1,8 +1,9 @@
 ## Context
 
-a2kay's `services/sqlite_sidecar.py` (sqlite-graph-and-logs D1) serves four stores: search
+a2kay's `services/sqlite_sidecar.py` (sqlite-graph-and-logs D1) serves three stores: search
 (two connections, `sqlite-vec` loaded), graph (one connection, read-only opens from a second
-process), audit and run history (append-only, UTC times). `duckdb-sidecar` is the precedent
+process) and run history (append-only, UTC times). The audit log it also served became a
+JSON-lines file in a2kay lean-logs. `duckdb-sidecar` is the precedent
 for shape and boundary.
 
 ## Goals / Non-Goals
