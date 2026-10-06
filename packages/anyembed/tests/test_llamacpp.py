@@ -220,3 +220,24 @@ def test_count_tokens_uses_the_loaded_model_when_there_is_one(tmp_path: Path) ->
     emb.embed_documents(["a"])
     assert emb.count_tokens(["a b c"]) == [5]
     assert len(_FakeLlama.made) == 1
+
+
+def test_a_process_that_only_counted_tokens_exits_cleanly(tmp_path: Path) -> None:
+    _real()
+    script = (
+        "from anyembed import LlamaCppEmbedder\n"
+        "e = LlamaCppEmbedder(model_id='m', dim=1024, repo_id='ggml-org/bge-m3-Q8_0-GGUF', filename='bge-m3-q8_0.gguf')\n"
+        "assert e.count_tokens(['one two'])[0] > 2\n"
+        "holder = [e]\n"  # alive at exit: the vocabulary is freed by the atexit hook too
+    )
+    done = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=300, check=False)
+    assert done.returncode == 0, done.stderr[-2000:]
+    assert "Exception ignored" not in done.stderr
+
+
+def test_a_vocabulary_load_is_closed_at_exit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    registered: list[Any] = []
+    monkeypatch.setattr("anyembed.llamacpp.atexit.register", lambda fn, ref: registered.append(ref))
+    emb = _embedder(tmp_path)
+    emb.count_tokens(["a"])
+    assert [r() for r in registered] == [emb]

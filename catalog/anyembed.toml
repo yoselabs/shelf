@@ -2,7 +2,7 @@
 name = "anyembed"
 kind = "any-lib"
 tier = "T1"
-release = "anyembed-v0.3.0"
+release = "anyembed-v0.3.1"
 capability = "Stop caring which embedding backend is underneath."
 implementation = "hybrid-adapter"
 status = "active"

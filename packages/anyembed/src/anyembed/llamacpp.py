@@ -16,7 +16,7 @@ added back around them.
 One ``Llama`` context is not safe to share between threads; calls are serialized by a
 lock, so one instance may serve an indexer thread and a query thread at once.
 
-A loaded model is closed at interpreter exit (``atexit``), while ``llama_cpp`` is still
+A loaded model (or vocabulary) is closed at interpreter exit (``atexit``), while ``llama_cpp`` is still
 importable. Left to the garbage collector it is freed during module teardown, after the
 bindings are gone: ``Llama.__del__`` raises, and on Metal ``ggml_metal_device_free`` then
 finds live resource sets and aborts the process (SIGABRT, a non-zero exit after a run that
@@ -155,6 +155,8 @@ class LlamaCppEmbedder:
             except Exception as exc:
                 msg = f"GGUF model {self.model_id!r} vocabulary could not be loaded from {path}: {exc}"
                 raise AnyEmbedError(msg) from exc
+            # Freed at exit like the model: left to module teardown, `Llama.__del__` raises.
+            atexit.register(_close_at_exit, weakref.ref(self))
         return self._vocab
 
     def count_tokens(self, texts: list[str]) -> list[int]:
