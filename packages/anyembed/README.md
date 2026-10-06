@@ -49,6 +49,9 @@ emb = LlamaCppEmbedder(
 - Documents and queries go through one encoding (same pooling, L2-normalized); only the
   optional `query_prefix` / `document_prefix` differ.
 - Truncates by tokens at `max_tokens` (512), keeping the model's special tokens.
+  `count_tokens(texts)` says how many tokens each document takes (prefix and special tokens
+  included) from a vocabulary-only load, no weights and no GPU; a host that must not lose
+  text routes the ones over `max_tokens` to an embedder with a longer limit.
 - One sequence per decode (`n_ctx = n_batch = max_tokens`): on Metal, packing several
   sequences into one batch measured slower, not faster.
 - Thread-safe: calls are serialized on one `llama.cpp` context.

@@ -1,6 +1,6 @@
 [project]
 name = "anyembed"
-version = "0.2.0"
+version = "0.3.0"
 description = "Stop caring which embedding backend is underneath — a neutral Embedder interface with a local transformers (BGE) backend."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]

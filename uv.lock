@@ -184,7 +184,7 @@ requires-dist = [{ name = "markdown-it-py", specifier = ">=3,<5" }]
 
 [[package]]
 name = "anyembed"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/anyembed" }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },

@@ -203,3 +203,20 @@ def test_a_process_that_loaded_the_real_model_exits_cleanly(tmp_path: Path) -> N
     assert done.returncode == 0, done.stderr[-2000:]
     assert "GGML_ASSERT" not in done.stderr
     assert "Exception ignored" not in done.stderr
+
+
+def test_count_tokens_counts_what_a_document_embeds_and_loads_only_the_vocabulary(tmp_path: Path) -> None:
+    _FakeLlama.made.clear()
+    emb = _embedder(tmp_path, document_prefix="d: ", max_tokens=4)
+    assert emb.max_tokens == 4
+    # "d: one two" is three words plus the two special tokens.
+    assert emb.count_tokens(["one two", ""]) == [5, 3]
+    assert [m.get("vocab_only") for m in _FakeLlama.made] == [True]
+
+
+def test_count_tokens_uses_the_loaded_model_when_there_is_one(tmp_path: Path) -> None:
+    _FakeLlama.made.clear()
+    emb = _embedder(tmp_path)
+    emb.embed_documents(["a"])
+    assert emb.count_tokens(["a b c"]) == [5]
+    assert len(_FakeLlama.made) == 1

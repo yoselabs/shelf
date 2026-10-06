@@ -86,6 +86,12 @@ class LlamaCppEmbedder:
         self._loader = loader
         self._lock = threading.Lock()
         self._llm: Any = None
+        self._vocab: Any = None
+
+    @property
+    def max_tokens(self) -> int:
+        """The longest input, special tokens included, embedded without truncation."""
+        return self._max_tokens
 
     def resolve(self) -> Path:
         """The GGUF file: ``path``, or the cached ``repo_id``/``filename`` (never a download offline)."""
@@ -132,12 +138,43 @@ class LlamaCppEmbedder:
         atexit.register(_close_at_exit, weakref.ref(self))
         return self._llm
 
+    def _tokenizer(self) -> Any:
+        """The loaded model, or else a vocabulary-only load of the same file: counting
+        tokens needs no weights and no GPU. Call with the lock held."""
+        if self._llm is not None:
+            return self._llm
+        if self._vocab is None:
+            path = self.resolve()
+            try:
+                loader = self._loader
+                if loader is None:
+                    from llama_cpp import Llama  # noqa: PLC0415 — heavy, lazy
+
+                    loader = Llama
+                self._vocab = loader(model_path=str(path), vocab_only=True, verbose=False)
+            except Exception as exc:
+                msg = f"GGUF model {self.model_id!r} vocabulary could not be loaded from {path}: {exc}"
+                raise AnyEmbedError(msg) from exc
+        return self._vocab
+
+    def count_tokens(self, texts: list[str]) -> list[int]:
+        """How many tokens each text takes as a document, prefix and special tokens included.
+
+        A count above :attr:`max_tokens` is a text :meth:`embed_documents` would truncate;
+        a host that must not lose that text routes it to an embedder with a longer limit.
+        """
+        with self._lock:
+            tok = self._tokenizer()
+            return [len(tok.tokenize((self._document_prefix + t).encode("utf-8"), add_bos=True)) for t in texts]
+
     def close(self) -> None:
         """Free the model (the next call loads it again)."""
         with self._lock:
             llm, self._llm = self._llm, None
-        if llm is not None and hasattr(llm, "close"):
-            llm.close()
+            vocab, self._vocab = self._vocab, None
+        for handle in (llm, vocab):
+            if handle is not None and hasattr(handle, "close"):
+                handle.close()
 
     def _truncate(self, llm: Any, text: str) -> str:
         tokens: list[int] = llm.tokenize(text.encode("utf-8"), add_bos=True)
