@@ -1,0 +1,20 @@
+[project]
+name = "mcp-arg-errors"
+version = "0.1.0"
+description = "FastMCP middleware: a tool call whose arguments do not fit the tool's schema becomes a fault naming the argument; one the tool does not have says the client's tool list is stale."
+readme = "README.md"
+authors = [{ name = "Denis Tomilin" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+    # >=3.4: `ToolResult(is_error=True)` raises TypeError on 3.3.x (see mcp-result-wire).
+    "fastmcp>=3.4,<4",
+    "pydantic>=2,<3",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_arg_errors"]

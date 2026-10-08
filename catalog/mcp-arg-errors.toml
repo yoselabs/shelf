@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "mcp-arg-errors"
+kind = "any-*"
+tier = "T2"
+release = "mcp-arg-errors-v0.1.0"
+capability = "Stop caring how a FastMCP tool call with arguments that do not fit the schema reaches an agent — one middleware hands the consumer a typed ArgumentFault naming the argument, and an argument the tool does not have is reported as a stale client tool list with a hint to reconnect, never accepted."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay's ArgumentErrorMiddleware (mcp/server.py) when removing update.unset froze every running agent session: the client kept sending the removed argument from its cached schema and got pydantic's 'Unexpected keyword argument' with no next step (intro.max_entities_per_section did the same earlier). The owner ruled out accepting dead arguments, so the fix is the error, generic for any FastMCP server. Born candidate."

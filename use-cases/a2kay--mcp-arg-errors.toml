@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "mcp-arg-errors"
+why = "a2kay removes tool parameters without backward compatibility; agents whose client cached the old schema must be told to reconnect instead of failing every call with pydantic's text."
+needs = "ArgumentErrorMiddleware(render) turning an argument-schema failure into a2kay's error envelope: invalid_argument naming the argument, and unknown_argument with the reconnect hint for an argument the tool does not have."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

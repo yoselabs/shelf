@@ -1,0 +1,10 @@
+seq = 111
+date = "2026-10-08"
+event = "delivery"
+software = "mcp-arg-errors"
+release = "mcp-arg-errors-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's ArgumentErrorMiddleware. Removing update.unset broke every already-connected agent: its client sent the removed argument from the cached schema and every update failed with pydantic's 'Unexpected keyword argument'. The owner ruled out accepting removed arguments; the fix is the error. ArgumentFault names the tool and argument; an argument the tool lacks is `unknown` with a reconnect hint, and wins over the call's other faults. The consumer renders the fault in its own envelope."""
