@@ -409,6 +409,14 @@ def test_escaped_quotes_count_too() -> None:
     assert is_double_escaped('He said \\"yes\\" and left.') is True
 
 
+def test_plain_double_quotes_are_not_an_escape() -> None:
+    """A quoted phrase on one line is prose: only a backslash before the quote is the encode.
+
+    A bare `"` was counted as an escape, so any one-line edit quoting two words was refused.
+    """
+    assert is_double_escaped('A vendor blog is "asserted", never "measured".') is False
+
+
 def test_prose_about_escape_sequences_is_not_caught() -> None:
     """Documentation of `\\n` is written across real lines, so it fails the first half.
 

@@ -124,7 +124,7 @@ def _strip_fences(text: str) -> str:
 
 
 # Escape sequences a JSON round-trip leaves behind as two literal characters.
-_ESCAPE_SEQUENCES = ("\\n", "\\t", "\\r", '"')
+_ESCAPE_SEQUENCES = ("\\n", "\\t", "\\r", '\\"')
 # One mention of an escape can be prose ("use \n to break a line"); several in a
 # body that never breaks a line is the json.dumps-twice shape.
 _MIN_ESCAPES = 2
