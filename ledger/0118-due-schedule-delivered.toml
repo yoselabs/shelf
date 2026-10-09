@@ -1,0 +1,10 @@
+seq = 118
+date = "2026-10-09"
+event = "delivery"
+software = "due-schedule"
+release = "due-schedule-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `services/jobs/schedule.py` (shelf scan, usecase-test-prep §12) unchanged in behaviour: `schedule_is_due`, `parse_interval`, `is_cron_like`, `is_valid_cron`, `is_due`, `cron_is_due`. The never-run rules travel with it: an interval fires at once, a cron waits for its next fire rather than backfiring every past occurrence; an empty or invalid spec is never due and is logged, not raised, so a scheduler loop survives one bad job file. a2kay keeps its scheduler and drops its direct croniter dependency. The 27 unit tests moved; added whitespace around a cron, `None` specs, and the never-run interval through the router."""

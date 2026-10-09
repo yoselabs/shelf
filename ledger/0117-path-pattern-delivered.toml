@@ -1,0 +1,10 @@
+seq = 117
+date = "2026-10-09"
+event = "delivery"
+software = "path-pattern"
+release = "path-pattern-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `core/file_pattern.py` (shelf scan, usecase-test-prep §12) unchanged in behaviour: `resolve`, `reverse_match`, `placeholders`, `parse`, `pattern_specificity`, `PatternError`. The rules a2kay paid for travel with it: a width is a minimum both ways (id 1000 under `{id:03}`), lazy single-segment captures (`{id}-{slug}` with a hyphenated slug), case-insensitive literals on the way back, and a compiled-pattern cache (a2kay-z4c). a2kay keeps `core/file_pattern.py` as a re-export because three import-linter contracts name it, and its placement translates `PatternError` into `invalid_argument`. The 22 unit tests moved; added `parse` widths and `pattern_specificity`."""

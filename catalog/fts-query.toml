@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "fts-query"
+kind = "primitive"
+tier = "T0"
+release = "fts-query-v0.1.0"
+capability = "Stop caring how a search box's text becomes an FTS5 query — stemmed words versus grep -w exact terms (identifiers, quoted phrases) in any script, identifier-only routing, the query's terms cut by the index's own FTS5 tokenizer, and one injected letter fold that holds on the index side and the query side alike."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (services/search/match.py) in the usecase-test-prep shelf scan. a2kay keeps its fold table (ё to е), the index's built marker and its stopword list; the fold became a parameter (Fold) so it drives fold_sql, fts_terms and the exact-term regex from one table. Stdlib only. Born candidate."

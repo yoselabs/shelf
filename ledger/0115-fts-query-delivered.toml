@@ -1,0 +1,10 @@
+seq = 115
+date = "2026-10-09"
+event = "delivery"
+software = "fts-query"
+release = "fts-query-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `services/search/match.py` (shelf scan, usecase-test-prep §12). `parse` splits a query into words and exact terms; `boundary_pattern`/`word_start` are any-script `grep -w -i` regexes; `Tokens` runs FTS5's own tokenizer in a private in-memory database; `fts_terms` cuts a query into the index's terms. The ё-to-е fold was a module constant; it became `Fold(table)`, one value driving `Fold.sql` (index side), `fts_terms` and the exact-term regex, so the sides cannot drift. a2kay keeps the table and the index's built marker (`fold-yo …`) in a thin `match.py`, and its stopword list in `index.py`. The 50 unit tests moved with the code, the fold tests passing the table explicitly; added: no-fold behaviour, `word_start` folding, `Fold.sql` output, and a refused fold table (`FtsQueryError`)."""

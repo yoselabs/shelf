@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "launchd-agent"
+kind = "primitive"
+tier = "T0"
+release = "launchd-agent-v0.1.0"
+capability = "Stop caring how a program starts at login on macOS — render a per-user LaunchAgent plist (RunAtLoad + KeepAlive), load and unload it through an injectable launchctl runner, report installed versus loaded, treat a refused bootstrap as a failure that leaves no plist behind, and give it a PATH that finds Homebrew and ~/.local/bin tools."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (owner/login_item.py), the layer that keeps its menu-bar supervisor alive across login and reboot. Carries a2kay-2bf: install discarded launchctl's exit code and reported success when launchd had refused. a2kay keeps its label scheme, program arguments, tool list and A2KAY_* environment. Stdlib only. Born candidate."

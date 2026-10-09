@@ -44,6 +44,7 @@ dev = [
     "zendriver>=0.15,<1",  # any-browser's CDP engine — installed here (NOT patchright, whose vendored Chromium is heavy) so its fake-fidelity contract (`test_fake_config_matches_real_add_argument`) checks the fake against the REAL Config every commit instead of importorskip-ing away. patchright + the browser binaries are installed only in the `make test-browser` lane.
     "pyrefly>=1.3,<2",
     "types-openpyxl>=3.1.5.20260827",
+    "types-croniter>=6.2.4.20260711",  # due-schedule imports croniter, which ships no types; pyrefly's untyped-import is an error
     "async-scope[asgi]",  # async-scope's uvicorn extra — installed here so the asgi lane serves a REAL server; base async-scope stays dependency-free and imports uvicorn lazily
     "httpx>=0.27,<1",     # the client half of that lane: a real request over the real socket
     "anyembed[llamacpp]",  # anyembed's GGUF backend extra — installed here so `llama_cpp` resolves for its tests + deptry (base anyembed stays on transformers; the GGUF backend is opt-in)
@@ -190,11 +191,14 @@ testpaths = [
     "packages/convert-md/tests",
     "packages/dom-schema/tests",
     "packages/duckdb-sidecar/tests",
+    "packages/due-schedule/tests",
+    "packages/fts-query/tests",
     "packages/git-porcelain/tests",
     "packages/html-fragment/tests",
     "packages/http-cache/tests",
     "packages/http-fetch/tests",
     "packages/json-in-html/tests",
+    "packages/launchd-agent/tests",
     "packages/lean-wire/tests",
     "packages/llm-cache/tests",
     "packages/llm-wobble/tests",
@@ -204,6 +208,7 @@ testpaths = [
     "packages/mcp-feedback/tests",
     "packages/mcp-result-wire/tests",
     "packages/page-tsv/tests",
+    "packages/path-pattern/tests",
     "packages/plugin-surface/tests",
     "packages/record-mine/tests",
     "packages/settings-base/tests",

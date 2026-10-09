@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "due-schedule"
+kind = "primitive"
+tier = "T0"
+release = "due-schedule-v0.1.0"
+capability = "Stop caring whether a recurring job is due — one schedule_is_due(spec, last_run_at, now) over an interval (30s/15m/6h/1d) or a 5-field cron (croniter): a never-run interval fires at once, a never-run cron waits for its next fire instead of backfiring, and an empty or invalid spec is never due, never raised."
+implementation = "hybrid-adapter"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (services/jobs/schedule.py), the due check its job scheduler runs every tick. a2kay keeps the scheduler (services/jobs/scheduler.py). One dependency, croniter; the timefmt package renders durations and was not a fit to evolve (it formats, this decides). Born candidate."

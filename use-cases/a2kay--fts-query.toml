@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "fts-query"
+why = "a2kay's search tiers route a query by what it asks for: identifier-only queries get exact grep -w matching and never load the embedding model; word queries are matched stemmed against a SQLite FTS5 index whose text folds ё to е."
+needs = "parse(query) -> ParsedQuery(words, exact, is_identifier); boundary_pattern/word_start regexes and fts_terms(text, stopwords) under a2kay's Fold({ё: е, Ё: Е}); Fold.sql for the index's content view and triggers; Tokens for the porter-stemmed query side."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

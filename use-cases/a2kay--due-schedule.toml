@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "due-schedule"
+why = "a2kay's job scheduler decides each tick which vault jobs to start from each job file's schedule and its run history; a typo in one job file must not stop the others."
+needs = "schedule_is_due(spec, last_run_at, now) with intervals and cron, never-run rules (interval at once, cron at the next fire), and invalid-is-never-due without raising."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

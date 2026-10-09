@@ -1,0 +1,10 @@
+seq = 116
+date = "2026-10-09"
+event = "delivery"
+software = "launchd-agent"
+release = "launchd-agent-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `owner/login_item.py` (shelf scan, usecase-test-prep §12). `render_plist` (RunAtLoad, KeepAlive, one log for stdout and stderr), `install`/`uninstall`/`status` keyed by label over an injectable launchctl runner, and `launch_path(tools)`, which puts the folders of the named tools ahead of launchd's four system folders. The a2kay-2bf fix travels with it: a refused `launchctl bootstrap` removes the written plist and raises `LaunchdError`. a2kay keeps its label per instance, the program arguments, its tool list (git, git-lfs, claude) and the A2KAY_* environment, and translates `LaunchdError` into its own `LoginItemError` in one place. Six of a2kay's fourteen tests were generic and moved (render, three PATH cases, the round trip, uninstall of nothing); a2kay keeps eight for its policy, among them the refused-bootstrap test, which now checks the `LoginItemError` seam while the shelf's copy checks the mechanism. Added: no working dir, tools order, the gui/<uid> domain, the real runner, `user_agents_dir`."""

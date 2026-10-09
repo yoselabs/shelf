@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "path-pattern"
+kind = "primitive"
+tier = "T0"
+release = "path-pattern-v0.1.0"
+capability = "Stop caring how a path template runs backwards — one brace pattern ({name}, zero-padded {n:04}, folder-spanning {..._path}) resolves to a path and reads a found path back into its placeholders, with width as a minimum both ways, lazy segment captures, case-insensitive literals and a specificity score for ties."
+implementation = "ours"
+status = "candidate"
+owner = "Denis Tomilin"
+notes = "Promoted from a2kay (core/file_pattern.py), the engine behind its ontology's file_pattern (ADR 0012 D8). a2kay keeps vault placement (core/vault_placement.py) and a re-export module whose name its import-linter contracts hold. Stdlib only. Born candidate."
