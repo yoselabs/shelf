@@ -1,0 +1,14 @@
+seq = 113
+date = "2026-10-09"
+event = "delivery"
+software = "git-porcelain"
+release = "git-porcelain-v0.4.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, for a server that commits on every write. `commit_paths`, `merge` and `finish_merge` take `config=` (each entry a `git -c key=value`): `--no-verify` never stopped `post-commit`, so every a2kay commit ran the git-lfs hook and spawned `git maintenance run --auto` until a2kay could pass `core.hooksPath=/dev/null` and `maintenance.auto=false`. A caller's config cannot override merge's diff3 conflict style.
+
+`commit_paths` went from seven git processes per commit to three (two when nothing changed): one `ls-files -t --cached --others --exclude-standard` replaces `ls-files` + `check-ignore`; `add` runs only when a path holds an untracked file; the change check is one `diff --quiet HEAD` on the working tree, which also covers an unborn branch; the new sha is read from the ref files (detached HEAD, linked worktree via `commondir`), falling back to `rev-parse` for packed or reftable refs. Under endpoint security each git process costs ~220 ms; a2kay's use-case suite tripled on the old count.
+
+`is_repo` is now a filesystem probe (walk up for a `.git` folder or `gitdir:` file), promoted from a2kay with its tests, plus `git_dir`; `merge_in_progress` uses it instead of forking `rev-parse --git-dir`. A repository git refuses to open (`safe.directory`) now counts as a repo, so its commands fail loud; `readiness` still reports no repo when git itself is missing."""

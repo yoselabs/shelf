@@ -7,6 +7,7 @@ no prompts, fail loud with :class:`GitError`.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -74,12 +75,64 @@ def git_returncode(vault: Path, *args: str) -> int:
     return _run(vault, args, None, None).returncode
 
 
+def _dot_git(path: Path) -> Path | None:
+    """The ``.git`` entry of the repository holding ``path``: a folder, or a file that points
+    at one (a linked worktree, a submodule). Found by walking up the folders, so a path inside
+    an ancestor's repository counts, as ``git rev-parse`` counts it."""
+    start = path.absolute()
+    for folder in (start, *start.parents):
+        dot = folder / ".git"
+        if dot.exists():
+            return dot
+    return None
+
+
 def is_repo(vault: Path) -> bool:
-    """Return True if ``vault`` is inside a git work tree (False if git is missing)."""
-    if shutil.which(_GIT) is None:
-        return False
-    out = run_git(vault, "rev-parse", "--is-inside-work-tree", check=False).strip()
-    return out == "true"
+    """True when ``vault`` is inside a git repository. A filesystem probe, not a git process:
+    a host may ask on every write, and a folder that is not a repository then costs nothing.
+    A repository git would refuse to open (``safe.directory``) still counts, so its commands
+    fail loud instead of the folder reading as untracked."""
+    return _dot_git(vault) is not None
+
+
+def git_dir(vault: Path) -> Path | None:
+    """The git directory of the repository holding ``vault``, or None outside one.
+
+    A ``.git`` file holds ``gitdir: <path>``, absolute or relative to the file's folder; it
+    resolves to the per-worktree folder, which is where ``HEAD`` and ``MERGE_HEAD`` live.
+    No git process; ``GIT_DIR`` in the environment is not consulted."""
+    dot = _dot_git(vault)
+    if dot is None or dot.is_dir():
+        return dot
+    try:
+        text = dot.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    prefix = "gitdir:"
+    if not text.startswith(prefix):
+        return None
+    target = Path(text[len(prefix) :].strip())
+    return target if target.is_absolute() else dot.parent / target
+
+
+_SHA = re.compile(r"[0-9a-f]{40}([0-9a-f]{24})?")
+
+
+def _head_from_files(vault: Path) -> str | None:
+    """The sha ``HEAD`` points at, read from the ref files; None when they cannot say
+    (packed or reftable refs, an unborn branch, ``GIT_DIR`` set) — ask git then."""
+    found = git_dir(vault)
+    if found is None or "GIT_DIR" in os.environ:
+        return None
+    try:
+        text = (found / "HEAD").read_text(encoding="utf-8").strip()
+        if text.startswith("ref: "):
+            common = found / "commondir"
+            base = found / common.read_text(encoding="utf-8").strip() if common.exists() else found
+            text = (base / text[5:].strip()).read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text if _SHA.fullmatch(text) else None
 
 
 def has_upstream(vault: Path) -> bool:
@@ -90,12 +143,8 @@ def has_upstream(vault: Path) -> bool:
 
 def merge_in_progress(vault: Path) -> bool:
     """Return True if a merge is in progress (a ``MERGE_HEAD`` exists in the git dir)."""
-    git_dir = run_git(vault, "rev-parse", "--git-dir", check=False).strip()
-    if not git_dir:
-        return False
-    base = Path(git_dir)
-    merge_head = (base if base.is_absolute() else vault / base) / "MERGE_HEAD"
-    return merge_head.exists()
+    found = git_dir(vault)
+    return found is not None and (found / "MERGE_HEAD").exists()
 
 
 def sync_status(vault: Path) -> dict[str, Any]:
@@ -124,7 +173,7 @@ def readiness(vault: Path, *, check_push: bool = True) -> dict[str, Any]:
     ``check_push=False`` skips the network ``ls-remote`` probe — used by ``intro``,
     which must stay local/fast; ``push_access`` is then reported as ``None``.
     """
-    if not is_repo(vault):
+    if shutil.which(_GIT) is None or not is_repo(vault):
         return {"is_repo": False, "identity": False, "remote": False, "push_access": False}
     email = run_git(vault, "config", "user.email", check=False).strip()
     remote = run_git(vault, "remote", check=False).strip()

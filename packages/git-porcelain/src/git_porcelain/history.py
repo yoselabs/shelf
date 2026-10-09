@@ -20,10 +20,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
 from git_porcelain.errors import GitError
-from git_porcelain.porcelain import _run, git_returncode, has_conflict_markers, merge_in_progress, run_git, unmerged_paths
+from git_porcelain.porcelain import _head_from_files, _run, git_returncode, has_conflict_markers, merge_in_progress, run_git, unmerged_paths
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
     from pathlib import Path
 
 RemoteFailure = Literal["offline", "auth", "rejected", "other"]
@@ -72,20 +72,29 @@ def _message(subject: str, trailers: Iterable[tuple[str, str]]) -> str:
     return subject if not lines else subject + "\n\n" + "\n".join(lines) + "\n"
 
 
-def _known(repo: Path, paths: Sequence[str]) -> list[str]:
-    """The subset of ``paths`` git can stage: each exists on disk or is (or holds something)
-    tracked, and is not ignored unless already tracked. A directory counts by its contents,
-    so a moved folder stages from its old path too."""
-    specs = [f":(literal){p}" for p in paths]
-    tracked = [t for t in run_git(repo, "ls-files", "-z", "--", *specs, check=False).split("\0") if t]
-    # check-ignore takes -z only with --stdin; quotePath=false keeps non-ASCII names as written.
-    ignored = set(run_git(repo, "-c", "core.quotePath=false", "check-ignore", "--", *paths, check=False).splitlines())
+def _config_args(config: Mapping[str, str] | None) -> list[str]:
+    """``-c key=value`` for each override, placed before the subcommand."""
+    return [arg for key, value in (config or {}).items() for arg in ("-c", f"{key}={value}")]
 
-    def holds_tracked(path: str) -> bool:
+
+def _known(repo: Path, specs: Sequence[str], config: list[str]) -> tuple[list[str], bool]:
+    """Which of ``specs`` git can stage, and whether any of them holds an untracked file.
+
+    One ``ls-files`` lists the tracked files under each path (deleted ones included) and the
+    untracked ones that are not ignored; a path counts when it is, or holds, one of them. So
+    a moved folder stages from its old path too, and an ignored, untracked path is skipped."""
+    out = run_git(repo, *config, "ls-files", "-z", "-t", "--cached", "--others", "--exclude-standard", "--", *specs)
+    listed = [(item[0], item[2:]) for item in out.split("\0") if len(item) > 2]
+    known: list[str] = []
+    untracked = False
+    for spec in specs:
+        path = spec.removeprefix(":(literal)")
         prefix = path.rstrip("/") + "/"
-        return any(t == path or t.startswith(prefix) for t in tracked)
-
-    return [p for p in paths if holds_tracked(p) or ((repo / p).exists() and p not in ignored)]
+        under = [tag for tag, p in listed if p == path or p.startswith(prefix)]
+        if under:
+            known.append(spec)
+            untracked = untracked or "?" in under
+    return known, untracked
 
 
 def commit_paths(
@@ -96,27 +105,35 @@ def commit_paths(
     author: Identity,
     committer: Identity,
     trailers: Iterable[tuple[str, str]] = (),
+    config: Mapping[str, str] | None = None,
 ) -> str | None:
     """Commit the current content of exactly ``paths`` (additions, edits, deletions).
 
     Paths staged by anyone else stay staged and out of this commit. A path that neither
     exists nor is tracked is ignored. Returns the new commit's sha, or None when none of
-    ``paths`` differs from ``HEAD``. Hooks are skipped (``--no-verify``). Raises
+    ``paths`` differs from ``HEAD``. Hooks that can refuse the commit are skipped
+    (``--no-verify``); ``post-commit`` and auto-maintenance still run unless ``config``
+    turns them off (``{"core.hooksPath": "/dev/null", "maintenance.auto": "false"}``) —
+    each entry is a ``git -c key=value`` for every git call made here. Raises
     :class:`GitError` when git refuses — a held ``index.lock`` included, which is never
     removed here.
+
+    Two git processes when nothing changed, three for a commit.
     """
-    known = _known(repo, list(dict.fromkeys(paths))) if paths else []
-    if not known:
+    if not paths:
         return None
-    specs = [f":(literal){p}" for p in known]
-    run_git(repo, "add", "-A", "--", *specs)
-    has_head = bool(run_git(repo, "rev-parse", "--verify", "-q", "HEAD", check=False).strip())
-    if has_head:
-        changed = run_git(repo, "diff", "--cached", "--name-only", "-z", "HEAD", "--", *specs, check=False)
-        if not changed.strip("\0"):
-            return None
+    cfg = _config_args(config)
+    specs, untracked = _known(repo, [f":(literal){p}" for p in dict.fromkeys(paths)], cfg)
+    if not specs:
+        return None
+    if untracked:
+        # Only a new file needs staging first; `commit --only` takes tracked paths as they are.
+        run_git(repo, *cfg, "add", "-A", "--", *specs)
+    elif git_returncode(repo, *cfg, "diff", "--quiet", "HEAD", "--", *specs) == 0:
+        return None  # the working tree matches HEAD; with no HEAD the commit below decides
     run_git(
         repo,
+        *cfg,
         "commit",
         "--no-verify",
         "--only",
@@ -131,8 +148,8 @@ def commit_paths(
 
 
 def head(repo: Path) -> str:
-    """The sha ``HEAD`` points at."""
-    return run_git(repo, "rev-parse", "HEAD").strip()
+    """The sha ``HEAD`` points at (read from the ref files when they can say, else from git)."""
+    return _head_from_files(repo) or run_git(repo, "rev-parse", "HEAD").strip()
 
 
 _FIELD = "\x1f"
@@ -260,19 +277,22 @@ def merge(
     committer: Identity,
     message: str | None = None,
     trailers: Iterable[tuple[str, str]] = (),
+    config: Mapping[str, str] | None = None,
 ) -> MergeResult:
     """Merge ``ref`` into the current branch: fast-forward when it can, a merge commit
     (by ``author``/``committer``, hooks skipped) when both sides moved.
 
     A conflict leaves the merge in progress with markers in the files — the common base
     included (``diff3``), so a resolver sees what each side changed. A local edit that the
-    merge would overwrite blocks it before anything changes (``blocked``).
+    merge would overwrite blocks it before anything changes (``blocked``). ``config`` is as
+    for :func:`commit_paths`; it cannot change the conflict style.
     """
     if is_ancestor(repo, ref, "HEAD"):
         return MergeResult("up_to_date")
     before = head(repo)
     fast_forward = is_ancestor(repo, "HEAD", ref)
-    args = ["-c", "merge.conflictStyle=diff3", "merge", "--no-verify", "--no-edit"]
+    # The caller's config comes first, so it cannot take the base section (diff3) away.
+    args = [*_config_args(config), "-c", "merge.conflictStyle=diff3", "merge", "--no-verify", "--no-edit"]
     if message is not None:
         args += ["-m", _message(message, trailers)]
     proc = _run(repo, (*args, ref), _identity_env(author, committer), None)
@@ -291,13 +311,15 @@ def finish_merge(
     committer: Identity,
     message: str | None = None,
     trailers: Iterable[tuple[str, str]] = (),
+    config: Mapping[str, str] | None = None,
 ) -> MergeResult:
     """Complete a conflicted merge once every conflicted file is free of markers.
 
     ``paths`` are the files the merge conflicted on (a host remembers them: a person who
     ran ``git add`` has cleared git's own list). Each is staged as it now stands — edited,
     or deleted to resolve it — so nobody needs to run git by hand. While any still holds
-    markers, nothing is staged and the result is ``conflict``.
+    markers, nothing is staged and the result is ``conflict``. ``config`` is as for
+    :func:`commit_paths`.
     """
     if not merge_in_progress(repo):
         return MergeResult("up_to_date")
@@ -307,7 +329,7 @@ def finish_merge(
         return MergeResult("conflict", conflicted=left)
     if wanted:
         run_git(repo, "add", "-A", "--", *[f":(literal){p}" for p in wanted])
-    args = ["commit", "--no-verify", "-q"]
+    args = [*_config_args(config), "commit", "--no-verify", "-q"]
     args += ["--no-edit"] if message is None else ["-m", _message(message, trailers)]
     run_git(repo, *args, env=_identity_env(author, committer))
     return MergeResult("merged", changed=_changed_since(repo, "HEAD^1"))

@@ -2,7 +2,7 @@
 name = "git-porcelain"
 kind = "any-lib"
 tier = "T1"
-release = "git-porcelain-v0.3.0"
+release = "git-porcelain-v0.4.0"
 capability = "Stop caring about git subprocess plumbing and credential fidelity."
 implementation = "ours"          # pure surface over the git binary; no third-party lib to swap
 status = "active"

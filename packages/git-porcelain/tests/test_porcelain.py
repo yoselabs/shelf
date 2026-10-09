@@ -35,6 +35,39 @@ def test_is_repo_true_inside_repo_false_outside(tmp_path: Path) -> None:
     assert git.is_repo(plain) is False
 
 
+def test_a_folder_inside_an_ancestor_repository_is_in_a_repo(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    nested = repo / "Notes" / "deep"
+    nested.mkdir(parents=True)
+    assert git.is_repo(nested)
+    assert git.git_dir(nested) == repo / ".git"
+    assert git.git_dir(tmp_path) is None
+
+
+def test_a_git_file_points_at_the_git_dir(tmp_path: Path) -> None:
+    """A linked worktree or a submodule has a `.git` file; both spellings of its target count."""
+    real = tmp_path / "elsewhere" / "worktrees" / "vault"
+    real.mkdir(parents=True)
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / ".git").write_text(f"gitdir: {real}\n", encoding="utf-8")
+    assert git.git_dir(vault) == real
+    (vault / ".git").write_text("gitdir: ../elsewhere/worktrees/vault\n", encoding="utf-8")
+    assert git.git_dir(vault) == vault / "../elsewhere/worktrees/vault"
+    assert git.is_repo(vault)
+    (vault / ".git").write_text("not a pointer\n", encoding="utf-8")
+    assert git.git_dir(vault) is None
+
+
+def test_is_repo_is_a_filesystem_probe_not_a_git_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    monkeypatch.setenv("PATH", "")
+    assert git.is_repo(repo) is True
+    assert git.readiness(repo)["is_repo"] is False  # no git binary: nothing is usable, and it never raises
+
+
 def test_run_git_returns_stdout_and_fails_loud(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)

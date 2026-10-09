@@ -46,8 +46,15 @@ if r.state == "conflict":                                        # markers left,
 
 - `commit_paths` commits exactly the paths given — additions, edits, deletions, renames —
   and leaves anything else the user staged alone. Identity is per call (a box with no
-  `user.name` still commits); hooks are skipped; a held `index.lock` raises and is never
-  removed.
+  `user.name` still commits); a held `index.lock` raises and is never removed. It costs
+  three git processes per commit, two when nothing changed.
+- `--no-verify` skips only the hooks that can refuse a commit; `post-commit` and
+  `git maintenance run --auto` still run. A program committing on every write passes
+  `config={"core.hooksPath": "/dev/null", "maintenance.auto": "false"}` (each entry a
+  `git -c key=value`) to `commit_paths`, `merge` and `finish_merge`.
+- `is_repo` and `git_dir` read the filesystem, no git process: a path inside an ancestor
+  repository counts, and a `.git` file's `gitdir:` pointer (a linked worktree, a
+  submodule) resolves to the per-worktree folder where `MERGE_HEAD` lives.
 - `status` returns one `StatusEntry` per file with `tracked` and a rename's `orig_path`;
   paths are unquoted (non-ASCII names come back as written, not as git's octal escapes).
 - `fetch` + `is_ancestor(repo, "origin/main", "HEAD")` tells whether a push would
@@ -79,7 +86,7 @@ git.merge(repo, "origin/main", author=me, committer=me); git.lfs_checkout(repo)
 
 ## Surface
 
-`run_git`, `git_returncode`, `is_repo`, `has_upstream`, `upstream`, `head`,
+`run_git`, `git_returncode`, `is_repo`, `git_dir`, `has_upstream`, `upstream`, `head`,
 `merge_in_progress`, `sync_status`, `readiness`, `status`, `dirty_rels`, `unmerged_paths`,
 `has_conflict_markers`, `show_stage`, `show_at`, `commit_paths`, `log_grep`, `push`,
 `fetch`, `merge`, `finish_merge`, `is_ancestor`, `classify_remote_failure`, `lfs_available`,

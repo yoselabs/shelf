@@ -1,6 +1,6 @@
 [project]
 name = "git-porcelain"
-version = "0.3.0"
+version = "0.4.0"
 description = "A pure, fail-loud git surface over the git binary — preserving the user's credential/config fidelity."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
