@@ -16,6 +16,12 @@ are found by scanning the regions the parser left as prose.
     for link in doc.wikilinks:          # code-span examples never appear here
         resolve(link.anchor)
     doc.replace_wikilinks(retitle).text  # same exclusion on the way out
+
+It also cuts itself into addressable sections — a heading's subtree by its GitHub-style
+slug, or a ``lines:A-B`` range — see :mod:`any_markdown.sections`:
+
+    doc.sections                         # every heading section, ids deduped
+    doc.section("scope--goals")          # a Section; its text is doc.text[s.start:s.end]
 """
 
 from __future__ import annotations
@@ -27,6 +33,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from markdown_it import MarkdownIt
+
+from any_markdown._lines import line_starts
+from any_markdown.chunks import Chunk, chunk
+from any_markdown.sections import ATX_HEADING_RE, Section, clip, find, line_parts, outline, slug
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -146,7 +156,7 @@ class Markdown:
         for backticks.
         """
         text = self.text
-        starts = _line_starts(text)
+        starts = line_starts(text)
         ranges: list[tuple[int, int]] = []
         for token in _walk(self.tokens):
             if token.type in _BLOCK_CODE_TOKENS and token.map:
@@ -189,6 +199,29 @@ class Markdown:
         out.append(self.text[last:])
         return Markdown("".join(out))
 
+    @cached_property
+    def sections(self) -> Sequence[Section]:
+        """Every ATX heading section, in document order: a heading plus its subtree, up to
+        the next heading of the same or a higher level, id'd by its deduped GitHub slug.
+
+        Lines inside a ```` ``` ```` / ``~~~`` fence are not headings. The scan is the line
+        rule in :mod:`any_markdown.sections`, kept stable so ids handed out stay valid.
+        """
+        return tuple(outline(self.text))
+
+    def section(self, id_: str) -> Section | None:
+        """Section ``id_`` — a heading slug from :attr:`sections`, or ``lines:A-B`` (1-based,
+        inclusive) or ``lines:N:A-B`` (characters ``A`` to ``B`` of line ``N``) — or ``None``
+        when the document has no such section. Its text is ``text[start:end]``."""
+        return find(self.text, id_, rows=self.sections)
+
+    def chunks(self, *, size: int = 1100, overlap: int = 150, part: int | None = None, measure: Callable[[str], int] = len) -> list[Chunk]:
+        """Heading-aware retrieval windows of ``size`` characters, ``overlap`` shared, each
+        carrying its start line, the headings above it and the :meth:`section` id it sits in.
+        A line over ``part`` (by ``measure``) gives its chunks character ids — see
+        :mod:`any_markdown.chunks`."""
+        return chunk(self.text, self.sections, size=size, overlap=overlap, part=part, measure=measure)
+
     def __repr__(self) -> str:
         where = f" path={self._path}" if self._path is not None else ""
         return f"<Markdown{where} chars={len(self.text)}>"
@@ -203,12 +236,16 @@ def _walk(tokens: list[Any]) -> list[Any]:
     return out
 
 
-def _line_starts(text: str) -> list[int]:
-    starts = [0]
-    for index, char in enumerate(text):
-        if char == "\n":
-            starts.append(index + 1)
-    return starts
-
-
-__all__ = ["WIKILINK_RE", "Markdown", "WikiLink", "anchor_of", "parse_one"]
+__all__ = [
+    "ATX_HEADING_RE",
+    "WIKILINK_RE",
+    "Chunk",
+    "Markdown",
+    "Section",
+    "WikiLink",
+    "anchor_of",
+    "clip",
+    "line_parts",
+    "parse_one",
+    "slug",
+]

@@ -5,7 +5,7 @@
 consumer = "a2kay"
 software = "any-markdown"
 why = "a2kay's vault is markdown, and its graph is built from the [[wikilinks]] in those bodies — while the same vault holds research and decisions ABOUT wikilink conventions, whose code spans are full of literal [[me]] and [[wikilinks]]. Reading one as a link mints a phantom edge; rewriting one edits the user's file."
-needs = "A document type that reports the links actually made — position and display name included — and rewrites them under the same exclusion, so the read path (graph indexing, ref validation) and the write path (display-name resync) can never disagree about what a link is."
+needs = "A document type that reports the links actually made — position and display name included — and rewrites them under the same exclusion, so the read path (graph indexing, ref validation) and the write path (display-name resync) can never disagree about what a link is. And the same document addressable in parts — a heading subtree by its GitHub slug, text with no heading by line range — with ids stable across releases, because a read hands them to an agent that asks for one back."
 sponsor = "Denis Tomilin"
 requester = "a2kay"
 status = "active"          # active | retired

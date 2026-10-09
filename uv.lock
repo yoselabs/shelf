@@ -175,7 +175,7 @@ provides-extras = ["patchright", "zendriver"]
 
 [[package]]
 name = "any-markdown"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-markdown" }
 dependencies = [
     { name = "markdown-it-py" },

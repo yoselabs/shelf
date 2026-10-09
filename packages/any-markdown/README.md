@@ -12,6 +12,12 @@ for link in doc.wikilinks:              # code-span examples are not here
     resolve(link.anchor, link.name, link.span)
 
 doc.replace_wikilinks(retitle).text     # same exclusion on the way out
+
+doc.sections                            # every heading's subtree, GitHub-slug ids
+s = doc.section("scope--goals")         # or "lines:40-80", "lines:3:0-9000"
+doc.text[s.start:s.end]
+line_parts(transcript, 11_000, measure=wire_bytes)  # no headings: cut at blank lines
+doc.chunks(size=1100, overlap=150)      # search windows: line, headings, section id
 ```
 
 ## What this package knows
@@ -38,6 +44,20 @@ spurious warning; *rewriting* one edits the user's document — a note demonstra
 `[[136|Old Title]]` silently rewritten when node 136 is retitled. `replace_wikilinks` shares
 `wikilinks`' exclusion for exactly this reason: one scan, one answer, reader and writer alike.
 
+**5. A section id is a promise to a client, so the heading scan is a line rule, not the
+grammar.** A section is an ATX heading plus its subtree, id'd by GitHub's slug, deduped
+`-2`, `-3` in document order. Ids are handed out and come back later, so they must not move
+when a parser's reading of an edge case does; the scan is `ATX_HEADING_RE` outside a
+` ``` ` / `~~~` fence. Text with no heading to cut at (a transcript, a dump, one table) is
+addressed by `lines:A-B`, and a line too long for one part by `lines:N:A-B` (characters of
+line N), cut at word breaks. How big a part may be is the caller's `measure` — characters
+by default, wire bytes when that is what it pays for.
+
+**6. A search hit is only useful if it opens where it was found.** `.chunks()` packs each
+heading span into overlapping windows and tags every window with its start line, the
+headings above it and the section id that `.section()` takes back — inside a line longer
+than `part`, the characters it holds, so a hit deep in a one-line transcript opens there.
+
 ## The surface
 
 | | |
@@ -48,6 +68,11 @@ spurious warning; *rewriting* one edits the user's document — a note demonstra
 | `.replace_wikilinks(fn)` | a new `Markdown`; returning `link.text` is the no-op |
 | `.code_spans` · `.is_code(pos)` | the code regions themselves |
 | `.tokens` | the markdown-it token stream — the escape hatch |
+| `.sections` · `.section(id)` | heading subtrees in order; one by slug or `lines:` id, else `None` |
+| `Section` | `.id` `.heading` `.level` (0 = line part) `.chars` `.start` `.end` |
+| `.chunks(size, overlap, part=None, measure=len)` | `Chunk` `.line` `.text` `.section` `.headings` |
+| `line_parts(text, budget, measure=len, base_line=1)` | `text` cut into `lines:` parts that cover it |
+| `slug(heading)` · `clip(text, budget, measure=len)` · `ATX_HEADING_RE` | the pieces, for a caller with its own policy |
 | `WikiLink` | `.anchor` `.name` `.span` `.text` `.display` |
 | `parse_one(v)` · `anchor_of(v)` | for one authored value, not a document |
 
@@ -58,4 +83,6 @@ spurious warning; *rewriting* one edits the user's document — a note demonstra
 
 Resolution — turning an anchor into whatever the app calls a target — is the app's business, and
 so is any identity rule underneath it (id padding, slug rules, ambiguity policy). This package
-tells you what was written and where; it has never heard of your URI scheme.
+tells you what was written and where; it has never heard of your URI scheme. Likewise for
+sections: how much of a document one response may carry, what a cut view shows first, and
+which ids a client is offered are the app's read policy — this package cuts and finds.

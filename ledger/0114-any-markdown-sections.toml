@@ -1,0 +1,14 @@
+seq = 114
+date = "2026-10-09"
+event = "delivery"
+software = "any-markdown"
+release = "any-markdown-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, promoted from a2kay's `core/sections.py`. A `Markdown` now cuts itself into addressable sections: `.sections` is every ATX heading's subtree in document order, id'd by its GitHub slug deduped `-2`, `-3`; `.section(id)` finds one by slug or by `lines:A-B` / `lines:N:A-B` (characters of one long line). `line_parts(text, budget, measure=, base_line=)` cuts heading-less text into parts that cover it, at blank lines where it can and at word breaks inside a line longer than a part; `clip` is the opening-within-a-budget cut both use. `.chunks()` is a2kay's search chunker (ADR 0023) over the same sections: overlapping windows, each with its start line, the headings above it and the section id `.section()` takes back; a2kay passes its window size, overlap and part budget.
+
+The budget is a `measure` parameter, characters by default. a2kay passes its JSON wire-byte length; its read policy — the 12,000-byte response budget, the lead, the cut view that fills its room, the outline-row cost — stayed in a2kay, which now holds only that policy over this package.
+
+The heading scan stayed a line rule (ATX regex outside a backtick/tilde fence), not the markdown-it grammar the wikilink side uses: ids are handed to agents and come back, so they must not move. Proved before the repoint: old and new `outline`, `line_parts` at two budgets and every id's lookup compared over a2kay's real vault, 7391 files, 7391 identical; the chunker likewise, 7391 files, 7391 identical. The unit tests moved with the code (a2kay's splitter tests to `tests/test_sections.py`, its chunker tests to `tests/test_chunks.py`), plus tests for what was documented but untested: a fenced `#` line, a closing `#` run, a word longer than a part, `lines:N:A-B` bounds."""
