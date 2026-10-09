@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "dir-trust"
+kind = "primitive"
+tier = "T0"
+release = "dir-trust-v0.1.0"
+capability = "Stop caring how a folder earns trust on this machine — a SHA-256 over its matching files in name order, a grant store kept outside the folder and written atomically, keys resolved so two spellings share a grant, and any edit, new file or removed file revoking the grant with no one revoking it."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (services/jobs/trust.py, ADR 0018 job trust). The digest and the YAML layout are unchanged, so grants already on disk stay valid; a test pins the digest. a2kay keeps services/jobs/trust.py as the seam that fixes the pattern to *.py and turns TrustStoreError into trust_required. Depends on ruamel.yaml only: the atomic write is inline, because a sibling dependency on atomic-io needs a workspace source, and that source leaks to git consumers and collides with their own atomic-io pin (the anyllm trap a2web documents). Born candidate."

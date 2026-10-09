@@ -5,7 +5,7 @@
 consumer = "a2kay"
 software = "any-file"
 why = "Every attachment a2kay stores passes its checks: the name is a bare basename, the stored path stays inside the entity's folder, text-extension names must not hold binary bytes, case twins are refused, and the media type it records decides the allowlist."
-needs = "safe_name / resolve_within raising UnsafeNameError / PathEscapeError (a2kay turns both into invalid_argument in core/attachments.py), looks_binary, name_collision, media_type(name, declared) independent of the host, is_text_media."
+needs = "safe_name / resolve_within raising UnsafeNameError / PathEscapeError (a2kay turns both into invalid_argument in core/attachments.py), looks_binary, name_collision, media_type(name, declared) independent of the host, is_text_media. Since v0.2.0: slugify for every filename a2kay mints, and secret_pattern (a2kay raises secret_file_name in core/secret_names.py)."
 sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

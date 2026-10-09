@@ -21,6 +21,7 @@ members = [
     "a2effect",
     "any-browser",
     "any-file",
+    "any-frontmatter",
     "any-markdown",
     "anyembed",
     "anyllm",
@@ -30,9 +31,11 @@ members = [
     "browser-cookies",
     "content-extract",
     "convert-md",
+    "dir-trust",
     "dom-schema",
     "duckdb-sidecar",
     "due-schedule",
+    "event-bus",
     "fts-query",
     "git-porcelain",
     "html-fragment",
@@ -47,6 +50,7 @@ members = [
     "managed-region",
     "mcp-arg-errors",
     "mcp-bridge",
+    "mcp-clients",
     "mcp-feedback",
     "mcp-result-wire",
     "page-tsv",
@@ -65,6 +69,7 @@ members = [
 
 [manifest.dependency-groups]
 dev = [
+    { name = "any-frontmatter", extras = ["merge"], editable = "packages/any-frontmatter" },
     { name = "anyembed", extras = ["llamacpp"], editable = "packages/anyembed" },
     { name = "anyllm", extras = ["anthropic", "openai", "claude-code-sdk"], editable = "packages/anyllm" },
     { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
@@ -186,12 +191,38 @@ provides-extras = ["patchright", "zendriver"]
 
 [[package]]
 name = "any-file"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-file" }
+dependencies = [
+    { name = "anyascii" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "anyascii", specifier = ">=0.3.2,<1" }]
+
+[[package]]
+name = "any-frontmatter"
+version = "0.1.0"
+source = { editable = "packages/any-frontmatter" }
+dependencies = [
+    { name = "ruamel-yaml" },
+]
+
+[package.optional-dependencies]
+merge = [
+    { name = "yaml-merge" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "ruamel-yaml", specifier = ">=0.18,<1" },
+    { name = "yaml-merge", marker = "extra == 'merge'", editable = "packages/yaml-merge" },
+]
+provides-extras = ["merge"]
 
 [[package]]
 name = "any-markdown"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/any-markdown" }
 dependencies = [
     { name = "markdown-it-py" },
@@ -199,6 +230,15 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "markdown-it-py", specifier = ">=3,<5" }]
+
+[[package]]
+name = "anyascii"
+version = "0.3.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/ba/edebda727008390936da4a9bf677c19cd63b32d51e864656d2cbd1028e25/anyascii-0.3.3.tar.gz", hash = "sha256:c94e9dd9d47b3d9494eca305fef9447d00b4bf1a32aff85aa746fa3ec7fb95c3", size = 264680, upload-time = "2025-06-29T03:33:30.427Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c2/76/783b75a21ce3563b8709050de030ae253853b147bd52e141edc1025aa268/anyascii-0.3.3-py3-none-any.whl", hash = "sha256:f5ab5e53c8781a36b5a40e1296a0eeda2f48c649ef10c3921c1381b1d00dee7a", size = 345090, upload-time = "2025-06-29T03:33:28.356Z" },
+]
 
 [[package]]
 name = "anyembed"
@@ -271,7 +311,7 @@ source = { editable = "packages/asgi-token-gate" }
 
 [[package]]
 name = "async-scope"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/async-scope" }
 
 [package.optional-dependencies]
@@ -1077,6 +1117,17 @@ wheels = [
 ]
 
 [[package]]
+name = "dir-trust"
+version = "0.1.0"
+source = { editable = "packages/dir-trust" }
+dependencies = [
+    { name = "ruamel-yaml" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "ruamel-yaml", specifier = ">=0.18,<1" }]
+
+[[package]]
 name = "diskcache"
 version = "5.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1211,6 +1262,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/d3/38/af70d7ab1ae9d4da4
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/8b/5fe2cc11fee489817272089c4203e679c63b570a5aaeb18d852ae3cbba6a/et_xmlfile-2.0.0-py3-none-any.whl", hash = "sha256:7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa", size = 18059, upload-time = "2024-10-25T17:25:39.051Z" },
 ]
+
+[[package]]
+name = "event-bus"
+version = "0.1.0"
+source = { editable = "packages/event-bus" }
 
 [[package]]
 name = "exceptiongroup"
@@ -2359,6 +2415,11 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "httpx", specifier = ">=0.28,<1" },
 ]
+
+[[package]]
+name = "mcp-clients"
+version = "0.1.0"
+source = { editable = "packages/mcp-clients" }
 
 [[package]]
 name = "mcp-feedback"
@@ -4067,7 +4128,7 @@ requires-dist = [{ name = "aiosqlite", specifier = ">=0.20,<1" }]
 
 [[package]]
 name = "sqlite-sidecar"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/sqlite-sidecar" }
 
 [[package]]

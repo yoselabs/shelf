@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "dir-trust"
+why = "A cloned vault may carry hostile jobs, so a2kay runs none until the operator trusts the vault on this machine, and any edit to a job must revoke that trust by itself."
+needs = "TrustStore(path).grant/revoke/is_trusted(key, folder, pattern='*.py') with the digest and store layout fixed, raising TrustStoreError (a2kay turns it into trust_required in services/jobs/trust.py); folder_hash."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

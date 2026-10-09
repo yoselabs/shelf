@@ -1,0 +1,10 @@
+seq = 130
+date = "2026-10-09"
+event = "delivery"
+software = "any-markdown"
+release = "any-markdown-v0.3.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE. `Budget(lead, measure=, row_cost=)` from a2kay's `core/sections.py` (usecase-test-prep §12b row 1): `.view` returns a body whole within its budget, else the lead, grown by whole sections or lines and into the first section's own lines while it and the outline of the rest fit, with an outline that folds its deepest level and then falls back to line parts; `.section_view` keeps body-wide ids; `.lead_of`, `.hint`, `.line_parts`, `.row`. a2kay's wire byte count is now the `measure` argument and its JSON outline row the `row_cost` argument; READ_BYTES, LEAD_BYTES, PART_BYTES, ALL and `wire_len` stay in a2kay. Behaviour unchanged: a2kay's 26 section tests passed against the package before they were moved. 25 ported with a JSON-wire measure defined in the test; a2kay keeps 5 that pin its measure and constants; default-measure, hint, unknown-section and fits-whole tests added. Author metadata changed to yoselabs."""

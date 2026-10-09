@@ -20,6 +20,9 @@ anyllm = { workspace = true }
 # page-tsv composes lean-wire; mcp-result-wire composes page-tsv. Resolve the
 # siblings from the workspace, not PyPI.
 lean-wire = { workspace = true }
+# any-frontmatter's `merge` extra is yaml-merge; the dev group installs it.
+yaml-merge = { workspace = true }
+any-frontmatter = { workspace = true }
 page-tsv = { workspace = true }
 # The dev group installs `anyembed[llamacpp]` so the GGUF backend's import resolves.
 anyembed = { workspace = true }
@@ -48,6 +51,7 @@ dev = [
     "async-scope[asgi]",  # async-scope's uvicorn extra — installed here so the asgi lane serves a REAL server; base async-scope stays dependency-free and imports uvicorn lazily
     "httpx>=0.27,<1",     # the client half of that lane: a real request over the real socket
     "anyembed[llamacpp]",  # anyembed's GGUF backend extra — installed here so `llama_cpp` resolves for its tests + deptry (base anyembed stays on transformers; the GGUF backend is opt-in)
+    "any-frontmatter[merge]",  # with_frontmatter's comment-keeping merge (yaml-merge) — an extra so a consumer that pins yaml-merge itself is not handed a second source for it
     "sse-starlette>=2,<4",  # NOT an async-scope dependency — the library whose unreset module-global the asgi lane exists to defend against, installed so that defence is actually exercised rather than suppressed away
 ]
 
@@ -184,15 +188,18 @@ testpaths = [
     "packages/any-file/tests",
     "packages/any-markdown/tests",
     "packages/anyembed/tests",
+    "packages/any-frontmatter/tests",
     "packages/anyllm/tests",
     "packages/asgi-token-gate/tests",
     "packages/async-scope/tests",
     "packages/atomic-io/tests",
     "packages/browser-cookies/tests",
     "packages/content-extract/tests",
+    "packages/dir-trust/tests",
     "packages/convert-md/tests",
     "packages/dom-schema/tests",
     "packages/duckdb-sidecar/tests",
+    "packages/event-bus/tests",
     "packages/due-schedule/tests",
     "packages/fts-query/tests",
     "packages/git-porcelain/tests",
@@ -208,6 +215,7 @@ testpaths = [
     "packages/managed-region/tests",
     "packages/mcp-arg-errors/tests",
     "packages/mcp-bridge/tests",
+    "packages/mcp-clients/tests",
     "packages/mcp-feedback/tests",
     "packages/mcp-result-wire/tests",
     "packages/page-tsv/tests",

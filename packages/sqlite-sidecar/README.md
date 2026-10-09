@@ -26,6 +26,19 @@ except sqlite3.DatabaseError as exc:
         set_aside(path)            # file, -wal and -shm → *.corrupt-<UTC stamp>
 ```
 
+A **derived store** — one rebuilt from a source of truth — is never repaired in place:
+
+```python
+mark_for_rebuild(path, reason="index drift")  # found damaged while serving: tell the next start
+prepare(path)                                 # at start: set aside if marked or unreadable
+ensure_schema(conn, version=21, script=DDL)   # another schema version: drop every table, recreate
+```
+
+Damage met while serving is not fixed in that process — every handle and reader holds the
+file — so it is marked, and `prepare` sets it aside before the next open. `set_aside` clears
+the mark. `ensure_schema` keeps the version in `schema_meta(schema_version)` and runs in one
+transaction; a script may declare `schema_meta` itself.
+
 Schema and queries stay with each store. Deliberately not a lifecycle base class.
 Stdlib only.
 

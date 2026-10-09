@@ -15,6 +15,9 @@ What is here because it was learned, not read:
   writer both called ``ok`` (10 of 40 cycles, while its ``MATCH`` results were right).
 * :func:`set_aside` moves ``-wal`` and ``-shm`` with the file: a fresh file opened beside
   an old WAL would replay someone else's pages.
+* A derived store is set aside and rebuilt, never repaired: :func:`mark_for_rebuild` while
+  serving, :func:`prepare` at the next start, :func:`ensure_schema` to empty a file written
+  under another schema version.
 * :func:`to_text` / :func:`from_text`: ``sqlite3``'s default datetime adapter is
   deprecated (3.12) and a value comes back as the text it went in as, so a time column
   is fixed-width ISO text — text order is then time order — coded in one place.
@@ -214,15 +217,96 @@ def set_aside(path: Path, *, at: datetime | None = None) -> list[Path]:
             dst = src.with_name(f"{src.name}.corrupt-{stamp}")
             src.rename(dst)
             moved.append(dst)
+    _mark(path).unlink(missing_ok=True)
     return moved
 
 
+# --- a derived store: damage is set aside and rebuilt, never repaired -------------------
+#
+# A store derived from a source of truth (an index of a folder, a cache) is never repaired
+# in place: the truth rebuilds it. Damage found while serving is not fixed in that process
+# either — open handles, prepared statements and readers all hold the file — so the store is
+# marked, and the next start sets it aside before opening it.
+
+#: Beside the store file: "set this aside before opening it".
+MARK_SUFFIX = ".rebuild"
+
+
+def _mark(path: Path) -> Path:
+    return path.with_name(path.name + MARK_SUFFIX)
+
+
+def mark_for_rebuild(path: Path | None, *, reason: str = "damaged") -> None:
+    """Ask the next :func:`prepare` to set the store at ``path`` aside. ``None`` (an in-memory
+    store) is a no-op. ``reason`` is written into the mark for whoever finds it."""
+    if path is not None:
+        _mark(path).write_text(f"{reason}: rebuild before opening\n", encoding="utf-8")
+
+
+def needs_rebuild(path: Path) -> bool:
+    """Whether the store at ``path`` is marked for rebuild."""
+    return _mark(path).exists()
+
+
+def prepare(path: Path) -> list[Path]:
+    """Before opening a derived store: set it aside when it is marked or SQLite cannot read it.
+
+    Returns where the files went (empty when nothing was wrong); the open that follows
+    starts an empty file. Only the process that owns the store may call this.
+    """
+    if needs_rebuild(path) or unreadable(path):
+        return set_aside(path)
+    return []
+
+
+def _statements(script: str) -> list[str]:
+    """``script`` cut into whole statements (``executescript`` would COMMIT first)."""
+    out: list[str] = []
+    pending = ""
+    for line in script.splitlines(keepends=True):
+        pending += line
+        if sqlite3.complete_statement(pending):
+            out.append(pending.strip())
+            pending = ""
+    return out
+
+
+def ensure_schema(conn: sqlite3.Connection, *, version: int, script: str) -> bool:
+    """Create ``script``'s schema at ``version``; on any other version, drop every table first.
+
+    For a derived store only: nothing in it is canonical, so a file written under another
+    schema is emptied rather than migrated, and the caller rebuilds it from the source.
+    The version lives in ``schema_meta(schema_version)``. One transaction. Returns whether
+    the schema was (re)created — ``False`` when the file was already at ``version``.
+    """
+    tables = sorted(
+        cast("str", name) for (name,) in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+    )
+    if "schema_meta" in tables:
+        row = cast("tuple[int] | None", conn.execute("SELECT schema_version FROM schema_meta").fetchone())
+        if row is not None and row[0] == version:
+            return False
+    with transaction(conn):
+        for table in tables:
+            conn.execute(f'DROP TABLE "{table}"')
+        conn.execute("CREATE TABLE IF NOT EXISTS schema_meta (schema_version INTEGER PRIMARY KEY)")
+        for statement in _statements(script):
+            conn.execute(statement)
+        conn.execute("INSERT INTO schema_meta (schema_version) VALUES (?)", [version])
+    return True
+
+
 __all__ = [
+    "MARK_SUFFIX",
     "ExtensionUnavailableError",
     "connect",
+    "ensure_schema",
     "from_text",
     "integrity_ok",
     "is_corruption",
+    "mark_for_rebuild",
+    "needs_rebuild",
+    "prepare",
     "set_aside",
     "to_text",
     "transaction",

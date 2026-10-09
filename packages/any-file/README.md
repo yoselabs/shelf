@@ -17,6 +17,8 @@ af.media_type("budget.xlsx")           # 'application/vnd.openxmlformats-officed
 af.media_type("x.bin", declared="image/png")     # the caller's word wins
 af.media_type("noext")                 # 'application/octet-stream'
 af.is_text_media("application/json")   # True: text/*, JSON, NDJSON
+af.slugify("Проект: план v1.2")         # 'proekt-plan-v1-2'
+af.secret_pattern("deploy/.env.prod")   # '.env.*' — None for 'token.png'
 ```
 
 ## Rules
@@ -34,6 +36,15 @@ af.is_text_media("application/json")   # True: text/*, JSON, NDJSON
   back unknown there. The table is Python's built-in one plus the office (OOXML, ODF),
   JSON-lines, YAML, TOML and common audio, image and video types, and every allow-worthy extension a common `mime.types` names (`.mpga`, `.wmv`, `.psd`, …) plus `.amr`. A compression suffix is
   an encoding: `genome.vcf.gz` is `text/x-vcard`.
+- `slugify(text, max_length=48, fallback="untitled")` transliterates first (anyascii, ISC;
+  `python-slugify`'s transliterator is Artistic/GPL-dual), then keeps `[a-z0-9]` runs joined
+  by `-`. Without transliteration a Cyrillic or CJK title collapses to nothing, and every
+  such name shares the fallback. anyascii is the identity on ASCII, so ASCII slugs are what
+  the regex alone gives. The cap bounds the result, and a cut leaves no trailing hyphen.
+- `secret_pattern(path)` matches the basename, case-insensitively, against
+  `SECRET_NAME_PATTERNS`: files that hold a credential because of what they are (`.env*`,
+  `*.pem`, `*.key`, `credentials.json`, `.netrc`, SSH private keys, …), never a name that
+  merely mentions a secret (`token.png`). What to do about a match is the caller's policy.
 - Errors: `UnsafeNameError` and `PathEscapeError`, both `AnyFileError`, carrying `value`.
 
-Stdlib only.
+Stdlib, plus anyascii for `slugify`.

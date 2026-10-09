@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "mcp-clients"
+kind = "primitive"
+tier = "T0"
+release = "mcp-clients-v0.1.0"
+capability = "Stop caring where each MCP client keeps its server list — Claude Code, Claude Desktop and OpenCode found by program, installer folder or app bundle, and each one's own config read for whether it names your server; a bad config reads as not connected, never as an error."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (owner/clients.py, the menu bar's client lines). Read-only: the shelf scan described it as writing client configs, but a2kay writes none — attach_recipe.py only prints a snippet — so no writer was invented. The server name is a parameter and ClientState values are plain words; a2kay keeps its check-mark display text in owner/clients.py. Stdlib only. Born candidate."

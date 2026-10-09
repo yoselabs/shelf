@@ -1,0 +1,10 @@
+seq = 126
+date = "2026-10-09"
+event = "delivery"
+software = "dir-trust"
+release = "dir-trust-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `services/jobs/trust.py` (ADR 0018 job trust; shelf scan, usecase-test-prep §12). `folder_hash(folder, pattern)` and `TrustStore(path).grant/revoke/is_trusted(key, folder, pattern=)`. The digest and the YAML layout are byte-for-byte what a2kay wrote, so every grant already on disk stays valid; a test pins the digest and another reads a store in the old layout. Two changes: a folder matching the pattern is skipped instead of crashing the hash, and a store that will not parse or write raises `TrustStoreError(path)` instead of a ruamel or OS error. The atomic write is inline rather than through atomic-io, whose workspace source would leak to git consumers and collide with their own atomic-io pin. a2kay keeps `services/jobs/trust.py` as the seam that fixes the pattern to `*.py` and turns `TrustStoreError` into `trust_required` with a hint naming the file. The six a2kay tests moved; removal, outside-the-pattern, resolved-key, other-keys-survive, fixed-digest, boundary, empty-folder, old-layout and error tests added. Sightings: none in a2web or a2kit."""

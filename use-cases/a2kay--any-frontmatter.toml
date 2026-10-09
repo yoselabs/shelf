@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "any-frontmatter"
+why = "Every a2kay entity is a markdown file with YAML frontmatter a human also edits: a write must keep their comments, a malformed file must not take down a whole-vault walk, and two agents editing one entity must not overwrite each other (ADR 0020)."
+needs = "Document, parse/read/dump/write raising FrontmatterError, Document.with_frontmatter (a2kay installs yaml-merge itself), compute_version/version_of/version_of_file, write_checked/check_version raising StaleVersionError (a2kay turns it into version_conflict in core/version.py), opt_str/str_seq."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

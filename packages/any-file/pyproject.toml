@@ -1,11 +1,13 @@
 [project]
 name = "any-file"
-version = "0.1.0"
-description = "Stop caring what a file name or its bytes say: a safe bare basename, a path held inside its root, a binary sniff, case and normalization twins, and a media type from a table that does not depend on the host's mime.types."
+version = "0.2.0"
+description = "Stop caring what a file name or its bytes say: a safe bare basename, a path held inside its root, a binary sniff, case and normalization twins, and a media type from a table that does not depend on the host's mime.types; a transliterated slug; secret-file name patterns."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.11"
 license = "Apache-2.0"
+# Transliteration for slugify: ISC, no dependencies of its own.
+dependencies = ["anyascii>=0.3.2,<1"]
 
 [build-system]
 requires = ["hatchling"]

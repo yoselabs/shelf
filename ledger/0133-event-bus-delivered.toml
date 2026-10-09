@@ -1,0 +1,10 @@
+seq = 133
+date = "2026-10-09"
+event = "delivery"
+software = "event-bus"
+release = "event-bus-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `core/events.py` (usecase-test-prep §12b row 5) unchanged in behaviour: `EventBus[E]` with strong subscribers, `subscribe` returning an idempotent release, `subscribed()` scoping it, `publish` over a snapshot, a raising subscriber reaching the publisher. blinker considered and not adopted: weak receivers by default (the silent-miss failure this bus exists to prevent), signals keyed by name and sender, an untyped kwargs payload. a2kay keeps `ChangeEvent`, `ChangeOp` and `publish_change`; `ChangeEventBus` is `EventBus[ChangeEvent]`. Nothing raises, so there is nothing to translate. Six bus tests moved; lambda-not-collected, self-release during delivery, raising-subscriber and `len` tests added."""

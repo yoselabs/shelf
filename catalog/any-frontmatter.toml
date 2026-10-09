@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "any-frontmatter"
+kind = "primitive"
+tier = "T0"
+release = "any-frontmatter-v0.1.0"
+capability = "Stop caring how a markdown file's YAML frontmatter is read, written and versioned — the author's comments and key order kept through a write, every malformation one FrontmatterError, an atomic write, a content-hash version that ignores layout, a write that refuses a stale version and re-checks after the rename, and reads of untyped values that never raise."
+implementation = "hybrid-adapter"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (core/frontmatter_io.py, core/document.py, core/version.py's hash and checked write, core/coerce.py; the local ledger's frontmatter-coerce row was past its promote count). Wraps ruamel.yaml's round-trip mode, held not subclassed. Sibling dependencies avoided: the atomic write is inline (the second inline copy, after dir-trust), the absence rule is written out to match lean-wire's is_empty, and yaml-merge is the `merge` extra behind Document.with_frontmatter — a consumer that pins yaml-merge itself gets no second source for it. a2kay keeps the partial-read token and turns StaleVersionError into version_conflict in core/version.py. Born candidate."

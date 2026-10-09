@@ -18,6 +18,9 @@ s = doc.section("scope--goals")         # or "lines:40-80", "lines:3:0-9000"
 doc.text[s.start:s.end]
 line_parts(transcript, 11_000, measure=wire_bytes)  # no headings: cut at blank lines
 doc.chunks(size=1100, overlap=150)      # search windows: line, headings, section id
+
+fit = Budget(lead=1500, measure=wire_bytes, row_cost=row_bytes)
+fit.view(doc.text, 12_000, part=11_000)  # whole, or its opening + an outline of the rest
 ```
 
 ## What this package knows
@@ -58,6 +61,15 @@ heading span into overlapping windows and tags every window with its start line,
 headings above it and the section id that `.section()` takes back — inside a line longer
 than `part`, the characters it holds, so a hit deep in a one-line transcript opens there.
 
+**7. A cut read must use its budget and lose nothing.** A view that stopped at its lead
+showed a median 508 bytes of a 12,000-byte budget, and the reader paid a second call for what
+the first had room for. `Budget.view` returns the body whole when it fits; otherwise the lead
+(never a separator, a comment, a stray YAML block or a bare title), grown by whole sections or
+whole lines — and into the first section's own lines — while it and the outline of the rest
+fit. The outline folds its deepest level to fit, then falls back to line parts; text the lead
+skipped stays listed. Every outline id goes back to `.section()`, so nothing is unreachable.
+The sizes are the caller's: `measure` for text, `row_cost` for one outline row as it renders.
+
 ## The surface
 
 | | |
@@ -72,6 +84,7 @@ than `part`, the characters it holds, so a hit deep in a one-line transcript ope
 | `Section` | `.id` `.heading` `.level` (0 = line part) `.chars` `.start` `.end` |
 | `.chunks(size, overlap, part=None, measure=len)` | `Chunk` `.line` `.text` `.section` `.headings` |
 | `line_parts(text, budget, measure=len, base_line=1)` | `text` cut into `lines:` parts that cover it |
+| `Budget(lead, measure=len, row_cost=None)` | `.view(body, budget, part=, room=None, base_line=1)` → `View(body, outline, truncated)` · `.section_view(body, id, budget, part=)` · `.lead_of(body)` · `.hint(body, part=)` · `.line_parts(text, part)` · `.row(section)` |
 | `slug(heading)` · `clip(text, budget, measure=len)` · `ATX_HEADING_RE` | the pieces, for a caller with its own policy |
 | `WikiLink` | `.anchor` `.name` `.span` `.text` `.display` |
 | `parse_one(v)` · `anchor_of(v)` | for one authored value, not a document |

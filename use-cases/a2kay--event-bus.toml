@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "event-bus"
+why = "The entity write path announces every committed change in process, and the serve-lifetime job trigger reacts to it; a subscription that silently stops, or one left behind by a restarted service, misses or doubles job runs."
+needs = "EventBus[ChangeEvent] with strong subscribers, subscribe returning an idempotent release, subscribed() as a context manager, publish over a snapshot."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

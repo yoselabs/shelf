@@ -1,0 +1,10 @@
+seq = 129
+date = "2026-10-09"
+event = "delivery"
+software = "any-frontmatter"
+release = "any-frontmatter-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `core/frontmatter_io.py`, `core/document.py`, `core/version.py` (hash, canonical form, checked write) and `core/coerce.py` (usecase-test-prep §12b row 2; a2kay's local ledger had `frontmatter-coerce` past its promote count). Behaviour kept, with two fixes found while moving it: a dump that raised (a value ruamel cannot represent) left the module's shared ruamel instance mid-document, and the next dump in the process wrote the frontmatter as an empty mapping — each dump now uses a fresh instance; and the double-space quoting rule was registered on ruamel's own RoundTripRepresenter class, which changed every round-trip dump in the process — it is now on a private subclass, and `round_trip_yaml()` hands a consumer the same configured instance for its other YAML files (a2kay's ontology store and validation use it, so their dumps keep the rule they had by accident). Sibling dependencies avoided because a consumer's own pin of the same package collides with a workspace source (measured: `uv lock` refuses two URLs for lean-wire): the atomic write is inline, the absence rule is written out to match lean-wire's `is_empty` (a2kay holds the two equal in a test), and yaml-merge is the `merge` extra behind `Document.with_frontmatter`. a2kay keeps its modules as re-export seams, the partial-read token, and the one translation of `StaleVersionError` into `version_conflict` in `core/version.py`. Moved: all of `test_frontmatter_io.py` (16), the hash and write cases of `test_version.py` (7), the read cases of `test_coerce.py` (4); added: with_frontmatter, failed write keeps the old file, missing file merges from empty, slipped-in writer reported, retried and bounded, check_version, the two fixes."""

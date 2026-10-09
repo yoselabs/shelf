@@ -1,9 +1,9 @@
 [project]
 name = "async-scope"
-version = "0.2.0"
-description = "Async resource lifecycle: LIFO teardown that never strands what it holds, memoized lazy thunks, and an ASGI app served on a loopback port without the two uvicorn teardown traps."
+version = "0.3.0"
+description = "Async resource lifecycle: LIFO teardown that never strands what it holds, background tasks stopped and waited for in their place, memoized lazy thunks, a thread whose cancel waits for it, and an ASGI app served on a loopback port without the two uvicorn teardown traps."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.11"
 license = "Apache-2.0"
 

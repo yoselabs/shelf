@@ -1,0 +1,10 @@
+seq = 132
+date = "2026-10-09"
+event = "delivery"
+software = "sqlite-sidecar"
+release = "sqlite-sidecar-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE. The derived-store policy from a2kay's `services/derived_store.py`, the open-time check in `app.py` and `graph_store_schema.migrate` (usecase-test-prep §12b row 7): `mark_for_rebuild(path, reason=)`, `needs_rebuild`, `prepare(path)` (set aside when marked or unreadable), and `ensure_schema(conn, version=, script=)` (drop every table and recreate on another version, in one transaction, version in `schema_meta`). `set_aside` now clears the mark. a2kay keeps the mark's reason text and the file-stamp table it creates outside the version rule. a2kay's recovery tests stay in a2kay (they drive the app); nine package tests added. Author metadata changed to yoselabs."""

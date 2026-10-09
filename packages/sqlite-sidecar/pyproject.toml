@@ -1,9 +1,9 @@
 [project]
 name = "sqlite-sidecar"
-version = "0.1.0"
-description = "SQLite sidecar plumbing — open (WAL, autocommit, extensions), transact, code a timestamp, tell corruption from busy, set a damaged file aside."
+version = "0.2.0"
+description = "SQLite sidecar plumbing — open (WAL, autocommit, extensions), transact, code a timestamp, tell corruption from busy, set a damaged file aside; a derived store marked, set aside and rebuilt, and emptied on a schema change."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = []

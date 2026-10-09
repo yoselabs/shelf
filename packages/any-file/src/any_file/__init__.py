@@ -7,6 +7,8 @@
 - :func:`media_type` — the caller's media type, else one read off the name from a table
   this module owns. Never the host's ``/etc/mime.types``: a slim container has none, so
   ``.xlsx`` and ``.docx`` came back unknown there and were refused.
+- :func:`slugify` — a transliterated lowercase hyphenated slug for a name a program mints.
+- :func:`secret_pattern` — the conventional secret-file pattern a name matches, if any.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import unicodedata
 from pathlib import Path
 
 from any_file._media_types import MEDIA_TYPES as _MEDIA_TYPES
+from any_file._names import DEFAULT_SLUG_LENGTH, SECRET_NAME_PATTERNS, secret_pattern, slugify
 
 _SNIFF_BYTES = 8192
 OCTET_STREAM = "application/octet-stream"
@@ -157,8 +160,10 @@ def is_text_media(media: str | None) -> bool:
 
 
 __all__ = [
+    "DEFAULT_SLUG_LENGTH",
     "OCTET_STREAM",
     "REGISTERED_TYPES",
+    "SECRET_NAME_PATTERNS",
     "TEXT_MEDIA_TYPES",
     "AnyFileError",
     "PathEscapeError",
@@ -169,4 +174,6 @@ __all__ = [
     "name_collision",
     "resolve_within",
     "safe_name",
+    "secret_pattern",
+    "slugify",
 ]

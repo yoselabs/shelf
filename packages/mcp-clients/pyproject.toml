@@ -1,0 +1,15 @@
+[project]
+name = "mcp-clients"
+version = "0.1.0"
+description = "Which MCP clients are on this machine and which of them name your server: Claude Code, Claude Desktop and OpenCode, each found by program or app and read from its own config, never written."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_clients"]

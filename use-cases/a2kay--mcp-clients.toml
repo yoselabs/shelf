@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "mcp-clients"
+why = "a2kay's menu bar shows, under the vault line, which MCP clients are installed and which already name the a2kay server, and it runs under launchd where PATH misses the installer folders."
+needs = "client_statuses(server, home, which=, applications=) -> tuple[ClientStatus, ...] in menu order over KNOWN_CLIENTS; ClientState (a2kay maps it to its display text in owner/clients.py)."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

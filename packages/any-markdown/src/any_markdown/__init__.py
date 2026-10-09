@@ -22,6 +22,11 @@ slug, or a ``lines:A-B`` range — see :mod:`any_markdown.sections`:
 
     doc.sections                         # every heading section, ids deduped
     doc.section("scope--goals")          # a Section; its text is doc.text[s.start:s.end]
+
+And fits itself into a size budget — whole, or its opening plus an outline of the rest — see
+:mod:`any_markdown.budget`:
+
+    Budget(lead=1500, measure=wire_bytes).view(doc.text, 12_000, part=11_000)
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ from typing import TYPE_CHECKING, Any
 from markdown_it import MarkdownIt
 
 from any_markdown._lines import line_starts
+from any_markdown.budget import Budget, View
 from any_markdown.chunks import Chunk, chunk
 from any_markdown.sections import ATX_HEADING_RE, Section, clip, find, line_parts, outline, slug
 
@@ -239,9 +245,11 @@ def _walk(tokens: list[Any]) -> list[Any]:
 __all__ = [
     "ATX_HEADING_RE",
     "WIKILINK_RE",
+    "Budget",
     "Chunk",
     "Markdown",
     "Section",
+    "View",
     "WikiLink",
     "anchor_of",
     "clip",

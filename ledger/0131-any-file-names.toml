@@ -1,0 +1,10 @@
+seq = 131
+date = "2026-10-09"
+event = "delivery"
+software = "any-file"
+release = "any-file-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE. `slugify` from a2kay's `core/slug.py` and `SECRET_NAME_PATTERNS`/`secret_pattern` from `core/secret_names.py` (usecase-test-prep §12b row 6). anyascii becomes any-file's first runtime dependency (ISC, none of its own); a2kay drops its direct anyascii pin. Unchanged in behaviour: ASCII slugs render as before, and the pattern list and basename match are a2kay's verbatim. a2kay keeps `refuse_secret_name`, which raises `secret_file_name` with its hint, and history's backstop. The slug tests moved (6); secret-pattern tests added (positive, mention-only negatives, lowercase-basename invariant)."""

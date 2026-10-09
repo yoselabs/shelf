@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "event-bus"
+kind = "primitive"
+tier = "T0"
+release = "event-bus-v0.1.0"
+capability = "Stop rewriting in-process publish/subscribe — one typed event, synchronous delivery over a snapshot, subscribers held strongly so a lambda never silently stops receiving, an idempotent release handle and a scoped subscription that always releases."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (core/events.py's ChangeEventBus). Chosen over adopting blinker: blinker holds receivers weakly by default — the exact silent-miss failure a2kay's bus was written to prevent — keys signals by name and sender, and carries an untyped kwargs payload. a2kay keeps ChangeEvent, ChangeOp and publish_change (which reads its call context); ChangeEventBus is EventBus[ChangeEvent]. Stdlib only. Born candidate."

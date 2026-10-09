@@ -5,7 +5,7 @@
 consumer = "a2kay"
 software = "sqlite-sidecar"
 why = "a2kay keeps three SQLite sidecar files (graph, search, run history), each opened the same way and each needing the same failure tests; without one helper the open, the transaction and the damage-versus-busy test drift apart store by store, as the DuckDB connect dance did before duckdb-sidecar."
-needs = "connect(target, extensions=, read_only=) with WAL, autocommit and the :memory: passthrough; transaction(conn, lock=) that is BEGIN IMMEDIATE outside and a savepoint inside; to_text/from_text for fixed-width UTC times; is_corruption (never busy or locked), unreadable, integrity_ok on a fresh connection, and set_aside moving -wal/-shm."
-sponsor = "Denis Tomilin"
+needs = "connect(target, extensions=, read_only=) with WAL, autocommit and the :memory: passthrough; transaction(conn, lock=) that is BEGIN IMMEDIATE outside and a savepoint inside; to_text/from_text for fixed-width UTC times; is_corruption (never busy or locked), unreadable, integrity_ok on a fresh connection, and set_aside moving -wal/-shm. Since v0.2.0: mark_for_rebuild when damage is met while serving, prepare at start, ensure_schema emptying a graph written under another version."
+sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

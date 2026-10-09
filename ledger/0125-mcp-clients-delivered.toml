@@ -1,0 +1,10 @@
+seq = 125
+date = "2026-10-09"
+event = "delivery"
+software = "mcp-clients"
+release = "mcp-clients-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `owner/clients.py` (shelf scan, usecase-test-prep §12) unchanged in behaviour: a client is installed when its program is on PATH or in its installer folder (launchd's PATH misses `~/.local/bin` and `~/.opencode/bin`) or its app bundle is in an application folder, and connected when its config's server table names the server. The scan called this a config writer; a2kay writes no client config, so the package reads only. Generalised: the server name is a parameter, the client table is `KNOWN_CLIENTS` of `McpClient` rows a caller can extend, and `ClientState` values are plain words. a2kay keeps `owner/clients.py` as the seam that passes `"a2kay"` and keeps its check-mark display text. Nothing raises, so there is no error to translate. The five a2kay tests moved; server-name, non-object table, OpenCode's `mcp` key, order and caller-supplied-client tests added. Sightings: none in a2web or a2kit."""

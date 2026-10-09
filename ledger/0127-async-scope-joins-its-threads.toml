@@ -1,0 +1,10 @@
+seq = 127
+date = "2026-10-09"
+event = "delivery"
+software = "async-scope"
+release = "async-scope-v0.3.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, not a new package. `to_thread_joined(fn)` from a2kay's `core/off_loop.py`: `asyncio.to_thread` raises `CancelledError` the moment its task is cancelled while the thread keeps running, so the caller releases its write guard or closes the store the thread writes through under live work. The cancel now propagates only after the thread returns. It belongs here because it is one more way a scope closes under something it still holds. a2kay's five importers point at the package and the module is gone. a2kay had no unit test for it; six added, one of which shows bare `to_thread` returning early so the others are known to measure something. Considered and not taken: a2kay's `menubar/worker.py`, a synchronous drop-while-busy thread for a GUI — threads, not async, and too thin. Sighting: a2web `cookie_jar.py` awaits a bare `asyncio.to_thread` on a read-only cookie read, where a cancel races nothing; not adopted."""

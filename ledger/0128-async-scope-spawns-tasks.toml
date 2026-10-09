@@ -1,0 +1,10 @@
+seq = 128
+date = "2026-10-09"
+event = "delivery"
+software = "async-scope"
+release = "async-scope-v0.3.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, folded into the still-unreleased v0.3.0. `ResourceScope.spawn(coro)` from a2kay's `serve.py` lifespan, which ran its on-serve services as bare tasks and cancelled and gathered them by hand inside an `AsyncExitStack` (usecase-test-prep §12b row 11: listed as a missed adoption, but the package had no task primitive, so it is an evolve). A spawned task sits on the LIFO stack with the entered resources: `aclose()` cancels it and waits for it, so a task spawned after a resource is gone before that resource closes. `asyncio.wait`, not `await task`, so the task's own cancel is not mistaken for the closer's and a cancel aimed at the closer still reaches it. A task that failed is re-raised after the unwind, like a failing close. A closed scope refuses a coroutine. a2kay change in behaviour: services stop one after another in reverse start order instead of all at once, and a service that crashed now surfaces at shutdown instead of being gathered away. Sighting: a2web `llm_eval/live_sink.py` cancels and awaits its heartbeat task by hand, swallowing `CancelledError` (including one aimed at its own `__aexit__`); not adopted here. Seven tests added."""

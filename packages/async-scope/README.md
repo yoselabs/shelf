@@ -30,6 +30,22 @@ resource whose `__aenter__` raised was never entered, so it is not on the
 teardown stack. Appending before the await is how a cleanup path becomes the
 thing that crashes, by calling `__aexit__` on a half-built object.
 
+## A background task the scope stops — `spawn`
+
+```python
+async with ResourceScope() as scope:
+    store = await scope.enter(open_store())
+    scope.spawn(watch(store))                 # runs now
+    ...
+# the watcher is cancelled AND finished before the store closes
+```
+
+`task.cancel()` returns before the task has stopped: its `finally` still runs, and
+whatever the scope closes next can close under it. `spawn` puts the task on the same
+LIFO stack as the resources, so it is cancelled and waited for in its place. The wait
+does not swallow a cancel aimed at the closer, and a task that failed is raised by
+`aclose()` after everything else is unwound.
+
 ## Why `memoized` and not a bare `async def`
 
 The lock. Without it, N concurrent first-callers each run the factory — which
@@ -47,6 +63,20 @@ Not a DI container. There is no registry, no resolution order, no graph. A
 container exists to resolve an *unknown* dependency graph; if you know your
 graph where you write it — and most applications do — these two behaviours are
 what you actually needed from one.
+
+## A thread whose cancel waits for it — `to_thread_joined`
+
+```python
+from async_scope import to_thread_joined
+
+rows = await to_thread_joined(lambda: store.scan(query))
+```
+
+`asyncio.to_thread` raises `CancelledError` as soon as its task is cancelled, but the
+thread keeps running — Python cannot stop one. The caller then releases its lock or
+closes the store the thread is still writing through. `to_thread_joined` lets the
+cancel through only after the thread returns, so a scope never closes under work it
+believes is finished. The price: a cancel takes as long as the work.
 
 ## Serving an ASGI app — `async_scope.asgi`
 
@@ -96,8 +126,9 @@ at once.
 
 ## Surface
 
-- `ResourceScope` — `enter(resource)`, `aclose()`, and async-context-manager use.
+- `ResourceScope` — `enter(resource)`, `spawn(coro)`, `aclose()`, and async-context-manager use.
 - `memoized(factory) -> Lazy[T]` — build at most once, concurrency-safe.
 - `lazy(value) -> Lazy[T]` — a pre-built value as a thunk.
+- `to_thread_joined(fn)` — `asyncio.to_thread`, but a cancel waits for `fn` to return.
 - `Lazy[T]` — `Callable[[], Awaitable[T]]`.
 - `async_scope.asgi` (extra `asgi`) — `serve_asgi`, `bind_loopback`, `LOOPBACK`, `ServeError`.
