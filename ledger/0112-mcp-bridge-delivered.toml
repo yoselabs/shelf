@@ -1,0 +1,10 @@
+seq = 112
+date = "2026-10-09"
+event = "delivery"
+software = "mcp-bridge"
+release = "mcp-bridge-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's bridge. Researched first: a Claude Desktop custom connector is called from Anthropic's cloud, so it cannot reach 127.0.0.1; claude_desktop_config.json takes only a command; mcp-remote needs system Node (Desktop's built-in Node runs extensions only) and documents no reconnect. The package wraps FastMCP's proxy and adds per-request headers and a bounded wait on a refused connection, so a call during a server restart goes through. a2kay keeps its token, launchd start and session naming."""

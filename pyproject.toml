@@ -200,6 +200,7 @@ testpaths = [
     "packages/llm-wobble/tests",
     "packages/managed-region/tests",
     "packages/mcp-arg-errors/tests",
+    "packages/mcp-bridge/tests",
     "packages/mcp-feedback/tests",
     "packages/mcp-result-wire/tests",
     "packages/page-tsv/tests",

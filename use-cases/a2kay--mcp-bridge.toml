@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "mcp-bridge"
+why = "Claude Desktop's Chat tab reaches the a2kay server only through a local stdio program; `a2kay bridge` is that program."
+needs = "build_bridge(url, headers=callable) with the token, the bridge's session id and the stdio client's name per request; calls held while the server restarts."
+sponsor = "Denis Tomilin"
+requester = "a2kay"
+status = "active"          # active | retired

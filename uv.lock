@@ -40,6 +40,7 @@ members = [
     "llm-wobble",
     "managed-region",
     "mcp-arg-errors",
+    "mcp-bridge",
     "mcp-feedback",
     "mcp-result-wire",
     "page-tsv",
@@ -2283,6 +2284,21 @@ dependencies = [
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "mcp-bridge"
+version = "0.1.0"
+source = { editable = "packages/mcp-bridge" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=3.4,<4" },
+    { name = "httpx", specifier = ">=0.28,<1" },
 ]
 
 [[package]]
