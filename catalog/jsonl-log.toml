@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "jsonl-log"
+kind = "primitive"
+tier = "T0"
+release = "jsonl-log-v0.1.0"
+capability = "Stop caring how an append-only JSON-lines log rotates and reads back — one flushed line per write, size rotation that never splits a line and keeps at most N files, reads newest file first that skip a blank, torn or undecodable line, and a read-only handle that never writes."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (services/audit_store.py's file half). a2kay keeps the audit semantics: the entry model, the schema version, the query filters and the stop-at-the-first-older-file rule. Second sighting: a2kit's packages/log/call_log.py writes per-day .jsonl through a logging.Handler with body sidecars and no rotation — not adopted. Codec-agnostic, stdlib only. Born candidate."

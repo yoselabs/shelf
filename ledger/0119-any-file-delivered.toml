@@ -1,0 +1,10 @@
+seq = 119
+date = "2026-10-09"
+event = "delivery"
+software = "any-file"
+release = "any-file-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `core/attachments.py` (`safe_attachment_name`, `resolve_within`, `looks_binary`, `name_collision`) and `services/files/attachments._resolve_media_type` (usecase-test-prep §12). Fixes a2kay-6cqa at the root: the media type came from the module-level `mimetypes.guess_type`, which reads the host's `/etc/mime.types`; python:3.12-slim has none, so `.xlsx`/`.docx` became `application/octet-stream` and were refused. The package guesses from an isolated `MimeTypes` table (Python's built-in one plus office, ODF, JSON-lines, YAML, TOML and common media types); a test blinds every host path and still resolves `.xlsx`. a2kay keeps policy: the secret-file-name rule, the allowlist, the text-extension table that decides git LFS, the layout and the uri. The 11 path and name tests moved; media-type and symlink-escape tests added."""

@@ -1,0 +1,10 @@
+seq = 122
+date = "2026-10-09"
+event = "delivery"
+software = "partial-time"
+release = "partial-time-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `core/time_interval.py` unchanged in behaviour: `interval` and `format_interval`, naive-UTC bounds, `bool` refused. a2kay's importers point at the package and the module is gone. The interval tests moved; format round-trip and whitespace cases added."""

@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "jsonl-log"
+why = "a2kay's audit log is one line per verb call, appended by the owner process and read back by admin queries and a CLI reader beside the owner."
+needs = "JsonlLog.open(path, rotate_bytes=, keep=, read_only=), append(bytes) raising LogClosedError (a2kay turns it into ValueError in services/audit_store.py), files() newest first, read(path, decode) skipping undecodable lines."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

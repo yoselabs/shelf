@@ -1,0 +1,10 @@
+seq = 123
+date = "2026-10-09"
+event = "delivery"
+software = "asgi-token-gate"
+release = "asgi-token-gate-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `transport/server_token.py` (static agent token), `transport/spoke_auth.py` (lease gate) and the token mechanics of `core/leases.py`. Two middlewares that were one mechanism written twice are one `TokenGate` with `StaticTokenGate` and `LeaseTokenGate`; a header that is not UTF-8 is now refused instead of raising in the lease gate. a2kay keeps its header name, deny wording, the `Principal` a lease holds (`LeaseRegistry` wraps `LeaseSet`) and the agent-token location. The lease, spoke-gate and static-gate tests moved."""

@@ -1,0 +1,15 @@
+[project]
+name = "asgi-token-gate"
+version = "0.1.0"
+description = "One ASGI middleware that gates every HTTP request on a header token: a static secret compared in constant time, or a live set of minted leases revoked instantly; non-HTTP scopes pass through."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/asgi_token_gate"]

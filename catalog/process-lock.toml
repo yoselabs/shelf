@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "process-lock"
+kind = "primitive"
+tier = "T0"
+release = "process-lock-v0.1.0"
+capability = "Stop caring how one process claims a path — an exclusive non-blocking flock the kernel drops when its holder dies (kill -9 included), re-entrant within a process until the last release, close-on-exec so a child never keeps it, and a refusal naming the holder's pid."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (core/owner_lock.py, the one-owner rule). a2kay keeps OwnerLock as the seam that turns LockHeldError into owner_conflict with its vault wording. held() replaces a2kay's test reading the private registry. POSIX, stdlib only. Born candidate."

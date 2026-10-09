@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "verb-cli"
+kind = "primitive"
+tier = "T1"
+release = "verb-cli-v0.1.0"
+capability = "Stop hand-writing argparse for a function that already says what it takes — a pydantic-annotated signature becomes flags (Field alias names the flag, description is the help, bool a paired --flag/--no-flag, a non-scalar one JSON flag), and the parsed flags become its keyword arguments, a model validated."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (cli/verbs.py's _analyze, _add_verb_flags, _collect_kwargs). a2kay keeps verb enumeration, rendering and exit codes. a2web and a2kit carry their own copies of this derivation; adopting it there is not done yet. Duck-typed metadata, stdlib only. Born candidate."

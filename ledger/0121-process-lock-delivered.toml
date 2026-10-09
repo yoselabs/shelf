@@ -1,0 +1,10 @@
+seq = 121
+date = "2026-10-09"
+event = "delivery"
+software = "process-lock"
+release = "process-lock-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `core/owner_lock.py` unchanged in behaviour: exclusive non-blocking `flock`, released by the kernel, re-entrant within a process, close-on-exec. a2kay keeps `OwnerLock.acquire(path, vault=)` as the seam that turns `LockHeldError` into `owner_conflict` with its vault wording and hint. `held()` is public so a2kay's command-cleanup test no longer reads the private registry; its use-case step no longer imports the private `_lock`. The killed-holder, twice-then-last-release and child-does-not-inherit tests moved; the pid, unknown-holder, mode and failure-cleanup tests added."""

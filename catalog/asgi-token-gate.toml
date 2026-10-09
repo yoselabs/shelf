@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "asgi-token-gate"
+kind = "primitive"
+tier = "T1"
+release = "asgi-token-gate-v0.1.0"
+capability = "Stop hand-writing the ASGI middleware that checks a token header — one gate over a static secret (minted once to a 0600 file, compared in constant time) or a live set of minted leases (no TTL, revoke fails the next call), 401 with a JSON body, non-HTTP scopes passed through."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (transport/server_token.py, transport/spoke_auth.py and the token half of core/leases.py): two middlewares that were one mechanism written twice. a2kay keeps its header name, deny messages, the Principal a lease resolves to, and where the agent token lives. Plain ASGI, stdlib only. Born candidate."

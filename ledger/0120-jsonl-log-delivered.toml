@@ -1,0 +1,10 @@
+seq = 120
+date = "2026-10-09"
+event = "delivery"
+software = "jsonl-log"
+release = "jsonl-log-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `services/audit_store.py`, the file half: append + flush, in-process size count, rotation that never splits a line, newest-file-first reads that skip a line that does not decode, a read-only handle. a2kay keeps `AuditEntry`, the schema version, the query filters and the stop-at-the-first-older-file rule, and translates `LogClosedError` into its `ValueError`. Second sighting, not adopted: a2kit `src/a2kit/packages/log/call_log.py` (`CallLogFileHandler`) writes per-day `.jsonl` through a `logging.Handler` with content-addressed body sidecars and no size rotation. The rotation, size-count, reopen, torn-line, read-only and append-only tests moved."""

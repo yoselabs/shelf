@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "any-file"
+why = "Every attachment a2kay stores passes its checks: the name is a bare basename, the stored path stays inside the entity's folder, text-extension names must not hold binary bytes, case twins are refused, and the media type it records decides the allowlist."
+needs = "safe_name / resolve_within raising UnsafeNameError / PathEscapeError (a2kay turns both into invalid_argument in core/attachments.py), looks_binary, name_collision, media_type(name, declared) independent of the host, is_text_media."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

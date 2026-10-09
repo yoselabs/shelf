@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "process-lock"
+why = "Exactly one a2kay process owns a vault's writable state; the CLI and tests build several components over one vault in one process."
+needs = "ProcessLock.acquire(path) raising LockHeldError(path, pid) (a2kay turns it into owner_conflict in core/owner_lock.py), release() idempotent and re-entrant, held()."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

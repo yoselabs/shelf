@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "verb-cli"
+why = "a2kay's CLI derives every verb's flags from the router method's pydantic-annotated signature."
+needs = "flags_of(fn), to_argparse(parser, specs), kwargs_of(ns, specs) raising FlagJsonError (a2kay prints it and exits 2 in cli/verbs.py)."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

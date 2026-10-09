@@ -1,0 +1,15 @@
+[project]
+name = "partial-time"
+version = "0.1.0"
+description = "A time value as the half-open interval it names: 2026 is the year, 2026-07 the month, 2026-07-09 the day, an instant its one second; naive-UTC bounds, and the precision read back from the width."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/partial_time"]

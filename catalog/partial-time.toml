@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "partial-time"
+kind = "primitive"
+tier = "T0"
+release = "partial-time-v0.1.0"
+capability = "Stop caring what precision a date was written at — every time value is the half-open interval it names (a year, a month, a day, an instant's one second) in naive UTC, so one overlap comparison serves every precision, and the width writes it back at its precision."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (core/time_interval.py; 02-time-and-order §5.1), unchanged in behaviour. Stdlib only. Born candidate."

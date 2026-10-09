@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "asgi-token-gate"
+why = "a2kay gates its loopback agent server on a static per-instance token and its internal job spoke on leases minted per job."
+needs = "StaticTokenGate and LeaseTokenGate with a header and deny message, LeaseSet (a2kay's LeaseRegistry wraps it with a Principal), stable_token(path) for the 0600 agent token."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

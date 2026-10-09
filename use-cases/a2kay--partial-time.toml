@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "partial-time"
+why = "a2kay indexes and queries every time field as an interval, so a month-precision date and a day in it compare as overlapping."
+needs = "interval(value) -> (lo, hi) | None in naive UTC; format_interval(lo, hi)."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

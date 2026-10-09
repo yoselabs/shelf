@@ -1,0 +1,15 @@
+[project]
+name = "jsonl-log"
+version = "0.1.0"
+description = "An append-only JSON-lines log with size rotation: one line per write, never split across files, at most N files kept; reads newest file first and skip a line that does not decode."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jsonl_log"]

@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "any-file"
+kind = "primitive"
+tier = "T0"
+release = "any-file-v0.1.0"
+capability = "Stop caring what a file's name and bytes say — a safe bare basename in NFC, a reference held inside its root, a NUL-byte binary sniff, case and normalization twins, and a media type from a table this package owns, so .xlsx and .docx resolve the same on a laptop and in a slim container with no /etc/mime.types."
+implementation = "hybrid-adapter"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (core/attachments.py's path guard, binary sniff and twin check; services/files/attachments.py's media-type guess). Fixes a2kay-6cqa at the root: the guess read the host's mime.types, which python:3.12-slim lacks. a2kay keeps its policy — the secret-file-name rule, the media-type allowlist, the text-extension table that decides git LFS, the attachment layout and the kay:// uri. Wraps stdlib mimetypes in an isolated table. Born candidate."

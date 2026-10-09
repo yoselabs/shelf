@@ -1,0 +1,10 @@
+seq = 124
+date = "2026-10-09"
+event = "delivery"
+software = "verb-cli"
+release = "verb-cli-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `cli/verbs.py` (`_analyze`, `_add_verb_flags`, `_collect_kwargs`): `flags_of`, `to_argparse`, `kwargs_of`, `FlagSpec`, `FlagJsonError`. Invalid JSON now names the typed flag (the alias) rather than the parameter. a2kay prints the error and exits 2 at one seam. Not in this delivery: a2web and a2kit carry their own copies of this derivation and have not adopted it. The four flag-machinery tests moved; alias, model, path and usage-error tests added."""
