@@ -1,9 +1,9 @@
 [project]
 name = "mcp-arg-errors"
-version = "0.1.0"
-description = "FastMCP middleware: a tool call whose arguments do not fit the tool's schema becomes a fault naming the argument; one the tool does not have says the client's tool list is stale."
+version = "0.2.0"
+description = "Every failed FastMCP tool call as an error an agent can act on: whatever a tool body raised as an is_error result carrying the typed error's envelope (an untyped one a defect with a trace id), and arguments that do not fit the schema as a fault naming the argument, one the tool does not have saying the client's tool list is stale."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = [

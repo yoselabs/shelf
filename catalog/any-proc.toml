@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "any-proc"
+kind = "primitive"
+tier = "T0"
+release = "any-proc-v0.1.0"
+capability = "Stop caring how a child process is started, limited, read back and kept alive — run one to a single marked JSON result with its arguments as a size-capped JSON object on stdin, OS limits applied between fork and exec (the process cap as headroom over what the user already runs) and a timeout; or keep one alive with a probe, a start timeout, a graceful stop, a restart budget over a rolling window with capped backoff, consumer-named terminal verdicts that are never respawned, and a log rotated per run."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay: any_proc.run from services/jobs/runner.py and jobsdk/main.py (the job subprocess, both ends of the result marker), any_proc.supervise from owner/daemon.py (the menu bar's serve-child supervisor, with its restart loop). One package for one concept — child processes a program owns — not one per helper. a2kay keeps trust, run history, JobRecord, the job argv and its default limits; and the serve command, the version probe, the owner-conflict reading of an exit, the token, snippet, history alerts and sync request. Stdlib only, POSIX. Born candidate."

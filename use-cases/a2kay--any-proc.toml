@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "any-proc"
+why = "Vault jobs are untrusted-shape code run in a subprocess: a job must not fill the disk, fork-bomb or hang the server, and its result must come back as one parseable value. The menu bar keeps the serve process alive across crashes without storming a lock another owner holds or respawning a server others are attached to."
+needs = "any_proc.run: call(argv, args=, env=, timeout=, limits=Limits(memory_bytes, file_size_bytes, process_headroom)) -> Outcome, ArgsError before any spawn, emit/read_args in the child. any_proc.supervise: Supervisor(spawn, probe, classify_exit=...) with start/stop/restart/poll_once/supervise, terminal verdicts named by the consumer (skewed, conflict), rotate_log."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

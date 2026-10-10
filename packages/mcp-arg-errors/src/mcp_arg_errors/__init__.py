@@ -11,6 +11,11 @@ never chose, and every call fails. An argument the tool does not have is reporte
 ``unknown``, with a hint to reconnect, so the agent is told how to recover instead of
 retrying a call that cannot succeed. The server never accepts the dead argument: that would
 be the backward compatibility a schema change exists to end.
+
+:class:`~mcp_arg_errors.wire.ErrorWire` covers the other half: whatever a tool body raises,
+as an ``is_error`` result carrying the typed error's envelope (an untyped one becomes a
+defect with a trace id). Render an :class:`ArgumentFault` as a typed error and pass it to
+``ErrorWire.result`` and every failed call reads the same.
 """
 
 from __future__ import annotations
@@ -20,6 +25,8 @@ from typing import TYPE_CHECKING, override
 
 from fastmcp.server.middleware import Middleware
 from pydantic import ValidationError
+
+from mcp_arg_errors.wire import DETAILS_CHARS, ErrorWire, TypedError, envelope_text
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -103,4 +110,13 @@ class ArgumentErrorMiddleware(Middleware):
             return self._to_result(fault)
 
 
-__all__ = ["STALE_TOOL_LIST_HINT", "ArgumentErrorMiddleware", "ArgumentFault", "argument_fault"]
+__all__ = [
+    "DETAILS_CHARS",
+    "STALE_TOOL_LIST_HINT",
+    "ArgumentErrorMiddleware",
+    "ArgumentFault",
+    "ErrorWire",
+    "TypedError",
+    "argument_fault",
+    "envelope_text",
+]

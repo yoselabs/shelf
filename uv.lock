@@ -23,6 +23,7 @@ members = [
     "any-file",
     "any-frontmatter",
     "any-markdown",
+    "any-proc",
     "anyembed",
     "anyllm",
     "asgi-token-gate",
@@ -236,6 +237,11 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "markdown-it-py", specifier = ">=3,<5" }]
+
+[[package]]
+name = "any-proc"
+version = "0.1.0"
+source = { editable = "packages/any-proc" }
 
 [[package]]
 name = "anyascii"
@@ -2435,7 +2441,7 @@ wheels = [
 
 [[package]]
 name = "mcp-arg-errors"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/mcp-arg-errors" }
 dependencies = [
     { name = "fastmcp" },

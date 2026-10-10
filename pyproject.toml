@@ -187,6 +187,7 @@ testpaths = [
     "packages/a2effect/tests",
     "packages/any-browser/tests",
     "packages/any-file/tests",
+    "packages/any-proc/tests",
     "packages/any-markdown/tests",
     "packages/anyembed/tests",
     "packages/any-frontmatter/tests",

@@ -1,0 +1,16 @@
+seq = 142
+date = "2026-10-10"
+event = "delivery"
+software = "any-proc"
+release = "any-proc-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay (usecase-test-prep §12b rows 3 and 8, with row 15's restart loop). One package for one concept, child processes a program owns, with a module per use: `any_proc.run` and `any_proc.supervise`.
+
+`any_proc.run` from `services/jobs/runner.py` and `jobsdk/main.py`: `call(argv, args=, env=, cwd=, timeout=, limits=)` returns an `Outcome` (result, returncode, stderr, duration, timed_out); `encode_args` refuses a non-object, an unserializable value or a payload over the cap with `ArgsError` before anything spawns; `Limits.process_headroom` is the user's task count at spawn plus headroom (a2kay 901dfda), counted in the parent before the fork; `emit`/`read_args` are the child's end, so the package owns both ends of the marker. The marker changes from `__A2KAY_JOB_RESULT__` to `__ANY_PROC_RESULT__`; parent and child are always the same install. a2kay keeps trust, run history, JobRecord, the job argv and its default limits, and turns `ArgsError` into `job_args_invalid` in `execute_job_subprocess`. A bad-JSON stdin in the child is now `ArgsError` instead of a JSON or type error.
+
+`any_proc.supervise` from `owner/daemon.py`: `Supervisor(spawn, probe, classify_exit=)` with start, stop, restart, poll_once, supervise. A probe's `Health` is `up`, `down`, or a consumer-named terminal verdict that is never respawned; a2kay's `skewed` and `conflict` are now that, and `DaemonState` maps them back. a2kay keeps the serve command, the version probe, the owner-conflict reading of the log tail, the token, snippet, history alerts and sync request. `rotate_log` moved.
+
+Tests: twenty supervisor tests and the run tests moved or rewritten against real children (stdin args, limits read back, a file-size kill, timeout, marker parsing); backoff-doubling-and-cap, stuck-child kill, idle and no-op rotation tests added. a2kay keeps conflict, skew, exit-reason, token/snippet and vault-pinning tests. Sightings: none in a2web."""

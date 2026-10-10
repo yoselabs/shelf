@@ -1,0 +1,12 @@
+seq = 143
+date = "2026-10-10"
+event = "delivery"
+software = "mcp-arg-errors"
+release = "mcp-arg-errors-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, not a new package (usecase-test-prep §12b row 4). `ErrorWire` from a2kay's `mcp/server.py` (`error_result`, `error_text`, `_error_wrap`): `guard(fn, drop_params=)` wraps a tool function so whatever it raises comes back as an `is_error` result with `{"error": envelope}` and text rendered from the same envelope; `result(exc)` is the same for an `ArgumentFault` the consumer turned into a typed error. Same concern as the middleware, every failed call, so it lives here. Typed errors are structural (`kind` + `to_envelope_dict()`): the package does not depend on a2effect, so it cannot hand a git consumer a second a2effect source next to its own pin. Injected: `defect` (a2kay passes `UnexpectedDefect`), `trace_id`, `text`, `passthrough`, `logger`. a2kay keeps the mapping of a fault to `unknown_argument`/`invalid_argument` and its trace ids; behaviour unchanged. Tests: ten wire tests over a real server and client.
+
+Sighting: a2web `src/a2web/error_wire.py` has its own copy, `guard_tool` raising `ToolError(prose) from exc` plus `TypedErrorEnvelopeMiddleware` recovering the cause. Not changed. To adopt: `ErrorWire(UnexpectedDefect, text=lambda e, _env: format_error_prose(e), passthrough=(FastMCPError,))` and drop the middleware, since a tool function may return the `ToolResult` itself. Two behaviour changes it would take on: an untyped failure no longer carries its own text (a2web's `quarantine` puts `str(exc)` in the message), and it gains a logged trace id. a2web pins a2effect 0.1; the wire needs none."""
