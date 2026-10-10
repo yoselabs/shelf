@@ -54,6 +54,11 @@ _AXES = (
 
 _TARGET = re.compile(r"^([a-zA-Z][\w-]*)\s*:(?!=)")
 
+# Targets that operate on the shelf's own layout (its catalog, its cross-package
+# advisory, its any-browser lane). A consumer has nothing for them to act on, so their
+# absence is not drift; without this every fresh consumer failed `make preset`.
+_SHELF_ONLY_TARGETS = frozenset({"catalog", "advisory", "test-browser"})
+
 
 def _load(path: Path) -> dict[str, Any]:
     with path.open("rb") as fh:
@@ -138,7 +143,7 @@ def main() -> int:
         "ruff-select": (_ruff(reference, "select"), _ruff(consumer, "select")),
         "ruff-ignore": (_ruff(reference, "ignore"), _ruff(consumer, "ignore")),
         "pyrefly-errors": (_pyrefly_errors(reference), _pyrefly_errors(consumer)),
-        "make-targets": (_make_targets(shelf / "Makefile"), _make_targets(repo / "Makefile")),
+        "make-targets": (_make_targets(shelf / "Makefile") - _SHELF_ONLY_TARGETS, _make_targets(repo / "Makefile")),
     }
 
     findings = [line for axis, _ in _AXES for line in _compare(axis, *values[axis], declared)]

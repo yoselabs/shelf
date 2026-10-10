@@ -258,7 +258,9 @@ asyncio_mode = "auto"
 # `warn` — set that way they are found, reported as "N warnings not shown", and never
 # counted. A run must end at `0 errors` with no warning tail.
 [tool.pyrefly]
-project-includes = ["packages"]
+project-includes = ["packages", "tools"]
+# tools/ scripts import their siblings by path (arch_advisory -> arch_rules, onboard.*).
+search-path = ["tools"]
 preset = "strict"
 
 # convert-md's bench probe runners for marker/unstructured/docling/pandoc (D4):
@@ -387,7 +389,7 @@ check-filenames = ""
 # ── coverage — measured on every `make test`; floor enforced (no silent rot) ───
 [tool.coverage.run]
 branch = true
-source = ["packages"]
+source = ["packages", "tools"]
 omit = ["*/tests/*"]
 
 [tool.coverage.report]

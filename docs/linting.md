@@ -89,9 +89,12 @@ Raise the floor as real coverage climbs; never lower it to make a red build gree
 When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
 
 1. The `[tool.ruff]`, `[tool.ruff.lint]`, `[tool.codespell]`, `[tool.coverage.*]` blocks from
-   `pyproject.toml`, and each package's `[tool.deptry]` if it needs ignores.
-2. The `Makefile` targets (`check guard bootstrap bootstrap-verify lint format typecheck spell
-   deps test`). Copy `guard` and `bootstrap`/`bootstrap-verify` **verbatim** — each resolves the
+   `pyproject.toml`, and each package's `[tool.deptry]` if it needs ignores. `[tool.pyrefly]` and
+   `[tool.pytest.ini_options]` are generated for the consumer: the strict preset, the same error
+   severities and the lighter test bar, without the shelf's own paths.
+2. The `Makefile` targets (`check guard preset bootstrap bootstrap-verify lint format typecheck
+   spell deps test cov sync`); `deps` becomes a single-package `uv run deptry .`. The shelf-only
+   targets (`catalog advisory test-browser`) are not copied and are not drift. Copy `guard` and `bootstrap`/`bootstrap-verify` **verbatim** — each resolves the
    shelf clone itself (`$SHELF_HOME` → `../shelf` → `~/Workspaces/shelf`), so they work unchanged
    in your repo. `guard` is what actually enforces the no-committed-local-shelf-source rule; the
    pre-commit hook is fast feedback, not enforcement (a hook is per-clone and any tool claiming

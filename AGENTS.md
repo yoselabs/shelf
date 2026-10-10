@@ -86,6 +86,10 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
 
 ## Consuming & contributing
 
+- **Blueprint** (`skills/blueprint/`, engine `packages/blueprint/`; being built:
+  [openspec/changes/blueprint-skill](openspec/changes/blueprint-skill/design.md)) — the shelf's
+  standard for every software repo, this one included: start a new repo, or audit an existing one,
+  by running `/blueprint` in it. The audit changes nothing; remediation follows the owner's yes.
 - **[docs/skill-authoring.md](docs/skill-authoring.md)** — how to build a skill: cost model, layout,
   triggering, wording, scripts, `claude plugin eval`, state, and how a skill keeps improving.
 - **[docs/consuming-the-shelf.md](docs/consuming-the-shelf.md)** — how a project onboards as a consumer

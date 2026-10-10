@@ -26,6 +26,7 @@ import hashlib
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 _ROOT = Path(__file__).resolve().parent.parent
 _PACKAGES = _ROOT / "packages"
@@ -85,15 +86,18 @@ class _Normalizer(ast.NodeTransformer):
     def _token(self, name: str) -> str:
         return self._canon.setdefault(name, f"L{len(self._canon)}")
 
+    @override
     def visit_Name(self, node: ast.Name) -> ast.AST:
         if node.id in self._locals:
             return ast.copy_location(ast.Name(id=self._token(node.id), ctx=node.ctx), node)
         return node
 
+    @override
     def visit_arg(self, node: ast.arg) -> ast.AST:
         new = ast.arg(arg=self._token(node.arg), annotation=None)
         return ast.copy_location(new, node)
 
+    @override
     def visit_Constant(self, node: ast.Constant) -> ast.AST:
         return ast.copy_location(ast.Constant(value=type(node.value).__name__), node)
 

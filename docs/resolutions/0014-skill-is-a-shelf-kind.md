@@ -81,3 +81,22 @@ skills on the shelf. Also out of scope: converting any specific existing runbook
 requirement only says conversion needs evidence, not which runbooks currently qualify), and
 authoring `shelf-c2s`'s catalog/onboard skill (a downstream consumer of this contract, not part of
 deciding it).
+
+## Amendment — 2026-10-10 (blueprint, the first real skill)
+
+Measured while building `blueprint` (`openspec/changes/blueprint-skill/`, design D14), on Claude Code
+2.1.296, in a throwaway plugin:
+
+- **Invocation mode is per skill, not implied by the Kind.** Fork D tied `Kind: skill` to push-based
+  discovery. A plugin skill with `disable-model-invocation: true` is still plugin-distributed,
+  catalogued and evaled, but leaves the always-on listing (zero standing cost) and runs only as
+  `/name`. `claude plugin eval` reaches it: a case whose prompt is `/probe hello` fired the skill and
+  passed. So: `Kind: skill` = catalogued, plugin-distributed, evaled; whether it auto-triggers is
+  each skill's own decision, recorded in its catalog entry. Blueprint is user-invoked.
+- **Eval location.** The plugin root is the repo (`source: "./"`), so the default suite would be
+  `shelf/evals/`. `"experimental": {"evals": "skills"}` in `.claude-plugin/plugin.json` makes
+  `claude plugin eval` discover every `skills/<name>/evals/<case>/` (it searches the eval dir
+  recursively). Run results are written to the root `evals/results/`, which is gitignored.
+- **Tag format.** `claude plugin tag` tags the plugin, not a skill: `skills--v<version>` from
+  `plugin.json`. A skill's own release stays a shelf tag, `<name>-vX.Y.Z`, and consumers of
+  blueprint record the checkpoint-set hash they were audited against (design D7), not a version.

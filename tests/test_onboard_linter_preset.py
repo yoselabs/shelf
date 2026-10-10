@@ -4,6 +4,7 @@ from shelf's own `pyproject.toml`/`Makefile`, never touching what's already ther
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -128,3 +129,87 @@ def test_creates_a_makefile_from_scratch_when_absent(repo: Path) -> None:
         "test:",
     ):
         assert target in make_text
+
+
+# ── shelf-4mz: the copied gate must RUN, not merely exist ─────────────────────
+# Reproduced 2026-10-10: a fresh repo onboarded with every operation verified=True,
+# then `make check` stopped at once on a missing `preset` target; `deps` looped over
+# the shelf's own packages/*; and no pyrefly table meant `make typecheck` ran lax.
+
+
+def _bare(repo: Path) -> None:
+    (repo / "pyproject.toml").write_text('[project]\nname = "consumer"\nversion = "0.1.0"\n')
+
+
+def _make_dry_run(repo: Path, target: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["make", "-n", target], cwd=repo, capture_output=True, text=True, check=False)
+
+
+def test_a_fresh_repo_gets_a_gate_whose_every_target_resolves(repo: Path) -> None:
+    _bare(repo)
+
+    result = LinterPresetOperation(repo).run({})
+
+    assert result.outcome == Outcome.APPLIED, result.message
+    dry = _make_dry_run(repo, "check")
+    assert dry.returncode == 0, dry.stderr
+
+
+def test_pyrefly_is_strict_and_carries_none_of_the_shelfs_own_paths(repo: Path) -> None:
+    _bare(repo)
+
+    LinterPresetOperation(repo).run({})
+
+    pyrefly = tomllib.loads((repo / "pyproject.toml").read_text())["tool"]["pyrefly"]
+    shelf = tomllib.loads((_ROOT / "pyproject.toml").read_text())["tool"]["pyrefly"]
+    assert pyrefly["preset"] == "strict"
+    assert pyrefly["errors"] == shelf["errors"], "preset drift compares this axis; it must match the shelf"
+    assert "project-includes" not in pyrefly
+    assert "project-excludes" not in pyrefly
+    assert "search-path" not in pyrefly
+    assert [sub["matches"] for sub in pyrefly["sub-config"]] == ["tests/**"]
+
+
+def test_pytest_gets_strict_markers_and_none_of_the_shelfs_testpaths(repo: Path) -> None:
+    _bare(repo)
+
+    LinterPresetOperation(repo).run({})
+
+    pytest_cfg = tomllib.loads((repo / "pyproject.toml").read_text())["tool"]["pytest"]["ini_options"]
+    assert "--strict-markers" in pytest_cfg["addopts"]
+    assert "testpaths" not in pytest_cfg
+
+
+def test_deps_checks_the_consumer_itself_not_the_shelfs_packages(repo: Path) -> None:
+    _bare(repo)
+
+    LinterPresetOperation(repo).run({})
+
+    deps = _make_dry_run(repo, "deps")
+    assert deps.returncode == 0, deps.stderr
+    assert "packages/" not in deps.stdout
+    assert "deptry ." in deps.stdout
+
+
+def test_a_copied_gate_that_names_a_missing_target_is_a_failure(repo: Path) -> None:
+    _bare(repo)
+    (repo / "Makefile").write_text("check: guard lint not-a-target\n")
+
+    result = LinterPresetOperation(repo).run({})
+
+    assert result.outcome == Outcome.FAILED
+    assert "not-a-target" in result.message
+
+
+def test_a_freshly_onboarded_repo_passes_preset_drift(repo: Path) -> None:
+    _bare(repo)
+
+    LinterPresetOperation(repo).run({})
+
+    drift = subprocess.run(
+        [sys.executable, str(_ROOT / "tools" / "preset_drift.py"), "--repo", str(repo), "--shelf-home", str(_ROOT)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert drift.returncode == 0, drift.stderr

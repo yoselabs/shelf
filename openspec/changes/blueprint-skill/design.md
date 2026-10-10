@@ -26,6 +26,58 @@ call, recorded so he can overrule · *Fable A/B* = adopted from a consult, with 
 
 All research is one pass unless a file says otherwise.
 
+## Status — 2026-10-10, end of the design session
+
+Resume here after compaction. Work queue: `bd show shelf-1y4` (epic) and `bd ready`.
+
+| part | state |
+|---|---|
+| design | done: D1-D18 + owner rounds 1-10 below; vocabulary in [CONTEXT.md](CONTEXT.md) |
+| research | done: 13 files in `research/`, all one pass; two Fable consults (advisory only) |
+| shelf prerequisites | done: `tools/` type-checked (shelf-yz4); resolution 0014 amended; plugin eval proven to reach a user-invoked skill and to find `skills/*/evals` via `experimental.evals`; strict beads settings live in the shelf; onboarding's broken Makefile copy fixed (shelf-4mz) |
+| blueprint code | not started: `packages/blueprint` (shelf-1y4.1) is the first bead; nothing under `skills/blueprint/` yet |
+| consumers waiting | a2kay, lifesim, a2peer, homelab: unblocked by shelf-1y4.12 (corpus audits), which needs the engine, the gate and backlog concerns, and the skill |
+
+Critical path: 1y4.1 engine → 1y4.2 gate + 1y4.3 backlog + 1y4.4 skill → 1y4.12 corpus audits.
+
+## Owner round 10 — output contract (2026-10-10)
+
+Owner: blueprint's output "should not be conversational… strict, structured, tables, properly tell
+what is connected with what, aggressively terse"; highlight what matters to the human; reuse parts
+of his `my-language` skill.
+
+D18, the output contract every direction follows:
+- Reports are tables, never prose: one row per checkpoint `id · concern · set up · working ·
+  evidence · remediation · fixed by (auto / agent / owner)`.
+- Connections are columns, not sentences: the concern, the ADR, the stack-profile row, the bead
+  each finding links to.
+- Only three things reach the owner in chat, after the report file is written: decisions that are
+  his, mistakes that reached him, work ready for his yes (`my-language` agent-result rule).
+- Status marks carry meaning only: ✅ passing · ❌ failing · ⚠️ needs the owner · 🔒 blocked; one per row.
+- Large or structural change: a short plain-words explanation first; when much work is ahead,
+  an Artifact page outlining all of it; anything structural drawn as a diagram — the target folder
+  structure, the target layers, the target test structure, the main design (owner, round 10).
+- From `my-language`: opener ≤10 words, one clause; every coined label glossed by its job on first
+  use; a hedge survives shortening; a one-pass finding says so; the decision ramp (ground → shared →
+  fork ✅/❌ → one-line question); word caps per message shape.
+
+## Owner round 9 — how a run goes in a consumer (2026-10-10)
+
+Owner, T3 summary: in lifesim you say "run blueprint"; the session fetches the shelf, finds the
+blueprint skill and runs it against lifesim. **The first run only checks and finds problems**, and
+produces an audit list. The agent then works out the best remediation for each; the script itself
+may propose the fix, since most findings can be fixed mechanically. Remediations applied, lifesim's
+`make check` passes. A month later, after blueprint has grown, the same run again.
+
+| effect | |
+|---|---|
+| D6 run protocol splits in two | **audit**: orient → enumerate → check → validate → report, changes nothing in the repo · **remediate**: the report's remediation plan (each finding marked auto-fixable by script or needs-agent or needs-owner) shown first, applied after the owner's yes, then re-check and record |
+| the engine proposes fixes | every check returns its remediation; a mechanical one carries a `fix` the engine can apply (`blueprint fix <id>`), so the agent's work is the non-mechanical rest |
+| packaging | engine as `packages/blueprint/` (Kind `cli`); skill in `skills/blueprint/`; shelf audited by its own blueprint |
+| per-commit checks | owner yes (round 10): each repo's own `make check` runs the fast scripted checks through a `blueprint` target; heavy checks (clean clone) run only in the audit |
+| packaging | owner yes: engine moves to `packages/blueprint/` (Kind `cli`) |
+| references | owner: blueprint is fundamental, so it is named in the shelf AGENTS.md and the owner's global instructions (done 2026-10-10); consumers get it through the resolver block once the skill exists |
+
 ## Owner round 8 — beads settings applied; one runner for all checks (2026-10-10)
 
 | item | decision / fact | effect |

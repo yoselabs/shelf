@@ -20,3 +20,6 @@ uv.lock.*
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# claude plugin eval run output
+evals/results/
