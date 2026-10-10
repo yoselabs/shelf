@@ -382,7 +382,7 @@ unannotated-return = false
 # fixture is authoritative and the linter yields to it, never the reverse.
 skip = "uv.lock,.venv,.git,*.pyc,.ruff_cache,.pytest_cache,docs/thoughts/*,packages/*/bench/corpus/*,packages/*/bench/outputs/*,packages/*/tests/fixtures/*.html"
 # doctrine/glossary coinages the dictionary flags but we mean on purpose.
-ignore-words-list = "wins,ontology,noqa,crate,ba,te,alls"
+ignore-words-list = "wins,ontology,noqa,crate,ba,te,alls,errorprone,haa"
 check-filenames = ""
 
 # deptry is configured PER PACKAGE (it reads each package's own pyproject when run
