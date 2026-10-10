@@ -79,6 +79,34 @@ def session_hooks(ctx: Context) -> Finding:
     return passing("SessionStart runs bd prime; Stop flags in-progress beads")
 
 
+# Where agent worktrees go: Claude Code's own folder, and the one blueprint prescribes for any harness.
+_WORKTREE_DIRS = (".claude/worktrees/", ".worktrees/")
+
+
+@check(
+    "agents.worktrees",
+    "every agent works in its own git worktree; the worktree folders are git-ignored",
+    layer="agent",
+)
+def worktrees(ctx: Context) -> Finding:
+    """Ignored, so no linter, test run or `git add -A` in the main checkout reaches into an agent's tree.
+
+    Why worktrees at all: a commit hook hides uncommitted edits while it runs, so a second agent writing
+    in the same checkout loses its write (reproduced with prek 0.3.6, 2026-10-11).
+    """
+    open_dirs = []
+    for folder in _WORKTREE_DIRS:
+        done = ctx.run("git", "check-ignore", "-q", f"{folder}probe")
+        if done is None:
+            return failing("git did not run", "install git")
+        if done.returncode != 0:
+            open_dirs.append(folder)
+    if open_dirs:
+        lines = "\\n".join(open_dirs)
+        return not_set_up(f"not git-ignored: {', '.join(open_dirs)}", f"printf '{lines}\\n' >> .gitignore", FixedBy.AUTO)
+    return passing(f"ignored: {', '.join(_WORKTREE_DIRS)}; the rule is in docs/agents/working-with-agents.md")
+
+
 _INSTALL = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint template --repo ."
 
 

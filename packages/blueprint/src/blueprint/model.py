@@ -28,6 +28,7 @@ SKIP_DIRS = frozenset(
         ".pytest_cache",
         ".pyrefly_cache",
         "worktrees",
+        ".worktrees",
         ".turbo",
         ".hypothesis",
         "bin",

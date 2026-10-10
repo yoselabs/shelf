@@ -13,3 +13,5 @@ evals/results/
 .beads/backup/
 .beads/*.jsonl
 .cache/
+.claude/worktrees/
+.worktrees/

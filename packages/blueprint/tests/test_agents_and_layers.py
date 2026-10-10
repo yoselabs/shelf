@@ -29,6 +29,7 @@ def _sound(repo: Repo) -> None:
     repo.write("AGENTS.md", "# map\n")
     repo.root.joinpath("CLAUDE.md").symlink_to("AGENTS.md")
     repo.write(".claude/settings.json", json.dumps({"env": {"BD_DISABLE_METRICS": "1"}, "hooks": _HOOKS}))
+    repo.write(".gitignore", ".claude/worktrees/\n.worktrees/\n")
 
 
 def test_a_sound_harness_passes_every_agent_checkpoint(repo: Repo) -> None:
@@ -44,6 +45,12 @@ def test_a_separate_claude_md_fails(repo: Repo) -> None:
     repo.root.joinpath("CLAUDE.md").unlink()
     repo.write("CLAUDE.md", "other rules\n")
     assert _verdicts(repo)["agents.instructions"] is Verdict.FAILING
+
+
+def test_worktree_folders_not_ignored_is_not_set_up(repo: Repo) -> None:
+    _sound(repo)
+    repo.write(".gitignore", ".claude/worktrees/\n")
+    assert _verdicts(repo)["agents.worktrees"] is Verdict.NOT_SET_UP
 
 
 def test_metrics_left_on_is_not_set_up(repo: Repo) -> None:
