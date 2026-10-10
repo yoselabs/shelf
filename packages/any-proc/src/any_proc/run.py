@@ -179,6 +179,9 @@ def call(
             cwd=cwd,
             timeout=timeout,
             input=stdin_json,
+            # No arguments is an empty stdin, never the parent's: a child that reads an
+            # inherited terminal waits on it until the timeout.
+            stdin=subprocess.DEVNULL if stdin_json is None else None,
             preexec_fn=preexec_fn,  # setrlimit only, async-signal-safe; see _preexec
         )
     except subprocess.TimeoutExpired as exc:

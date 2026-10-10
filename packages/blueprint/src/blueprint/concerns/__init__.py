@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 
-MODULES = ("gate", "backlog")
+MODULES = ("gate", "backlog", "stack", "framework", "agents")
 
 
 def load() -> None:

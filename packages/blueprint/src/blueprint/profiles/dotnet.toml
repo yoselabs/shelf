@@ -1,0 +1,62 @@
+# Stack profile (see python-uv.toml for the format).
+stack = "dotnet"
+status = "provisional"
+source = "lifesim's bootstrap (openspec/changes/blueprint-skill/research/lifesim-strategy.md §5.2); one repo, partly unverified"
+
+[[role]]
+role = "toolchain"
+tool = "global.json pinning the SDK"
+install = "dotnet new globaljson --sdk-version <version> --roll-forward latestFeature"
+config = [{ path = "global.json", contains = '"version"' }]
+
+[[role]]
+role = "formatter"
+tool = "CSharpier as a local dotnet tool"
+install = "dotnet new tool-manifest; dotnet tool install csharpier"
+config = [{ path = ".config/dotnet-tools.json", contains = "csharpier" }]
+gate = "csharpier check"
+
+[[role]]
+role = "linter"
+tool = "the .NET analyzers at latest-all, warnings as errors, plus Meziantou, Roslynator, Sonar"
+install = "Directory.Build.props: TreatWarningsAsErrors, AnalysisLevel latest-all, EnforceCodeStyleInBuild; analyzer PackageReferences"
+config = [
+    { path = "Directory.Build.props", contains = "<TreatWarningsAsErrors>true" },
+    { path = "Directory.Build.props", contains = "<AnalysisLevel>latest-all" },
+]
+gate = "dotnet build"
+
+[[role]]
+role = "types"
+tool = "nullable reference types, as errors"
+install = "Directory.Build.props: <Nullable>enable</Nullable> (TreatWarningsAsErrors makes them errors)"
+config = [{ path = "Directory.Build.props", contains = "<Nullable>enable" }]
+gate = "dotnet build"
+
+[[role]]
+role = "dependencies"
+tool = "central package management"
+install = "Directory.Packages.props with every version; ManagePackageVersionsCentrally in Directory.Build.props"
+config = [{ path = "Directory.Packages.props" }, { path = "Directory.Build.props", contains = "ManagePackageVersionsCentrally" }]
+gate = "dotnet build"
+
+[[role]]
+role = "tests"
+tool = "dotnet test (xunit v3 on Microsoft.Testing.Platform)"
+install = "a tests/ project per layer; global.json test runner"
+gate = "dotnet test"
+
+[[role]]
+role = "architecture"
+tool = "BannedApiAnalyzers with BannedSymbols lists"
+install = "Microsoft.CodeAnalysis.BannedApiAnalyzers; BannedSymbols.*.txt as AdditionalFiles"
+config = [{ path = "Directory.Build.props", contains = "BannedApiAnalyzers" }]
+gate = "dotnet build"
+
+[[role]]
+role = "coverage"
+untested = "no coverage floor proven for .NET yet"
+
+[[role]]
+role = "spelling"
+untested = "no spelling checker chosen for .NET yet"

@@ -73,11 +73,27 @@ def detect_stacks(repo: Path) -> tuple[str, ...]:
     stacks: list[str] = []
     if (repo / "pyproject.toml").is_file():
         stacks.append("python-uv" if (repo / "uv.lock").is_file() else "python")
-    if walk(repo, "*.sln", 2) or walk(repo, "*.csproj", 3):
+    if walk(repo, "*.sln", 2) or walk(repo, "*.slnx", 2) or walk(repo, "*.csproj", 3):
         stacks.append("dotnet")
     if (repo / "package.json").is_file():
         stacks.append("node")
+    if (repo / "go.mod").is_file():
+        stacks.append("go")
+    if (repo / "Cargo.toml").is_file():
+        stacks.append("rust")
     return tuple(stacks)
+
+
+# A framework is found by a marker file; its folder is where the marker sits.
+FRAMEWORK_MARKERS = {"godot": "project.godot"}
+
+
+def detect_frameworks(repo: Path) -> tuple[tuple[str, str], ...]:
+    """Each framework whose marker file is within three levels of the root, with its folder."""
+    found: list[tuple[str, str]] = []
+    for name, marker in FRAMEWORK_MARKERS.items():
+        found += [(name, str(p.parent.relative_to(repo)) or ".") for p in walk(repo, marker, 4)]
+    return tuple(found)
 
 
 def _detect_kind(repo: Path) -> str:
@@ -100,4 +116,5 @@ def detect(repo: Path, state: State) -> Profile:
         traits=tuple(declared.get("traits", ())),
         stacks=tuple(declared.get("stacks", ())) or detect_stacks(repo),
         tracker="beads" if (repo / ".beads").is_dir() else declared.get("tracker"),
+        frameworks=tuple((str(f), str(r)) for f, r in declared.get("frameworks", {}).items()) or detect_frameworks(repo),
     )

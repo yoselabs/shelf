@@ -1,0 +1,68 @@
+# Framework profile (see ../python-uv.toml for the format; it layers on top of dotnet.toml for a C# Godot project).
+# `{root}` is the folder holding project.godot (lifesim: src/Game.Godot); repo-level files (.gitignore,
+# .gitattributes, Makefile, .github/workflows) stay at the repo root. A path may be a glob (`*.csproj`).
+stack = "godot"
+status = "provisional"
+source = "godot-profile.md in openspec/changes/blueprint-skill/research (late-2026 web/GitHub pass, one pass, not cross-checked); lifesim is the only consumer"
+
+[[role]]
+role = "engine-version"
+tool = "Godot.NET.Sdk/<version> in the Godot csproj (exact pin); features line in project.godot; same number in CI"
+install = "csproj Sdk=\"Godot.NET.Sdk/4.7.2\"; CI reads the version from that csproj (or global.json msbuild-sdks) instead of repeating it"
+config = [{ path = "{root}/*.csproj", contains = "Godot.NET.Sdk/" }]
+
+[[role]]
+role = "project-hygiene"
+tool = ".godot/ ignored, *.uid and *.import committed, .gitattributes with LF + LFS for binaries"
+install = "Godot editor: Project > Version Control > Generate Version Control Metadata (writes .gitignore + .gitattributes); never ignore *.uid"
+config = [
+    { path = ".gitignore", contains = ".godot/" },
+    { path = ".gitattributes", contains = "text=auto eol=lf" },
+]
+
+[[role]]
+role = "scripts-lint"
+tool = "gdtoolkit (gdlint + gdformat) when the project has .gd files; otherwise not applicable"
+install = "uv tool install gdtoolkit; gdlint . and gdformat --check . in make check"
+na = "C#-only project (no .gd files); becomes mandatory the moment a .gd file exists (gate: gdlint)"
+
+[[role]]
+role = "build"
+tool = "godot --headless --import, then --build-solutions --quit, run from the Godot project folder"
+install = "make godot-import (or a recipe reached by make check) running both commands with $(GODOT)"
+config = [{ any = [
+    { path = "Makefile", contains = "--build-solutions" },
+    { path = "justfile", contains = "--build-solutions" },
+] }]
+gate = "--headless"
+
+[[role]]
+role = "tests"
+tool = "GdUnit4Net (gdUnit4.api + test adapter, dotnet test) or Chickensoft GoDotTest for in-engine C# tests"
+install = "add gdUnit4.api, gdUnit4.test.adapter, gdUnit4.analyzers to the Godot test project; or GoDotTest with --run-tests --quit-on-finish"
+config = [{ any = [
+    { path = "Directory.Packages.props", contains = "gdUnit4" },
+    { path = "Directory.Packages.props", contains = "GoDotTest" },
+    { path = "{root}/*.csproj", contains = "gdUnit4" },
+    { path = "{root}/*.csproj", contains = "GoDotTest" },
+] }]
+untested = "neither runner verified against Godot 4.7.2 + net10.0 + Microsoft.Testing.Platform; lifesim has no view tests yet"
+
+[[role]]
+role = "scene-integrity"
+tool = "headless import fails on broken scene/resource references; a --headless --import log scan for ERROR lines"
+install = "make godot-import fails on 'ERROR:' / 'Parse Error' in the import log; no maintained static .tscn linter found"
+untested = "no deterministic tool proven; log-scan of --import is a hypothesis never seen red"
+
+[[role]]
+role = "architecture"
+tool = "MSBuild target failing a Sim.* project that resolves GodotSharp, plus BannedApiAnalyzers"
+install = "Directory.Build.props ForbidGodotInSim target (IsSimProject) as in lifesim; optional ArchUnitNET test"
+config = [{ path = "Directory.Build.props", contains = "GodotSharp" }]
+gate = "dotnet build"
+
+[[role]]
+role = "ci"
+tool = "GitHub Actions: actions/setup-dotnet + chickensoft-games/setup-godot, then the same make check and headless import"
+install = ".github/workflows/*.yml using chickensoft-games/setup-godot@v2 with use-dotnet true, version from the csproj Sdk"
+config = [{ path = ".github/workflows/*.yml", contains = "setup-godot" }]

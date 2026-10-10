@@ -47,12 +47,6 @@ def test_a_setting_from_the_environment_fails_strict_config(repo: Repo) -> None:
     assert _verdicts(repo)["backlog.strict-config"] is Verdict.FAILING
 
 
-def test_metrics_left_on_is_not_set_up(repo: Repo) -> None:
-    _beads(repo)
-    repo.write(".claude/settings.json", "{}")
-    assert _verdicts(repo)["backlog.metrics-off"] is Verdict.NOT_SET_UP
-
-
 def test_a_tracked_jsonl_export_fails(repo: Repo) -> None:
     _beads(repo)
     repo.write(".beads/issues.jsonl", "{}\n")
@@ -94,4 +88,4 @@ def test_the_gate_run_leaves_out_what_needs_bds_database(repo: Repo) -> None:
     ids = {r.id for r in run(repo.root, concern="backlog", env=repo.env).rows}
     assert "backlog.strict-config" not in ids
     assert "backlog.lint" not in ids
-    assert "backlog.metrics-off" in ids
+    assert "backlog.no-tracked-export" in ids

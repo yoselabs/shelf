@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from blueprint.model import Context, Finding, FixedBy, Profile, check, failing, not_checked, not_set_up, passing
+from blueprint.model import Context, Finding, FixedBy, check, failing, not_checked, not_set_up, passing, uses_beads
 
 # Effective values bd must report (`bd config show --json`), owner rounds 5-8.
 STRICT = {
@@ -18,10 +18,6 @@ STRICT = {
     "import.auto": "false",
 }
 _METRICS_ENV = "BD_DISABLE_METRICS"
-
-
-def _beads(profile: Profile) -> bool:
-    return profile.tracker == "beads"
 
 
 def _settings_env(ctx: Context) -> dict[str, str] | None:
@@ -46,7 +42,12 @@ def tracker(ctx: Context) -> Finding:
     return passing("beads initialised (.beads/config.yaml)")
 
 
-@check("backlog.strict-config", "bd's effective config is the strict set, none of it from the environment", applies=_beads, audit_only=True)
+@check(
+    "backlog.strict-config",
+    "bd's effective config is the strict set, none of it from the environment",
+    applies=uses_beads,
+    audit_only=True,
+)
 def strict_config(ctx: Context) -> Finding:
     """Every STRICT key has its value, and its source is the repo's config, not an env var."""
     done = ctx.run("bd", "config", "show", "--json", timeout=60)
@@ -72,22 +73,7 @@ def strict_config(ctx: Context) -> Finding:
     return passing(f"{len(STRICT)} strict settings in effect from .beads/config.yaml")
 
 
-@check(
-    "backlog.metrics-off",
-    f"every agent session in the repo runs bd with metrics off ({_METRICS_ENV}=1 in .claude/settings.json)",
-    applies=_beads,
-)
-def metrics_off(ctx: Context) -> Finding:
-    """bd reads `metrics.disabled` only from the user config, so the repo turns it off through the session env."""
-    env = _settings_env(ctx)
-    if env is None:
-        return failing(".claude/settings.json is not valid JSON", "fix the JSON")
-    if env.get(_METRICS_ENV) != "1":
-        return not_set_up(f'{_METRICS_ENV} is not "1" in .claude/settings.json env', f'add "env": {{"{_METRICS_ENV}": "1"}}', FixedBy.AUTO)
-    return passing(f"{_METRICS_ENV}=1 in .claude/settings.json")
-
-
-@check("backlog.no-tracked-export", "no beads JSONL export is tracked by git (the Dolt history is the record)", applies=_beads)
+@check("backlog.no-tracked-export", "no beads JSONL export is tracked by git (the Dolt history is the record)", applies=uses_beads)
 def no_tracked_export(ctx: Context) -> Finding:
     """`git ls-files .beads` lists no `*.jsonl`."""
     listed = ctx.git("ls-files", ".beads")
@@ -106,7 +92,7 @@ def no_tracked_export(ctx: Context) -> Finding:
 @check(
     "backlog.no-local-override",
     "nothing outside .beads/config.yaml weakens bd: no config.local.yaml, no BD_* in the session env",
-    applies=_beads,
+    applies=uses_beads,
 )
 def no_local_override(ctx: Context) -> Finding:
     """`.beads/config.local.yaml` absent; .claude/settings.json env sets no BD_*/BEADS_* other than metrics."""
@@ -122,7 +108,7 @@ def no_local_override(ctx: Context) -> Finding:
     return passing("no local file or session env overrides bd")
 
 
-@check("backlog.lint", "every open bead carries the sections bd requires (`bd lint` exits 0)", applies=_beads, audit_only=True)
+@check("backlog.lint", "every open bead carries the sections bd requires (`bd lint` exits 0)", applies=uses_beads, audit_only=True)
 def lint(ctx: Context) -> Finding:
     """`bd lint` passes."""
     done = ctx.run("bd", "lint", timeout=120)

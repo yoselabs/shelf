@@ -12,3 +12,4 @@ evals/results/
 .beads/dolt/
 .beads/backup/
 .beads/*.jsonl
+.cache/

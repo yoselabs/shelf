@@ -1,0 +1,51 @@
+# The blueprint run survey: the agent answers every question at the end of each run, in
+# docs/blueprint/survey.md; the owner relays it to the shelf, where it feeds the reabsorb direction.
+# Answers come from a closed set so surveys from many repos can be counted. Evidence is one line:
+# a row id, a file, a quote. `blueprint survey` prints the template; `blueprint survey --check FILE`
+# fails on a missing or out-of-set answer.
+
+answers = ["yes", "partly", "no", "n/a"]
+
+[[section]]
+name = "experience"
+intro = "Did the run meet the owner's expectations of blueprint?"
+questions = [
+    { id = "E1", text = "The report says, per stack, which tools the repo will use for each role (formatter, linter, types, tests, coverage) and what gets installed" },
+    { id = "E2", text = "Every finding sits under its concern (gate, backlog, stack, ...), one table per concern, not one mixed list" },
+    { id = "E3", text = "Each failing row names its remediation and who applies it (auto, agent, owner)" },
+    { id = "E4", text = "The chat carried only the plan table, owner decisions and mistakes; no prose recap of the report" },
+    { id = "E5", text = "Nothing was asked of the owner that the agent could have found itself" },
+    { id = "E6", text = "The audit changed nothing outside docs/blueprint/ before the owner's yes" },
+    { id = "E7", text = "The report and the chat kept the layers apart: generic, stack-specific, framework-specific, agent harness" },
+    { id = "E8", text = "A stack or role with no standard was said plainly as 'no standard for this stack yet', not as a repo failure" },
+    { id = "E9", text = "The run felt managed: the owner saw the summary and their decisions only, no narration of the process" },
+]
+
+[[section]]
+name = "completeness"
+intro = "Did blueprint cover what this repo needs?"
+questions = [
+    { id = "C1", text = "The engine detected every stack the repo uses (name any it missed in the evidence)" },
+    { id = "C2", text = "Every stack had a profile, and every role in it had a tool (name roles left untested)" },
+    { id = "C3", text = "The concerns checked cover what matters here; name the concerns this repo needs that blueprint lacks" },
+    { id = "C4", text = "Every framework in use (game engine, web framework) was detected and judged from its own profile, or named as a blueprint gap" },
+    { id = "C5", text = "Each 'not checked' row says why, and the reason is outside the repo's control" },
+]
+
+[[section]]
+name = "correctness"
+intro = "Were the verdicts and remediations right?"
+questions = [
+    { id = "R1", text = "Every verdict matches what you see in the repo (name rows you disagree with)" },
+    { id = "R2", text = "Every remediation is safe and complete as written (name ones that were wrong or partial)" },
+    { id = "R3", text = "Remediated rows turned passing on re-check (name any that did not)" },
+]
+
+[[section]]
+name = "cost"
+intro = "What did the run cost, and what should be a script?"
+questions = [
+    { id = "K1", text = "The engine ran in under a minute (give the wall time)" },
+    { id = "K2", text = "The agent did no repeated manual inspection a script could do (name it if it did)" },
+    { id = "K3", text = "Bulk work went to a cheaper model where the harness allowed it (name the harness and model in the evidence)" },
+]

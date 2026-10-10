@@ -1,0 +1,78 @@
+# Stack profile: the per-stack answer to every concern that has one (CONTEXT.md: stack profile).
+# Each [[role]] says which tool, how it is installed, the config that proves it is set up
+# (every entry must hold; `{ any = [...] }` holds when one alternative does), and the text `make check` must reach to prove it runs (a regex).
+# A role with `untested` has no proven answer yet; one with `na` does not apply to the stack.
+stack = "python-uv"
+status = "evidenced"  # evidenced: the shelf and a2kay run it | provisional: written, not yet proven
+source = "the shelf's own gate (pyproject.toml, Makefile; resolution 0004)"
+
+[[role]]
+role = "toolchain"
+tool = "uv, with a committed lockfile and a declared Python range"
+install = "uv init; uv lock; commit uv.lock"
+config = [
+    { path = "uv.lock" },
+    # A virtual workspace root has no [project]; .python-version pins it instead.
+    { any = [{ path = "pyproject.toml", contains = "requires-python" }, { path = ".python-version" }] },
+]
+
+[[role]]
+role = "formatter"
+tool = "ruff format"
+install = "uv add --dev ruff; copy [tool.ruff] from the shelf (make bootstrap)"
+config = [{ path = "pyproject.toml", contains = "[tool.ruff" }]
+gate = "ruff format --check"
+
+[[role]]
+role = "linter"
+tool = "ruff check, the shelf's rule set"
+install = "copy [tool.ruff.lint] from the shelf (make bootstrap)"
+config = [{ path = "pyproject.toml", contains = "[tool.ruff.lint]" }]
+gate = "ruff check"
+
+[[role]]
+role = "types"
+tool = "pyrefly, strict preset"
+install = "uv add --dev pyrefly; copy [tool.pyrefly] from the shelf (make bootstrap)"
+config = [{ path = "pyproject.toml", contains = "[tool.pyrefly]" }, { path = "pyproject.toml", contains = 'preset = "strict"' }]
+gate = "pyrefly check"
+
+[[role]]
+role = "spelling"
+tool = "codespell"
+install = "uv add --dev codespell; copy [tool.codespell] from the shelf"
+config = [{ path = "pyproject.toml", contains = "[tool.codespell]" }]
+gate = "codespell"
+
+[[role]]
+role = "dependencies"
+tool = "deptry (unused, missing, transitive)"
+install = "uv add --dev deptry"
+gate = "deptry"
+
+[[role]]
+role = "tests"
+tool = "pytest, strict markers"
+install = "uv add --dev pytest pytest-xdist"
+config = [{ path = "pyproject.toml", contains = "[tool.pytest.ini_options]" }]
+gate = "pytest"
+
+[[role]]
+role = "coverage"
+tool = "pytest-cov with a floor"
+install = "uv add --dev pytest-cov; run pytest with --cov-fail-under=<just below current>"
+gate = "cov-fail-under"
+
+[[role]]
+role = "architecture"
+untested = "no layer tool chosen yet: import-linter vs tach is open (shelf-435)"
+
+[[role]]
+role = "hooks"
+tool = "prek runs ruff check and ruff format --check on staged Python files"
+install = "add ruff-check and ruff-format local hooks (types: [python]) to .pre-commit-config.yaml after bd's entries"
+config = [{ path = ".pre-commit-config.yaml", contains = "ruff check" }, { path = ".pre-commit-config.yaml", contains = "ruff format" }]
+
+[[role]]
+role = "agent-guidance"
+untested = "no Python conventions file for agents written yet (docs/agents templates: shelf-1y4.7)"

@@ -1,0 +1,60 @@
+# Git hooks, owned by prek (or pre-commit, which reads the same file). The blueprint recipe
+# (openspec/changes/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself
+# (`bd init --skip-hooks`); its hooks run from here, first, so a failing check below still blocks the
+# commit and bd still runs. Install: `prek install` (installs every type in default_install_hook_types).
+default_install_hook_types: [pre-commit, post-merge, pre-push, post-checkout, prepare-commit-msg]
+repos:
+- repo: local
+  hooks:
+  - id: bd-pre-commit
+    name: bd pre-commit
+    entry: bd hooks run pre-commit
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [pre-commit]
+  - id: bd-post-merge
+    name: bd post-merge
+    entry: bd hooks run post-merge
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [post-merge]
+  - id: bd-pre-push
+    name: bd pre-push
+    entry: bd hooks run pre-push
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [pre-push]
+  - id: bd-dolt-push
+    name: bd dolt push
+    # `bd hooks run pre-push` does not push the Dolt data ref (refs/dolt/data); git push and bd dolt
+    # push are two remote syncs. Non-fatal: a Dolt hiccup must not block the code push.
+    entry: sh -c 'bd dolt push || echo "bd dolt push failed, push it by hand" >&2'
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [pre-push]
+  - id: bd-post-checkout
+    name: bd post-checkout
+    entry: sh -c 'bd hooks run post-checkout "$PRE_COMMIT_FROM_REF" "$PRE_COMMIT_TO_REF" "$PRE_COMMIT_CHECKOUT_TYPE"' --
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [post-checkout]
+  - id: bd-prepare-commit-msg
+    name: bd prepare-commit-msg
+    entry: bd hooks run prepare-commit-msg
+    language: system
+    always_run: true
+    stages: [prepare-commit-msg]
+- repo: local
+  hooks:
+  - id: gate
+    name: make check
+    entry: make check
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [pre-commit]

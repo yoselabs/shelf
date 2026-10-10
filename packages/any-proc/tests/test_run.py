@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 from typing import TYPE_CHECKING
 
@@ -41,6 +42,22 @@ def test_arguments_reach_the_child_over_stdin_and_the_result_comes_back() -> Non
 
 def test_no_arguments_reads_as_none() -> None:
     assert call(_py(_ECHO), timeout=30).result == {"got": None}
+
+
+def test_no_arguments_never_reads_the_parents_stdin() -> None:
+    # The parent's fd 0 is a terminal that stays open: a child reading it would wait for
+    # the timeout instead of seeing no arguments.
+    read_end, write_end = os.pipe()
+    saved = os.dup(0)
+    os.dup2(read_end, 0)
+    try:
+        out = call(_py(_ECHO), timeout=10)
+    finally:
+        os.dup2(saved, 0)
+        for fd in (saved, read_end, write_end):
+            os.close(fd)
+    assert not out.timed_out
+    assert out.result == {"got": None}
 
 
 @pytest.mark.parametrize(

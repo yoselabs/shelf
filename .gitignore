@@ -23,3 +23,8 @@ uv.lock.*
 
 # claude plugin eval run output
 evals/results/
+
+# agent worktrees (Claude Code) and build-tool trial caches
+.claude/worktrees/
+.turbo/
+.cache/

@@ -27,6 +27,8 @@ SKIP_DIRS = frozenset(
         ".ruff_cache",
         ".pytest_cache",
         ".pyrefly_cache",
+        "worktrees",
+        ".turbo",
         ".hypothesis",
         "bin",
         "obj",
@@ -75,6 +77,9 @@ class Finding:
     remediation: str = ""
     fixed_by: FixedBy = FixedBy.AGENT
     applicable: bool = True
+    # The blueprint itself cannot judge this yet (a stack with no profile, a role its profile leaves
+    # untested). Reported every run, never a pass, but not the repo's fault: the exit code ignores it.
+    blueprint_gap: bool = False
 
     @property
     def verdict(self) -> Verdict:
@@ -105,9 +110,9 @@ def not_set_up(evidence: str, remediation: str, fixed_by: FixedBy = FixedBy.AGEN
     return Finding(set_up=False, working=None, evidence=evidence, remediation=remediation, fixed_by=fixed_by)
 
 
-def not_checked(reason: str, remediation: str = "", fixed_by: FixedBy = FixedBy.AGENT) -> Finding:
+def not_checked(reason: str, remediation: str = "", fixed_by: FixedBy = FixedBy.AGENT, *, blueprint_gap: bool = False) -> Finding:
     """The check could not run; the reason is the evidence. Never a pass."""
-    return Finding(set_up=None, working=None, evidence=reason, remediation=remediation, fixed_by=fixed_by)
+    return Finding(set_up=None, working=None, evidence=reason, remediation=remediation, fixed_by=fixed_by, blueprint_gap=blueprint_gap)
 
 
 def not_applicable(reason: str) -> Finding:
@@ -124,6 +129,14 @@ class Profile:
     traits: tuple[str, ...]
     stacks: tuple[str, ...]
     tracker: str | None
+    # Frameworks on top of a stack (a game engine, a web framework), each with the folder it lives in
+    # relative to the repo root: (("godot", "src/Game.Godot"),).
+    frameworks: tuple[tuple[str, str], ...] = ()
+
+
+def uses_beads(profile: Profile) -> bool:
+    """Whether the repo tracks its work in beads (an `applies` predicate)."""
+    return profile.tracker == "beads"
 
 
 @dataclass
@@ -166,21 +179,38 @@ class Context:
         return done.stdout if done is not None and done.returncode == 0 else None
 
 
+# What part of the setup a concern judges: generic (any repo), stack (one language's tools),
+# framework (an engine or framework on top of a stack), or agent (the agent harness: instructions,
+# session settings, session hooks). Reports group by it.
+LAYERS = ("generic", "stack", "framework", "agent")
+
+
+@dataclass(frozen=True)
+class Sub:
+    """One row a multi-row check emits: its own concern label, id and statement."""
+
+    concern: str
+    id: str
+    statement: str
+    finding: Finding
+
+
 @dataclass(frozen=True)
 class Check:
-    """One checkpoint's script: `run` decides its verdict.
+    """One checkpoint's script: `run` decides its verdict, or, for a multi-row check, one per `Sub`.
 
     `audit_only`: left out of the per-commit gate (`--gate` without `--audit`), because it is slow or reads
-    state only the developer's own clone has (bd's database).
+    state only the developer's own clone has (bd's database, installed hooks).
     """
 
     id: str
     concern: str
     statement: str
-    run: Callable[[Context], Finding]
+    run: Callable[[Context], Finding | list[Sub]]
     version: int = 1
     audit_only: bool = False
     applies: Callable[[Profile], bool] = lambda _profile: True
+    layer: str = "generic"
 
 
 REGISTRY: list[Check] = []
@@ -193,12 +223,31 @@ def check(
     version: int = 1,
     audit_only: bool = False,
     applies: Callable[[Profile], bool] = lambda _profile: True,
+    layer: str = "generic",
 ) -> Callable[[Callable[[Context], Finding]], Callable[[Context], Finding]]:
     """Register the decorated function as checkpoint `id` (`<concern>.<name>`)."""
 
     def register(fn: Callable[[Context], Finding]) -> Callable[[Context], Finding]:
         concern = id.split(".", 1)[0]
-        REGISTRY.append(Check(id=id, concern=concern, statement=statement, run=fn, version=version, audit_only=audit_only, applies=applies))
+        REGISTRY.append(
+            Check(id=id, concern=concern, statement=statement, run=fn, version=version, audit_only=audit_only, applies=applies, layer=layer)
+        )
+        return fn
+
+    return register
+
+
+def check_each(
+    id: str,  # noqa: A002 -- the checkpoint family's own word for it
+    statement: str,
+    *,
+    version: int = 1,
+    layer: str = "generic",
+) -> Callable[[Callable[[Context], list[Sub]]], Callable[[Context], list[Sub]]]:
+    """Register a function that emits several rows, each with its own concern and id (one per stack)."""
+
+    def register(fn: Callable[[Context], list[Sub]]) -> Callable[[Context], list[Sub]]:
+        REGISTRY.append(Check(id=id, concern=id.split(".", 1)[0], statement=statement, run=fn, version=version, layer=layer))
         return fn
 
     return register

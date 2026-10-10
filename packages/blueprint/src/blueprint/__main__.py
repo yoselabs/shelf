@@ -1,4 +1,5 @@
 """`blueprint check`: judge a repository against the blueprint, in one process.
+`blueprint survey`: write the run survey template, or check a filled one.
 
 Runs as bare `python3` from a shelf clone, no install:
 
@@ -15,8 +16,11 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from blueprint import report
+from blueprint import report, survey
 from blueprint.runner import run
+
+RECIPES = Path(__file__).resolve().parent / "recipes"
+RECIPE_FILES = {"hooks": "pre-commit-config.yaml"}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,16 +38,46 @@ def main(argv: list[str] | None = None) -> int:
     form = chk.add_mutually_exclusive_group()
     form.add_argument("--json", action="store_true", help="print JSON")
     form.add_argument("--gate", action="store_true", help="print only what is not passing, one line each (for `make blueprint`)")
+    form.add_argument("--summary", action="store_true", help="print one row per concern, grouped by layer")
     chk.add_argument("--write", action="store_true", help="write docs/blueprint/<concern>.md reports")
+    srv = sub.add_parser("survey", help="write the run survey template, or check a filled one")
+    srv.add_argument("--repo", default=".", type=Path, help="the repository the survey is about (default: cwd)")
+    srv.add_argument("--check", type=Path, metavar="FILE", help="exit 1 unless FILE answers every question in the closed set")
+    rcp = sub.add_parser("recipe", help="print a blueprint recipe file")
+    rcp.add_argument("name", choices=sorted(RECIPE_FILES), help="hooks: the .pre-commit-config.yaml prek reads")
     args = parser.parse_args(argv)
 
+    if args.command == "recipe":
+        sys.stdout.write((RECIPES / RECIPE_FILES[args.name]).read_text())
+        return 0
+    if args.command == "survey":
+        return _survey(args.repo, args.check)
     result = run(args.repo, concern=args.concern, audit=args.audit)
-    text = report.as_json(result) if args.json else report.gate(result) if args.gate else report.markdown(result)
+    if args.json:
+        text = report.as_json(result)
+    elif args.gate:
+        text = report.gate(result)
+    elif args.summary:
+        text = report.summary(result)
+    else:
+        text = report.markdown(result)
     sys.stdout.write(text + "\n")
     if args.write:
         for path in report.write(result, args.repo.resolve(), date.today()):  # noqa: DTZ011 -- a report date, the owner's calendar
             sys.stderr.write(f"wrote {path}\n")
     return result.exit_code
+
+
+def _survey(repo: Path, filled: Path | None) -> int:
+    if filled is None:
+        result = run(repo)
+        sys.stdout.write(survey.template(repo.resolve().name, result.set_hash) + "\n")
+        return 0
+    found = survey.problems(filled.read_text())
+    for line in found:
+        sys.stdout.write(f"survey: {line}\n")
+    sys.stdout.write(f"survey: {'incomplete' if found else 'complete'}\n")
+    return 1 if found else 0
 
 
 if __name__ == "__main__":

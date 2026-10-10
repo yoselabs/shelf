@@ -1,0 +1,6 @@
+# Blueprint state for the shelf (packages/blueprint README: the format). Human-owned.
+
+[settings]
+# gate.clean-clone: a fresh clone's `make check`, measured at 19 s with the gate image cached
+# (2026-10-10); an image rebuild after a lockfile change takes about 1-2 min more.
+clean-clone-seconds = 240

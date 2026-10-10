@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import tempfile
 import time
@@ -108,36 +107,65 @@ def ci(ctx: Context) -> Finding:
     return passing(f"{len(files)} workflow(s) run the gate, pinned, with permissions")
 
 
-_MANAGERS = {
-    "pre-commit": (".pre-commit-config.yaml",),
+# Hooks (research/hooks-and-beads.md): prek owns them through .pre-commit-config.yaml, and bd's hooks
+# run from that file (`bd hooks run <event>`), never installed by bd itself. bd appends its block to
+# other managers' hook files, where a failing check then no longer blocks the commit.
+HOOK_CONFIG = ".pre-commit-config.yaml"
+BD_EVENTS = ("pre-commit", "post-merge", "pre-push", "post-checkout", "prepare-commit-msg")
+_OTHER_MANAGERS = {
     "lefthook": ("lefthook.yml", "lefthook.yaml", ".lefthook.yml", ".lefthook.yaml"),
     "husky": (".husky",),
+    "githooks": (".githooks",),
 }
+_RECIPE = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint recipe hooks > .pre-commit-config.yaml; then `prek install`"
+_BEADS_MARKER = "BEGIN BEADS INTEGRATION"
 
 
-# Audit only: installed hooks are per-clone state; CI's fresh checkout and the gate container have none.
-@check("gate.one-hook-manager", "one tool owns the git hooks, and the pre-commit hook chains beads when the repo uses it", audit_only=True)
-def one_hook_manager(ctx: Context) -> Finding:
-    """Exactly one hook manager config; an executable pre-commit hook; beads chained in it."""
+@check("gate.hooks-recipe", "prek owns the git hooks through .pre-commit-config.yaml, and bd's hooks run from it", version=2)
+def hooks_recipe(ctx: Context) -> Finding:
+    """The versioned half of the recipe: one config, bd's five events in it, no bd-owned hook files tracked."""
+    others = [name for name, files in _OTHER_MANAGERS.items() if any(ctx.path(f).exists() for f in files)]
+    config = ctx.read(HOOK_CONFIG)
+    tracked = (ctx.git("ls-files", ".beads/hooks", ".beads-hooks") or "").split()
+    problems: list[str] = []
+    if others:
+        problems.append(f"hooks also owned by {', '.join(others)}: move their checks into {HOOK_CONFIG} and delete them")
+    if tracked:
+        problems.append(f"bd's own hook files are tracked ({len(tracked)}): git rm -r --cached .beads/hooks")
+    if config is None:
+        return not_set_up("; ".join(["no .pre-commit-config.yaml", *problems]), _RECIPE, FixedBy.AUTO)
+    if ctx.profile.tracker == "beads":
+        missing = [e for e in BD_EVENTS if f"bd hooks run {e}" not in config]
+        if missing:
+            problems.append(f"bd events not run from {HOOK_CONFIG}: {', '.join(missing)}")
+        if "default_install_hook_types" not in config:
+            problems.append("no default_install_hook_types, so `prek install` installs pre-commit only")
+    if problems:
+        return failing("; ".join(problems), f"apply the recipe ({_RECIPE}), keeping the repo's own checks after bd's entries")
+    return passing(f"{HOOK_CONFIG} owns the hooks" + (", bd's five events run from it" if ctx.profile.tracker == "beads" else ""))
+
+
+@check("gate.hooks-installed", "the installed git hooks are prek's, in .git/hooks, with no bd block injected", version=2, audit_only=True)
+def hooks_installed(ctx: Context) -> Finding:
+    """The clone-local half: core.hooksPath unset, prek's (or pre-commit's) script installed, no bd marker."""
     if ctx.git("rev-parse", "--git-dir") is None:
         return not_checked("not a git repository")
-    managers = [name for name, files in _MANAGERS.items() if any(ctx.path(f).exists() for f in files)]
-    if len(managers) > 1:
-        return failing(f"{len(managers)} hook managers configured: {', '.join(managers)}", "keep one; move the other's hooks into it")
-    hooks_path = (ctx.git("rev-parse", "--git-path", "hooks") or "").strip()
-    hooks_dir = Path(hooks_path) if Path(hooks_path).is_absolute() else ctx.repo / hooks_path
+    fix = "bd hooks uninstall; git config --unset core.hooksPath; prek install"
+    hooks_path = (ctx.git("config", "--local", "core.hooksPath") or "").strip()
+    if hooks_path:
+        return failing(f"core.hooksPath is {hooks_path}: a fresh clone runs no hooks, and prek refuses to install", fix, FixedBy.AUTO)
+    hooks_dir = Path((ctx.git("rev-parse", "--git-path", "hooks") or ".git/hooks").strip())
+    hooks_dir = hooks_dir if hooks_dir.is_absolute() else ctx.repo / hooks_dir
     pre_commit = hooks_dir / "pre-commit"
-    if not pre_commit.is_file() or not os.access(pre_commit, os.X_OK):
-        return not_set_up(
-            f"no executable pre-commit hook in {hooks_path or '.git/hooks'}",
-            "install the hooks (`make bootstrap` for a shelf consumer)",
-            FixedBy.AUTO,
-        )
+    if not pre_commit.is_file():
+        return not_set_up("no pre-commit hook installed", "prek install", FixedBy.AUTO)
+    injected = sorted(p.name for p in hooks_dir.iterdir() if p.is_file() and _BEADS_MARKER in p.read_text(errors="replace"))
+    if injected:
+        return failing(f"bd injected its block into {', '.join(injected)}", fix, FixedBy.AUTO)
     text = pre_commit.read_text(errors="replace")
-    if ctx.profile.tracker == "beads" and "bd hooks run" not in text and not managers:
-        return failing("the pre-commit hook does not chain beads (`bd hooks run`)", "`bd hooks install --chain`", FixedBy.AUTO)
-    owner = managers[0] if managers else f"{hooks_path or '.git/hooks'} scripts"
-    return passing(f"hooks owned by {owner}" + (", beads chained" if ctx.profile.tracker == "beads" else ""))
+    if "File generated by prek" not in text and "File generated by pre-commit" not in text:
+        return failing("the pre-commit hook is not prek's", "prek install --overwrite", FixedBy.AUTO)
+    return passing("prek's hooks installed in .git/hooks; no bd block injected")
 
 
 def _gate_scripts(ctx: Context, makefile: str) -> list[str]:
@@ -196,3 +224,12 @@ def clean_clone(ctx: Context) -> Finding:
         done = ctx.run("make", "check", cwd=Path(tmp), timeout=3600)
         took = round(time.monotonic() - start)
     return _judge_clone(done, took, ctx.settings.get("clean-clone-seconds"))
+
+
+def reachable_recipes(makefile: str) -> str:
+    """The recipe text of every target `make check` or `make check-all` reaches, joined.
+
+    `check-all` counts: a repo may narrow `check` to what a change touches and keep the whole
+    run (coverage floor included) in `check-all`, which CI runs.
+    """
+    return "\n".join(dict.fromkeys(_reachable(makefile) + _reachable(makefile, "check-all")))

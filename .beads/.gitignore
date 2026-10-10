@@ -81,3 +81,6 @@ bd.db
 # Dolt history (bd history <id>) already records every write, so it stays local.
 issues.jsonl
 interactions.jsonl
+
+# bd never owns the hooks here: prek runs bd from .pre-commit-config.yaml (blueprint gate.hooks-recipe)
+hooks/

@@ -31,8 +31,9 @@ check-host: guard preset blueprint lint typecheck spell deps test-affected
 check-all-host: guard preset blueprint lint typecheck spell deps test
 test-image:
 	docker build -q -f tools/gate/gate.Dockerfile -t $(TEST_IMAGE) .
+# The result cache lives in a named volume per checkout, so it survives between container runs.
 container-%: test-image
-	docker run --rm $(TEST_IMAGE) make $*
+	docker run --rm -v $(TEST_IMAGE)-cache:/app/.cache $(TEST_IMAGE) make $*
 
 # The blueprint's per-commit checkpoints (packages/blueprint): one line per one that is not
 # passing. The audit-only ones (slow, or reading this clone's bd database) run in the
@@ -133,10 +134,12 @@ test:
 	uv run pytest $(PYTEST_PAR) --cov --cov-report=term-missing --cov-fail-under=65
 
 # Only the tests a change can reach: the changed packages, every package depending on them,
-# and the fitness tests (tools/affected.py). No coverage floor: it is measured over the whole
-# repo, so a partial run cannot meet it.
+# and the fitness tests (tools/affected.py). A package whose inputs are unchanged since its suite
+# last passed is skipped (the result cache, .cache/affected-passed.json). No coverage floor: it is
+# measured over the whole repo, so a partial run cannot meet it.
 test-affected:
-	uv run pytest $(PYTEST_PAR) -p no:cov $$(python3 tools/affected.py --explain)
+	@paths="$$(python3 tools/affected.py --explain --skip-passed)"; \
+	 uv run pytest $(PYTEST_PAR) -p no:cov $$paths && python3 tools/affected.py --record $$paths
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. CI runs

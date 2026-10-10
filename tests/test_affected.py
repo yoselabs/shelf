@@ -49,3 +49,16 @@ def _pkgs(paths: list[str]) -> set[str]:
 )
 def test_a_change_selects_its_packages_and_their_dependents(repo: Path, changed: list[str], expected: set[str]) -> None:
     assert _pkgs(affected.affected(repo, changed)) == expected
+
+
+def test_a_suite_that_passed_is_skipped_until_it_or_a_dependency_changes(repo: Path) -> None:
+    (repo / "packages/base/src.py").write_text("x = 1\n")
+    paths = ["tests", "packages/base/tests", "packages/middle/tests", "packages/leaf/tests"]
+    affected.record(repo, paths)
+    assert affected.skip_passed(repo, paths) == ["tests"]
+
+    (repo / "packages/base/src.py").write_text("x = 2\n")
+    assert affected.skip_passed(repo, paths) == ["tests", "packages/base/tests", "packages/middle/tests"]
+
+    (repo / "uv.lock").write_text("changed\n")
+    assert affected.skip_passed(repo, paths) == paths
