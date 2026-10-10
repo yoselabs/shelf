@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "bdd-tags"
+why = "a2kay's use-case features trace to specs and beads by tag, state known bugs as strict expected failures, and write scenarios before their steps."
+needs = "The pytest plugin: spec:/bug: swallowed, known_bug:<id> strict xfail, pending skipped and registered."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

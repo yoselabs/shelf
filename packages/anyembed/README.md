@@ -70,3 +70,9 @@ started = time.time()
 vectors = cache.embed(emb.model_id, texts, emb.embed_documents)  # computes only the misses
 cache.prune(unused_since=started)  # after a full pass: drop what the corpus no longer has
 ```
+
+## Testing helpers
+
+`anyembed.testing.HashEmbedder(dim)` is an `Embedder` that loads no model: a vector is a hash
+of its text, unit length, so the same text always lands in the same place
+(`hash_vector(text, dim)` for one vector).

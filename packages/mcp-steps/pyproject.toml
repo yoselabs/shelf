@@ -1,0 +1,26 @@
+[project]
+name = "mcp-steps"
+version = "0.1.0"
+description = "Gherkin steps that drive an MCP server the way a client does: an actor calls a tool with a JSON docstring, each actor is its own session on the same server, and the last result or refusal is kept for the Then steps."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+# No sibling shelf dependency on purpose: one would need a workspace source, and that
+# source leaks to a git consumer and collides with its own pin of the sibling.
+dependencies = [
+    "fastmcp>=3.4,<4",
+    "pytest-bdd>=8,<9",
+]
+
+# fastmcp is named only in annotations: the suite hands in fastmcp Clients and gets
+# fastmcp results back, so the version range is part of the contract all the same.
+[tool.deptry.per_rule_ignores]
+DEP002 = ["fastmcp"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcp_steps"]

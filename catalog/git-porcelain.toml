@@ -2,9 +2,9 @@
 name = "git-porcelain"
 kind = "any-lib"
 tier = "T1"
-release = "git-porcelain-v0.4.0"
+release = "git-porcelain-v0.5.0"
 capability = "Stop caring about git subprocess plumbing and credential fidelity."
 implementation = "ours"          # pure surface over the git binary; no third-party lib to swap
 status = "active"
-owner = "Denis Tomilin"
-notes = "A pure, fail-loud surface over the git binary, preserving the user's credential/config fidelity."
+owner = "yoselabs"
+notes = "A pure, fail-loud surface over the git binary, preserving the user's credential/config fidelity. v0.5.0: git_porcelain.testing — hermetic_env/apply_hermetic_env (no host config, no leaked GIT_DIR, the quiet set opt-out, identity a parameter) and git(cwd, *args); no pytest import. Its own tests use these helpers."

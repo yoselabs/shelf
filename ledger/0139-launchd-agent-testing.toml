@@ -1,0 +1,10 @@
+seq = 139
+date = "2026-10-10"
+event = "delivery"
+software = "launchd-agent"
+release = "launchd-agent-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE: launchd_agent.testing — FakeLaunchctl, RefusingLaunchctl (from the package's tests and a2kay's tests/test_owner_login_item.py, near-identical copies) and refusing_launchctl_bin (from a2kay's tests/conftest.py). The package's own tests import them. Package metadata names yoselabs."""

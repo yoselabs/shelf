@@ -1,9 +1,9 @@
 [project]
 name = "launchd-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "A per-user macOS LaunchAgent: render its plist, load it with launchctl (a refused bootstrap is a failure, not a plist left behind), unload it, and report whether it is installed and loaded."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.11"
 license = "Apache-2.0"
 

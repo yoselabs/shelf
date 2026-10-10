@@ -8,55 +8,17 @@ are never touched.
 from __future__ import annotations
 
 import plistlib
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import launchd_agent as la
 import pytest
+from launchd_agent.testing import FakeLaunchctl, RefusingLaunchctl
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 _LABEL = "dev.example.agent"
-
-
-@dataclass
-class _Result:
-    returncode: int
-    stdout: str = ""
-    stderr: str = ""
-
-
-class FakeLaunchctl:
-    """Records launchctl invocations and tracks which labels are 'loaded'."""
-
-    def __init__(self) -> None:
-        self.loaded: set[str] = set()
-        self.calls: list[list[str]] = []
-
-    def __call__(self, cmd: list[str]) -> _Result:
-        self.calls.append(cmd)
-        sub = cmd[1]
-        if sub == "bootstrap":  # launchctl bootstrap gui/<uid> <plist>
-            self.loaded.add(Path(cmd[3]).stem)
-            return _Result(0)
-        if sub == "bootout":  # launchctl bootout gui/<uid>/<label>
-            self.loaded.discard(cmd[2].rsplit("/", 1)[-1])
-            return _Result(0)
-        if sub == "print":  # launchctl print gui/<uid>/<label>
-            return _Result(0 if cmd[2].rsplit("/", 1)[-1] in self.loaded else 1)
-        return _Result(0)
-
-
-class RefusingLaunchctl(FakeLaunchctl):
-    """`launchctl bootstrap` refuses — the label is already loaded, or the domain rejects it."""
-
-    def __call__(self, cmd: list[str]) -> _Result:
-        if cmd[1] == "bootstrap":
-            self.calls.append(cmd)
-            return _Result(5, stderr="Bootstrap failed: 5: Input/output error")
-        return super().__call__(cmd)
 
 
 def _install(tmp_path: Path, ctl: la.Launchctl) -> Path:

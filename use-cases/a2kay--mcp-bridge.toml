@@ -6,6 +6,6 @@ consumer = "a2kay"
 software = "mcp-bridge"
 why = "Claude Desktop's Chat tab reaches the a2kay server only through a local stdio program; `a2kay bridge` is that program."
 needs = "build_bridge(url, headers=callable) with the token, the bridge's session id and the stdio client's name per request; calls held while the server restarts."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

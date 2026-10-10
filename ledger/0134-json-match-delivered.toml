@@ -1,0 +1,10 @@
+seq = 134
+date = "2026-10-10"
+event = "delivery"
+software = "json-match"
+release = "json-match-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `tests/usecases/steps/values.py` unchanged in behaviour: `dig` (dotted path, -1, `*`, MISSING apart from null), `as_text`, `compare` over every operator of the step vocabulary, `matches` (subset). Two changes: `*` over a non-list raises TypeError instead of an assert, and an unknown operator raises ValueError naming the list (`OPS`, longest first for a step regex). Tests are Gherkin: three features of Scenario Outlines. a2kay's assertion steps import it; values.py is deleted."""

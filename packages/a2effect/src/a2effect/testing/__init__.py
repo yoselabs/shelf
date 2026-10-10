@@ -1,4 +1,11 @@
-"""contract_tests(app) — pytest-collectible test generator for the typed-error contract.
+"""Test helpers for the typed-error contract.
+
+- ``contract_tests(app)``: a pytest-collectible test generator for the contract (below).
+- ``envelope_of(x)`` / ``assert_refused(x, code)``: read the error envelope out of what a
+  caller received (an MCP tool result, an HTTP body, its JSON text) and assert on its code.
+- ``a2effect.testing.steps``: the Gherkin step ``the call is refused with "{code}"``
+  (needs the ``testing`` extra's pytest-bdd).
+
 
 The contract checks operate against a minimal `App`-shaped protocol:
 
@@ -12,6 +19,7 @@ to be available on the app; if missing, surface-parity tests are skipped, never 
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any, Protocol, get_args, get_type_hints, runtime_checkable
 
 import pytest
@@ -141,3 +149,54 @@ def contract_tests(  # noqa: C901 — three independent check categories share o
             tests["test_surface_parity"] = test_surface_parity
 
     return tests
+
+
+def _body(received: Any) -> dict[str, Any]:
+    """The JSON body a caller received: an MCP result's structured content or first text block,
+    a mapping as is, or JSON text parsed."""
+    if isinstance(received, dict):
+        return received
+    if isinstance(received, str | bytes):
+        parsed: Any = json.loads(received)
+        if not isinstance(parsed, dict):
+            msg = f"the body is not a JSON object: {received!r}"
+            raise AssertionError(msg)  # noqa: TRY004 — a test helper fails as an assertion, whatever the cause
+        return parsed
+    structured = getattr(received, "structured_content", None) or getattr(received, "structuredContent", None)
+    if isinstance(structured, dict):
+        return structured
+    content = getattr(received, "content", None) or []
+    text = getattr(content[0], "text", None) if content else None
+    if text is None:
+        msg = f"no envelope in {received!r}: neither structured content nor a text block"
+        raise AssertionError(msg)
+    return _body(text)
+
+
+def envelope_of(received: Any) -> dict[str, Any]:
+    """The error envelope (``code``, ``message``, ``hint``, ``details``…) in what a caller received.
+
+    ``received`` is an MCP tool result (``structured_content`` or its first text block holds
+    ``{"error": …}``), an HTTP body, its JSON text, or the envelope itself. Returned as a plain
+    mapping, so a test reads ``details`` without knowing the envelope version.
+    """
+    body = _body(received)
+    error = body.get("error", body)
+    if not isinstance(error, dict) or "code" not in error:
+        msg = f"no error envelope with a code in {body!r}"
+        raise AssertionError(msg)
+    return error
+
+
+def assert_refused(received: Any, code: str) -> dict[str, Any]:
+    """Assert ``received`` carries an envelope with ``code``; return the envelope.
+
+    ``None`` means the call succeeded, which fails with that said."""
+    if received is None:
+        msg = f"expected a refusal with {code!r}, the call succeeded"
+        raise AssertionError(msg)
+    error = envelope_of(received)
+    if error["code"] != code:
+        msg = f"expected a refusal with {code!r}, got {error['code']!r}: {error}"
+        raise AssertionError(msg)
+    return error

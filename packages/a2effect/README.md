@@ -96,6 +96,19 @@ member to assert: envelopes round-trip identically across MCP/HTTP/CLI,
 every registered enricher is reachable from some tool's declared raise
 set, and the three surfaces agree on the envelope shape.
 
+### 5. Assert on a refusal
+
+```python
+from a2effect.testing import assert_refused, envelope_of
+
+envelope_of(result)               # an MCP result, an HTTP body, its JSON text, or the envelope
+assert_refused(result, "not_found")   # returns the envelope; None means the call succeeded
+```
+
+`a2effect.testing.steps` ships the Gherkin step `the call is refused with "{code}"` (the
+`testing` extra brings pytest-bdd). It reads an `outcome` fixture the suite provides: any object
+whose `error` holds the last refusal's envelope and whose `last` the last result.
+
 ## What you get on the wire
 
 The envelope (v2) is `{code, message, hint, retryable, details,

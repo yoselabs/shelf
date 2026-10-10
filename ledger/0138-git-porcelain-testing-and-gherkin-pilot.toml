@@ -1,0 +1,10 @@
+seq = 138
+date = "2026-10-10"
+event = "delivery"
+software = "git-porcelain"
+release = "git-porcelain-v0.5.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE: git_porcelain.testing — `hermetic_env`/`apply_hermetic_env` (no system or global config, the git variables that point elsewhere removed, the quiet set through GIT_CONFIG_* and opt-out with config={}, the identity a parameter, HOME optional) and `git(cwd, *args)` failing with git's stderr. No pytest import. From a2kay's tests/conftest.py and the package's own 3 env setups and 4 `_git` copies. The package's tests use it (4 `_git` copies gone). PILOT reverted: as Gherkin the tests grew from 1,070 to ~1,590 lines (steps were the package's own), so they stay pytest. Package metadata names yoselabs."""

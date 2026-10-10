@@ -1,0 +1,10 @@
+seq = 135
+date = "2026-10-10"
+event = "delivery"
+software = "bdd-tags"
+release = "bdd-tags-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's `tests/usecases/conftest.py` (`pytest_bdd_apply_tag`, the `@pending` collection hook). Now a pytest plugin on entry point `pytest11`, registering the `pending` marker itself. Tests are Gherkin over pytester sandboxes (the shelf root conftest declares `pytester`). a2kay's two hooks are deleted."""

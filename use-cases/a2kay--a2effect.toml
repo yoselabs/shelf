@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "a2effect"
+why = "a2kay's typed errors are a2effect AppErrors, and its use-case scenarios assert on the envelope a refused MCP call carries."
+needs = "AppError, codes(), the v2 ErrorEnvelope; a2effect.testing.envelope_of and the step `the call is refused with \"{code}\"` (testing extra)."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

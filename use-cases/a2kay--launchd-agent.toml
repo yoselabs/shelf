@@ -6,6 +6,6 @@ consumer = "a2kay"
 software = "launchd-agent"
 why = "a2kay's menu-bar supervisor must survive login and reboot so agents never meet a missing server; a LaunchAgent with KeepAlive starts it, and the menu bar's 'Start at login' must say so when launchd refuses."
 needs = "install(label, argv, env, log_path, agents_dir, working_dir, run_launchctl) raising LaunchdError on a refused bootstrap; uninstall/status(label) -> LoginItemStatus; launch_path(tools) so git, git-lfs and claude are found at login."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

@@ -3,7 +3,7 @@ name = "mcp-bridge"
 version = "0.1.0"
 description = "A stdio MCP server that relays every request to a Streamable HTTP MCP server: headers per request, a fresh server session per call, and a call made while the server restarts waits for it."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = [

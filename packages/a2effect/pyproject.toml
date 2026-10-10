@@ -1,9 +1,9 @@
 [project]
 name = "a2effect"
-version = "0.2.0"
+version = "0.3.0"
 description = "Typed-error foundation for Python frameworks. Standalone, pydantic-only, adoptable by any framework wanting typed errors on the wire."
 readme = "README.md"
-authors = [{name = "Denis Tomilin"}]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.11"
 license = "Apache-2.0"
 keywords = ["errors", "effect", "typed-errors", "mcp", "fastapi"]
@@ -21,9 +21,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# `a2effect.testing` ships a pytest-based contract-test generator, so pytest is a
-# real (opt-in) dependency of that module — base a2effect stays pydantic-only.
-testing = ["pytest>=8,<9"]
+# `a2effect.testing` ships a pytest-based contract-test generator and pytest-bdd steps,
+# so both are real (opt-in) dependencies of that module — base a2effect stays pydantic-only.
+testing = ["pytest>=8,<9", "pytest-bdd>=8,<9"]
 
 # Lint rules ship here, registered for any conforming runner via entry points.
 [project.entry-points."a2lint.rules"]

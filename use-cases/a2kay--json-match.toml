@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "json-match"
+why = "Every Then step of a2kay's use-case scenarios reads a subject by a dotted path and compares it with quoted text or a JSON subset; the rules are the step vocabulary's, written once."
+needs = "dig with MISSING apart from null, compare over OPS, matches (subset), as_text."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

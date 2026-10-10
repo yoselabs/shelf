@@ -28,7 +28,7 @@ hanging on a prompt.
 ```python
 me = git.Identity("a2kay", "a2kay@example.invalid")
 sha = git.commit_paths(repo, ["notes/a.md", "notes/old.md"], "move note/a",
-                       author=git.Identity("Robin Vale", "robin@example.com"), committer=me,
+                       author=git.Identity("the author", "author@example.invalid"), committer=me,
                        trailers=[("App-Entity", "note/a")])     # None when nothing changed
 for c in git.log_grep(repo, "^App-Entity: note/a$"):            # newest first, with paths
     old = git.show_at(repo, c.paths[0], c.sha)                   # None if absent there
@@ -93,3 +93,21 @@ git.merge(repo, "origin/main", author=me, committer=me); git.lfs_checkout(repo)
 `lfs_setup`, `lfs_checkout`, `lfs_paths`, `lfs_push`, `lfs_fetch`, and the types
 `Identity`, `Commit`, `MergeResult`, `StatusEntry`, `GitError`, `RemoteError`. Interpreting the git data (mapping conflicts to
 your domain, etc.) is the caller's job.
+
+## Testing helpers
+
+```python
+from git_porcelain import Identity
+from git_porcelain.testing import apply_hermetic_env, git
+
+apply_hermetic_env(monkeypatch, identity=Identity("the author", "author@example.invalid"), home=tmp_path)
+git(repo, "init", "-q", "-b", "main")   # stdout; a failure raises with git's stderr
+```
+
+- `hermetic_env` / `apply_hermetic_env` shut the machine's git out: no system or global
+  config, `GIT_DIR` and the other variables that point elsewhere removed, settings passed
+  through `GIT_CONFIG_*` (command-line scope, so a repository's own config cannot undo them).
+- `QUIET` (no hooks, no auto-maintenance, no signing, no template) is the default; a test of a
+  hook or of maintenance passes `config={}`. The identity is a parameter; `None` leaves git
+  with no `user.*`. Neither imports pytest.
+- This package's own tests use these helpers.

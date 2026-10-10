@@ -1,0 +1,10 @@
+seq = 137
+date = "2026-10-10"
+event = "delivery"
+software = "a2effect"
+release = "a2effect-v0.3.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE: a2effect.testing becomes a package. `envelope_of` reads the envelope from an MCP result (structured content or first text block), an HTTP body, its JSON text or the envelope itself; `assert_refused` asserts its code. `a2effect.testing.steps` ships `the call is refused with \"{code}\"` over an `outcome` fixture; pytest-bdd joins the `testing` extra. Was SHELVED at count 2 (a2kay, a2web); promoted on the owner's 2026-10-10 call that shelf steps live with their package. Additive; contract_tests unchanged. Tests for the new parts are Gherkin. Package metadata names yoselabs."""

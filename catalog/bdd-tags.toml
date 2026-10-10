@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "bdd-tags"
+kind = "primitive"
+tier = "T0"
+release = "bdd-tags-v0.1.0"
+capability = "Stop rewriting the tag hooks every Gherkin suite grows — @spec:/@bug: traceability that is not a pytest marker, @known_bug:<id> as a strict expected failure, @pending as a skip; a pytest plugin that is on once installed."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (tests/usecases/conftest.py, pytest_bdd_apply_tag and the pending hook). Entry point pytest11, so a consumer writes nothing in a conftest (pytest refuses pytest_plugins below the rootdir). Depends on pytest and pytest-bdd. Born candidate."

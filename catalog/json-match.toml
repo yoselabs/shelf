@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "json-match"
+kind = "primitive"
+tier = "T0"
+release = "json-match-v0.1.0"
+capability = "Stop rewriting how a test step reads and compares a JSON value — a dotted path into it (an index, -1, * over a list) with absent told apart from null, a comparison against quoted text, and a subset match that checks only the keys named."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (tests/usecases/steps/values.py, the use-case step vocabulary's Paths, Comparing and matches: rules). No dependencies; not tied to pytest. Born candidate."

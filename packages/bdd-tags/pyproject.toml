@@ -1,0 +1,26 @@
+[project]
+name = "bdd-tags"
+version = "0.1.0"
+description = "The tags a Gherkin suite reads rather than runs: @spec:/@bug: traceability that is not a pytest marker, @known_bug:<id> as a strict expected failure, and @pending as a skip."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = ["pytest>=8,<9", "pytest-bdd>=8,<9"]
+
+# A pytest plugin: installing the package turns it on, so no consumer writes
+# `pytest_plugins` in a conftest (which pytest refuses below the rootdir).
+[project.entry-points.pytest11]
+bdd_tags = "bdd_tags"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bdd_tags"]
+
+# pytest-bdd is never imported: the plugin implements its `pytest_bdd_apply_tag` hook,
+# which only pytest-bdd calls.
+[tool.deptry.per_rule_ignores]
+DEP002 = ["pytest-bdd"]

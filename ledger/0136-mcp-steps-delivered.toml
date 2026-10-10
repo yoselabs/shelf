@@ -1,0 +1,10 @@
+seq = 136
+date = "2026-10-10"
+event = "delivery"
+software = "mcp-steps"
+release = "mcp-steps-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """Promoted from a2kay's use-case world (`tests/usecases/conftest.py` Agent: sessions per actor, call, the refusal envelope, notices) and `steps/calls.py` (`{actor} calls \"{tool}\" with:`). McpSessions keeps one fastmcp Client per actor from one connect factory, runs calls on an asyncio.Runner, keeps last or error; `ask` is the observer's read that keeps nothing; `prepare` is the suite's placeholder hook. The refusal reader is a parameter, so there is no sibling dependency on a2effect. Tests are Gherkin against an in-memory FastMCP server. a2kay's Agent now holds an McpSessions; mcp-bridge's tests drive the bridge through it."""

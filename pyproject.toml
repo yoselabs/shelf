@@ -33,6 +33,7 @@ anyembed = { workspace = true }
 [dependency-groups]
 dev = [
     "pytest>=8,<9",
+    "pytest-bdd>=8,<9",  # Gherkin: how every shelf package states its tests (scenarios + outlines); property tests stay plain pytest
     "pytest-cov>=6,<8",       # coverage measurement + floor
     "ruff>=0.7,<1",           # lint + format
     "pyrefly>=1.3,<2",        # type checking
@@ -192,6 +193,7 @@ testpaths = [
     "packages/anyllm/tests",
     "packages/asgi-token-gate/tests",
     "packages/async-scope/tests",
+    "packages/bdd-tags/tests",
     "packages/atomic-io/tests",
     "packages/browser-cookies/tests",
     "packages/content-extract/tests",
@@ -207,6 +209,7 @@ testpaths = [
     "packages/http-cache/tests",
     "packages/http-fetch/tests",
     "packages/json-in-html/tests",
+    "packages/json-match/tests",
     "packages/jsonl-log/tests",
     "packages/launchd-agent/tests",
     "packages/lean-wire/tests",
@@ -217,6 +220,7 @@ testpaths = [
     "packages/mcp-bridge/tests",
     "packages/mcp-clients/tests",
     "packages/mcp-feedback/tests",
+    "packages/mcp-steps/tests",
     "packages/mcp-result-wire/tests",
     "packages/page-tsv/tests",
     "packages/partial-time/tests",

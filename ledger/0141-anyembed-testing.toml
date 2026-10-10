@@ -1,0 +1,10 @@
+seq = 141
+date = "2026-10-10"
+event = "delivery"
+software = "anyembed"
+release = "anyembed-v0.4.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE: anyembed.testing — hash_vector(text, dim) and HashEmbedder, an Embedder that loads no model, from a2kay's tests/conftest.py `_fake_vector`. Package metadata names yoselabs."""

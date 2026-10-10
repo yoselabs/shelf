@@ -6,19 +6,15 @@ Real temp repos and a real bare remote; no subprocess mocking.
 
 from __future__ import annotations
 
-import subprocess
 from typing import TYPE_CHECKING
 
 import git_porcelain as git
 import pytest
 from git_porcelain import GitError, Identity, RemoteError
+from git_porcelain.testing import git as _git
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-
-def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True, text=True).stdout
 
 
 def _init(path: Path, *, identity: bool = True) -> Path:

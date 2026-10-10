@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "mcp-steps"
+kind = "composite"
+tier = "T2"
+release = "mcp-steps-v0.1.0"
+capability = "Stop rewriting the harness that drives an MCP server from Gherkin — one session per actor on one server, called synchronously from plain steps, the last result (with notices) or refusal kept and never raised, and the step `{actor} calls \"{tool}\" with:` over a JSON docstring."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay (tests/usecases/conftest.py Agent's sessions and call, steps/calls.py). No sibling shelf dependency: the refusal reader is a parameter (a2effect.testing.envelope_of for an a2effect envelope), because a sibling dep needs a workspace source that leaks to git consumers and collides with their own pin. Depends on fastmcp and pytest-bdd. Born candidate."

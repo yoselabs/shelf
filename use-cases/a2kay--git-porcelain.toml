@@ -6,6 +6,6 @@ consumer = "a2kay"
 software = "git-porcelain"
 why = "a2kay's vault is git-backed; it needs safe, fail-loud git state queries without hand-rolling subprocess plumbing or risking credential drift."
 needs = "Repo-state predicates (is_repo, dirty, conflict/merge checks) that preserve the user's git config."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

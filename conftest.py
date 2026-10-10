@@ -31,3 +31,7 @@ from hypothesis import settings
 settings.register_profile("default")
 settings.register_profile("ci", derandomize=True)
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
+
+# `pytester` runs a small suite in a sandbox; bdd-tags proves its plugin hooks with it.
+# Declared here because pytest accepts `pytest_plugins` only in the rootdir conftest.
+pytest_plugins = ["pytester"]

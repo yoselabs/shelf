@@ -8,12 +8,12 @@ standalone transfer agent); no subprocess mocking.
 from __future__ import annotations
 
 import shutil
-import subprocess
 from typing import TYPE_CHECKING
 
 import git_porcelain as git
 import pytest
 from git_porcelain import Identity, RemoteError
+from git_porcelain.testing import git as _git
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -24,10 +24,6 @@ ROBIN = Identity("Robin Vale", "robin@example.com")
 BOT = Identity("a2kay", "a2kay@example.invalid")
 ATTRIBUTES = "*.png filter=lfs diff=lfs merge=lfs -text\n"
 PNG = bytes(range(256)) * 40
-
-
-def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True, text=True).stdout
 
 
 def _isolate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

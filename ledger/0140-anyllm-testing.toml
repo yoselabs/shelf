@@ -1,0 +1,10 @@
+seq = 140
+date = "2026-10-10"
+event = "delivery"
+software = "anyllm"
+release = "anyllm-v0.7.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE: anyllm.testing.hermetic_llm_env — SCRUBBED_ENV plus a consumer's own key names removed, and the Claude Code CLI and SDK adapters reported unavailable (raising if either loses `available`). From a2web's tests/conftest.py `_hermetic_llm_env`; a2kay adopts it in its hermetic env. No pytest import. Package metadata names yoselabs."""

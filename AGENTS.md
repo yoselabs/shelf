@@ -64,6 +64,11 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
 ### Conventions
 
 - Tests-first (BDD/TDD): the failing test (a use-case scenario) before the implementation.
+- Gherkin (pytest-bdd, `tests/features/*.feature`) where the steps are shared ones (`mcp-steps`, `json-match`,
+  a2effect's refusal step). A package's own logic stays plain pytest: the 2026-10-10 pilot rewrote mcp-bridge and
+  git-porcelain as features and both grew 50–90% in lines, because their steps were theirs alone. A generic step or test
+  double lives in the `testing` module of the package it fakes (no runtime dependency: pytest/pytest-bdd only
+  behind a `testing` extra), or in a new package only where none is related.
 - Versions are **git tags**, namespaced per package (`anyllm-v0.2.0`). Never delete an old tag.
 - Changes go through **OpenSpec** (`openspec/changes/<name>/`): proposal → design → tasks → apply →
   archive. Project context for the AI lives in [openspec/config.yaml](openspec/config.yaml).

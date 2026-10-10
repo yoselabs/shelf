@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import git_porcelain as git
 import pytest
 from git_porcelain import Identity, porcelain
+from git_porcelain.testing import git as _git
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,10 +28,6 @@ QUIET = {"core.hooksPath": "/dev/null", "maintenance.auto": "false"}
 def _no_host_config(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-
-
-def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True, text=True).stdout
 
 
 def _repo(tmp_path: Path) -> Path:

@@ -7,16 +7,12 @@ git is present in CI), plus the host-agnostic boundary invariant.
 from __future__ import annotations
 
 import ast
-import subprocess
 from pathlib import Path
 
 import git_porcelain as git
 import pytest
 from git_porcelain import GitError
-
-
-def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(["git", "-C", str(cwd), *args], check=True, capture_output=True, text=True).stdout
+from git_porcelain.testing import git as _git
 
 
 def _init_repo(path: Path) -> None:

@@ -6,6 +6,6 @@ consumer = "a2web"
 software = "anyllm"
 why = "a2web's extraction/judge pipeline needs a metered, fail-loud LLM contract (tokens/cost/latency) across multiple backends, not a bare string."
 needs = "The async Completion-returning complete() surface, fail-loud AnyLLMError (caught locally at Extractor/Judge to degrade to raw), and available()-gated backend selection."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2web"
 status = "active"          # active | retired

@@ -100,3 +100,11 @@ tagged — upgrade when you're ready.
 
 New in v0.2: token/cost/latency on every result, prompt-cache breakpoints
 (`PromptParts`), and two more backends (`claude-code-sdk`, `openai-compatible`).
+
+## Testing helpers
+
+`anyllm.testing.hermetic_llm_env(monkeypatch, extra_env=())` removes the provider variables
+(`SCRUBBED_ENV`, plus a consumer's own key names) and reports the Claude Code CLI and SDK
+backends unavailable, so a test sees no LLM it did not configure. A test that wants one sets
+its own variable or patches `available` after it. It does not cover an adapter added later
+with its own probe; add it there.

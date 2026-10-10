@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "mcp-steps"
+why = "a2kay's use-case scenarios drive the real MCP server as an agent does, with a second session on the same server for concurrent writes."
+needs = "McpSessions(runner, connect, refusal=envelope_of) with session/ask/call/close and last/error; the step `{actor} calls \"{tool}\" with:` over the mcp_world fixture."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

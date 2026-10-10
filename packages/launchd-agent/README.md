@@ -32,3 +32,10 @@ a fake.
   tool's folder in front.
 - The log's folder is created by `install`; launchd does not create it.
 - macOS only at run time; the module imports anywhere. Stdlib only.
+
+## Testing helpers
+
+`launchd_agent.testing`: `FakeLaunchctl` (records each command, keeps the loaded labels, so
+install, status and uninstall round-trip), `RefusingLaunchctl` (every `bootstrap` refused, exit
+5) and `refusing_launchctl_bin(folder)` (a `launchctl` program that refuses everything, for a
+folder put first on `PATH`). Pass a fake as `run_launchctl=`.
