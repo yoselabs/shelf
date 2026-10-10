@@ -1,6 +1,6 @@
 [project]
 name = "any-proc"
-version = "0.1.0"
+version = "0.1.1"
 description = "Child processes you start and keep: run one to a single JSON result under OS limits and a timeout, or keep one alive with a probe, a start timeout, a graceful stop and a bounded restart budget."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
