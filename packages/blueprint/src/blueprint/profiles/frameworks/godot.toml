@@ -38,12 +38,12 @@ config = [{ path = ".gitattributes", contains = "filter=lfs" }]
 
 [[role]]
 role = "scripts-lint"
-na = "C#-only project (no .gd files): the C# analyzers are the lint. The moment a .gd file exists this becomes mandatory: gdtoolkit gdlint/gdformat (4.5.0, 2025-10-09, stale) or GDQuest GDScript-formatter (0.27.0, 2026-09-25, formatter only) are the candidates, both untested on Godot 4.7"
+na = "C#-only project (no .gd files): the C# analyzers are the lint. The moment a .gd file exists this becomes mandatory: gdtoolkit 4.5.0 (gdlint plus `gdformat --check`, install `uvx --from gdtoolkit gdlint <root>`; maintainer quiet since 2025-10 but not archived, no linter successor, works on 4.5 syntax; check only, never auto-format in a hook; 4.6/4.7 syntax untested). GDQuest GDScript-formatter 0.27.0 is an untested formatter-only alternative"
 
 [[role]]
 role = "build"
 tool = "godot --headless --path <root> --import, then --build-solutions --quit, both inside make check; the import log is scanned for ERROR lines and the tree must stay clean"
-install = """Makefile: GODOT ?= godot; `godot-build:` runs `"$(GODOT)" --headless --path {root} --import 2>&1 | tee import.log`, then \
+install = """Godot binary on the agent's machine, the .NET build of the version the csproj pins (macOS: `brew install --cask godot-mono`, or the official .NET zip from godotengine.org into ~/Applications; set GODOT to its binary). Makefile: GODOT ?= godot; `godot-build:` runs `"$(GODOT)" --headless --path {root} --import 2>&1 | tee import.log`, then \
 `! grep -q 'ERROR:' import.log` (import exits 0 even on broken scene references), then `"$(GODOT)" --headless --path {root} --build-solutions --quit` \
 (exit 1 on a C# compile error), then `git diff --exit-code && test -z "$(git status --porcelain)"`; add godot-build to the `check` prerequisites"""
 config = [{ path = "Makefile", contains = "--build-solutions" }]
@@ -74,12 +74,10 @@ gate = "dotnet build"
 
 [[role]]
 role = "ci"
-tool = "GitHub Actions: actions/setup-dotnet (global.json) + chickensoft-games/setup-godot@v2 with the csproj's version, then `make check`"
-install = ".github/workflows/check.yml: actions/checkout (lfs: true), actions/setup-dotnet with global-json-file, chickensoft-games/setup-godot@v2 (use-dotnet: true, include-templates only when exporting), run `make check` with GODOT set to the installed binary"
-config = [
-    { path = ".github/workflows/*.yml", contains = "setup-godot" },
-    { path = ".github/workflows/*.yml", contains = "make check" },
-]
+# Owner, 2026-10-10: no CI pipelines for Godot projects for now; agents run `make check` locally,
+# where the Godot binary is installed (see the build role). The tool below is the answer once CI comes.
+tool = "TBD; when CI comes: actions/setup-dotnet (global.json) + chickensoft-games/setup-godot@v2, then `make check`"
+untested = "TBD by the owner: Godot projects run their gate on the agent's machine, not in CI"
 
 [[role]]
 role = "hooks"

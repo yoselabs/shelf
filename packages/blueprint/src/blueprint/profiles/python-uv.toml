@@ -2,6 +2,11 @@
 # Each [[role]] says which tool, how it is installed, the config that proves it is set up
 # (every entry must hold; `{ any = [...] }` holds when one alternative does), and the text `make check` must reach to prove it runs (a regex).
 # A role with `untested` has no proven answer yet; one with `na` does not apply to the stack.
+#
+# Choosing a tool (owner, 2026-10-10): age alone never disqualifies one. A tool untouched for years
+# is fine when it is robust, widely used, and works with the current stack; it is refused only when
+# it is abandoned: archived, broken on the current toolchain, or its users have moved to a successor.
+# Ecosystems differ (C# and Java tools release rarely); judge by use and compatibility, not by date.
 stack = "python-uv"
 status = "evidenced"  # evidenced: the shelf and a2kay run it | provisional: written, not yet proven
 source = "the shelf's own gate (pyproject.toml, Makefile; resolution 0004)"

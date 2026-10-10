@@ -30,7 +30,7 @@ tool = "SDK analyzers at AnalysisLevel latest-all + Meziantou.Analyzer + Roslyna
 install = """Directory.Build.props: <TreatWarningsAsErrors>true, <AnalysisLevel>latest-all, <EnforceCodeStyleInBuild>true, \
 <Deterministic>true, <ContinuousIntegrationBuild Condition="'$(CI)' != ''">true; PackageReference (PrivateAssets=all) Meziantou.Analyzer, \
 Roslynator.Analyzers, SonarAnalyzer.CSharp; versions in Directory.Packages.props; make build runs `dotnet build -warnaserror`. \
-Never #pragma/SuppressMessage: a path-scoped line in .editorconfig with a reason. Do not add StyleCop (it fights CSharpier) or Roslynator.Formatting.Analyzers"""
+Never #pragma/SuppressMessage: a path-scoped line in .editorconfig with a reason. Do not add StyleCop (SA1513 and others fight CSharpier; the rest duplicates the three packs) or Roslynator.Formatting.Analyzers"""
 config = [
     { path = "Directory.Build.props", contains = "<TreatWarningsAsErrors>true" },
     { path = "Directory.Build.props", contains = "<AnalysisLevel>latest-all" },
@@ -90,7 +90,7 @@ role = "architecture"
 tool = "BannedApiAnalyzers (RS0030 an error) with BannedSymbols.*.txt as AdditionalFiles, plus ArchUnitNET tests (xUnit v3) for layer and module rules"
 install = """PackageReference Microsoft.CodeAnalysis.BannedApiAnalyzers (PrivateAssets=all); BannedSymbols.<Rule>.txt at the repo root, \
 one line `T:Namespace.Type;why`, added as <AdditionalFiles> in Directory.Build.props, scoped by a property per project kind; \
-tests/<Name>.Architecture references TngTech.ArchUnitNET + TngTech.ArchUnitNET.xUnitV3. NetArchTest is dead (last release 2021)"""
+tests/<Name>.Architecture references TngTech.ArchUnitNET + TngTech.ArchUnitNET.xUnitV3. NetArchTest.Rules (2021) still works but duplicates ArchUnitNET: one architecture-test library per repo"""
 config = [
     { path = "Directory.Build.props", contains = "BannedApiAnalyzers" },
     { path = "BannedSymbols*.txt" },
