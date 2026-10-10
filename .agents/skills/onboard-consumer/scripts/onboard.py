@@ -43,23 +43,21 @@ def _resolve_shelf_home(explicit: str | None) -> Path | None:
 
 
 def _run(shelf_home: Path, repo: Path, *, want_beads: bool) -> int:
-    # GuardOperation shells out to tools/hooks/install.py, which resolves the shelf clone
-    # itself via $SHELF_HOME -- propagate what THIS script resolved so the two never disagree
-    # (an unset SHELF_HOME here previously let that subprocess fall back to a different, often
-    # wrong, shelf clone than the one this script is actually importing operations from).
+    # The prek config's guard hook resolves the shelf clone via $SHELF_HOME; propagate what THIS
+    # script resolved so the two never disagree.
     os.environ["SHELF_HOME"] = str(shelf_home)
     sys.path.insert(0, str(shelf_home / "tools"))
     # Deferred: sys.path must carry the shelf clone before these resolve.
     from onboard.beads import BeadsOperation  # noqa: PLC0415
-    from onboard.guard import GuardOperation  # noqa: PLC0415
+    from onboard.hooks import HooksOperation  # noqa: PLC0415
     from onboard.linter_preset import LinterPresetOperation  # noqa: PLC0415
     from onboard.operations import Operation, run_all  # noqa: PLC0415
     from onboard.resolver_block import ResolverBlockOperation  # noqa: PLC0415
     from onboard.verify import all_satisfied  # noqa: PLC0415
 
-    ops: list[Operation] = [GuardOperation(repo), ResolverBlockOperation(repo)]
-    if want_beads:
-        ops.append(BeadsOperation(repo))
+    # Beads first (`bd init --skip-hooks`), then the hooks that run bd's events from prek's config.
+    ops: list[Operation] = [BeadsOperation(repo)] if want_beads else []
+    ops += [HooksOperation(repo, beads=want_beads, requires=("beads",) if want_beads else ()), ResolverBlockOperation(repo)]
     if (repo / "pyproject.toml").exists():
         ops.append(LinterPresetOperation(repo))
     else:

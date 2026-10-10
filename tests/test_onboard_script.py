@@ -72,5 +72,5 @@ def test_onboards_a_real_consumer_repo_and_exits_zero(repo: Path, tmp_path: Path
     result = _run("--repo", str(repo), "--shelf-home", str(_ROOT), home=tmp_path / "home")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    for name in ("guard", "resolver-block", "beads", "linter-preset"):
+    for name in ("beads", "hooks", "resolver-block", "linter-preset"):
         assert f"{name}: applied" in result.stdout

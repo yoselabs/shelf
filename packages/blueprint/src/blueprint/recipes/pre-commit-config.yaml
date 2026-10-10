@@ -57,4 +57,5 @@ repos:
     language: system
     always_run: true
     pass_filenames: false
-    stages: [pre-commit]
+    # The whole gate before code leaves the machine; per-commit hooks stay fast (format, lint).
+    stages: [pre-push]

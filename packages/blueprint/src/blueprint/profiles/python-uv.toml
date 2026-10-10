@@ -80,4 +80,6 @@ config = [{ path = ".pre-commit-config.yaml", contains = "ruff check" }, { path 
 
 [[role]]
 role = "agent-guidance"
-untested = "no Python conventions file for agents written yet (docs/agents templates: shelf-1y4.7)"
+tool = "docs/agents/python.md: tools per role, placement, naming, comments, traps"
+install = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint template --repo ."
+config = [{ path = "docs/agents/python.md" }]

@@ -53,25 +53,18 @@ shelf's own repo and went unnoticed. Do not rely on a hook as the enforcement po
 Note what the gate does *not* read: your working tree. An **uncommitted** local override is the
 supported co-development workflow (§1) and stays legitimate.
 
-**Optionally add the hook for faster feedback** — it catches the mistake at commit time instead of
-at gate time. The `onboard-consumer` skill installs it as part of onboarding (via the `guard`
-operation, `tools/onboard/guard.py`); to run it standalone:
+**The hooks are prek's** (blueprint's hook recipe, `research/hooks-and-beads.md` in the blueprint
+change). Onboarding's `hooks` operation (`tools/onboard/hooks.py`) writes `.pre-commit-config.yaml`
+and runs `prek install`:
 
-```bash
-python "$SHELF_HOME/tools/hooks/install.py"   # run in the consumer repo root
-```
+| entry | stage | what it does |
+|---|---|---|
+| bd's five events (`bd hooks run <event>`) | each git event | beads' own hook work; bd never installs hooks itself (`bd init --skip-hooks`) |
+| `shelf-guard` | pre-commit | refuses a committed local shelf source |
+| `ruff check`, `ruff format --check` | pre-commit | lint and format on the staged Python files |
+| `make check` | pre-push | the whole gate before code leaves the machine |
 
-It writes **two marker-delimited spans** into the same `pre-commit` file:
-
-| span | what it does at commit time |
-|---|---|
-| `shelf-guard` | refuses a committed local shelf source |
-| `shelf-lint` | `ruff check` + `ruff format --check` on the staged Python, and the preset-drift check when `pyproject.toml` is staged |
-
-The spans are independent: a hook installed before `shelf-lint` existed gains it on the next run,
-with anything another tool chained on preserved. `shelf-lint` **fails open** when ruff cannot be
-found (no `./.venv/bin/ruff`, none on `PATH`) — a machine without ruff must still be able to commit —
-and it reads the **working tree** for the staged paths, so a partially staged file is linted whole.
+Print the recipe with `PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint recipe hooks`.
 Both are the same trade the guard makes: the hook is fast feedback, `make check` is the enforcement.
 
 Idempotent. It asks git where hooks live (`git rev-parse --git-path hooks`, which honors

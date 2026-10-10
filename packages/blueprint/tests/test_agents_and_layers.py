@@ -6,8 +6,9 @@ import json
 from datetime import date
 from typing import TYPE_CHECKING
 
-from blueprint import report
+from blueprint import report, templates
 from blueprint.model import Verdict
+from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -32,6 +33,9 @@ def _sound(repo: Repo) -> None:
 
 def test_a_sound_harness_passes_every_agent_checkpoint(repo: Repo) -> None:
     _sound(repo)
+    templates.install(repo.root, detect(repo.root, load_state(repo.root)))
+    for path in (repo.root / "docs/agents").glob("*.md"):
+        path.write_text(templates.PLACEHOLDER.sub("filled", path.read_text()))
     assert set(_verdicts(repo).values()) == {Verdict.PASSING}
 
 

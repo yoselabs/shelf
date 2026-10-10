@@ -173,6 +173,21 @@ def _gate_scripts(ctx: Context, makefile: str) -> list[str]:
     return list(dict.fromkeys(m for m in found if ctx.path(m).is_file()))
 
 
+@check("gate.runs-blueprint", "`make check` runs blueprint's per-commit checkpoints (`make blueprint`)")
+def runs_blueprint(ctx: Context) -> Finding:
+    """Gaps come back between audits unless the repo's own gate re-checks them on every commit."""
+    makefile = ctx.read("Makefile")
+    if makefile is None:
+        return not_applicable("no Makefile: gate.one-command reports the missing gate")
+    if "blueprint check" in reachable_recipes(makefile):
+        return passing("`make check` reaches `blueprint check --gate`")
+    return not_set_up(
+        "`make check` never runs blueprint",
+        "copy the shelf's `blueprint` target into the Makefile and add it to `check` (`make bootstrap` does both)",
+        FixedBy.AUTO,
+    )
+
+
 @check("gate.guards-have-red-tests", "every repo-local script `make check` runs has a test that names it")
 def guards_have_red_tests(ctx: Context) -> Finding:
     """Each repo `*.py` that `make check` reaches is named by some test file (a guard never seen red is a hypothesis)."""

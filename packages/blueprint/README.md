@@ -56,11 +56,11 @@ expires = 2027-04-01
 
 | layer | concern | checkpoints |
 |---|---|---|
-| generic | gate | `one-command` · `ci` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` · `clean-clone` (audit only) |
+| generic | gate | `one-command` · `runs-blueprint` · `ci` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` · `clean-clone` (audit only) |
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
 | stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional) |
 | framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, provisional: engine-version · project-hygiene · scripts-lint · headless-build · tests · scene-integrity · architecture · ci); paths may use `{root}` (the project folder) and globs |
-| agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` |
+| agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `culture-files` · `managed-block` |
 
 Hooks follow one recipe: prek owns them through `.pre-commit-config.yaml` and bd's five events run
 from it (`blueprint recipe hooks` prints it); bd never installs hooks itself.
@@ -68,6 +68,11 @@ from it (`blueprint recipe hooks` prints it); bd never installs hooks itself.
 A stack with no profile, or a role its profile leaves untested, is a **blueprint gap**: reported
 every run, never a pass, but left out of the exit code, since the shelf lacks the answer, not the repo.
 A new stack is a new `profiles/<stack>.toml`, not code.
+
+## Culture templates
+
+`blueprint template --repo .` copies the `docs/agents/` files the profile requires (`templates/`)
+and writes the AGENTS.md managed block; it never overwrites a file the repo has.
 
 ## Survey
 

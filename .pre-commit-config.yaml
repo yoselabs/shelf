@@ -61,12 +61,16 @@ repos:
     pass_filenames: false
     stages: [pre-commit]
   - id: ruff-check
+    # the same paths `make lint` covers, so the hook never refuses what the gate accepts
+    files: ^(packages|tests|tools)/|^conftest\.py$
     name: ruff check
     entry: uv run --frozen ruff check --force-exclude
     language: system
     types: [python]
     stages: [pre-commit]
   - id: ruff-format
+    # the same paths `make lint` covers, so the hook never refuses what the gate accepts
+    files: ^(packages|tests|tools)/|^conftest\.py$
     name: ruff format
     entry: uv run --frozen ruff format --check --force-exclude
     language: system

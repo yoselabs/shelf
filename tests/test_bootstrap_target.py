@@ -57,7 +57,7 @@ def test_make_bootstrap_invokes_the_script_and_applies_every_operation(repo: Pat
     result = _make(repo, "bootstrap", home=tmp_path / "home")
 
     assert result.returncode == 0, result.stdout + result.stderr
-    for name in ("guard", "resolver-block", "beads", "linter-preset"):
+    for name in ("beads", "hooks", "resolver-block", "linter-preset"):
         assert f"{name}: applied" in result.stdout
 
 
@@ -79,7 +79,7 @@ def test_make_bootstrap_verify_is_the_same_call_under_a_different_name(repo: Pat
     result = _make(repo, "bootstrap-verify", home=home)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "guard: applied" in result.stdout
+    assert "hooks: applied" in result.stdout
 
 
 def test_make_bootstrap_does_not_clobber_a_foreign_hook_manager(repo: Path, tmp_path: Path) -> None:
@@ -90,7 +90,7 @@ def test_make_bootstrap_does_not_clobber_a_foreign_hook_manager(repo: Path, tmp_
     result = _make(repo, "bootstrap", home=tmp_path / "home")
 
     assert result.returncode != 0
-    assert "husky" in result.stdout
+    assert "another hook manager owns it" in result.stdout
     assert (hooks / "pre-commit").read_text().startswith("#!/usr/bin/env sh\n."), "the foreign hook was overwritten"
 
 

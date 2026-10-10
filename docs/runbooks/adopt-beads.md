@@ -8,10 +8,12 @@ identifier scan that would have silently narrowed, and the git-sync gap in Phase
 
 **Beads is part of onboarding a shelf consumer, opt-out by default.** The `onboard-consumer` skill
 (`<shelf>/.agents/skills/onboard-consumer/SKILL.md`) runs the `beads` operation
-(`tools/onboard/beads.py`) automatically unless `--no-beads` is passed — `bd init`, config set with
-readback (never trust the success message, see §1.2 below), and the `bd dolt push` chain (§2.2)
-appended after bd's own markers, all in one idempotent pass, and refusing to run before the commit
-guard has verified (§1.2's ordering landmine). This runbook is now that operation's justification:
+(`tools/onboard/beads.py`) automatically unless `--no-beads` is passed: `bd init --skip-hooks`, the
+blueprint's strict settings with readback (never trust the success message, see §1.2 below), and the
+session settings (metrics off, `bd prime` at session start). Since 2026-10-11 bd never installs hooks:
+its events, and the `bd dolt push` of §2.2, run from prek's `.pre-commit-config.yaml` (the `hooks`
+operation), because bd's injection into other managers' hook files made failing checks stop blocking.
+The hook sections below are kept as the history of why. This runbook is now that operation's justification:
 every finding below is *why* the operation asserts what it asserts, kept here rather than folded
 silently into the code so the next person hitting a bd surprise can see it was already found once.
 

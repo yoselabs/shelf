@@ -75,7 +75,7 @@ def test_all_satisfied_is_true_only_when_every_operation_is() -> None:
 
 def test_config_revert_is_caught_and_self_healed_by_a_second_verify_pass(repo: Path) -> None:
     """The landmine-5 scenario: `bd config set` succeeds, `.beads/config.yaml` is a
-    TRACKED file (committed by `bd init` with the export keys unset), and a plain
+    TRACKED file (committed by `bd init` without the strict keys), and a plain
     `git checkout -- .beads/config.yaml` silently reverts it with no signal from
     `bd` itself. shelf hit exactly this, 2026-08-12.
 
@@ -87,21 +87,20 @@ def test_config_revert_is_caught_and_self_healed_by_a_second_verify_pass(repo: P
     idempotent, effect-asserting operation" buys over a read-only check that
     would only report the drift and leave it for a human to re-run.
     """
-    guard_stub = _AlwaysOk(name="guard")
     beads_op = BeadsOperation(repo)
 
-    first = beads_op.run({"guard": Result(Outcome.APPLIED, verified=True)})
+    first = beads_op.run({})
     assert first.outcome == Outcome.APPLIED, first.message
 
     # `bd init`'s own commit ships the config with the export keys unset --
     # reverting to it is exactly the trap: an ordinary tree-rewinding git
     # operation undoing an in-effect `bd config set` with zero warning.
     _git(repo, "checkout", "--", ".beads/config.yaml")
-    reverted = subprocess.run(["bd", "config", "get", "export.auto"], cwd=repo, capture_output=True, text=True, check=True)
-    assert reverted.stdout.strip() != "true", "test setup didn't actually revert anything -- nothing to catch"
+    reverted = subprocess.run(["bd", "config", "get", "validation.on-create"], cwd=repo, capture_output=True, text=True, check=True)
+    assert reverted.stdout.strip() != "error", "test setup didn't actually revert anything -- nothing to catch"
 
-    second = verify([guard_stub, beads_op])["beads"]
+    second = verify([beads_op])["beads"]
 
     assert second.outcome == Outcome.APPLIED, second.message
-    healed = subprocess.run(["bd", "config", "get", "export.auto"], cwd=repo, capture_output=True, text=True, check=True)
-    assert healed.stdout.strip() == "true", "verify did not actually re-check -- it trusted the first run's result"
+    healed = subprocess.run(["bd", "config", "get", "validation.on-create"], cwd=repo, capture_output=True, text=True, check=True)
+    assert healed.stdout.strip() == "error", "verify did not actually re-check -- it trusted the first run's result"

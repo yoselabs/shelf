@@ -16,7 +16,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from blueprint import report, survey
+from blueprint import report, survey, templates
+from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
 RECIPES = Path(__file__).resolve().parent / "recipes"
@@ -43,10 +44,16 @@ def main(argv: list[str] | None = None) -> int:
     srv = sub.add_parser("survey", help="write the run survey template, or check a filled one")
     srv.add_argument("--repo", default=".", type=Path, help="the repository the survey is about (default: cwd)")
     srv.add_argument("--check", type=Path, metavar="FILE", help="exit 1 unless FILE answers every question in the closed set")
+    tpl = sub.add_parser("template", help="copy missing docs/agents/ files and write the AGENTS.md managed block")
+    tpl.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     rcp = sub.add_parser("recipe", help="print a blueprint recipe file")
     rcp.add_argument("name", choices=sorted(RECIPE_FILES), help="hooks: the .pre-commit-config.yaml prek reads")
     args = parser.parse_args(argv)
 
+    if args.command == "template":
+        for changed in _install_templates(args.repo):
+            sys.stdout.write(f"wrote {changed}\n")
+        return 0
     if args.command == "recipe":
         sys.stdout.write((RECIPES / RECIPE_FILES[args.name]).read_text())
         return 0
@@ -66,6 +73,11 @@ def main(argv: list[str] | None = None) -> int:
         for path in report.write(result, args.repo.resolve(), date.today()):  # noqa: DTZ011 -- a report date, the owner's calendar
             sys.stderr.write(f"wrote {path}\n")
     return result.exit_code
+
+
+def _install_templates(repo: Path) -> list[str]:
+    repo = repo.resolve()
+    return templates.install(repo, detect(repo, load_state(repo)))
 
 
 def _survey(repo: Path, filled: Path | None) -> int:

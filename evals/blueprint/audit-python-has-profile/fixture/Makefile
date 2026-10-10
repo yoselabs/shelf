@@ -1,0 +1,2 @@
+check:
+	ruff format --check .

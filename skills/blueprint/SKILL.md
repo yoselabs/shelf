@@ -85,10 +85,11 @@ gets a short plain-words picture first; much work ahead gets one page outlining 
 
 ## 6. Start, reabsorb
 
-- **Start:** audit the empty repo, then on the yes: tracker (`bd init --skip-hooks`, strict
-  settings) → hooks (`recipe hooks > .pre-commit-config.yaml`, `prek install`) → gate (`make check`,
-  CI) → the stack's profile → the framework's profile → agent harness. A Python repo: the shelf onboarding writes most of the
-  gate (`python3 <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo .`).
+- **Start:** audit the empty repo, then on the yes: onboarding (`python3
+  <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo .`: beads strict and quiet, prek
+  hooks from the recipe, the gate with `make blueprint` in it) → `template --repo .` (docs/agents/
+  and the AGENTS.md block; then fill every `{{name}}` from the repo) → the stack's profile → the
+  framework's profile → CI.
 - **Reabsorb:** a blueprint gap, or anything the run met that no checkpoint covers, becomes one
   bead in the **shelf** titled `blueprint lacks: <what>` (repo, evidence, the checkpoint or profile
   you would add). Never add it inside the consumer.
@@ -108,6 +109,8 @@ a "partly".
   blocking commits in other managers' hook files.
 - `--audit` adds the audit-only rows: slow ones (a fresh clone running `make check`) and ones
   reading this clone's state (installed hooks, bd's database). The repo's `make blueprint` skips them.
+- Culture files: `template --repo .` copies only what is missing and rewrites only the AGENTS.md
+  block; fill the placeholders, never delete the block's markers.
 - v0.1: concerns `gate`, `backlog`, `stack`, `framework`, `agents`; profiles python-uv
   (evidenced), dotnet and godot (provisional). Do not invent rows for what the engine does not check.
 - Two projects of one framework (a game and a prototype spike) each get a table; the owner names

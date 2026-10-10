@@ -55,6 +55,7 @@ dev = [
     "any-frontmatter[merge]",  # with_frontmatter's comment-keeping merge (yaml-merge) — an extra so a consumer that pins yaml-merge itself is not handed a second source for it
     "sse-starlette>=2,<4",  # NOT an async-scope dependency — the library whose unreset module-global the asgi lane exists to defend against, installed so that defence is actually exercised rather than suppressed away
     "pytest-xdist>=3.6,<4",
+    "prek>=0.5,<1",
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────

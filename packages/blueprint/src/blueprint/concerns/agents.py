@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from blueprint import templates
 from blueprint.model import FixedBy, check, failing, not_set_up, passing, uses_beads
 
 if TYPE_CHECKING:
@@ -76,3 +77,31 @@ def session_hooks(ctx: Context) -> Finding:
     if missing:
         return not_set_up(f"missing {'; '.join(missing)}", "copy both hooks from the shelf's .claude/settings.json", FixedBy.AUTO)
     return passing("SessionStart runs bd prime; Stop flags in-progress beads")
+
+
+_INSTALL = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint template --repo ."
+
+
+@check("agents.culture-files", "every docs/agents/ file the repo's profile requires exists, its placeholders filled", layer="agent")
+def culture_files(ctx: Context) -> Finding:
+    """Missing files are not set up (auto: copied from the templates); a leftover `{{name}}` is failing."""
+    names = templates.required(ctx.profile)
+    missing = [n for n in names if ctx.read(f"docs/agents/{n}.md") is None]
+    if missing:
+        return not_set_up(f"missing docs/agents/: {', '.join(f'{n}.md' for n in missing)}", _INSTALL, FixedBy.AUTO)
+    unfilled = [n for n in names if templates.PLACEHOLDER.search(ctx.read(f"docs/agents/{n}.md") or "")]
+    if unfilled:
+        return failing(f"placeholders left in: {', '.join(f'{n}.md' for n in unfilled)}", "fill each {{name}} from the repo")
+    return passing(f"{len(names)} conventions files: {', '.join(names)}")
+
+
+@check("agents.managed-block", "AGENTS.md carries blueprint's managed block, current for this profile", layer="agent")
+def managed_block(ctx: Context) -> Finding:
+    """The block between the markers equals what the templates produce for this profile."""
+    text = ctx.read("AGENTS.md") or ""
+    if templates.BEGIN not in text or templates.END not in text:
+        return not_set_up("AGENTS.md has no blueprint block", _INSTALL, FixedBy.AUTO)
+    current = text[text.index(templates.BEGIN) : text.index(templates.END) + len(templates.END)].strip()
+    if current != templates.block(ctx.profile).strip():
+        return failing("the managed block differs from the template for this profile", _INSTALL, FixedBy.AUTO)
+    return passing("managed block current")

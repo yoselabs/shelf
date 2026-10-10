@@ -59,6 +59,7 @@ _MAKE_TARGETS = (
     "test",
     "cov",
     "sync",
+    "blueprint",
 )
 
 _GENERATED_PREFIXES = ("tool.pyrefly", "tool.pytest")
@@ -71,7 +72,7 @@ deps:
 # The shelf's `check` dispatches to a container and to targets a consumer is not given
 # (check-host, test-affected); a consumer gets the plain gate.
 _CONSUMER_CHECK = """# The gate. Fast, deterministic tools first; tests last.
-check: guard preset lint typecheck spell deps test
+check: guard preset blueprint lint typecheck spell deps test
 
 """
 _CONSUMER_PYTEST = """[tool.pytest.ini_options]
