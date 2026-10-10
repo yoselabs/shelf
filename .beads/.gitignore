@@ -75,3 +75,9 @@ bd.db
 # They would override fork protection in .git/info/exclude.
 # Config files (metadata.json, config.yaml) are tracked by git by default
 # since no pattern above ignores them.
+
+# The Dolt database is the only store; no JSONL copies (owner, 2026-10-10).
+# bd still appends field changes to interactions.jsonl and has no switch to stop it;
+# Dolt history (bd history <id>) already records every write, so it stays local.
+issues.jsonl
+interactions.jsonl

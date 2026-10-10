@@ -86,6 +86,8 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
 
 ## Consuming & contributing
 
+- **[docs/skill-authoring.md](docs/skill-authoring.md)** — how to build a skill: cost model, layout,
+  triggering, wording, scripts, `claude plugin eval`, state, and how a skill keeps improving.
 - **[docs/consuming-the-shelf.md](docs/consuming-the-shelf.md)** — how a project onboards as a consumer
   (depend by git+tag, install the commit guard, paste the resolver block into its `AGENTS.md`).
 - **[docs/agent-loop.md](docs/agent-loop.md)** — the standing loop every consumer's agent self-applies:

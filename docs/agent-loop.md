@@ -167,7 +167,8 @@ STEPS:
    **not** branch position — a worktree opened days ago can silently be behind `main`.
 2. On branch `work/<project>` (create if absent).
 3. Extract into the unit dir the candidate's **Kind** owns — `packages/<name>/` for code,
-   `skills/<name>/` for a general-purpose, auto-triggering skill (resolution 0014) — behind a
+   `skills/<name>/` for a general-purpose, auto-triggering skill (resolution 0014; how to write one:
+   `docs/skill-authoring.md`) — behind a
    stable **Capability**, with:
    - **`<name>` names the deliverable, not the origin** (resolution 0008): read it as a consumer who
      has never seen this app — does it say what the package does? If it only makes sense with

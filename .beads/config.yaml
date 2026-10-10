@@ -66,6 +66,25 @@
 # - github.token    → use GITHUB_TOKEN env var instead
 
 sync.remote: "git+https://github.com/yoselabs/shelf.git"
+
+# Strict beads settings (blueprint, owner decisions 2026-10-10; evidence:
+# openspec/changes/blueprint-skill/research/beads-config.md). The beads doctor
+# (shelf-xvf) checks the EFFECTIVE values, so env or local-file overrides fail it.
+no-git-ops: true
+create:
+    require-description: true
+validation:
+    on-create: error
+    on-close: error
+    metadata:
+        mode: error
+        fields:
+            branch:
+                type: string
+            commit:
+                type: string
 export:
-    auto: true
-    git-add: true
+    auto: false
+    git-add: false
+import:
+    auto: false
