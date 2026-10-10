@@ -96,3 +96,87 @@ Owner rule: age alone never disqualifies a tool; refuse only when abandoned (arc
 | GdUnit4Net 5.0.0 (stable 2025-06-21; 5.1.0-rc5 on NuGet) | not refused on age; repo godot-gdunit-labs/gdUnit4Net 189 stars, pushed 2026-10-06 | not tested here | untested (VSTest vs MTP) | untested, unchanged | listed because the stable-release date looked old; the open question is the MTP clash, not age |
 
 Net effect: no verdict flips from ❌ to ✅ for a .NET role. One flips for Godot: scripts-lint now names gdtoolkit instead of "stale". Two refusals stand with the age reasoning removed (StyleCop: conflict; NetArchTest: duplicate).
+
+## Architecture and extra-strict analyzers (2026-10-11)
+
+Method: hands-on, one session. Scratch solutions under the session scratchpad (`strict/`: 4 library projects + 1 xunit.v3 test project + a Godot.NET.Sdk 4.7.2 project, SDK 10.0.301, net10.0, C# 14, lifesim's strict props as the baseline; `fin/`: the adopted set built clean). Evidence: NuGet registration API and GitHub API on 2026-10-11 (version, publish date, pushed_at, archived). T = run here. Owner rule applied: refuse only if abandoned, broken on the current toolchain, superseded by a successor, or in conflict with the doctrine; never for age.
+Planted in the scratch Sim.Core: V1 project reference to a presentation project, V2 module `Needs` using module `Household`, V3 type-level use of `Sim.Presentation` (using, base type, attribute, generic argument, `typeof`, `nameof`, fully qualified), V4 `DateTime.Now`, `new Random()`, `HttpClient`, `Dictionary` enumeration.
+
+### A. Architecture rules, head to head
+
+| Tool (version, date) | Catches (T) | Misses / pitfalls (T) | Cost (T) | Usage / maintenance (2026-10-11) | Verdict |
+|---|---|---|---|---|---|
+| MSBuild guard: a `BeforeTargets=ResolveProjectReferences` target erroring when a project's `ProjectReference` items are not in its `AllowedRefs` | V1 (project DAG): `Sim.Core references Sim.Presentation, outside its layer` | only project edges; says nothing about namespaces in one project | fails in 1.9 s, before compile | no dependency; 12 lines in Directory.Build.props | ✅ |
+| Microsoft.CodeAnalysis.BannedApiAnalyzers 5.6.0 (2026-07-02) | V4 and members: `P:` DateTime.Now, `M:` Guid.NewGuid, `T:` Random, `N:` namespace on expressions, base types, attributes, typeof | **declaration-only type uses pass**: with `T:Dictionary`2` banned, `new Dictionary` fired (2 sites) but a `Dictionary` property type, parameter type, `foreach` variable did not. Leaks.cs: RS0030 6 sites vs NsDepCop 9; missed the generic argument in a field type, `nameof`, a `Func<Widget,int>` parameter. Banned generic id must be `Dictionary`2`; `{TKey,TValue}` silently matched nothing | per project, ~0 s | github.com/dotnet/roslyn-analyzers (moved into dotnet/roslyn; last commit 2025-11-25, not archived); in lifesim | ✅ the only member-level tool |
+| NsDepCop 3.2.0 (2026-10-04), GPL-2.0-only | V2, V3 in every form above (9 sites in Leaks.cs); default-deny mode (`Allowed` entries only) flagged `System.Threading.Tasks`, `System.Net.Http` as uses of an unlisted namespace; `Disallowed` pairs for module rules | allow/deny is per namespace, not per type (`VisibleMembers OfNamespace` loaded but did not fire for `Dictionary`: not made to work). Analyzer reads only `$(ProjectDir)config.nsdepcop`; a project without one fails NSDEPCOP03. A root file added through `AdditionalFiles` applies to every project: 111 errors once tests were included (whitelist) | no measurable cost (1.7-3.2 s noise on a 4-file project either way) | github.com/realvizu/NsDepCop pushed 2026-10-04, 300 stars, 15 open issues; GPL is fine for a build-time dev dependency (PrivateAssets=all, not shipped) but is on record | ✅ for layer and module rules, per-project config |
+| TngTech.ArchUnitNET 0.13.4 + .xUnitV3 (2026-08-20) | V2, V3 (`NotDependOnAnyTypesThat().ResideInNamespaceMatching`), type-level BCL use (`...HaveFullNameContaining("System.Collections.Generic.Dictionary`2")` found the property type, the Enumerator and HashSet that BannedApi missed), naming (`HaveNameEndingWith`), PlantUML (`AdhereToPlantUmlDiagram`, red with the right edge `NeedsSystem depends on Label`), slices | **vacuous passes**: `NotDependOnAny(Types().That()...)` against a BCL type and four `NotCallAny` formulations for `DateTime.get_Now` all passed green while the dependency existed (the debug dump showed `Clock -> System.DateTime`). Only the `...AnyTypesThat()` predicate form fires. Cannot ban a BCL member. Slice cycle rule seen green only. PlantUML component syntax is `[Name] <<regex>> as alias` | test run 0.3 s; build of the test project 2-3 s | github.com/TNG/ArchUnitNET pushed 2026-10-10, 1.4k stars, 9.4M downloads | ✅ for structure: cycles, naming, attributes, diagrams, type-level bans |
+| NetArchTest.Rules 1.3.2 (2021-05-23) | V2, V3 (both tests red) | no diagram, no cycles; same job as ArchUnitNET | n/a | pushed 2024-07, 1.8k stars | ❌ duplicate (unchanged) |
+| NetArchTest.eNhancedEdition 1.4.5 (2025-06-04) | not run | - | - | 1.0M downloads | untested |
+| Microsoft dependency validation (VS layer diagrams) | not tried: Visual Studio Enterprise feature, no `dotnet` CLI path found | - | - | - | untested |
+| "Arch.Unit" | no NuGet package of that name exists (search 2026-10-11) | - | - | - | n/a |
+
+**Pick: four layers, each doing what the others cannot.** MSBuild guard (project DAG) -> NsDepCop (namespace DAG, default-deny, build time) -> BannedApiAnalyzers (members and constructors) -> ArchUnitNET (cycles, naming, diagrams, type-level BCL bans). One rule lives in one layer: layer edges in NsDepCop, member bans in BannedSymbols, structure in ArchUnitNET. The "one architecture-test library per repo" rule stays; NetArchTest remains refused as a duplicate.
+
+### B. Extra-strict analyzers
+
+Every package ran alone on `Bugs.cs` (about 100 planted defects), a clean file, and a Godot-shaped partial class (`[GlobalClass]`, `[Signal]`, `[Export]`, scene-wired callbacks, `async void _Input`), TreatWarningsAsErrors off, then the kept set together with it on. "New" = diagnostic ids the baseline (`latest-all` + Meziantou + Roslynator + Sonar + BannedApi) did not fire.
+
+| Package (version, date) | New catches on Bugs.cs | Noise: clean / Godot | Conflict / defect | Usage / maintenance | Verdict |
+|---|---|---|---|---|---|
+| Microsoft.VisualStudio.Threading.Analyzers 18.7.23 (2026-06-22) | VSTHRD002 sync-over-async (`.Result`, `.Wait()`, `GetResult`), 100/101 async void, 103, 105, 110 unobserved task, 114, 200 naming | 0 / VSTHRD100 on `async void _Input` override, VSTHRD200 on `async Task` without suffix | none | github.com/microsoft/vs-threading pushed 2026-10-09 | ✅ |
+| IDisposableAnalyzers 4.0.8 (2024-06-19) | IDISP001 undisposed, 003 reassign, 004 ignored, 006, 011 returns disposed, 013 await in using, 025 (baseline had only CA2000) | 0 / IDISP004 on `GetTree().CreateTimer` (GodotObject is IDisposable) | none | github.com/DotNetAnalyzers/IDisposableAnalyzers last commit 2024-02, not archived, 108 open issues; works on compiler 5.6 | ✅ |
+| ErrorProne.NET.CoreAnalyzers 0.9.0-beta.4 (2026-06-05; no stable since 0.1.2, 2018) | EPC13 unobserved Task, EPC17 async void delegate, EPC25 default struct Equals/GetHashCode, EPC31 null Task, ERP021 `throw e`, ERP022 swallowed exception | 0 / EPC27 on async void override; EPC29 on xunit's generated entry point | none | github.com/SergeyTeplyakov/ErrorProne.NET pushed 2026-09-08, 1.1k stars; pin the beta | ✅ (pinned beta) |
+| ErrorProne.NET.Structs 0.6.1-beta.1 (2024-01-17) | 0 on two struct samples (large struct by value, hidden copy, `in`); EPS01/05/06/09-13 live in its own dll, not absorbed by Core | 0 / 0 | none | same repo | untested (no catch demonstrated) |
+| SharpSource 1.33.4 (2026-10-04) | SS063 ValueTask awaited twice (new); the rest duplicate other kept tools (SS048 lock, SS013 rethrow, SS066 disposable field, SS040) | 0 / SS066 on every Godot node field | none | github.com/Vannevelj/SharpSource release 2026-09-27 | ✅ (one unique rule, cheap) |
+| Nullable.Extended.Analyzer 1.16.6891 (2026-09-02) | NX0002 `!` without justification (enforces "no `!` outside tests") | 0 / NX0002 on `= null!` for `[Export]` properties | none | NuGet | ✅ |
+| ReflectionAnalyzers 0.3.1 (2021-12-19) | REFL003 member does not exist, REFL005, REFL008, REFL016, REFL025 (typo in `GetMethod("...")`) | 0 / 0 | none | github.com/DotNetAnalyzers/ReflectionAnalyzers last commit 2023-12, not archived, 82 stars | ✅ low yield, no cost |
+| AsyncFixer 2.1.0 (2025-12-29) | AsyncFixer04 (using without await) overlaps VSTHRD107; 01 elision is style; 03 = VSTHRD100 | 0 / AsyncFixer03 on async void override | none | pushed 2025-12-29 | ❌ redundant with Threading + ErrorProne |
+| Gu.Analyzers 2.0.3 | GU0011 only (= EPC13) | 0 / 0 | none | last commit 2024-03 | ❌ redundant |
+| ExhaustiveMatching.Analyzer 0.5.0 (2020-05-26) | EM0001 missing enum value, EM0003 unhandled subtype of a `[Closed]` hierarchy; but EM0101 rejects `case Wolf:` type patterns | 0 / 0 | needs `throw ExhaustiveMatch.Failed(x)` in code (runtime package) | github.com/WalkerCodeRanger/ExhaustiveMatching last push 2023-11 | ❌ superseded for enums by IDE0010/IDE0072 (below); closed hierarchies wait for C# 15 unions |
+| SecurityCodeScan.VS2019 5.6.7 (2022-09-05) | SCS0005, SCS0006 only; both already CA5394 / CA5351 | 0 / 0 | none | repo pushed 2024-07; web-framework taint rules not exercised (no web in this stack) | ❌ redundant here |
+| Puma.Security.Rules 2.4.11 (2022-02-01) | SEC0029/0031/0115/0116 | AD0001 analyzer crash (NullReferenceException) on the clean file | broken on this toolchain | repo pushed 2026-08 | ❌ broken |
+| NetFabric.Hyperlinq.Analyzer 2.3.0 (2023-10-13) | 0 on Bugs.cs | HLQ012 "use CollectionsMarshal.AsSpan" on clean code | pushes a replacement library | pushed 2024-05 | ❌ no bug class |
+| Microsoft.CodeAnalysis.PublicApiAnalyzers 5.6.0 | RS0016/RS0037 flood (109+34) without PublicAPI files | 46 / 2 | library-only value | dotnet/roslyn | ❌ `na` for an app; ✅ for a published NuGet library |
+| Microsoft.CodeAnalysis.CSharp.CodeStyle 5.9.0 | CS9057: analyzer needs compiler 5.9, SDK 10.0.301 runs 5.6 | n/a | broken on toolchain; redundant with `EnforceCodeStyleInBuild` | - | ❌ |
+| Philips.CodeAnalysis.MaintainabilityAnalyzers 2.0.0 | PH2021... readability | PH2028 demands a copyright header, PH2045 bans static classes | contradicts "no file headers" | pushed 2026-09 | ❌ conflict |
+| CSharpGuidelinesAnalyzer 3.8.5 | AV1706 x71 (short names), AV2210 | 8 / 2 | naming war with Godot `_Ready`, `X`, `i` | 2024-04 | ❌ noise |
+| Menees.Analyzers 4.0.2 | MEN008 file name vs type (= MA0048), MEN013 (= SS002) | 1 / 0 | duplicates | - | ❌ redundant |
+| ClrHeapAllocationAnalyzer 3.0.0 (2020-02) | HAA* everywhere, unscoped | n/a | superseded by the scoped PerformanceSensitiveAnalyzers | - | ❌ successor exists |
+| Microsoft.CodeAnalysis.PerformanceSensitiveAnalyzers 5.0.0-1.25277.114 (2025-06-06, prerelease) | HAA0202/0301/0302/0401/0601 only inside a method marked `[PerformanceSensitive]` (5 hits in `Tick`, 0 in the unmarked twin) | 0 / 0 | **the package injects `PerformanceSensitiveAttribute.cs` into every project; with `N:System.Threading` banned that file fails RS0030, and an `.editorconfig` section cannot reach a file under ~/.nuget** | dotnet/roslyn-analyzers | untested for adoption (works, but needs a `Compile Remove` workaround not tried); the right tool for "no LINQ allocation in hot paths" |
+| GodotSharpAnalyzers 0.1.0 (2025-07-22) | GD0001 signal `+=` never `-=` (correct on the leak sample, silent when `-=` exists) | 0 / 0 | its id GD0001 collides with Godot's own GD0001 (missing `partial`), so one `.editorconfig` line mutes both | `projectUrl` github.com/megacrit/GodotSharpAnalyzers returns 404 (2026-10-11), 2.2k downloads | ❌ source repo gone, id clash; signal-leak detection is the one Godot custom-rule candidate |
+| Chickensoft.AutoInject.Analyzers 2.14.x | not run (needs AutoInject) | - | - | github.com/chickensoft-games/AutoInject pushed 2026-10-10 | untested |
+| Microsoft.Unity.Analyzers 1.28.0 | Unity API only | - | - | - | n/a |
+| Godot's own analyzers (GD0001-GD0107, in Godot.NET.Sdk) | `partial` missing, unsupported `[Export]` type (GD0102 seen when the `Game.Godot` namespace shadowed `Godot`) | 0 | none | ships with the SDK | ✅ already on |
+
+**The biggest lever is not a package.** The baseline runs with `latest-all` but most of Meziantou, Roslynator, Sonar and the IDE rules are off by default.
+- Blanket on: `dotnet_analyzer_diagnostic.severity = warning` in `.editorconfig`, then `dotnet_analyzer_diagnostic.category-Style.severity = none` and four IDE rules back on (IDE0005, IDE0010, IDE0072, IDE0161).
+- Result on the Bugs file: MA0040 (token not forwarded), MA0042 (`Wait()` in async), MA0031/MA0020 (LINQ `Count()`), RCS1229, RCS1261, RCS1163/1213 (unused), and IDE0010/IDE0072 (**missing enum member in a switch, including a switch with a `_ =>` discard that hides it**).
+- Noise on the clean file and the Godot class: 0.
+- Without the `category-Style` line, 15 style diagnostics appear on a clean file (var, block bodies, braces).
+- Opt-outs needed: MA0038 and MA0041 (deprecated duplicates of CA1822), RCS1181 (fights `// why:` comments).
+- `roslynator_analyzers.enabled_by_default = true` alone added one rule (RCS1242); the blanket severity line is what lights Roslynator.
+- The old profile named the three packs but ran a fraction of them.
+
+### C. Custom rules
+
+- **BannedSymbols per project covers every determinism need on the lifesim list** (wall clock, Random, Guid, hash codes, platform maths, threading namespace, IO) at member and constructor level. The gap (declared-only types) is closed by ArchUnitNET's type-level rule and NsDepCop's namespace whitelist, both T above. **A custom analyzer project is not warranted.** No skeleton.
+- No off-the-shelf analyzer bans float arithmetic; platform-variant maths (sin, exp, pow) is already covered by `M:` bans, and basic IEEE operations are deterministic in .NET. Not worth a rule.
+- Watch list, not adopted: SsalKit.Determinism 0.0.6 (2026-08-09, MIT, 3 stars, 38 commits, warning-only by design) found 5 of 6 planted calls (SSALD001-004, 006) inside a `[Deterministic]` type; its purpose is scoping inside a mixed assembly, which lifesim does not have. GameDeterminism.Analyzers 0.1.2 (2026-09-17, 0 stars) DRIFT0001-0004 found Dictionary enumeration, DateTime.Now, Parallel.For, `new Random()`; DRIFT0001 (enumeration of an unordered collection) is the only form BannedSymbols cannot express, but ArchUnitNET's type rule covers it today.
+- Candidates only if a real incident appears: Godot signal `+=` without `-=` (GodotSharpAnalyzers' idea, rewritten in-repo with tests), string literals passed to `Call`/`EmitSignal`/`Connect` instead of the generated `MethodName`/`SignalName` constants. Neither exists as a maintained tool; neither is demonstrated needed.
+
+### D. Compatibility: the adopted set built clean
+
+`fin/`: `Directory.Build.props` with TreatWarningsAsErrors, `latest-all`, Meziantou, Roslynator, Sonar, BannedApi, Threading, IDisposableAnalyzers, ErrorProne.NET.CoreAnalyzers 0.9.0-beta.4, SharpSource, Nullable.Extended, ReflectionAnalyzers, NsDepCop (only where `config.nsdepcop` exists), the MSBuild ref guard, and the blanket-on `.editorconfig`. `dotnet build scratch.slnx -t:Rebuild`: 0 warnings, 0 errors; `dotnet build src/Game.Godot -t:Rebuild` (Godot.NET.Sdk 4.7.2): 0 warnings, 0 errors; `dotnet test --solution scratch.slnx --no-build`: 3 passed. A planted `Bad.cs` in the Sim project went red with RS0030 (DateTime.Now, Random), NSDEPCOP01 (System.Net.Http, Tasks), IDISP004/014, CA2000, SS002. Each Godot-scope line was removed in turn on the Godot project; these turned the build red without it:
+
+| Id | Tool | Why it misfires in the Godot folder |
+|---|---|---|
+| CA1822, S2325 | SDK, Sonar | scene-wired callbacks stay instance methods |
+| CA2213 | SDK | the scene tree owns node lifetime (`Timer?` field "never disposed"); already red under the old profile |
+| CA2227 | SDK | `[Export]` collection needs a setter; already red under the old profile |
+| IDISP004 | IDisposableAnalyzers | every `GodotObject` is IDisposable (`GetTree().CreateTimer(...)`); IDISP001-003/006 sit in the same family and fire on `new Node()` |
+| SS066 | SharpSource | "disposable field not disposed" on every node field |
+| NX0002 | Nullable.Extended | `= null!` on an `[Export]` property the editor assigns |
+| VSTHRD100, EPC27 | Threading, ErrorProne | `public override async void _Input(...)` is the engine's signature (AsyncFixer03 would also fire: dropped) |
+| EPC29 | ErrorProne | xunit.v3's generated entry point (test scope, not Godot) |
+
+Other Godot facts met on the way: with `ImplicitUsings` on, `Timer` is ambiguous between `Godot.Timer` and `System.Threading.Timer` (CS0104); `<Using Remove="System.Threading" />` in the Godot csproj fixed it, the file-level alias was a workaround. A namespace named `Game.Godot` shadows `Godot` (`Godot.Collections` unresolved, GD0102): write `global::Godot.Collections.Array<string>` or name the namespace otherwise. PerformanceSensitiveAnalyzers and GodotSharpAnalyzers are not in the set.

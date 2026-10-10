@@ -3,7 +3,7 @@
 # Every property below can sit in Directory.Build.props or Directory.Packages.props; the config entries accept either.
 stack = "dotnet"
 status = "provisional"
-source = "dotnet-godot-layering.md (2026-10-10, one web pass + a scratch copy of lifesim built strict with Godot 4.7.2); lifesim is the only consumer"
+source = "dotnet-godot-layering.md (2026-10-10 roles; 2026-10-11 linter + architecture re-researched hands-on, scratch solution + Godot 4.7.2 csproj built clean with the adopted set); lifesim is the only consumer"
 
 [[role]]
 role = "toolchain"
@@ -26,11 +26,16 @@ gate = "csharpier check"
 
 [[role]]
 role = "linter"
-tool = "SDK analyzers at AnalysisLevel latest-all + Meziantou.Analyzer + Roslynator.Analyzers + SonarAnalyzer.CSharp, EnforceCodeStyleInBuild, warnings as errors; severities only in .editorconfig"
+tool = """SDK analyzers at AnalysisLevel latest-all + Meziantou.Analyzer + Roslynator.Analyzers + SonarAnalyzer.CSharp, every rule switched on (`dotnet_analyzer_diagnostic.severity = warning`, IDE style category off, four IDE defect rules back on) and warnings as errors; plus Microsoft.VisualStudio.Threading.Analyzers (sync-over-async, async void, unobserved tasks), IDisposableAnalyzers (leaks, returned-disposed), ErrorProne.NET.CoreAnalyzers 0.9.0-beta.4 (unobserved Task, struct equality, swallowed exceptions, `throw e`), SharpSource (ValueTask awaited twice), Nullable.Extended.Analyzer (`!` needs a justification), ReflectionAnalyzers (misspelled reflection targets); severities only in .editorconfig"""
 install = """Directory.Build.props: <TreatWarningsAsErrors>true, <AnalysisLevel>latest-all, <EnforceCodeStyleInBuild>true, \
-<Deterministic>true, <ContinuousIntegrationBuild Condition="'$(CI)' != ''">true; PackageReference (PrivateAssets=all) Meziantou.Analyzer, \
-Roslynator.Analyzers, SonarAnalyzer.CSharp; versions in Directory.Packages.props; make build runs `dotnet build -warnaserror`. \
-Never #pragma/SuppressMessage: a path-scoped line in .editorconfig with a reason. Do not add StyleCop (SA1513 and others fight CSharpier; the rest duplicates the three packs) or Roslynator.Formatting.Analyzers"""
+<Deterministic>true, <ContinuousIntegrationBuild Condition="'$(CI)' != ''">true; PackageReference (PrivateAssets=all) Meziantou.Analyzer, Roslynator.Analyzers, SonarAnalyzer.CSharp, \
+Microsoft.VisualStudio.Threading.Analyzers, IDisposableAnalyzers, ErrorProne.NET.CoreAnalyzers (Version 0.9.0-beta.4: no stable line exists, pin the beta), SharpSource, Nullable.Extended.Analyzer, ReflectionAnalyzers; \
+versions in Directory.Packages.props; make build runs `dotnet build -warnaserror`. \
+.editorconfig [*.cs]: `dotnet_analyzer_diagnostic.severity = warning` (most Meziantou/Roslynator/Sonar rules are off by default; this turns them on), then \
+`dotnet_analyzer_diagnostic.category-Style.severity = none` and `dotnet_diagnostic.IDE0005/IDE0010/IDE0072/IDE0161.severity = warning` (IDE0010 and IDE0072 catch an enum member missing from a switch even behind `_ =>`), \
+and `none` with a reason for MA0038, MA0041 (deprecated duplicates of CA1822) and RCS1181 (fights `// why:` comments). In tests/: EPC29 none (xunit.v3 entry point). \
+Never #pragma/SuppressMessage: a path-scoped line in .editorconfig with a reason. Do not add StyleCop, Roslynator.Formatting.Analyzers, Microsoft.CodeAnalysis.CSharp.CodeStyle (needs a newer compiler than the SDK), Philips/CSharpGuidelines/Menees (style packs that contradict the no-file-header rule or duplicate the three packs), \
+AsyncFixer/Gu.Analyzers (covered by Threading + ErrorProne), Puma (analyzer crash), ExhaustiveMatching (IDE0010/IDE0072 cover enums). Library repos that publish a NuGet package add Microsoft.CodeAnalysis.PublicApiAnalyzers"""
 config = [
     { path = "Directory.Build.props", contains = "<TreatWarningsAsErrors>true" },
     { path = "Directory.Build.props", contains = "<AnalysisLevel>latest-all" },
@@ -38,7 +43,15 @@ config = [
     { path = "Directory.Build.props", contains = "Meziantou.Analyzer" },
     { path = "Directory.Build.props", contains = "Roslynator.Analyzers" },
     { path = "Directory.Build.props", contains = "SonarAnalyzer.CSharp" },
-    { path = ".editorconfig", contains = "dotnet_diagnostic" },
+    { path = "Directory.Build.props", contains = "Microsoft.VisualStudio.Threading.Analyzers" },
+    { path = "Directory.Build.props", contains = "IDisposableAnalyzers" },
+    { path = "Directory.Build.props", contains = "ErrorProne.NET.CoreAnalyzers" },
+    { path = "Directory.Build.props", contains = "SharpSource" },
+    { path = "Directory.Build.props", contains = "Nullable.Extended.Analyzer" },
+    { path = "Directory.Build.props", contains = "ReflectionAnalyzers" },
+    { path = ".editorconfig", contains = "dotnet_analyzer_diagnostic.severity = warning" },
+    { path = ".editorconfig", contains = "category-Style.severity = none" },
+    { path = ".editorconfig", contains = "IDE0010" },
 ]
 gate = "dotnet build"
 
@@ -87,13 +100,19 @@ gate = "typos"
 
 [[role]]
 role = "architecture"
-tool = "BannedApiAnalyzers (RS0030 an error) with BannedSymbols.*.txt as AdditionalFiles, plus ArchUnitNET tests (xUnit v3) for layer and module rules"
-install = """PackageReference Microsoft.CodeAnalysis.BannedApiAnalyzers (PrivateAssets=all); BannedSymbols.<Rule>.txt at the repo root, \
-one line `T:Namespace.Type;why`, added as <AdditionalFiles> in Directory.Build.props, scoped by a property per project kind; \
-tests/<Name>.Architecture references TngTech.ArchUnitNET + TngTech.ArchUnitNET.xUnitV3. NetArchTest.Rules (2021) still works but duplicates ArchUnitNET: one architecture-test library per repo"""
+tool = """four layers, one rule in one place: (1) an MSBuild target that fails when a project references a project outside its `AllowedRefs`; (2) NsDepCop 3.2.0 (build time, namespace allow/deny, default-deny whitelist, module-to-module rules) via a `config.nsdepcop` per layer project; (3) BannedApiAnalyzers (RS0030 an error) with BannedSymbols.*.txt for members and constructors (DateTime.Now, Random, Guid.NewGuid, platform maths); (4) ArchUnitNET tests (xUnit v3) for cycles, naming, attributes, PlantUML layer diagrams and type-level bans. One architecture-test library per repo (NetArchTest refused: duplicate)"""
+install = """(1) Directory.Build.props: Target CheckProjectRefs BeforeTargets=ResolveProjectReferences, Condition `'$(AllowedRefs)' != ''`, builds @(_Ref) from @(ProjectReference->'%(Filename)'), @(_Bad) = @(_Ref) Exclude=$(AllowedRefs), Error when @(_Bad) is not empty; each layer csproj sets <AllowedRefs>. \
+(2) Directory.Build.props: `<PackageReference Include="NsDepCop" PrivateAssets="all" />` inside an ItemGroup with Condition `Exists('$(MSBuildProjectDirectory)/config.nsdepcop')` (a project without the file would fail NSDEPCOP03; do not use one root config, it applies to tests too); \
+src/<Layer>/config.nsdepcop: `<NsDepCopConfig IsEnabled="true" InheritanceDepth="0">` with `<Allowed From="Ns.*" To="Ns.*" />` lines (anything unlisted is illegal) and `<Disallowed From=".." To=".." />` for module rules. NsDepCop is GPL-2.0-only: fine as a build-time dev dependency, never shipped. \
+(3) PackageReference Microsoft.CodeAnalysis.BannedApiAnalyzers (PrivateAssets=all); BannedSymbols.<Rule>.txt at the repo root, one line `T:Namespace.Type;why` (generic ids `Dictionary`2`), added as <AdditionalFiles> in Directory.Build.props, scoped by a property per project kind. It flags constructor calls, member access, typeof, base types and attributes, NOT a type that only appears in a field, property, parameter or foreach (use rule 4 for those). \
+(4) tests/<Name>.Architecture references TngTech.ArchUnitNET + TngTech.ArchUnitNET.xUnitV3. Write bans as `.Should().NotDependOnAnyTypesThat()....`; the `NotDependOnAny(Types()...)` object form and `NotCallAny` pass vacuously against BCL types. Run `dotnet test --solution <sln> --no-build`"""
 config = [
     { path = "Directory.Build.props", contains = "BannedApiAnalyzers" },
+    { path = "Directory.Build.props", contains = "NsDepCop" },
+    { path = "Directory.Build.props", contains = "AllowedRefs" },
     { path = "BannedSymbols*.txt" },
+    { path = "src/*/config.nsdepcop" },
+    { path = "Directory.Packages.props", contains = "TngTech.ArchUnitNET" },
 ]
 gate = "dotnet build"
 

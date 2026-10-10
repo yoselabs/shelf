@@ -5,7 +5,7 @@
 # Research: openspec/changes/blueprint-skill/research/dotnet-godot-layering.md
 stack = "godot"
 status = "provisional"
-source = "dotnet-godot-layering.md (2026-10-10, one web pass + Godot 4.7.2 run headless on a scratch copy of lifesim); lifesim is the only consumer"
+source = "dotnet-godot-layering.md (2026-10-10, one web pass + Godot 4.7.2 run headless on a scratch copy of lifesim; architecture re-checked 2026-10-11 with the extra-strict analyzer set built clean on a Godot.NET.Sdk 4.7.2 csproj); lifesim is the only consumer"
 
 [[role]]
 role = "engine-version"
@@ -62,13 +62,21 @@ gate = "ERROR:"
 
 [[role]]
 role = "architecture"
-tool = "the engine-free core cannot resolve GodotSharp (MSBuild error target keyed on a project property) plus BannedApiAnalyzers; the Godot csproj references the composition project only; ArchUnitNET for the rest"
+tool = "the engine-free core cannot resolve GodotSharp (MSBuild error target keyed on a project property); the Godot csproj references the composition project only (the dotnet.toml AllowedRefs guard, NsDepCop and BannedApiAnalyzers apply); ArchUnitNET for the rest; the analyzer misfires that only exist in the Godot folder are switched off by path in .editorconfig"
 install = """Directory.Build.props: Target ForbidEngineInCore AfterTargets=ResolveAssemblyReferences, Condition on the core marker property (lifesim: IsSimProject), \
-Error when @(ReferencePath) holds GodotSharp or GodotSharpEditor; Godot csproj has one ProjectReference (the composition root). \
-In the Godot folder's .editorconfig scope set CA1822 and S2325 to none (instance callbacks wired by name from scenes break if made static), plus CA1707, IDE1006, CA1812, CA1515"""
+Error when @(ReferencePath) holds GodotSharp or GodotSharpEditor; Godot csproj has one ProjectReference (the composition root) and <AllowedRefs>Sim.Composition</AllowedRefs>. \
+Godot csproj also gets `<Using Remove="System.Threading" />` (ImplicitUsings makes `Timer` ambiguous with Godot.Timer, CS0104); never name a namespace `Game.Godot` (it shadows `Godot`). \
+.editorconfig section for the Godot folder (each line `dotnet_diagnostic.<ID>.severity = none`, each seen red without it on Godot.NET.Sdk 4.7.2): \
+CA1822 and S2325 (scene-wired callbacks stay instance methods), CA2213 (scene tree owns node lifetime), CA2227 ([Export] collections need a setter), \
+IDISP004 and SS066 (every GodotObject is IDisposable), NX0002 (`= null!` on [Export] properties), VSTHRD100 and EPC27 (`override async void _Input`); \
+beside lifesim's CA1707, IDE1006, CA1812, CA1515. IDISP001/002/003/006 sit in the same family as IDISP004 and are muted the same way when `new Node()` trips them"""
 config = [
     { path = "Directory.Build.props", contains = "GodotSharp" },
     { path = ".editorconfig", contains = "CA1822" },
+    { path = ".editorconfig", contains = "CA2213" },
+    { path = ".editorconfig", contains = "CA2227" },
+    { path = ".editorconfig", contains = "IDISP004" },
+    { path = ".editorconfig", contains = "VSTHRD100" },
 ]
 gate = "dotnet build"
 
