@@ -1,0 +1,10 @@
+seq = 145
+date = "2026-10-11"
+event = "delivery"
+software = "any-proc"
+release = "any-proc-v0.1.1"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """FIX: `run.call` with no arguments gives the child an empty stdin (DEVNULL), never the parent's. A child reading an inherited terminal waited on it until the timeout; a2kay sent `{}` to work around it (a2kay-eabf)."""

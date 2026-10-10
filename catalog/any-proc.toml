@@ -2,7 +2,7 @@
 name = "any-proc"
 kind = "primitive"
 tier = "T0"
-release = "any-proc-v0.1.0"
+release = "any-proc-v0.1.1"
 capability = "Stop caring how a child process is started, limited, read back and kept alive — run one to a single marked JSON result with its arguments as a size-capped JSON object on stdin, OS limits applied between fork and exec (the process cap as headroom over what the user already runs) and a timeout; or keep one alive with a probe, a start timeout, a graceful stop, a restart budget over a rolling window with capped backoff, consumer-named terminal verdicts that are never respawned, and a log rotated per run."
 implementation = "ours"
 status = "candidate"
