@@ -1,6 +1,6 @@
 [project]
 name = "bdd-tags"
-version = "0.1.0"
+version = "0.1.1"
 description = "The tags a Gherkin suite reads rather than runs: @spec:/@bug: traceability that is not a pytest marker, @known_bug:<id> as a strict expected failure, and @pending as a skip."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

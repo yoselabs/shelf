@@ -2,7 +2,7 @@
 name = "bdd-tags"
 kind = "primitive"
 tier = "T0"
-release = "bdd-tags-v0.1.0"
+release = "bdd-tags-v0.1.1"
 capability = "Stop rewriting the tag hooks every Gherkin suite grows — @spec:/@bug: traceability that is not a pytest marker, @known_bug:<id> as a strict expected failure, @pending as a skip; a pytest plugin that is on once installed."
 implementation = "ours"
 status = "candidate"

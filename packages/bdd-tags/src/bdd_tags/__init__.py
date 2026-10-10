@@ -29,6 +29,9 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", f"{PENDING}: a scenario whose steps are not written yet; reported as skipped (bdd-tags)")
 
 
+# First, ahead of pytest-bdd's own hook, which turns every tag into a marker: plugin load order
+# is not fixed, and a `@spec:` marker then fails `--strict-markers` at collection.
+@pytest.hookimpl(tryfirst=True)
 def pytest_bdd_apply_tag(tag: str, function: Callable[..., object]) -> bool | None:
     """Traceability tags are swallowed; ``known_bug:`` becomes a strict xfail; any other tag is a marker."""
     if tag.startswith(TRACE_PREFIXES):

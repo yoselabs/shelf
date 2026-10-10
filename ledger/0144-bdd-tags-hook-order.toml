@@ -1,0 +1,10 @@
+seq = 144
+date = "2026-10-10"
+event = "delivery"
+software = "bdd-tags"
+release = "bdd-tags-v0.1.1"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """FIX: `pytest_bdd_apply_tag` runs tryfirst. Plugin load order is not fixed; in a fresh container image pytest-bdd's own hook ran first, turned `@spec:` tags into markers, and `--strict-markers` failed collection of 98 a2kay feature files."""
