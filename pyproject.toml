@@ -54,6 +54,7 @@ dev = [
     "anyembed[llamacpp]",  # anyembed's GGUF backend extra — installed here so `llama_cpp` resolves for its tests + deptry (base anyembed stays on transformers; the GGUF backend is opt-in)
     "any-frontmatter[merge]",  # with_frontmatter's comment-keeping merge (yaml-merge) — an extra so a consumer that pins yaml-merge itself is not handed a second source for it
     "sse-starlette>=2,<4",  # NOT an async-scope dependency — the library whose unreset module-global the asgi lane exists to defend against, installed so that defence is actually exercised rather than suppressed away
+    "pytest-xdist>=3.6,<4",
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
@@ -185,6 +186,7 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 testpaths = [
     "tests",
     "packages/a2effect/tests",
+    "packages/blueprint/tests",
     "packages/any-browser/tests",
     "packages/any-file/tests",
     "packages/any-proc/tests",

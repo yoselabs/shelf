@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+name = "blueprint"
+kind = "cli"
+tier = "T1"
+release = "blueprint-v0.1.0"
+capability = "Stop judging a repository's setup by reading it — one command detects what the repo is (kind, stacks, tracker) and runs every applicable checkpoint in one process, each returning set up?, working?, the evidence and the remediation (auto, agent or owner), as a table per concern, JSON, or the one-line-per-failure form a repo's own `make check` runs."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "The engine behind the blueprint skill (openspec/changes/blueprint-skill). Stdlib only; runs as bare python3 from a shelf clone (PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint check). v0.1 carries the gate and backlog concerns. Born candidate."

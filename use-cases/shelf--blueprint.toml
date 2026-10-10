@@ -1,0 +1,9 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it.
+consumer = "shelf"
+software = "blueprint"
+why = "The shelf is audited by its own blueprint: its `make check` runs the fast checkpoints, so a gate or backlog regression fails the commit that causes it."
+needs = "blueprint check --gate (exit 1 on failing or not set up, 2 on not checked), the gate and backlog concerns."
+sponsor = "yoselabs"
+requester = "shelf"
+status = "active"          # active | retired

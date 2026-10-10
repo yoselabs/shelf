@@ -230,9 +230,9 @@ Layout (PE):
 - **Two tiers** (resolution 0014): `skills/<name>/` is `Kind: skill` — catalogued, plugin-distributed,
   evals required before `active`, measured always-on cost recorded in the catalog entry;
   `.agents/skills/` is shelf-internal, invoked by path, ungoverned.
-- **Eval location — untested:** the shelf plugin's root is the repo (`source: "./"`), so the
-  default suite is `shelf/evals/`, shared by every skill. To keep a skill's cases in
-  `skills/<name>/evals/`, set `experimental.evals` on the marketplace entry or pass `--eval-dir`.
+- **Eval location:** the shelf plugin's root is the repo (`source: "./"`), so cases live in
+  `evals/<skill>/<case>/`. `claude plugin eval` refuses an eval dir inside `skills/` (measured
+  2026-10-10, resolution 0014 amendment).
 - **Tag format — untested:** `claude plugin tag` creates `<name>--v<version>`; the shelf rule is
   `<name>-vX.Y.Z`. Check with `--dry-run` before the first skill tag. Run
   `claude plugin validate . --strict` first; whether `tag` runs it is undocumented.

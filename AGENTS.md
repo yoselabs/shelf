@@ -26,8 +26,14 @@ A task is **done** only when the full quality gate passes across the **entire re
 not just the files the task touched:
 
 ```bash
-make check    # ruff check + ruff format + pyrefly (strict) + codespell + deptry + pytest/coverage
+make check      # ruff + format + pyrefly (strict) + codespell + deptry + the tests the change reaches
+make check-all  # the same, every test, with the coverage floor (CI runs this)
 ```
+
+Both run in a Linux container when Docker answers (the macOS endpoint scanner made the host run
+10-17 min); `SHELF_HOST_CHECK=1` forces the host. The lint, type and dependency checks always cover
+the whole repo; only the tests are narrowed, to the changed packages and every package depending
+on them (`tools/affected.py`).
 
 **No carve-outs.** "Pre-existing drift", "unrelated file", or "that's a separate change" do **not**
 satisfy Done. If `make check` is red for any reason, the task is not finished. This toolchain is the

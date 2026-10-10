@@ -220,7 +220,9 @@ def test_fake_config_matches_real_add_argument(arg: str) -> None:
         else:
             return "accepted"
 
-    real = _outcome(zd.Config(headless=True))
+    # A browser path stops Config hunting for an installed Chrome (none in the gate
+    # container); add_argument never looks at it.
+    real = _outcome(zd.Config(headless=True, browser_executable_path="/nonexistent/chrome"))
     fake = _outcome(_FakeConfig(headless=True))
     assert fake == real, (
         f"fake Config.add_argument({arg!r}) → {fake}, but the real "

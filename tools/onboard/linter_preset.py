@@ -5,7 +5,8 @@ Implements `docs/linting.md`'s own copy list, mechanically:
 1. The `[tool.ruff]`, `[tool.ruff.lint]` (+ subtables), `[tool.codespell]`,
    `[tool.coverage.*]` blocks from shelf's `pyproject.toml`.
 2. The `Makefile` targets (`check guard preset bootstrap bootstrap-verify lint format typecheck spell deps test`);
-   `deps` is rewritten for a single-package repo, since the shelf's own loops over `packages/*`.
+   `check` is the plain gate (the shelf's own dispatches to its container), and `deps` is rewritten
+   for a single-package repo, since the shelf's own loops over `packages/*`.
 3. The `dev` dependency-group.
 4. A `[tool.pyrefly]` and a `[tool.pytest.ini_options]` built for a consumer: the shelf's strict
    preset and error severities (the axis `make preset` compares), its lighter bar for tests, and
@@ -65,6 +66,12 @@ _SHELF_TESTS_SUBCONFIG = "packages/*/tests/**"
 _CONSUMER_DEPS = """# dependency hygiene: unused, missing and transitive dependencies (deptry).
 deps:
 \tuv run deptry .
+
+"""
+# The shelf's `check` dispatches to a container and to targets a consumer is not given
+# (check-host, test-affected); a consumer gets the plain gate.
+_CONSUMER_CHECK = """# The gate. Fast, deterministic tools first; tests last.
+check: guard preset lint typecheck spell deps test
 
 """
 _CONSUMER_PYTEST = """[tool.pytest.ini_options]
@@ -203,6 +210,7 @@ class LinterPresetOperation:
         to_copy = _make_targets_to_copy(existing_make)
         if to_copy:
             shelf_targets = dict(_split_make_targets(_SHELF_MAKEFILE.read_text()))
+            shelf_targets["check"] = _CONSUMER_CHECK
             if not (self.repo / "packages").is_dir():
                 shelf_targets["deps"] = _CONSUMER_DEPS
             new_make = (existing_make.rstrip("\n") + "\n\n" if existing_make else "") + "".join(shelf_targets[name] for name in to_copy)

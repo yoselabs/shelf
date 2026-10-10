@@ -93,10 +93,11 @@ Measured while building `blueprint` (`openspec/changes/blueprint-skill/`, design
   `/name`. `claude plugin eval` reaches it: a case whose prompt is `/probe hello` fired the skill and
   passed. So: `Kind: skill` = catalogued, plugin-distributed, evaled; whether it auto-triggers is
   each skill's own decision, recorded in its catalog entry. Blueprint is user-invoked.
-- **Eval location.** The plugin root is the repo (`source: "./"`), so the default suite would be
-  `shelf/evals/`. `"experimental": {"evals": "skills"}` in `.claude-plugin/plugin.json` makes
-  `claude plugin eval` discover every `skills/<name>/evals/<case>/` (it searches the eval dir
-  recursively). Run results are written to the root `evals/results/`, which is gitignored.
+- **Eval location.** The plugin root is the repo (`source: "./"`), so the suite is `shelf/evals/`,
+  one directory per skill: `evals/<name>/<case>/`. Corrected 2026-10-10 by a real run: `claude plugin
+  eval` refuses an eval dir inside `skills/` ("must not be inside the plugin's skills/ directory, a
+  loaded component directory"), both through `experimental.evals` and `--eval-dir`, so the earlier
+  `experimental.evals: "skills"` was dropped. Run results go to `evals/results/`, gitignored.
 - **Tag format.** `claude plugin tag` tags the plugin, not a skill: `skills--v<version>` from
   `plugin.json`. A skill's own release stays a shelf tag, `<name>-vX.Y.Z`, and consumers of
   blueprint record the checkpoint-set hash they were audited against (design D7), not a version.

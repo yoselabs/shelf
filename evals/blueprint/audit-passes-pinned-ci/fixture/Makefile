@@ -1,0 +1,3 @@
+check: lint
+lint:
+	true

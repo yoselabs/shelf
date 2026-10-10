@@ -34,11 +34,12 @@ Resume here after compaction. Work queue: `bd show shelf-1y4` (epic) and `bd rea
 |---|---|
 | design | done: D1-D18 + owner rounds 1-10 below; vocabulary in [CONTEXT.md](CONTEXT.md) |
 | research | done: 13 files in `research/`, all one pass; two Fable consults (advisory only) |
-| shelf prerequisites | done: `tools/` type-checked (shelf-yz4); resolution 0014 amended; plugin eval proven to reach a user-invoked skill and to find `skills/*/evals` via `experimental.evals`; strict beads settings live in the shelf; onboarding's broken Makefile copy fixed (shelf-4mz) |
-| blueprint code | not started: `packages/blueprint` (shelf-1y4.1) is the first bead; nothing under `skills/blueprint/` yet |
+| shelf prerequisites | done: `tools/` type-checked (shelf-yz4); resolution 0014 amended; plugin eval proven to reach a user-invoked skill; eval cases live in `evals/<skill>/` (plugin eval refuses them inside `skills/`); strict beads settings live in the shelf; onboarding's broken Makefile copy fixed (shelf-4mz) |
+| blueprint code | v0.1 built: engine `packages/blueprint` (stdlib, one process, profile detection, overrides, set hash, reports, exit codes), gate concern (5 checkpoints) and backlog concern (7), each with a passing and a planted-violation test; `skills/blueprint/SKILL.md` with two paired eval cases; the shelf runs `make blueprint` in its own gate and passes it. Audit-only rows (`--audit`): clean clone, installed hooks, and the two that read bd's database |
+| test speed | `make check` runs in a Linux container when Docker answers and tests only the packages a change reaches (`tools/affected.py`); `make check-all` runs everything and is what CI runs. Full gate 16m51s on the host → about 1 min in the container (2026-10-10) |
 | consumers waiting | a2kay, lifesim, a2peer, homelab: unblocked by shelf-1y4.12 (corpus audits), which needs the engine, the gate and backlog concerns, and the skill |
 
-Critical path: 1y4.1 engine → 1y4.2 gate + 1y4.3 backlog + 1y4.4 skill → 1y4.12 corpus audits.
+Next: 1y4.12, audits of a2kay, lifesim, a2peer and homelab with `/blueprint`; then the remaining concerns one at a time.
 
 ## Owner round 10 — output contract (2026-10-10)
 

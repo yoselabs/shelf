@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: audit-flags-tag-pinned-ci
+context:
+  scaffold_script: scaffold.sh

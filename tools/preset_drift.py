@@ -55,9 +55,13 @@ _AXES = (
 _TARGET = re.compile(r"^([a-zA-Z][\w-]*)\s*:(?!=)")
 
 # Targets that operate on the shelf's own layout (its catalog, its cross-package
-# advisory, its any-browser lane). A consumer has nothing for them to act on, so their
-# absence is not drift; without this every fresh consumer failed `make preset`.
-_SHELF_ONLY_TARGETS = frozenset({"catalog", "advisory", "test-browser"})
+# advisory, its any-browser lane, its gate container and affected-only run). `blueprint`
+# reaches a consumer through the blueprint remediation, not the linter preset. A consumer
+# has nothing for them to act on, so their absence is not drift; without this every
+# fresh consumer failed `make preset`.
+_SHELF_ONLY_TARGETS = frozenset(
+    {"catalog", "advisory", "test-browser", "check-all", "check-host", "check-all-host", "test-image", "test-affected", "blueprint", "eval"}
+)
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -119,17 +123,18 @@ def main() -> int:
         print(f"preset-drift: no pyproject.toml at {repo} -- CANNOT VERIFY, not a pass", file=sys.stderr)
         return 2
 
-    shelf = _shelf_root(args.shelf_home)
-    if shelf is None:
-        print("preset-drift: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass", file=sys.stderr)
-        return 2
     # A worktree of the shelf is the shelf, and its `../shelf` resolves to the main
     # checkout — so identity is "this script lives in the repo under test", not a path
     # comparison. Without it, `make preset` in a shelf worktree grades the branch
-    # against `main` and fails on every change the branch is making.
-    if shelf == repo or Path(__file__).resolve().parent.parent == repo:
+    # against `main` and fails on every change the branch is making. Checked before the
+    # clone lookup: the shelf's own gate container has no clone beside it.
+    shelf = _shelf_root(args.shelf_home)
+    if Path(__file__).resolve().parent.parent == repo or shelf == repo:
         print("preset-drift: this IS the shelf; nothing to compare against")
         return 0
+    if shelf is None:
+        print("preset-drift: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass", file=sys.stderr)
+        return 2
 
     try:
         consumer = _load(consumer_toml)

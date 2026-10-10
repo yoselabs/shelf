@@ -4,10 +4,45 @@
 # This is the reference toolchain every consumer of the shelf inherits (resolution 0004).
 # Each target is one linter doing one job; `check` is the gate.
 
-.PHONY: check guard preset bootstrap bootstrap-verify lint format typecheck spell deps test test-browser cov catalog advisory sync
+.PHONY: check check-all check-host check-all-host test-image blueprint eval guard preset bootstrap bootstrap-verify lint format typecheck spell deps test test-affected test-browser cov catalog advisory sync
 
-# The gate. Fast, deterministic tools first; tests last.
-check: guard preset lint typecheck spell deps test
+# pytest runs one worker per core (pytest-xdist).
+PYTEST_PAR := -n auto
+
+# The gate. Fast, deterministic tools first; tests last. Tests cover only what the change
+# touches (`test-affected`); `check-all` runs every test with the coverage floor, and CI runs
+# `check-all`.
+#
+# Both run inside a Linux container when Docker answers: on the macOS host an endpoint scanner
+# inspects every process start and file write, and the suite took 10-17 min there (2026-10-10).
+# In CI, inside a container, or with SHELF_HOST_CHECK=1 they run in place; the container
+# speeds the gate up and is never required. One image per checkout, so worktrees never run
+# each other's code. Image: tools/gate/gate.Dockerfile.
+TEST_IMAGE := shelf-gate-$(notdir $(CURDIR))
+# `docker run` sits in its own target so `make -n check` only prints it: make runs any
+# recipe line naming $(MAKE) even under -n, and blueprint's gate.one-command dry-runs `check`.
+GATE = if [ -z "$$CI" ] && [ -z "$$SHELF_HOST_CHECK" ] && [ ! -f /.dockerenv ] && docker info >/dev/null 2>&1; \
+	then $(MAKE) container-$(1); else $(MAKE) $(1); fi
+check:
+	@$(call GATE,check-host)
+check-all:
+	@$(call GATE,check-all-host)
+check-host: guard preset blueprint lint typecheck spell deps test-affected
+check-all-host: guard preset blueprint lint typecheck spell deps test
+test-image:
+	docker build -q -f tools/gate/gate.Dockerfile -t $(TEST_IMAGE) .
+container-%: test-image
+	docker run --rm $(TEST_IMAGE) make $*
+
+# The blueprint's per-commit checkpoints (packages/blueprint): one line per one that is not
+# passing. The audit-only ones (slow, or reading this clone's bd database) run in the
+# /blueprint audit, not here. Same resolution order as `guard`.
+blueprint:
+	@s=packages/blueprint/src; \
+	 [ -d "$$s/blueprint" ] || s="$${SHELF_HOME:-../shelf}/packages/blueprint/src"; \
+	 [ -d "$$s/blueprint" ] || s="$$HOME/Workspaces/shelf/packages/blueprint/src"; \
+	 if [ -d "$$s/blueprint" ]; then PYTHONPATH="$$s" python3 -m blueprint check --repo . --gate; \
+	 else echo "blueprint: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
 
 # The commit guard as a GATE, not only a hook. A pre-commit hook is per-clone and
 # can be silently disabled by anything that claims core.hooksPath -- beads, husky,
@@ -95,7 +130,13 @@ deps:
 # Substrate adapters (docling/torch/subprocess) are legitimately hard to unit-test,
 # so the floor is a rot-guard, not a vanity number. Raise it as coverage climbs.
 test:
-	uv run pytest --cov --cov-report=term-missing --cov-fail-under=65
+	uv run pytest $(PYTEST_PAR) --cov --cov-report=term-missing --cov-fail-under=65
+
+# Only the tests a change can reach: the changed packages, every package depending on them,
+# and the fitness tests (tools/affected.py). No coverage floor: it is measured over the whole
+# repo, so a partial run cannot meet it.
+test-affected:
+	uv run pytest $(PYTEST_PAR) -p no:cov $$(python3 tools/affected.py --explain)
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. CI runs
@@ -109,6 +150,16 @@ test-browser:
 # coverage report only (human view).
 cov:
 	uv run pytest --cov --cov-report=term-missing
+
+# The skills' eval cases (evals/<skill>/<case>/), with `claude plugin eval`. Not in `check`: live
+# runs cost money. Run from a copy without .venv and .git: plugin eval refuses a plugin dir of
+# more than 20000 entries. EVAL_ARGS passes more flags, e.g. EVAL_ARGS="--case audit-*".
+eval:
+	@d=$$(mktemp -d); \
+	 rsync -a --exclude .venv --exclude .git --exclude __pycache__ --exclude '.*_cache' --exclude .hypothesis \
+	   --exclude .beads --exclude evals/results ./ "$$d/" && \
+	 ( cd "$$d" && claude plugin eval . --trust-plugin --scaffold --allow-tools Bash Write Edit --max-cost-usd 20 $(EVAL_ARGS) ); \
+	 rc=$$?; mkdir -p evals/results && cp -R "$$d/evals/results/." evals/results/ 2>/dev/null; rm -rf "$$d"; exit $$rc
 
 # regenerate the derived ontology indexes (catalog/ledger/use-cases READMEs).
 # The files are truth; the READMEs are projected (constitution I). A freshness

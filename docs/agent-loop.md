@@ -182,8 +182,8 @@ STEPS:
      bag-of-functions shape, and it is expensive to convert after the first tag.
    - the **boundary test** — must not import any consumer app (the one invariant);
    - a **Contract** born `candidate` (inert until a live consumer breaks without it);
-   - the package `pyproject.toml`, or for a skill, `SKILL.md` + an `evals/` directory (a skill with
-     no eval coverage stays `candidate`, never `active`).
+   - the package `pyproject.toml`, or for a skill, `SKILL.md` + eval cases in `evals/<name>/` (a
+     skill with no eval coverage stays `candidate`, never `active`).
    - **Candidate is a `docs/runbooks/*.md` procedure, considered for conversion to a skill?**
      Conversion is *earned*, not swept (resolution 0014, Article V applied to skill triggers): only
      proceed with a concrete instance of a live agent demonstrably missing or not following the

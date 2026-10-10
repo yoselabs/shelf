@@ -26,10 +26,14 @@ from __future__ import annotations
 
 import os
 
-from hypothesis import settings
+from hypothesis import HealthCheck, settings
 
-settings.register_profile("default")
-settings.register_profile("ci", derandomize=True)
+# too_slow times input generation by the wall clock. With one pytest worker per core
+# (`make test`, pytest-xdist) a cold first draw on a loaded machine trips it -- a red
+# caused by the machine, not the change.
+_NOT_TIMED = [HealthCheck.too_slow]
+settings.register_profile("default", suppress_health_check=_NOT_TIMED)
+settings.register_profile("ci", derandomize=True, suppress_health_check=_NOT_TIMED)
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 
 # `pytester` runs a small suite in a sandbox; bdd-tags proves its plugin hooks with it.
