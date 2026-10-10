@@ -43,7 +43,11 @@ Resume here after compaction. Work queue: `bd show shelf-1y4` (epic) and `bd rea
 | survey | `blueprint survey`: experience, completeness, correctness, cost; filled after every run, checked complete by the engine |
 | consumers waiting | a2kay, lifesim, a2peer, homelab: unblocked by shelf-1y4.12 (corpus audits), which needs the engine, the gate and backlog concerns, and the skill |
 
-Next: 1y4.12, audits of a2kay, lifesim, a2peer and homelab with `/blueprint`; then the remaining concerns one at a time.
+Next (2026-10-11, milestone pushed): the owner runs the audit on lifesim, a2peer, a2kay, homelab and relays
+each `docs/blueprint/survey.md`. Open in flight: stricter .NET analyzers and the architecture tool (research
+appended to research/dotnet-godot-layering.md, profile edits uncommitted if any), build-tool round 2 (moon,
+Turborepo reports pending; Nx done: research/affected-trials.md + scratch trial2-*.md), eval run results.
+Later: knowledge concern (1y4.6), kickoff (1y4.9), reabsorb (1y4.10), opencode (1y4.16), Godot proof (1y4.17).
 
 ## Owner round 10 — output contract (2026-10-10)
 
