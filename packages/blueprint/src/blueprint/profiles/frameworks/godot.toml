@@ -1,68 +1,100 @@
-# Framework profile (see ../python-uv.toml for the format; it layers on top of dotnet.toml for a C# Godot project).
+# Framework profile (see ../python-uv.toml for the format). Layers on dotnet.toml for a Godot 4.x C# game: every
+# dotnet.toml rule applies to the Godot csproj too (verified: strict props build it clean), the rows here add what is Godot's.
 # `{root}` is the folder holding project.godot (lifesim: src/Game.Godot); repo-level files (.gitignore,
-# .gitattributes, Makefile, .github/workflows) stay at the repo root. A path may be a glob (`*.csproj`).
+# .gitattributes, Makefile, .github/workflows) stay at the repo root. Paths may be globs (`*.csproj`, no `**`).
+# Research: openspec/changes/blueprint-skill/research/dotnet-godot-layering.md
 stack = "godot"
 status = "provisional"
-source = "godot-profile.md in openspec/changes/blueprint-skill/research (late-2026 web/GitHub pass, one pass, not cross-checked); lifesim is the only consumer"
+source = "dotnet-godot-layering.md (2026-10-10, one web pass + Godot 4.7.2 run headless on a scratch copy of lifesim); lifesim is the only consumer"
 
 [[role]]
 role = "engine-version"
-tool = "Godot.NET.Sdk/<version> in the Godot csproj (exact pin); features line in project.godot; same number in CI"
-install = "csproj Sdk=\"Godot.NET.Sdk/4.7.2\"; CI reads the version from that csproj (or global.json msbuild-sdks) instead of repeating it"
-config = [{ path = "{root}/*.csproj", contains = "Godot.NET.Sdk/" }]
+tool = "Godot.NET.Sdk/<x.y.z> exact in the Godot csproj (single source); config/features in project.godot says the same major.minor; CI reads the csproj"
+install = """csproj `<Project Sdk="Godot.NET.Sdk/4.7.2">` plus an explicit <TargetFramework> (the editor rewrites a csproj missing either); \
+project.godot config/features=PackedStringArray("4.7", "C#", ...). CI derives the version: \
+`grep -o 'Godot.NET.Sdk/[0-9.]*' {root}/*.csproj | cut -d/ -f2` into setup-godot's `version`"""
+config = [
+    { path = "{root}/*.csproj", contains = "Godot.NET.Sdk/" },
+    { path = "{root}/project.godot", contains = 'config/features=PackedStringArray("4.' },
+]
 
 [[role]]
 role = "project-hygiene"
-tool = ".godot/ ignored, *.uid and *.import committed, .gitattributes with LF + LFS for binaries"
-install = "Godot editor: Project > Version Control > Generate Version Control Metadata (writes .gitignore + .gitattributes); never ignore *.uid"
+tool = ".godot/ ignored, *.uid and *.import committed (never ignored), .gitattributes with LF, .csharpierignore for .godot/"
+install = """Godot editor: Project > Version Control > Generate Version Control Metadata (writes .gitignore + .gitattributes with `* text=auto eol=lf`); \
+add `.godot/`, `bin/`, `obj/` to .gitignore and `.godot/` to .csharpierignore; never ignore *.uid or *.import; \
+after a headless import `git status --porcelain` must be empty (a new .uid or import file means something was not committed)"""
 config = [
     { path = ".gitignore", contains = ".godot/" },
     { path = ".gitattributes", contains = "text=auto eol=lf" },
 ]
 
 [[role]]
+role = "assets"
+tool = "Git LFS for binary assets via .gitattributes; export_presets.cfg committed, credentials only in .godot/export_credentials.cfg"
+install = """.gitattributes: `*.png filter=lfs diff=lfs merge=lfs -text` for png, jpg, webp, wav, ogg, mp3, glb, gltf-bin, fbx, ttf, otf; \
+`git lfs install --skip-repo` (prek owns the hooks); CI checkout with `lfs: true`. Open: the pre-push LFS upload hook under prek is unproven (see research doc)"""
+config = [{ path = ".gitattributes", contains = "filter=lfs" }]
+
+[[role]]
 role = "scripts-lint"
-tool = "gdtoolkit (gdlint + gdformat) when the project has .gd files; otherwise not applicable"
-install = "uv tool install gdtoolkit; gdlint . and gdformat --check . in make check"
-na = "C#-only project (no .gd files); becomes mandatory the moment a .gd file exists (gate: gdlint)"
+na = "C#-only project (no .gd files): the C# analyzers are the lint. The moment a .gd file exists this becomes mandatory: gdtoolkit gdlint/gdformat (4.5.0, 2025-10-09, stale) or GDQuest GDScript-formatter (0.27.0, 2026-09-25, formatter only) are the candidates, both untested on Godot 4.7"
 
 [[role]]
 role = "build"
-tool = "godot --headless --import, then --build-solutions --quit, run from the Godot project folder"
-install = "make godot-import (or a recipe reached by make check) running both commands with $(GODOT)"
-config = [{ any = [
-    { path = "Makefile", contains = "--build-solutions" },
-    { path = "justfile", contains = "--build-solutions" },
-] }]
-gate = "--headless"
+tool = "godot --headless --path <root> --import, then --build-solutions --quit, both inside make check; the import log is scanned for ERROR lines and the tree must stay clean"
+install = """Makefile: GODOT ?= godot; `godot-build:` runs `"$(GODOT)" --headless --path {root} --import 2>&1 | tee import.log`, then \
+`! grep -q 'ERROR:' import.log` (import exits 0 even on broken scene references), then `"$(GODOT)" --headless --path {root} --build-solutions --quit` \
+(exit 1 on a C# compile error), then `git diff --exit-code && test -z "$(git status --porcelain)"`; add godot-build to the `check` prerequisites"""
+config = [{ path = "Makefile", contains = "--build-solutions" }]
+gate = "--build-solutions"
 
 [[role]]
 role = "tests"
-tool = "GdUnit4Net (gdUnit4.api + test adapter, dotnet test) or Chickensoft GoDotTest for in-engine C# tests"
-install = "add gdUnit4.api, gdUnit4.test.adapter, gdUnit4.analyzers to the Godot test project; or GoDotTest with --run-tests --quit-on-finish"
-config = [{ any = [
-    { path = "Directory.Packages.props", contains = "gdUnit4" },
-    { path = "Directory.Packages.props", contains = "GoDotTest" },
-    { path = "{root}/*.csproj", contains = "gdUnit4" },
-    { path = "{root}/*.csproj", contains = "GoDotTest" },
-] }]
-untested = "neither runner verified against Godot 4.7.2 + net10.0 + Microsoft.Testing.Platform; lifesim has no view tests yet"
+untested = "two candidates, neither run here: Chickensoft GoDotTest 2.0.47 (2026-09-09; self-contained runner, --run-tests --quit-on-finish, not VSTest or MTP so no clash with the MTP-only global.json) or GdUnit4Net 5.0.0 (VSTest adapter, stable release 2025-06-21; may clash with an MTP-only global.json). Engine-free logic stays in the xunit.v3 projects; in-engine tests only for thin views"
 
 [[role]]
 role = "scene-integrity"
-tool = "headless import fails on broken scene/resource references; a --headless --import log scan for ERROR lines"
-install = "make godot-import fails on 'ERROR:' / 'Parse Error' in the import log; no maintained static .tscn linter found"
-untested = "no deterministic tool proven; log-scan of --import is a hypothesis never seen red"
+tool = "the headless import log scan: any `ERROR:` line fails the gate (broken ext_resource, missing script, parse errors)"
+install = "same make target as `build`; the pattern is `ERROR:` after stripping ANSI codes (`sed 's/\\x1b\\[[0-9;]*m//g'`); seen red on a broken ext_resource and a bad scene line, green on a clean import (Godot 4.7.2)"
+config = [{ path = "Makefile", contains = "ERROR:" }]
+gate = "ERROR:"
 
 [[role]]
 role = "architecture"
-tool = "MSBuild target failing a Sim.* project that resolves GodotSharp, plus BannedApiAnalyzers"
-install = "Directory.Build.props ForbidGodotInSim target (IsSimProject) as in lifesim; optional ArchUnitNET test"
-config = [{ path = "Directory.Build.props", contains = "GodotSharp" }]
+tool = "the engine-free core cannot resolve GodotSharp (MSBuild error target keyed on a project property) plus BannedApiAnalyzers; the Godot csproj references the composition project only; ArchUnitNET for the rest"
+install = """Directory.Build.props: Target ForbidEngineInCore AfterTargets=ResolveAssemblyReferences, Condition on the core marker property (lifesim: IsSimProject), \
+Error when @(ReferencePath) holds GodotSharp or GodotSharpEditor; Godot csproj has one ProjectReference (the composition root). \
+In the Godot folder's .editorconfig scope set CA1822 and S2325 to none (instance callbacks wired by name from scenes break if made static), plus CA1707, IDE1006, CA1812, CA1515"""
+config = [
+    { path = "Directory.Build.props", contains = "GodotSharp" },
+    { path = ".editorconfig", contains = "CA1822" },
+]
 gate = "dotnet build"
 
 [[role]]
 role = "ci"
-tool = "GitHub Actions: actions/setup-dotnet + chickensoft-games/setup-godot, then the same make check and headless import"
-install = ".github/workflows/*.yml using chickensoft-games/setup-godot@v2 with use-dotnet true, version from the csproj Sdk"
-config = [{ path = ".github/workflows/*.yml", contains = "setup-godot" }]
+tool = "GitHub Actions: actions/setup-dotnet (global.json) + chickensoft-games/setup-godot@v2 with the csproj's version, then `make check`"
+install = ".github/workflows/check.yml: actions/checkout (lfs: true), actions/setup-dotnet with global-json-file, chickensoft-games/setup-godot@v2 (use-dotnet: true, include-templates only when exporting), run `make check` with GODOT set to the installed binary"
+config = [
+    { path = ".github/workflows/*.yml", contains = "setup-godot" },
+    { path = ".github/workflows/*.yml", contains = "make check" },
+]
+
+[[role]]
+role = "hooks"
+tool = "prek local hook godot-uid: every staged .cs/.gd in the Godot folder has a sibling .uid"
+install = """.pre-commit-config.yaml local hook: id: godot-uid / entry: sh -c 'rc=0; for f in "$@"; do [ -f "$f.uid" ] || { echo "missing $f.uid: open the project in the Godot editor and commit it" >&2; rc=1; }; done; exit $rc' -- \
+/ language: system / files: ^{root}/.*\\.(cs|gd)$ (escape the dots; {root} as the folder path)"""
+config = [{ path = ".pre-commit-config.yaml", contains = "godot-uid" }]
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/godot.md (engine pin, headless commands, partial/GlobalClass/Signal rules, scene conventions, what never to edit), linked from AGENTS.md"
+install = """create docs/agents/godot.md (<= 120 lines): the make targets; never hand-edit .godot/ or *.uid; scripts must be `partial` (GD0001 is an error), signals are `[Signal] delegate void NameEventHandler`; \
+scene-wired callbacks stay instance methods (analyzer exemption lives in .editorconfig); views read snapshots and send commands, no game rules in nodes; \
+after editing a .tscn run `make godot-build`; new script means commit its .uid. Link from AGENTS.md: `Godot conventions: docs/agents/godot.md`"""
+config = [
+    { path = "docs/agents/godot.md" },
+    { path = "AGENTS.md", contains = "docs/agents/godot.md" },
+]

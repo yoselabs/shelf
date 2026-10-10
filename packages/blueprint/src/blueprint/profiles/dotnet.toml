@@ -1,62 +1,123 @@
-# Stack profile (see python-uv.toml for the format).
+# Stack profile (see python-uv.toml for the format). .NET 10 SDK, C# 14, late 2026.
+# Research: openspec/changes/blueprint-skill/research/dotnet-godot-layering.md (tool, evidence URL + date, verdict per role).
+# Every property below can sit in Directory.Build.props or Directory.Packages.props; the config entries accept either.
 stack = "dotnet"
 status = "provisional"
-source = "lifesim's bootstrap (openspec/changes/blueprint-skill/research/lifesim-strategy.md §5.2); one repo, partly unverified"
+source = "dotnet-godot-layering.md (2026-10-10, one web pass + a scratch copy of lifesim built strict with Godot 4.7.2); lifesim is the only consumer"
 
 [[role]]
 role = "toolchain"
-tool = "global.json pinning the SDK"
-install = "dotnet new globaljson --sdk-version <version> --roll-forward latestFeature"
-config = [{ path = "global.json", contains = '"version"' }]
+tool = "global.json pins the SDK (rollForward latestPatch); NuGet lock files (RestorePackagesWithLockFile) committed, locked mode in CI"
+install = """dotnet new globaljson --sdk-version <x.y.z> --roll-forward latestPatch; in Directory.Build.props set \
+<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile> and <RestoreLockedMode Condition="'$(CI)' != ''">true</RestoreLockedMode>; \
+dotnet restore; commit every packages.lock.json"""
+config = [
+    { path = "global.json", contains = '"version"' },
+    { path = "global.json", contains = '"rollForward"' },
+    { path = "Directory.Build.props", contains = "RestorePackagesWithLockFile" },
+]
 
 [[role]]
 role = "formatter"
-tool = "CSharpier as a local dotnet tool"
-install = "dotnet new tool-manifest; dotnet tool install csharpier"
+tool = "CSharpier 1.3.0 as a local dotnet tool (layout only; no dotnet format, no Roslynator.Formatting)"
+install = "dotnet new tool-manifest; dotnet tool install csharpier; add .csharpierignore (.godot/, obj/, bin/); make fmt-check runs `dotnet tool restore` then `dotnet csharpier check .`"
 config = [{ path = ".config/dotnet-tools.json", contains = "csharpier" }]
 gate = "csharpier check"
 
 [[role]]
 role = "linter"
-tool = "the .NET analyzers at latest-all, warnings as errors, plus Meziantou, Roslynator, Sonar"
-install = "Directory.Build.props: TreatWarningsAsErrors, AnalysisLevel latest-all, EnforceCodeStyleInBuild; analyzer PackageReferences"
+tool = "SDK analyzers at AnalysisLevel latest-all + Meziantou.Analyzer + Roslynator.Analyzers + SonarAnalyzer.CSharp, EnforceCodeStyleInBuild, warnings as errors; severities only in .editorconfig"
+install = """Directory.Build.props: <TreatWarningsAsErrors>true, <AnalysisLevel>latest-all, <EnforceCodeStyleInBuild>true, \
+<Deterministic>true, <ContinuousIntegrationBuild Condition="'$(CI)' != ''">true; PackageReference (PrivateAssets=all) Meziantou.Analyzer, \
+Roslynator.Analyzers, SonarAnalyzer.CSharp; versions in Directory.Packages.props; make build runs `dotnet build -warnaserror`. \
+Never #pragma/SuppressMessage: a path-scoped line in .editorconfig with a reason. Do not add StyleCop (it fights CSharpier) or Roslynator.Formatting.Analyzers"""
 config = [
     { path = "Directory.Build.props", contains = "<TreatWarningsAsErrors>true" },
     { path = "Directory.Build.props", contains = "<AnalysisLevel>latest-all" },
+    { path = "Directory.Build.props", contains = "<EnforceCodeStyleInBuild>true" },
+    { path = "Directory.Build.props", contains = "Meziantou.Analyzer" },
+    { path = "Directory.Build.props", contains = "Roslynator.Analyzers" },
+    { path = "Directory.Build.props", contains = "SonarAnalyzer.CSharp" },
+    { path = ".editorconfig", contains = "dotnet_diagnostic" },
 ]
 gate = "dotnet build"
 
 [[role]]
 role = "types"
-tool = "nullable reference types, as errors"
-install = "Directory.Build.props: <Nullable>enable</Nullable> (TreatWarningsAsErrors makes them errors)"
-config = [{ path = "Directory.Build.props", contains = "<Nullable>enable" }]
+tool = "nullable reference types enabled, every nullable warning an error"
+install = "Directory.Build.props: <Nullable>enable</Nullable> and <WarningsAsErrors>$(WarningsAsErrors);nullable</WarningsAsErrors> (with TreatWarningsAsErrors)"
+config = [
+    { path = "Directory.Build.props", contains = "<Nullable>enable" },
+    { path = "Directory.Build.props", contains = "nullable" },
+]
 gate = "dotnet build"
 
 [[role]]
 role = "dependencies"
-tool = "central package management"
-install = "Directory.Packages.props with every version; ManagePackageVersionsCentrally in Directory.Build.props"
-config = [{ path = "Directory.Packages.props" }, { path = "Directory.Build.props", contains = "ManagePackageVersionsCentrally" }]
+tool = "central package management with transitive pinning, NuGetAudit (all, low) with audit warnings as errors; vulnerable or unpinned packages fail the build"
+install = """Directory.Packages.props holds every <PackageVersion>; set <ManagePackageVersionsCentrally>true, \
+<CentralPackageTransitivePinningEnabled>true, <NuGetAudit>true, <NuGetAuditMode>all, <NuGetAuditLevel>low in Directory.Build.props \
+(TreatWarningsAsErrors turns NU1901-NU1904 into errors; add <WarningsNotAsErrors>NU1900 so an offline machine does not fail)"""
+config = [
+    { path = "Directory.Packages.props" },
+    { any = [{ path = "Directory.Packages.props", contains = "ManagePackageVersionsCentrally" }, { path = "Directory.Build.props", contains = "ManagePackageVersionsCentrally" }] },
+    { any = [{ path = "Directory.Packages.props", contains = "CentralPackageTransitivePinningEnabled" }, { path = "Directory.Build.props", contains = "CentralPackageTransitivePinningEnabled" }] },
+    { any = [{ path = "Directory.Packages.props", contains = "NuGetAuditMode" }, { path = "Directory.Build.props", contains = "NuGetAuditMode" }] },
+]
 gate = "dotnet build"
 
 [[role]]
 role = "tests"
-tool = "dotnet test (xunit v3 on Microsoft.Testing.Platform)"
-install = "a tests/ project per layer; global.json test runner"
+tool = "xunit.v3 (4.0.2) on Microsoft.Testing.Platform; one tests/ project per layer; CsCheck for properties"
+install = """global.json: "test": { "runner": "Microsoft.Testing.Platform" }; tests/*/ projects reference xunit.v3 (version in Directory.Packages.props); \
+make test runs `dotnet test --solution <sln> --no-build` (no --nologo: MTP rejects it)"""
+config = [{ path = "global.json", contains = "Microsoft.Testing.Platform" }]
 gate = "dotnet test"
 
 [[role]]
-role = "architecture"
-tool = "BannedApiAnalyzers with BannedSymbols lists"
-install = "Microsoft.CodeAnalysis.BannedApiAnalyzers; BannedSymbols.*.txt as AdditionalFiles"
-config = [{ path = "Directory.Build.props", contains = "BannedApiAnalyzers" }]
-gate = "dotnet build"
-
-[[role]]
 role = "coverage"
-untested = "no coverage floor proven for .NET yet"
+untested = "no .NET coverage floor proven: coverlet.MTP 10.1.0 lists --coverlet-threshold but its own page also says threshold validation is unsupported, and Microsoft.Testing.Extensions.CodeCoverage 18.12.0 documents none; never run red/green"
 
 [[role]]
 role = "spelling"
-untested = "no spelling checker chosen for .NET yet"
+tool = "typos (crate-ci) with a committed config; splits identifiers, so it works on C#"
+install = "brew install typos-cli (or cargo install typos-cli); typos.toml with [default.extend-words] for domain terms; make check runs `typos`"
+config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
+gate = "typos"
+
+[[role]]
+role = "architecture"
+tool = "BannedApiAnalyzers (RS0030 an error) with BannedSymbols.*.txt as AdditionalFiles, plus ArchUnitNET tests (xUnit v3) for layer and module rules"
+install = """PackageReference Microsoft.CodeAnalysis.BannedApiAnalyzers (PrivateAssets=all); BannedSymbols.<Rule>.txt at the repo root, \
+one line `T:Namespace.Type;why`, added as <AdditionalFiles> in Directory.Build.props, scoped by a property per project kind; \
+tests/<Name>.Architecture references TngTech.ArchUnitNET + TngTech.ArchUnitNET.xUnitV3. NetArchTest is dead (last release 2021)"""
+config = [
+    { path = "Directory.Build.props", contains = "BannedApiAnalyzers" },
+    { path = "BannedSymbols*.txt" },
+]
+gate = "dotnet build"
+
+[[role]]
+role = "hooks"
+tool = "prek runs `dotnet csharpier check` and typos on staged files (pre-commit); make check on pre-push"
+install = """.pre-commit-config.yaml, local hooks after the bd ones: \
+- id: csharpier / entry: dotnet csharpier check / language: system / types: [c#]; \
+- id: typos / entry: typos --force-exclude / language: system / pass_filenames: true; \
+- id: gate / entry: make check / language: system / always_run: true / pass_filenames: false / stages: [pre-push]. \
+Do not run dotnet build on pre-commit (seconds to tens of seconds)"""
+config = [
+    { path = ".pre-commit-config.yaml", contains = "dotnet csharpier check" },
+    { path = ".pre-commit-config.yaml", contains = "typos" },
+]
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/dotnet.md (build and test commands, analyzer policy, layering, nullability, comment conventions), linked from AGENTS.md; a short AGENTS.md per top-level code folder"
+install = """create docs/agents/dotnet.md (<= 150 lines): commands (make check/build/test/fmt); `Directory.Build.props` and `Directory.Packages.props` are the only places for \
+settings and versions; analyzers: never #pragma, add a path-scoped .editorconfig line with a reason; nullability: no `!` outside tests; \
+comments: `// why:` for non-obvious decisions (units, determinism, workarounds with a link), `<summary>` on public types of library projects stating the contract and invariants, no file headers, no comment that restates code; \
+layering table; test naming. Link it from AGENTS.md with the line `.NET conventions: docs/agents/dotnet.md`"""
+config = [
+    { path = "docs/agents/dotnet.md" },
+    { path = "AGENTS.md", contains = "docs/agents/dotnet.md" },
+]
