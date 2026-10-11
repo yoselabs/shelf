@@ -218,17 +218,16 @@ spell:
 # dependency hygiene: uv.lock matches every pyproject (`uv run` alone never notices a stale lock;
 # shelf main ran green on one, 2026-10-11), then per package (unused / missing / transitive). deptry reads each
 # package's own pyproject from its dir; --known-first-party (the src import name)
-# silences the src-layout self-import DEP003 noise. just has no loops, so this one is a shebang recipe.
+# silences the src-layout self-import DEP003 noise. A shebang recipe: just has no loops.
 [group('gate')]
 deps:
     #!/usr/bin/env bash
     set -euo pipefail
     env -u UV_FROZEN uv lock --check
-    for p in packages/*/; do
-        imp=$(ls "$p/src")
-        echo "-- deptry $p (first-party: $imp)"
-        ( cd "$p" && uv run deptry . --known-first-party "$imp" ) || exit 1
-    done
+    # One deptry per package, all cores at once; a package's output prints only when it fails.
+    printf '%s\n' packages/*/ | xargs -P "$(getconf _NPROCESSORS_ONLN)" -I{} bash -c \
+        'p={}; imp=$(ls "$p/src"); out=$(cd "$p" && uv run deptry . --known-first-party "$imp" 2>&1) || { printf -- "-- deptry %s\n%s\n" "$p" "$out"; exit 1; }'
+    echo "deptry: every package clean"
 
 # tests with coverage; the floor guards against REGRESSION (set just below current).
 # Substrate adapters (docling/torch/subprocess) are legitimately hard to unit-test,
