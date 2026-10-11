@@ -1,4 +1,6 @@
-# shelf-8eg: dotnet coverage role
+# dotnet coverage role (shelf-8eg)
+
+Adopted into profiles/dotnet.toml (coverage role) and the `dotnet-coverage` recipe (recipes/check_coverage.py).
 
 Verdict: DONE, seen red and green UNDER MTP on a scratch copy of lifesim (the bead's own premise was wrong in one place). Real repo untouched; ran `dotnet test` on a copy, .NET SDK 10.0.401, macOS arm64, strict analyzer set + warnings as errors, xunit.v3 on Microsoft.Testing.Platform (MTP-only global.json).
 

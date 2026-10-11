@@ -21,7 +21,7 @@ from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
 RECIPES = Path(__file__).resolve().parent / "recipes"
-RECIPE_FILES = {"hooks": "pre-commit-config.yaml", "unity-integrity": "unity_integrity.py"}
+RECIPE_FILES = {"hooks": "pre-commit-config.yaml", "unity-integrity": "unity_integrity.py", "dotnet-coverage": "check_coverage.py"}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -53,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     rcp.add_argument(
         "name",
         choices=sorted(RECIPE_FILES),
-        help="hooks: the .pre-commit-config.yaml prek reads; unity-integrity: tools/unity_integrity.py",
+        help="hooks: .pre-commit-config.yaml; unity-integrity: tools/unity_integrity.py; dotnet-coverage: tools/check_coverage.py",
     )
     args = parser.parse_args(argv)
 

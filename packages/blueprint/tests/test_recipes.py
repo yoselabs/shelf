@@ -20,15 +20,19 @@ def test_every_recipe_prints_its_file(capsys: pytest.CaptureFixture[str]) -> Non
         assert capsys.readouterr().out == (RECIPES / file).read_text()
 
 
-def _integrity(repo: Repo, capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
+def _run(recipe: str, args: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
     # Loaded from its file, the way a repo runs its copy; in-process, so coverage sees it.
-    spec = importlib.util.spec_from_file_location("unity_integrity", RECIPES / RECIPE_FILES["unity-integrity"])
+    spec = importlib.util.spec_from_file_location(recipe.replace("-", "_"), RECIPES / RECIPE_FILES[recipe])
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    code = module.main([str(repo.root)])
+    code = module.main(args)
     return code, capsys.readouterr().out
+
+
+def _integrity(repo: Repo, capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
+    return _run("unity-integrity", [str(repo.root)], capsys)
 
 
 def _clean_unity(repo: Repo) -> None:
@@ -52,3 +56,22 @@ def test_the_unity_integrity_script_fails_on_each_broken_rule(repo: Repo, capsys
     assert code == 1
     for needle in ("asset without .meta: Assets/Enemy.cs", "orphan meta", "duplicate guid", "Force Text"):
         assert needle in out, needle
+
+
+def _coverage(repo: Repo, line: float, branch: float, capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
+    summary = repo.write("cov/Summary.json", f'{{"summary": {{"linecoverage": {line}, "branchcoverage": {branch}}}}}')
+    floor = repo.write("coverage-floor.json", '{"line": 89.0, "branch": 75.0}')
+    return _run("dotnet-coverage", [str(summary), str(floor)], capsys)
+
+
+def test_the_coverage_floor_passes_at_or_over_the_floor(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    code, out = _coverage(repo, 89.9, 75.0, capsys)
+    assert code == 0
+    assert "line 89.9% (floor 89.0%)" in out
+
+
+def test_the_coverage_floor_fails_under_it_and_names_the_metric(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    code, out = _coverage(repo, 91.0, 74.2, capsys)
+    assert code == 1
+    assert "branch coverage 74.2% < floor 75.0%" in out
+    assert "line coverage" not in out.split("below floor")[-1]

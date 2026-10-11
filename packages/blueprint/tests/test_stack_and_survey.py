@@ -97,8 +97,8 @@ def test_a_stack_without_a_profile_is_a_blueprint_gap_not_a_repo_failure(repo: R
 
 
 def test_an_untested_role_is_a_blueprint_gap(repo: Repo) -> None:
-    repo.write("App.sln", "")
-    verdict, evidence, gap = _rows(repo)["stack.dotnet.coverage"]
+    repo.write("stacks/a/compose.yml", "services: {}")
+    verdict, evidence, gap = _rows(repo)["stack.compose.formatter"]
     assert verdict is Verdict.NOT_CHECKED
     assert gap
     assert "no standard yet" in evidence
@@ -260,3 +260,23 @@ def test_a_nix_host_eval_outside_the_gate_fails_the_types_row(repo: Repo) -> Non
     repo.write("tools/check-host.sh", "#!/bin/sh\n")
     repo.write("justfile", "check:\n    true\ncheck-host:\n    bash tools/check-host.sh bee\n")
     assert _rows(repo)["stack.nix.types"][0] is Verdict.FAILING
+
+
+def _coverage_files(repo: Repo) -> None:
+    repo.write("App.sln", "")
+    repo.write("Directory.Packages.props", '<PackageVersion Include="coverlet.MTP" Version="10.1.0" />')
+    repo.write(".config/dotnet-tools.json", '{"tools": {"dotnet-reportgenerator-globaltool": {"version": "5.5.11"}}}')
+    repo.write("coverage-floor.json", '{"line": 89.0, "branch": 75.0}')
+    repo.write("tools/check_coverage.py", "")
+
+
+def test_dotnet_coverage_floor_run_by_the_gate_passes(repo: Repo) -> None:
+    _coverage_files(repo)
+    repo.write("justfile", "check: coverage\ncoverage:\n    python3 tools/check_coverage.py cov/Summary.json coverage-floor.json\n")
+    assert _rows(repo)["stack.dotnet.coverage"][0] is Verdict.PASSING
+
+
+def test_dotnet_coverage_floor_outside_the_gate_fails(repo: Repo) -> None:
+    _coverage_files(repo)
+    repo.write("justfile", "check:\n    true\ncoverage:\n    python3 tools/check_coverage.py cov/Summary.json coverage-floor.json\n")
+    assert _rows(repo)["stack.dotnet.coverage"][0] is Verdict.FAILING
