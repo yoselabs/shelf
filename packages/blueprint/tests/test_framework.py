@@ -208,3 +208,27 @@ def test_reading_initialize_result_without_asserting_the_protocol_version_is_not
     verdict, evidence = _rows(repo)["framework.mcp.framework-version"]
     assert verdict is Verdict.NOT_SET_UP
     assert "protocolVersion" in evidence
+
+
+_NO_MCP_IN_CORE = """
+[tool.importlinter]
+root_packages = ["demo"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "the core never imports the MCP framework"
+type = "forbidden"
+source_modules = ["demo.core"]
+forbidden_modules = ["fastmcp", "mcp"]
+"""
+
+
+def test_the_mcp_architecture_row_wants_a_contract_keeping_the_framework_out_of_the_core(repo: Repo) -> None:
+    # a2kay (shelf-pt0): the row was a blueprint gap; the standard is an import-linter forbidden contract.
+    _a2kay_shaped(repo)
+    verdict, evidence = _rows(repo)["framework.mcp.architecture"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "include_external_packages" in evidence
+    repo.write("pyproject.toml", (repo.root / "pyproject.toml").read_text() + _NO_MCP_IN_CORE)
+    repo.write("Makefile", "check:\n\tuv run pytest\n\tuv run lint-imports\n")
+    assert _rows(repo)["framework.mcp.architecture"][0] is Verdict.PASSING

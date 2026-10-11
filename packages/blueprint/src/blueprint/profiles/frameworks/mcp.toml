@@ -102,7 +102,16 @@ gate = "pytest"
 [[role]]
 role = "architecture"
 tool = "the domain core does not import fastmcp; the server module is a thin adapter (register tools, map errors, set annotations) that calls core functions; auth and transport options are read from one config object, not from tool bodies"
-untested = "the python-uv architecture tool is import-linter; the contract is a `forbidden` one: modules `fastmcp` and `mcp` (include_external_packages = true) from the core package. Not yet proven on an MCP server repo, and no shared check exists to point at (a2kay enforces it with its own archlint)"
+install = """import-linter (the python-uv architecture tool) in [tool.importlinter] with `include_external_packages = true` and one \
+`forbidden` contract: source_modules = the core packages (the domain logic), forbidden_modules = ["fastmcp", "mcp"]; the modules that may import \
+fastmcp (the server entry point, the tool registration, the transport) stay out of source_modules. `lint-imports` runs from `just check`. \
+Proposed by a2kay's audit (shelf-pt0, 2026-10-11): a2kay keeps fastmcp out of its core with its own layer contracts; not yet proven by a second server"""
+# A "fastmcp" in quotes is a module name in a contract (a dependency spec reads "fastmcp>=...").
+config = [
+    { path = "pyproject.toml", contains = "include_external_packages = true" },
+    { path = "pyproject.toml", contains = '"fastmcp"' },
+]
+gate = "lint-imports"
 
 [[role]]
 role = "ci"
