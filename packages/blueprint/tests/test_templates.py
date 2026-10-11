@@ -183,3 +183,9 @@ def test_a_nix_compose_shell_repo_gets_a_conventions_file_per_stack(repo: Repo) 
     installed = _install(repo)
     for name in ("nix", "compose", "shell"):
         assert f"docs/agents/{name}.md" in installed
+
+
+def test_a_path_the_domain_file_names_only_if_it_exists_is_not_required(repo: Repo) -> None:
+    repo.write("CONTEXT.md", "# c\n")
+    text = "Glossary: `CONTEXT.md`, or `CONTEXT-MAP.md` at the repo root if it exists.\n"
+    assert _domain(repo, text) is Verdict.PASSING

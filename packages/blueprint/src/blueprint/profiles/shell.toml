@@ -13,7 +13,7 @@ na = "a script has no language version; the interpreter is its shebang's (bash 3
 [[role]]
 role = "formatter"
 tool = "shfmt 3.14.1 (mvdan/sh; mise `shfmt`) with `-d`, its style in a committed .editorconfig ([*.sh] indent_style, indent_size, switch_case_indent)"
-install = "mise.toml: shfmt = \"3.14.1\"; .editorconfig [*.sh]; justfile: `shfmt -d $(git ls-files '*.sh')` (exit 1 and a diff when unformatted); a first adoption runs `shfmt -w` once"
+install = "mise.toml: shfmt = \"3.14.1\"; .editorconfig [*.sh]; justfile: `shfmt -d $(git ls-files '*.sh')` (exit 1 and a diff when unformatted); a first adoption runs `shfmt -w` once. Scripts that are deploy inputs (baked into an image, mounted by a stack) redeploy when reformatted: reformat them with a planned deploy, or scope shfmt away from them with the reason"
 config = [{ path = ".editorconfig", contains = "[*.sh" }, { path = "mise.toml", contains = "shfmt" }]
 gate = "shfmt"
 

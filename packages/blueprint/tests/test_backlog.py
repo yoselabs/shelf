@@ -217,3 +217,29 @@ def test_an_uninitialized_database_gets_the_fix_bootstrap_alone_cannot_make(repo
     )
     row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
     assert "embeddeddolt.broken" in row.remediation
+
+
+# homelab, 2026-10-11: `bd bootstrap` in a fresh clone rewrites .beads/metadata.json without a final newline, so an
+# end-of-file-fixer over every file failed `just check` in every new clone.
+_FIXER = (
+    "repos:\n- repo: https://github.com/pre-commit/pre-commit-hooks\n  rev: v6.0.0\n  hooks:\n"
+    "  - id: end-of-file-fixer\n{extra}  - id: check-yaml\n"
+)
+
+
+def test_a_whitespace_fixer_hook_over_beads_files_fails(repo: Repo) -> None:
+    _beads(repo)
+    repo.write(".pre-commit-config.yaml", _FIXER.format(extra=""))
+    assert _verdicts(repo)["backlog.hooks-spare-beads"] is Verdict.FAILING
+
+
+def test_a_fixer_hook_that_excludes_beads_passes(repo: Repo) -> None:
+    _beads(repo)
+    repo.write(".pre-commit-config.yaml", _FIXER.format(extra="    exclude: ^\\.beads/\n"))
+    assert _verdicts(repo)["backlog.hooks-spare-beads"] is Verdict.PASSING
+
+
+def test_a_top_level_exclude_of_beads_covers_every_hook(repo: Repo) -> None:
+    _beads(repo)
+    repo.write(".pre-commit-config.yaml", "exclude: ^(\\.beads/|vendor/)\n" + _FIXER.format(extra=""))
+    assert _verdicts(repo)["backlog.hooks-spare-beads"] is Verdict.PASSING

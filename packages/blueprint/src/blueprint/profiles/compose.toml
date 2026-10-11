@@ -21,7 +21,9 @@ Seen red on a planted file: no-unbound-port-interfaces and service-image-require
 It does NOT flag `privileged: true` (no such rule), so the policy row below carries that. Watch item: last release 2025-07-24 and last non-CI commit 2025-09; not abandoned yet (issues still opened 2026-04), but if it goes a full year without a release the role passes to a conftest policy. \
 Dockerfiles beside the compose files are the dockerfile stack's (its linter row: hadolint)"""
 install = """npm: `npx dclint@3.1.0 --max-warnings 0 $(git ls-files '*compose*.y*ml')` (or the dclint Docker image); .dclintrc with `rules:` overrides, each with a comment saying why. Seen on homelab: 19 compose files trip require-project-name-field, service-keys-order, require-quotes-in-ports; \
-the strict answer is to fix them, not to disable the rules"""
+the strict answer is to fix them, not to disable the rules. \
+Where compose files are deploy inputs (a change redeploys the service on push, homelab's ci_deploy), a fix costs a redeploy: batch fixes into a planned deploy, \
+or disable the rule in .dclintrc with that reason until one. Where the deployed files are rendered from templates, lint the rendered output and fix findings at the renderer"""
 config = [{ any = [{ path = ".dclintrc" }, { path = ".dclintrc.json" }, { path = "dclint.config.js" }, { path = ".pre-commit-config.yaml", contains = "dclint" }, { any = [{ path = "justfile", contains = "dclint" }, { path = "Makefile", contains = "dclint" }] }] }]
 gate = "dclint"
 

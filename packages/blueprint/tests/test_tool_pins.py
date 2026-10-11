@@ -155,3 +155,9 @@ def test_a_gate_that_runs_gitleaks_must_pin_it(repo: Repo) -> None:
     verdict, evidence = _pins(repo)
     assert verdict is Verdict.FAILING
     assert "gitleaks is not pinned" in evidence
+
+
+def test_a_justfile_comment_naming_gitleaks_does_not_need_a_pin(repo: Repo) -> None:
+    _tools_repo(repo)
+    repo.write("justfile", "# All prek hooks over every file (ruff, shellcheck, gitleaks).\n" + _JUSTFILE)
+    assert _pins(repo)[0] is Verdict.PASSING

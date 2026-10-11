@@ -58,7 +58,8 @@ def _needed(ctx: Context) -> dict[str, str]:
     if ctx.read("justfile") is not None and not _rust_just(ctx):
         needed["just"] = "justfile"
     # A gitleaks hook from its own repo is pinned by the hook's `rev`; one the justfile runs comes from mise.
-    if "gitleaks" in (ctx.read("justfile") or ""):
+    recipes = "\n".join(line for line in (ctx.read("justfile") or "").splitlines() if not line.lstrip().startswith("#"))
+    if "gitleaks" in recipes:
         needed["gitleaks"] = "justfile"
     if "filter=lfs" in (ctx.read(".gitattributes") or ""):
         needed["git-lfs"] = ".gitattributes"

@@ -219,3 +219,33 @@ def no_tracker_file(ctx: Context) -> Finding:
     if found:
         return failing(f"second backlog: {', '.join(found)}", "move each item into beads (`bd create`), then delete the file")
     return passing("beads is the only backlog")
+
+
+# Hooks that rewrite any file they are given. bd writes .beads/ itself (`bd bootstrap` leaves metadata.json without a final
+# newline), so a fixer run over every file fails `just check` in each fresh clone (homelab, 2026-10-11).
+_FIXERS = ("end-of-file-fixer", "trailing-whitespace", "mixed-line-ending")
+_HOOK_ID = re.compile(r"^(\s*)-\s*id:\s*([\w-]+)", re.MULTILINE)
+
+
+def _spares_beads(block: str) -> bool:
+    return any(".beads" in line for line in block.splitlines() if line.strip().startswith("exclude:"))
+
+
+@check("backlog.hooks-spare-beads", "whitespace-fixer hooks exclude .beads/, which bd writes", applies=uses_beads)
+def hooks_spare_beads(ctx: Context) -> Finding:
+    """A fixer hook (end-of-file-fixer, trailing-whitespace) carries `exclude: ^\\.beads/`, or the config's top-level exclude does."""
+    text = ctx.read(".pre-commit-config.yaml") or ""
+    top = "\n".join(line for line in text.splitlines() if line.startswith("exclude:"))
+    starts = list(_HOOK_ID.finditer(text))
+    ends = [found.start() for found in starts[1:]] + [len(text)] if starts else []
+    bare = [
+        found.group(2)
+        for found, end in zip(starts, ends, strict=True)
+        if found.group(2) in _FIXERS and not _spares_beads(text[found.end() : end])
+    ]
+    if bare and not _spares_beads(top):
+        return failing(
+            f"{', '.join(bare)} run over .beads/, which bd rewrites (a fresh clone's `bd bootstrap` fails them)",
+            "add `exclude: ^\\.beads/` to each of those hooks in .pre-commit-config.yaml",
+        )
+    return passing("no whitespace-fixer hook reaches .beads/")

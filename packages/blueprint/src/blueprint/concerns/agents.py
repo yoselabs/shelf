@@ -248,11 +248,13 @@ _LINKED = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 # A repo-relative file: no scheme, placeholder, glob or command; ends in a known extension; `NNNN` and `YYYY` are patterns.
 _PATH = re.compile(r"[\w.-]+(?:/[\w.-]+)*\.(?:md|toml|ya?ml|json|py|sh|txt|just)")
 _PATTERN = re.compile(r"N{2,}|YYYY|MM-DD")
+_OPTIONAL = re.compile(r"\bif (?:it|one|they) exists?\b|\bif present\b|\bwhen present\b", re.IGNORECASE)
 
 
 def _named_paths(text: str) -> list[str]:
     """The repo files a conventions file names in backticks or links, outside code fences, in first-seen order."""
-    prose = _FENCE.sub("", text)
+    # A path named only "if it exists" (the domain template's CONTEXT-MAP.md) is optional, not a claim.
+    prose = "\n".join(line for line in _FENCE.sub("", text).splitlines() if not _OPTIONAL.search(line))
     named = [*_BACKTICKED.findall(prose), *(t.split("#")[0] for t in _LINKED.findall(prose))]
     return list(dict.fromkeys(t for t in named if _PATH.fullmatch(t) and not _PATTERN.search(t)))
 
