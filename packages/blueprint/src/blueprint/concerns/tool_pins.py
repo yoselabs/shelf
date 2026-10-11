@@ -185,6 +185,7 @@ def tools_installed(ctx: Context) -> Finding:
     if drift:
         return failing(
             "; ".join(drift) + " on this machine's PATH",
-            "run `just tools` (mise install --locked) and put mise's shims before other installs on PATH",
+            'run `just tools` (mise install --locked), then put mise first on PATH: `eval "$(mise activate zsh)"` (or bash) in the '
+            "shell's rc file, or prepend ~/.local/share/mise/shims; a brew or system copy earlier on PATH wins otherwise",
         )
     return passing("installed as pinned: " + ", ".join(f"{t} {v}" for t, v in pins.items()))

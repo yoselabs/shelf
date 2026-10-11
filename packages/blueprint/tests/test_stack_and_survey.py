@@ -334,3 +334,12 @@ def test_an_unpinned_nix_image_fails_the_nix_toolchain(repo: Repo) -> None:
     verdict, evidence, _ = _rows(repo)["stack.nix.toolchain"]
     assert verdict is Verdict.NOT_SET_UP
     assert "nixos/nix:latest" in evidence
+
+
+def test_pyrefly_must_not_read_ignore_files(repo: Repo) -> None:
+    # homelab: in a worktree under .claude/worktrees/ (excluded by .git/info/exclude) pyrefly matched no file and passed.
+    _python_repo(repo)
+    repo.write("pyproject.toml", _PYPROJECT + '\n[tool.pyrefly]\npreset = "strict"\n')
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.types"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "use-ignore-files = false" in evidence

@@ -472,6 +472,9 @@ ignore_imports = [
 # counted. A run must end at `0 errors` with no warning tail.
 [tool.pyrefly]
 project-includes = ["packages", "tools"]
+# Off: pyrefly matches .gitignore and .git/info/exclude against absolute paths, so in a worktree under .claude/worktrees/
+# (an excluded path Claude Code adds) it matched no file and passed (homelab, 2026-10-11).
+use-ignore-files = false
 # tools/ scripts import their siblings by path (arch_advisory -> arch_rules, onboard.*).
 search-path = ["tools"]
 preset = "strict"

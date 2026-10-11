@@ -51,7 +51,12 @@ gate = '(?m)id:\s*ruff\s*$'
 role = "types"
 tool = "pyrefly, strict preset"
 install = "uv add --dev pyrefly; copy [tool.pyrefly] from the shelf (just bootstrap)"
-config = [{ path = "pyproject.toml", contains = "[tool.pyrefly]" }, { path = "pyproject.toml", contains = 'preset = "strict"' }]
+# use-ignore-files = false: with ignore files on, a worktree under an ignored path (.claude/worktrees/) checks no file and passes.
+config = [
+    { path = "pyproject.toml", contains = "[tool.pyrefly]" },
+    { path = "pyproject.toml", contains = 'preset = "strict"' },
+    { path = "pyproject.toml", contains = "use-ignore-files = false" },
+]
 gate = "pyrefly check"
 
 [[role]]

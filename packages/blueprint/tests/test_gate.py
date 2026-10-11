@@ -529,7 +529,8 @@ def test_the_hooks_fix_merges_into_an_existing_config_and_never_overwrites_it(re
     assert row.verdict is Verdict.FAILING
     assert "> .pre-commit-config.yaml" not in row.remediation
     assert "keep every hook" in row.remediation
-    assert "leave out the recipe's `gate` hook" in row.remediation
+    # the recipe's gate hook is pre-push only: a gate that runs `pre-commit run` does not recurse through it
+    assert "leave out" not in row.remediation
 
 
 def _recording_tool(repo: Repo, name: str) -> None:

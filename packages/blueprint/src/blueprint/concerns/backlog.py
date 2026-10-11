@@ -79,7 +79,13 @@ def strict_config(ctx: Context) -> Finding:
         elif source != "config.yaml":
             wrong.append(f"{key} comes from {source}, not .beads/config.yaml")
     if wrong:
-        return failing("; ".join(wrong), _remediation(wrong), FixedBy.AGENT)
+        fix = _remediation(wrong)
+        if ctx.path(".git").is_file():
+            # A worktree's bd reads the main checkout's .beads (homelab: `bd where`), not the file this tree holds.
+            fix += (
+                "; in a git worktree bd reads the main checkout's .beads/config.yaml (`bd where`): the row passes once this branch merges"
+            )
+        return failing("; ".join(wrong), fix, FixedBy.AGENT)
     return passing(f"{len(STRICT)} strict settings in effect from .beads/config.yaml")
 
 

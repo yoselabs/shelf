@@ -242,17 +242,14 @@ _RECIPE = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint recipe
 _BEADS_MARKER = "BEGIN BEADS INTEGRATION"
 
 
-def _merge_fix(ctx: Context) -> str:
-    """The fix for an existing hook config: merge the recipe in (shelf-3gl: `>` destroyed homelab's own ~20 hooks)."""
-    fix = (
-        f"merge the recipe into the existing {HOOK_CONFIG}, never overwrite it: `default_install_hook_types` at the top, the "
-        "recipe's bd `repo: local` block first under `repos:`, and keep every hook the repo already has after it "
-        "(`python3 -m blueprint recipe hooks` prints the recipe); then `prek install`"
-    )
-    gate = gate_graph.load(ctx)
-    if gate is not None and gate_graph.HOOK_RUN.search(gate.gate_recipes()):
-        fix += "; leave out the recipe's `gate` hook: this gate runs the hooks itself (`pre-commit run`), so it would recurse"
-    return fix
+# The fix for an existing hook config: merge the recipe in (shelf-3gl: `>` destroyed homelab's own ~20 hooks). Its `gate`
+# hook stays: it is pre-push only and `prek run --all-files` runs the pre-commit stage, so a gate that runs the hooks does
+# not recurse through it (homelab, 2026-10-11).
+_MERGE_FIX = (
+    f"merge the recipe into the existing {HOOK_CONFIG}, never overwrite it: `default_install_hook_types` at the top, the "
+    "recipe's bd `repo: local` block first under `repos:`, and keep every hook the repo already has after it "
+    "(`python3 -m blueprint recipe hooks` prints the recipe); then `prek install`"
+)
 
 
 @check("gate.hooks-recipe", "prek owns the git hooks through .pre-commit-config.yaml, and bd's hooks run from it", version=2)
@@ -275,7 +272,7 @@ def hooks_recipe(ctx: Context) -> Finding:
         if "default_install_hook_types" not in config:
             problems.append("no default_install_hook_types, so `prek install` installs pre-commit only")
     if problems:
-        return failing("; ".join(problems), _merge_fix(ctx))
+        return failing("; ".join(problems), _MERGE_FIX)
     return passing(f"{HOOK_CONFIG} owns the hooks" + (", bd's five events run from it" if ctx.profile.tracker == "beads" else ""))
 
 

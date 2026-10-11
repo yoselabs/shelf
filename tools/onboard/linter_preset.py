@@ -166,7 +166,7 @@ def _consumer_pyrefly() -> str:
     tests = next((sub for sub in shelf.get("sub-config", []) if sub.get("matches") == _SHELF_TESTS_SUBCONFIG), no_subconfig)
     test_errors = "".join(f"{key} = {_toml_value(value)}\n" for key, value in tests.get("errors", {}).items())
     return (
-        f"[tool.pyrefly]\npreset = {_toml_value(shelf['preset'])}\n\n[tool.pyrefly.errors]\n{errors}\n"
+        f"[tool.pyrefly]\npreset = {_toml_value(shelf['preset'])}\nuse-ignore-files = false\n\n[tool.pyrefly.errors]\n{errors}\n"
         f'[[tool.pyrefly.sub-config]]\nmatches = "tests/**"\n\n[tool.pyrefly.sub-config.errors]\n{test_errors}\n'
     )
 
