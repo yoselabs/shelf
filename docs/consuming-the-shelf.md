@@ -157,7 +157,8 @@ targets get the guard/resolver-block/beads pieces only).
 
 Every tool the repo runs (uv, just, prek, bd, git-lfs, an engine editor) is pinned exactly in a committed `mise.toml`
 and locked with per-platform checksums in `mise.lock` ([ADR 0024](adr/0024-mise-pins-every-repo-tool.md)). The preset's
-`tools` recipe installs them with `mise install --locked`, leaving the user's own mise config out. Run `just tools` after
-every clone and every pin bump, before anything else. blueprint's `stack.tool-pins` checks the pins on every commit and
+`tools` recipe installs them with `mise install --locked`, leaving the user's own mise config out. After a fresh
+clone run `mise trust --yes && mise install --locked` as plain commands (until the trust every mise shim refuses, uv
+included), then the stack's sync and `bd bootstrap`; after a pin bump, `just tools`. `gate.clean-clone` runs the same steps. blueprint's `stack.tool-pins` checks the pins on every commit and
 `stack.tools-installed` checks this machine's versions in the audit. A repo that declares LFS patterns is also checked
 for binaries outside LFS (`gate.lfs-binaries`) and, in the audit, for this clone's LFS filter (`gate.lfs-installed`).

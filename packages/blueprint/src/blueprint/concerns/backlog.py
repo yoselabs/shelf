@@ -168,7 +168,14 @@ LINTED_STATUSES = ("open", "blocked")
     version=2,
 )
 def lint(ctx: Context) -> Finding:
-    """`bd lint` passes for each status that is not deferred or closed."""
+    """bd's database answers, then `bd lint` passes for each status still to be started."""
+    probe = ctx.run("bd", "list", "--limit", "1", "--json", timeout=60)
+    if probe is None:
+        return not_checked("`bd` did not answer", _NO_BD)
+    if probe.returncode != 0:
+        # On a database that is missing or uninitialized `bd lint` checks 0 issues and exits 0 (a2kay, shelf-9g7).
+        cause = next((ln.strip() for ln in (probe.stderr + probe.stdout).splitlines() if ln.strip().startswith("Error")), "bd list failed")
+        return failing(f"bd's database does not answer in this clone: {cause}", "bd bootstrap (pulls it from refs/dolt/data); then re-run")
     failed: list[str] = []
     for status in LINTED_STATUSES:
         done = ctx.run("bd", "lint", "--status", status, timeout=120)

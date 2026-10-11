@@ -478,6 +478,30 @@ def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budge
     return passing(f"fresh-clone gate passed in {took}s (budget {budget}s)")
 
 
+# What a fresh clone needs before its gate can run, in order: until `mise trust` every mise shim refuses (uv
+# included), and a beads repo's database is not in git, it is pulled from refs/dolt/data (a2kay: shelf-45k, 8q7).
+_FRESH_CLONE_STEPS = (
+    ("mise.toml", ("mise", "trust", "--yes", ".")),
+    ("mise.toml", ("mise", "install", "--locked")),
+    (".beads/config.yaml", ("bd", "bootstrap", "--yes")),
+)
+
+
+def _fresh_clone_steps(ctx: Context, clone: Path) -> Finding | None:
+    """Run each step the clone's files call for; the first that fails is the finding."""
+    env = {**ctx.env, "MISE_IGNORED_CONFIG_PATHS": str(Path.home() / ".config" / "mise"), "BD_DISABLE_METRICS": "1"}
+    for marker, argv in _FRESH_CLONE_STEPS:
+        if not (clone / marker).is_file():
+            continue
+        done = ctx.run(*argv, cwd=clone, timeout=600, env=env)
+        if done is None or done.returncode != 0:
+            why = "not installed or timed out" if done is None else _cause(done)
+            return failing(
+                f"fresh-clone step `{' '.join(argv)}` failed: {why}", "make the documented after-clone steps work on a new clone"
+            )
+    return None
+
+
 @check("gate.clean-clone", "a fresh clone passes `just check` within its recorded budget", audit_only=True)
 def clean_clone(ctx: Context) -> Finding:
     """Clone HEAD into a temp dir and run `just check` (a Makefile repo: `make check`) there, timed."""
@@ -489,6 +513,8 @@ def clean_clone(ctx: Context) -> Finding:
         if clone is None or clone.returncode != 0:
             return not_checked("could not clone the repository")
         start = time.monotonic()
+        if (failed := _fresh_clone_steps(ctx, Path(tmp))) is not None:
+            return failed
         done = ctx.run(gate_graph.just_command(ctx) if word == "just" else word, "check", cwd=Path(tmp), timeout=3600)
         took = round(time.monotonic() - start)
     return _judge_clone(done, took, ctx.settings.get("clean-clone-seconds"), word)

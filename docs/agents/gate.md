@@ -40,9 +40,10 @@ prek owns the hooks, from `.pre-commit-config.yaml`. bd never installs its own (
 | prepare-commit-msg, post-merge, post-checkout | `bd hooks run <event>` | bd keeps its data in step |
 | pre-push | `bd hooks run pre-push`, `bd dolt push` (non-fatal), then `just check` | Heavy checks once per push |
 
-Install after clone, in this order: `just tools` (the exact tool versions mise.toml pins, from mise.lock; ADR 0024),
-then the stack's sync (python: `uv sync --locked`), then `prek install`. A repo with LFS also needs `git lfs install
---skip-repo` once per user. Recipe: blueprint's `recipes/pre-commit-config.yaml`; bd hooks come first.
+After a clone, in this order, as plain commands (until `mise trust` every mise shim refuses, uv and just included):
+`mise trust --yes && mise install --locked` (the exact tools mise.toml pins, from mise.lock; ADR 0024), the stack's sync
+(python: `uv sync --locked`), `bd bootstrap` in a beads repo (its database comes from refs/dolt/data, not from git),
+then `prek install`. A repo with LFS also needs `git lfs install --skip-repo` once per user. After a pin bump: `just tools`. Recipe: blueprint's `recipes/pre-commit-config.yaml`; bd hooks come first.
 
 ## Tool versions
 

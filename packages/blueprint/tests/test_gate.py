@@ -288,7 +288,7 @@ def test_a_gate_image_that_drops_files_blueprint_reads_fails_naming_them(repo: R
     # a2kay: the image's dockerignore dropped .beads and .claude, so `make blueprint` in the container reported
     # "no .beads/config.yaml"; the Makefile text alone looked fine.
     _container_gate(repo, ".beads\n.claude\n")
-    verdict, evidence = _verdict(repo, "gate.runs-blueprint")
+    verdict, evidence = _verdict(repo, "gate.runs-blueprint", audit=False)
     assert verdict is Verdict.FAILING
     assert ".beads/config.yaml" in evidence
     assert ".claude/settings.json" in evidence
@@ -297,22 +297,22 @@ def test_a_gate_image_that_drops_files_blueprint_reads_fails_naming_them(repo: R
 
 def test_files_re_included_after_the_drop_are_not_dropped(repo: Repo) -> None:
     _container_gate(repo, ".beads\n.claude\n!.beads/config.yaml\n")
-    verdict, evidence = _verdict(repo, "gate.runs-blueprint")
+    verdict, evidence = _verdict(repo, "gate.runs-blueprint", audit=False)
     assert verdict is Verdict.FAILING
     assert ".beads/config.yaml" not in evidence
     assert ".claude/settings.json" in evidence
     _container_gate(repo, ".beads\n.claude\n!.beads/config.yaml\n!.claude/settings.json\n")
-    assert _verdict(repo, "gate.runs-blueprint")[0] is Verdict.PASSING
+    assert _verdict(repo, "gate.runs-blueprint", audit=False)[0] is Verdict.PASSING
 
 
 def test_the_images_own_ignore_file_outranks_the_root_one(repo: Repo) -> None:
     _container_gate(repo, ".beads\n.claude\n", image_ignore=".venv\n")
-    assert _verdict(repo, "gate.runs-blueprint")[0] is Verdict.PASSING
+    assert _verdict(repo, "gate.runs-blueprint", audit=False)[0] is Verdict.PASSING
 
 
 def test_a_gate_with_no_container_is_not_judged_by_the_dockerignore(repo: Repo) -> None:
     _container_gate(repo, ".beads\n.claude\n", image="")
-    assert _verdict(repo, "gate.runs-blueprint")[0] is Verdict.PASSING
+    assert _verdict(repo, "gate.runs-blueprint", audit=False)[0] is Verdict.PASSING
 
 
 _NO_CI_ADR = (
@@ -530,3 +530,35 @@ def test_the_hooks_fix_merges_into_an_existing_config_and_never_overwrites_it(re
     assert "> .pre-commit-config.yaml" not in row.remediation
     assert "keep every hook" in row.remediation
     assert "leave out the recipe's `gate` hook" in row.remediation
+
+
+def _recording_tool(repo: Repo, name: str) -> None:
+    """A fake tool that appends its arguments to calls.log and succeeds."""
+    log = repo.bin_dir / "calls.log"
+    (repo.bin_dir / name).write_text(f'#!/bin/sh\necho "{name} $*" >> "{log}"\nexit 0\n')
+    (repo.bin_dir / name).chmod(0o755)
+
+
+def test_clean_clone_runs_the_fresh_clone_steps_before_the_gate(repo: Repo) -> None:
+    # a2kay (shelf-45k, shelf-8q7): an untrusted mise.toml and a clone with no bd database failed every fresh clone.
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("mise.toml", '[tools]\nprek = "0.5.5"\n')
+    repo.write(".beads/config.yaml", "")
+    repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
+    repo.commit()
+    _recording_tool(repo, "mise")
+    _recording_tool(repo, "bd")
+    assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.PASSING
+    calls = (repo.bin_dir / "calls.log").read_text().splitlines()
+    assert calls[:3] == ["mise trust --yes .", "mise install --locked", "bd bootstrap --yes"]
+
+
+def test_clean_clone_names_a_fresh_clone_step_that_failed(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write(".beads/config.yaml", "")
+    repo.commit()
+    repo.fake_tool(repo.bin_dir / "bd", "Error: no remote")
+    (repo.bin_dir / "bd").write_text("#!/bin/sh\necho 'Error: no remote' >&2\nexit 1\n")
+    verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
+    assert verdict is Verdict.FAILING
+    assert "bd bootstrap" in evidence

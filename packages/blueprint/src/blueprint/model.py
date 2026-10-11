@@ -204,16 +204,19 @@ class Context:
         """Whether `tool` is on this context's PATH."""
         return shutil.which(tool, path=self.env.get("PATH")) is not None
 
-    def run(self, *argv: str, timeout: float = 120, cwd: Path | None = None) -> subprocess.CompletedProcess[str] | None:
-        """Run `argv` in the repo; None when the program is missing or the timeout passes."""
-        exe = shutil.which(argv[0], path=self.env.get("PATH"))
+    def run(
+        self, *argv: str, timeout: float = 120, cwd: Path | None = None, env: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str] | None:
+        """Run `argv` in the repo (or `cwd`), with this context's env or `env`; None when the program is missing or times out."""
+        env = env or self.env
+        exe = shutil.which(argv[0], path=env.get("PATH"))
         if exe is None:
             return None
         try:
             return subprocess.run(
                 [exe, *argv[1:]],
                 cwd=cwd or self.repo,
-                env=self.env,
+                env=env,
                 capture_output=True,
                 text=True,
                 errors="replace",  # a tool's output (a binary blob, a non-UTF-8 log) never crashes a check

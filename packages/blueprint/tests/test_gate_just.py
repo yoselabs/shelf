@@ -149,7 +149,7 @@ def test_the_gate_image_ignore_file_is_judged_for_a_justfile_gate(repo: Repo) ->
     repo.write(".beads/config.yaml", "")
     repo.write(".dockerignore", ".beads\n")
     repo.commit()
-    verdict, evidence = _row(repo, "gate.runs-blueprint")
+    verdict, evidence = _row(repo, "gate.runs-blueprint", audit=False)
     assert verdict is Verdict.FAILING
     assert ".beads/config.yaml" in evidence
 

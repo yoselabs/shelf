@@ -189,3 +189,17 @@ def test_bds_root_lock_file_must_be_git_ignored(repo: Repo) -> None:
     assert verdict is Verdict.FAILING
     repo.write(".gitignore", ".beads.gate.lock*\n")
     assert _verdicts(repo)["backlog.lock-ignored"] is Verdict.PASSING
+
+
+def test_a_clone_whose_bd_database_does_not_answer_fails_lint(repo: Repo) -> None:
+    # a2kay (shelf-9g7): an uninitialized database made `bd lint` say "0 issues checked" and exit 0.
+    _beads(repo)
+    real = (repo.bin_dir / "bd").read_text()
+    (repo.bin_dir / "bd").write_text(
+        real.replace(
+            'if [ "$1" = lint ]', 'if [ "$1" = list ]; then echo "Error: no beads database found" >&2; exit 1; fi\nif [ "$1" = lint ]', 1
+        )
+    )
+    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    assert row.verdict is Verdict.FAILING
+    assert "bd bootstrap" in row.remediation
