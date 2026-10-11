@@ -1,6 +1,6 @@
 # The linter reference — how this repo stays clean, and how yours inherits it
 
-The shelf's quality bar is a **config-preset** (resolution 0004): the toolchain below is configured in
+The shelf's quality bar is a **config-preset** (ADR 0004): the toolchain below is configured in
 `pyproject.toml` + driven by `make`, and a new project inherits it by **copying** the blocks and owning
 the copy. No CLI, no runtime dependency, no cage. This file is the reference to converge toward.
 
@@ -110,7 +110,7 @@ choice, visible in your own `pyproject`. The shelf is the baseline you converge 
 
 ### Making the divergence actually visible — `make preset`
 
-"Visible" was the word resolution 0004 used, and for a year nothing made it so. The onboarding copy
+"Visible" was the word ADR 0004 used, and for a year nothing made it so. The onboarding copy
 (`tools/onboard/linter_preset.py`) is append-only by design: it never opens a table a consumer already
 owns, so it reports *"already current"* for a repo missing two whole rule families. Ten repos here
 reached ten rule sets without anyone deciding to.
@@ -133,7 +133,7 @@ let one happen by accident.
 Not compared: `per-file-ignores` keys and `sub-config` matches. Those are paths, and a consumer's tree
 is not this one's. A check that fails on every consumer forever teaches everyone to ignore it.
 
-## Architectural fitness rules (native, not OPA — resolution 0005)
+## Architectural fitness rules (native, not OPA — ADR 0005)
 
 Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest (like
 `tests/test_boundary.py`), reimplementing a2kit's Rego policies without dragging OPA in:

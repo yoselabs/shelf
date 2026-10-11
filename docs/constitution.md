@@ -44,7 +44,7 @@ abstraction. If the shelf *lacks* the piece and it is generic substrate, don't j
 it** (Article VII).
 
 ### VII. Promote aggressively — capitalize generic substrate at writing time; reconcile later.
-The opposite posture from adopt (resolution 0006). The moment you write a generic helper, a pattern +
+The opposite posture from adopt (ADR 0006). The moment you write a generic helper, a pattern +
 its safety wrapper, or an abstraction over an awkward stdlib/library API, home it in the shelf **then** —
 a self-assessed "this feels reusable" is enough; **no second consumer required**. The aim is that every
 app is mostly *business logic + dependencies*. Two guards, not a gate: it must be **shape-proven, not
@@ -52,8 +52,8 @@ shape-guessed** (the interface is validated by real use — the *consumer* may b
 not be a guess), and it is answerable at **reconciliation** (Article VIII).
 
 **Three triggers, not two.** Substrate glue you are about to write; a *sharp edge* discovered while
-debugging (resolution 0012); and — the quietest — a dependency that is correct, documented and
-correctly used, which was simply **verbose** (resolution 0015). "Stop caring about X" includes how
+debugging (ADR 0012); and — the quietest — a dependency that is correct, documented and
+correctly used, which was simply **verbose** (ADR 0015). "Stop caring about X" includes how
 much you must type to use X. When that third one fires, extract the **thing** the domain has (a type
 owning its own state and derivations), not a drawer of functions over the library's type; wrap, do
 not inherit; and name it `any-<domain>` — the domain, never the origin library. Many methods on one

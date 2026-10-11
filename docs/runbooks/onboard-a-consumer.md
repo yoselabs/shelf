@@ -2,7 +2,7 @@
 
 The **heavy, deliberately-invoked** operation: bring a project in as a shelf consumer *and* audit a
 codebase that **predates the shelf** for generic substrate it hand-rolled before it could promote in the
-moment. This is the **post-facto catch-up** for the aggressive promotion doctrine (resolution 0006) — for
+moment. This is the **post-facto catch-up** for the aggressive promotion doctrine (ADR 0006) — for
 *new* code, promotion happens at writing time (agent-loop.md §3), not here. Run it in a dedicated session,
 not mid-feature.
 

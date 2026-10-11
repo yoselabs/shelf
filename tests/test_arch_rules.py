@@ -1,4 +1,4 @@
-"""Architectural fitness rules — blocking, intra-package (resolution 0005).
+"""Architectural fitness rules — blocking, intra-package (ADR 0005).
 
 Native reimplementation of a2kit's Rego policies (no OPA). These BLOCK on within-package
 findings; cross-package duplication is advisory only (`make advisory`), because
@@ -26,7 +26,7 @@ def _body_dup_pairs() -> set[frozenset[str]]:
 
 
 def test_no_runtime_dep_without_upper_bound() -> None:
-    # RG004 — an unbounded dep breaks silently on a major bump (see resolution 0001's ethos).
+    # RG004 — an unbounded dep breaks silently on a major bump (see ADR 0001's ethos).
     allow = _allowlist("dep_upper_bound")
     offenders = [(pkg, spec) for pkg, spec in arch_rules.unbounded_deps() if arch_rules.dep_name(spec) not in allow]
     assert not offenders, f"runtime deps without an upper bound (add `<X` or allowlist w/ reason): {offenders}"

@@ -118,7 +118,7 @@ Ready to write immediately (this change is its worked example):
 > capability grid down to a single consumer's current diet — that is how a
 > package accretes hidden assumptions and stops being reusable substrate.
 
-This is a governance resolution (next number in `docs/resolutions/`), distilled
+This is a governance resolution (next number in `docs/adr/`), distilled
 into `agent-loop.md` in the same commit (enforced by
 `tests/test_resolution_distillation.py`). It generalizes the correction made
 mid-exploration: the initial framing over-anchored on "what does a2kay feed,"
@@ -128,7 +128,7 @@ when the shelf's own doctrine makes convert-md generic-first, consumer-second.
 
 The shelf now has two instances of one exercise (PDF bench, docx bench). Two is
 enough to see the pattern; writing it *before* the second instance would be
-inventing, not extracting (the shelf's own rule, and how resolution 0009 was
+inventing, not extracting (the shelf's own rule, and how ADR 0009 was
 written — after walking PROMOTE end-to-end). So: draft the skeleton at the
 start of the bench, finalize the workflow text once the docx run confirms each
 step generalizes. Expected shape of the named workflow:

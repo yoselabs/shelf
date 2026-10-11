@@ -1,6 +1,6 @@
 ## 1. Glossary and catalog schema
 
-- [x] 1.1 Add `skill` to the `Kind` enum in `docs/glossary.md`'s spine diagram (one line, alongside
+- [x] 1.1 Add `skill` to the `Kind` enum in `CONTEXT.md`'s spine diagram (one line, alongside
       `primitive | any-lib | composite | cli | framework | config-preset`) — no new glossary concept.
 - [x] 1.2 Verify `tools/catalog.py`'s `render_catalog` and its field set accept `kind = "skill"` with
       no other catalog field changes (name, tier, release, capability, implementation, status, owner,
@@ -16,7 +16,7 @@
 
 ## 2. Resolution and loop distillation
 
-- [x] 2.1 Write `docs/resolutions/0014-skill-is-a-shelf-kind.md` — the alternatives rejected (second
+- [x] 2.1 Write `docs/adr/0014-skill-is-a-shelf-kind.md` — the alternatives rejected (second
       loop file, second repo, blanket runbook conversion, hand-rolled char-count budget vs `claude
       plugin details`, and a single mechanism covering both `.agents/skills/` tooling skills and
       catalog-registered skills — see design.md's "Two skill tiers" decision), each with its

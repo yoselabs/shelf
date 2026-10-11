@@ -22,7 +22,7 @@ Raised by Denis. Four distinct entry paths, one shared lifecycle gate.
    - How to **scan for easy cases** — the "this is really a shelf piece" detector during normal work.
 
 3. **Promote something already built into micro-software and replace it.**
-   - When in-app code is generic substrate — promote it in the moment (res 0006, no 2nd consumer needed);
+   - When in-app code is generic substrate — promote it in the moment (ADR 0006, no 2nd consumer needed);
      for codebases predating the shelf, the catch-up sweep (`../runbooks/onboard-a-consumer.md`) does it.
    - The replace procedure: extract behind the contract, repoint the origin app, keep the tests.
 

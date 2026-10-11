@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A lazily-opened aiosqlite connection with a lock, idempotent close, and the async context-manager lifecycle — schema stays caller-side."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     "aiosqlite>=0.20,<1",

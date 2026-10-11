@@ -9,7 +9,7 @@
 # Ecosystems differ (C# and Java tools release rarely); judge by use and compatibility, not by date.
 stack = "python-uv"
 status = "evidenced"  # evidenced: the shelf and a2kay run it | provisional: written, not yet proven
-source = "the shelf's own gate (pyproject.toml, Makefile; resolution 0004)"
+source = "the shelf's own gate (pyproject.toml, Makefile; ADR 0004)"
 
 [[role]]
 role = "toolchain"

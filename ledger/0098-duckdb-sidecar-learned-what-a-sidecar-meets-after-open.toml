@@ -7,7 +7,7 @@ actor = "a2kay"
 consumer = "a2kay"
 verdict = "pass"
 cost = ""
-note = """EVOLVE, not a sibling (resolution 0007). v0.1.0 stopped at connection acquisition. a2kay's 2026-09-13 substrate audit found four DuckDB findings from three dated debugging sessions sitting in a2kay comments, one of them a data-corruption mode, and every one of them learned from a failure rather than from the documentation — which is resolution 0012's definition of a sharp edge and its promotion trigger.
+note = """EVOLVE, not a sibling (ADR 0007). v0.1.0 stopped at connection acquisition. a2kay's 2026-09-13 substrate audit found four DuckDB findings from three dated debugging sessions sitting in a2kay comments, one of them a data-corruption mode, and every one of them learned from a failure rather than from the documentation — which is ADR 0012's definition of a sharp edge and its promotion trigger.
 
 Two had a code shape and are now the package's surface.
 

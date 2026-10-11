@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "Typed-error foundation for Python frameworks. Standalone, pydantic-only, adoptable by any framework wanting typed errors on the wire."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 keywords = ["errors", "effect", "typed-errors", "mcp", "fastapi"]
 classifiers = [

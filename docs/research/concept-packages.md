@@ -1,6 +1,6 @@
 # Concept packages — grouping the shelf into stdlib-shaped domains
 
-- **Status:** research (2026-10-10). Not a resolution. If accepted, it becomes one resolution plus
+- **Status:** research (2026-10-10). Not an ADR. If accepted, it becomes one ADR plus
   one RECONCILE pass per group.
 - **Question:** should the shelf stop minting one package per helper and group pieces into
   concept packages (`any-file`, `any-time`, `any-mcp`, …) that a perfect stdlib would offer?
@@ -184,7 +184,7 @@ Every candidate group was put through four checks, in this order. Any one of the
    contain a shelf package: that is how the yaml-merge collision started.
 4. **One version per package.**
    - A release bumps the whole package: additive in any module → minor, breaking in any module →
-     major (resolution 0007, monotonic contracts).
+     major (ADR 0007, monotonic contracts).
    - What a bump costs consumers: nothing until they re-pin. When they do re-pin to get a fix in
      module A, they also take module B's additive changes, and monotonic contracts make that safe.
      A breaking change anywhere becomes a major for every consumer of the group. That is the real
@@ -206,7 +206,7 @@ Every candidate group was put through four checks, in this order. Any one of the
    dependency, it does.
 7. **Catalog and use-cases.**
    - One `catalog/<pkg>.toml` per package, with a `[modules]` table: one line of capability per
-     module, which keeps the cold-reading test of resolution 0008 working at module level.
+     module, which keeps the cold-reading test of ADR 0008 working at module level.
    - One `use-cases/<consumer>--<pkg>.toml` per consumer, with a `modules = [...]` list of what it
      imports. Without that list, Article VIII's orphan check goes blind inside a group: a dead
      module would live forever because a sibling is used.
@@ -214,7 +214,7 @@ Every candidate group was put through four checks, in this order. Any one of the
      the next major.
 8. **Naming.** `any-<domain>`. The import name never shadows the stdlib or a common library, so no
    `time`, `files`, `json`, `html`, `yaml` or `sqlite`. The `any_` prefix guarantees this. Where a
-   member already carries a name that passes resolution 0008 (any-file, any-markdown, anyllm,
+   member already carries a name that passes ADR 0008 (any-file, any-markdown, anyllm,
    lean-wire), the group **keeps that name**. Consumers who already pin it then bump a tag instead
    of rewriting a line.
 
@@ -222,7 +222,7 @@ Every candidate group was put through four checks, in this order. Any one of the
 
 ### Shims: ❌ retire at once
 
-Tags are permanent repo-wide snapshots (resolution 0001). A consumer still pinned to
+Tags are permanent repo-wide snapshots (ADR 0001). A consumer still pinned to
 `partial-time-v0.1.0` keeps working forever at zero cost, so a re-export shim adds nothing. It is
 also harmful: a shim is a **new** tag of the old name that depends on the group. That creates a
 second URL for the group, which is the transitive collision a2kay's and a2web's comments describe.
@@ -300,7 +300,7 @@ removed in step 1. Total: about 6–7 working days.
   that actually alters behaviour; the rest is bookkeeping.
 - `RECONCILE` step 4 becomes per module (rule 7), and step 2 (kitchen sink) names the four admission
   checks.
-- A resolution records the admission checks, the no-shim decision and the catalog rule for groups:
+- An ADR records the admission checks, the no-shim decision and the catalog rule for groups:
   `kind` = the strongest member kind (`any-*` over `primitive`), `tier` = the highest member tier.
 
 ### Out of scope, but the bigger lever
@@ -332,7 +332,7 @@ mcp-result-wire, plugin-surface, settings-base, verb-cli.
 
 ## 7. How this fails
 
-- **A group becomes `utils`.** Guard: the cold-reading test from resolution 0008 is run on the group
+- **A group becomes `utils`.** Guard: the cold-reading test from ADR 0008 is run on the group
   name **and** on every module line in `[modules]`. A module that fails it goes back out.
 - **Module-level rot hidden by a used sibling.** Guard: `modules = [...]` in use-cases, and per-module
   RECONCILE (rule 7). Without both, grouping quietly turns off Article VIII.

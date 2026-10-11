@@ -35,11 +35,11 @@ The cost guard (ADR-0016 in a2web: never bill metered Anthropic in dev/eval/benc
 is generic budget enforcement over `(provider, model)`. Promote it as an
 `anyllm.cost` submodule beside `anyllm`'s existing `PromptParts`/provider surface,
 keyed on `anyllm.ProviderName` (a `StrEnum`), NOT a2web's manifest strings —
-otherwise the guard drifts from the provider set it guards. Resolution 0007
+otherwise the guard drifts from the provider set it guards. ADR 0007
 monotonicity: `anyllm` exposes more (`CostPolicy`, `assert_within_budget`,
 `with_cost_guard`, `CostViolation`) and removes nothing → new tag, old stays.
 
-## D5 — any-browser: promote the drivers NOW, gate travels with them (resolution 0013)
+## D5 — any-browser: promote the drivers NOW, gate travels with them (ADR 0013)
 
 The earlier plan held the drivers off the shelf until a shelf-side real-launch
 gate existed, on the (correct) witness-rule observation that a promoted driver

@@ -64,7 +64,7 @@ Tests-first. `make check` green, whole repo, is Done.
 - [x] 3.1 `linter-preset` — ruff/codespell/coverage blocks, Makefile targets, dev group.
       (`tools/onboard/linter_preset.py`)
 - [x] 3.2 Failing test: merges into an existing `pyproject.toml`/`Makefile` rather than
-      overwriting; a repo with its own ruff config keeps its overrides (resolution 0004's
+      overwriting; a repo with its own ruff config keeps its overrides (ADR 0004's
       "copy, then own" must survive re-running onboarding). Merge granularity is per-family
       (owning `[tool.ruff]` at all — even one overridden key — takes the whole ruff namespace
       off the table, `[tool.ruff.lint]` included; same for `tool.coverage.*`), never per-line —
@@ -136,7 +136,7 @@ Tests-first. `make check` green, whole repo, is Done.
       undetectable resolver-block drift, the config-revert trap, and the absence of any
       verification.)
 
-## 6. Close the loop (resolution 0009)
+## 6. Close the loop (ADR 0009)
 - [x] 6.1 `make check` green, whole repo. (806 tests, 86.13% coverage, re-confirmed after every commit.)
 - [x] 6.2 File a bead for re-onboarding a2kay and a2web (design open question 1) — do not do it
       inside this change. (`shelf-brb`)

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Declared CSS extraction that reports WHY it yielded nothing — separating an empty page from a schema that stopped matching, so a rotted site scraper fails loudly instead of answering 'nothing here' forever."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     "selectolax>=0.3,<1",

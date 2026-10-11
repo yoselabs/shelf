@@ -24,7 +24,7 @@ def test_a_godot_project_in_a_subfolder_is_found_and_its_pin_read_through_a_glob
     _godot(repo)
     rows = _rows(repo)
     assert "in src/Game" in rows["framework.godot.profile"][1]
-    assert rows["framework.godot.engine-version"][0] is Verdict.PASSING
+    assert rows["framework.godot.framework-version"][0] is Verdict.PASSING
 
 
 def test_missing_godot_hygiene_is_not_set_up(repo: Repo) -> None:
@@ -49,3 +49,90 @@ def test_two_projects_get_one_table_each_and_a_declared_one_wins(repo: Repo) -> 
 
 def test_no_framework_means_no_rows(repo: Repo) -> None:
     assert _rows(repo) == {}
+
+
+_SERVER = "from fastmcp import FastMCP\n\nmcp = FastMCP('demo')\n"
+_CLIENT = "from fastmcp import Client\n\nclient = Client('http://localhost/mcp')\n"
+_DEPENDS = 'dependencies = ["fastmcp>=3.4,<4"]'
+
+
+def _mcp(repo: Repo, *, dependency: str = _DEPENDS, source: str = _SERVER, root: str = ".") -> None:
+    prefix = "" if root == "." else f"{root}/"
+    repo.write(f"{prefix}pyproject.toml", f'[project]\nname = "demo"\nversion = "0"\n{dependency}\n')
+    repo.write(f"{prefix}src/demo/server.py", source)
+
+
+def test_a_fastmcp_server_is_detected_from_its_dependency_and_its_use(repo: Repo) -> None:
+    _mcp(repo)
+    rows = _rows(repo)
+    assert "in ." in rows["framework.mcp.profile"][1]
+    assert "framework.mcp.surface-integrity" in rows
+
+
+def test_a_server_in_a_subfolder_gets_its_folder_as_root(repo: Repo) -> None:
+    _mcp(repo, root="services/tools")
+    assert "in services/tools" in _rows(repo)["framework.mcp.profile"][1]
+
+
+def test_an_optional_dependency_counts_and_the_slim_package_too(repo: Repo) -> None:
+    _mcp(repo, dependency='[project.optional-dependencies]\nserve = ["FastMCP_slim>=4"]')
+    assert "framework.mcp.profile" in _rows(repo)
+
+
+def test_a_client_only_repo_is_not_an_mcp_server(repo: Repo) -> None:
+    _mcp(repo, source=_CLIENT)
+    assert _rows(repo) == {}
+
+
+def test_a_dev_group_dependency_is_a_test_client_not_a_server(repo: Repo) -> None:
+    _mcp(repo, dependency='[dependency-groups]\ndev = ["fastmcp>=3"]')
+    assert _rows(repo) == {}
+
+
+def test_a_throwaway_server_in_tests_does_not_make_a_server(repo: Repo) -> None:
+    _mcp(repo, source=_CLIENT)
+    repo.write("tests/test_client.py", _SERVER)
+    assert _rows(repo) == {}
+
+
+def test_a_declared_framework_wins_over_detection(repo: Repo) -> None:
+    _mcp(repo)
+    repo.write("docs/blueprint/blueprint.toml", '[profile.frameworks]\nmcp = "elsewhere"\n')
+    assert "in elsewhere" in _rows(repo)["framework.mcp.profile"][1]
+
+
+def test_a_declared_framework_is_judged_even_when_nothing_is_detected(repo: Repo) -> None:
+    _mcp(repo, source=_CLIENT)
+    repo.write("docs/blueprint/blueprint.toml", '[profile.frameworks]\nmcp = "."\n')
+    assert "framework.mcp.profile" in _rows(repo)
+
+
+def _a2kay_shaped(repo: Repo) -> None:
+    _mcp(repo, dependency=_DEPENDS + '\n[tool.ruff.lint]\nselect = ["T20"]')
+    repo.write("uv.lock", '[[package]]\nname = "fastmcp"\n')
+    repo.write("tests/test_server.py", "async def t(c):\n    r = await c.initialize_result\n    assert Client(s) and r.is_error\n")
+    repo.write("tests/test_stdio.py", "t = StdioTransport\n")
+    repo.write("tests/contracts/test_tool_list.py", "tools = list_tools()\nhint = 'readOnlyHint'\n")
+    repo.write("tests/contracts/tools.snapshot.json", "[]\n")
+    repo.write("Makefile", "check:\n\tuv run pytest\n")
+
+
+def test_a_repo_shaped_like_a2kay_passes_the_configured_roles(repo: Repo) -> None:
+    _a2kay_shaped(repo)
+    rows = _rows(repo)
+    for role in ("framework-version", "project-hygiene", "build", "tests", "surface-integrity"):
+        assert rows[f"framework.mcp.{role}"][0] is Verdict.PASSING, role
+    assert rows["framework.mcp.agent-guidance"][0] is Verdict.NOT_SET_UP
+
+
+def test_a_server_without_a_tool_list_snapshot_is_not_set_up(repo: Repo) -> None:
+    _a2kay_shaped(repo)
+    (repo.root / "tests/contracts/tools.snapshot.json").unlink()
+    assert _rows(repo)["framework.mcp.surface-integrity"][0] is Verdict.NOT_SET_UP
+
+
+def test_the_framework_layer_shows_in_the_report(repo: Repo) -> None:
+    _mcp(repo)
+    report = run(repo.root, concern="framework", env=repo.env)
+    assert report.rows
+    assert {r.layer for r in report.rows} == {"framework"}

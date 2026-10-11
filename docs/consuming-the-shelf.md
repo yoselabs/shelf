@@ -14,7 +14,7 @@ current state). This file stays the reference for *what* each piece is and *why*
 mechanism. `docs/runbooks/onboard-a-consumer.md` covers the broader adoption sweep the skill is
 part of.
 
-**`onboard-consumer` is deliberately outside the `Kind: skill` catalog** (resolution 0014). It's
+**`onboard-consumer` is deliberately outside the `Kind: skill` catalog** (ADR 0014). It's
 pull-based — invoked by path from `$SHELF_HOME`, zero standing cost, findable only because this file
 tells you where it is — not push-based/auto-triggered like a catalog-registered, plugin-installed
 skill. Don't fold it into `catalog/*.toml` or gate it on `claude plugin details`; that machinery
@@ -142,7 +142,7 @@ The **DEEP · STABLE · WINS** gate is deliberate: it keeps "reach for the shelf
 
 ## 4. Inherit the linter reference (copy, then own)
 
-The shelf's quality bar is a **config-preset**, not a CLI ([resolution 0004](resolutions/0004-linters-are-a-config-preset.md)):
+The shelf's quality bar is a **config-preset**, not a CLI ([ADR 0004](adr/0004-linters-are-a-config-preset.md)):
 copy the `[tool.ruff|codespell|coverage]` blocks + the `Makefile` targets + the `dev` dependency-group
 from this repo into yours, then override anything you genuinely need to. Full toolchain and the exact
 copy list: **[linting.md](linting.md)**. `make check` green (whole-repo, no carve-outs) is the bar.

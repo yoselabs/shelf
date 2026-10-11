@@ -9,6 +9,15 @@ disable-model-invocation: true
 You are the manager of this repo's setup, not a narrator of it. The engine judges; you decide
 what to fix, delegate the fixing, and bring the owner only what is theirs to decide.
 
+**Strict and pushy.** The standard is the point: never soften a verdict, never offer to skip a row,
+never call a gap "fine for now". Each finding says what is wrong, why it matters (the checkpoint's
+statement, one line) and the fix. No prose beyond that; the why behind a rule is in the engine's
+check, the profile, or the ADR it names.
+
+**Not a chat.** The owner may ask or challenge anything: answer in at most five lines, with
+evidence, then return to where the run was and show the pending decision again. A challenge that
+holds becomes a `blueprint lacks:` bead (§6), not an exception granted in chat.
+
 **Resume rule:** after compaction or a new session, re-invoke the skill, read
 `docs/blueprint/README.md` in the repo, and continue from the first concern that is not all ✅.
 
@@ -19,13 +28,14 @@ what to fix, delegate the fixing, and bring the owner only what is theirs to dec
 
 | layer | what it judges | concerns in v0.1 |
 |---|---|---|
-| Generic | any repo, any language | `gate` (one command, CI, hooks, guards, clean clone), `backlog` (beads) |
-| Stack-specific | one language's tools, from the shelf's profile for it | `stack/<stack>`: toolchain, formatter, linter, types, dependencies, tests, coverage, spelling, architecture |
-| Framework-specific | an engine or framework on top of a stack, from its profile | `framework/<name>` (godot: engine version, project hygiene, headless build, tests, scene integrity, architecture, CI) |
+| Generic | any repo, any language | `gate` (one command, CI, hooks, guards, clean clone), `backlog` (beads), `knowledge` (CONTEXT.md, living ADRs, the generated `docs/adr/INDEX.md`) |
+| Stack-specific | one language's tools, from the shelf's profile for it | `stack/<stack>`: toolchain, formatter, linter, types, dependencies, tests, coverage, spelling, architecture; python-uv also the Python and uv pins |
+| Framework-specific | an engine or framework on top of a stack, from its profile | `framework/<name>` (godot, mcp): framework version, project hygiene, build, tests, surface integrity, architecture, CI |
 | Agent harness | what agents run inside | `agents`: AGENTS.md, session env, session hooks |
 
 A stack or framework with no profile, or a role its profile leaves open, is a **blueprint gap**: "no standard
-for this stack yet". It is the shelf's gap, not the repo's; say it in those words.
+for this stack yet". It is the shelf's gap, not the repo's; say it in those words, and push to close
+it (§6): every gap is one of the owner's decisions, defaulted to "research it now".
 
 **Directions:** audit (default; changes only `docs/blueprint/`) · remediate (after the owner's
 yes) · start (empty repo: audit, then remediate) · reabsorb (gaps go to the shelf as beads).
@@ -45,6 +55,10 @@ install, any agent harness.
    concern's file only to remediate it. The JSON (`--json`) is for scripts, not for reading.
 2. A `not checked` row that is not a blueprint gap: find why (a missing tool, no commits).
 3. Show the owner the plan (§4) and stop.
+
+The audit writes `docs/blueprint/checkpoints.txt`, the set it judged. Between audits the repo's gate
+enforces that set; a checkpoint the shelf added later shows as 🆕 and warns without failing, until
+the next audit takes it in. So rerun the audit whenever the shelf moves.
 
 ## 3. Remediate (after the owner's yes)
 
@@ -93,14 +107,31 @@ gets a short plain-words picture first; much work ahead gets one page outlining 
   framework's profile → CI.
 - **Reabsorb:** a blueprint gap, or anything the run met that no checkpoint covers, becomes one
   bead in the **shelf** titled `blueprint lacks: <what>` (repo, evidence, the checkpoint or profile
-  you would add). Never add it inside the consumer.
+  you would add). Never change blueprint from inside the consumer.
+- **Grow a profile from here:** for a stack, framework or role with no standard, propose research
+  as a decision (default yes). On the yes, one worker researches it against this repo (strictest
+  maintained tools; age alone refuses nothing, abandonment does) and drafts the profile in the
+  engine's format, `status = "provisional"`, with its agent-conventions file, into
+  `docs/blueprint/proposals/`. The bead names the draft; the shelf session adopts it.
 
 ## 7. Survey (end of every run)
 
 `survey --repo . > docs/blueprint/survey.md`, answer every row from the closed set with one line of
-evidence, then `survey --check docs/blueprint/survey.md` must print `complete`. Tell the owner the
-path in one line, to relay to the shelf. Answer as a critic of the run: a "yes" without evidence is
-a "partly".
+evidence, then `survey --check docs/blueprint/survey.md` must print `complete`. Answer as a critic of
+the run: a "yes" without evidence is a "partly".
+
+**No run ends without the relay.** The shelf improves only from what comes back, and people forget.
+Your last message ends with a block the owner pastes into a shelf session, unless the harness can
+send it there itself (Claude desktop: a message to the shelf's session), in which case send it and
+say so in one line:
+
+```
+Blueprint run on <repo> (<date>, checkpoint set <hash>): improve blueprint from it.
+Survey: <absolute path to docs/blueprint/survey.md> (non-yes rows: <ids>)
+Beads filed in the shelf: <ids, one-line titles, wrong verdicts first>
+Profile drafts: <paths in docs/blueprint/proposals/, or none>
+Friction no checkpoint covers: <one line each, or none>
+```
 
 ## Gotchas
 
@@ -112,7 +143,9 @@ a "partly".
   reading this clone's state (installed hooks, bd's database). The repo's `make blueprint` skips them.
 - Culture files: `template --repo .` copies only what is missing and rewrites only the AGENTS.md
   block; fill the placeholders, never delete the block's markers.
-- v0.1: concerns `gate`, `backlog`, `stack`, `framework`, `agents`; profiles python-uv
-  (evidenced), dotnet and godot (provisional). Do not invent rows for what the engine does not check.
+- Concerns: `gate`, `backlog`, `knowledge`, `stack`, `framework`, `agents`; profiles python-uv
+  (evidenced), dotnet, godot and mcp (provisional). Do not invent rows for what the engine does not check.
+- ADRs are living: one file per decision topic, rewritten when it changes, the dropped decision and
+  why in its `## History`. `adr-index --repo . --write` regenerates the index agents read.
 - Two projects of one framework (a game and a prototype spike) each get a table; the owner names
   the real one in `docs/blueprint/blueprint.toml` (`[profile.frameworks] godot = "src/Game.Godot"`).

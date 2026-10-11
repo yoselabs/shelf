@@ -8,7 +8,7 @@ or not it fires. Explored and measured this session (57 installed skills already
 of fixed per-session overhead); this proposal formalizes what was decided, not re-derives it.
 
 The loop (`docs/agent-loop.md`) already reasons about `Kind` generically — `config-preset`
-(resolution 0004) is precedent that `Kind` isn't only "Python package." What's missing is the
+(ADR 0004) is precedent that `Kind` isn't only "Python package." What's missing is the
 skill-specific answer to the five mechanism slots every Kind needs (unit dir, contract-verify, pin,
 breaking-change signal, gate-membership test) and the shelf's own distribution surface for shipping
 them. Without this, the next skill either invents its own ad hoc contract or ships with no contract
@@ -51,9 +51,9 @@ cost to budget.
   runbook→skill promotion: a runbook only becomes a skill once a live agent has demonstrably missed
   it (Article V's "protection is earned" test, applied to skill triggers) — never a blanket sweep.
   No specific runbook is converted by this change.
-- One-line addition to `docs/glossary.md`'s `Kind` enum (skill joins the list, same treatment as
+- One-line addition to `CONTEXT.md`'s `Kind` enum (skill joins the list, same treatment as
   `config-preset` got — no new glossary concept, just a new enumerated value).
-- A `docs/resolutions/0014-skill-is-a-shelf-kind.md` capturing the alternatives rejected (a second
+- A `docs/adr/0014-skill-is-a-shelf-kind.md` capturing the alternatives rejected (a second
   loop file for skills; a separate shelf-skills repo; blanket runbook conversion) with the
   distillation landing in `agent-loop.md` in this same change, per `EVOLVE-THE-LOOP`'s own rule.
 
@@ -78,7 +78,7 @@ it); converting any specific existing runbook; changing anything about `.agents/
 
 ## Impact
 
-- `docs/glossary.md` — one-line `Kind` enum addition.
+- `CONTEXT.md` — one-line `Kind` enum addition.
 - `docs/agent-loop.md` — `SEAM`/`PROMOTE` gains the earned-conversion requirement; no other workflow
   changes (they're already Kind-agnostic).
 - `tools/catalog.py`, `catalog/README.md` — schema/projection accepts `kind = "skill"` entries (no
@@ -86,7 +86,7 @@ it); converting any specific existing runbook; changing anything about `.agents/
   implementation, status, owner, notes).
 - New: `.claude-plugin/marketplace.json`, `plugin.json`, `skills/.gitkeep` at shelf root (scaffold
   only).
-- New: `docs/resolutions/0014-skill-is-a-shelf-kind.md`.
+- New: `docs/adr/0014-skill-is-a-shelf-kind.md`.
 - New: a gate-coverage test for `skills/*/` (mirrors `tests/test_gate_covers_every_package.py`) and a
   token-budget assertion (mirrors `tests/test_catalog_release_is_current.py`'s "hand-maintained fact
   checked against the tool that knows it" shape).

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Guard: a consumer's linter config matches the shelf's, or says why not.
 
-The shelf's ``pyproject.toml`` IS the linter preset (resolution 0004) and a
+The shelf's ``pyproject.toml`` IS the linter preset (ADR 0004) and a
 consumer inherits it by **copying** — "inherit the judgment, own the result".
 That resolution also says drift is acceptable *and visible*. It was not visible.
 ``tools/onboard/linter_preset.py`` is append-only by design, so it reports

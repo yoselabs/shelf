@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Read and compare a JSON value the way a test step states it: a dotted path into it, a comparison against quoted text, and a subset match that names only the keys it cares about."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = []
 

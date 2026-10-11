@@ -4,7 +4,7 @@ version = "0.4.0"
 description = "Stop caring which embedding backend is underneath — a neutral Embedder interface with a local transformers (BGE) backend."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     "torch>=2.4,<3",

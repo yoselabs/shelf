@@ -87,7 +87,7 @@ fail; a paragraph can only ask. And it converts "the next agent must remember 14
 
 ## Non-goals
 
-- **A shelf package, or a bootstrap CLI.** Resolution 0004 settled the shape for exactly this
+- **A shelf package, or a bootstrap CLI.** ADR 0004 settled the shape for exactly this
   class of thing: the toolchain is a *config preset that consumers inherit*, not a program
   they install. A contract plus a reference `Makefile` fragment, not `shelf-bootstrap`.
 - **One universal bootstrap implementation.** Repos legitimately differ (uv vs poetry, beads

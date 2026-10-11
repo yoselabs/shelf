@@ -43,7 +43,7 @@ Greenfield forces it. `shelf-abf`'s `make bootstrap` cannot be the entry point f
 Makefile arrives *during* onboarding — the Makefile is an output of the process, not an input.
 Something must run before the target has anything, and it has to come from shelf.
 
-On resolution 0004 ("linters are a config preset, not a CLI"), which this looks like it violates:
+On ADR 0004 ("linters are a config preset, not a CLI"), which this looks like it violates:
 0004's objection is to a **runtime dependency** — a program a consumer must keep installed and
 version-matched to build its code. A one-shot operation that copies config in and exits is not
 that. It leaves no import, no pin, no version coupling; the consumer owns the copy afterward,

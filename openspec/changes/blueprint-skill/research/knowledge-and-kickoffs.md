@@ -199,7 +199,7 @@ Pattern: lint targets never modify files ("safe for AI, CI, pre-commit" — aggr
    Why: lifesim invented `about`/`derived_from`/`supersedes`; a later `a2kay validate` will reject or ignore them.
    If a "about this area" link is needed, add it as a declared repo-local overlay field, not ad hoc.
 4. **Ids = dated slugs (`YYYY-MM-DD-slug.md`) for decisions, slugs elsewhere — never `0001-` counters.** Why: ADR 0046
-   §12, parallel worktrees. Note the conflict: a2kay/a2web `docs/adr/NNNN-*` and shelf `docs/resolutions/NNNN-*` use
+   §12, parallel worktrees. Note the conflict: a2kay/a2web `docs/adr/NNNN-*` and shelf `docs/adr/NNNN-*` use
    counters; the blueprint should leave existing ADR dirs alone and use slugs for new vaults.
 5. **Supersession = same-day two-way update**: old gets `status: superseded` + `superseded_by`; sweep files quoting
    it (lifesim checklist #41). Why: the only enforced condition today is superseded ⇒ superseded_by; the sweep is the

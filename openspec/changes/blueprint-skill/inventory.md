@@ -43,7 +43,7 @@ knowledge and kickoff research ([research/knowledge-and-kickoffs.md](research/kn
 | name.clash | No clash on npm, PyPI, Homebrew, GitHub, MCP registry | A-own, A-agt | judge |
 | name.plain | A plain word the audience knows (EN + RU, UK, TR, ES speakers); no bad meaning in those | A-own, A-agt | judge |
 | name.house | House convention where it applies (`a2` + noun for agent tools); short, since it becomes a tool prefix | A-agt | judge |
-| name.deliverable | Names say the deliverable, not the origin (shelf resolution 0008) | S | judge |
+| name.deliverable | Names say the deliverable, not the origin (shelf ADR 0008) | S | judge |
 
 ## 3. Workspace and hygiene
 
@@ -201,7 +201,7 @@ knowledge and kickoff research ([research/knowledge-and-kickoffs.md](research/kn
 | # | conflict | sources | lean |
 |---|---|---|---|
 | C1 | Type checker: a2peer list says `ty`; the shelf preset switched ty → pyrefly on 2026-09-12 | A-agt vs S | pyrefly (shelf preset is the reference); a2peer list is stale |
-| C2 | Architecture enforcement: a2peer says import-linter or tach; shelf resolution 0005 says native pytest fitness tests, and the layer DAG is not ported yet | A-agt vs S | Fable B; if the shelf has no DAG rule, promoting one is a shelf bead |
+| C2 | Architecture enforcement: a2peer says import-linter or tach; shelf ADR 0005 says native pytest fitness tests, and the layer DAG is not ported yet | A-agt vs S | Fable B; if the shelf has no DAG rule, promoting one is a shelf bead |
 | C3 | Hygiene files: a2peer wants LICENSE / README / SECURITY.md; prior art rejects existence checks | A-agt vs P | audit content (purpose line, security contact), not existence |
 | C4 | Symlink direction: a2peer checklist has CLAUDE.md canonical; shelf has AGENTS.md canonical | A-agt vs S | AGENTS.md canonical |
 | C5 | State: lifesim wants `bootstrap.yaml`; shelf "one job per system" says beads | L-agt vs S | Fable A (F1) |

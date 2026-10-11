@@ -59,7 +59,7 @@
 
 ## 6. Extract shelf primitive: generic-first, specific-second (D5)
 
-- [x] 6.1 Write `docs/resolutions/00NN-generic-first-specific-second.md`
+- [x] 6.1 Write `docs/adr/00NN-generic-first-specific-second.md`
       (Status/Expires/Track/Distilled-into), stating the rule + the corollary
       (never scope a package's capability grid to one consumer's diet).
 - [x] 6.2 Distill it into `agent-loop.md` (the package-reasoning discipline) in
@@ -73,12 +73,12 @@
 - [x] 7.2 Finalize it *from* the completed docx run — reconcile every step
       against what actually happened across BOTH the PDF and docx benches
       (extracted, not invented). Decide the open question: peer workflow vs
-      sub-procedure. Add its `OUTPUT` + close-the-loop step (resolution 0009).
+      sub-procedure. Add its `OUTPUT` + close-the-loop step (ADR 0009).
 - [x] 7.3 If it warrants a resolution of its own (a new named workflow is a
       governance fact), write it and distil in the same commit; else fold the
       citation into the existing workflow set.
 
-## 8. Close the loop (resolution 0009)
+## 8. Close the loop (ADR 0009)
 
 - [x] 8.1 `make catalog` if `catalog/*.toml` / `use-cases/*.toml` changed;
       ledger rows written (delivery for the convert-md re-cut; verdict only if

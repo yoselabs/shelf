@@ -12,8 +12,8 @@ contract-guarantee, not "micro"/smallness.)*
   (`anyllm-v0.2.0`). Consumers in other repos pin `{ git, subdirectory, tag }`. No PyPI.
 - `docs/doctrine.md` — the *why*: what the shelf is and the load-bearing ideas.
 - `docs/constitution.md` — the 8 load-bearing rules.
-- `docs/glossary.md` — the ontology (TYPES only, never instances).
-- `docs/` — thoughts → tracks → missions → resolutions (see `docs/resolutions/README.md`).
+- `CONTEXT.md` — the ontology (TYPES only, never instances).
+- `docs/` — thoughts → tracks → missions → ADRs (see `docs/adr/README.md`; the list is `docs/adr/INDEX.md`).
 - `tests/` — repo-level fitness tests (the boundary spine: no package may import a consumer).
 
 ## The one law that keeps this reusable

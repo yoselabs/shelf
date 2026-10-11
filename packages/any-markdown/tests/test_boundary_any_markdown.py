@@ -28,7 +28,7 @@ def test_imports_no_consumer() -> None:
 
 
 def test_knows_nothing_about_a_consumers_identity_rules() -> None:
-    # Resolution 0010, generic-first: resolving an anchor to a target, and any id rule
+    # ADR 0010, generic-first: resolving an anchor to a target, and any id rule
     # underneath it, is the app's business. This package reports what was written.
     assert not hasattr(any_markdown, "canonical_id")
     assert not any("kay://" in py.read_text(encoding="utf-8") for py in Path(any_markdown.__file__).parent.rglob("*.py"))

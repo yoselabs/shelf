@@ -6,7 +6,7 @@ See `proposal.md` for motivation. Relevant current state:
   `ESCAPE-HATCH`, `EVOLVE-THE-LOOP`) already reason generically over `Kind`; only five slots are
   Python-specific per Kind today (unit dir, contract-verify tool, pin syntax, breaking-change signal,
   gate-membership test).
-- `Kind` already has one non-Python member (`config-preset`, resolution 0004) — precedent that
+- `Kind` already has one non-Python member (`config-preset`, ADR 0004) — precedent that
   membership isn't defined by "is a Python package."
 - The shelf's own machine has a working precedent for a marketplace living in a distribution-neutral
   repo (`context7-marketplace`'s `marketplace.json` points a plugin at a relative in-repo path,

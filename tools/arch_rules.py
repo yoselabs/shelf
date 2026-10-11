@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Architectural fitness rules — the native reimplementation of a2kit's Rego policies.
 
-Resolution 0005: the shelf models architecture-fitness as pure-stdlib Python (like
+ADR 0005: the shelf models architecture-fitness as pure-stdlib Python (like
 ``tests/test_boundary.py``), NOT as OPA/Rego — OPA is a non-hermetic binary substrate
 the shelf exists to shed. This engine is the shared machinery; the blocking assertions
 live in ``tests/test_arch_rules.py`` and the non-blocking cross-package report in

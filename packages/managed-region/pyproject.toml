@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Idempotent, prose-preserving machine-owned block between markers — the direnv/terraform managed-block pattern, marker-agnostic."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 
 [build-system]

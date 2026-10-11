@@ -24,21 +24,21 @@
 
 ## 3. Resolution distillation field
 
-- [x] 3.1 Add `Distilled into:` to the resolution template in `docs/resolutions/README.md`
-- [x] 3.2 Backfill `docs/resolutions/0001-repo-topology.md`
-- [x] 3.3 Backfill `docs/resolutions/0002-doctrine-homes-in-the-shelf.md`
-- [x] 3.4 Backfill `docs/resolutions/0003-ontology-lives-as-flat-files.md`
-- [x] 3.5 Backfill `docs/resolutions/0004-linters-are-a-config-preset.md`
-- [x] 3.6 Backfill `docs/resolutions/0005-architecture-rules-are-native-fitness-tests.md`
-- [x] 3.7 Backfill `docs/resolutions/0006-aggressive-capitalization-reconcile-later.md`
+- [x] 3.1 Add `Distilled into:` to the resolution template in `docs/adr/README.md`
+- [x] 3.2 Backfill `docs/adr/0001-repo-topology.md`
+- [x] 3.3 Backfill `docs/adr/0002-doctrine-homes-in-the-shelf.md`
+- [x] 3.4 Backfill `docs/adr/0003-ontology-lives-as-flat-files.md`
+- [x] 3.5 Backfill `docs/adr/0004-linters-are-a-config-preset.md`
+- [x] 3.6 Backfill `docs/adr/0005-architecture-rules-are-native-fitness-tests.md`
+- [x] 3.7 Backfill `docs/adr/0006-aggressive-capitalization-reconcile-later.md`
       (→ `agent-loop.md#workflow-seam` / `#workflow-promote`)
-- [x] 3.8 Backfill `docs/resolutions/0007-evolve-on-monotonic-contracts.md`
+- [x] 3.8 Backfill `docs/adr/0007-evolve-on-monotonic-contracts.md`
       (→ `agent-loop.md#workflow-seam`)
 
 ## 4. Blocking test for the distillation field
 
 - [x] 4.1 Write `tests/test_resolution_distillation.py`, mirroring
-      `tests/test_catalog_projection.py`'s pattern: iterate `docs/resolutions/*.md`, assert a
+      `tests/test_catalog_projection.py`'s pattern: iterate `docs/adr/*.md`, assert a
       non-empty `Distilled into:` frontmatter line on each
 - [x] 4.2 Run it against the backfilled resolutions (task 3) — must pass
 

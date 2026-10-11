@@ -1,7 +1,7 @@
 """Every `skills/<name>/` must have eval cases in `evals/<name>/`, or it is invisible to the gate.
 
 Mirrors `test_gate_covers_every_package.py`'s shape for the `skill` Kind
-(skill-as-shelf-kind, resolution 0014): a skill member with a `SKILL.md` but no
+(skill-as-shelf-kind, ADR 0014): a skill member with a `SKILL.md` but no
 cases under `evals/<name>/` can be committed and never checked by anything —
 `claude plugin eval` only runs against cases that exist, so silence here is the
 same failure class as a package suite absent from `testpaths`.
@@ -37,7 +37,7 @@ def test_every_skill_has_eval_coverage() -> None:
     """A skill with no `evals/<name>/` cases is committed but never checked by `claude plugin eval`.
 
     The cases live at the plugin root, not in the skill: `claude plugin eval` refuses an eval
-    dir inside `skills/` (resolution 0014, amendment).
+    dir inside `skills/` (ADR 0014, amendment).
     """
     uncovered = [p.name for p in _skill_dirs() if not any((_ROOT / "evals" / p.name).glob("*/prompt.md"))]
     assert not uncovered, (

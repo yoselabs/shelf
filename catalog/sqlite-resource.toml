@@ -1,4 +1,4 @@
-# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
 name = "sqlite-resource"
 kind = "primitive"
 tier = "T0"

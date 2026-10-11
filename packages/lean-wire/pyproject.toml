@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "Token-lean agent-facing wire payloads — a truly line-oriented TSV codec + opt-in empty-field pruning, so a model reads data not noise."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     "pydantic>=2,<3",

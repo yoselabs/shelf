@@ -51,8 +51,8 @@ gives resolutions a required, checked landing spot.
 
 - `docs/agent-loop.md` — full restructure (format change, not a behavior break for existing
   consumers; the four directions, PROMOTE procedure, etc. keep their current substance).
-- `docs/resolutions/*.md` (all 7) — gain a `Distilled into:` frontmatter field.
-- `docs/resolutions/README.md` — template gains the new mandatory field.
+- `docs/adr/*.md` (all 7) — gain a `Distilled into:` frontmatter field.
+- `docs/adr/README.md` — template gains the new mandatory field.
 - `tests/` — new blocking test for the `Distilled into:` field (`make check` fails without it).
 - `packages/anyllm/CHANGELOG.md` — new file, first entry backfilled.
 - No package code changes. No consumer repo (a2kay, a2web) needs to act — the resolver block each

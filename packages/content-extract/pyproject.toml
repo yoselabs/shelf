@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "Extract a web page's main content to Markdown plus structured metadata (title, byline, date), headings, and role-classified links."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     "convert-md",

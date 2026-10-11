@@ -12,7 +12,7 @@ Implements `docs/linting.md`'s own copy list, mechanically:
    preset and error severities (the axis `make preset` compares), its lighter bar for tests, and
    none of the shelf's own include/exclude/search paths or testpaths.
 
-Resolution 0004 — "linters are a config-preset, not a CLI" — means this is a
+ADR 0004 — "linters are a config-preset, not a CLI" — means this is a
 **one-shot scaffold**, not a syncing tool: copy, then the consumer owns it.
 That is also why the merge granularity is per-table / per-target, never
 per-line: **a repo that already has its own `[tool.ruff]` keeps it exactly as

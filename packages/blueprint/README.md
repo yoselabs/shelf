@@ -59,7 +59,7 @@ expires = 2027-04-01
 | generic | gate | `one-command` · `runs-blueprint` · `ci` · `ci-no-manifest-edit` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` · `clean-clone` (audit only) |
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
 | stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional) |
-| framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, provisional: engine-version · project-hygiene · scripts-lint · headless-build · tests · scene-integrity · architecture · ci); paths may use `{root}` (the project folder) and globs |
+| framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, provisional: framework-version · project-hygiene · embedded-script-lint · build · tests · surface-integrity · architecture · ci); paths may use `{root}` (the project folder) and globs |
 | agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `culture-files` · `managed-block` |
 
 Hooks follow one recipe: prek owns them through `.pre-commit-config.yaml` and bd's five events run

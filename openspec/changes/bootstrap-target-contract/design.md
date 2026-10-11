@@ -37,7 +37,7 @@ cannot provide them.
 **Decision.** Ship `docs/runbooks/repo-bootstrap.md` (obligations) plus a reference `Makefile`
 fragment. Do not ship a `shelf-bootstrap` program.
 
-Resolution 0004 already decided this shape for the linter toolchain — a config preset
+ADR 0004 already decided this shape for the linter toolchain — a config preset
 consumers inherit, not a CLI they install — and the reasoning transfers intact: a CLI creates
 a version-skew surface and a dependency, for logic that is mostly "run these in this order and
 check the result." Repos differ enough (uv vs poetry, beads or not) that the shared thing is

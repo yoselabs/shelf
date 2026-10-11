@@ -7,7 +7,7 @@ it) · **refuted** (the files show the opposite) · **untested** (needs a run). 
 findings are marked untested where I could not verify them against a primary source.
 
 Files read: proposal, design, inventory, research/{skill-practices, plugin-tooling, prior-art,
-repo-standards, owner-corrections, shelf-machinery}, docs/constitution, resolution 0014,
+repo-standards, owner-corrections, shelf-machinery}, docs/constitution, ADR 0014,
 specs/skill-kind, onboard-consumer SKILL.md, shelf `pyproject.toml` / `Makefile` /
 `tools/catalog.py` / `tests/test_gate_covers_every_skill.py` / `.claude-plugin/*.json`, and
 k-my `my-language/{SKILL.md, calibration.md, mine.py}` + workspace `check.py`.
@@ -200,7 +200,7 @@ runs it.
 | claim | verdict | why |
 |---|---|---|
 | Ship v0.1 user-invoked (`disable-model-invocation: true`) | supported | Zero always-on cost; k-my already pays ~4.3k tokens/session; blueprint is the rarest-run skill and first to lose its description under the 1% listing budget. Started on purpose by a line in AGENTS.md and by `make bootstrap`'s final message. |
-| Resolution 0014 scopes `Kind: skill` to push-based skills, so a user-invoked one does not fit | refuted as a blocker | 0014's tier split is about *standing cost vs discoverability*. A plugin-distributed, user-invoked skill has the plugin's distribution and tag mechanics with ~0 always-on cost. Amend 0014 by one line: Kind: skill governs plugin-distributed skills; invocation mode is a per-skill field; the budget assertion records both always-on (~0) and on-invoke. |
+| ADR 0014 scopes `Kind: skill` to push-based skills, so a user-invoked one does not fit | refuted as a blocker | 0014's tier split is about *standing cost vs discoverability*. A plugin-distributed, user-invoked skill has the plugin's distribution and tag mechanics with ~0 always-on cost. Amend 0014 by one line: Kind: skill governs plugin-distributed skills; invocation mode is a per-skill field; the budget assertion records both always-on (~0) and on-invoke. |
 | Evals can reach a user-invoked skill via a `/blueprint …` prompt | untested — **build step 0, item 1** | CC docs: disable-model-invocation removes it from the model's context; whether `claude plugin eval` expands a leading slash command non-interactively is unknown. If it cannot: keep model-invocation on *during eval runs only* with the description set to the exact trigger phrase, or run evals against a copy without the flag (same body). Decide after the test, not before. |
 | Also untested, same step | — | `evals/` location: default suite is `shelf/evals/` (plugin root = repo root) while skill-kind spec and `test_gate_covers_every_skill.py` expect `skills/blueprint/evals/` → `experimental.evals` or `--eval-dir`. Local Claude Code 2.1.259 < required 2.1.269: `claude update` first. |
 

@@ -1,7 +1,7 @@
 # Mission — the contract layer + the `Implementation` build-vs-adopt harness
 
 - **Status:** captured (2026-07-08), not yet built. The deepest idea in the design; **inert until a real
-  contract need appears** — the first candidate, `convert-md`'s string-input capability (res 0006), already
+  contract need appears** — the first candidate, `convert-md`'s string-input capability (ADR 0006), already
   shipped and was adopted *without* a contract file, so that trigger fired and passed with nothing built.
   Tracked as bead `shelf-4ze` (deferred: needs a fresh, concrete trigger).
 - **Track:** governance / the unit of selection

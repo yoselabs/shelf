@@ -87,7 +87,7 @@ which the host translates at its own seam if it wants a domain error.
 
 ## Migrating v0.1 → v0.2 (breaking)
 
-v0.2.0 evolved the contract to a superset (resolution 0007, the *monotonicity
+v0.2.0 evolved the contract to a superset (ADR 0007, the *monotonicity
 test*): it only expands exposure and removes nothing. `anyllm-v0.1.0` stays
 tagged — upgrade when you're ready.
 

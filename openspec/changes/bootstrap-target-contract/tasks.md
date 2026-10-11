@@ -86,7 +86,7 @@ Tests-first. `make check` green across the whole repo is Done.
       `_MAKE_TARGETS`, so a consumer running `linter-preset` actually gets them copied, not just
       documented).
 
-## 6. Close the loop (resolution 0009)
+## 6. Close the loop (ADR 0009)
 - [x] 6.1 `make check` green, whole repo.
 - [x] 6.2 Confirm `shelf-gag` closed on its own — it is, independent of this change.
 - [x] 6.3 Ledger row.

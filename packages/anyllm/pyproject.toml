@@ -4,7 +4,7 @@ version = "0.7.0"
 description = "Stop caring which LLM provider is underneath — one async completion contract with token/cost accounting and four backends (claude-code-cli/-sdk, anthropic-api, openai-compatible)."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 # Base install is featherweight: the claude-code-cli backend is stdlib-only
 # (subprocess). Each SDK-backed backend is an opt-in extra so a consumer pulls

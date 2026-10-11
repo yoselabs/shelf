@@ -241,7 +241,7 @@ one guesses at.
 ## Non-Goals
 
 - Not re-opening the reuse-vs-simplification doctrine question (settled:
-  the shelf promotes speculatively, per resolution 0006, global-inventory
+  the shelf promotes speculatively, per ADR 0006, global-inventory
   reading).
 - ~~Not deciding today whether to replace docling — that's the harness's
   job.~~ **Superseded by D5**: the harness did its job: docling is dropped

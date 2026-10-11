@@ -34,7 +34,7 @@ Resume here after compaction. Work queue: `bd show shelf-1y4` (epic) and `bd rea
 |---|---|
 | design | done: D1-D18 + owner rounds 1-10 below; vocabulary in [CONTEXT.md](CONTEXT.md) |
 | research | done: 13 files in `research/`, all one pass; two Fable consults (advisory only) |
-| shelf prerequisites | done: `tools/` type-checked (shelf-yz4); resolution 0014 amended; plugin eval proven to reach a user-invoked skill; eval cases live in `evals/<skill>/` (plugin eval refuses them inside `skills/`); strict beads settings live in the shelf; onboarding's broken Makefile copy fixed (shelf-4mz) |
+| shelf prerequisites | done: `tools/` type-checked (shelf-yz4); ADR 0014 amended; plugin eval proven to reach a user-invoked skill; eval cases live in `evals/<skill>/` (plugin eval refuses them inside `skills/`); strict beads settings live in the shelf; onboarding's broken Makefile copy fixed (shelf-4mz) |
 | blueprint code | v0.1 built: engine `packages/blueprint` (stdlib, one process, profile detection, overrides, set hash, reports, exit codes), gate concern (5 checkpoints) and backlog concern (7), each with a passing and a planted-violation test; `skills/blueprint/SKILL.md` with two paired eval cases; the shelf runs `make blueprint` in its own gate and passes it. Audit-only rows (`--audit`): clean clone, installed hooks, and the two that read bd's database |
 | test speed | `make check` runs in a Linux container when Docker answers and tests only the packages a change reaches (`tools/affected.py`); `make check-all` runs everything and is what CI runs. Full gate 16m51s on the host → about 1 min in the container (2026-10-10) |
 | layers (owner, 2026-10-10) | reports group concerns by layer: generic (gate, backlog), stack-specific (profiles per language), framework-specific (profiles per engine: godot), agent harness (agents); a stack or framework with no profile is a *blueprint gap*: "no standard yet", the shelf's gap, never the repo's failure |
@@ -107,7 +107,7 @@ language: "whatever".
 |---|---|
 | **Every checkpoint whose verdict a program can decide is a script.** `where: judge` is allowed only with a written reason why no script can decide it | overrides D8's "the checks themselves are never scripted" (Fable A Q4) |
 | **The checks run in each repo's own gate,** as one target (`make blueprint`) that `make check` depends on; resolved from the shelf clone the same way `guard` and `preset` are | non-compliance fails the commit that causes it, not the next audit; the AI audit is left with judge items and remediation |
-| **Language: Python 3, standard library only** (*agent*; owner: "whatever") | the shelf's guard, preset and onboard tools already run as bare `python3` in consumers; testable with the gate's own pytest. ❌ Rego: needs the conftest Go binary, broke on JSON-with-comments in agent-harness, and resolution 0005 already chose native tests over OPA. ❌ Bash: untestable, and the zsh word-splitting trap tagged the wrong commit in a2kay. ❌ JavaScript: no Node in Python repos |
+| **Language: Python 3, standard library only** (*agent*; owner: "whatever") | the shelf's guard, preset and onboard tools already run as bare `python3` in consumers; testable with the gate's own pytest. ❌ Rego: needs the conftest Go binary, broke on JSON-with-comments in agent-harness, and ADR 0005 already chose native tests over OPA. ❌ Bash: untestable, and the zsh word-splitting trap tagged the wrong commit in a2kay. ❌ JavaScript: no Node in Python repos |
 | **Checks read state; they never wrap tools.** A check reads config files, git state and tool exit codes; it never re-implements a linter (agent-harness stalled on that) | principle 14 stands |
 | **One result shape for every check:** id · verdict (not set up / failing / passing / not applicable / not checked) · evidence · remediation command; JSON and one line per check for humans | the report files are generated from it; plugin eval grades them by regex |
 | **Each check ships with a pass fixture and a planted-violation fixture,** run by the shelf's `make check` | "a gate never seen red is a hypothesis" |
@@ -249,7 +249,7 @@ question.
 | 5 | formatter | ruff format |
 | 6 | linter, strictest preset | ruff, shelf preset, `make preset` |
 | 7 | types / compiler strictness | pyrefly strict |
-| 8 | architecture enforcement | import-linter or tach, chosen once (Fable B C2: resolution 0005 bans an external policy engine, not an in-toolchain tool) — untested, needs a shelf bead |
+| 8 | architecture enforcement | import-linter or tach, chosen once (Fable B C2: ADR 0005 bans an external policy engine, not an in-toolchain tool) — untested, needs a shelf bead |
 | 9 | test runner, parallelism, test kinds (tables, property, golden) | pytest, xdist (untested), Hypothesis |
 | 10 | actor-surface scenarios and their in-process driver | pytest-bdd <9 + shelf `bdd-tags`, `mcp-steps`, `json-match` |
 | 11 | isolation: env, clock, randomness, process seams | autouse hermetic conftest; shelf `testing` modules |
@@ -435,7 +435,7 @@ a2kay 30-bug check runs.
 ### D14. Trigger and distribution (Fable A Q5)
 
 User-invoked (`disable-model-invocation: true`): zero always-on cost. Reached by `/blueprint`, by a
-line in each consumer's resolver block, and from `make bootstrap`'s output. Amend resolution 0014
+line in each consumer's resolver block, and from `make bootstrap`'s output. Amend ADR 0014
 by one line: Kind skill = plugin-distributed; invocation mode is per skill.
 
 ### D15. Evals (Fable A Q6, docs/skill-authoring.md §7)
@@ -501,8 +501,8 @@ from lifesim, most cells "untested").
 
 ## Build order
 
-0. **Prerequisites:** shelf-yz4 (`tools/` in the gate); amend resolution 0014 for D14 through the
-   resolutions flow (`docs/resolutions/README.md`, `Distilled into:` line); confirm plugin eval reaches a
+0. **Prerequisites:** shelf-yz4 (`tools/` in the gate); amend ADR 0014 for D14 through the
+   resolutions flow (`docs/adr/README.md`, `Distilled into:` line); confirm plugin eval reaches a
    `/blueprint` user-invoked skill; eval dir location (`experimental.evals` or `--eval-dir`); tag
    format (`skills--v…` vs the shelf rule).
 1. **Gate pillar end to end:** checkpoints 1–5 as files; `tools/blueprint/` enumerate + validate +

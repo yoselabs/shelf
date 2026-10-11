@@ -4,7 +4,7 @@ version = "0.1.2"
 description = "A sqlite-backed TTL cache for LLM completions, keyed on (key, model) and speaking anyllm.Completion."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     "aiosqlite>=0.20,<1",

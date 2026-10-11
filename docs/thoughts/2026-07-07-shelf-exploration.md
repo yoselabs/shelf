@@ -6,8 +6,8 @@
 > K skill + 5 read-only adversary agents (topology · contract-governance · reuse-directive ·
 > catalog-build-vs-adopt · a2kay-inheritance mining).
 >
-> **Homes when instantiated:** ~~doctrine + ontology → Kay~~ — **superseded by [resolution 0002]
-> (../resolutions/0002-doctrine-homes-in-the-shelf.md): everything homes in the shelf; consumers
+> **Homes when instantiated:** ~~doctrine + ontology → Kay~~ — **superseded by [ADR 0002]
+> (../adr/0002-doctrine-homes-in-the-shelf.md): everything homes in the shelf; consumers
 > reference it, if necessary. Kay is not a runtime dependency.**
 
 ---
@@ -181,8 +181,8 @@ docs/
   thoughts/     ← raw explorations (dated, unresolved, freely messy)
   tracks/       ← a durable line of work (topology, contract-governance, …)
   missions/     ← a scoped objective within a track (OpenSpec changes attach here)
-  resolutions/  ← decided things (ADR-style: fork, choice, why, expiry)
-  constitution.md · glossary.md   ← the two standing docs
+  adr/          ← decided things (now docs/adr; ADR-style: fork, choice, why, expiry)
+  constitution.md · CONTEXT.md   ← the two standing docs
 ```
 Thoughts feed tracks; tracks spawn missions; missions close into resolutions (a resolution with an
 expiry = beliefs-with-expiry).

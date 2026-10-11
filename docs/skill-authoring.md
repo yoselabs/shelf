@@ -1,7 +1,7 @@
 # Skill authoring — how to build a skill that works, stays cheap, and keeps improving
 
 The reference for writing any agent skill: a `Kind: skill` member under `skills/<name>/`
-(resolution 0014), a shelf-internal one under `.agents/skills/`, or a skill in any other repo.
+(ADR 0014), a shelf-internal one under `.agents/skills/`, or a skill in any other repo.
 `docs/linting.md` is the reference for code; this file is the reference for skills.
 
 > **Status: one research pass, 2026-10-10, not cross-checked.** Collected while designing
@@ -227,12 +227,12 @@ Layout (PE):
 
 ## 10. In the shelf specifically
 
-- **Two tiers** (resolution 0014): `skills/<name>/` is `Kind: skill` — catalogued, plugin-distributed,
+- **Two tiers** (ADR 0014): `skills/<name>/` is `Kind: skill` — catalogued, plugin-distributed,
   evals required before `active`, measured always-on cost recorded in the catalog entry;
   `.agents/skills/` is shelf-internal, invoked by path, ungoverned.
 - **Eval location:** the shelf plugin's root is the repo (`source: "./"`), so cases live in
   `evals/<skill>/<case>/`. `claude plugin eval` refuses an eval dir inside `skills/` (measured
-  2026-10-10, resolution 0014 amendment).
+  2026-10-10, ADR 0014 amendment).
 - **Tag format — untested:** `claude plugin tag` creates `<name>--v<version>`; the shelf rule is
   `<name>-vX.Y.Z`. Check with `--dry-run` before the first skill tag. Run
   `claude plugin validate . --strict` first; whether `tag` runs it is undocumented.

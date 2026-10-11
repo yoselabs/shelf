@@ -3,7 +3,7 @@
 Sits *below* the provider interface: any backend that speaks Anthropic-shaped
 usage reuses :func:`extract_token_counts` and :func:`anthropic_cost_usd`. Kept
 separate so it can be lifted into its own tiny package if a non-LLM holder ever
-wants it (resolution 0007 reconcile-later note).
+wants it (ADR 0007 reconcile-later note).
 """
 
 from __future__ import annotations

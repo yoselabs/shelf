@@ -1,7 +1,7 @@
 # Fable round B — the content of the checklist (2026-10-10)
 
 Consult on `proposal.md`, `design.md` (incl. the later "Structure — five layers" section, question 7 in §8), `inventory.md`, the six research files, the constitution,
-the doctrine and resolution 0005. Verdict vocabulary: **supported / refuted / untested**, per
+the doctrine and ADR 0005. Verdict vocabulary: **supported / refuted / untested**, per
 sub-claim. ✅ do · ❌ refuse · ⚠️ do with the stated change. Tool facts not verified in this session
 are marked untested, never asserted. Every number quoted is from the research files, not
 re-estimated. Nothing here edits the inventory; contradictions in it are named, not fixed.
@@ -78,7 +78,7 @@ already refute "Gherkin everywhere":
 | .NET simulation / game | scenario files (seed + expectations) + golden logs + property tests; architecture tests | determinism (`test.determinism`), a scenario vocabulary in one schema file | ✅ supported (lifesim as built); Reqnroll only if an actor performs steps — untested |
 | TS web app | Playwright specs with a fixtures module as the only allowed API; component tests for logic without the browser | a lint rule that tests import only from `fixtures/` (the STEPS.md equivalent); tags via annotations | untested — cucumber-js adds a layer nobody reads |
 | Go CLI | `testscript` (txtar command scripts) — the Go-native "feature file" | commands = the vocabulary; in-process `main` via `testscript`'s `TestMain` hook | untested in this session; the shape matches |
-| Infra repo (homelab, Nix/Komodo) | no actor. Plan-diff tests, policy tests over the rendered config, one ephemeral apply as smoke | "declared ⇔ live" check (`ops.declarative-infra`) | ✅ Gherkin refuted here; note resolution 0005's OPA ban does not reach infra repos where the policy engine is the stack |
+| Infra repo (homelab, Nix/Komodo) | no actor. Plan-diff tests, policy tests over the rendered config, one ephemeral apply as smoke | "declared ⇔ live" check (`ops.declarative-infra`) | ✅ Gherkin refuted here; note ADR 0005's OPA ban does not reach infra repos where the policy engine is the stack |
 
 **Recommendation.** Rename `test.usecases-first` to *actor-surface scenarios first*; its `check`
 names the three preserved properties, its `applies to` names the carrier per pack. Gherkin becomes the
@@ -183,7 +183,7 @@ right antidote; the inventory should be sized to it.
 | # | lean | verdict | reason / change |
 |---|---|---|---|
 | C1 pyrefly | ✅ supported | But the checkpoint must say "the shelf preset's type checker at its strict preset", never `pyrefly`. A tool name in a rule is the instance data `agents.no-instance-data` bans; the preset switched once already (ty → pyrefly, 2026-09-12) |
-| C2 import-linter/tach vs native pytest | ❌ false conflict | Resolution 0005 rejected OPA as a **non-hermetic binary** and chose native tests for **AST-fact rules** (dup bodies, name collisions). An import DAG checked by an in-toolchain dependency (import-linter, tach, ArchUnitNET, dependency-cruiser) violates nothing in it. Hand-writing a DAG checker in pytest is the tool-wrapper trap in reverse. **Real finding:** a2kay uses import-linter, a2web uses tach + `tests/architecture` — the python-uv preset must pick one (bead). Universal form = `arch.reads-design`: the tool reads the one declared DAG (lifesim's ArchUnitNET reads `depends_on` from `design/systems/*.md`) |
+| C2 import-linter/tach vs native pytest | ❌ false conflict | ADR 0005 rejected OPA as a **non-hermetic binary** and chose native tests for **AST-fact rules** (dup bodies, name collisions). An import DAG checked by an in-toolchain dependency (import-linter, tach, ArchUnitNET, dependency-cruiser) violates nothing in it. Hand-writing a DAG checker in pytest is the tool-wrapper trap in reverse. **Real finding:** a2kay uses import-linter, a2web uses tach + `tests/architecture` — the python-uv preset must pick one (bead). Universal form = `arch.reads-design`: the tool reads the one declared DAG (lifesim's ArchUnitNET reads `depends_on` from `design/systems/*.md`) |
 | C3 content, not existence | ✅ supported | Go further: README purpose line, SECURITY contact, LICENSE apply only to **public** repos (`applies to: visibility=public`). A SECURITY.md in a private solo tool is cargo cult |
 | C4 AGENTS.md canonical, CLAUDE.md symlink | ⚠️ canonical yes; symlink mechanism no | The checkpoint is "one canonical file; every client entry file resolves to it with zero duplicated lines". The mechanism is a pack choice: symlink on POSIX, a one-line `@AGENTS.md` import (a2web's form) where symlinks are unreliable. lifesim is .NET/Godot; a Windows checkout breaks a symlink unless `core.symlinks` and developer mode are on (untested here, but the risk is well known). See §7.1 |
 | C5 state file vs beads | Round A, but content forces one line | Principle 3 already requires overrides **checked into the repo** with reason codes. Beads-only contradicts principle 3 on its own terms. Minimum: a small checked-in file with `blueprint_version` + overrides; findings go to beads. R4 row 12 (Copier, cruft, projen all keep a version pointer) points the same way |
@@ -332,7 +332,7 @@ a named failure in the research.** Anything judge-only or single-stack drops to 
 Not in the fifteen, by the criterion: everything in `shape.*` and `name.*` (runbook); mutation
 pruning and lineage (pack tools); `gate.container` (measured, not prescribed); Docker rules (pack,
 services only); the LLM, data and monorepo packs (§5.1) — written when the first project needs each,
-resolution 0014's own trigger logic.
+ADR 0014's own trigger logic.
 
 ## 6. Ordering
 

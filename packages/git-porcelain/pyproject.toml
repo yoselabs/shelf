@@ -4,7 +4,7 @@ version = "0.5.0"
 description = "A pure, fail-loud git surface over the git binary — preserving the user's credential/config fidelity."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = []
 

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from blueprint.model import FixedBy, Verdict
 from blueprint.profile import STATE_DIR
+from blueprint.runner import ACCEPTED
 
 if TYPE_CHECKING:
     from datetime import date
@@ -98,7 +99,10 @@ def gate(run: Run) -> str:
     """The `make blueprint` form: one line per checkpoint that is not passing."""
     lines = [f"blueprint: {p}" for p in run.problems]
     lines += [
-        f"blueprint: {mark(r)} {r.id} -- {r.verdict}: {r.evidence}" + (f" -> {r.remediation}" if r.remediation else "")
+        f"blueprint: {'🆕' if r.new else mark(r)} {r.id} -- {r.verdict}"
+        + (" (new since the last audit: warns until /blueprint runs)" if r.new else "")
+        + f": {r.evidence}"
+        + (f" -> {r.remediation}" if r.remediation else "")
         for r in run.rows
         if r.verdict not in {Verdict.PASSING, Verdict.NOT_APPLICABLE}
     ]
@@ -145,6 +149,10 @@ def write(run: Run, repo: Path, today: date) -> list[Path]:
     index = out_dir / "README.md"
     index.write_text(f"# Blueprint\n\n{stamp}\n\n{_header(run)}\n\n{summary(run)}\n")
     written = [index]
+    # The audit record: what the gate enforces until the next audit (runner.ACCEPTED).
+    accepted = repo / ACCEPTED
+    accepted.write_text("".join(f"{r.key}\n" for r in sorted(run.rows, key=lambda r: r.key)))
+    written.append(accepted)
     for layer, concern in _concerns(run):
         rows = [r for r in run.rows if r.concern == concern]
         path = out_dir / f"{concern.replace('/', '-')}.md"

@@ -1,6 +1,6 @@
 """The preset-drift check: a consumer matches the shelf's linter config, or says why not.
 
-Resolution 0004 makes the shelf's `pyproject.toml` the preset and says drift is
+ADR 0004 makes the shelf's `pyproject.toml` the preset and says drift is
 "acceptable and visible". It was not visible — `linter_preset.py` is append-only
 and reports "already current" for a repo missing whole rule families, which is how
 ten repos here reached ten rule sets with nobody deciding to.

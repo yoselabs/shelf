@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A function signature becomes CLI flags: Annotated Field alias names the flag, description is the help, bool is a paired --flag/--no-flag, a non-scalar is one JSON flag; argparse in, keyword arguments out."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 
 [build-system]

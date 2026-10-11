@@ -22,14 +22,14 @@ as free prose outside a workflow block.
 
 ### Requirement: The loop defines a procedure for evolving itself
 `docs/agent-loop.md` SHALL contain a `WORKFLOW: EVOLVE-THE-LOOP` whose trigger is friction with the
-loop discovered mid-session, and whose steps require that any non-trivial fix be backed by a
-resolution distilled into the loop in the same change.
+loop discovered mid-session, and whose steps require that any non-trivial fix be backed by an
+ADR distilled into the loop in the same change.
 
 #### Scenario: An agent hits a gap in the loop
 - **WHEN** an agent mid-session finds a judgment call the loop does not cover
-- **THEN** it follows `WORKFLOW: EVOLVE-THE-LOOP`: fix directly if trivial, otherwise write a
-  resolution and distill the operational takeaway into the relevant workflow block in the same
-  change — never merging the resolution without the distillation
+- **THEN** it follows `WORKFLOW: EVOLVE-THE-LOOP`: fix directly if trivial, otherwise write an
+  ADR and distill the operational takeaway into the relevant workflow block in the same
+  change — never merging the ADR without the distillation
 
 ### Requirement: Worktree freshness is checked on PROMOTE entry
 `WORKFLOW: PROMOTE`'s first step SHALL be fetching and rebasing the shelf worktree onto

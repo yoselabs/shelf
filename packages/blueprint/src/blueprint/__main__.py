@@ -16,7 +16,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from blueprint import report, survey, templates
+from blueprint import adr, report, survey, templates
 from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
@@ -46,19 +46,16 @@ def main(argv: list[str] | None = None) -> int:
     srv.add_argument("--check", type=Path, metavar="FILE", help="exit 1 unless FILE answers every question in the closed set")
     tpl = sub.add_parser("template", help="copy missing docs/agents/ files and write the AGENTS.md managed block")
     tpl.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+    idx = sub.add_parser("adr-index", help="print docs/adr/INDEX.md as the ADRs generate it")
+    idx.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+    idx.add_argument("--write", action="store_true", help="write it to docs/adr/INDEX.md instead")
     rcp = sub.add_parser("recipe", help="print a blueprint recipe file")
     rcp.add_argument("name", choices=sorted(RECIPE_FILES), help="hooks: the .pre-commit-config.yaml prek reads")
     args = parser.parse_args(argv)
 
-    if args.command == "template":
-        for changed in _install_templates(args.repo):
-            sys.stdout.write(f"wrote {changed}\n")
-        return 0
-    if args.command == "recipe":
-        sys.stdout.write((RECIPES / RECIPE_FILES[args.name]).read_text())
-        return 0
-    if args.command == "survey":
-        return _survey(args.repo, args.check)
+    commands = {"template": _template, "adr-index": _adr_index, "recipe": _recipe, "survey": lambda a: _survey(a.repo, a.check)}
+    if args.command in commands:
+        return commands[args.command](args)
     result = run(args.repo, concern=args.concern, audit=args.audit)
     if args.json:
         text = report.as_json(result)
@@ -73,6 +70,26 @@ def main(argv: list[str] | None = None) -> int:
         for path in report.write(result, args.repo.resolve(), date.today()):  # noqa: DTZ011 -- a report date, the owner's calendar
             sys.stderr.write(f"wrote {path}\n")
     return result.exit_code
+
+
+def _template(args: argparse.Namespace) -> int:
+    for changed in _install_templates(args.repo):
+        sys.stdout.write(f"wrote {changed}\n")
+    return 0
+
+
+def _adr_index(args: argparse.Namespace) -> int:
+    text = adr.index(args.repo.resolve())
+    if args.write:
+        (args.repo / adr.FOLDER / adr.INDEX).write_text(text)
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
+def _recipe(args: argparse.Namespace) -> int:
+    sys.stdout.write((RECIPES / RECIPE_FILES[args.name]).read_text())
+    return 0
 
 
 def _install_templates(repo: Path) -> list[str]:

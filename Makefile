@@ -1,7 +1,7 @@
 # Definition of Done: `make check` green over the WHOLE repo — no carve-outs.
 # "Pre-existing drift" / "unrelated file" never satisfies Done. (Inherited from a2kay AGENTS.md §1.)
 #
-# This is the reference toolchain every consumer of the shelf inherits (resolution 0004).
+# This is the reference toolchain every consumer of the shelf inherits (ADR 0004).
 # Each target is one linter doing one job; `check` is the gate.
 
 .PHONY: check check-all check-host check-all-host test-image blueprint eval guard preset bootstrap bootstrap-verify lint format typecheck spell deps test test-affected test-browser cov catalog advisory sync
@@ -69,7 +69,7 @@ guard:
 	 if [ -f "$$g" ]; then python3 "$$g" --committed; \
 	 else echo "guard: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
 
-# The linter preset, as a GATE. Resolution 0004 makes this repo's config the preset and
+# The linter preset, as a GATE. ADR 0004 makes this repo's config the preset and
 # says drift is "acceptable and visible" -- it was not visible. The onboarding copy is
 # append-only, so it reports "already current" for a repo missing whole rule families.
 # This fails on any difference from the preset that the consumer has not declared, with

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-package architectural advisories — NON-blocking (resolution 0005).
+"""Cross-package architectural advisories — NON-blocking (ADR 0005).
 
 Within a package, duplication is a bug (blocked by ``tests/test_arch_rules.py``).
 *Across* packages it is a signal, not a sin: constitution VI values some duplication,

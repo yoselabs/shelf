@@ -7,14 +7,14 @@ reusable than either answer, and it is **not** the method `WORKFLOW: BENCH`
 describes.
 
 Written because the consumer's agent re-derived the whole procedure from
-scratch, which is the same signal that produced resolution 0011 (two benches,
+scratch, which is the same signal that produced ADR 0011 (two benches,
 identical shape, existing nowhere in the loop).
 
 ---
 
 ## The gap
 
-`WORKFLOW: BENCH` (resolution 0011) is explicitly for **tools**:
+`WORKFLOW: BENCH` (ADR 0011) is explicitly for **tools**:
 
 > Frame as keep/replace on a specific capability … **Model-free grade** — human-judge
 > each output on the named axes … not LLM-judged.
@@ -285,7 +285,7 @@ Open questions before this becomes a resolution:
   `llm-wobble`. A judge-harness would be a fourth in that family, and the user
   named it as wanting to be "part of our better LLM evaluation stack in the
   shelf". That is a real pull, but nothing here has been used by a second
-  consumer yet — promotion-to-be-challenged (resolution 0013) says that is a
+  consumer yet — promotion-to-be-challenged (ADR 0013) says that is a
   reason to promote *sooner*, not to hold, so it is worth an explicit call
   rather than a default no.
 

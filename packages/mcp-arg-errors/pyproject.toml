@@ -4,7 +4,7 @@ version = "0.2.0"
 description = "Every failed FastMCP tool call as an error an agent can act on: whatever a tool body raised as an is_error result carrying the typed error's envelope (an untyped one a defect with a trace id), and arguments that do not fit the schema as a fault naming the argument, one the tool does not have saying the client's tool list is stale."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     # >=3.4: `ToolResult(is_error=True)` raises TypeError on 3.3.x (see mcp-result-wire).

@@ -1,0 +1,122 @@
+# Framework profile (see ../python-uv.toml for the format). Layers on python-uv.toml for a Python MCP server built on the
+# standalone `fastmcp` package: every python-uv rule applies; the rows here add what is the MCP surface's.
+# `{root}` is the folder holding the pyproject.toml that declares fastmcp (usually "."). Paths may be globs (`tests/*.py`, no `**`).
+# Detection (profile.py FRAMEWORK_DEPENDENCIES): a `fastmcp` dependency in [project].dependencies AND a `FastMCP(` call in src.
+# Research: openspec/changes/blueprint-skill/research/mcp-profile.md
+stack = "mcp"
+status = "provisional"
+source = "mcp-profile.md (2026-10-11): fastmcp 3.4.8 and 4.1.0 and mcp 2.3.0 run in scratch venvs (in-memory Client, list_tools, bad-argument call, stdio handshake, `fastmcp inspect`); MCP spec 2025-11-25 and 2026-07-28 read; a2kay (fastmcp 3.4.4, mcp 1.28.1) read, its contract tests are the pattern; a2kay is the only consumer"
+
+[[role]]
+role = "framework-version"
+tool = "fastmcp (standalone, PrefectHQ) in [project].dependencies with a lower bound and a major cap, resolved in uv.lock; the negotiated protocol version is asserted in one test so an SDK bump that moves it shows as a diff"
+install = """`uv add 'fastmcp>=<x.y>,<<next major>'` (new servers: the current major, 4.x on 2026-10-11; 3.4.x is still maintained). \
+Never `mcp.server.fastmcp` (frozen v1 copy; gone in mcp 2.x) and never `from mcp.server.mcpserver import MCPServer` for a server the shelf's FastMCP packages (mcp-bridge, mcp-feedback, mcp-result-wire, mcp-arg-errors) must serve. \
+One test reads `client.initialize_result` and asserts the protocol version string"""
+config = [
+    { any = [
+        { path = "pyproject.toml", contains = "fastmcp>=" },
+        { path = "pyproject.toml", contains = "fastmcp==" },
+        { path = "pyproject.toml", contains = "fastmcp~=" },
+    ] },
+    { path = "uv.lock", contains = 'name = "fastmcp"' },
+    { any = [
+        { path = "tests/*.py", contains = "initialize_result" },
+        { path = "tests/*/*.py", contains = "initialize_result" },
+    ] },
+]
+
+[[role]]
+role = "project-hygiene"
+tool = "stdout belongs to the protocol: no print() in server code (ruff T20 on, per-file ignore only for tests and the CLI module), logging goes to stderr; a stdio subprocess test proves the stream holds only JSON-RPC"
+install = """pyproject [tool.ruff.lint] select has "T20" (the shelf preset already has it); logging.basicConfig(stream=sys.stderr) or none (FastMCP's own logger writes to stderr, read in fastmcp/utilities/logging.py); \
+the stdio test is the `build` row. Server entrypoint `mcp.run()` has no `print` before it, no banner on stdout (FastMCP's banner goes to stderr)"""
+config = [{ path = "pyproject.toml", contains = "T20" }]
+
+[[role]]
+role = "binary-assets"
+na = "an MCP server ships no binary assets; resources it serves are produced by code and covered by the contract tests"
+
+[[role]]
+role = "embedded-script-lint"
+na = "Python only: ruff in the python-uv profile is the lint; there is no second script language"
+
+[[role]]
+role = "build"
+tool = "a stdio smoke test starts the real entrypoint (`python -m <pkg>` or the console script) as a subprocess with fastmcp's StdioTransport, completes the handshake, lists tools, makes one call and one bad call; it runs inside `make check` as an ordinary pytest test"
+install = """tests/test_stdio_serves.py: `Client(StdioTransport(command=sys.executable, args=["-m", "<pkg>", "serve"], env=..., cwd=tmp_path))`; assert the tool-name set, one round trip, and that a bad call returns `is_error` and not a transport failure. \
+Pattern: a2kay tests/test_serve_stdio_e2e.py. A server with a Streamable HTTP mode gets the same test over a loopback port (shelf package async-scope[asgi] owns the uvicorn traps)"""
+config = [
+    { any = [
+        { path = "tests/*.py", contains = "StdioTransport" },
+        { path = "tests/*/*.py", contains = "StdioTransport" },
+    ] },
+]
+gate = "pytest"
+
+[[role]]
+role = "tests"
+tool = "in-memory contract tests: `Client(server)` against the built FastMCP object, no subprocess, no network; Gherkin through the shelf's mcp-steps where the steps are shared; a bad-argument call returns an is_error result an agent can act on"
+install = """`from fastmcp import Client` then `async with Client(server) as client:` (FastMCP's own testing page recommends this; pytest-asyncio with asyncio_mode = "auto", inline-snapshot for the structures). \
+Cover: the tool set equals the frozen set; one call per tool round-trips; a call with a wrong argument type and one with an unknown argument both come back `is_error=True` with text naming the argument (shelf package mcp-arg-errors makes that one shape); \
+a failing tool body comes back as the catalogued error, never a masked 'Error calling tool'. `raise_on_error=False` to inspect the error result"""
+config = [
+    { any = [
+        { path = "tests/*.py", contains = "Client(" },
+        { path = "tests/*/*.py", contains = "Client(" },
+    ] },
+    { any = [
+        { path = "tests/*.py", contains = "is_error" },
+        { path = "tests/*/*.py", contains = "is_error" },
+    ] },
+]
+gate = "pytest"
+
+[[role]]
+role = "surface-integrity"
+tool = "the tool list is a committed snapshot: wire JSON of list_tools (names, descriptions, inputSchema, outputSchema, annotations), sorted, diffed by a test; plus property tests over the live list: every tool has a description, annotations that are set (not the pessimistic defaults), and inputSchema.additionalProperties false"
+install = """tests/contracts/test_tool_list.py: build the server, `list_tools()` through the in-memory Client, dump each tool with `model_dump(mode="json", by_alias=True, exclude_none=True)` (by_alias is required: tested, fastmcp 4.1.0 dumps annotations as read_only_hint without it, 3.4.8 dumps readOnlyHint either way; 4 also adds a `title` field, so a 3 to 4 bump shows in the snapshot), \
+sort by name, compare with tests/contracts/<name>.snapshot.json; regenerate only on purpose through an env var (a2kay: A2KAY_UPDATE_SNAPSHOT=1). \
+Property asserts: description non-empty; `annotations` present with all of readOnlyHint, destructiveHint, idempotentHint, openWorldHint set explicitly (FastMCP defaults are readOnly false, destructive true, openWorld true); a read tool is readOnly and not destructive; no dotted or prefixed names that the code lacks; total serialized size under a budget. \
+Pattern: a2kay tests/contracts/test_mcp_tool_list.py"""
+config = [
+    { any = [
+        { path = "tests/*.snapshot.json" },
+        { path = "tests/*/*.snapshot.json" },
+        { path = "tests/*/*/*.snapshot.json" },
+    ] },
+    { any = [
+        { path = "tests/*.py", contains = "list_tools" },
+        { path = "tests/*/*.py", contains = "list_tools" },
+    ] },
+    { any = [
+        { path = "tests/*.py", contains = "readOnlyHint" },
+        { path = "tests/*/*.py", contains = "readOnlyHint" },
+        { path = "tests/*.py", contains = "read_only_hint" },
+        { path = "tests/*/*.py", contains = "read_only_hint" },
+    ] },
+]
+gate = "pytest"
+
+[[role]]
+role = "architecture"
+tool = "the domain core does not import fastmcp; the server module is a thin adapter (register tools, map errors, set annotations) that calls core functions; auth and transport options are read from one config object, not from tool bodies"
+untested = "the python-uv architecture tool is still open (import-linter vs tach); once chosen, the contract is: forbidden module `fastmcp` and `mcp` from the core package. a2kay enforces this with its own archlint; no shared check exists to point at"
+
+[[role]]
+role = "ci"
+na = "no MCP-specific CI step: the stdio and in-memory tests run inside `make check`, which the python-uv ci row already runs from the lockfile; no server binary or service to install"
+
+[[role]]
+role = "hooks"
+na = "no MCP-specific hook: the snapshot and contract tests are in the gate, and a hook that built the server per commit would repeat the gate"
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/mcp.md (tool descriptions are for models, annotations, error shape, stdout rule, snapshot regeneration, what never to hand-edit), linked from AGENTS.md"
+install = """create docs/agents/mcp.md (<= 120 lines): the FastMCP pin and why; tool naming and description rules; annotations on every tool; errors as is_error results with an actionable message; \
+never print to stdout; regenerate the tool-list snapshot only on purpose and read the diff; the in-memory client for tests. Link from AGENTS.md: `MCP conventions: docs/agents/mcp.md`"""
+config = [
+    { path = "docs/agents/mcp.md" },
+    { path = "AGENTS.md", contains = "docs/agents/mcp.md" },
+]

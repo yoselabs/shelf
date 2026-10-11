@@ -1,6 +1,6 @@
 """The LLM provider contract — one async call, one rich result.
 
-v0.2.0 (resolution 0007, the monotonicity test) evolved this from the v0.1
+v0.2.0 (ADR 0007, the monotonicity test) evolved this from the v0.1
 ``LLMAdapter`` (sync, ``complete(prompt) -> str``). The unified contract only
 *expands* exposure and removes nothing a caller relied on:
 

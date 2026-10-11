@@ -15,6 +15,7 @@ everything else is fixed text. Edit here, never in a consumer's copy of an unmod
 | `agents/python.md` | `docs/agents/python.md` | per stack: python-uv (fill `<role>_tool` and `<role>_run` for each role in the table, `inner_loop`, `scenario_dir`, `glossary_file`) |
 | `agents/dotnet.md` | `docs/agents/dotnet.md` | per stack: dotnet |
 | `agents/godot.md` | `docs/agents/godot.md` | per framework: godot (fill `godot_root`) |
+| `agents/mcp.md` | `docs/agents/mcp.md` | per framework: mcp (fill `mcp_root`) |
 | `agents-md-block.md` | the managed block in `AGENTS.md`, between its markers | always (fill `stack_rows`: one table row per stack or framework file present) |
 
 ## Filling `python.md`

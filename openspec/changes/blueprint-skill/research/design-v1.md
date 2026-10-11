@@ -73,7 +73,7 @@ Inputs already in hand:
    to check it.
 8. **Stack-neutral core, stack packs on demand.** `stacks/python-uv.md` with evidence;
    `stacks/dotnet.md` from lifesim, labelled provisional inside the file; any other stack is
-   written when its first project arrives (resolution 0014's own trigger logic).
+   written when its first project arrives (ADR 0014's own trigger logic).
 9. **Ask the owner only what is his** — taste, scope, priority, risk appetite, money, anything that
    leaves the machine. One question format: numbered, context first, a recommendation that "yes"
    accepts. An agent's choice is recorded as the agent's. Nothing is recorded as his that he did
@@ -133,7 +133,7 @@ Rules that follow:
 | 4 | formatter | ruff format |
 | 5 | linter, strictest preset | ruff, shelf preset, `make preset` drift gate |
 | 6 | types / compiler strictness | pyrefly strict |
-| 7 | architecture enforcement | pytest fitness tests (resolution 0005); layer DAG not ported yet |
+| 7 | architecture enforcement | pytest fitness tests (ADR 0005); layer DAG not ported yet |
 | 8 | test runner | pytest |
 | 9 | behaviour tests (Gherkin) and their driver | pytest-bdd <9, shelf `bdd-tags`, `mcp-steps`, `json-match` |
 | 10 | test isolation and doubles | autouse hermetic conftest; shelf `testing` modules |
@@ -173,7 +173,7 @@ authoring session's (✅ adopted / ❌ rejected):
 | Q1 | Fixed 8-step run protocol: orient → enumerate (script) → check → validate (script) → report → fix → re-check → record; an empty repo runs the decide-phase owner round first | ✅ | becomes the body of SKILL.md |
 | Q2 | Projected per-pillar runbook carries only check · verify · fix; why and evidence stay out of the load path | ✅ | refines principle 2 / F9 |
 | Q4 | Day-one scripts under `tools/blueprint/`: enumerate, validate (refuses `passing` without evidence, `not checked` without reason, an expired override), project; diff soon after. Checks themselves never scripted | ✅ | supersedes principle 5's "no scripts in v0.1"; principle 14 stands |
-| Q5 | User-invoked v0.1; amend resolution 0014 by one line (Kind: skill = plugin-distributed; invocation mode per skill) | ✅ | decides F6 |
+| Q5 | User-invoked v0.1; amend ADR 0014 by one line (Kind: skill = plugin-distributed; invocation mode per skill) | ✅ | decides F6 |
 | Q6 | Paired fault/clean cases from observed failures; regex over the report + tool_used/tool_order; ≤1 llm grader; `--ablation none` runs=1 while iterating, two arms runs=3 before a tag; static checks in `make check` | ✅ | decides F10 |
 | Q7 | Evolution loop: reason codes and "blueprint lacks" lines captured per run → `tools/blueprint/mine.py` over consumers' `blueprint.toml` files and transcripts (candidates only) → regressions table → RECONCILE adopts or rejects, a rejection written into the checkpoint's Refused section → the set-hash diff tells each consumer which checkpoints to re-audit; a session hook logs, never blocks | ✅ | the reabsorption loop the owner asked for |
 | 9 | Not thought about: the shelf must pass its own blueprint (5 known defects); ~40 judge questions on an empty repo need one owner round per phase; multi-stack repos need `applies_to` as path globs; report evidence can leak PII; the plugin ships the whole repo | ✅ all | added to risks; PII needles run in the validator |
@@ -187,7 +187,7 @@ authoring session's (✅ adopted / ❌ rejected):
 | F3 | restart vs migrate for an existing repo | rule for when the audit recommends a fresh skeleton | R6 has two owner rulings for restart ("remove the whole thing … except linters"; "shape of the code doesn't matter"); both keep the gate and the behaviour tests and throw away the code. Lean: a restart keeps the gate + behaviour scenarios as the spec and rebuilds code behind them; migrate when the scenarios do not exist yet (write them first: a2kay order use cases → isolation → prune → merge → shelf) | Fable |
 | F4 | which a2kay testing lessons are universal and which are Python-shaped | — | Gherkin-first, placement table, hermetic env, mutation-proven deletion are universal; tool names are not | Fable + R5 |
 | F5 | scoring | binary per checkpoint vs maturity tiers | — | **decided**: principle 3 (set up? / working? per checkpoint); no tiers, no averages (agent-weiss's domain averages hid the inverted scores) |
-| F6 | trigger: auto vs user-invoked | R8: ship v0.1 user-invoked (`disable-model-invocation: true`), triggered by a line in each consumer's AGENTS.md (and by `make bootstrap`), zero always-on cost; k-my skills already cost ~4,326 tokens every session and rarely used skills lose their description first when the listing budget overflows. Against: resolution 0014 scopes `Kind: skill` to push-based skills; a user-invoked one may only be evaled through a prompt starting `/blueprint` (untested) | user-invoked for v0.1 | Fable A |
+| F6 | trigger: auto vs user-invoked | R8: ship v0.1 user-invoked (`disable-model-invocation: true`), triggered by a line in each consumer's AGENTS.md (and by `make bootstrap`), zero always-on cost; k-my skills already cost ~4,326 tokens every session and rarely used skills lose their description first when the listing budget overflows. Against: ADR 0014 scopes `Kind: skill` to push-based skills; a user-invoked one may only be evaled through a prompt starting `/blueprint` (untested) | user-invoked for v0.1 | Fable A |
 | F9 | loading unit vs authoring unit (R8) | author one file per checkpoint; ship a generated `references/<area>.md` per area + an index in SKILL.md, because docs require references one level deep and nested files get read partly | take R8's version | Fable A |
 | F10 | audit output an eval can grade (R8) | plugin eval has no code graders (regex, tool_used, tool_order, file_exists, llm, baseline); so the audit writes a report file, one line per checkpoint `id · set up? · working? · evidence`, graded by regex; each fault fixture paired with a clean fixture so "everything failing" cannot score | take | Fable A |
 | F11 | tag naming (R8, untested) | `claude plugin tag` makes `<name>--v<version>`; shelf rule is `<name>-vX.Y.Z` | check before the first tag; amend the skill-kind spec if the CLI cannot change | test it |

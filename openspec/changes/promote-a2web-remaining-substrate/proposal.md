@@ -10,7 +10,7 @@ with no shelf equivalent. a2web wants to shrink to product-only; these should
 live on the shelf where a second consumer can challenge and evolve them.
 
 This change also carries the governance shift that reshapes one of the five.
-**Resolution 0013 (promote to be challenged)** — landed in this same branch —
+**ADR 0013 (promote to be challenged)** — landed in this same branch —
 retires the earlier "hold the browser drivers off the shelf until a real-launch
 gate exists" stance. Holding forfeits the second-consumer challenge that is the
 only thing that ever universalizes an abstraction; the verification obligation
@@ -32,11 +32,11 @@ skip-forbidden real-launch gate ported into the shelf's own CI in the same chang
 4. **EVOLVE `anyllm.cost`** ← `a2web/packages/llm_cost_guard.py`. Add a `cost`
    submodule (`CostPolicy`, `assert_within_budget`, `with_cost_guard`,
    `CostViolation`) keyed on `anyllm.ProviderName`, not a2web manifest strings.
-   Monotonic (resolution 0007): exposes more, removes nothing.
+   Monotonic (ADR 0007): exposes more, removes nothing.
 5. **`any-browser`** ← `a2web/packages/browser_backends/`. The `BrowserBackend`
    Protocol + `RenderedPage`/`BackendCookie`/`RenderOutcome` seam **and** both
    drivers (Playwright-API rung, raw-CDP rung) + launchers — promoted together
-   per resolution 0013, with a **skip-forbidden real-launch gate** ported into the
+   per ADR 0013, with a **skip-forbidden real-launch gate** ported into the
    shelf CI (both engines launch against a real page and assert a render; a
    missing binary FAILS, never skips). a2web's `select_backend*`, manifest gating,
    fast/robust rung split, and `RenderOutcome → Verdict/OperatorHint` mapping stay

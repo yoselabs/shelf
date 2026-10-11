@@ -1,4 +1,4 @@
-# One MicroSoftware INSTANCE (glossary spine; resolution 0003 — flat files).
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
 name = "mcp-arg-errors"
 kind = "any-*"
 tier = "T2"

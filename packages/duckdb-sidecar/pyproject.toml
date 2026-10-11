@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "Shared DuckDB sidecar connection helper — normalize the target, create the parent directory, support :memory:, connect."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     "duckdb>=1,<2",

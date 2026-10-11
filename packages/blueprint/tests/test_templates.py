@@ -87,3 +87,10 @@ def test_a_gate_that_never_runs_blueprint_is_not_set_up(repo: Repo) -> None:
     repo.write("Makefile", "check: blueprint\nblueprint:\n\tpython3 -m blueprint check --repo . --gate\n")
     rows = {r.id: r.verdict for r in run(repo.root, concern="gate", env=repo.env).rows}
     assert rows["gate.runs-blueprint"] is Verdict.PASSING
+
+
+def test_an_mcp_server_gets_its_conventions_file_and_a_block_row(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "demo"\nversion = "0"\ndependencies = ["fastmcp>=3.4,<4"]\n')
+    repo.write("src/demo/server.py", "from fastmcp import FastMCP\nmcp = FastMCP('d')\n")
+    assert "docs/agents/mcp.md" in _install(repo)
+    assert "docs/agents/mcp.md" in (repo.root / "AGENTS.md").read_text()

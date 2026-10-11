@@ -17,7 +17,7 @@ compute, surface state): ``complete`` is clean and swappable; provider
 *availability* is surfaced (``available()``) so a host fails loud rather than
 silently degrading.
 
-Evolved from v0.1's sync ``complete(prompt) -> str`` per resolution 0007 (the
+Evolved from v0.1's sync ``complete(prompt) -> str`` per ADR 0007 (the
 monotonicity test); v0.1.0 stays tagged for consumers that have not upgraded.
 v0.5.0 adds :mod:`anyllm.cost` (a :class:`CostPolicy` + :func:`with_cost_guard`
 that refuse expensive/metered spend before the call) — purely additive.

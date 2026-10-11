@@ -35,14 +35,16 @@ ROLES = (
     "hooks",  # what prek runs per commit for this stack (fast: format and lint on staged files)
     "agent-guidance",  # the stack's conventions file agents read (docs/agents/<stack>.md), linked from AGENTS.md
 )
+# Names are framework-neutral: a role says what is judged, and each profile maps its own tools onto it
+# (godot: scenes and import settings; mcp: the tool list and its schema).
 FRAMEWORK_ROLES = (
-    "engine-version",  # the framework/engine version pinned in a file a script can read, the same everywhere
-    "project-hygiene",  # generated folders ignored, required metadata committed, line endings fixed
-    "assets",  # binary assets in LFS or kept out; import settings committed
-    "scripts-lint",  # the framework's own script language linted, or `na` with the reason
-    "build",  # the framework's build/import runs headless from `make check`
-    "tests",  # in-framework tests (scenes, nodes), headless
-    "scene-integrity",  # broken references between scenes and resources caught
+    "framework-version",  # the framework/engine/library version pinned in a file a script can read, the same everywhere
+    "project-hygiene",  # generated folders ignored, required metadata committed, line endings fixed, protocol streams clean
+    "binary-assets",  # binary assets in LFS or kept out; import settings committed
+    "embedded-script-lint",  # a script language the framework embeds is linted, or `na` with the reason
+    "build",  # the framework's build/import/serve smoke runs headless from `make check`
+    "tests",  # tests run through the framework itself (scene tree, in-memory client), headless
+    "surface-integrity",  # the surface the framework exposes (scene references, tool list) cannot drift unseen
     "architecture",  # the core stays framework-free; the framework layer is thin
     "ci",  # the framework runs in CI, version taken from the pin
     "hooks",  # what prek adds per commit for the framework

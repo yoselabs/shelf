@@ -57,11 +57,11 @@ TRIGGER (either one fires this workflow):
   / file / format / config / datetime / collections / a wrapper over an awkward stdlib or
   third-party API.
 - **Just fixed a bug** whose root cause was a *dependency's* behaviour rather than your own logic
-  (resolution 0012). This trigger exists because the first one never fires here: at the moment you
+  (ADR 0012). This trigger exists because the first one never fires here: at the moment you
   write it, a **sharp edge** looks like a bugfix, not like substrate — the code is trivial and the
   discovery was expensive, and it is the *discovery* the shelf amortizes. See PROMOTE below for the
   one-question test.
-- **Just used a dependency correctly and found it verbose** (resolution 0015). Nothing broke,
+- **Just used a dependency correctly and found it verbose** (ADR 0015). Nothing broke,
   nothing was fought — you wrote an expression and thought *"why isn't this a method?"*, or you
   reached for the second library because the first one covers only half the domain. That thought
   is the trigger; it fires no other one, because there is no bug and no glue. "Stop caring about X"
@@ -69,14 +69,14 @@ TRIGGER (either one fires this workflow):
 
 STEPS:
 1. Compare against the **CATALOG** (`<shelf>/catalog/README.md` + `<shelf>/packages/` +
-   `glossary.md`) — never against another consumer; you cannot see what else is being built, so
-   the catalog is the frame. **Reason generic-first, weight consumer-second** (resolution 0010):
+   `CONTEXT.md`) — never against another consumer; you cannot see what else is being built, so
+   the catalog is the frame. **Reason generic-first, weight consumer-second** (ADR 0010):
    define what the capability needs across the *class* of inputs at large, then use your live
    consumer only to *rank* common (→ default path) vs rare (→ opt-in / graceful degradation) — never
    to scope the capability down to one consumer's current diet. A capability the class has but your
    consumer skips becomes an opt-in or a documented gap, not an amputation.
 2. Pick one direction. **You are usually the abstraction's *second* consumer here, and that makes
-   you its first real challenge** (resolution 0013): a piece that fit its origin app perfectly is
+   you its first real challenge** (ADR 0013): a piece that fit its origin app perfectly is
    *over-fit* until something else bends it. So treat a shape that feels *almost* right as a prompt
    to EVOLVE it universal, not to quietly work around it; and treat *your own* not-yet-verifiable or
    unsure-of-the-shape extraction as a reason to PROMOTE **sooner** (it only gets challenged once it
@@ -90,7 +90,7 @@ STEPS:
      cases (`PROMOTE` workflow, on the existing package), then adopt. One evolving piece beats two
      near-identical ones — *when the generalization stays coherent* (the `convert-md → convert_html`
      move). **When the candidate is a richer superset of a package that already exists, evolve to
-     the superset — do not grow a sibling and promise to merge later** (resolution 0007, the
+     the superset — do not grow a sibling and promise to merge later** (ADR 0007, the
      monotonicity test): decide each axis by whether the new shape **exposes more and removes
      nothing** (rich return over bare value; fail-loud over errors-as-values — raising *surfaces*
      the failure). If it does → converge everyone onto it; the thin caller ignores the extra. Keep
@@ -106,7 +106,7 @@ STEPS:
      move on — that's the extraction moment lost; over-promotion is cheap to fix at `RECONCILE`, a
      lost moment is not. → run `PROMOTE`.
 
-     **Not-yet-verifiable is NOT a reason to hold** (resolution 0013). "I can't prove this is the
+     **Not-yet-verifiable is NOT a reason to hold** (ADR 0013). "I can't prove this is the
      right shape / can't fully test it yet" *feels* like conscientiousness and is the more dangerous
      deferral, because holding forfeits the second-consumer challenge that would have told you the
      shape — and the shelf makes a wrong guess cheap (RECONCILE demote, immutable tags, opt-in
@@ -117,7 +117,7 @@ STEPS:
      real-substrate gate, not a TODO. Promote-and-walk-away (the gate left as a promise) is the one
      move this does not license — that ships a blind spot to every consumer.
 
-     **Arriving from the ergonomics trigger?** (resolution 0015.) Same PROMOTE path, three
+     **Arriving from the ergonomics trigger?** (ADR 0015.) Same PROMOTE path, three
      differences in what you extract:
      - **Promote the *thing*, not a drawer of functions over someone else's type.** Where the
        domain has a noun — a document, a connection, an archive — extract a type the consumer holds
@@ -131,7 +131,7 @@ STEPS:
        base class.
      - **Name it `any-<domain>`, and go *more* generic than your case.** `any-markdown`,
        `any-datetime` — the domain, never the origin library (`markdown-it-extra`, `datetime-utils`
-       are resolution 0008's disease). The `any-` prefix means *the consumer stops caring about
+       are ADR 0008's disease). The `any-` prefix means *the consumer stops caring about
        this domain*; **one** library underneath earns it as well as five, and fusing two libraries
        to get the better half of each is `kind = "composite"` (what `convert-md` does). Check the
        catalog for a piece already holding that domain before minting a sibling.
@@ -144,7 +144,7 @@ STEPS:
      `_reset_registry()`, a module global that exists to be monkeypatched) is a sharp edge worked
      *around* rather than solved. **Sizing rule — a sharp edge is normally a *feature of* a
      capability package, never a package of its own.** Naming one after the library it patches
-     (`logging-extra`, `httpx-utils`) is resolution 0008's disease from the other direction; if no
+     (`logging-extra`, `httpx-utils`) is ADR 0008's disease from the other direction; if no
      capability package exists to host it, ask what capability you are actually building. And if the
      sharp edge belongs to something *we own*, fix it there — don't package a patch around your own
      house.
@@ -167,16 +167,16 @@ STEPS:
    **not** branch position — a worktree opened days ago can silently be behind `main`.
 2. On branch `work/<project>` (create if absent).
 3. Extract into the unit dir the candidate's **Kind** owns — `packages/<name>/` for code,
-   `skills/<name>/` for a general-purpose, auto-triggering skill (resolution 0014; how to write one:
+   `skills/<name>/` for a general-purpose, auto-triggering skill (ADR 0014; how to write one:
    `docs/skill-authoring.md`) — behind a
    stable **Capability**, with:
-   - **`<name>` names the deliverable, not the origin** (resolution 0008): read it as a consumer who
+   - **`<name>` names the deliverable, not the origin** (ADR 0008): read it as a consumer who
      has never seen this app — does it say what the package does? If it only makes sense with
      origin-app context (a codename, internal jargon, a name that only disambiguated within that
      app's own module tree), rename it now — this is free before the first tag, breaking after.
      Keeping the origin module/folder name verbatim is fine *when it already passes that test*, not
      as the default.
-   - the **shape decision** (resolution 0015): does this domain have a *thing* the consumer should
+   - the **shape decision** (ADR 0015): does this domain have a *thing* the consumer should
      hold — a type owning its own state and derivations — or is it genuinely a function? Decide
      once, here; a module of free functions each re-taking the raw type as argument 1 is the
      bag-of-functions shape, and it is expensive to convert after the first tag.
@@ -185,7 +185,7 @@ STEPS:
    - the package `pyproject.toml`, or for a skill, `SKILL.md` + eval cases in `evals/<name>/` (a
      skill with no eval coverage stays `candidate`, never `active`).
    - **Candidate is a `docs/runbooks/*.md` procedure, considered for conversion to a skill?**
-     Conversion is *earned*, not swept (resolution 0014, Article V applied to skill triggers): only
+     Conversion is *earned*, not swept (ADR 0014, Article V applied to skill triggers): only
      proceed with a concrete instance of a live agent demonstrably missing or not following the
      runbook. "Might get used more" or "would be handy as a skill" is protecting on fear — the
      runbook stays a runbook. A converted skill also carries a real, measured cost every consumer
@@ -196,7 +196,7 @@ STEPS:
    — the measured cost, not a guess, is what the entry asserts (skill-kind capability).
 5. Tag namespaced and push: for a package, `git tag <name>-vX.Y.Z && git push origin work/<project>
    --tags`; for a skill, `claude plugin tag` (validates `plugin.json` against the marketplace entry
-   before tagging, refusing a mismatch — resolution 0014). **Never delete an old tag** — that is what
+   before tagging, refusing a mismatch — ADR 0014). **Never delete an old tag** — that is what
    makes every consumer's upgrade opt-in.
 6. **Repoint the origin consumer:** add the git+tag source, delete the in-repo copy, keep tests green.
 7. **Breaking change?** Ship its migration in the same change, in two places:
@@ -206,7 +206,7 @@ STEPS:
      job). AI-facing only: it exists so `RECEIVE` can answer "what do I change" without reading
      source. Example: `LLMAdapter.complete(prompt) -> str  ⇒  LLMProvider.complete(*, user, ...) -> Completion`.
      Only gets an entry on contract-shape changes — most releases add zero lines.
-8. **Close the loop** (resolution 0009) — the change isn't done when the code is right, it's done
+8. **Close the loop** (ADR 0009) — the change isn't done when the code is right, it's done
    when the shelf's shared surfaces agree with it and `main` carries it:
    - `make catalog` if `catalog/*.toml` or `use-cases/*.toml` changed — a stale derived README lies.
    - Append a `ledger/00NN-<slug>.toml` **`delivery`** row (grep `ledger/*.toml` for `^event` for
@@ -244,7 +244,7 @@ STEPS:
    boundary just to avoid touching call sites — that reintroduces the exact quirk the evolution
    removed.
 5. Tests green.
-6. **Close the loop** (resolution 0009) — this is a shelf write even though you're in the
+6. **Close the loop** (ADR 0009) — this is a shelf write even though you're in the
    consumer's repo: in `../shelf-<project>` (create it if this session doesn't have one yet),
    append a `verdict` ledger row (`adopted`/`kept`/`rejected`), `make catalog` if warranted, commit,
    push. Small and append-only — doesn't need `PROMOTE`'s full worktree ceremony, but does need the
@@ -264,12 +264,12 @@ STEPS: walk `<shelf>/catalog/README.md`, ask per piece:
 1. **Overlap?** Two packages doing almost the same thing → **merge** (lineage `merged-with` /
    `absorbed-into`).
 2. **Kitchen-sink?** One package accreted unrelated concerns → **split** into coherent pieces.
-   *Many methods on one subject is not this* (resolution 0015) — a capability type that grew a
+   *Many methods on one subject is not this* (ADR 0015) — a capability type that grew a
    method a year, each earned by a consumer, is the shelf working. The test is unrelated concerns
    fused, never surface size.
 3. **Bag of functions?** A package exposes free functions that each take the same third-party type
    as their first argument, and consumers pass that raw type around → the domain has a **thing**
-   nobody extracted (resolution 0015). Evolve to the type (monotonic: it exposes more and removes
+   nobody extracted (ADR 0015). Evolve to the type (monotonic: it exposes more and removes
    nothing), keep the functions as thin delegates for one release.
 4. **Unused?** No active use-case past its TTL → **deprecate → delete** (decay is a virtue).
 5. **Over-promoted?** Turned out too niche / wrong shape → **demote**: duplicate back into its one
@@ -280,7 +280,7 @@ STEPS: walk `<shelf>/catalog/README.md`, ask per piece:
 Never delete a *tag* (`PROMOTE` step 5); retiring a package means marking it `deprecated` and
 stopping new adoption.
 
-**Close the loop** (resolution 0009), same shape as `PROMOTE` step 8: `make catalog`, a `verdict`
+**Close the loop** (ADR 0009), same shape as `PROMOTE` step 8: `make catalog`, a `verdict`
 ledger row per action taken (merge/split/delete/demote, against the affected package(s)), `make
 check` green, merge + push to `main`.
 
@@ -294,7 +294,7 @@ empirically, not by an upfront gate — and `main` carries the verdict.
 TRIGGER: a keep-vs-replace or build-vs-adopt decision between substrate tools (conversion engines,
 parsers, client libraries) where reputation or inheritance isn't enough — you're about to pick or
 defend a tool and can't cite evidence. Invoked from `SEAM` (ADOPT's "WINS", when contested) or
-`RECONCILE` (re-checking an inherited choice). Resolution 0011.
+`RECONCILE` (re-checking an inherited choice). ADR 0011.
 
 STEPS:
 1. **Frame** as keep/replace on a *specific capability*, not "which tool is best" abstractly — name
@@ -312,7 +312,7 @@ STEPS:
    outputs; not LLM-judged. Score the incumbent too — "no difference" is a decisive result.
 5. **Dated findings doc** under `bench/results/`, committed as an artifact — re-runnable against
    future tool versions.
-6. **Decide → ledger row**, then close the loop (resolution 0009). The bench answers "which tool";
+6. **Decide → ledger row**, then close the loop (ADR 0009). The bench answers "which tool";
    a separate call answers "is it worth it."
 
 OUTPUT: an evidence-backed keep/replace decision, a committed re-runnable bench + dated findings, and
@@ -349,17 +349,17 @@ not covered.
 
 STEPS:
 1. Trivial / mechanical (typo, missing cross-link, obvious omission)? → fix this file directly. Done.
-2. Otherwise: write a resolution (`docs/resolutions/000N-*.md`) — the fork rejected, the reasoning,
-   an `Expires:` date.
+2. Otherwise: write or rewrite an ADR (`docs/adr/NNNN-*.md`; format in `docs/adr/README.md`) — the
+   fork rejected, the reasoning, an `expires:` date; a changed decision gets a `## History` entry.
 3. **In the same change:** distill the operational takeaway into the relevant `WORKFLOW` block
-   above. Fill the resolution's `Distilled into:` field with the workflow name, OR
-   `N/A — self-enforcing via <test/tool>` if the resolution doesn't change agent behavior at all.
-4. Never split steps 2–3 across changes. A resolution merged without its distillation is
+   above. Fill the ADR's `distilled_into:` frontmatter field with the workflow name, OR
+   `N/A — self-enforcing via <test/tool>` if the ADR doesn't change agent behavior at all.
+4. Never split steps 2–3 across changes. An ADR merged without its distillation is
    incomplete, not "to be done later" — `make check` enforces the field is filled (see
-   `tests/test_resolution_distillation.py`), but only a human/agent discipline enforces that the
+   `tests/test_adr_distillation.py`), but only a human/agent discipline enforces that the
    *distillation itself* actually happened, so treat step 3 as non-optional.
 
-OUTPUT: this file and its authoring resolution land in the same commit — the loop never silently
+OUTPUT: this file and its authoring ADR land in the same commit — the loop never silently
 falls behind its own decisions.
 
 ---

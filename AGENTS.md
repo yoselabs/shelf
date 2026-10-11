@@ -15,7 +15,7 @@ If you catch this file naming a specific package count or roster, that's a bug �
 
 1. **[docs/doctrine.md](docs/doctrine.md)** — the *why*: what the shelf is and the load-bearing ideas.
 2. **[docs/constitution.md](docs/constitution.md)** — the 8 operating rules that follow from the doctrine.
-3. **[docs/glossary.md](docs/glossary.md)** — the ontology / vocabulary (**types only**, never instances).
+3. **[CONTEXT.md](CONTEXT.md)** — the ontology / vocabulary (**types only**, never instances).
 4. **§ The working agreement** (below) — Definition of Done, conventions, the one invariant.
 
 ## The working agreement
@@ -38,7 +38,7 @@ on them (`tools/affected.py`).
 **No carve-outs.** "Pre-existing drift", "unrelated file", or "that's a separate change" do **not**
 satisfy Done. If `make check` is red for any reason, the task is not finished. This toolchain is the
 **reference every consumer inherits** ([docs/linting.md](docs/linting.md), a config-preset not a CLI —
-[resolution 0004](docs/resolutions/0004-linters-are-a-config-preset.md)).
+[ADR 0004](docs/adr/0004-linters-are-a-config-preset.md)).
 
 ### The constitution governs
 
@@ -50,10 +50,10 @@ Read [docs/constitution.md](docs/constitution.md) before changing anything. The 
 - **Structure controls size, not caps.** A big file = a missing boundary, not a lint failure.
 - **Protection is earned.** A contract is born `candidate` (inert) until a live consumer breaks
   without it. Do NOT protect on fear.
-- **Adopt conservatively, promote aggressively** ([res 0006](docs/resolutions/0006-aggressive-capitalization-reconcile-later.md)).
+- **Adopt conservatively, promote aggressively** ([ADR 0006](docs/adr/0006-aggressive-capitalization-reconcile-later.md)).
   *Pulling* a shelf dep: only if DEEP·STABLE·WINS, else duplicate. *Writing* generic substrate: promote
   it to the shelf in the moment (extracted, never invented) — a self-assessed "feels reusable" is
-  enough, no 2nd consumer needed. **Three triggers** ([res 0015](docs/resolutions/0015-ergonomics-is-a-capability.md)):
+  enough, no 2nd consumer needed. **Three triggers** ([ADR 0015](docs/adr/0015-ergonomics-is-a-capability.md)):
   glue you're about to write, a bug rooted in a dependency, and a dependency that merely made you
   *type too much*. On the third, extract the **thing** the domain has, name it `any-<domain>`.
 - **Decay + reconciliation are mandatory.** Unreused past TTL → deprecate. A recurring reconciliation
@@ -83,7 +83,7 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
 
 - **`packages/`** — the software (uv-workspace members), versioned by **git tag** (`anyllm-v0.1.0`).
   The live roster is [catalog/README.md](catalog/README.md) (derived — do not look for it here).
-- **The ontology** (flat files, [resolution 0003](docs/resolutions/0003-ontology-lives-as-flat-files.md)) —
+- **The ontology** (flat files, [ADR 0003](docs/adr/0003-ontology-lives-as-flat-files.md)) —
   instance data, projected into READMEs by `make catalog` (never hand-edit the READMEs):
   - `catalog/` — one manifest per MicroSoftware (supply). `catalog/README.md` is derived.
   - `use-cases/` — one file per (consumer × software): each consumer **publishes** why it depends and
@@ -102,7 +102,7 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
   (depend by git+tag, install the commit guard, paste the resolver block into its `AGENTS.md`).
 - **[docs/agent-loop.md](docs/agent-loop.md)** — the standing loop every consumer's agent self-applies:
   fetch cadence, adopt-vs-promote, promote-in-the-moment, the promote procedure, RECONCILE, escape hatch.
-- **Contribute back** by **promoting aggressively** ([res 0006](docs/resolutions/0006-aggressive-capitalization-reconcile-later.md)):
+- **Contribute back** by **promoting aggressively** ([ADR 0006](docs/adr/0006-aggressive-capitalization-reconcile-later.md)):
   the moment you write generic substrate, home it in the shelf (extracted, never invented) — no 2nd
   consumer needed; reconcile later. Read the constitution (Articles VI–VIII) first.
 
@@ -114,9 +114,9 @@ Don't go looking for it, and don't start a replacement.
 
 - **`bd ready`** — the single curated view of what's actionable (`bd list --all` for everything,
   including deferred). Close beads as they finish; the git log plus the ledger are the record.
-- **[docs/resolutions/](docs/resolutions/)** — decided things (ADR-style, each with an expiry).
-  Start: [0001 — repo topology](docs/resolutions/0001-repo-topology.md). Flow explained in the
-  [resolutions README](docs/resolutions/README.md) (thoughts → tracks → missions → resolutions).
+- **[docs/adr/](docs/adr/)** — decisions as living ADRs, one file per topic. Read
+  [docs/adr/INDEX.md](docs/adr/INDEX.md) (generated), open a file only to challenge it. Flow in the
+  [ADR README](docs/adr/README.md) (thoughts → tracks → missions → ADRs).
 - **[docs/missions/](docs/missions/)** — scoped future objectives.
 - **[docs/thoughts/](docs/thoughts/)** — the origin exploration (kept, not authoritative).
 
@@ -140,7 +140,7 @@ duplicates; that's bd's doing, not drift). **These rules override them where the
   Never invent a synthetic blocking bead for "not started yet" — that's `deferred`.
 - **Gated work carries its trigger in the defer reason.** This repo's doctrine is "do NOT build on
   spec" — a deferred bead whose reason doesn't name a concrete trigger is incomplete.
-- **Link a bead to a mission/resolution** with `bd update <id> --spec-id "<path>"` (a native field,
+- **Link a bead to a mission/ADR** with `bd update <id> --spec-id "<path>"` (a native field,
   not free text). **Branch/commit provenance:** `bd update <id> --set-metadata branch=<name>
   --set-metadata commit=<sha>` — a convention, not a bd feature. **Supersession:**
   `bd dep add <new> <old> --type supersedes`, never delete the superseded bead.

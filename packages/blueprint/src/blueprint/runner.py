@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -32,6 +32,15 @@ class Row:
     fixed_by: FixedBy
     blueprint_gap: bool = False
     layer: str = "generic"
+    version: int = 1
+    # Not in the set the repo's last audit judged: reported, never failing the gate, until the next
+    # audit takes it in. A shelf change must not turn every consumer's pre-push red mid-task.
+    new: bool = False
+
+    @property
+    def key(self) -> str:
+        """`id@version`, the line the audit record keeps."""
+        return f"{self.id}@{self.version}"
 
 
 @dataclass(frozen=True)
@@ -53,10 +62,19 @@ class Run:
         A row the blueprint itself cannot judge yet (`blueprint_gap`) counts for neither: it is the
         shelf's gap, filed there, not the repo's.
         """
-        verdicts = {r.verdict for r in self.rows if not r.blueprint_gap}
+        verdicts = {r.verdict for r in self.rows if not r.blueprint_gap and not r.new}
         if verdicts & {Verdict.FAILING, Verdict.NOT_SET_UP} or self.problems:
             return 1
         return 2 if Verdict.NOT_CHECKED in verdicts else 0
+
+
+ACCEPTED = "docs/blueprint/checkpoints.txt"
+
+
+def _accepted(repo: Path) -> set[str] | None:
+    """The `id@version` lines the last audit wrote; None before the first audit, so all is enforced."""
+    path = repo / ACCEPTED
+    return set(path.read_text().split()) if path.is_file() else None
 
 
 def active(profile: Profile, concern: str | None = None) -> list[Check]:
@@ -108,6 +126,7 @@ def _row(chk: Check, sub: Sub, state: State, today: date) -> Row:
         finding.fixed_by,
         finding.blueprint_gap,
         chk.layer,
+        chk.version,
     )
 
 
@@ -124,5 +143,8 @@ def run(
     checks = active(profile, concern)
     today = today or date.today()  # noqa: DTZ011 -- override expiry is a calendar date in the owner's zone
     rows = tuple(_row(c, sub, state, today) for c in checks if audit or not c.audit_only for sub in _judge(c, ctx))
+    accepted = _accepted(repo)
+    if accepted is not None:
+        rows = tuple(replace(r, new=True) if r.key not in accepted and r.verdict is not Verdict.PASSING else r for r in rows)
     skipped = 0 if audit else sum(c.audit_only for c in checks)
     return Run(profile=profile, set_hash=set_hash(active(profile)), rows=rows, problems=state.problems, skipped_audit=skipped)

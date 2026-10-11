@@ -7,7 +7,7 @@ Per-package cycle = PROMOTE workflow (agent-loop.md): extract behind a Capabilit
 
 ## 0. Setup & governance
 - [x] 0.1 Worktree `../shelf-a2web` on `work/a2web`, reset to `main` (2026-07-26).
-- [x] 0.2 Resolution 0013 (promote to be challenged) + agent-loop distillation — committed `35a178b`.
+- [x] 0.2 ADR 0013 (promote to be challenged) + agent-loop distillation — committed `35a178b`.
 - [x] 0.3 a2web dead-leftover cleanup (`content_extract`/`cookie_store`/`html_fragment`/`record_extract` — pycache-only, source already `git rm`'d in a prior repoint).
 
 ## 1. plugin-surface  (IN PROGRESS)
@@ -44,7 +44,7 @@ Per-package cycle = PROMOTE workflow (agent-loop.md): extract behind a Capabilit
       reads `provider.name` and drops the separate manifest-id arg. The old a2web
       "`.name` can vary" comment was stale (pre-v0.3.0 enum union). The subscription-vs-
       metered distinction is a property of the BACKEND, so the enum is the right key.
-- [x] 3.2 Monotonicity (resolution 0007): v0.4.0→v0.5.0, purely additive — new `cost`
+- [x] 3.2 Monotonicity (ADR 0007): v0.4.0→v0.5.0, purely additive — new `cost`
       submodule + 5 top-level re-exports, removed nothing. (Also: `FBT` added to
       `packages/*/tests` per-file-ignores — boolean parametrize params are test noise.)
 - [x] 3.3 Ported the acceptance suite (`tests/test_cost.py`, 16 assertions incl.
@@ -113,7 +113,7 @@ Per-package cycle = PROMOTE workflow (agent-loop.md): extract behind a Capabilit
       `any-browser[patchright,zendriver]`, `tach.toml` module dropped. a2web gate
       1173 passed / 90.49% / 37 arch.
 
-## 6. Close the loop (resolution 0009)  ✅ DONE 2026-07-27
+## 6. Close the loop (ADR 0009)  ✅ DONE 2026-07-27
 - [x] 6.1 Four new `use-cases/a2web--<pkg>.toml` (plugin-surface, llm-wobble, llm-cache,
       any-browser). anyllm.cost needed none — a2web already has `a2web--anyllm.toml`;
       updated it (and the anyllm catalog entry) to name the cost guard + bump v0.2.0→v0.5.0

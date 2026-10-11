@@ -49,7 +49,7 @@ Always `uv run <tool>`; never a global interpreter or `pip install`. Add a depen
 |---|---|
 | Source | `src/<package>/`, one concept per module |
 | Tests | `tests/<mirrored source path>/test_<module>.py`; scenarios in `packages/<name>/tests/features/` |
-| Names | modules and functions `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE`; a domain term spelled as in `docs/glossary.md` |
+| Names | modules and functions `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE`; a domain term spelled as in `CONTEXT.md` |
 | Test names | `test_<behaviour>`; never after a bead or fix |
 
 ## Traps

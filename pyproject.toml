@@ -6,6 +6,10 @@
 #
 # Working name only — branding is deliberately deferred.
 
+# uv's floor: a different uv rewrites uv.lock's revision (blueprint stack.python-uv.uv-version).
+[tool.uv]
+required-version = ">=0.10.12"
+
 [tool.uv.workspace]
 members = ["packages/*"]
 
@@ -60,7 +64,7 @@ dev = [
 
 # ── The reference linter preset ───────────────────────────────────────────────
 # This is the canonical "how things are done" for every consumer of the shelf: a
-# new project inherits THIS setup (resolution 0004 — a config-preset, not a CLI).
+# new project inherits THIS setup (ADR 0004 — a config-preset, not a CLI).
 # Curated-broad on purpose: an explicit, grouped select reads as a reference far
 # better than `ALL` minus a wall of ignores, and it does not silently break on a
 # ruff upgrade that adds a rule. Every family below earns its place; every ignore

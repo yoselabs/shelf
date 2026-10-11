@@ -40,4 +40,4 @@ Findings about lifesim itself (read-only inspection):
 - `root` concept: lifesim's Godot project is `src/Game.Godot`; profile paths must resolve under repo root and under each folder containing `project.godot`.
 - Globs: CI workflow file names and `*.csproj` are not fixed; `config.path` needs glob support.
 - A `.uid` sibling check and an `ENGINE-VERSION` equality check (csproj Sdk vs `config/features` vs CI) are scripted checks, not substring checks: need a custom concern.
-- Never-seen-red rule: scene-integrity log scan and the tests role stay untested until proven.
+- Never-seen-red rule: surface-integrity log scan and the tests role stay untested until proven.

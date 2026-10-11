@@ -2,7 +2,7 @@
 """Project the flat-file ontology into human-readable indexes.
 
 The catalog (``catalog/*.toml``), the use-cases (``use-cases/*.toml``), and the
-ledger (``ledger/*.toml``) are the unit of truth (constitution I, resolution 0003).
+ledger (``ledger/*.toml``) are the unit of truth (constitution I, ADR 0003).
 This script DERIVES ``catalog/README.md``, ``use-cases/README.md``, and
 ``ledger/README.md`` from them — never hand-edit those files; run ``make catalog``.
 ``tests/test_catalog_projection.py`` fails if they drift, so the indexes can never
@@ -53,7 +53,7 @@ def render_catalog(entries: list[dict[str, object]], use_cases: list[dict[str, o
     """Render the catalog manifests as a markdown index, consumers derived from use-cases."""
     header = (
         f"# Catalog — the shelf's MicroSoftware instances\n\n{_BANNER}\n\n"
-        "One row per `catalog/*.toml`. Types live in [`docs/glossary.md`](../docs/glossary.md); these are "
+        "One row per `catalog/*.toml`. Types live in [`CONTEXT.md`](../CONTEXT.md); these are "
         "instances. **Consumers are derived** from active [`use-cases/`](../use-cases/README.md) — a piece with "
         "none is *orphaned* (Article VIII). Founding set — bootstrapped, not promoted (Article VII governs new entries).\n\n"
         "| Software | Kind | Tier | Release | Status | Implementation | Consumers | Capability |\n"

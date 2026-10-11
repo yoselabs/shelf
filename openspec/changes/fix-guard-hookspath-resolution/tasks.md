@@ -52,7 +52,7 @@ its implementation. `make check` green across the whole repo is the only Done.
 - [ ] 4.3 `docs/runbooks/adopt-beads.md`: cross-reference this change from the
       `core.hooksPath` section, so the next adopter meets the fix, not just the hazard.
 
-## 5. Close the loop (resolution 0009)
+## 5. Close the loop (ADR 0009)
 - [ ] 5.1 Re-arm this repo's own clone and verify live — it is currently unguarded.
 - [ ] 5.2 `make check` green, whole repo, no carve-outs.
 - [ ] 5.3 `bd close shelf-efh`; confirm `shelf-gag` leaves `bd blocked` and appears in

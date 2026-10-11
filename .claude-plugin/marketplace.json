@@ -4,7 +4,7 @@
     "name": "yoselabs"
   },
   "metadata": {
-    "description": "General-purpose skills distributed by the shelf — small, ownable, contract-guaranteed pieces, catalogued as Kind: skill (resolution 0014). Shelf-process-internal tooling skills (onboard-consumer, beads) are not listed here; they live at .agents/skills/, invoked by path.",
+    "description": "General-purpose skills distributed by the shelf — small, ownable, contract-guaranteed pieces, catalogued as Kind: skill (ADR 0014). Shelf-process-internal tooling skills (onboard-consumer, beads) are not listed here; they live at .agents/skills/, invoked by path.",
     "version": "0.1.0"
   },
   "plugins": [

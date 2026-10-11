@@ -7,7 +7,7 @@ it tells an agent to do, except for the specific gaps enumerated below, found by
 design conversation against the loop's actual coverage.
 
 Companion artifacts already exist and are NOT touched here: `docs/doctrine.md` (why),
-`docs/constitution.md` (rules), `docs/resolutions/*.md` (decision records, ADR-style, each with an
+`docs/constitution.md` (rules), `docs/adr/*.md` (decision records, ADR-style, each with an
 `Expires:` date) — this change only adds one required field to that last one.
 
 ## Goals / Non-Goals
@@ -22,7 +22,7 @@ Companion artifacts already exist and are NOT touched here: `docs/doctrine.md` (
   staleness bound, no upgrade-path artifact for consumers reconciling to a newer tag.
 
 **Non-Goals:**
-- Not renaming `resolutions/` → `adr/`.
+- Not renaming the resolutions folder (renamed to docs/adr/ later, 2026-10-11).
 - Not building the `anyllm.ProviderName` enum or touching any package code.
 - Not building the advisory (non-blocking) expired-resolution scanner — noted as a follow-up only.
 - Not changing `doctrine.md` / `constitution.md` content.
@@ -75,7 +75,7 @@ TRIGGER: friction with this loop discovered mid-session — a gap, an unclear ru
 STEPS:
 1. Trivial / mechanical (typo, missing cross-link, obvious omission)?
    → fix agent-loop.md directly. Done.
-2. Otherwise: write a resolution (docs/resolutions/000N-*.md) — the fork
+2. Otherwise: write a resolution (docs/adr/000N-*.md) — the fork
    rejected, the reasoning, an Expires: date.
 3. IN THE SAME CHANGE: distill the operational takeaway into the relevant
    WORKFLOW block here. Fill the resolution's `Distilled into:` field with
@@ -154,7 +154,7 @@ Distilled into: N/A — self-enforcing via tests/test_boundary.py
 
 New test, same shape/location pattern as `tests/test_catalog_projection.py` (which already keeps
 `catalog/README.md` etc. from drifting from source manifests — a precedent for "a doc-consistency
-rule enforced by a blocking pytest test, not a human habit"): iterate `docs/resolutions/*.md`,
+rule enforced by a blocking pytest test, not a human habit"): iterate `docs/adr/*.md`,
 assert each has a non-empty `Distilled into:` line. Fails `make check` if missing — no carve-outs,
 per `AGENTS.md` §1.
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Read the local machine's browser cookie store (Chrome/Chromium/Brave/Edge/Firefox/Safari/Vivaldi/Opera) as typed rows — a thin, cross-platform adapter over browser-cookie3."
 readme = "README.md"
 authors = [{ name = "Denis Tomilin" }]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 keywords = ["cookies", "browser", "chrome", "firefox", "safari", "browser-cookie3"]
 # No runtime dependencies: the underlying reader is OPTIONAL and imported lazily

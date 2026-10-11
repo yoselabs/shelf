@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import os
+import re
 import tomllib
 from dataclasses import dataclass
 from datetime import date
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import Any
 
-from blueprint.model import Profile, walk
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from blueprint.model import SKIP_DIRS, Profile, walk
 
 STATE_DIR = "docs/blueprint"
 STATE_FILE = f"{STATE_DIR}/blueprint.toml"
@@ -88,11 +88,52 @@ def detect_stacks(repo: Path) -> tuple[str, ...]:
 FRAMEWORK_MARKERS = {"godot": "project.godot"}
 
 
+@dataclass(frozen=True)
+class DependencyRule:
+    """A framework declared as a runtime dependency and confirmed by a use in the project's source."""
+
+    deps: tuple[str, ...]
+    used: tuple[str, ...]
+
+
+# `fastmcp` is also a client library, so the dependency alone would flag a repo that only calls servers; a
+# `FastMCP(` in source says this project builds one. The official SDK alone is not matched: the profile prescribes fastmcp.
+FRAMEWORK_DEPENDENCIES = {"mcp": DependencyRule(deps=("fastmcp", "fastmcp-slim"), used=("FastMCP(",))}
+# Test code builds throwaway servers for any client library, so it is not evidence of a shipped one.
+_NOT_SOURCE = SKIP_DIRS | {"tests", "test"}
+
+
+def _runtime_dependencies(pyproject: Path) -> set[str]:
+    """Normalized (PEP 503) names in [project] dependencies and optional-dependencies; dev groups are left out."""
+    try:
+        project = tomllib.loads(pyproject.read_text()).get("project", {})
+    except (tomllib.TOMLDecodeError, OSError):
+        return set()
+    specs = list(project.get("dependencies", []))
+    for extra in project.get("optional-dependencies", {}).values():
+        specs += extra
+    names = (re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", str(spec).strip()) for spec in specs)
+    return {re.sub(r"[-_.]+", "-", m.group().lower()) for m in names if m}
+
+
+def _source_uses(folder: Path, needles: tuple[str, ...]) -> bool:
+    for here, dirs, files in os.walk(folder):
+        dirs[:] = [d for d in dirs if d not in _NOT_SOURCE]
+        for name in files:
+            if name.endswith(".py") and any(n in (Path(here) / name).read_text(errors="replace") for n in needles):
+                return True
+    return False
+
+
 def detect_frameworks(repo: Path) -> tuple[tuple[str, str], ...]:
-    """Each framework whose marker file is within three levels of the root, with its folder."""
+    """Each framework found within three levels of the root, with its folder: by marker file, then by dependency."""
     found: list[tuple[str, str]] = []
     for name, marker in FRAMEWORK_MARKERS.items():
         found += [(name, str(p.parent.relative_to(repo)) or ".") for p in walk(repo, marker, 4)]
+    for name, rule in FRAMEWORK_DEPENDENCIES.items():
+        for pyproject in walk(repo, "pyproject.toml", 4):
+            if _runtime_dependencies(pyproject) & set(rule.deps) and _source_uses(pyproject.parent, rule.used):
+                found.append((name, str(pyproject.parent.relative_to(repo)) or "."))
     return tuple(found)
 
 
