@@ -7,7 +7,7 @@ role-classified links) is unchanged.
 
 from __future__ import annotations
 
-import datetime
+import datetime as dt
 from pathlib import Path
 
 import pytest
@@ -37,7 +37,7 @@ async def test_extract_blog_markdown() -> None:
 async def test_extract_returns_published_date() -> None:
     html = _BLOG.read_text()
     result = await extract_markdown(html, "https://example.org/post/x")
-    assert result.published == datetime.date(2026, 4, 1)
+    assert result.published == dt.date(2026, 4, 1)
 
 
 @pytest.mark.asyncio

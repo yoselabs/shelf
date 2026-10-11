@@ -33,8 +33,10 @@ def template(repo_name: str, set_hash: str) -> str:
     out = [
         f"# Blueprint run survey: {repo_name}",
         "",
-        f"Checkpoint set: `{set_hash}`. Answer every row with one of: {' · '.join(answers)}. "
-        "Evidence is one line: a row id, a file, a quote. Anything worth a checkpoint goes in Lacks.",
+        (
+            f"Checkpoint set: `{set_hash}`. Answer every row with one of: {' · '.join(answers)}. "
+            "Evidence is one line: a row id, a file, a quote. Anything worth a checkpoint goes in Lacks."
+        ),
         "",
     ]
     for section, intro in intros.items():

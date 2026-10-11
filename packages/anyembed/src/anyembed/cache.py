@@ -27,8 +27,10 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
 _SCHEMA = (
-    "CREATE TABLE IF NOT EXISTS embedding_cache(model_id TEXT NOT NULL, text_hash BLOB NOT NULL, "
-    "dim INTEGER NOT NULL, vector BLOB NOT NULL, last_used REAL NOT NULL, PRIMARY KEY (model_id, text_hash)) WITHOUT ROWID",
+    (
+        "CREATE TABLE IF NOT EXISTS embedding_cache(model_id TEXT NOT NULL, text_hash BLOB NOT NULL, "
+        "dim INTEGER NOT NULL, vector BLOB NOT NULL, last_used REAL NOT NULL, PRIMARY KEY (model_id, text_hash)) WITHOUT ROWID"
+    ),
     "CREATE INDEX IF NOT EXISTS embedding_cache_lru ON embedding_cache(last_used)",
 )
 
