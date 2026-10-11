@@ -227,3 +227,36 @@ def test_the_one_install_there_is_must_satisfy_the_pin_too(repo: Repo) -> None:
     _dotnet_repo(repo, "disable")
     repo.fake_tool(repo.bin_dir / "dotnet", "10.0.302 [/opt/homebrew/sdk]")
     assert _rows(repo)["stack.dotnet.toolchain"][0] is Verdict.FAILING
+
+
+def test_flake_nix_in_a_subfolder_detects_the_nix_stack(repo: Repo) -> None:
+    # Host flakes in subfolders, none at the root.
+    repo.write("hosts/bee/flake.nix", "{ }")
+    repo.write("hosts/sol/flake.nix", "{ }")
+    repo.write("hosts/bee/flake.lock", "{}")
+    rows = _rows(repo)
+    assert "detected from hosts/bee/flake.nix, hosts/sol/flake.nix" in rows["stack.nix.profile"][1]
+    assert rows["stack.nix.coverage"][0] is Verdict.NOT_APPLICABLE
+    assert rows["stack.nix.tests"][2] is True  # an untested role is a blueprint gap
+
+
+def test_many_compose_files_make_one_compose_table(repo: Repo) -> None:
+    for name in ("web", "proxy", "media"):
+        repo.write(f"stacks/{name}/compose.yml", "services: {}")
+    rows = _rows(repo)
+    assert [k for k in rows if k.endswith(".profile")] == ["stack.compose.profile"]
+    assert "stacks/media/compose.yml" in rows["stack.compose.profile"][1]
+
+
+def test_a_nix_host_eval_in_the_gate_passes_the_types_row(repo: Repo) -> None:
+    repo.write("hosts/bee/flake.nix", "{ }")
+    repo.write("tools/check-host.sh", "#!/bin/sh\n")
+    repo.write("justfile", "check: check-host\ncheck-host:\n    bash tools/check-host.sh bee\n")
+    assert _rows(repo)["stack.nix.types"][0] is Verdict.PASSING
+
+
+def test_a_nix_host_eval_outside_the_gate_fails_the_types_row(repo: Repo) -> None:
+    repo.write("hosts/bee/flake.nix", "{ }")
+    repo.write("tools/check-host.sh", "#!/bin/sh\n")
+    repo.write("justfile", "check:\n    true\ncheck-host:\n    bash tools/check-host.sh bee\n")
+    assert _rows(repo)["stack.nix.types"][0] is Verdict.FAILING

@@ -156,6 +156,10 @@ def load_state(repo: Path, today: date | None = None) -> State:
     return State(declared, overrides, data.get("settings", {}), tuple(problems), ignores)
 
 
+# Compose files by name; a repo with many (one per service folder) still gets one `compose` table.
+COMPOSE_FILES = ("compose.yml", "compose.yaml", "docker-compose.yml", "docker-compose.yaml")
+
+
 def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
     """Each stack present with the files that set it, from their manifests."""
     found: dict[str, list[str]] = {}
@@ -165,6 +169,10 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
     dotnet = [*walk(repo, "*.sln", 2, skip), *walk(repo, "*.slnx", 2, skip), *walk(repo, "*.csproj", 3, skip)]
     if dotnet:
         found["dotnet"] = [p.relative_to(repo).as_posix() for p in dotnet]
+    if flakes := walk(repo, "flake.nix", 3, skip):
+        found["nix"] = [p.relative_to(repo).as_posix() for p in flakes]
+    if composes := [p for pattern in COMPOSE_FILES for p in walk(repo, pattern, 3, skip)]:
+        found["compose"] = sorted(p.relative_to(repo).as_posix() for p in composes)
     for stack, manifest in (("node", "package.json"), ("go", "go.mod"), ("rust", "Cargo.toml")):
         if (repo / manifest).is_file():
             found[stack] = [manifest]

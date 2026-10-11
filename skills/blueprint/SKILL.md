@@ -147,7 +147,7 @@ Friction no checkpoint covers: <one line each, or none>
 - Culture files: `template --repo .` copies only what is missing and rewrites only the AGENTS.md
   block; fill the placeholders, never delete the block's markers.
 - Concerns: `gate`, `backlog`, `knowledge`, `stack`, `framework`, `agents`; profiles python-uv
-  (evidenced), dotnet, godot, unity and mcp (provisional). Do not invent rows for what the engine does not check.
+  (evidenced); dotnet, nix, compose, godot, unity and mcp (provisional). Do not invent rows for what the engine does not check.
 - ADRs are living: one file per decision topic, rewritten when it changes, the dropped decision and
   why in its `## History`. `adr-index --repo . --write` regenerates the index agents read.
 - Two projects of one framework (a game and a prototype spike) each get a table; the owner names

@@ -23,7 +23,7 @@ gate = "nixfmt --check"
 
 [[role]]
 role = "linter"
-tool = """statix (anti-pattern lints, `statix check`, exit 1 on any finding) AND deadnix (`deadnix --fail`, unused bindings and lambda arguments; without --fail it always exits 0). Use the nixpkgs build of statix: upstream (oppiliappan) moved to tangled.org and its README points at the Molybdenum Software fork that nixpkgs packages (pushed 2026-10-09) \
+tool = """statix (anti-pattern lints, `statix check`, exit 1 on any finding) AND deadnix (`deadnix --fail`, unused bindings and lambda arguments; without --fail it always exits 0). Use the nixpkgs build of statix: upstream (oppiliappan) moved to tangled.org and its README points at the Molybdenum Software fork that nixpkgs packages. \
 Findings are fixed or switched off in statix.toml `disabled = [...]` with a reason; never a blanket disable"""
 install = """justfile: `statix check .` and `deadnix --fail .`, both through the same pinned nixpkgs as the formatter. Seen on homelab: statix 7 warnings (empty pattern `{ ... }:`, repeated attribute keys), deadnix unused lambda patterns (`{ config, lib, pkgs, ... }:` with config unused), exit 1 on both. \
 Open: for module files that take `{ config, lib, pkgs, ... }:` by convention, decide between `deadnix --no-lambda-pattern-names` (-L) and trimming the arguments; trimming is the strict answer"""
@@ -32,7 +32,7 @@ gate = "statix check"
 
 [[role]]
 role = "types"
-tool = """evaluating every output the repo deploys: `nix eval "path:<repo>?dir=hosts/<h>#nixosConfigurations.<h>.config.system.build.toplevel.drvPath" --raw` per host. The module system type-checks every option value, rejects unknown/misspelled options, fires module assertions and undefined variables; evaluation is architecture-independent, so an x86_64 host evaluates on an arm64 Mac. Seen red on a planted misspelled option (exit 1, `The option services.avahi.enabel does not exist`), green on the real host. A `path:` flake ref checks the working tree, a `git+file:` ref misses uncommitted files"""
+tool = """evaluating every output the repo deploys: `nix eval "path:<repo>?dir=hosts/<h>#nixosConfigurations.<h>.config.system.build.toplevel.drvPath" --raw` per host. The module system type-checks every option value, rejects unknown/misspelled options, fires module assertions and undefined variables; evaluation is architecture-independent, so an x86_64 host evaluates on an arm64 Mac. Seen red on a planted misspelled option (exit 1, `The option services.avahi.<typo> does not exist`), green on the real host. A `path:` flake ref checks the working tree, a `git+file:` ref misses uncommitted files"""
 install = """a `just check-hosts` that loops over hosts/*/flake.nix and runs the eval (inside the pinned nixos/nix image when Nix is not installed), and is reached by `just check` and by CI. homelab has the command (tools/check-host.sh, `make check-host HOST=` (homelab is still on make)) but `just check` never reaches it and no workflow runs it. \
 Cost: 40 s warm to 3 min cold per host, so CI caches /nix. `nix flake check --no-build "path:<repo>?dir=hosts/<h>"` is the equal alternative (tested green on bee: it evaluates `nixosConfigurations.bee`, 2 min cold; not seen red) and also runs `checks.*` if the flake defines any"""
 config = [{ any = [{ path = "tools/check-host.sh" }, { any = [{ path = "justfile", contains = "nixosConfigurations" }, { path = "Makefile", contains = "nixosConfigurations" }] }, { path = "flake.nix", contains = "checks" }] }]
