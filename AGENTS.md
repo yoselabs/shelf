@@ -31,7 +31,9 @@ just check-all  # the same, every test, with the coverage floor (CI runs this)
 ```
 
 The runner is [just](https://just.systems) ([ADR 0023](docs/adr/0023-the-gate-runner-is-just.md)), pinned as the
-`rust-just` dev dependency: `uv run just check` works on any clone after `uv sync`.
+`rust-just` dev dependency: `uv run just check` works on any clone after `uv sync`. After a clone (and after a pin
+bump), run `uv run just tools` first: it installs the exact uv, prek and bd that `mise.toml` pins
+([ADR 0024](docs/adr/0024-mise-pins-every-repo-tool.md)); never install those tools another way for this repo.
 
 Both run in a Linux container when Docker answers (the macOS endpoint scanner made the host run
 10-17 min); `SHELF_HOST_CHECK=1` forces the host. The lint, type and dependency checks always cover

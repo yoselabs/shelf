@@ -152,3 +152,12 @@ you, merging per-table/per-recipe rather than overwriting — a project that alr
 `[tool.ruff]` keeps it exactly as written, ruff.lint included. The `onboard-consumer` skill runs it
 automatically when `pyproject.toml` exists, and states plainly when it doesn't apply (non-Python
 targets get the guard/resolver-block/beads pieces only).
+
+## 5. Pin the tools (mise)
+
+Every tool the repo runs (uv, just, prek, bd, git-lfs, an engine editor) is pinned exactly in a committed `mise.toml`
+and locked with per-platform checksums in `mise.lock` ([ADR 0024](adr/0024-mise-pins-every-repo-tool.md)). The preset's
+`tools` recipe installs them with `mise install --locked`, leaving the user's own mise config out. Run `just tools` after
+every clone and every pin bump, before anything else. blueprint's `stack.tool-pins` checks the pins on every commit and
+`stack.tools-installed` checks this machine's versions in the audit. A repo that declares LFS patterns is also checked
+for binaries outside LFS (`gate.lfs-binaries`) and, in the audit, for this clone's LFS filter (`gate.lfs-installed`).

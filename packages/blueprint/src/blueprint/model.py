@@ -211,7 +211,14 @@ class Context:
             return None
         try:
             return subprocess.run(
-                [exe, *argv[1:]], cwd=cwd or self.repo, env=self.env, capture_output=True, text=True, timeout=timeout, check=False
+                [exe, *argv[1:]],
+                cwd=cwd or self.repo,
+                env=self.env,
+                capture_output=True,
+                text=True,
+                errors="replace",  # a tool's output (a binary blob, a non-UTF-8 log) never crashes a check
+                timeout=timeout,
+                check=False,
             )
         except subprocess.TimeoutExpired:
             return None

@@ -23,7 +23,7 @@ in the same folder during that time is lost, and the commit fails (reproduced wi
 | step | do |
 |---|---|
 | start | the harness's worktree mode (Claude Code puts them in `.claude/worktrees/`), or `git worktree add .worktrees/<name> -b <branch>` |
-| set up | the stack's sync in the new tree (python: `uv sync`); nothing is copied from the main checkout |
+| set up | `just tools` (pinned tool versions; once per machine and after a pin bump), then the stack's sync in the new tree (python: `uv sync`); nothing is copied from the main checkout |
 | beads | `bd` in a worktree uses the main checkout's database; never `bd init` there |
 | hooks | prek's hooks are installed once for the repo and run in every worktree; never install per worktree |
 | finish | `just check` green in the worktree; on the owner's yes, rebase on main and merge fast-forward; then `git worktree remove` |
