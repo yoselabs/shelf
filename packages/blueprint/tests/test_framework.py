@@ -34,8 +34,32 @@ def test_missing_godot_hygiene_is_not_set_up(repo: Repo) -> None:
 
 def test_headless_build_outside_the_gate_fails(repo: Repo) -> None:
     _godot(repo)
-    repo.write("Makefile", "check:\n\ttrue\nimport:\n\tgodot --headless --import --build-solutions\n")
+    repo.write("Makefile", "check:\n\ttrue\nimport:\n\tgodot --headless --import | grep ERROR: ; godot --headless --build-solutions\n")
     assert _rows(repo)["framework.godot.build"][0] is Verdict.FAILING
+
+
+def test_godot_surface_check_and_in_engine_tests_in_the_gate_pass(repo: Repo) -> None:
+    _godot(repo)
+    repo.write("tools/check_godot.py", "")
+    repo.write("Directory.Packages.props", '<PackageVersion Include="Chickensoft.GoDotTest" Version="2.0.47" />')
+    repo.write("src/Game/viewtests/TestEntry.cs", "env.ShouldRunTests")
+    repo.write(
+        "justfile",
+        "check: godot-surface godot-test\n"
+        "godot-surface:\n    python3 -I tools/check_godot.py src/Game\n"
+        "godot-test:\n    godot --headless --run-tests --quit-on-finish\n",
+    )
+    rows = _rows(repo)
+    assert rows["framework.godot.surface-integrity"][0] is Verdict.PASSING
+    assert rows["framework.godot.tests"][0] is Verdict.PASSING
+
+
+def test_godot_tests_configured_but_outside_the_gate_fail(repo: Repo) -> None:
+    _godot(repo)
+    repo.write("Directory.Packages.props", '<PackageVersion Include="Chickensoft.GoDotTest" Version="2.0.47" />')
+    repo.write("src/Game/viewtests/TestEntry.cs", "env.ShouldRunTests")
+    repo.write("justfile", "check:\n    true\ngodot-test:\n    godot --run-tests\n")
+    assert _rows(repo)["framework.godot.tests"][0] is Verdict.FAILING
 
 
 def test_two_projects_get_one_table_each_and_a_declared_one_wins(repo: Repo) -> None:

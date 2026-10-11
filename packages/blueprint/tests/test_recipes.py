@@ -75,3 +75,35 @@ def test_the_coverage_floor_fails_under_it_and_names_the_metric(repo: Repo, caps
     assert code == 1
     assert "branch coverage 74.2% < floor 75.0%" in out
     assert "line coverage" not in out.split("below floor")[-1]
+
+
+_UID = "uid://b1"
+
+
+def _godot_project(repo: Repo) -> None:
+    repo.write("project.godot", 'config/features=PackedStringArray("4.7", "C#")\n')
+    repo.write("Game.csproj", '<Project Sdk="Godot.NET.Sdk/4.7.2"></Project>\n')
+    repo.write("Panel.cs", "partial class Panel {}\n")
+    repo.write("Panel.cs.uid", f"{_UID}\n")
+    repo.write(
+        "Main.tscn",
+        '[gd_scene load_steps=2 format=3 uid="uid://m1"]\n\n'
+        f'[ext_resource type="Script" uid="{_UID}" path="res://Panel.cs" id="1_a"]\n\n'
+        '[node name="Main" type="Control"]\nscript = ExtResource("1_a")\n',
+    )
+
+
+def test_the_godot_check_passes_a_clean_project(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    _godot_project(repo)
+    assert _run("godot-integrity", [str(repo.root)], capsys) == (0, "godot surface: clean\n")
+
+
+def test_the_godot_check_fails_where_the_import_log_stays_quiet(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    _godot_project(repo)
+    (repo.root / "Panel.cs.uid").unlink()
+    repo.write("Other.tscn", '[gd_scene format=3]\n\n[ext_resource type="Script" path="res://Gone.cs" id="1_b"]\ngarbage here\n')
+    repo.write("Game.csproj", '<Project Sdk="Godot.NET.Sdk/4.6.1"></Project>\n')
+    code, out = _run("godot-integrity", [str(repo.root)], capsys)
+    assert code == 1
+    for needle in ("Panel.cs has no committed .uid", "does not exist", "not a section", "never used", "says Godot.NET.Sdk 4.6"):
+        assert needle in out, needle

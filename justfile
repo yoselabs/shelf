@@ -222,7 +222,7 @@ eval *args:
     set -uo pipefail
     d=$(mktemp -d)
     rsync -a --exclude .venv --exclude .git --exclude __pycache__ --exclude '.*_cache' --exclude .hypothesis \
-        --exclude .beads --exclude evals/results ./ "$d/" && \
+        --exclude .beads --exclude evals/results --exclude .worktrees --exclude .claude/worktrees ./ "$d/" && \
     ( cd "$d" && claude plugin eval . --trust-plugin --scaffold --allow-tools Bash Write Edit --max-cost-usd 20 {{ args }} )
     rc=$?
     mkdir -p evals/results && cp -R "$d/evals/results/." evals/results/ 2>/dev/null
