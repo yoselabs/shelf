@@ -72,7 +72,7 @@ def chunk(
     long = _long_lines(text, starts, part, measure) if part is not None else set()
     out: list[Chunk] = []
     for s, e in spans:
-        out.extend(_windows(text[s:e], s, starts, sections, long, size, overlap))
+        out.extend(_windows(text[s:e], s, starts, sections, long, size=size, overlap=overlap))
     return out
 
 
@@ -84,7 +84,7 @@ def _long_lines(text: str, starts: list[int], part: int, measure: Callable[[str]
 
 
 def _windows(
-    segment: str, base: int, starts: list[int], sections: Sequence[Section], long: Collection[int], size: int, overlap: int
+    segment: str, base: int, starts: list[int], sections: Sequence[Section], long: Collection[int], *, size: int, overlap: int
 ) -> list[Chunk]:
     chunks: list[Chunk] = []
     start = 0

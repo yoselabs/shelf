@@ -162,7 +162,7 @@ class _Judged:
     remediation: str = ""
 
 
-def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str, gate_text: str, root: str = ".") -> _Judged:
+def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str, gate_text: str, *, root: str = ".") -> _Judged:
     if profile is None:
         return _Judged(stack, "no-profile", "no profile")
     spec = profile.roles.get(role)

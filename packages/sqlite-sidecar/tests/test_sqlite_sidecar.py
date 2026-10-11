@@ -121,19 +121,19 @@ def test_a_transaction_holds_the_lock_it_is_given(tmp_path: Path) -> None:
 # --- the timestamp codec ----------------------------------------------------------
 
 
-def _naive(year: int, month: int, day: int, hour: int = 0, minute: int = 0, second: int = 0, micro: int = 0) -> datetime:
-    return datetime(year, month, day, hour, minute, second, micro)  # noqa: DTZ001 — a naive value is UTC by contract
+def _naive(year: int, month: int, day: int, clock: tuple[int, int, int, int] = (0, 0, 0, 0)) -> datetime:
+    return datetime(year, month, day, *clock)  # noqa: DTZ001 — a naive value is UTC by contract
 
 
 def test_text_is_fixed_width_utc() -> None:
     assert sc.to_text(_naive(2026, 7, 1)) == "2026-07-01 00:00:00.000000"
-    assert sc.to_text(_naive(987, 1, 2, 3, 4, 5, 6)) == "0987-01-02 03:04:05.000006"
+    assert sc.to_text(_naive(987, 1, 2, (3, 4, 5, 6))) == "0987-01-02 03:04:05.000006"
     plus3 = timezone(timedelta(hours=3))
     assert sc.to_text(datetime(2026, 7, 1, 3, 0, tzinfo=plus3)) == "2026-07-01 00:00:00.000000"
 
 
 def test_text_reads_back_naive_or_utc_aware() -> None:
-    value = _naive(2026, 7, 1, 12, 30, 15, 250)
+    value = _naive(2026, 7, 1, (12, 30, 15, 250))
     assert sc.from_text(sc.to_text(value)) == value
     aware = datetime(2026, 7, 1, 12, 30, tzinfo=UTC)
     assert sc.from_text(sc.to_text(aware), aware=True) == aware
@@ -141,7 +141,7 @@ def test_text_reads_back_naive_or_utc_aware() -> None:
 
 
 def test_text_order_is_time_order() -> None:
-    times = [_naive(2026, 7, 1, 0, 0, 0, 1), _naive(999, 12, 31), _naive(2026, 7, 1), _naive(9999, 1, 1)]
+    times = [_naive(2026, 7, 1, (0, 0, 0, 1)), _naive(999, 12, 31), _naive(2026, 7, 1), _naive(9999, 1, 1)]
     assert sorted(times, key=sc.to_text) == sorted(times)
 
 

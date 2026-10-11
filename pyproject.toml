@@ -137,7 +137,6 @@ select = [
 ignore = [
     "ANN401",  # allow `Any` in genuinely-variadic *args/**kwargs
     "PLR0913", # arg count — deep functions legitimately take many args
-    "PLR0917", # positional-arg count (stable since ruff 0.17) — the same call as PLR0913; keyword-only everywhere would churn every consumer for no defect
     "PLR2004", # magic values — too noisy at this scale; revisit if it bites
     "ISC001",  # single-line implicit concat — the formatter owns this; would conflict
     "TRY003",  # long messages in raise — EM handles the real concern; TRY003 over-fires

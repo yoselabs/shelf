@@ -102,7 +102,7 @@ class Budget:
             tops = [r for r in rows if r.level == top]
             if len(tops) == 1 and tops[0].end == len(body):
                 rows = rows[1:]  # the one container is the view itself
-        filled = self._filled(body, lead_start, lead_end, rows, room, part, base_line)
+        filled = self._filled(body, lead_start, lead_end, rows, room, part=part, base_line=base_line)
         if filled is not None:
             return filled
         if not rows:
@@ -111,7 +111,7 @@ class Budget:
         preamble = body[: rows[0].start]
         if body[lead_end : rows[0].start].strip() and _meaningful(preamble):
             head = self.line_parts(preamble, part, base_line=base_line)
-        return View(body=shown, outline=self._fit(body, head, rows, room - self.measure(shown), part, base_line), truncated=True)
+        return View(body=shown, outline=self._fit(body, head, rows, room - self.measure(shown), part, base_line=base_line), truncated=True)
 
     def section_view(self, body: str, id_: str, budget: int, *, part: int, room: int | None = None) -> View | None:
         """Section ``id_`` of ``body`` through :meth:`view`, or ``None`` if there is none.
@@ -154,7 +154,9 @@ class Budget:
 
     # --- filling the room past the lead ---------------------------------------------------
 
-    def _filled(self, body: str, lead_start: int, lead_end: int, rows: list[Section], room: int, part: int, base_line: int) -> View | None:
+    def _filled(
+        self, body: str, lead_start: int, lead_end: int, rows: list[Section], room: int, *, part: int, base_line: int
+    ) -> View | None:
         """The opening past the lead that fits ``room`` with the outline of the rest, or ``None``.
 
         With headings it ends where a section starts; without, at a line. Text the lead
@@ -176,7 +178,7 @@ class Budget:
             if best is None:
                 return None
             cut = rows[best].start
-            grown = self._into_section(body, lead_start, cut, rows, best, room - tail[best + 1], part, base_line)
+            grown = self._into_section(body, lead_start, cut, rows, best, room=room - tail[best + 1], part=part, base_line=base_line)
             if grown is not None:
                 end, parts = grown
                 return View(body=body[lead_start:end], outline=[*head, *parts, *rows[best + 1 :]], truncated=True)
@@ -192,7 +194,7 @@ class Budget:
         return View(body=shown, outline=[*head, *rest], truncated=True)
 
     def _into_section(
-        self, body: str, lead_start: int, cut: int, rows: list[Section], i: int, room: int, part: int, base_line: int
+        self, body: str, lead_start: int, cut: int, rows: list[Section], i: int, *, room: int, part: int, base_line: int
     ) -> tuple[int, list[Section]] | None:
         """Grow an opening that stops at ``rows[i]`` into that section's own lines, up to its
         first sub-heading. Returns where the opening ends and the line parts it leaves."""
@@ -218,7 +220,7 @@ class Budget:
             taken += len(line)
         return text[:taken]
 
-    def _fit(self, body: str, head: list[Section], rows: list[Section], room: int, part: int, base_line: int) -> list[Section]:
+    def _fit(self, body: str, head: list[Section], rows: list[Section], room: int, part: int, *, base_line: int) -> list[Section]:
         """``head`` + ``rows`` within ``room``: fold the deepest level, then fall back to line parts."""
 
         def cost(rs: list[Section]) -> int:

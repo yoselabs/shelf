@@ -44,7 +44,7 @@ def roles(ctx: Context) -> list[Sub]:
         note = "" if prof.status == "evidenced" else "; provisional: written, not yet proven in a second repo"
         subs.append(Sub(concern, f"framework.{key}.profile", statement, passing(f"{prof.status} profile, in {root}: {tools}{note}")))
         for role in FRAMEWORK_ROLES:
-            judged = judge_role(ctx, name, prof, role, reached, root)
+            judged = judge_role(ctx, name, prof, role, reached, root=root)
             subs.append(
                 Sub(concern, f"framework.{key}.{role}", f"{name} {role}: the profile's tool is set up and run", finding_for(judged))
             )

@@ -8,8 +8,8 @@ import pytest
 from partial_time import format_interval, interval
 
 
-def _dt(year: int, month: int, day: int, hour: int = 0, minute: int = 0, second: int = 0) -> datetime:
-    return datetime(year, month, day, hour, minute, second)  # noqa: DTZ001 — naive UTC on purpose
+def _dt(year: int, month: int, day: int, hour: int = 0, *, second: int = 0) -> datetime:
+    return datetime(year, month, day, hour, 0, second)  # noqa: DTZ001 — naive UTC on purpose
 
 
 @pytest.mark.parametrize(
@@ -19,14 +19,14 @@ def _dt(year: int, month: int, day: int, hour: int = 0, minute: int = 0, second:
         ("2026-07", _dt(2026, 7, 1), _dt(2026, 8, 1)),
         ("2026-12", _dt(2026, 12, 1), _dt(2027, 1, 1)),
         ("2026-07-09", _dt(2026, 7, 9), _dt(2026, 7, 10)),
-        ("2026-07-09T10:00:00Z", _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, 0, 1)),
-        ("2026-07-09T13:00:00+03:00", _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, 0, 1)),
-        ("2026-07-09 10:00", _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, 0, 1)),
+        ("2026-07-09T10:00:00Z", _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, second=1)),
+        ("2026-07-09T13:00:00+03:00", _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, second=1)),
+        ("2026-07-09 10:00", _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, second=1)),
         (" 2026-07 ", _dt(2026, 7, 1), _dt(2026, 8, 1)),
         (date(2026, 7, 9), _dt(2026, 7, 9), _dt(2026, 7, 10)),
-        (datetime(2026, 7, 9, 10, tzinfo=UTC), _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, 0, 1)),
-        (datetime(2026, 7, 9, 13, tzinfo=timezone(timedelta(hours=3))), _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, 0, 1)),
-        (datetime(2026, 7, 9, 10, 0, 0, 999_999, tzinfo=UTC), _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, 0, 1)),
+        (datetime(2026, 7, 9, 10, tzinfo=UTC), _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, second=1)),
+        (datetime(2026, 7, 9, 13, tzinfo=timezone(timedelta(hours=3))), _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, second=1)),
+        (datetime(2026, 7, 9, 10, 0, 0, 999_999, tzinfo=UTC), _dt(2026, 7, 9, 10), _dt(2026, 7, 9, 10, second=1)),
     ],
 )
 def test_a_value_is_the_span_it_names(value: object, lo: datetime, hi: datetime) -> None:
