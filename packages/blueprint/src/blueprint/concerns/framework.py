@@ -18,7 +18,7 @@ FRAMEWORK_DIR = PROFILE_DIR / "frameworks"
 
 
 @check_each(
-    "framework.roles", "each framework's tool for each role, from its profile, is set up and run by `make check`", layer="framework"
+    "framework.roles", "each framework's tool for each role, from its profile, is set up and run by `just check`", layer="framework"
 )
 def roles(ctx: Context) -> list[Sub]:
     """Per detected framework: one profile row, then one row per role its profile names."""

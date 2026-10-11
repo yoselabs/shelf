@@ -1,19 +1,19 @@
 ---
 id: 0021
 title: Affected-only tests stay on tools/affected.py; moon is the migration target
-statement: make check narrows tests with tools/affected.py; no build tool yet. Migrate to moon's generic task graph when the shelf gets its first non-Python package (bead shelf-qgz).
+statement: just check narrows tests with tools/affected.py; no build tool yet. Migrate to moon's generic task graph when the shelf gets its first non-Python package (bead shelf-qgz).
 concerns: [gate, tooling]
 status: accepted
 decided_by: owner
 updated: 2026-10-11
-distilled_into: tools/affected.py; Makefile check / test-affected
+distilled_into: tools/affected.py; justfile check / test-affected
 ---
 
 # 0021 — Keep tools/affected.py; moon next
 
 ## Decision
 
-`tools/affected.py` (the uv-workspace dependency walk plus a pass cache) keeps narrowing `make check`
+`tools/affected.py` (the uv-workspace dependency walk plus a pass cache) keeps narrowing `just check`
 to the changed packages and their dependents. Every tool trialled works on the shelf today only with
 config we would own anyway, and buys nothing until a second language lands.
 

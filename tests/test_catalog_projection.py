@@ -1,7 +1,7 @@
 """The derived ontology indexes must always match their source *.toml files.
 
 Constitution I: files are truth; indexes are DERIVED, never hand-edited. This test
-fails if catalog/ledger/use-cases READMEs drift from the manifests — run `make catalog`.
+fails if catalog/ledger/use-cases READMEs drift from the manifests — run `just catalog`.
 """
 
 import sys
@@ -15,8 +15,8 @@ import catalog  # noqa: E402  -- path-injected tool module, imported after sys.p
 
 def test_ontology_indexes_are_fresh() -> None:
     for path, expected in catalog.projections().items():
-        assert path.exists(), f"{path} missing — run `make catalog`"
-        assert path.read_text() == expected, f"{path} is stale — run `make catalog`"
+        assert path.exists(), f"{path} missing — run `just catalog`"
+        assert path.read_text() == expected, f"{path} is stale — run `just catalog`"
 
 
 def test_no_orphaned_software() -> None:

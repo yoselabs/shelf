@@ -101,7 +101,7 @@ def _range_tested(ctx: Context, pin: tuple[int, int] | None) -> Finding:
         shown = ", ".join(untested[:5]) + (f", and {len(untested) - 5} more" if len(untested) > 5 else "")
         return failing(
             f"lower bound below the pin {pin[0]}.{pin[1]} and no CI run on it: {shown}",
-            f"raise requires-python to >={pin[0]}.{pin[1]}, or add a CI job running `uv run --python <lower> make test`",
+            f"raise requires-python to >={pin[0]}.{pin[1]}, or add a CI job running `uv run --python <lower> just test`",
         )
     return passing(f"every lower bound is the pin {pin[0]}.{pin[1]} or has a CI run")
 

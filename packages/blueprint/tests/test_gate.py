@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@{_SHA} # v4
-      - run: make check
+      - run: just check
 """
 
 
@@ -61,11 +61,11 @@ def test_ci_fails_on_a_tag_pinned_action(repo: Repo) -> None:
 
 
 def test_ci_fails_without_permissions_or_the_gate_word(repo: Repo) -> None:
-    repo.write(".github/workflows/check.yml", _SOUND_CI.replace("permissions:\n  contents: read\n", "").replace("make check", "pytest"))
+    repo.write(".github/workflows/check.yml", _SOUND_CI.replace("permissions:\n  contents: read\n", "").replace("just check", "pytest"))
     verdict, evidence = _verdict(repo, "gate.ci")
     assert verdict is Verdict.FAILING
     assert "permissions" in evidence
-    assert "no workflow runs `make check`" in evidence
+    assert "no workflow runs the gate" in evidence
 
 
 def test_ci_is_not_set_up_without_workflows(repo: Repo) -> None:
@@ -206,7 +206,7 @@ def test_clean_clone_evidence_names_the_command_that_failed(repo: Repo) -> None:
 def _ci(steps: str, *, gate: bool = True) -> str:
     """The sound workflow with `steps` (shell lines, one step each) before the gate step."""
     body = "".join(f"      - name: step {i}\n        run: {line}\n" for i, line in enumerate(steps.splitlines()))
-    tail = "      - run: make check\n" if gate else ""
+    tail = "      - run: just check\n" if gate else ""
     return _SOUND_CI.partition("      - uses:")[0] + f"      - uses: actions/checkout@{_SHA} # v4\n" + body + tail
 
 

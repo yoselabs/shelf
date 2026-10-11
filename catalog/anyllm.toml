@@ -1,6 +1,6 @@
 # One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
 # The catalog holds instances; the glossary holds types. Files are truth
-# (constitution I); catalog/README.md is DERIVED — run `make catalog`.
+# (constitution I); catalog/README.md is DERIVED — run `just catalog`.
 name = "anyllm"
 kind = "any-lib"                 # primitive | any-lib | composite | cli | framework | config-preset
 tier = "T1"                      # T0 primitive · T1 any-* · T2 composite

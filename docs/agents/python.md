@@ -1,20 +1,20 @@
 # Python conventions
 
-Stack: python-uv. The gate is `make check`; this file is what to know before writing code.
+Stack: python-uv. The gate is `just check`; this file is what to know before writing code.
 
 ## Tools per role
 
 | role | tool | run by |
 |---|---|---|
 | toolchain | uv, committed `uv.lock`, declared Python range or `.python-version` | `uv sync` |
-| formatter | `ruff format` | `make format` (check in the gate) |
-| linter | `ruff check`, the shelf's rule set from `[tool.ruff.lint]` | `make lint` |
-| types | pyrefly, `preset = "strict"` | `make typecheck` |
-| spelling | codespell | `make spell` |
-| dependencies | deptry (unused, missing, transitive) | `make deps` |
-| tests | pytest, strict markers, xdist | `make test` (`make test-affected` while iterating) |
-| coverage | pytest-cov with a floor just below current | in `make test` |
-| architecture | import-linter contracts in `[tool.importlinter]`; ruff TID251 banned-api for banned APIs | `make arch` (banned APIs ride `make lint`); see [architecture.md](architecture.md) |
+| formatter | `ruff format` | `just format` (check in the gate) |
+| linter | `ruff check`, the shelf's rule set from `[tool.ruff.lint]` | `just lint` |
+| types | pyrefly, `preset = "strict"` | `just typecheck` |
+| spelling | codespell | `just spell` |
+| dependencies | deptry (unused, missing, transitive) | `just deps` |
+| tests | pytest, strict markers, xdist | `just test` (`just test-affected` while iterating) |
+| coverage | pytest-cov with a floor just below current | in `just test` |
+| architecture | import-linter contracts in `[tool.importlinter]`; ruff TID251 banned-api for banned APIs | `just arch` (banned APIs ride `just lint`); see [architecture.md](architecture.md) |
 | hooks | prek: ruff check and ruff format on staged `.py` | [gate.md](gate.md) |
 
 Why: one tool per role, strictest preset.
@@ -23,9 +23,9 @@ Why: one tool per role, strictest preset.
 
 ```bash
 uv sync                  # environment from the lockfile
-make check               # the gate: whole repo, same as CI
+just check               # the gate: whole repo, same as CI
 uv run pytest path::name # one test while iterating; the gate still decides done
-make test-affected       # the tests the change reaches
+just test-affected       # the tests the change reaches
 ```
 
 Always `uv run <tool>`; never a global interpreter or `pip install`. Add a dependency with

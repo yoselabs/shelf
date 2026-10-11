@@ -1,10 +1,10 @@
 # The linter reference — how this repo stays clean, and how yours inherits it
 
 The shelf's quality bar is a **config-preset** (ADR 0004): the toolchain below is configured in
-`pyproject.toml` + driven by `make`, and a new project inherits it by **copying** the blocks and owning
+`pyproject.toml` + driven by `just` ([ADR 0023](adr/0023-the-gate-runner-is-just.md)), and a new project inherits it by **copying** the blocks and owning
 the copy. No CLI, no runtime dependency, no cage. This file is the reference to converge toward.
 
-The one rule that never bends: **`make check` is green over the WHOLE repo — no carve-outs** (AGENTS.md §1).
+The one rule that never bends: **`just check` is green over the WHOLE repo — no carve-outs** (AGENTS.md §1).
 
 ## The toolchain — one tool, one job
 
@@ -14,11 +14,11 @@ The one rule that never bends: **`make check` is green over the WHOLE repo — n
 | **ruff format** | formatting — the single formatter; no bikeshedding | `[tool.ruff]` | ✅ |
 | **pyrefly** | type checking; `preset = "strict"` plus correctness opt-ins, every severity spelled `"error"` so nothing lands in a warning tail | `[tool.pyrefly]` | ✅ |
 | **codespell** | typos in code, docstrings, and docs | `[tool.codespell]` | ✅ |
-| **deptry** | dependency hygiene per package — unused / missing / transitive | `make deps` (per-pkg) | ✅ |
+| **deptry** | dependency hygiene per package — unused / missing / transitive | `just deps` (per-pkg) | ✅ |
 | **pytest + coverage** | tests + a coverage floor that guards against regression | `[tool.pytest…]`, `[tool.coverage…]` | ✅ |
 
-Run the whole thing with `make check`. Individual targets: `make lint typecheck spell deps test`
-(and `make format`, `make cov` for a human coverage view).
+Run the whole thing with `just check`. Individual targets: `just lint typecheck spell deps test`
+(and `just format`, `just cov` for a human coverage view).
 
 ## Why the ruff config looks the way it does
 
@@ -92,9 +92,10 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
    `pyproject.toml`, and each package's `[tool.deptry]` if it needs ignores. `[tool.pyrefly]` and
    `[tool.pytest.ini_options]` are generated for the consumer: the strict preset, the same error
    severities and the lighter test bar, without the shelf's own paths.
-2. The `Makefile` targets (`check guard preset bootstrap bootstrap-verify lint format typecheck
+2. The `justfile` recipes (`check guard preset blueprint bootstrap bootstrap-verify lint format typecheck
    spell deps test cov sync`); `deps` becomes a single-package `uv run deptry .`. The shelf-only
-   targets (`catalog advisory test-browser`) are not copied and are not drift. Copy `guard` and `bootstrap`/`bootstrap-verify` **verbatim** — each resolves the
+   recipes (`catalog advisory test-browser`) are not copied and are not drift. Pin the runner with
+   `uv add --dev rust-just` and run it as `uv run just check` (the `dev` group below carries it). Copy `guard` and `bootstrap`/`bootstrap-verify` **verbatim** — each resolves the
    shelf clone itself (`$SHELF_HOME` → `../shelf` → `~/Workspaces/shelf`), so they work unchanged
    in your repo. `guard` is what actually enforces the no-committed-local-shelf-source rule; the
    pre-commit hook is fast feedback, not enforcement (a hook is per-clone and any tool claiming
@@ -108,25 +109,25 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
 Then **own it**: override any rule your project genuinely needs to, on purpose. Divergence is a local
 choice, visible in your own `pyproject`. The shelf is the baseline you converge back toward, not a lock.
 
-### Making the divergence actually visible — `make preset`
+### Making the divergence actually visible — `just preset`
 
 "Visible" was the word ADR 0004 used, and for a year nothing made it so. The onboarding copy
 (`tools/onboard/linter_preset.py`) is append-only by design: it never opens a table a consumer already
 owns, so it reports *"already current"* for a repo missing two whole rule families. Ten repos here
 reached ten rule sets without anyone deciding to.
 
-`tools/preset_drift.py`, wired as `make preset` and copied verbatim like `guard`, compares three axes
-— `[tool.ruff.lint] select`/`ignore`, `[tool.pyrefly.errors]`, and the `Makefile` target set — and
+`tools/preset_drift.py`, wired as `just preset` and copied verbatim like `guard`, compares three axes
+— `[tool.ruff.lint] select`/`ignore`, `[tool.pyrefly.errors]`, and the `justfile` recipe set — and
 fails on any difference the consumer has not declared in its own:
 
 ```toml
 [tool.shelf-preset]
 ruff-select-omitted = []
 pyrefly-errors-extra = ["unknown-argument-type"]  # reflective verb dispatch, a2kay only
-make-targets-extra = ["archlint"]                 # import-linter contracts, no shelf equivalent
+recipes-extra = ["archlint"]                      # import-linter contracts, no shelf equivalent
 ```
 
-An empty list means "identical here". The tool never edits, never proposes a value, and takes no side
+An empty list means "identical here". (`make-targets-extra`, the axis's name before ADR 0023, still counts.) The tool never edits, never proposes a value, and takes no side
 about which repo is right — a declared difference passes, exactly as 0004 intends. It only refuses to
 let one happen by accident.
 
@@ -140,18 +141,18 @@ Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest, rei
 - **`tests/test_arch_rules.py`** (blocking, via `tools/arch_rules.py`): dependency **upper-bounds**;
   **body-duplication** and **private-name-collision** *within* a package. Suppress with a reasoned entry
   in `tests/arch_allowlist.toml`.
-- **`make advisory`** (non-blocking): *cross-package* duplication — a T0-primitive candidate, not a
+- **`just advisory`** (non-blocking): *cross-package* duplication — a T0-primitive candidate, not a
   violation (constitution VI values some duplication).
 
-The import graph is enforced by **import-linter** (`make arch`, contracts in `[tool.importlinter]`): no
+The import graph is enforced by **import-linter** (`just arch`, contracts in `[tool.importlinter]`): no
 package imports a consumer app, and packages stay independent except the workspace edges they declare.
 **Banned APIs** are ruff's `TID251` (`[tool.ruff.lint.flake8-tidy-imports.banned-api]`, a `msg` per entry);
 the shelf bans the consumer apps there, which also covers `packages/*/tests`. ADR 0005.
 
 | rule class | enforcer | run by |
 |---|---|---|
-| import edges, layers, cycles | import-linter contracts in `pyproject.toml` | `make arch` |
-| banned APIs and modules | ruff `TID251` banned-api | `make lint` |
-| AST facts (RG001-RG004) | `tools/arch_rules.py` via `tests/test_arch_rules.py` | `make test` |
+| import edges, layers, cycles | import-linter contracts in `pyproject.toml` | `just arch` |
+| banned APIs and modules | ruff `TID251` banned-api | `just lint` |
+| AST facts (RG001-RG004) | `tools/arch_rules.py` via `tests/test_arch_rules.py` | `just test` |
 
 Still un-ported (add when a real violation appears): the `dict[str,Any]`-ban.

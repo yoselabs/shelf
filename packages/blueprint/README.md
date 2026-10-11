@@ -16,10 +16,10 @@ PYTHONPATH=../shelf/packages/blueprint/src python3 -m blueprint check --repo .
 | flag | effect |
 |---|---|
 | `--summary` | one row per concern, grouped by layer (generic, stack-specific, agent harness); says how many audit-only checkpoints it left out, so pair it with `--audit` to match a README written by `--audit --write` |
-| `--gate` | one line per checkpoint that is not passing; what `make blueprint` prints |
+| `--gate` | one line per checkpoint that is not passing; what `just blueprint` prints |
 | `--json` | the run as JSON, for agents and evals |
 | `--write` | `docs/blueprint/README.md` (the summary) and `<concern>.md`, one table per concern |
-| `--audit` | also the audit-only checkpoints: slow ones (a fresh clone running `make check`) and ones that read this machine's bd database, which CI and the gate container do not have |
+| `--audit` | also the audit-only checkpoints: slow ones (a fresh clone running `just check`) and ones that read this machine's bd database, which CI and the gate container do not have |
 | `--concern X` | one concern only |
 
 Exit codes: `0` everything passes or does not apply · `1` something fails or is not set up ·
@@ -69,7 +69,7 @@ and the scope: concerns checked, concerns not run, and whether the audit-only ch
 
 | layer | concern | checkpoints |
 |---|---|---|
-| generic | gate | `one-command` · `runs-blueprint` · `ci` · `ci-no-manifest-edit` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` (follows `make check` into pre-commit hooks) · `checkers-wired` · `default-branch` (audit only) · `git-remote` (audit only) · `clean-clone` (audit only) |
+| generic | gate | `one-command` · `runner` (a Makefile-only gate fails: the runner is just, ADR 0023; the graph is read from `just --dump --dump-format json`, a Makefile still being judged) · `runs-blueprint` · `ci` · `ci-no-manifest-edit` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` (follows `just check` into pre-commit hooks) · `checkers-wired` · `default-branch` (audit only) · `git-remote` (audit only) · `clean-clone` (audit only) |
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
 | stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional; the toolchain row also checks every dotnet install against global.json); `python-uv.uv-tool` (audit only): an application's installed uv tool matches uv.lock |
 | framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, provisional: framework-version · project-hygiene · embedded-script-lint · build · tests · surface-integrity · architecture · ci); paths may use `{root}` (the project folder) and globs |

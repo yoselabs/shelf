@@ -18,7 +18,7 @@ package. Every Python rule applies. `{{mcp_root}}` is the folder holding the `py
 ## Run
 
 ```bash
-make check                          # includes the contract and stdio tests
+just check                          # includes the contract and stdio tests
 uv run pytest tests/contracts -q    # the tool-list snapshot and property tests
 uv run fastmcp inspect <file.py>:mcp --format mcp   # what a client would see, as JSON
 ```

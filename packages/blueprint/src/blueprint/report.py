@@ -138,7 +138,7 @@ def markdown(run: Run) -> str:
 
 
 def gate(run: Run) -> str:
-    """The `make blueprint` form: one line per checkpoint that is not passing."""
+    """The `just blueprint` form: one line per checkpoint that is not passing."""
     lines = [f"blueprint: {p}" for p in run.problems]
     lines += [
         f"blueprint: {'🆕' if r.new else mark(r)} {r.id} -- {r.verdict}"

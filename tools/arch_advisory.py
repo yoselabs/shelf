@@ -4,7 +4,7 @@
 Within a package, duplication is a bug (blocked by ``tests/test_arch_rules.py``).
 *Across* packages it is a signal, not a sin: constitution VI values some duplication,
 and a body shared by two packages is a candidate for a T0 primitive (rule of three).
-So this reports, never fails. Run it with ``make advisory``.
+So this reports, never fails. Run it with ``just advisory``.
 """
 
 from __future__ import annotations

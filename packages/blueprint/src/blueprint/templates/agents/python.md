@@ -1,6 +1,6 @@
 # Python conventions
 
-Stack: python-uv. The gate is `make check`; this file is what to know before writing code.
+Stack: python-uv. The gate is `just check`; this file is what to know before writing code.
 
 ## Tools per role
 
@@ -23,7 +23,7 @@ Why: one tool per role, strictest preset.
 
 ```bash
 uv sync                  # environment from the lockfile
-make check               # the gate: whole repo, same as CI
+just check               # the gate: whole repo, same as CI
 uv run pytest path::name # one test while iterating; the gate still decides done
 {{inner_loop}}
 ```

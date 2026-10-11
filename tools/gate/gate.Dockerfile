@@ -1,11 +1,13 @@
-# The shelf's gate (`make check-host`) in a Linux container. On the macOS host an endpoint
+# The shelf's gate (`just check-host`) in a Linux container. On the macOS host an endpoint
 # scanner inspects every process start and file write, which makes the suite several times
-# slower (a2kay measured 340 s on the host against 64 s here). Built and run by `make check`.
+# slower (a2kay measured 340 s on the host against 64 s here). Built and run by `just check`.
 #
 # Code is copied in, never bind-mounted: a bind mount brings the slow path back. The
 # dependency layer is keyed on the manifests (every pyproject.toml + uv.lock) alone, so a
-# code change rebuilds only the last two layers. .git comes along: `make guard` reads HEAD.
+# code change rebuilds only the last two layers. .git comes along: `just guard` reads HEAD.
 
+# make stays for blueprint's fallback tests (a consumer still on a Makefile is judged, then fails gate.runner);
+# just itself arrives with the venv: `rust-just` is a dev dependency, run as `just` from /opt/venv/bin.
 FROM python:3.12-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends git make \
     && rm -rf /var/lib/apt/lists/*

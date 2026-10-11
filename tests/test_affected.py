@@ -42,7 +42,7 @@ def _pkgs(paths: list[str]) -> set[str]:
         (["packages/top/README.md"], {"top"}),
         (["docs/x.md", "tests/test_x.py", "tools/x.py", "AGENTS.md"], set()),
         (["uv.lock"], {"base", "middle", "top", "leaf", "plug"}),
-        (["Makefile"], {"base", "middle", "top", "leaf", "plug"}),
+        (["justfile"], {"base", "middle", "top", "leaf", "plug"}),
         (["packages/plug/src/plug/x.py"], {"base", "middle", "top", "leaf", "plug"}),
         ([], set()),
     ],

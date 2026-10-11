@@ -211,7 +211,7 @@ def culture_files(ctx: Context) -> Finding:
         return failing(
             where,
             "replace each `_Add your ... here_` or `{{name}}` line with the repo's real content "
-            "(build and test: `make check`; architecture; conventions), or delete the heading",
+            "(build and test: `just check`; architecture; conventions), or delete the heading",
         )
     return passing(f"{len(names)} conventions files: {', '.join(names)}; no placeholder in the instruction files")
 

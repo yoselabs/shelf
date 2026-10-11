@@ -14,7 +14,7 @@ distilled_into: blueprint runner.ACCEPTED; report.write
 ## Decision
 
 The audit (`check --write`) writes `docs/blueprint/checkpoints.txt` (`id@version` per row). The
-per-commit gate (`make blueprint`) fails only on rows in that set; a row added or changed in the
+per-commit gate (`just blueprint`) fails only on rows in that set; a row added or changed in the
 shelf since shows as 🆕 and does not fail. The next audit takes it in. A repo never audited enforces
 everything; one audited before the record existed treats its non-passing rows as new.
 

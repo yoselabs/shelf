@@ -3,7 +3,7 @@
 Replaces the hand-written hook installer (tools/hooks/install.py, deleted 2026-10-11). The recipe
 (openspec/changes/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself; its
 five events run from `.pre-commit-config.yaml`, first, then the shelf's commit guard and ruff on staged
-files, then `make check`. A failing check blocks the commit and bd still runs; bd's own injection into
+files, then `just check`. A failing check blocks the commit and bd still runs; bd's own injection into
 another manager's hook file made a failing check stop blocking.
 
 Append-only like the rest of onboarding: an existing `.pre-commit-config.yaml` is kept as the owner
@@ -30,7 +30,7 @@ _BEADS_MARKER = "BEGIN BEADS INTEGRATION"
 _GATE_BLOCK = "- repo: local\n  hooks:\n  - id: gate\n"
 
 # The shelf consumer's own fast checks, between bd's entries and the gate. The guard is resolved the
-# same way `make guard` does it, so a consumer needs no copy of the script.
+# same way `just guard` does it, so a consumer needs no copy of the script.
 _SHELF_HOOKS = """# The shelf's commit guard and ruff on staged files (shelf onboarding).
 - repo: local
   hooks:

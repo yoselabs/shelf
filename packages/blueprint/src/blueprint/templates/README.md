@@ -22,7 +22,7 @@ everything else is fixed text. Edit here, never in a consumer's copy of an unmod
 
 The file states no tool of its own: every cell in the tools-per-role table is the repo's. Fill the
 tool and the command from what the repo has, not from the shelf's choices: the `stack.python-uv.<role>`
-rows of `blueprint check --concern stack` print the detected tool per role, and the Makefile names
+rows of `blueprint check --concern stack` print the detected tool per role, and the justfile names
 what runs it. A role the repo has no tool for says `none yet` (and the reason), never another repo's tool.
 `inner_loop` is the command a contributor runs while iterating (a fast test target); delete the line
 when the repo has none. `glossary_file` is where the repo keeps its domain terms.

@@ -10,19 +10,19 @@ Godot project too. `{{godot_root}}` is the folder holding `project.godot`.
 | framework-version | `Godot.NET.Sdk/<x.y.z>` exact in the Godot `.csproj` (single source); `config/features` in `project.godot` has the same major.minor | config check |
 | project-hygiene | `.godot/` ignored; `*.uid` and `*.import` committed; `.gitattributes` with `text=auto eol=lf` | config check, clean tree after import |
 | binary-assets | Git LFS patterns in `.gitattributes` for binaries; `export_presets.cfg` committed, credentials only in `.godot/export_credentials.cfg` | config check |
-| build | `godot --headless --path {{godot_root}} --import`, then `--build-solutions --quit`, both inside `make check` | gate |
+| build | `godot --headless --path {{godot_root}} --import`, then `--build-solutions --quit`, both inside `just check` | gate |
 | surface-integrity | the import log is scanned: any `ERROR:` line fails the gate | gate |
 | architecture | the engine-free core cannot reference `GodotSharp`; the Godot project references the composition root only | MSBuild target, BannedApiAnalyzers |
 | hooks | prek `godot-uid`: every staged `.cs`/`.gd` has a sibling `.uid` | hook |
 | tests | engine-free logic in xunit projects; in-engine tests only for thin views (runner not chosen) | untested |
 | embedded-script-lint | not applicable while C#-only; with the first `.gd` file add gdtoolkit (`gdlint`, `gdformat --check`) | - |
-| ci | none for now: agents run `make check` on a machine with the Godot .NET binary (`GODOT` env var) | - |
+| ci | none for now: agents run `just check` on a machine with the Godot .NET binary (`GODOT` env var) | - |
 
 ## Run
 
 ```bash
-make check         # includes godot-build: import, scan for ERROR:, build solutions, clean-tree check
-make godot-build   # after editing any .tscn, .tres or script: read the ERROR: lines
+just check         # includes godot-build: import, scan for ERROR:, build solutions, clean-tree check
+just godot-build   # after editing any .tscn, .tres or script: read the ERROR: lines
 ```
 
 Without the matching Godot .NET binary the gate cannot pass: set `GODOT` to it.

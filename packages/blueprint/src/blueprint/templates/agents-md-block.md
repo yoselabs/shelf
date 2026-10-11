@@ -1,7 +1,7 @@
 <!-- blueprint:begin -->
 ## Working agreement (managed by blueprint; do not edit between the markers)
 
-Done = `make check` green over the whole repo. Never `--no-verify`. Commit only on the owner's yes.
+Done = `just check` green over the whole repo. Never `--no-verify`. Commit only on the owner's yes.
 Read a file below when its trigger applies, not before.
 
 | file | read when |

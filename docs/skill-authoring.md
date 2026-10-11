@@ -186,7 +186,7 @@ Layout (PE):
   both; PASS needs quoted evidence (AS).
 - **Pressure scenarios** for discipline rules (the agent marking ✅ without proof); a RED baseline
   before writing the rule (SP).
-- **Keep evals out of `make check`.** Live runs take minutes and cost money; run them on demand and
+- **Keep evals out of `just check`.** Live runs take minutes and cost money; run them on demand and
   before a tag (SP `tests/` vs `evals/` split). The gate keeps the static checks: frontmatter,
   description length, name = directory, generated files fresh.
 - **CI form:** `claude plugin eval . --trust-plugin --json results.json --threshold 0.8

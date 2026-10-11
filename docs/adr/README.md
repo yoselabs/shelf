@@ -35,7 +35,7 @@ distilled_into: <the agent-loop.md WORKFLOW it was folded into>   |   N/A — se
 ---
 ```
 
-`distilled_into` is **mandatory** (`tests/test_adr_distillation.py` fails `make check` without it,
+`distilled_into` is **mandatory** (`tests/test_adr_distillation.py` fails `just check` without it,
 no carve-outs). It forces the judgment call: does this decision change what an agent *does*
 mid-session (→ name the workflow it was folded into, per `agent-loop.md` WORKFLOW:
 EVOLVE-THE-LOOP), or is it purely structural/tooling, already enforced by a test or the repo layout

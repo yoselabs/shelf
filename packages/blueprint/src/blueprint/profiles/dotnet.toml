@@ -22,7 +22,7 @@ installs = ["$PATH", "$DOTNET_ROOT", "/usr/local/share/dotnet", "/usr/share/dotn
 [[role]]
 role = "formatter"
 tool = "CSharpier 1.3.0 as a local dotnet tool (layout only; no dotnet format, no Roslynator.Formatting)"
-install = "dotnet new tool-manifest; dotnet tool install csharpier; add .csharpierignore (.godot/, obj/, bin/); make fmt-check runs `dotnet tool restore` then `dotnet csharpier check .`"
+install = "dotnet new tool-manifest; dotnet tool install csharpier; add .csharpierignore (.godot/, obj/, bin/); just fmt-check runs `dotnet tool restore` then `dotnet csharpier check .`"
 config = [{ path = ".config/dotnet-tools.json", contains = "csharpier" }]
 gate = "csharpier check"
 
@@ -32,7 +32,7 @@ tool = """SDK analyzers at AnalysisLevel latest-all + Meziantou.Analyzer + Rosly
 install = """Directory.Build.props: <TreatWarningsAsErrors>true, <AnalysisLevel>latest-all, <EnforceCodeStyleInBuild>true, \
 <Deterministic>true, <ContinuousIntegrationBuild Condition="'$(CI)' != ''">true; PackageReference (PrivateAssets=all) Meziantou.Analyzer, Roslynator.Analyzers, SonarAnalyzer.CSharp, \
 Microsoft.VisualStudio.Threading.Analyzers, IDisposableAnalyzers, ErrorProne.NET.CoreAnalyzers (Version 0.9.0-beta.4: no stable line exists, pin the beta), SharpSource, Nullable.Extended.Analyzer, ReflectionAnalyzers; \
-versions in Directory.Packages.props; make build runs `dotnet build -warnaserror`. \
+versions in Directory.Packages.props; just build runs `dotnet build -warnaserror`. \
 .editorconfig [*.cs]: `dotnet_analyzer_diagnostic.severity = warning` (most Meziantou/Roslynator/Sonar rules are off by default; this turns them on), then \
 `dotnet_analyzer_diagnostic.category-Style.severity = none` and `dotnet_diagnostic.IDE0005/IDE0010/IDE0072/IDE0161.severity = warning` (IDE0010 and IDE0072 catch an enum member missing from a switch even behind `_ =>`), \
 and `none` with a reason for MA0038, MA0041 (deprecated duplicates of CA1822) and RCS1181 (fights `// why:` comments). In tests/: EPC29 none (xunit.v3 entry point). \
@@ -85,7 +85,7 @@ gate = "dotnet build"
 role = "tests"
 tool = "xunit.v3 (4.0.2) on Microsoft.Testing.Platform; one tests/ project per layer; CsCheck for properties"
 install = """global.json: "test": { "runner": "Microsoft.Testing.Platform" }; tests/*/ projects reference xunit.v3 (version in Directory.Packages.props); \
-make test runs `dotnet test --solution <sln> --no-build` (no --nologo: MTP rejects it)"""
+just test runs `dotnet test --solution <sln> --no-build` (no --nologo: MTP rejects it)"""
 config = [{ path = "global.json", contains = "Microsoft.Testing.Platform" }]
 gate = "dotnet test"
 
@@ -96,7 +96,7 @@ untested = "no .NET coverage floor proven: coverlet.MTP 10.1.0 lists --coverlet-
 [[role]]
 role = "spelling"
 tool = "typos (crate-ci) with a committed config; splits identifiers, so it works on C#"
-install = "brew install typos-cli (or cargo install typos-cli); typos.toml with [default.extend-words] for domain terms; make check runs `typos`"
+install = "brew install typos-cli (or cargo install typos-cli); typos.toml with [default.extend-words] for domain terms; just check runs `typos`"
 config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
 gate = "typos"
 
@@ -120,11 +120,11 @@ gate = "dotnet build"
 
 [[role]]
 role = "hooks"
-tool = "prek runs `dotnet csharpier check` and typos on staged files (pre-commit); make check on pre-push"
+tool = "prek runs `dotnet csharpier check` and typos on staged files (pre-commit); just check on pre-push"
 install = """.pre-commit-config.yaml, local hooks after the bd ones: \
 - id: csharpier / entry: dotnet csharpier check / language: system / types: [c#]; \
 - id: typos / entry: typos --force-exclude / language: system / pass_filenames: true; \
-- id: gate / entry: make check / language: system / always_run: true / pass_filenames: false / stages: [pre-push]. \
+- id: gate / entry: just check / language: system / always_run: true / pass_filenames: false / stages: [pre-push]. \
 Do not run dotnet build on pre-commit (seconds to tens of seconds)"""
 config = [
     { path = ".pre-commit-config.yaml", contains = "dotnet csharpier check" },
@@ -134,7 +134,7 @@ config = [
 [[role]]
 role = "agent-guidance"
 tool = "docs/agents/dotnet.md (build and test commands, analyzer policy, layering, nullability, comment conventions), linked from AGENTS.md; a short AGENTS.md per top-level code folder"
-install = """create docs/agents/dotnet.md (<= 150 lines): commands (make check/build/test/fmt); `Directory.Build.props` and `Directory.Packages.props` are the only places for \
+install = """create docs/agents/dotnet.md (<= 150 lines): commands (just check/build/test/fmt); `Directory.Build.props` and `Directory.Packages.props` are the only places for \
 settings and versions; analyzers: never #pragma, add a path-scoped .editorconfig line with a reason; nullability: no `!` outside tests; \
 comments: `// why:` for non-obvious decisions (units, determinism, workarounds with a link), `<summary>` on public types of library projects stating the contract and invariants, no file headers, no comment that restates code; \
 layering table; test naming. Link it from AGENTS.md with the line `.NET conventions: docs/agents/dotnet.md`"""

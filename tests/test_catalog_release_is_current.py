@@ -25,7 +25,7 @@ hand-maintained restatement of a fact the repo already knows must be checked
 against that fact by a test, or it must not be hand-maintained.**
 
 Asserted against `pyproject.toml`, deliberately, NOT against `git tag`. The
-promote loop bumps the version and runs `make check` BEFORE tagging (steps 4
+promote loop bumps the version and runs `just check` BEFORE tagging (steps 4
 then 5), so a tag-based check would fail every release at exactly the moment it
 is supposed to pass, and would be disabled within a week. The version file is
 the fact; the tag follows it.

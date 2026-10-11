@@ -2,7 +2,7 @@
 
 This file is deliberately NOT `browser`-marked. Its subject is the skip→fail
 policy (`browser_unavailable_policy`), not any real engine, so it needs no
-Chromium and runs in `make check` on every commit.
+Chromium and runs in `just check` on every commit.
 
 Why it can't live in `test_browser_smoke.py`: that module is `browser`-marked
 and therefore deselected from the default gate, AND the FAIL branch it guards is

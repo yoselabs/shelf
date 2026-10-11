@@ -15,7 +15,7 @@ It flags a ``[tool.uv.sources]`` entry that is local (``path`` or
 ``--staged`` (default) reads the index — what *is about to* be committed. This is
 the pre-commit hook's question, and it catches the mistake before it lands.
 
-``--committed`` reads ``HEAD`` — what *has* been committed. This is ``make
+``--committed`` reads ``HEAD`` — what *has* been committed. This is ``just
 guard``'s question. It exists because a hook is per-clone and can be silently
 disabled by anything that claims ``core.hooksPath``, so the hook is fast
 feedback and the gate is the enforcement.
@@ -25,7 +25,7 @@ is exactly the supported co-development workflow (``docs/consuming-the-shelf.md`
 §1), so failing on it would break the thing the docs tell you to do.
 
 Wire it via pre-commit (``.pre-commit-hooks.yaml`` at the shelf root), as a
-native git hook, or as ``make guard`` — see ``docs/consuming-the-shelf.md`` §2.
+native git hook, or as ``just guard`` — see ``docs/consuming-the-shelf.md`` §2.
 
 Exit codes: ``0`` clean · ``1`` offenders found · ``2`` could not check (not a
 git repository). A check that cannot run is never reported as a pass.

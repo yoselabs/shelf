@@ -1,5 +1,5 @@
-"""The `linter-preset` operation (python+uv only) — copies missing tables/targets
-from shelf's own `pyproject.toml`/`Makefile`, never touching what's already there.
+"""The `linter-preset` operation (python+uv only) — copies missing tables/recipes
+from shelf's own `pyproject.toml`/`justfile`, never touching what's already there.
 """
 
 from __future__ import annotations
@@ -77,46 +77,46 @@ def test_second_run_is_a_no_op_when_everything_already_copied(repo: Path) -> Non
     assert (repo / "pyproject.toml").read_text() == before
 
 
-def test_copies_missing_makefile_targets_and_leaves_existing_ones_alone(repo: Path) -> None:
+def test_copies_missing_justfile_recipes_and_leaves_existing_ones_alone(repo: Path) -> None:
     (repo / "pyproject.toml").write_text('[project]\nname = "consumer"\nversion = "0.1.0"\n')
-    (repo / "Makefile").write_text("lint:\n\techo my own lint step, not shelf's\n")
+    (repo / "justfile").write_text("lint:\n    echo my own lint step, not shelf's\n")
 
     result = LinterPresetOperation(repo).run({})
 
     assert result.outcome == Outcome.APPLIED, result.message
-    make_text = (repo / "Makefile").read_text()
-    assert "echo my own lint step" in make_text, "the consumer's own lint target was overwritten"
-    assert "guard:" in make_text
-    assert "typecheck:" in make_text
-    lint_occurrences = make_text.count("\nlint:") + (1 if make_text.startswith("lint:") else 0)
-    assert lint_occurrences == 1, "shelf's lint target was appended even though the consumer already had one"
+    just_text = (repo / "justfile").read_text()
+    assert "echo my own lint step" in just_text, "the consumer's own lint recipe was overwritten"
+    assert "guard:" in just_text
+    assert "typecheck:" in just_text
+    lint_occurrences = just_text.count("\nlint:") + (1 if just_text.startswith("lint:") else 0)
+    assert lint_occurrences == 1, "shelf's lint recipe was appended even though the consumer already had one"
 
 
 def test_an_unrelated_owned_bootstrap_target_is_not_aliased_by_bootstrap_verify(repo: Path) -> None:
     """Found against a real consumer (a2kay): it already had its own `bootstrap:` target (a
-    common Make name, unrelated to shelf onboarding). `bootstrap` is correctly left alone as
+    common name, unrelated to shelf onboarding). `bootstrap` is correctly left alone as
     owned -- but `bootstrap-verify: bootstrap` must not be copied either, since on its own it
-    would silently alias to the consumer's unrelated target rather than shelf's onboarding
+    would silently alias to the consumer's unrelated recipe rather than shelf's onboarding
     script."""
     (repo / "pyproject.toml").write_text('[project]\nname = "consumer"\nversion = "0.1.0"\n')
-    (repo / "Makefile").write_text("bootstrap:\n\techo set up my own dev env, nothing to do with the shelf\n")
+    (repo / "justfile").write_text("bootstrap:\n    echo set up my own dev env, nothing to do with the shelf\n")
 
     result = LinterPresetOperation(repo).run({})
 
     assert result.outcome == Outcome.APPLIED, result.message
-    make_text = (repo / "Makefile").read_text()
-    assert "echo set up my own dev env" in make_text, "the consumer's own bootstrap target was overwritten"
-    assert "bootstrap-verify" not in make_text, "bootstrap-verify would alias to the consumer's unrelated bootstrap target"
-    assert "guard:" in make_text, "unrelated targets must still be copied"
+    just_text = (repo / "justfile").read_text()
+    assert "echo set up my own dev env" in just_text, "the consumer's own bootstrap recipe was overwritten"
+    assert "bootstrap-verify" not in just_text, "bootstrap-verify would alias to the consumer's unrelated bootstrap recipe"
+    assert "guard:" in just_text, "unrelated recipes must still be copied"
 
 
-def test_creates_a_makefile_from_scratch_when_absent(repo: Path) -> None:
+def test_creates_a_justfile_from_scratch_when_absent(repo: Path) -> None:
     (repo / "pyproject.toml").write_text('[project]\nname = "consumer"\nversion = "0.1.0"\n')
 
     result = LinterPresetOperation(repo).run({})
 
     assert result.outcome == Outcome.APPLIED, result.message
-    make_text = (repo / "Makefile").read_text()
+    just_text = (repo / "justfile").read_text()
     for target in (
         "check:",
         "guard:",
@@ -129,30 +129,30 @@ def test_creates_a_makefile_from_scratch_when_absent(repo: Path) -> None:
         "deps:",
         "test:",
     ):
-        assert target in make_text
+        assert target in just_text
 
 
 # ── shelf-4mz: the copied gate must RUN, not merely exist ─────────────────────
 # Reproduced 2026-10-10: a fresh repo onboarded with every operation verified=True,
-# then `make check` stopped at once on a missing `preset` target; `deps` looped over
-# the shelf's own packages/*; and no pyrefly table meant `make typecheck` ran lax.
+# then `just check` stopped at once on a missing `preset` recipe; `deps` looped over
+# the shelf's own packages/*; and no pyrefly table meant `just typecheck` ran lax.
 
 
 def _bare(repo: Path) -> None:
     (repo / "pyproject.toml").write_text('[project]\nname = "consumer"\nversion = "0.1.0"\n')
 
 
-def _make_dry_run(repo: Path, target: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["make", "-n", target], cwd=repo, capture_output=True, text=True, check=False)
+def _dry_run(repo: Path, recipe: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["just", "--dry-run", recipe], cwd=repo, capture_output=True, text=True, check=False)
 
 
-def test_a_fresh_repo_gets_a_gate_whose_every_target_resolves(repo: Path) -> None:
+def test_a_fresh_repo_gets_a_gate_whose_every_recipe_resolves(repo: Path) -> None:
     _bare(repo)
 
     result = LinterPresetOperation(repo).run({})
 
     assert result.outcome == Outcome.APPLIED, result.message
-    dry = _make_dry_run(repo, "check")
+    dry = _dry_run(repo, "check")
     assert dry.returncode == 0, dry.stderr
 
 
@@ -186,20 +186,20 @@ def test_deps_checks_the_consumer_itself_not_the_shelfs_packages(repo: Path) -> 
 
     LinterPresetOperation(repo).run({})
 
-    deps = _make_dry_run(repo, "deps")
+    deps = _dry_run(repo, "deps")
     assert deps.returncode == 0, deps.stderr
-    assert "packages/" not in deps.stdout
-    assert "deptry ." in deps.stdout
+    assert "packages/" not in deps.stderr  # just --dry-run prints the recipe lines to stderr
+    assert "deptry ." in deps.stderr
 
 
-def test_a_copied_gate_that_names_a_missing_target_is_a_failure(repo: Path) -> None:
+def test_a_copied_gate_that_names_a_missing_recipe_is_a_failure(repo: Path) -> None:
     _bare(repo)
-    (repo / "Makefile").write_text("check: guard lint not-a-target\n")
+    (repo / "justfile").write_text("check: guard lint not-a-recipe\n")
 
     result = LinterPresetOperation(repo).run({})
 
     assert result.outcome == Outcome.FAILED
-    assert "not-a-target" in result.message
+    assert "not-a-recipe" in result.message
 
 
 def test_a_freshly_onboarded_repo_passes_preset_drift(repo: Path) -> None:
@@ -214,3 +214,24 @@ def test_a_freshly_onboarded_repo_passes_preset_drift(repo: Path) -> None:
         check=False,
     )
     assert drift.returncode == 0, drift.stderr
+
+
+def test_a_makefile_beside_the_new_justfile_is_named_in_the_result(repo: Path) -> None:
+    _bare(repo)
+    (repo / "Makefile").write_text("check:\n\ttrue\n")
+
+    result = LinterPresetOperation(repo).run({})
+
+    assert result.outcome == Outcome.APPLIED, result.message
+    assert "Makefile" in result.message
+    assert (repo / "Makefile").read_text() == "check:\n\ttrue\n", "the consumer's Makefile is theirs to port and delete"
+
+
+def test_the_recipes_keep_their_group_attribute_and_the_test_recipe_runs_without_the_shelfs_worker_variable(repo: Path) -> None:
+    _bare(repo)
+
+    LinterPresetOperation(repo).run({})
+
+    text = (repo / "justfile").read_text()
+    assert "[group('gate')]\nlint:" in text
+    assert "pytest_par" not in text

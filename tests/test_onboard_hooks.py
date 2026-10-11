@@ -28,7 +28,7 @@ def repo(tmp_path: Path) -> Path:
 
 def test_the_config_runs_bd_first_then_the_shelf_checks_then_the_gate() -> None:
     text = config_text(beads=True, python=True)
-    order = [text.index(s) for s in ("bd hooks run pre-commit", "forbid-local-shelf-source", "ruff check", "entry: make check")]
+    order = [text.index(s) for s in ("bd hooks run pre-commit", "forbid-local-shelf-source", "ruff check", "entry: uv run just check")]
     assert order == sorted(order)
     assert "default_install_hook_types" in text
 

@@ -10,83 +10,66 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from blueprint import gate_graph
 from blueprint.model import Context, Finding, FixedBy, check, failing, is_skipped, not_applicable, not_checked, not_set_up, passing, walk
 
 if TYPE_CHECKING:
     import subprocess
 
-_TARGET = re.compile(r"^([A-Za-z][A-Za-z0-9_.-]*)\s*:(?!=)", re.MULTILINE)
-_GATE_RUN = re.compile(r"\bmake\s+(?:-\S+\s+)*check(?:-all)?\b")
+    from blueprint.gate_graph import Gate
+
+# `make check`, `just check-all`, `uv run just check`, `uvx rust-just@1.58.0 check`: a step that runs the gate.
+_GATE_RUN = re.compile(r"\b(?:make|just|rust-just(?:@\S+)?)\s+(?:-\S+\s+)*check(?:-all)?\b")
 _USES = re.compile(r"^\s*-?\s*uses:\s*['\"]?([^\s'\"#]+)", re.MULTILINE)
 _SHA = re.compile(r"@[0-9a-f]{40}$")
 # A script a recipe runs: `python3 x.py`, `uv run python x.py`, or `g=x.py` handed to python later.
 _SCRIPT = re.compile(r"(?:python3?\s+|uv run python\s+|\b[A-Za-z_]\w*=)((?:[\w.-]+/)*[\w.-]+\.py)\b")
 _ONBOARD = (
-    "the shelf onboarding writes the gate: `make bootstrap`, or python3 <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo ."
+    "the shelf onboarding writes the gate: `just bootstrap`, or python3 <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo ."
 )
 
 
-def _targets(makefile: str) -> set[str]:
-    return set(_TARGET.findall(makefile))
-
-
-def _rules(makefile: str) -> dict[str, tuple[list[str], str]]:
-    """target -> (prerequisites, recipe text)."""
-    rules: dict[str, tuple[list[str], str]] = {}
-    matches = list(_TARGET.finditer(makefile))
-    for i, m in enumerate(matches):
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(makefile)
-        header, _, body = makefile[m.start() : end].partition("\n")
-        recipe = "\n".join(line for line in body.splitlines() if line.startswith("\t"))
-        rules[m.group(1)] = (header.split(":", 1)[1].split(), recipe)
-    return rules
-
-
-_VARIABLE = re.compile(r"^([A-Za-z_]\w*)\s*[:?]?=\s*(.*?)\s*$", re.MULTILINE)
-_VARIABLE_USE = re.compile(r"\$[({]([A-Za-z_]\w*)[)}]")
-
-
-def _expand(text: str, makefile: str) -> str:
-    """`$(PY)` and `${PY}` replaced by the Makefile's simple `PY := value` lines (three passes, for nested names).
-
-    Why: a recipe written `$(PY) tools/check_design.py` hides its script from every pattern below.
-    """
-    variables = dict(_VARIABLE.findall(makefile))
-    for _ in range(3):
-        text = _VARIABLE_USE.sub(lambda m: variables.get(m.group(1), m.group(0)), text)
-    return text
-
-
-def _reachable(makefile: str, start: str = "check") -> list[str]:
-    """Recipes of every target `start` reaches: through prerequisites, or a recipe naming a target."""
-    rules = _rules(makefile)
-    seen, queue = {start}, [start]
-    while queue:
-        prereqs, recipe = rules.get(queue.pop(), ([], ""))
-        words = set(prereqs) | set(re.findall(r"[\w.-]+", recipe))
-        for nxt in sorted(words & rules.keys() - seen):
-            seen.add(nxt)
-            queue.append(nxt)
-    return [_expand(rules[t][1], makefile) for t in sorted(seen) if t in rules]
-
-
-@check("gate.one-command", "`make check` exists and every target it names resolves")
+@check("gate.one-command", "`just check` exists and every recipe it names resolves")
 def one_command(ctx: Context) -> Finding:
-    """The Makefile has a `check` target and `make -n check` resolves."""
+    """The justfile has a `check` recipe and `just --dry-run check` resolves (a Makefile: `make -n check`)."""
     python = any(s.startswith("python") for s in ctx.profile.stacks)
-    fixer = (_ONBOARD, FixedBy.AUTO) if python else ("add a Makefile whose `check` target runs every linter and the tests", FixedBy.AGENT)
-    makefile = ctx.read("Makefile")
-    if makefile is None:
-        return not_set_up("no Makefile", *fixer)
-    if "check" not in _targets(makefile):
-        return not_set_up("the Makefile has no `check` target", *fixer)
-    dry = ctx.run("make", "-n", "check", timeout=60)
+    fixer = (_ONBOARD, FixedBy.AUTO) if python else ("add a justfile whose `check` recipe runs every linter and the tests", FixedBy.AGENT)
+    gate = gate_graph.load(ctx)
+    if gate is None:
+        return not_set_up("no justfile", *fixer)
+    if not gate.has_recipe("check"):
+        if gate.unread and gate.runner == "just":
+            return not_checked(f"the justfile cannot be read: {gate.unread} (pin the runner: `uv add --dev rust-just`)")
+        return not_set_up(f"the {gate.path} has no `check` {'recipe' if gate.runner == 'just' else 'target'}", *fixer)
+    argv = _DRY_RUN[gate.runner]
+    dry = ctx.run(gate_graph.just_command(ctx) if gate.runner == "just" else argv[0], *argv[1:], timeout=60)
+    shown = " ".join(argv)
     if dry is None:
-        return not_checked("`make` is not installed or timed out")
+        return not_checked(f"`{gate.runner}` is not installed or timed out")
     if dry.returncode != 0:
-        complaint = (dry.stderr.strip() or dry.stdout.strip()).splitlines()[-1:] or ["no output"]
-        return failing(f"`make -n check` fails: {complaint[0]}", "add or fix the target make names")
-    return passing("`make -n check` resolves")
+        lines = (dry.stderr.strip() or dry.stdout.strip()).splitlines() or ["no output"]
+        # just prints "error: <what>" first and a source excerpt after it; make's last line is the error.
+        complaint = next((line for line in lines if line.startswith("error")), lines[-1])
+        return failing(f"`{shown}` fails: {complaint}", "add or fix the recipe the gate names")
+    return passing(f"`{shown}` resolves")
+
+
+_DRY_RUN = {"just": ("just", "--dry-run", "check"), "make": ("make", "-n", "check")}
+_MIGRATION = (
+    "move the Makefile to a justfile (ADR 0023): `uv add --dev rust-just`, port each target to a recipe "
+    "(same names; loops go in shebang recipes; no backticks), run it as `uv run just check`, delete the Makefile; "
+    "the shelf's own justfile is the reference"
+)
+
+
+@check("gate.runner", "the gate runner is just: a justfile holds the gate, not a Makefile")
+def runner(ctx: Context) -> Finding:
+    """One runner for every repo, so blueprint reads the gate graph from one JSON dump (ADR 0023)."""
+    if gate_graph.load(ctx) is None:
+        return not_applicable("no gate: gate.one-command reports the missing one")
+    if gate_graph.has_makefile_only(ctx):
+        return failing("the gate is a Makefile; the shelf's runner is just (a justfile)", _MIGRATION)
+    return passing("a justfile holds the gate")
 
 
 def _workflows(ctx: Context) -> list[Path]:
@@ -96,20 +79,20 @@ def _workflows(ctx: Context) -> list[Path]:
 
 @check("gate.ci", "CI runs the gate command; every action is pinned to a commit SHA; permissions are declared")
 def ci(ctx: Context) -> Finding:
-    """GitHub Actions: some job runs `make check`/`check-all`; `uses:` pinned by SHA; top-level permissions."""
+    """GitHub Actions: some job runs `just check`/`check-all` (or make's); `uses:` pinned by SHA; top-level permissions."""
     files = _workflows(ctx)
     if not files:
         if ctx.read(".gitlab-ci.yml") is not None:
             return not_checked("GitLab CI is not checked yet; blueprint covers GitHub Actions")
         return not_set_up(
             "no .github/workflows/*.yml",
-            "add a workflow that runs `make check-all` (or `make check`) on push and pull request; "
+            "add a workflow that runs `uv run just check-all` (or `just check`) on push and pull request; "
             "a repo that decided on no CI records an override of gate.ci with its reason and "
             '`adr = "NNNN"` (the accepted ADR that decided it)',
         )
     problems: list[str] = []
     if not any(_GATE_RUN.search(f.read_text()) for f in files):
-        problems.append("no workflow runs `make check`")
+        problems.append("no workflow runs the gate (`just check` or `just check-all`)")
     for f in files:
         text = f.read_text()
         unpinned = sorted({u for u in _USES.findall(text) if not u.startswith(("./", "docker://")) and not _SHA.search(u)})
@@ -219,7 +202,7 @@ def _rewrites(run_text: str) -> str | None:
 
 @check("gate.ci-no-manifest-edit", "no CI step before the gate rewrites a dependency manifest or lockfile")
 def ci_no_manifest_edit(ctx: Context) -> Finding:
-    """CI gates the committed dependency set: a step ahead of `make check` that edits pyproject.toml or re-locks gates another one."""
+    """CI gates the committed dependency set: a step ahead of `just check` that edits pyproject.toml or re-locks gates another one."""
     files = _workflows(ctx)
     if not files:
         return not_applicable("no .github/workflows: gate.ci reports the missing CI")
@@ -313,7 +296,7 @@ _HOOK_SCRIPT = re.compile(r"(?<![\w./-])((?:[\w.-]+/)*[\w.-]+\.py)\b")
 
 
 def _hook_entries(ctx: Context, recipes: str) -> list[str]:
-    """The `entry:` lines of .pre-commit-config.yaml when `make check` runs the hooks (`pre-commit run`, `prek run`).
+    """The `entry:` lines of .pre-commit-config.yaml when the gate runs the hooks (`pre-commit run`, `prek run`).
 
     Why: a gate that runs pre-commit runs every hook's command, and the repo's own guards are usually among them.
     """
@@ -322,22 +305,22 @@ def _hook_entries(ctx: Context, recipes: str) -> list[str]:
     return _HOOK_ENTRY.findall(ctx.read(HOOK_CONFIG) or "")
 
 
-def _gate_commands(ctx: Context, makefile: str) -> str:
-    """Everything `make check` runs: its recipes (variables expanded) and the hook commands it triggers."""
-    recipes = reachable_recipes(makefile)
+def _gate_commands(ctx: Context, gate: Gate) -> str:
+    """Everything the gate runs: its recipes (variables expanded) and the hook commands it triggers."""
+    recipes = gate.gate_recipes()
     return "\n".join([recipes, *_hook_entries(ctx, recipes)])
 
 
-def _gate_scripts(ctx: Context, makefile: str) -> list[str]:
-    recipes = reachable_recipes(makefile)
-    found = [m for recipe in _reachable(makefile) for m in _SCRIPT.findall(recipe)]
-    for entry in _hook_entries(ctx, recipes):
+def _gate_scripts(ctx: Context, gate: Gate) -> list[str]:
+    found = [m for recipe in gate.reachable() for m in _SCRIPT.findall(recipe)]
+    for entry in _hook_entries(ctx, gate.gate_recipes()):
         found += [m for m in _HOOK_SCRIPT.findall(entry) if not Path(m).name.startswith("test_")]
     return list(dict.fromkeys(m for m in found if ctx.path(m).is_file()))
 
 
 # The tracked files blueprint reads. A container gate whose image leaves one out judges a different repo.
 _BLUEPRINT_READS = (
+    "justfile",
     "Makefile",
     "AGENTS.md",
     "CLAUDE.md",
@@ -385,12 +368,12 @@ def _dropped(path: str, ignore: str) -> bool:
     return dropped
 
 
-def _image_ignores(ctx: Context, makefile: str) -> dict[str, str]:
-    """Ignore file name -> text, for each image the Makefile builds: `<Dockerfile>.dockerignore` first, else the root one."""
-    if not _DOCKER_BUILD.search(makefile):
+def _image_ignores(ctx: Context, gate_text: str) -> dict[str, str]:
+    """Ignore file name -> text, for each image the gate file builds: `<Dockerfile>.dockerignore` first, else the root one."""
+    if not _DOCKER_BUILD.search(gate_text):
         return {}
     ignores: dict[str, str] = {}
-    for dockerfile in _DOCKER_FILE_FLAG.findall(makefile) or [""]:
+    for dockerfile in _DOCKER_FILE_FLAG.findall(gate_text) or [""]:
         for name in (f"{dockerfile}.dockerignore" if dockerfile else "", ".dockerignore"):
             if name and (text := ctx.read(name)) is not None:
                 ignores[name] = text
@@ -398,50 +381,50 @@ def _image_ignores(ctx: Context, makefile: str) -> dict[str, str]:
     return ignores
 
 
-def _dropped_reads(ctx: Context, makefile: str) -> list[str]:
+def _dropped_reads(ctx: Context, gate_text: str) -> list[str]:
     tracked = (ctx.git("ls-files") or "").splitlines()
     reads = [f for f in tracked if any(fnmatch(f, pattern) for pattern in _BLUEPRINT_READS)]
-    return [f"{name} drops {f}" for name, text in _image_ignores(ctx, makefile).items() for f in reads if _dropped(f, text)]
+    return [f"{name} drops {f}" for name, text in _image_ignores(ctx, gate_text).items() for f in reads if _dropped(f, text)]
 
 
 @check(
     "gate.runs-blueprint",
-    "`make check` runs blueprint's per-commit checkpoints (`make blueprint`), on the files blueprint reads",
+    "`just check` runs blueprint's per-commit checkpoints (`just blueprint`), on the files blueprint reads",
     version=2,
 )
 def runs_blueprint(ctx: Context) -> Finding:
     """Gaps come back between audits unless the repo's own gate re-checks them on every commit."""
-    makefile = ctx.read("Makefile")
-    if makefile is None:
-        return not_applicable("no Makefile: gate.one-command reports the missing gate")
-    if "blueprint check" not in reachable_recipes(makefile):
+    gate = gate_graph.load(ctx)
+    if gate is None:
+        return not_applicable("no justfile: gate.one-command reports the missing gate")
+    if "blueprint check" not in gate.gate_recipes():
         return not_set_up(
-            "`make check` never runs blueprint",
-            "copy the shelf's `blueprint` target into the Makefile and add it to `check` (`make bootstrap` does both)",
+            "`just check` never runs blueprint",
+            "copy the shelf's `blueprint` recipe into the justfile and add it to `check` (`just bootstrap` does both)",
             FixedBy.AUTO,
         )
-    dropped = _dropped_reads(ctx, makefile)
+    dropped = _dropped_reads(ctx, gate.text)
     if dropped:
         return failing(
             f"the gate image's ignore file leaves out tracked files blueprint reads: {'; '.join(dropped)}",
             "re-include each with a `!<path>` line after the drop (a container without .beads/config.yaml reports a false 'no tracker'), "
             "or keep the file in the build context; docs/agents/gate.md lists what a container gate must carry",
         )
-    return passing("`make check` reaches `blueprint check --gate`")
+    return passing("`just check` reaches `blueprint check --gate`")
 
 
-@check("gate.guards-have-red-tests", "every repo-local script `make check` runs has a test that names it", version=2)
+@check("gate.guards-have-red-tests", "every repo-local script `just check` runs has a test that names it", version=2)
 def guards_have_red_tests(ctx: Context) -> Finding:
-    """Each repo `*.py` that `make check` reaches, in a recipe or through its pre-commit hooks, is named by some test file.
+    """Each repo `*.py` that `just check` reaches, in a recipe or through its pre-commit hooks, is named by some test file.
 
     A guard never seen red is a hypothesis.
     """
-    makefile = ctx.read("Makefile")
-    if makefile is None:
-        return not_applicable("no Makefile, so no guard scripts")
-    scripts = _gate_scripts(ctx, makefile)
+    gate = gate_graph.load(ctx)
+    if gate is None:
+        return not_applicable("no justfile, so no guard scripts")
+    scripts = _gate_scripts(ctx, gate)
     if not scripts:
-        return not_applicable("`make check` runs no repo-local Python script")
+        return not_applicable("`just check` runs no repo-local Python script")
     tests = [p.read_text(errors="replace") for p in walk(ctx.repo, "test_*.py")]
     untested = [s for s in scripts if not any(Path(s).stem in t or Path(s).stem.replace("-", "_") in t for t in tests)]
     if untested:
@@ -452,24 +435,24 @@ def guards_have_red_tests(ctx: Context) -> Finding:
     return passing(f"{len(scripts)} script(s) ({', '.join(scripts)}), each named by a test")
 
 
-# make's own trailer (`make: *** [check] Error 2`, `make[1]: Leaving directory`) names no cause.
-_MAKE_LINE = re.compile(r"^g?make(\[\d+\])?: ")
+# The runner's own trailer (`make: *** [check] Error 2`, "error: Recipe `lint` failed on line 9 ...") names no cause.
+_RUNNER_LINE = re.compile(r"^(?:g?make(\[\d+\])?: |error: Recipe `)")
 
 
 def _cause(done: subprocess.CompletedProcess[str]) -> str:
-    """The last line of the failing run's output that make did not write itself; stderr first, it carries the error."""
+    """The last line of the failing run's output that the runner did not write itself; stderr first, it carries the error."""
     for stream in (done.stderr, done.stdout):
-        lines = [line.strip() for line in stream.splitlines() if line.strip() and not _MAKE_LINE.match(line.strip())]
+        lines = [line.strip() for line in stream.splitlines() if line.strip() and not _RUNNER_LINE.match(line.strip())]
         if lines:
             return lines[-1]
     return "no output"
 
 
-def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budget: object) -> Finding:
+def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budget: object, word: str = "just") -> Finding:
     if done is None:
-        return failing("`make check` in a fresh clone did not finish within an hour", "find the step that hangs")
+        return failing(f"`{word} check` in a fresh clone did not finish within an hour", "find the step that hangs")
     if done.returncode != 0:
-        return failing(f"`make check` fails in a fresh clone ({took}s): {_cause(done)}", "make the gate pass from a clean checkout")
+        return failing(f"`{word} check` fails in a fresh clone ({took}s): {_cause(done)}", "make the gate pass from a clean checkout")
     if not isinstance(budget, int):
         return not_set_up(
             f"fresh-clone gate passed in {took}s; no budget recorded",
@@ -483,19 +466,20 @@ def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budge
     return passing(f"fresh-clone gate passed in {took}s (budget {budget}s)")
 
 
-@check("gate.clean-clone", "a fresh clone passes `make check` within its recorded budget", audit_only=True)
+@check("gate.clean-clone", "a fresh clone passes `just check` within its recorded budget", audit_only=True)
 def clean_clone(ctx: Context) -> Finding:
-    """Clone HEAD into a temp dir and run `make check` there, timed."""
+    """Clone HEAD into a temp dir and run `just check` (a Makefile repo: `make check`) there, timed."""
     if ctx.git("rev-parse", "HEAD") is None:
         return not_checked("no commit to clone")
+    word = "make" if gate_graph.has_makefile_only(ctx) else "just"
     with tempfile.TemporaryDirectory(prefix="blueprint-clone-") as tmp:
         clone = ctx.run("git", "clone", "--quiet", str(ctx.repo), tmp, timeout=300)
         if clone is None or clone.returncode != 0:
             return not_checked("could not clone the repository")
         start = time.monotonic()
-        done = ctx.run("make", "check", cwd=Path(tmp), timeout=3600)
+        done = ctx.run(gate_graph.just_command(ctx) if word == "just" else word, "check", cwd=Path(tmp), timeout=3600)
         took = round(time.monotonic() - start)
-    return _judge_clone(done, took, ctx.settings.get("clean-clone-seconds"))
+    return _judge_clone(done, took, ctx.settings.get("clean-clone-seconds"), word)
 
 
 _CHECKER = re.compile(r"^(?:check|lint|validate|verify)[_-].+\.(?:py|sh)$")
@@ -515,21 +499,21 @@ def _checker_scripts(ctx: Context) -> list[str]:
     return sorted(found)
 
 
-@check("gate.checkers-wired", "every check/lint script under tools/ or scripts/ is run by `make check`")
+@check("gate.checkers-wired", "every check/lint script under tools/ or scripts/ is run by `just check`")
 def checkers_wired(ctx: Context) -> Finding:
     """A checker nothing runs guards nothing: its name says check, and the repo's own docs may say run it before a commit."""
-    makefile = ctx.read("Makefile")
-    if makefile is None:
-        return not_applicable("no Makefile: gate.one-command reports the missing gate")
+    gate = gate_graph.load(ctx)
+    if gate is None:
+        return not_applicable("no justfile: gate.one-command reports the missing gate")
     scripts = _checker_scripts(ctx)
     if not scripts:
         return not_applicable("no check_*/lint_* script under tools/ or scripts/")
-    commands = _gate_commands(ctx, makefile)
+    commands = _gate_commands(ctx, gate)
     unwired = [s for s in scripts if not re.search(rf"(?<![\w.-]){re.escape(Path(s).name)}", commands)]
     if unwired:
         return failing(
-            f"`make check` never runs {', '.join(unwired)}",
-            "run each from a target `make check` reaches (then gate.guards-have-red-tests wants a test per script), "
+            f"`just check` never runs {', '.join(unwired)}",
+            "run each from a recipe `just check` reaches (then gate.guards-have-red-tests wants a test per script), "
             "or delete it; a script kept on purpose is an override of gate.checkers-wired with a reason and an expiry or adr",
         )
     return passing(f"{len(scripts)} checker script(s), each run by the gate")
@@ -569,12 +553,3 @@ def git_remote(ctx: Context) -> Finding:
         "no git remote",
         "git remote add origin <url> and push; a repo kept local on purpose is an override of gate.git-remote with a reason and an adr",
     )
-
-
-def reachable_recipes(makefile: str) -> str:
-    """The recipe text of every target `make check` or `make check-all` reaches, joined.
-
-    `check-all` counts: a repo may narrow `check` to what a change touches and keep the whole
-    run (coverage floor included) in `check-all`, which CI runs.
-    """
-    return "\n".join(dict.fromkeys(_reachable(makefile) + _reachable(makefile, "check-all")))

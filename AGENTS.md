@@ -26,9 +26,12 @@ A task is **done** only when the full quality gate passes across the **entire re
 not just the files the task touched:
 
 ```bash
-make check      # ruff + format + pyrefly (strict) + codespell + deptry + the tests the change reaches
-make check-all  # the same, every test, with the coverage floor (CI runs this)
+just check      # ruff + format + pyrefly (strict) + codespell + deptry + the tests the change reaches
+just check-all  # the same, every test, with the coverage floor (CI runs this)
 ```
+
+The runner is [just](https://just.systems) ([ADR 0023](docs/adr/0023-the-gate-runner-is-just.md)), pinned as the
+`rust-just` dev dependency: `uv run just check` works on any clone after `uv sync`.
 
 Both run in a Linux container when Docker answers (the macOS endpoint scanner made the host run
 10-17 min); `SHELF_HOST_CHECK=1` forces the host. The lint, type and dependency checks always cover
@@ -36,7 +39,7 @@ the whole repo; only the tests are narrowed, to the changed packages and every p
 on them (`tools/affected.py`).
 
 **No carve-outs.** "Pre-existing drift", "unrelated file", or "that's a separate change" do **not**
-satisfy Done. If `make check` is red for any reason, the task is not finished. This toolchain is the
+satisfy Done. If `just check` is red for any reason, the task is not finished. This toolchain is the
 **reference every consumer inherits** ([docs/linting.md](docs/linting.md), a config-preset not a CLI —
 [ADR 0004](docs/adr/0004-linters-are-a-config-preset.md)).
 
@@ -64,7 +67,7 @@ Read [docs/constitution.md](docs/constitution.md) before changing anything. The 
 
 A shelf package **must not import any consumer app** (a2kay, a2web, a2kit, …). The dependency arrow
 points UP into the apps, never down out of them. Enforced by
-the import-linter `forbidden` contract in [pyproject.toml](pyproject.toml) (`make arch`; ruff TID251 covers `packages/*/tests`). If you need a consumer's type, you have the arrow
+the import-linter `forbidden` contract in [pyproject.toml](pyproject.toml) (`just arch`; ruff TID251 covers `packages/*/tests`). If you need a consumer's type, you have the arrow
 backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more.
 
 ### Conventions
@@ -84,7 +87,7 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
 - **`packages/`** — the software (uv-workspace members), versioned by **git tag** (`anyllm-v0.1.0`).
   The live roster is [catalog/README.md](catalog/README.md) (derived — do not look for it here).
 - **The ontology** (flat files, [ADR 0003](docs/adr/0003-ontology-lives-as-flat-files.md)) —
-  instance data, projected into READMEs by `make catalog` (never hand-edit the READMEs):
+  instance data, projected into READMEs by `just catalog` (never hand-edit the READMEs):
   - `catalog/` — one manifest per MicroSoftware (supply). `catalog/README.md` is derived.
   - `use-cases/` — one file per (consumer × software): each consumer **publishes** why it depends and
     what it needs. Consumers are *derived* from these; zero active ⇒ orphaned (constitution Article VIII).
@@ -230,7 +233,7 @@ bd prime                # Refresh Beads context
 <!-- blueprint:begin -->
 ## Working agreement (managed by blueprint; do not edit between the markers)
 
-Done = `make check` green over the whole repo. Never `--no-verify`. Commit only on the owner's yes.
+Done = `just check` green over the whole repo. Never `--no-verify`. Commit only on the owner's yes.
 Read a file below when its trigger applies, not before.
 
 | file | read when |

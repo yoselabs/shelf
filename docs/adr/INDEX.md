@@ -15,12 +15,13 @@ the file holds the reasons, the rejected options and the history.
 
 ## gate
 
-- [0004](0004-linters-are-a-config-preset.md) **Linters are a config-preset, not a CLI**: The shelf's own pyproject [tool.*] blocks and Makefile targets are the lint reference; a consumer copies them and owns the copy. No lint CLI, no runtime dependency.
+- [0004](0004-linters-are-a-config-preset.md) **Linters are a config-preset, not a CLI**: The shelf's own pyproject [tool.*] blocks and justfile recipes are the lint reference; a consumer copies them and owns the copy. No lint CLI, no runtime dependency.
 - [0005](0005-architecture-rules-are-native-fitness-tests.md) **Architecture rules run in the toolchain; AST facts are native tests**: Import-graph rules run in-toolchain (import-linter in pyproject; ruff TID251 for banned APIs); AST-fact rules stay pure-stdlib pytest, blocking in a package, advisory across; no policy engine.
 - [0018](0018-new-checkpoints-warn-until-the-next-audit.md) **A new blueprint checkpoint warns until the repo's next audit**: Each audit records the checkpoints it judged in docs/blueprint/checkpoints.txt; between audits the gate enforces that set and a newer checkpoint only warns (🆕).
 - [0020](0020-prek-runs-every-hook.md) **prek runs every git hook, bd's included**: prek is the one hook manager; bd's events run from .pre-commit-config.yaml via `bd hooks run`; bd never installs hooks itself and core.hooksPath stays unset.
-- [0021](0021-affected-tests-stay-on-affected-py.md) **Affected-only tests stay on tools/affected.py; moon is the migration target**: make check narrows tests with tools/affected.py; no build tool yet. Migrate to moon's generic task graph when the shelf gets its first non-Python package (bead shelf-qgz).
+- [0021](0021-affected-tests-stay-on-affected-py.md) **Affected-only tests stay on tools/affected.py; moon is the migration target**: just check narrows tests with tools/affected.py; no build tool yet. Migrate to moon's generic task graph when the shelf gets its first non-Python package (bead shelf-qgz).
 - [0022](0022-every-exception-is-justified.md) **Every exception to a blueprint rule is justified**: An override or ignored path in blueprint.toml needs a reason and either an expires date or an adr naming the accepted ADR that records the durable decision; the gate reports one without.
+- [0023](0023-the-gate-runner-is-just.md) **The gate runner is just**: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`.
 
 ## knowledge
 
@@ -43,7 +44,7 @@ the file holds the reasons, the rejected options and the history.
 
 - [0006](0006-aggressive-capitalization-reconcile-later.md) **Promote aggressively at writing time, reconcile later**: Generic substrate is promoted to the shelf when you write it, on a self-assessed "feels reusable"; adoption stays conservative and a mandatory reconcile pass prunes over-promotion.
 - [0007](0007-evolve-on-monotonic-contracts.md) **Evolve on monotonic contracts**: Evolve the one package to the richer superset instead of cutting a sibling; converge on a contract that exposes more and removes nothing, and keep a narrower one only for a stated requirement.
-- [0009](0009-close-the-loop-on-every-mutating-workflow.md) **Close the loop on every mutating workflow**: PROMOTE, RECEIVE and RECONCILE are done only when catalog, ledger and the main branch agree: make catalog, a ledger row per event, make check green, merged and pushed, worktree removed.
+- [0009](0009-close-the-loop-on-every-mutating-workflow.md) **Close the loop on every mutating workflow**: PROMOTE, RECEIVE and RECONCILE are done only when catalog, ledger and the main branch agree: just catalog, a ledger row per event, just check green, merged and pushed, worktree removed.
 - [0010](0010-generic-first-specific-second.md) **Generic first, consumer second**: Define a package's capability across the whole class of inputs first, then let the live consumer only rank what ships by default versus opt-in; never narrow the grid to one consumer's diet.
 - [0011](0011-benchmarking-is-a-named-workflow.md) **Benchmarking is a named workflow (BENCH)**: Contested keep-vs-replace and build-vs-adopt calls between tools are decided by the BENCH workflow on isolated, model-free, dated evidence, not by reputation or inheritance.
 - [0012](0012-sharp-edges-are-a-promotion-trigger.md) **Sharp edges are a promotion trigger**: A bug rooted in a dependency's behaviour is a promotion trigger fired at bugfix time; the lesson ships as a feature of a capability package, never as a library-shaped package.

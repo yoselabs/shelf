@@ -22,8 +22,8 @@
 # shelf's, or says why not.
 - id: shelf-preset-drift
   name: linter config matches the shelf preset (or declares why not)
-  description: Fails on any ruff/pyrefly/Makefile difference from the shelf not declared in [tool.shelf-preset].
+  description: Fails on any ruff/pyrefly/justfile difference from the shelf not declared in [tool.shelf-preset].
   entry: tools/preset_drift.py
   language: script
-  files: ^(pyproject\.toml|Makefile)$
+  files: ^(pyproject\.toml|justfile|Makefile)$
   pass_filenames: false

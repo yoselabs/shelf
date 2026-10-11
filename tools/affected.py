@@ -5,11 +5,11 @@ Prints pytest paths, one per line: always `tests` (the fitness tests), plus `pac
 for every package the change touches and every package that depends on one of them, walked
 through the uv-workspace graph (each member's dependencies, optional dependencies and
 dependency groups). A change anywhere the graph cannot see — the root `pyproject.toml`,
-`uv.lock`, `conftest.py`, the `Makefile`, CI, an unknown path, or a pytest plugin package that
+`uv.lock`, `conftest.py`, the `justfile`, CI, an unknown path, or a pytest plugin package that
 loads into every run — selects every package.
 
 The change is the diff from the upstream merge-base (HEAD when there is no upstream) to the
-working tree, plus untracked files. `make check-all` runs everything regardless.
+working tree, plus untracked files. `just check-all` runs everything regardless.
 
 Result cache (`--skip-passed`, `--record`): a package's fingerprint hashes its files, the files of
 every package it depends on, and the root files every test run reads (uv.lock, pyproject.toml,

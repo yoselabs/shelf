@@ -22,7 +22,7 @@ parallel-safe additive writes).
 - **Types in `CONTEXT.md`, instances in `catalog/` + `ledger/`.** The glossary's litmus holds:
   "would this survive deleting every package?" No means instance data, never the glossary.
 - **Every rollup is DERIVED (constitution I).** Catalog index and ledger summary are *projected* by a
-  generator (`tools/catalog.py`, `make catalog`), never hand-maintained. A freshness test fails if a
+  generator (`tools/catalog.py`, `just catalog`), never hand-maintained. A freshness test fails if a
   README drifts.
 - **Supply and demand are separate files.** `catalog/<sw>.toml` is the supply. A consumer's
   dependency is its own `use-cases/<consumer>--<sw>.toml`, which publishes why it needs the piece and

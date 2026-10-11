@@ -29,7 +29,7 @@ ride the package's tag and shelf doctrine is deliberately always-HEAD (not a Kin
   `claude plugin details` (the actual always-on token cost).
 - **C, one repo, two roles.** The shelf repo is also the plugin marketplace and plugin source
   (`marketplace.json` points at a relative in-repo path, precedent: `context7-marketplace`), keeping
-  one catalog projection, ledger, `make check` and resolver block.
+  one catalog projection, ledger, `just check` and resolver block.
 - **D, two tiers.** `.agents/skills/` (shelf-internal tooling such as onboard-consumer, beads) is
   **pull-based**: invoked by path, absent from the auto-scanned listing even inside the shelf repo,
   zero standing cost. A catalog-registered plugin skill is **push-based**: auto-triggered by

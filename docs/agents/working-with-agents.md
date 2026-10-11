@@ -10,7 +10,7 @@ How an agent (or a person) works in this repo, session start to handoff.
 | 2 | `bd ready`; pick one bead; `bd update <id> --claim` as the first write | A claim stops two agents taking one task |
 | 3 | Read the bead's acceptance criteria; none means ask, do not guess | Criteria are the definition of the task's done |
 | 4 | Work test first ([testing.md](testing.md)); keep to files the bead needs | Disjoint files make parallel work safe |
-| 5 | `make check` green over the whole repo | [gate.md](gate.md) |
+| 5 | `just check` green over the whole repo | [gate.md](gate.md) |
 | 6 | `bd close <id> --reason "..."`; new work found becomes a new bead | Nothing stays only in chat |
 | 7 | Report: files changed, gate result, bead state, next command | The owner reads the report, not the diff |
 
@@ -26,7 +26,7 @@ in the same folder during that time is lost, and the commit fails (reproduced wi
 | set up | the stack's sync in the new tree (python: `uv sync`); nothing is copied from the main checkout |
 | beads | `bd` in a worktree uses the main checkout's database; never `bd init` there |
 | hooks | prek's hooks are installed once for the repo and run in every worktree; never install per worktree |
-| finish | `make check` green in the worktree; on the owner's yes, rebase on main and merge fast-forward; then `git worktree remove` |
+| finish | `just check` green in the worktree; on the owner's yes, rebase on main and merge fast-forward; then `git worktree remove` |
 
 Both folders are git-ignored (`agents.worktrees`), so no linter, test run or `git add -A` reaches into another tree.
 

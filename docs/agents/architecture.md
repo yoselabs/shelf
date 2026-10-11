@@ -7,7 +7,7 @@ only prose is not a rule.
 
 | layer | holds | may depend on | enforced by |
 |---|---|---|---|
-| packages | the shelf's software, one concept per package | the standard library, third-party libraries, and sibling packages they declare | `lint-imports` (`make arch`): the `forbidden` contract bars every consumer app, `independence` bars undeclared sibling edges; ruff TID251 bars consumer imports in `packages/*/tests` |
+| packages | the shelf's software, one concept per package | the standard library, third-party libraries, and sibling packages they declare | `lint-imports` (`just arch`): the `forbidden` contract bars every consumer app, `independence` bars undeclared sibling edges; ruff TID251 bars consumer imports in `packages/*/tests` |
 | tools | the shelf's own scripts: onboarding, catalog, gate helpers | the standard library and `packages/blueprint` | `tools/arch_rules.py` via `tests/test_arch_rules.py` |
 | consumer apps | live in their own repos and import packages | anything | nothing here: the arrow only points from apps to packages |
 

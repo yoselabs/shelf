@@ -25,8 +25,8 @@ in one adaptive, verified pass:
 python3 "$SHELF_HOME/.agents/skills/onboard-consumer/scripts/onboard.py" --repo /path/to/consumer
 ```
 
-Once the Makefile targets are copied in (they're part of what this run copies, if it also copies
-the linter reference — see step 3 below), `make bootstrap` is the same call.
+Once the justfile recipes are copied in (they're part of what this run copies, if it also copies
+the linter reference — see step 3 below), `just bootstrap` is the same call.
 
 It's idempotent: safe to re-run on an already-onboarded repo to check its current state, and it
 adapts to what it finds (an existing pre-commit/husky/lefthook hook, a non-Python target, beads
@@ -85,7 +85,7 @@ extraction moment is not. Only *adopting a dep* stays conservative (DEEP·STABLE
 ## Phase E — promote / extend (when Phase D says PROMOTE or EXTEND)
 
 Follow **agent-loop.md §4** exactly, in the project's shelf worktree `../shelf-<project>`:
-extract behind a Capability + boundary test + `candidate` Contract; `make check` green in the worktree;
+extract behind a Capability + boundary test + `candidate` Contract; `just check` green in the worktree;
 tag namespaced; repoint **every** consumer that wants it (delete each in-repo copy, keep tests green); a
 breaking change ships its migration. For a *superset* promotion that supersedes an existing thinner package,
 the old package is `deprecated` (not deleted — Article VIII) with a migration note; consumers move opt-in.
@@ -93,7 +93,7 @@ the old package is `deprecated` (not deleted — Article VIII) with a migration 
 ## Phase F — record & report
 
 - **Publish use-cases**: one `use-cases/<consumer>--<sw>.toml` per adopted piece (why + what — the retention claim).
-- **Ledger**: append a `<seq>-<consumer>-<sw>-<event>.toml` per delivery/verdict; `make catalog`.
+- **Ledger**: append a `<seq>-<consumer>-<sw>-<event>.toml` per delivery/verdict; `just catalog`.
 - **Report**: a table of every candidate → verdict → action, plus **what the shelf gained** — packages
   promoted / capabilities extended, i.e. generic substrate now available to the *next* project. The success
   metric is **future-code-avoided (catalog coverage), NOT existing-repo shrink.** A sweep that promotes a
@@ -106,4 +106,4 @@ the old package is `deprecated` (not deleted — Article VIII) with a migration 
   before deleting consumer code or cutting a promotion tag.
 - **Cross-repo edits stay isolated:** consumer changes in the consumer repo; shelf changes in
   `../shelf-<project>`. Never edit the shelf main checkout.
-- **`make check` green** in every repo you touch before you stop.
+- **`just check` green** in every repo you touch before you stop.

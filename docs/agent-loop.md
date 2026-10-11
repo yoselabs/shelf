@@ -191,7 +191,7 @@ STEPS:
      runbook stays a runbook. A converted skill also carries a real, measured cost every consumer
      session pays whether it fires or not (`claude plugin details <name>`) — earn that cost before
      spending it.
-4. `make check` green **in the worktree**. For a skill: also run `claude plugin details <name>` and
+4. `just check` green **in the worktree**. For a skill: also run `claude plugin details <name>` and
    record its always-on token figure in the catalog entry's `notes` field before marking it `active`
    — the measured cost, not a guess, is what the entry asserts (skill-kind capability).
 5. Tag namespaced and push: for a package, `git tag <name>-vX.Y.Z && git push origin work/<project>
@@ -208,14 +208,14 @@ STEPS:
      Only gets an entry on contract-shape changes — most releases add zero lines.
 8. **Close the loop** (ADR 0009) — the change isn't done when the code is right, it's done
    when the shelf's shared surfaces agree with it and `main` carries it:
-   - `make catalog` if `catalog/*.toml` or `use-cases/*.toml` changed — a stale derived README lies.
+   - `just catalog` if `catalog/*.toml` or `use-cases/*.toml` changed — a stale derived README lies.
    - Append a `ledger/00NN-<slug>.toml` **`delivery`** row (grep `ledger/*.toml` for `^event` for
      the existing vocabulary — don't invent a new one). If the same session also completes the
      repoint (step 6) and it holds, append a **separate** `verdict` row (`adopted`/`kept`) — two
      events, two rows, never one row wearing both hats.
    - If this closed a bead, `bd close <id>` in the same change; if only partially closed,
      `bd update <id> --append-notes "<what remains>"` instead of closing it.
-   - `make check` green, **then merge `work/<project>` into `main` and push** — a promotion that
+   - `just check` green, **then merge `work/<project>` into `main` and push** — a promotion that
      never reaches `main` never happened, from any other session's point of view.
 9. `git -C <shelf> worktree remove ../shelf-<project>` once step 8's merge landed; delete the
    remote work branch too if it merged cleanly (a merged branch left behind is dead weight, not a
@@ -246,7 +246,7 @@ STEPS:
 5. Tests green.
 6. **Close the loop** (ADR 0009) — this is a shelf write even though you're in the
    consumer's repo: in `../shelf-<project>` (create it if this session doesn't have one yet),
-   append a `verdict` ledger row (`adopted`/`kept`/`rejected`), `make catalog` if warranted, commit,
+   append a `verdict` ledger row (`adopted`/`kept`/`rejected`), `just catalog` if warranted, commit,
    push. Small and append-only — doesn't need `PROMOTE`'s full worktree ceremony, but does need the
    worktree, not a stray edit against the shared clone.
 
@@ -280,8 +280,8 @@ STEPS: walk `<shelf>/catalog/README.md`, ask per piece:
 Never delete a *tag* (`PROMOTE` step 5); retiring a package means marking it `deprecated` and
 stopping new adoption.
 
-**Close the loop** (ADR 0009), same shape as `PROMOTE` step 8: `make catalog`, a `verdict`
-ledger row per action taken (merge/split/delete/demote, against the affected package(s)), `make
+**Close the loop** (ADR 0009), same shape as `PROMOTE` step 8: `just catalog`, a `verdict`
+ledger row per action taken (merge/split/delete/demote, against the affected package(s)), `just
 check` green, merge + push to `main`.
 
 OUTPUT: catalog garbage-collected with hindsight — "was that the right abstraction?" answered
@@ -355,7 +355,7 @@ STEPS:
    above. Fill the ADR's `distilled_into:` frontmatter field with the workflow name, OR
    `N/A — self-enforcing via <test/tool>` if the ADR doesn't change agent behavior at all.
 4. Never split steps 2–3 across changes. An ADR merged without its distillation is
-   incomplete, not "to be done later" — `make check` enforces the field is filled (see
+   incomplete, not "to be done later" — `just check` enforces the field is filled (see
    `tests/test_adr_distillation.py`), but only a human/agent discipline enforces that the
    *distillation itself* actually happened, so treat step 3 as non-optional.
 

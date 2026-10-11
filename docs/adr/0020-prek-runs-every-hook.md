@@ -14,7 +14,7 @@ distilled_into: blueprint gate.hooks-recipe, gate.hooks-installed; recipes/pre-c
 ## Decision
 
 `bd init --skip-hooks`; bd's five events are the first entries in `.pre-commit-config.yaml`
-(`bd hooks run <event>`), `bd dolt push` runs on pre-push, `make check` on pre-push; `prek install`.
+(`bd hooks run <event>`), `bd dolt push` runs on pre-push, `just check` on pre-push; `prek install`.
 Never `bd hooks install`.
 
 Why: bd injecting its block into another manager's hook file made a failing check stop blocking

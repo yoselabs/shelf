@@ -1,6 +1,6 @@
-# The Definition of Done (AGENTS.md §1: `make check` green, whole repo, no carve-outs)
+# The Definition of Done (AGENTS.md §1: `just check` green, whole repo, no carve-outs)
 # enforced from outside any one contributor's memory — see shelf-2xb. Deliberately minimal:
-# one job, one command, no browser engines (make test-browser is a separate, opt-in target).
+# one job, one command, no browser engines (just test-browser is a separate, opt-in target).
 #
 # HYPOTHESIS_PROFILE=ci: conftest.py's seeding policy. A fixed seed means a property-test
 # failure is reproducible and would have failed on the previous commit too -- it can never
@@ -29,4 +29,4 @@ jobs:
 
       - run: uv sync --locked
 
-      - run: make check-all
+      - run: uv run just check-all

@@ -14,17 +14,17 @@ contract-guarantee, not "micro"/smallness.)*
 - `docs/constitution.md` — the 8 load-bearing rules.
 - `CONTEXT.md` — the ontology (TYPES only, never instances).
 - `docs/` — thoughts → tracks → missions → ADRs (see `docs/adr/README.md`; the list is `docs/adr/INDEX.md`).
-- `tests/` — repo-level fitness tests (the boundary spine lives in `[tool.importlinter]`, run by `make arch`; these tests guard it and the AST rules).
+- `tests/` — repo-level fitness tests (the boundary spine lives in `[tool.importlinter]`, run by `just arch`; these tests guard it and the AST rules).
 
 ## The one law that keeps this reusable
 
 A shelf package **never imports a consumer app**. The dependency arrow points UP into the
-apps, never down out of them. Enforced by the import-linter `forbidden` contract in `pyproject.toml` (`make arch`).
+apps, never down out of them. Enforced by the import-linter `forbidden` contract in `pyproject.toml` (`just arch`).
 
 ## Quality gate
 
 ```
-make check   # ruff check + ruff format --check + ty + pytest, whole-repo, no carve-outs
+just check   # ruff check + ruff format --check + ty + pytest, whole-repo, no carve-outs
 ```
 
 ## Provenance

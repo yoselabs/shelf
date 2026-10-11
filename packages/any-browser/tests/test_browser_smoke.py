@@ -8,8 +8,8 @@ catch. Both families are covered:
   - Playwright API → patchright (fast Chromium)
   - raw CDP        → zendriver
 
-Excluded from the default `make check` run (the `browser` marker is deselected
-by the pyproject `addopts` default). Run it with `make test-browser`.
+Excluded from the default `just check` run (the `browser` marker is deselected
+by the pyproject `addopts` default). Run it with `just test-browser`.
 
 **Skip vs fail is environment-conditional (the dead-rung guard).** On a dev
 laptop with no Chromium, a missing engine skips — humane and correct for the

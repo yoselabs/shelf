@@ -73,7 +73,7 @@ The owner's one yes covers the whole plan. Per concern, in layer order (generic,
   `adr = "NNNN"` naming the accepted ADR that records the durable decision (no CI, builds on the
   owner's machines). A path detection must skip (a throwaway spike) is a `[[profile.ignore]]` entry
   under the same rule. Rows still not ✅ at the end become beads.
-- Finish with the repo's own `make check` green and `--write` again.
+- Finish with the repo's own `just check` green and `--write` again.
 
 ## 4. What the owner sees
 
@@ -105,7 +105,7 @@ gets a short plain-words picture first; much work ahead gets one page outlining 
 
 - **Start:** audit the empty repo, then on the yes: onboarding (`python3
   <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo .`: beads strict and quiet, prek
-  hooks from the recipe, the gate with `make blueprint` in it) → `template --repo .` (docs/agents/
+  hooks from the recipe, the gate as a `justfile` with `just blueprint` in it; the runner is `just`, pinned as `rust-just`) → `template --repo .` (docs/agents/
   and the AGENTS.md block; then fill every `{{name}}` from the repo) → the stack's profile → the
   framework's profile → CI.
 - **Reabsorb:** a blueprint gap, or anything the run met that no checkpoint covers, becomes one
@@ -142,8 +142,8 @@ Friction no checkpoint covers: <one line each, or none>
 - Hooks: never let bd install its own (`bd init --skip-hooks`; `bd hooks install` never). bd's
   hooks run from `.pre-commit-config.yaml` via prek; bd's own injection makes a failing check stop
   blocking commits in other managers' hook files.
-- `--audit` adds the audit-only rows: slow ones (a fresh clone running `make check`) and ones
-  reading this clone's state (installed hooks, bd's database). The repo's `make blueprint` skips them.
+- `--audit` adds the audit-only rows: slow ones (a fresh clone running `just check`) and ones
+  reading this clone's state (installed hooks, bd's database). The repo's `just blueprint` skips them.
 - Culture files: `template --repo .` copies only what is missing and rewrites only the AGENTS.md
   block; fill the placeholders, never delete the block's markers.
 - Concerns: `gate`, `backlog`, `knowledge`, `stack`, `framework`, `agents`; profiles python-uv

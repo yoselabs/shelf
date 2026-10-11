@@ -49,7 +49,7 @@ repos:
     language: system
     always_run: true
     stages: [prepare-commit-msg]
-# The shelf's own fast checks. `make check` stays the gate (CI, Definition of Done); the hook
+# The shelf's own fast checks. `just check` stays the gate (CI, Definition of Done); the hook
 # keeps commits fast: the local-source guard, ruff on staged files, preset drift on pyproject.
 - repo: local
   hooks:
@@ -61,7 +61,7 @@ repos:
     pass_filenames: false
     stages: [pre-commit]
   - id: ruff-check
-    # the same paths `make lint` covers, so the hook never refuses what the gate accepts
+    # the same paths `just lint` covers, so the hook never refuses what the gate accepts
     files: ^(packages|tests|tools)/|^conftest\.py$
     name: ruff check
     entry: uv run --frozen ruff check --force-exclude
@@ -69,7 +69,7 @@ repos:
     types: [python]
     stages: [pre-commit]
   - id: ruff-format
-    # the same paths `make lint` covers, so the hook never refuses what the gate accepts
+    # the same paths `just lint` covers, so the hook never refuses what the gate accepts
     files: ^(packages|tests|tools)/|^conftest\.py$
     name: ruff format
     entry: uv run --frozen ruff format --check --force-exclude

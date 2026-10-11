@@ -5,7 +5,7 @@ drifts silently the moment the source changes, with no way to detect it, which
 is the constitution's "files are truth; indexes are derived" violated for a doc
 fragment. `BLOCK_TEXT` below is the one source; this operation re-projects it
 into the same marker-delimited region every run, so a consumer can be checked
-for drift the same way `make catalog` checks the ontology indexes.
+for drift the same way `just catalog` checks the ontology indexes.
 
 Marker-delimited, never a full-file rewrite: only the text between
 `_BEGIN`/`_END` is ever touched, and a fresh block is always appended at the

@@ -21,10 +21,10 @@ skill. Don't fold it into `catalog/*.toml` or gate it on `claude plugin details`
 governs the other tier (general-purpose skills meant to auto-fire in a consumer's own, unrelated
 sessions), which this one isn't.
 
-**Once §4's Makefile targets are copied, `make bootstrap` is the same skill under one command**
-(`make bootstrap-verify` re-checks without implying first-time setup — mechanically identical,
+**Once §4's justfile recipes are copied, `just bootstrap` is the same skill under one command**
+(`just bootstrap-verify` re-checks without implying first-time setup — mechanically identical,
 see `bootstrap-target-contract`'s design doc for why that's a deliberate, not lazy, choice). Before
-a Makefile exists yet (greenfield, or before §4 is done), invoke the script directly:
+a justfile exists yet (greenfield, or before §4 is done), invoke the script directly:
 `python3 "$SHELF_HOME/.agents/skills/onboard-consumer/scripts/onboard.py" --repo .`
 
 ## 1. Depend on the shelf (git + tag — distributable, never a local path)
@@ -38,12 +38,12 @@ anyllm = { git = "https://github.com/yoselabs/shelf", subdirectory = "packages/a
 source — it ties the project to one filesystem. (For local co-development of shelf + a consumer, use an
 *uncommitted* override; see [`agent-loop.md`](agent-loop.md) §6.)
 
-## 2. The commit guard — enforced by `make check`, accelerated by a hook
+## 2. The commit guard — enforced by `just check`, accelerated by a hook
 
 The shelf ships a guard that **refuses a local `path=`/editable shelf source**, so a co-development
 override can never leak into a commit and break CI or another checkout.
 
-**Enforcement is the `guard` target in `make check`** (copied with the rest of the preset, §4). It
+**Enforcement is the `guard` target in `just check`** (copied with the rest of the preset, §4). It
 reads `HEAD` — committed content — so it holds on any clone, with no hooks, no onboarding, and
 nothing installed. That matters because the alternative does not hold: a git hook is per-clone and
 **any tool that claims `core.hooksPath` silently disables it** — beads, husky, and lefthook all do,
@@ -62,10 +62,10 @@ and runs `prek install`:
 | bd's five events (`bd hooks run <event>`) | each git event | beads' own hook work; bd never installs hooks itself (`bd init --skip-hooks`) |
 | `shelf-guard` | pre-commit | refuses a committed local shelf source |
 | `ruff check`, `ruff format --check` | pre-commit | lint and format on the staged Python files |
-| `make check` | pre-push | the whole gate before code leaves the machine |
+| `just check` | pre-push | the whole gate before code leaves the machine |
 
 Print the recipe with `PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint recipe hooks`.
-Both are the same trade the guard makes: the hook is fast feedback, `make check` is the enforcement.
+Both are the same trade the guard makes: the hook is fast feedback, `just check` is the enforcement.
 
 Idempotent. It asks git where hooks live (`git rev-parse --git-path hooks`, which honors
 `core.hooksPath`) rather than assuming `.git/hooks`, then **proves the guard blocks** by running it
@@ -143,12 +143,12 @@ The **DEEP · STABLE · WINS** gate is deliberate: it keeps "reach for the shelf
 ## 4. Inherit the linter reference (copy, then own)
 
 The shelf's quality bar is a **config-preset**, not a CLI ([ADR 0004](adr/0004-linters-are-a-config-preset.md)):
-copy the `[tool.ruff|codespell|coverage]` blocks + the `Makefile` targets + the `dev` dependency-group
+copy the `[tool.ruff|codespell|coverage]` blocks + the `justfile` recipes + the `dev` dependency-group
 from this repo into yours, then override anything you genuinely need to. Full toolchain and the exact
-copy list: **[linting.md](linting.md)**. `make check` green (whole-repo, no carve-outs) is the bar.
+copy list: **[linting.md](linting.md)**. `just check` green (whole-repo, no carve-outs) is the bar.
 
 The `linter-preset` operation (`tools/onboard/linter_preset.py`, python+uv only) does this copy for
-you, merging per-table/per-target rather than overwriting — a project that already has its own
+you, merging per-table/per-recipe rather than overwriting — a project that already has its own
 `[tool.ruff]` keeps it exactly as written, ruff.lint included. The `onboard-consumer` skill runs it
 automatically when `pyproject.toml` exists, and states plainly when it doesn't apply (non-Python
 targets get the guard/resolver-block/beads pieces only).

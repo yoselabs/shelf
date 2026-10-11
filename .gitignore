@@ -29,3 +29,4 @@ evals/results/
 .worktrees/
 .turbo/
 .cache/
+.beads.gate.lock*

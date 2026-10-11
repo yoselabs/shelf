@@ -2,7 +2,7 @@
 
 `testpaths` in the root `pyproject.toml` is hand-maintained, and a hand-maintained
 list of what to check is the classic silent-enforcement loss: nothing fails when
-an entry is *missing*, so a package can ship a green `make check` while its own
+an entry is *missing*, so a package can ship a green `just check` while its own
 suite has never been executed. That is strictly worse than having no suite —
 a green gate is read as evidence.
 
@@ -53,7 +53,7 @@ def test_every_package_suite_is_in_the_gate() -> None:
     missing = sorted(_package_test_dirs() - _declared_testpaths())
     assert missing == [], (
         "these package test suites exist on disk but are NOT in `testpaths`, so "
-        f"`make check` never runs them: {missing}. Add them to the root pyproject.toml."
+        f"`just check` never runs them: {missing}. Add them to the root pyproject.toml."
     )
 
 

@@ -1,7 +1,7 @@
 ---
 id: 0009
 title: Close the loop on every mutating workflow
-statement: PROMOTE, RECEIVE and RECONCILE are done only when catalog, ledger and the main branch agree: make catalog, a ledger row per event, make check green, merged and pushed, worktree removed.
+statement: PROMOTE, RECEIVE and RECONCILE are done only when catalog, ledger and the main branch agree: just catalog, a ledger row per event, just check green, merged and pushed, worktree removed.
 concerns: [workflow]
 status: accepted
 decided_by: owner
@@ -18,7 +18,7 @@ A shelf-mutating workflow (`PROMOTE`, `RECEIVE`, `RECONCILE`) is not done when t
 it is done when the shelf's shared coordination surfaces agree with it and `main` carries it. Before
 calling one finished:
 
-1. `make catalog`: if `catalog/*.toml` or `use-cases/*.toml` changed, regenerate the derived
+1. `just catalog`: if `catalog/*.toml` or `use-cases/*.toml` changed, regenerate the derived
    `README.md`s in the same commit (a stale derived index looks authoritative and lies).
 2. **A ledger entry** `ledger/00NN-<slug>.toml` using the *existing* event vocabulary (`delivery`,
    `verdict`, `verification`; grep `^event` before inventing one). A promotion is a `delivery` row, a
@@ -27,17 +27,17 @@ calling one finished:
    two rows**; never collapse delivery+verdict into one row with a bolted-on field.
 3. **Prune the backlog**: delete the line (`docs/backlog.md`) that triggered the work, or edit it to
    what remains. Since 2026-08-12 the backlog is beads (that file was deleted): close the bead.
-4. `make check` green, **then merge the work branch into `main` and push**, not merely "in the
+4. `just check` green, **then merge the work branch into `main` and push**, not merely "in the
    worktree". A promotion that never reaches `main` never happened from any other session's view.
 5. Only then `git worktree remove`, and delete the remote work branch if it merged cleanly.
 
 **`RECEIVE` writes to the shelf too**, though it runs in a consumer's repo: the ledger write is a
 shelf edit, so touch `../shelf-<project>` (create it if missing), append the `verdict` row,
-`make catalog` if warranted, commit, push. Small, append-only, low-conflict, but via the worktree,
+`just catalog` if warranted, commit, push. Small, append-only, low-conflict, but via the worktree,
 never a stray edit against the shared clone.
 
 Propagated: `PROMOTE` step 8 "Close the loop" (the list above), `RECEIVE` step 6 (ledger `verdict`
-row), `RECONCILE` closing step (`make catalog`, a `verdict` row per action, `make check`, merge+push).
+row), `RECONCILE` closing step (`just catalog`, a `verdict` row per action, `just check`, merge+push).
 
 ## Rejected
 
@@ -47,7 +47,7 @@ row), `RECONCILE` closing step (`make catalog`, a `verdict` row per action, `mak
   collapsed into one row), merging to main (three ad hoc confirmations in one session), pruning the
   backlog, or naming the terminal state "tree clean, `main` pushed, no dangling worktree/branch".
   `RECEIVE` and `RECONCILE` had the same silence.
-- **A fitness test now.** The next escalation, if drift recurs, is a `make check` test failing when
+- **A fitness test now.** The next escalation, if drift recurs, is a `just check` test failing when
   `catalog/*.toml` changed in a diff with no matching `ledger/*.toml`. Deferred, not built: fix the
   known instance, do not pre-build enforcement for a violation that has not recurred.
 

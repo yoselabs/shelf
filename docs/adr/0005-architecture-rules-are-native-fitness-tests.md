@@ -17,11 +17,11 @@ distilled_into: blueprint python-uv architecture role; tests/test_arch_rules.py 
 Two classes of rule, two enforcers:
 
 - **Import graph** (layers, dependency direction, cycles, the one invariant, undeclared sibling edges):
-  **import-linter** contracts in `[tool.importlinter]` in `pyproject.toml`, run by `make arch`. A guard
+  **import-linter** contracts in `[tool.importlinter]` in `pyproject.toml`, run by `just arch`. A guard
   test keeps `root_packages` equal to `packages/*/src` and the `independence` ignore list equal to the
   workspace dependencies the packages declare.
 - **Banned APIs** (a consumer app in a package's tests, a clock or `uuid4` in a core): ruff `TID251`
-  banned-api, one `msg` per entry, run by `make lint`.
+  banned-api, one `msg` per entry, run by `just lint`.
 - **AST facts** (RG001-RG004, below): stay native, pure-stdlib pytest.
 
 The line is "no non-hermetic binary, no policy engine". A pip dev-dependency that parses imports is on the
@@ -32,14 +32,14 @@ right side of it; OPA is not. Benched 2026-10-11 on the shelf, a2kay and a2web.
 a2kit's architectural rules (RG001 body-duplication, RG002 private-name-collision, RG003
 allowlist-hygiene, RG004 dependency-upper-bounds) are reimplemented by *intent* as native Python
 fitness tests, walk the AST
-(`ast`), read the manifests (`tomllib`), pure stdlib, inside `make check`, ownable, deletable.
+(`ast`), read the manifests (`tomllib`), pure stdlib, inside `just check`, ownable, deletable.
 
 **Scope rule** (load-bearing, departs from a2kit). Constitution VI values some duplication; a2kit was
 one package, the shelf is many deliberately independent ones:
 
 - **Within a package:** duplication or name collision is a bug. **Blocking** (`tests/test_arch_rules.py`).
 - **Across packages:** duplication is a *signal*, not a sin: a body shared by two packages is a
-  candidate for a T0 primitive (rule of three). **Advisory only** (`make advisory`, never a build
+  candidate for a T0 primitive (rule of three). **Advisory only** (`just advisory`, never a build
   failure); forcing the abstraction would violate VI.
 - **Dependency upper bounds:** always blocking; an unbounded dep breaks silently on a major bump
   (ADR 0001's ethos). Exceptions go in `tests/arch_allowlist.toml` **with a reason** (RG003).

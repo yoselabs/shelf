@@ -10,14 +10,15 @@ repos here reached ten different rule sets with no one deciding to.
 
 This closes that loop without taking the ownership away. It compares three axes —
 ``[tool.ruff.lint] select``/``ignore``, ``[tool.pyrefly.errors]``, and the
-``Makefile`` target set — and fails on any difference the consumer has not
+``justfile`` recipe set (a consumer still on a ``Makefile`` is compared by its targets) — and fails on any difference the consumer has not
 declared in its own::
 
     [tool.shelf-preset]
     ruff-select-omitted = []
     pyrefly-errors-extra = ["unknown-argument-type"]  # reflective verb dispatch
-    make-targets-extra = ["archlint"]                 # import-linter contracts
+    recipes-extra = ["archlint"]                      # import-linter contracts
 
+(``make-targets-extra`` / ``make-targets-omitted``, this axis's name before ADR 0023, still count.)
 An empty list means "identical here". A declared entry is a local choice made on
 purpose, in the consumer's own file, next to a reason. An *undeclared* one is
 drift, and that is the only thing this fails on — it never edits, never proposes
@@ -49,19 +50,34 @@ _AXES = (
     ("ruff-select", "ruff select"),
     ("ruff-ignore", "ruff ignore"),
     ("pyrefly-errors", "pyrefly error kinds"),
-    ("make-targets", "make targets"),
+    ("recipes", "gate recipes"),
 )
 
-_TARGET = re.compile(r"^([a-zA-Z][\w-]*)\s*:(?!=)")
+# A recipe header: `name:`, `name arg:`, `name *args: dep`; an assignment (`:=`) and `set x := y` are not recipes.
+_RECIPE = re.compile(r"^@?([A-Za-z_][\w-]*)(?:[ \t]+[^:=\n]*?)?[ \t]*:(?!=)")
+_JUSTFILES = ("justfile", "Justfile", ".justfile")
 
-# Targets that operate on the shelf's own layout (its catalog, its cross-package
+# Recipes that operate on the shelf's own layout (its catalog, its cross-package
 # advisory, its import-graph contracts (`arch`: a consumer's layers are its own), its
 # any-browser lane, its gate container and affected-only run). `blueprint`
 # is copied (the per-commit blueprint checks), so it is not shelf-only. A consumer
 # has nothing for them to act on, so their absence is not drift; without this every
-# fresh consumer failed `make preset`.
+# fresh consumer failed `just preset`.
 _SHELF_ONLY_TARGETS = frozenset(
-    {"catalog", "advisory", "arch", "test-browser", "check-all", "check-host", "check-all-host", "test-image", "test-affected", "eval"}
+    {
+        "catalog",
+        "advisory",
+        "arch",
+        "test-browser",
+        "check-all",
+        "check-host",
+        "check-all-host",
+        "test-image",
+        "test-affected",
+        "eval",
+        "gate",
+        "container",
+    }
 )
 
 
@@ -81,14 +97,16 @@ def _pyrefly_errors(config: dict[str, Any]) -> set[str]:
     return {kind for kind, severity in errors.items() if severity == "error"}
 
 
-def _make_targets(makefile: Path) -> set[str]:
-    if not makefile.is_file():
-        return set()
-    return {m.group(1) for line in makefile.read_text().splitlines() if (m := _TARGET.match(line))}
+def _recipes(repo: Path) -> set[str]:
+    """The names in the repo's justfile, else in its Makefile (a consumer not yet migrated); empty when it has neither."""
+    for name in (*_JUSTFILES, "Makefile"):
+        if (path := repo / name).is_file():
+            return {m.group(1) for line in path.read_text().splitlines() if (m := _RECIPE.match(line))}
+    return set()
 
 
 def _shelf_root(explicit: str | None) -> Path | None:
-    """Resolve the shelf the way ``make guard`` does, so one answer is wrong in one place.
+    """Resolve the shelf the way ``just guard`` does, so one answer is wrong in one place.
 
     An explicit ``--shelf-home`` does NOT fall back. Searching on from a path the
     caller named would silently check against a different shelf than the one they
@@ -126,7 +144,7 @@ def main() -> int:
 
     # A worktree of the shelf is the shelf, and its `../shelf` resolves to the main
     # checkout — so identity is "this script lives in the repo under test", not a path
-    # comparison. Without it, `make preset` in a shelf worktree grades the branch
+    # comparison. Without it, `just preset` in a shelf worktree grades the branch
     # against `main` and fails on every change the branch is making. Checked before the
     # clone lookup: the shelf's own gate container has no clone beside it.
     shelf = _shelf_root(args.shelf_home)
@@ -145,11 +163,14 @@ def main() -> int:
         return 2
 
     declared = consumer.get("tool", {}).get("shelf-preset", {})
+    # This axis was called make-targets before ADR 0023; a consumer's declaration under the old name still excuses.
+    for suffix in ("omitted", "extra"):
+        declared[f"recipes-{suffix}"] = [*declared.get(f"recipes-{suffix}", []), *declared.get(f"make-targets-{suffix}", [])]
     values = {
         "ruff-select": (_ruff(reference, "select"), _ruff(consumer, "select")),
         "ruff-ignore": (_ruff(reference, "ignore"), _ruff(consumer, "ignore")),
         "pyrefly-errors": (_pyrefly_errors(reference), _pyrefly_errors(consumer)),
-        "make-targets": (_make_targets(shelf / "Makefile") - _SHELF_ONLY_TARGETS, _make_targets(repo / "Makefile")),
+        "recipes": (_recipes(shelf) - _SHELF_ONLY_TARGETS, _recipes(repo)),
     }
 
     findings = [line for axis, _ in _AXES for line in _compare(axis, *values[axis], declared)]

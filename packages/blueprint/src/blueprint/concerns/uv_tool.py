@@ -1,7 +1,7 @@
 """An application installed as a uv tool: its environment is resolved at install time and drifts from uv.lock.
 
 `uv tool install --editable .` follows the source, not the lockfile: a dependency bump in uv.lock reaches
-the tool only on a reinstall. `make check` runs in `.venv`, so it stays green while the installed tool
+the tool only on a reinstall. `just check` runs in `.venv`, so it stays green while the installed tool
 imports a name its old dependency lacks (a2kay: the daemon died on start, the KB MCP was down).
 """
 
@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from blueprint import gate_graph
 from blueprint.model import Finding, Sub, check_each, failing, not_applicable, not_checked, passing
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 _ID = "stack.python-uv.uv-tool"
 _STATEMENT = "an application installed as a uv tool has the dependency versions uv.lock pins"
 _REINSTALL = "uv tool install --reinstall --editable ."
-_INSTALL_TARGET = re.compile(r"^(install|reinstall|tool-install|install-tool)\s*:", re.MULTILINE)
+_INSTALL_RECIPES = ("install", "reinstall", "tool-install", "install-tool")
 
 
 def _applies(profile: Profile) -> bool:
@@ -33,11 +34,12 @@ def _norm(name: str) -> str:
 
 
 def _reinstall_step(ctx: Context) -> str | None:
-    """The repo's own reinstall: a Makefile target running `uv tool install`, else a hook that does."""
-    makefile = ctx.read("Makefile") or ""
-    target = _INSTALL_TARGET.search(makefile)
-    if target and "uv tool install" in makefile[target.start() :]:
-        return f"make {target.group(1)}"
+    """The repo's own reinstall: a recipe running `uv tool install`, else a hook that does."""
+    gate = gate_graph.load(ctx)
+    if gate is not None:
+        for name in _INSTALL_RECIPES:
+            if name in gate.recipes and "uv tool install" in gate.recipes[name].body:
+                return f"{gate.runner} {name}"
     return "the post-merge hook in .pre-commit-config.yaml" if "uv tool install" in (ctx.read(".pre-commit-config.yaml") or "") else None
 
 
@@ -77,11 +79,11 @@ def uv_tool(ctx: Context) -> list[Sub]:
     fix = (
         f"reinstall the tool: {step} (and keep it running after every lock change)"
         if step
-        else f"`{_REINSTALL}` now; add a `make install` target running it and a post-merge hook that calls it, so a lock change reinstalls"
+        else f"`{_REINSTALL}` now; add a `just install` recipe running it and a post-merge hook that calls it, so a lock change reinstalls"
     )
     return _single(
         failing(
-            f"the installed {name} tool differs from uv.lock: {', '.join(drift)}; `make check` uses .venv and cannot see it",
+            f"the installed {name} tool differs from uv.lock: {', '.join(drift)}; `just check` uses .venv and cannot see it",
             fix,
         )
     )

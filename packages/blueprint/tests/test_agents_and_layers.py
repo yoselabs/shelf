@@ -113,7 +113,7 @@ def test_bd_template_placeholders_left_in_claude_md_fail_and_pass_once_replaced(
     assert verdict is Verdict.FAILING
     assert "CLAUDE.md" in evidence
     assert "3 template placeholder" in evidence
-    repo.write("CLAUDE.md", _BD_TEMPLATE.format(build="`make check`", arch="a package per concern", conv="tests first"))
+    repo.write("CLAUDE.md", _BD_TEMPLATE.format(build="`just check`", arch="a package per concern", conv="tests first"))
     assert _evidence(repo, "agents.culture-files")[0] is Verdict.PASSING
 
 

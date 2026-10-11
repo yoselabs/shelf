@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from blueprint.concerns.gate import reachable_recipes
+from blueprint import gate_graph
 from blueprint.model import Finding, Sub, check_each, failing, is_skipped, not_applicable, not_checked, not_set_up, passing
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ FRAMEWORK_ROLES = (
     "project-hygiene",  # generated folders ignored, required metadata committed, line endings fixed, protocol streams clean
     "binary-assets",  # binary assets in LFS or kept out; import settings committed
     "embedded-script-lint",  # a script language the framework embeds is linted, or `na` with the reason
-    "build",  # the framework's build/import/serve smoke runs headless from `make check`
+    "build",  # the framework's build/import/serve smoke runs headless from `just check`
     "tests",  # tests run through the framework itself (scene tree, in-memory client), headless
     "surface-integrity",  # the surface the framework exposes (scene references, tool list) cannot drift unseen
     "architecture",  # the core stays framework-free; the framework layer is thin
@@ -111,9 +111,10 @@ def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
 
 
 def gate_text(ctx: Context) -> str:
-    """Everything `make check` reaches, plus a justfile and lefthook config if present."""
-    parts = [reachable_recipes(ctx.read("Makefile") or "")]
-    parts += [ctx.read(f) or "" for f in ("justfile", "Justfile", "lefthook.yml", "lefthook.yaml")]
+    """Everything `just check` reaches (a Makefile's `check`, for a repo not yet migrated), plus a lefthook config if present."""
+    gate = gate_graph.load(ctx)
+    parts = [gate.gate_recipes() if gate else ""]
+    parts += [ctx.read(f) or "" for f in ("lefthook.yml", "lefthook.yaml")]
     return "\n".join(parts)
 
 
@@ -213,7 +214,7 @@ def _sdk_installs(ctx: Context, stack: str, spec: Role, judged: _Judged) -> _Jud
     """global.json must be satisfiable by an SDK of every dotnet install the tools may resolve.
 
     Why: lifesim pinned the SDK of the dotnet on PATH, and Godot's .NET editor resolved the other install,
-    whose newer feature band the pin does not accept: `make build` passed, the editor's build exited 155.
+    whose newer feature band the pin does not accept: `just build` passed, the editor's build exited 155.
     """
     try:
         sdk = json.loads(ctx.read("global.json") or "{}").get("sdk", {})
@@ -253,8 +254,8 @@ def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judg
     return _Judged(
         stack,
         "failing",
-        f"{spec.tool} set up, but `make check` never runs `{spec.gate}`{others}",
-        f"run `{spec.gate}` from `make check`{others}",
+        f"{spec.tool} set up, but `just check` never runs `{spec.gate}`{others}",
+        f"run `{spec.gate}` from `just check`{others}",
     )
 
 
@@ -285,7 +286,7 @@ def _profile_row(stack: str, prof: StackProfile | None, origin: str = "") -> Sub
     return Sub(f"stack/{stack}", f"stack.{stack}.profile", statement, passing(f"{prof.status} profile: {tools}{note}{seen}"))
 
 
-@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `make check`", layer="stack", version=3)
+@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `just check`", layer="stack", version=3)
 def roles(ctx: Context) -> list[Sub]:
     """Per detected stack: one profile row, then one row per role."""
     if not ctx.profile.stacks:
@@ -307,6 +308,6 @@ def roles(ctx: Context) -> list[Sub]:
             continue
         for role in ROLES:
             judged = judge_role(ctx, stack, prof, role, reached)
-            statement = f"{stack} {role}: the profile's tool is set up and run by `make check`"
+            statement = f"{stack} {role}: the profile's tool is set up and run by `just check`"
             subs.append(Sub(f"stack/{stack}", f"stack.{stack}.{role}", statement, finding_for(judged)))
     return subs

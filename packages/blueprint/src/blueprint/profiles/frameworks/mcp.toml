@@ -43,7 +43,7 @@ na = "Python only: ruff in the python-uv profile is the lint; there is no second
 
 [[role]]
 role = "build"
-tool = "a stdio smoke test starts the real entrypoint (`python -m <pkg>` or the console script) as a subprocess with fastmcp's StdioTransport, completes the handshake, lists tools, makes one call and one bad call; it runs inside `make check` as an ordinary pytest test"
+tool = "a stdio smoke test starts the real entrypoint (`python -m <pkg>` or the console script) as a subprocess with fastmcp's StdioTransport, completes the handshake, lists tools, makes one call and one bad call; it runs inside `just check` as an ordinary pytest test"
 install = """tests/test_stdio_serves.py: `Client(StdioTransport(command=sys.executable, args=["-m", "<pkg>", "serve"], env=..., cwd=tmp_path))`; assert the tool-name set, one round trip, and that a bad call returns `is_error` and not a transport failure. \
 Pattern: a2kay tests/test_serve_stdio_e2e.py. A server with a Streamable HTTP mode gets the same test over a loopback port (shelf package async-scope[asgi] owns the uvicorn traps)"""
 config = [
@@ -105,7 +105,7 @@ untested = "the python-uv architecture tool is import-linter; the contract is a 
 
 [[role]]
 role = "ci"
-na = "no MCP-specific CI step: the stdio and in-memory tests run inside `make check`, which the python-uv ci row already runs from the lockfile; no server binary or service to install"
+na = "no MCP-specific CI step: the stdio and in-memory tests run inside `just check`, which the python-uv ci row already runs from the lockfile; no server binary or service to install"
 
 [[role]]
 role = "hooks"

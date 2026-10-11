@@ -30,13 +30,13 @@ deprecated = "error"
 implicit-bool = false
 """
 
-_MAKEFILE = "check: lint\n\t@true\nlint:\n\t@true\n"
+_JUSTFILE = "check: lint\n\nlint:\n    @true\n"
 
 
-def _write(root: Path, pyproject: str, makefile: str = _MAKEFILE) -> Path:
+def _write(root: Path, pyproject: str, justfile: str = _JUSTFILE) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     (root / "pyproject.toml").write_text(pyproject)
-    (root / "Makefile").write_text(makefile)
+    (root / "justfile").write_text(justfile)
     return root
 
 
@@ -101,11 +101,33 @@ def test_a_pyrefly_kind_set_false_is_a_rejection_not_a_rule(tmp_path: Path, shel
     assert result.returncode == 0, result.stderr
 
 
-def test_a_make_target_difference_is_reported(tmp_path: Path, shelf: Path) -> None:
-    consumer = _write(tmp_path / "consumer", _SHELF, makefile=_MAKEFILE + "archlint:\n\t@true\n")
+def test_a_recipe_difference_is_reported(tmp_path: Path, shelf: Path) -> None:
+    consumer = _write(tmp_path / "consumer", _SHELF, justfile=_JUSTFILE + "\narchlint:\n    @true\n")
     result = _run(consumer, shelf)
     assert result.returncode == 1
     assert "extra 'archlint'" in result.stderr
+
+
+def test_a_recipe_with_parameters_counts_and_an_assignment_does_not(tmp_path: Path, shelf: Path) -> None:
+    consumer = _write(tmp_path / "consumer", _SHELF, justfile=_JUSTFILE + "\nflag := 'x'\n\nrun *args:\n    @true\n")
+    result = _run(consumer, shelf)
+    assert "extra 'run'" in result.stderr
+    assert "flag" not in result.stderr
+
+
+def test_a_difference_declared_under_the_old_make_targets_key_still_counts(tmp_path: Path, shelf: Path) -> None:
+    pyproject = _SHELF + '\n[tool.shelf-preset]\nmake-targets-extra = ["archlint"]\n'
+    consumer = _write(tmp_path / "consumer", pyproject, justfile=_JUSTFILE + "\narchlint:\n    @true\n")
+    assert _run(consumer, shelf).returncode == 0
+
+
+def test_a_consumer_still_on_a_makefile_is_compared_by_its_targets(tmp_path: Path, shelf: Path) -> None:
+    consumer = _write(tmp_path / "consumer", _SHELF)
+    (consumer / "justfile").unlink()
+    (consumer / "Makefile").write_text("check: lint\n\t@true\nlint:\n\t@true\nextra:\n\t@true\n")
+    result = _run(consumer, shelf)
+    assert result.returncode == 1
+    assert "extra 'extra'" in result.stderr
 
 
 def test_per_file_ignores_are_not_compared(tmp_path: Path, shelf: Path) -> None:
@@ -138,7 +160,9 @@ def test_the_shelf_does_not_compare_against_itself(shelf: Path) -> None:
 
 
 def test_a_shelf_only_target_missing_from_a_consumer_is_not_drift(tmp_path: Path) -> None:
-    shelf = _write(tmp_path / "shelf", _SHELF, makefile=_MAKEFILE + "catalog:\n\t@true\nadvisory:\n\t@true\ntest-browser:\n\t@true\n")
+    shelf = _write(
+        tmp_path / "shelf", _SHELF, justfile=_JUSTFILE + "\ncatalog:\n    @true\nadvisory:\n    @true\ntest-browser:\n    @true\n"
+    )
     consumer = _write(tmp_path / "consumer", _SHELF)
     result = _run(consumer, shelf)
     assert result.returncode == 0, result.stderr

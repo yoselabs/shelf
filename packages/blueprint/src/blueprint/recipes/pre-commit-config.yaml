@@ -52,8 +52,9 @@ repos:
 - repo: local
   hooks:
   - id: gate
-    name: make check
-    entry: make check
+    name: just check
+    # just is pinned as the `rust-just` dev dependency (ADR 0023); a repo without uv runs `just check` from brew.
+    entry: uv run just check
     language: system
     always_run: true
     pass_filenames: false

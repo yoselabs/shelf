@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 _ADR = """---
 id: 0001
 title: One gate command
-statement: make check is the only gate; CI and hooks run it
+statement: just check is the only gate; CI and hooks run it
 concerns: [gate]
 status: accepted
 decided_by: owner
@@ -23,7 +23,7 @@ updated: 2026-10-11
 # 0001 One gate command
 
 ## Decision
-make check is the gate.
+just check is the gate.
 
 ## History
 - 2026-10-11: decided. Rejected: per-tool CI steps, because they drift from the local gate.
@@ -92,6 +92,6 @@ def test_the_index_carries_statements_and_leaves_out_superseded(repo: Repo) -> N
     _sound(repo)
     repo.write("docs/adr/0002-old.md", _ADR.replace("0001", "0002").replace("status: accepted", "status: superseded"))
     text = adr.index(repo.root)
-    assert "make check is the only gate; CI and hooks run it" in text
+    assert "just check is the only gate; CI and hooks run it" in text
     assert "0002" not in text
     assert "only to challenge" in text

@@ -43,6 +43,16 @@ def test_a_role_configured_and_run_by_the_gate_passes(repo: Repo) -> None:
     assert rows["stack.python-uv.toolchain"][0] is Verdict.PASSING
 
 
+def test_a_justfile_gate_is_read_through_its_graph_and_a_recipe_nothing_reaches_does_not_count(repo: Repo) -> None:
+    _python_repo(repo)
+    repo.write("Makefile", "")
+    gate = 'check: (gate "lint")\n\n[private]\ngate target:\n    just {{ target }}\n\n'
+    repo.write("justfile", gate + "lint:\n    uv lock --check\n    uv run ruff format --check .\n    uv run ruff check .\n")
+    assert _rows(repo)["stack.python-uv.formatter"][0] is Verdict.PASSING
+    repo.write("justfile", "check:\n    true\n\nlint:\n    uv run ruff format --check .\n    uv run ruff check .\n")
+    assert _rows(repo)["stack.python-uv.formatter"][0] is Verdict.FAILING
+
+
 def test_a_gate_without_the_lock_check_fails_the_toolchain(repo: Repo) -> None:
     _python_repo(repo)
     repo.write("Makefile", _MAKEFILE.replace("\tuv lock --check\n", ""))

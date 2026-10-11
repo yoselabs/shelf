@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from blueprint.testing import Repo
 
 _PYPROJECT = '[project]\nname = "x"\nrequires-python = ">=3.12"\n\n[tool.uv]\nrequired-version = ">=0.10"\n'
-_CI = "jobs:\n  check:\n    steps:\n      - uses: astral-sh/setup-uv@abc # v6\n      - run: uv sync --locked\n      - run: make check\n"
+_CI = "jobs:\n  check:\n    steps:\n      - uses: astral-sh/setup-uv@abc # v6\n      - run: uv sync --locked\n      - run: just check\n"
 
 
 _PIN_ROWS = {f"stack.python-uv.{n}" for n in ("python-pin", "python-range", "python-range-tested", "python-ci", "uv-version")}
@@ -134,6 +134,14 @@ def test_a_tool_env_older_than_the_lock_fails_and_names_the_repos_reinstall_step
     assert "sqlite-sidecar 0.1.0 (lock 0.2.0)" in evidence
     assert "mytool 0.1.0" not in evidence  # the project itself is the lock's editable entry, not a dependency
     assert "make install" in remediation
+
+
+def test_the_reinstall_step_is_a_justfile_recipe_when_the_gate_is_just(repo: Repo) -> None:
+    repo.write("pyproject.toml", _TOOL_PYPROJECT)
+    repo.write("uv.lock", _LOCK)
+    repo.write("justfile", "check:\n    true\ninstall:\n    uv tool install --reinstall --editable .\n")
+    _installed_tool(repo, {"sqlite-sidecar": "0.1.0"})
+    assert "just install" in _tool_row(repo)[2]
 
 
 def test_without_a_reinstall_step_the_remediation_asks_for_one_that_runs_after_a_lock_change(repo: Repo) -> None:

@@ -1,6 +1,6 @@
 # Stack profile: the per-stack answer to every concern that has one (CONTEXT.md: stack profile).
 # Each [[role]] says which tool, how it is installed, the config that proves it is set up
-# (every entry must hold; `{ any = [...] }` holds when one alternative does), and the text `make check` must reach to prove it runs (a regex).
+# (every entry must hold; `{ any = [...] }` holds when one alternative does), and the text `just check` must reach to prove it runs (a regex).
 # A role with `untested` has no proven answer yet; one with `na` does not apply to the stack.
 #
 # Choosing a tool (owner, 2026-10-10): age alone never disqualifies one. A tool untouched for years
@@ -9,7 +9,7 @@
 # Ecosystems differ (C# and Java tools release rarely); judge by use and compatibility, not by date.
 stack = "python-uv"
 status = "evidenced"  # evidenced: the shelf and a2kay run it | provisional: written, not yet proven
-source = "the shelf's own gate (pyproject.toml, Makefile; ADR 0004)"
+source = "the shelf's own gate (pyproject.toml, justfile; ADR 0004, 0023)"
 
 [[role]]
 role = "toolchain"
@@ -26,21 +26,21 @@ gate = "uv lock --check"
 [[role]]
 role = "formatter"
 tool = "ruff format"
-install = "uv add --dev ruff; copy [tool.ruff] from the shelf (make bootstrap)"
+install = "uv add --dev ruff; copy [tool.ruff] from the shelf (just bootstrap)"
 config = [{ path = "pyproject.toml", contains = "[tool.ruff" }]
 gate = "ruff format --check"
 
 [[role]]
 role = "linter"
 tool = "ruff check, the shelf's rule set"
-install = "copy [tool.ruff.lint] from the shelf (make bootstrap)"
+install = "copy [tool.ruff.lint] from the shelf (just bootstrap)"
 config = [{ path = "pyproject.toml", contains = "[tool.ruff.lint]" }]
 gate = "ruff check"
 
 [[role]]
 role = "types"
 tool = "pyrefly, strict preset"
-install = "uv add --dev pyrefly; copy [tool.pyrefly] from the shelf (make bootstrap)"
+install = "uv add --dev pyrefly; copy [tool.pyrefly] from the shelf (just bootstrap)"
 config = [{ path = "pyproject.toml", contains = "[tool.pyrefly]" }, { path = "pyproject.toml", contains = 'preset = "strict"' }]
 gate = "pyrefly check"
 
@@ -86,7 +86,7 @@ contains = "fail_under"
 [[role]]
 role = "architecture"
 tool = "import-linter (layers, forbidden, independence, acyclic_siblings, protected) for import edges; ruff TID251 banned-api for banned APIs; both read pyproject.toml, one declaration each"
-install = "uv add --dev 'import-linter>=2.15,<3'; [tool.importlinter] root_package(s) + [[tool.importlinter.contracts]] in pyproject.toml: a layers contract with containers and exhaustive = true, acyclic_siblings, forbidden (not-installed apps/frameworks via include_external_packages = true); banned APIs in [tool.ruff.lint.flake8-tidy-imports.banned-api] with a msg each, scoped to the core; `arch: uv run lint-imports` in make check; plant a forbidden edge and see it fail"
+install = "uv add --dev 'import-linter>=2.15,<3'; [tool.importlinter] root_package(s) + [[tool.importlinter.contracts]] in pyproject.toml: a layers contract with containers and exhaustive = true, acyclic_siblings, forbidden (not-installed apps/frameworks via include_external_packages = true); banned APIs in [tool.ruff.lint.flake8-tidy-imports.banned-api] with a msg each, scoped to the core; `arch: uv run lint-imports` in just check; plant a forbidden edge and see it fail"
 config = [
     { any = [{ path = "pyproject.toml", contains = "[tool.importlinter" }, { path = ".importlinter" }] },
 ]

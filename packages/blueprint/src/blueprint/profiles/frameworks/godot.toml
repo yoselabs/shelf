@@ -1,7 +1,7 @@
 # Framework profile (see ../python-uv.toml for the format). Layers on dotnet.toml for a Godot 4.x C# game: every
 # dotnet.toml rule applies to the Godot csproj too (verified: strict props build it clean), the rows here add what is Godot's.
 # `{root}` is the folder holding project.godot (lifesim: src/Game.Godot); repo-level files (.gitignore,
-# .gitattributes, Makefile, .github/workflows) stay at the repo root. Paths may be globs (`*.csproj`, no `**`).
+# .gitattributes, justfile, .github/workflows) stay at the repo root. Paths may be globs (`*.csproj`, no `**`).
 # Research: openspec/changes/blueprint-skill/research/dotnet-godot-layering.md
 stack = "godot"
 status = "provisional"
@@ -42,11 +42,11 @@ na = "C#-only project (no .gd files): the C# analyzers are the lint. The moment 
 
 [[role]]
 role = "build"
-tool = "godot --headless --path <root> --import, then --build-solutions --quit, both inside make check; the import log is scanned for ERROR lines and the tree must stay clean"
-install = """Godot binary on the agent's machine, the .NET build of the version the csproj pins (macOS: `brew install --cask godot-mono`, or the official .NET zip from godotengine.org into ~/Applications; set GODOT to its binary). Makefile: GODOT ?= godot; `godot-build:` runs `"$(GODOT)" --headless --path {root} --import 2>&1 | tee import.log`, then \
-`! grep -q 'ERROR:' import.log` (import exits 0 even on broken scene references), then `"$(GODOT)" --headless --path {root} --build-solutions --quit` \
-(exit 1 on a C# compile error), then `git diff --exit-code && test -z "$(git status --porcelain)"`; add godot-build to the `check` prerequisites"""
-config = [{ path = "Makefile", contains = "--build-solutions" }]
+tool = "godot --headless --path <root> --import, then --build-solutions --quit, both inside just check; the import log is scanned for ERROR lines and the tree must stay clean"
+install = """Godot binary on the agent's machine, the .NET build of the version the csproj pins (macOS: `brew install --cask godot-mono`, or the official .NET zip from godotengine.org into ~/Applications; set GODOT to its binary). justfile: `godot := env('GODOT', 'godot')`; `godot-build` is a shebang recipe (bash) that runs `"{{godot}}" --headless --path {root} --import 2>&1 | tee import.log`, then \
+`! grep -q 'ERROR:' import.log` (import exits 0 even on broken scene references), then `"{{godot}}" --headless --path {root} --build-solutions --quit` \
+(exit 1 on a C# compile error), then `git diff --exit-code && test -z "$(git status --porcelain)"`; no backticks in the justfile (`just --dry-run` runs them); add godot-build to the `check` dependencies"""
+config = [{ any = [{ path = "justfile", contains = "--build-solutions" }, { path = "Makefile", contains = "--build-solutions" }] }]
 gate = "--build-solutions"
 
 [[role]]
@@ -56,8 +56,8 @@ untested = "two candidates, neither run here: Chickensoft GoDotTest 2.0.47 (2026
 [[role]]
 role = "surface-integrity"
 tool = "the headless import log scan: any `ERROR:` line fails the gate (broken ext_resource, missing script, parse errors)"
-install = "same make target as `build`; the pattern is `ERROR:` after stripping ANSI codes (`sed 's/\\x1b\\[[0-9;]*m//g'`); seen red on a broken ext_resource and a bad scene line, green on a clean import (Godot 4.7.2)"
-config = [{ path = "Makefile", contains = "ERROR:" }]
+install = "same recipe as `build`; the pattern is `ERROR:` after stripping ANSI codes (`sed 's/\\x1b\\[[0-9;]*m//g'`); seen red on a broken ext_resource and a bad scene line, green on a clean import (Godot 4.7.2)"
+config = [{ any = [{ path = "justfile", contains = "ERROR:" }, { path = "Makefile", contains = "ERROR:" }] }]
 gate = "ERROR:"
 
 [[role]]
@@ -82,9 +82,9 @@ gate = "dotnet build"
 
 [[role]]
 role = "ci"
-# Owner, 2026-10-10: no CI pipelines for Godot projects for now; agents run `make check` locally,
+# Owner, 2026-10-10: no CI pipelines for Godot projects for now; agents run `just check` locally,
 # where the Godot binary is installed (see the build role). The tool below is the answer once CI comes.
-tool = "TBD; when CI comes: actions/setup-dotnet (global.json) + chickensoft-games/setup-godot@v2, then `make check`"
+tool = "TBD; when CI comes: actions/setup-dotnet (global.json) + chickensoft-games/setup-godot@v2, then `just check`"
 untested = "TBD by the owner: Godot projects run their gate on the agent's machine, not in CI"
 
 [[role]]
@@ -97,9 +97,9 @@ config = [{ path = ".pre-commit-config.yaml", contains = "godot-uid" }]
 [[role]]
 role = "agent-guidance"
 tool = "docs/agents/godot.md (engine pin, headless commands, partial/GlobalClass/Signal rules, scene conventions, what never to edit), linked from AGENTS.md"
-install = """create docs/agents/godot.md (<= 120 lines): the make targets; never hand-edit .godot/ or *.uid; scripts must be `partial` (GD0001 is an error), signals are `[Signal] delegate void NameEventHandler`; \
+install = """create docs/agents/godot.md (<= 120 lines): the just recipes; never hand-edit .godot/ or *.uid; scripts must be `partial` (GD0001 is an error), signals are `[Signal] delegate void NameEventHandler`; \
 scene-wired callbacks stay instance methods (analyzer exemption lives in .editorconfig); views read snapshots and send commands, no game rules in nodes; \
-after editing a .tscn run `make godot-build`; new script means commit its .uid. Link from AGENTS.md: `Godot conventions: docs/agents/godot.md`"""
+after editing a .tscn run `just godot-build`; new script means commit its .uid. Link from AGENTS.md: `Godot conventions: docs/agents/godot.md`"""
 config = [
     { path = "docs/agents/godot.md" },
     { path = "AGENTS.md", contains = "docs/agents/godot.md" },

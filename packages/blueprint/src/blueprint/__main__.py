@@ -38,7 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     form = chk.add_mutually_exclusive_group()
     form.add_argument("--json", action="store_true", help="print JSON")
-    form.add_argument("--gate", action="store_true", help="print only what is not passing, one line each (for `make blueprint`)")
+    form.add_argument("--gate", action="store_true", help="print only what is not passing, one line each (for `just blueprint`)")
     form.add_argument("--summary", action="store_true", help="print one row per concern, grouped by layer")
     chk.add_argument("--write", action="store_true", help="write docs/blueprint/<concern>.md reports")
     srv = sub.add_parser("survey", help="write the run survey template, or check a filled one")

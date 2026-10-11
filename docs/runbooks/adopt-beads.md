@@ -118,7 +118,7 @@ list, not by hand-reformatting a file `bd` itself will rewrite on the next `bd c
 **Same pattern for `shellcheck`: `.beads/hooks/*` are bd-generated shell shims, not scripts you
 wrote.** Verified on homelab: `.beads/hooks/pre-commit` fails `shellcheck` (SC2016, a single-quote-
 vs-double-quote info-level warning inside bd's own template) the moment `shellcheck` runs
-repo-wide rather than staged-files-only (`make lint` vs the pre-commit hook's normal staged-diff
+repo-wide rather than staged-files-only (`just lint` vs the pre-commit hook's normal staged-diff
 scope). Fix the same way: exclude `.beads/hooks/` from the linter's config, don't hand-edit
 bd-owned shell content. General lesson for adopting any linter-in-pre-commit repo: run the FULL
 repo-wide lint (not just a staged-files check) once after `bd init`, not only after the specific

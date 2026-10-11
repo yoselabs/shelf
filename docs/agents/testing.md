@@ -36,4 +36,4 @@ Stack-neutral doctrine. The stack file names the tools.
 
 ## Bug workflow
 
-1. Reproduce as a failing scenario. 2. See it red. 3. Fix. 4. See it green. 5. Run `make check`.
+1. Reproduce as a failing scenario. 2. See it red. 3. Fix. 4. See it green. 5. Run `just check`.

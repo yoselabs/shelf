@@ -1,6 +1,6 @@
 # .NET conventions
 
-Stack: dotnet (.NET 10 SDK, C# 14). The gate is `make check`; this file is what to know before writing code.
+Stack: dotnet (.NET 10 SDK, C# 14). The gate is `just check`; this file is what to know before writing code.
 
 ## Tools per role
 
@@ -15,17 +15,17 @@ Stack: dotnet (.NET 10 SDK, C# 14). The gate is `make check`; this file is what 
 | coverage | no proven .NET floor yet: do not claim one | - |
 | spelling | typos with a committed config | `typos.toml` |
 | architecture | BannedApiAnalyzers (`BannedSymbols.*.txt`) + ArchUnitNET tests | see [architecture.md](architecture.md) |
-| hooks | prek: `dotnet csharpier check` and `typos` on staged files; `make check` on pre-push | [gate.md](gate.md) |
+| hooks | prek: `dotnet csharpier check` and `typos` on staged files; `just check` on pre-push | [gate.md](gate.md) |
 
 Do not add StyleCop (its layout rules fight CSharpier) or Roslynator.Formatting (a second layout owner).
 
 ## Run
 
 ```bash
-make check    # the gate: whole repo
-make build    # dotnet build -warnaserror
-make test     # dotnet test --solution <sln> --no-build   (no --nologo: the runner rejects it)
-make fmt      # csharpier format
+just check    # the gate: whole repo
+just build    # dotnet build -warnaserror
+just test     # dotnet test --solution <sln> --no-build   (no --nologo: the runner rejects it)
+just fmt      # csharpier format
 ```
 
 ## Code rules

@@ -8,7 +8,7 @@ where the two differ, this file wins for this repo and says why.
 
 | # | Article | Why |
 |---|---|---|
-| 1 | **Done = `make check` green over the whole repo.** No "pre-existing", no "unrelated file". | A partial gate lets drift accumulate where nobody looks |
+| 1 | **Done = `just check` green over the whole repo.** No "pre-existing", no "unrelated file". | A partial gate lets drift accumulate where nobody looks |
 | 2 | **Test first, from a scenario.** Write the failing scenario that states the behaviour, then the code. See [testing.md](testing.md). | A test written after the code only confirms what the code does |
 | 3 | **Never skip a hook or the gate.** No `--no-verify`, no `SKIP=`, no commenting out a check. A red check is fixed or the rule is changed in a reviewed commit. | A bypassed gate trains everyone to bypass it |
 | 4 | **A guard is seen red before it is trusted.** Plant the violation, watch the gate fail, remove it. | A check that never failed may check nothing |

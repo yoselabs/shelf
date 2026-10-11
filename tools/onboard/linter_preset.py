@@ -4,17 +4,18 @@ Implements `docs/linting.md`'s own copy list, mechanically:
 
 1. The `[tool.ruff]`, `[tool.ruff.lint]` (+ subtables), `[tool.codespell]`,
    `[tool.coverage.*]` blocks from shelf's `pyproject.toml`.
-2. The `Makefile` targets (`check guard preset bootstrap bootstrap-verify lint format typecheck spell deps test`);
+2. The `justfile` recipes (`check guard preset bootstrap bootstrap-verify lint format typecheck spell deps test`),
+   with the attributes and comments that sit directly above each (ADR 0023: the gate runner is just);
    `check` is the plain gate (the shelf's own dispatches to its container), and `deps` is rewritten
    for a single-package repo, since the shelf's own loops over `packages/*`.
 3. The `dev` dependency-group.
 4. A `[tool.pyrefly]` and a `[tool.pytest.ini_options]` built for a consumer: the shelf's strict
-   preset and error severities (the axis `make preset` compares), its lighter bar for tests, and
+   preset and error severities (the axis `just preset` compares), its lighter bar for tests, and
    none of the shelf's own include/exclude/search paths or testpaths.
 
 ADR 0004 — "linters are a config-preset, not a CLI" — means this is a
 **one-shot scaffold**, not a syncing tool: copy, then the consumer owns it.
-That is also why the merge granularity is per-table / per-target, never
+That is also why the merge granularity is per-table / per-recipe, never
 per-line: **a repo that already has its own `[tool.ruff]` keeps it exactly as
 written** — this operation appends only what is genuinely absent, and never
 opens an existing table to negotiate with its contents. `docs/linting.md`
@@ -23,14 +24,15 @@ not this operation's to make.
 
 Effect-assertion: after writing, `pyproject.toml` is re-parsed with `tomllib`
 (catches injected syntax errors — a byte count matching is not proof the file
-is still valid TOML), and `make -n check` runs in the repo: every target the gate
-names must resolve. Checking that target names were written was not enough —
+is still valid TOML), and `just --dry-run check` runs in the repo: every recipe the gate
+names must resolve. Checking that recipe names were written was not enough —
 shelf-4mz shipped a `check` that depended on a `preset` target never copied.
 """
 
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import tomllib
 from dataclasses import dataclass
@@ -41,14 +43,15 @@ from .operations import Outcome, Result
 
 _SHELF_ROOT = Path(__file__).resolve().parent.parent.parent
 _SHELF_PYPROJECT = _SHELF_ROOT / "pyproject.toml"
-_SHELF_MAKEFILE = _SHELF_ROOT / "Makefile"
+_SHELF_JUSTFILE = _SHELF_ROOT / "justfile"
+_JUSTFILES = ("justfile", "Justfile", ".justfile")
 
 _TABLE_PREFIXES = ("tool.ruff", "tool.codespell", "tool.coverage")
 _DEV_GROUP_TABLE = "dependency-groups"
 # Shelf-specific ruff tables a consumer must not inherit: the banned-api list bans the consumer apps
 # (a2kay, ...), which would ban a consumer from importing itself.
 _SHELF_ONLY_TABLES = ("tool.ruff.lint.flake8-tidy-imports",)
-_MAKE_TARGETS = (
+_RECIPES = (
     "check",
     "guard",
     "preset",
@@ -68,15 +71,22 @@ _MAKE_TARGETS = (
 _GENERATED_PREFIXES = ("tool.pyrefly", "tool.pytest")
 _SHELF_TESTS_SUBCONFIG = "packages/*/tests/**"
 _CONSUMER_DEPS = """# dependency hygiene: the lockfile matches pyproject, then unused, missing and transitive (deptry).
+[group('gate')]
 deps:
-\tuv lock --check
-\tuv run deptry .
+    uv lock --check
+    uv run deptry .
 
 """
-# The shelf's `check` dispatches to a container and to targets a consumer is not given
+# The shelf's `check` dispatches to a container and to recipes a consumer is not given
 # (check-host, test-affected); a consumer gets the plain gate.
 _CONSUMER_CHECK = """# The gate. Fast, deterministic tools first; tests last.
+[group('gate')]
 check: guard preset blueprint lint typecheck spell deps test
+
+"""
+# A new justfile starts with the shelf's shell setting: plain recipe lines fail fast and on unset pipes.
+_JUSTFILE_HEADER = """# The gate runner is just (ADR 0023), pinned as the `rust-just` dev dependency: `uv run just check`.
+set shell := ["bash", "-euo", "pipefail", "-c"]
 
 """
 _CONSUMER_PYTEST = """[tool.pytest.ini_options]
@@ -85,7 +95,8 @@ addopts = "-ra --strict-markers"
 """
 
 _TOML_HEADER_RE = re.compile(r"^\[([^\]]+)\]\s*$", re.MULTILINE)
-_MAKE_TARGET_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_.-]*):", re.MULTILINE)
+# `name:`, `name arg:`, `name *args: dep`; a `name := value` assignment is not a recipe (`:=`), nor is `set x := y`.
+_JUST_RECIPE_RE = re.compile(r"^@?([A-Za-z_][A-Za-z0-9_-]*)(?:[ \t]+[^:=\n]*?)?[ \t]*:(?!=)")
 
 
 def _split_toml_tables(text: str) -> list[tuple[str, str]]:
@@ -94,10 +105,19 @@ def _split_toml_tables(text: str) -> list[tuple[str, str]]:
     return [(m.group(1), text[m.start() : (matches[i + 1].start() if i + 1 < len(matches) else len(text))]) for i, m in enumerate(matches)]
 
 
-def _split_make_targets(text: str) -> list[tuple[str, str]]:
-    """Top-level `name:` recipes, in file order, as `(name, block_text_incl_header)`."""
-    matches = list(_MAKE_TARGET_RE.finditer(text))
-    return [(m.group(1), text[m.start() : (matches[i + 1].start() if i + 1 < len(matches) else len(text))]) for i, m in enumerate(matches)]
+def _split_just_recipes(text: str) -> list[tuple[str, str]]:
+    """Recipes in file order, as `(name, block_text)`: the comment and `[attribute]` lines directly above a recipe belong to it."""
+    lines = text.splitlines(keepends=True)
+    starts: list[tuple[str, int]] = []
+    for i, line in enumerate(lines):
+        if m := _JUST_RECIPE_RE.match(line):
+            first = i
+            while first > 0 and lines[first - 1].startswith(("#", "[")):
+                first -= 1
+            starts.append((m.group(1), first))
+    return [
+        (name, "".join(lines[first : starts[k + 1][1] if k + 1 < len(starts) else len(lines)])) for k, (name, first) in enumerate(starts)
+    ]
 
 
 def _owns(target_names: set[str], prefix: str) -> bool:
@@ -161,23 +181,26 @@ def _missing_generated_blocks(target_text: str) -> str:
 
 
 def _gate_resolves(repo: Path) -> str | None:
-    """`None` when every target `make check` names resolves; otherwise make's complaint."""
-    try:
-        dry = subprocess.run(["make", "-n", "check"], cwd=repo, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        return "make is not installed -- cannot verify the copied gate"
-    return None if dry.returncode == 0 else (dry.stderr.strip() or dry.stdout.strip())
+    """`None` when every recipe `just check` names resolves; otherwise just's complaint."""
+    exe = shutil.which("just") or (str(venv) if (venv := repo / ".venv" / "bin" / "just").is_file() else None)
+    if exe is None:
+        return "just is not installed -- cannot verify the copied gate (pin it: `uv add --dev rust-just`, then `uv sync`)"
+    dry = subprocess.run([exe, "--dry-run", "check"], cwd=repo, capture_output=True, text=True, check=False)
+    if dry.returncode == 0:
+        return None
+    lines = (dry.stderr.strip() or dry.stdout.strip()).splitlines()
+    return next((line for line in lines if line.startswith("error")), lines[-1] if lines else "no output")
 
 
-def _make_targets_to_copy(target_text: str) -> list[str]:
-    shelf_targets = dict(_split_make_targets(_SHELF_MAKEFILE.read_text()))
-    target_names = {name for name, _ in _split_make_targets(target_text)}
+def _recipes_to_copy(target_text: str) -> list[str]:
+    shelf_recipes = dict(_split_just_recipes(_SHELF_JUSTFILE.read_text()))
+    target_names = {name for name, _ in _split_just_recipes(target_text)}
 
-    to_copy = [name for name in _MAKE_TARGETS if name in shelf_targets and name not in target_names]
+    to_copy = [name for name in _RECIPES if name in shelf_recipes and name not in target_names]
     # `bootstrap-verify: bootstrap` is meaningless on its own: found against a real consumer
     # (a2kay) that already owned an unrelated `bootstrap:` target of its own (a very common
-    # Make target name) -- `bootstrap` was correctly skipped as owned, but `bootstrap-verify`
-    # was still copied, silently aliasing to the consumer's OWN unrelated target. If `bootstrap`
+    # name) -- `bootstrap` was correctly skipped as owned, but `bootstrap-verify`
+    # was still copied, silently aliasing to the consumer's OWN unrelated recipe. If `bootstrap`
     # isn't ours to add (already present under any meaning), its dependent isn't either.
     if "bootstrap-verify" in to_copy and "bootstrap" in target_names and "bootstrap" not in to_copy:
         to_copy.remove("bootstrap-verify")
@@ -187,14 +210,14 @@ def _make_targets_to_copy(target_text: str) -> list[str]:
 
 @dataclass
 class LinterPresetOperation:
-    """Copies missing `pyproject.toml` tables and `Makefile` targets from shelf into `repo` (python+uv only)."""
+    """Copies missing `pyproject.toml` tables and `justfile` recipes from shelf into `repo` (python+uv only)."""
 
     repo: Path
     name: str = "linter-preset"
     requires: tuple[str, ...] = ()
 
     def run(self, _results: dict[str, Result]) -> Result:
-        """Copy every shelf table/target family not already owned by `repo`."""
+        """Copy every shelf table/recipe family not already owned by `repo`."""
         pyproject = self.repo / "pyproject.toml"
         if not pyproject.exists():
             return Result(Outcome.COULD_NOT_APPLY, verified=False, message=f"{pyproject} does not exist — not a python+uv target")
@@ -212,32 +235,40 @@ class LinterPresetOperation:
             pyproject.write_text(new_toml)
             applied.append("pyproject.toml tables")
 
-        makefile = self.repo / "Makefile"
-        existing_make = makefile.read_text() if makefile.exists() else ""
-        to_copy = _make_targets_to_copy(existing_make)
+        justfile = next((self.repo / n for n in _JUSTFILES if (self.repo / n).is_file()), self.repo / "justfile")
+        existing = justfile.read_text() if justfile.exists() else ""
+        to_copy = _recipes_to_copy(existing)
         if to_copy:
-            shelf_targets = dict(_split_make_targets(_SHELF_MAKEFILE.read_text()))
-            shelf_targets["check"] = _CONSUMER_CHECK
+            shelf_recipes = dict(_split_just_recipes(_SHELF_JUSTFILE.read_text()))
+            shelf_recipes["check"] = _CONSUMER_CHECK
+            # The shelf's xdist worker count is a variable of its own justfile; a consumer's `test` runs plain.
+            shelf_recipes["test"] = shelf_recipes["test"].replace("{{ pytest_par }} ", "")
             if not (self.repo / "packages").is_dir():
-                shelf_targets["deps"] = _CONSUMER_DEPS
-            new_make = (existing_make.rstrip("\n") + "\n\n" if existing_make else "") + "".join(shelf_targets[name] for name in to_copy)
-            makefile.write_text(new_make)
-            applied.append("Makefile targets")
+                shelf_recipes["deps"] = _CONSUMER_DEPS
+            head = existing.rstrip("\n") + "\n\n" if existing else _JUSTFILE_HEADER
+            justfile.write_text(head + "".join(shelf_recipes[name] for name in to_copy))
+            applied.append(f"{justfile.name} recipes")
 
-        return _verify(self.repo, applied, to_copy)
+        return _verify(self.repo, applied, to_copy, justfile)
 
 
-def _verify(repo: Path, applied: list[str], to_copy: list[str]) -> Result:
-    """Assert the effect: valid TOML, every copied target present, and `make check` resolving."""
-    pyproject, makefile = repo / "pyproject.toml", repo / "Makefile"
+def _verify(repo: Path, applied: list[str], to_copy: list[str], justfile: Path) -> Result:
+    """Assert the effect: valid TOML, every copied recipe present, and `just --dry-run check` resolving."""
+    pyproject = repo / "pyproject.toml"
     done = f"copied {', '.join(applied)}" if applied else "already current — nothing to copy"
     try:
-        tomllib.loads(pyproject.read_text())
+        pyproject_text = pyproject.read_text()
+        tomllib.loads(pyproject_text)
     except tomllib.TOMLDecodeError as exc:
         return Result(Outcome.FAILED, verified=False, message=f"{pyproject} is not valid TOML after writing: {exc}")
-    written = {name for name, _ in _split_make_targets(makefile.read_text())} if makefile.exists() else set()
+    written = {name for name, _ in _split_just_recipes(justfile.read_text())} if justfile.exists() else set()
     if missing := set(to_copy) - written:
-        return Result(Outcome.FAILED, verified=False, message=f"Makefile still missing targets after write: {missing}")
-    if makefile.exists() and (complaint := _gate_resolves(repo)):
-        return Result(Outcome.FAILED, verified=False, message=f"{done}, but make check does not resolve: {complaint}")
-    return Result(Outcome.APPLIED, verified=True, message=done)
+        return Result(Outcome.FAILED, verified=False, message=f"{justfile.name} still missing recipes after write: {missing}")
+    if justfile.exists() and (complaint := _gate_resolves(repo)):
+        return Result(Outcome.FAILED, verified=False, message=f"{done}, but `just check` does not resolve: {complaint}")
+    notes = []
+    if "rust-just" not in pyproject_text:
+        notes.append("pin the runner: `uv add --dev rust-just`")
+    if (repo / "Makefile").is_file() and justfile.name != "Makefile":
+        notes.append("a Makefile still sits beside the justfile: port its targets, then delete it")
+    return Result(Outcome.APPLIED, verified=True, message=done + (f" ({'; '.join(notes)})" if notes else ""))
