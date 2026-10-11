@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 import tempfile
 import time
 from dataclasses import dataclass
@@ -11,7 +12,20 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
-from blueprint.model import Context, Finding, FixedBy, check, failing, is_skipped, not_applicable, not_checked, not_set_up, passing, walk
+from blueprint.model import (
+    Context,
+    Finding,
+    FixedBy,
+    Verdict,
+    check,
+    failing,
+    is_skipped,
+    not_applicable,
+    not_checked,
+    not_set_up,
+    passing,
+    walk,
+)
 
 if TYPE_CHECKING:
     import subprocess
@@ -439,7 +453,9 @@ def guards_have_red_tests(ctx: Context) -> Finding:
     if untested:
         return failing(
             f"no test names {', '.join(untested)}",
-            "add a test per script that plants the violation it guards against and asserts it fails",
+            # A gate script is a guard (it fails the gate on a violation) or a helper the gate calls (a2kay's container slot queue).
+            "add a test per script: for a guard, plant the violation it guards against and assert it fails; "
+            "for a helper (a queue, a generator, a launcher), test the behaviour the gate relies on",
         )
     return passing(f"{len(scripts)} script(s) ({', '.join(scripts)}), each named by a test")
 
@@ -515,20 +531,62 @@ def _fresh_clone_steps(ctx: Context, clone: Path) -> Finding | None:
 
 @check("gate.clean-clone", "a fresh clone passes `just check` within its recorded budget", audit_only=True)
 def clean_clone(ctx: Context) -> Finding:
-    """Clone HEAD into a temp dir and run `just check` (a Makefile repo: `make check`) there, timed."""
+    """Clone HEAD into a temp dir and run `just check` (a Makefile repo: `make check`) there, timed.
+
+    When HEAD fails and the working tree holds uncommitted changes, the same run on a snapshot of the working tree tells
+    "commit to verify" (mid-remediation, a2kay: shelf-83g) from a real failure; the row passes only on HEAD.
+    """
     if ctx.git("rev-parse", "HEAD") is None:
         return not_checked("no commit to clone")
     word = "make" if gate_graph.has_makefile_only(ctx) else "just"
+    budget = ctx.settings.get("clean-clone-seconds")
     with tempfile.TemporaryDirectory(prefix="blueprint-clone-") as tmp:
         clone = ctx.run("git", "clone", "--quiet", str(ctx.repo), tmp, timeout=300)
         if clone is None or clone.returncode != 0:
             return not_checked("could not clone the repository")
-        start = time.monotonic()
-        if (failed := _fresh_clone_steps(ctx, Path(tmp))) is not None:
-            return failed
-        done = ctx.run(gate_graph.just_command(ctx) if word == "just" else word, "check", cwd=Path(tmp), timeout=3600)
-        took = round(time.monotonic() - start)
-    return _judge_clone(done, took, ctx.settings.get("clean-clone-seconds"), word)
+        judged = _gate_in(ctx, Path(tmp), word, budget)
+    uncommitted = [line[3:] for line in (ctx.git("status", "--porcelain", "--untracked-files=all") or "").splitlines()]
+    if judged.verdict is not Verdict.FAILING or not uncommitted:
+        return judged
+    with tempfile.TemporaryDirectory(prefix="blueprint-snapshot-") as tmp:
+        if not _snapshot(ctx, Path(tmp)):
+            return judged
+        if _gate_in(ctx, Path(tmp), word, budget).verdict is Verdict.FAILING:
+            return judged
+    named = ", ".join(uncommitted[:5]) + (f" and {len(uncommitted) - 5} more" if len(uncommitted) > 5 else "")
+    return not_checked(
+        f"{judged.evidence}; the working tree passes in a snapshot clone: commit to verify (uncommitted: {named})",
+        "commit the changes on the owner's yes and re-run the audit; a file the gate needs but nobody commits belongs in the gate",
+        FixedBy.OWNER,
+    )
+
+
+def _gate_in(ctx: Context, folder: Path, word: str, budget: object) -> Finding:
+    """The after-clone steps, then the gate, in `folder`, timed against the recorded budget."""
+    start = time.monotonic()
+    if (failed := _fresh_clone_steps(ctx, folder)) is not None:
+        return failed
+    done = ctx.run(gate_graph.just_command(ctx) if word == "just" else word, "check", cwd=folder, timeout=3600)
+    return _judge_clone(done, round(time.monotonic() - start), budget, word)
+
+
+def _snapshot(ctx: Context, folder: Path) -> bool:
+    """A one-commit repo of the working tree as it is: tracked and untracked files git does not ignore."""
+    listed = ctx.git("ls-files", "-z", "--cached", "--others", "--exclude-standard")
+    if listed is None:
+        return False
+    for rel in filter(None, listed.split("\0")):
+        source = ctx.path(rel)
+        if source.is_file():
+            target = folder / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+    steps = (
+        ("init", "-q"),
+        ("add", "-A"),
+        ("-c", "user.email=blueprint@invalid", "-c", "user.name=blueprint", "commit", "-qm", "snapshot"),
+    )
+    return all((done := ctx.run("git", *args, cwd=folder, timeout=300)) is not None and done.returncode == 0 for args in steps)
 
 
 _CHECKER = re.compile(r"^(?:check|lint|validate|verify)[_-].+\.(?:py|sh)$")

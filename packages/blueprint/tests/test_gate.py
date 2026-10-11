@@ -178,13 +178,22 @@ def test_clean_clone_passes_within_its_budget(repo: Repo) -> None:
     assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.PASSING
 
 
-def test_clean_clone_fails_when_an_uncommitted_file_is_what_made_it_pass(repo: Repo) -> None:
+def test_clean_clone_never_passes_on_an_uncommitted_file_and_names_it(repo: Repo) -> None:
+    # HEAD fails, the working tree passes: the row says what to commit (a2kay, shelf-83g), and never passes on it.
     repo.write("Makefile", "check:\n\ttest -f generated.txt\n")
     repo.commit()
     repo.write("generated.txt", "only on this machine")
     verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
-    assert verdict is Verdict.FAILING
-    assert "fresh clone" in evidence
+    assert verdict is Verdict.NOT_CHECKED
+    assert "commit to verify" in evidence
+    assert "generated.txt" in evidence
+
+
+def test_clean_clone_still_fails_when_the_working_tree_fails_too(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\tfalse\n")
+    repo.commit()
+    repo.write("notes.txt", "x")
+    assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.FAILING
 
 
 def test_clean_clone_evidence_is_the_failing_line_not_makes_own_error_trailer(repo: Repo) -> None:
@@ -574,3 +583,12 @@ def test_clean_clone_retries_bd_bootstrap_over_the_other_transport(repo: Repo) -
     (repo.bin_dir / "bd").write_text('#!/bin/sh\n[ -n "$GIT_CONFIG_COUNT" ] && exit 0\necho "Error: auth" >&2; exit 1\n')
     (repo.bin_dir / "bd").chmod(0o755)
     assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.PASSING
+
+
+def test_the_untested_script_fix_tells_a_guard_from_a_helper(repo: Repo) -> None:
+    # a2kay (shelf-i6k): scripts/container_slot.py is a job queue, and the fix asked it to "plant the violation it guards".
+    repo.write("justfile", "check:\n    python3 scripts/container_slot.py\n")
+    repo.write("scripts/container_slot.py", "print('slot')\n")
+    row = next(r for r in run(repo.root, concern="gate", env=repo.env).rows if r.id == "gate.guards-have-red-tests")
+    assert row.verdict is Verdict.FAILING
+    assert "for a helper" in row.remediation
