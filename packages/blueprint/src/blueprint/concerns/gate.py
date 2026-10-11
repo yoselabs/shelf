@@ -483,6 +483,8 @@ def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budge
 _FRESH_CLONE_STEPS = (
     ("mise.toml", ("mise", "trust", "--yes", ".")),
     ("mise.toml", ("mise", "install", "--locked")),
+    # The stack's sync once, before the gate's parallel steps each start building the same environment at once.
+    ("uv.lock", ("uv", "sync", "--locked")),
     (".beads/config.yaml", ("bd", "bootstrap", "--yes")),
 )
 
