@@ -553,3 +553,47 @@ def git_remote(ctx: Context) -> Finding:
         "no git remote",
         "git remote add origin <url> and push; a repo kept local on purpose is an override of gate.git-remote with a reason and an adr",
     )
+
+
+# The files that make a gate. A remote branch holding one of them may already carry the gate main lacks.
+_GATE_FILES = ("justfile", "Makefile", ".pre-commit-config.yaml", "lefthook.yml", "lefthook.yaml", ".github/workflows/*")
+# The rows that tell an agent to build or repair a gate: where an unmerged branch holding one changes who decides.
+BRANCH_AWARE = frozenset(
+    {
+        "gate.one-command",
+        "gate.runner",
+        "gate.ci",
+        "gate.ci-no-manifest-edit",
+        "gate.hooks-recipe",
+        "gate.runs-blueprint",
+        "gate.clean-clone",
+    }
+)
+
+
+def unmerged_gate_branches(ctx: Context) -> dict[str, list[str]]:
+    """Remote-tracking branches ahead of the default branch -> the gate files they change there.
+
+    Local refs only (no fetch), and nothing is run against a branch: the owner judges it.
+    """
+    head = (ctx.git("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD") or "").strip().removeprefix("refs/remotes/")
+    base = head or "origin/main"
+    refs = (ctx.git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin") or "").split()
+    found: dict[str, list[str]] = {}
+    for ref in refs:
+        if ref in {base, "origin", "origin/HEAD"} or ctx.git("rev-parse", "--verify", "--quiet", base) is None:
+            continue
+        changed = (ctx.git("diff", "--name-only", f"{base}...{ref}") or "").splitlines()
+        if files := [f for f in changed if any(fnmatch(f, pattern) for pattern in _GATE_FILES)]:
+            found[ref] = files
+    return found
+
+
+def branch_note(evidence: str, remediation: str, branches: dict[str, list[str]]) -> tuple[str, str]:
+    """A not-passing gate row's evidence and remediation, naming the branches that hold gate files and handing the decision to the owner."""
+    held = "; ".join(f"{ref} changes {', '.join(files)}" for ref, files in branches.items())
+    return (
+        f"{evidence}; unmerged remote branch(es) hold gate files: {held}",
+        f"do not build a parallel gate: the owner decides whether to merge that branch or remediate on main "
+        f"(the branch is not judged here). Without the branch: {remediation}".rstrip(": "),
+    )

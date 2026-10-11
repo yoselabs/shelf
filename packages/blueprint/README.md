@@ -75,6 +75,8 @@ and the scope: concerns checked, concerns not run, and whether the audit-only ch
 | framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, unity, mcp, provisional: framework-version · project-hygiene · binary-assets · embedded-script-lint · build · tests · surface-integrity · architecture · ci · hooks · agent-guidance); paths may use `{root}` (the project folder) and globs |
 | agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `worktrees` · `culture-files` (placeholders in docs/agents/, AGENTS.md and CLAUDE.md) · `managed-block` |
 
+With `--audit`, a gate row that is failing or not set up (`one-command`, `runner`, `ci`, `ci-no-manifest-edit`, `hooks-recipe`, `runs-blueprint`, `clean-clone`) also names any remote-tracking branch (`origin/*`, local refs, no fetch) ahead of the default branch that changes a gate file (justfile, Makefile, `.github/workflows/*`, hook config), and hands the fix to the owner: merge that branch or remediate on main, not a parallel gate. The branch itself is never checked.
+
 Hooks follow one recipe: prek owns them through `.pre-commit-config.yaml` and bd's five events run
 from it (`blueprint recipe hooks` prints it); bd never installs hooks itself. A framework's own gate script is a recipe too (`blueprint recipe unity-integrity`): the repo copies it into `tools/` and owns the copy.
 
