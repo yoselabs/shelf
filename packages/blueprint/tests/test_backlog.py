@@ -106,6 +106,22 @@ def test_a_bead_failing_lint_fails(repo: Repo) -> None:
     assert _verdicts(repo)["backlog.lint"] is Verdict.FAILING
 
 
+def test_a_blocked_bead_is_linted_too(repo: Repo) -> None:
+    # `bd lint` alone reads only `open`; a blocked bead turns ready when its blocker closes, so it needs criteria too.
+    _beads(repo)
+    real = (repo.bin_dir / "bd").read_text()
+    (repo.bin_dir / "bd").write_text(
+        real.replace(
+            'if [ "$1" = lint ]',
+            'if [ "$1" = lint ] && [ "$3" = blocked ]; then echo "x-9 [task]: t"; exit 1; fi\nif [ "$1" = lint ]',
+            1,
+        )
+    )
+    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    assert row.verdict is Verdict.FAILING
+    assert "x-9" in row.evidence
+
+
 _LINT = """Template warnings (3 issues, 4 warnings):
 
 a2kay-p6hj [epic]: Search rewrite

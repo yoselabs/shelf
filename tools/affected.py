@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Which test directories a change touches: the shelf's affected-only test run (Nx-style).
 
-Prints pytest paths, one per line: always `tests` (the fitness tests), plus `packages/<p>/tests`
+Prints pytest paths, one per line: the fitness tests (`tests`, without its onboarding tests unless an onboarding
+input changed), plus `packages/<p>/tests`
 for every package the change touches and every package that depends on one of them, walked
 through the uv-workspace graph (each member's dependencies, optional dependencies and
 dependency groups). A change anywhere the graph cannot see — the root `pyproject.toml`,
@@ -49,6 +50,18 @@ _NO_PACKAGE_EFFECT = (
     ".claude-plugin/",
 )
 _NO_PACKAGE_EFFECT_FILES = frozenset({".gitignore", "LICENSE", "README.md", "AGENTS.md", "CLAUDE.md"})
+# The fitness tests that build real consumer repos (8-14 s each, 2026-10-11) read only the onboarding machinery, so
+# they run when an input of it changes; every other fitness test runs on every change, and `check-all` runs them all.
+_ONBOARDING_TESTS = ("test_onboard_", "test_bootstrap_target.py")
+_ONBOARDING_INPUTS = ("tools/onboard/", "tools/preset_drift.py", ".agents/skills/onboard-consumer/", "tests/conftest.py")
+_ONBOARDING_INPUT_FILES = frozenset(
+    {"justfile", "pyproject.toml", "uv.lock", "conftest.py", ".pre-commit-config.yaml", ".beads/config.yaml"}
+)
+# What one onboarding test reads beyond those: the blueprint concern or recipe it checks its result with.
+_ONBOARDING_EXTRA = {
+    "test_onboard_beads.py": ("packages/blueprint/src/blueprint/concerns/backlog.py",),
+    "test_onboard_hooks.py": ("packages/blueprint/src/blueprint/recipes/",),
+}
 _REQ_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 
 
@@ -82,6 +95,19 @@ def workspace(repo: Path) -> tuple[dict[str, set[str]], set[str]]:
     return graph, plugins
 
 
+def _fitness(repo: Path, changed: list[str]) -> list[str]:
+    """`tests` whole when an onboarding input changed; else each fitness test file but the onboarding ones a change misses."""
+    if any(p.startswith(_ONBOARDING_INPUTS) or p in _ONBOARDING_INPUT_FILES for p in changed):
+        return ["tests"]
+
+    def runs(name: str) -> bool:
+        reads = (f"tests/{name}", *_ONBOARDING_EXTRA.get(name, ()))
+        return not name.startswith(_ONBOARDING_TESTS) or any(p.startswith(reads) for p in changed)
+
+    files = [p.relative_to(repo).as_posix() for p in sorted((repo / "tests").glob("test_*.py")) if runs(p.name)]
+    return files or ["tests"]
+
+
 def affected(repo: Path, changed: list[str]) -> list[str]:
     """The pytest paths to run for `changed` (repo-relative paths)."""
     graph, plugins = workspace(repo)
@@ -108,7 +134,7 @@ def affected(repo: Path, changed: list[str]) -> list[str]:
             seen.add(d)
             queue.append(d)
 
-    return ["tests", *(f"packages/{d}/tests" for d in sorted(seen) if (repo / "packages" / d / "tests").is_dir())]
+    return [*_fitness(repo, changed), *(f"packages/{d}/tests" for d in sorted(seen) if (repo / "packages" / d / "tests").is_dir())]
 
 
 CACHE = Path(".cache/affected-passed.json")
@@ -155,7 +181,9 @@ def skip_passed(repo: Path, paths: list[str]) -> list[str]:
     """`paths` without the package suites whose current fingerprint already passed."""
     graph, _ = workspace(repo)
     cache = _load_cache(repo)
-    return [p for p in paths if p == "tests" or fingerprint(repo, graph, p.split("/")[1]) not in cache.get(p.split("/")[1], [])]
+    return [
+        p for p in paths if not p.startswith("packages/") or fingerprint(repo, graph, p.split("/")[1]) not in cache.get(p.split("/")[1], [])
+    ]
 
 
 def record(repo: Path, paths: list[str]) -> None:

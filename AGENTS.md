@@ -143,6 +143,8 @@ duplicates; that's bd's doing, not drift). **These rules override them where the
   | Waiting on something with no bead (external access, a human decision) | `bd update <id> --status blocked` + a comment; find via `bd list --status blocked`, **not** `bd blocked` |
 
   Never invent a synthetic blocking bead for "not started yet" — that's `deferred`.
+- **A bead without acceptance criteria stays deferred.** `just check` runs `bd lint` over open and blocked beads
+  (`beads-lint`); claimed work is past that gate.
 - **Gated work carries its trigger in the defer reason.** This repo's doctrine is "do NOT build on
   spec" — a deferred bead whose reason doesn't name a concrete trigger is incomplete.
 - **Link a bead to a mission/ADR** with `bd update <id> --spec-id "<path>"` (a native field,

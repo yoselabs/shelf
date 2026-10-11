@@ -26,10 +26,23 @@ test_image := "shelf-gate-" + file_name(justfile_directory())
 # In CI, inside a container, or with SHELF_HOST_CHECK=1 they run in place; the container
 # speeds the gate up and is never required.
 [group('gate')]
-check: (gate "check-host")
+check: beads-lint (gate "check-host")
 
 [group('gate')]
-check-all: (gate "check-all-host")
+check-all: beads-lint (gate "check-all-host")
+
+# Every bead still to be started (open or blocked) carries its acceptance criteria: criteria are what make a bead
+# ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. Runs on the
+# host, before the container: bd's database lives in this clone (CI bootstraps it from refs/dolt/data first).
+[group('gate')]
+beads-lint:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -d .beads ] || exit 0
+    command -v bd >/dev/null || { echo "beads-lint: bd is not installed -- run just tools" >&2; exit 2; }
+    rc=0
+    for status in open blocked; do BD_DISABLE_METRICS=1 bd lint --status "$status" || rc=1; done
+    exit "$rc"
 
 # The dispatch sits in its own private recipe so `check` and `check-all` stay plain dependency edges
 # for the graph reader.
@@ -44,10 +57,38 @@ gate target:
     fi
 
 [group('gate')]
-check-host: guard preset blueprint lint typecheck arch spell deps test-affected
+check-host: (steps "guard" "preset" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test-affected")
 
 [group('gate')]
-check-all-host: guard preset blueprint lint typecheck arch spell deps test
+check-all-host: (steps "guard" "preset" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test")
+
+# Runs the gate's steps at once, each into its own log, then prints one timing line (a step over its budget is
+# marked) and the log of every step that failed. Each name is a recipe, so the gate graph still reads the edges.
+# Budgets, in seconds: GATE_STEP_BUDGET (default 60) per step, GATE_BUDGET (default 180) for the whole gate. The
+# gate runs several times within one feature, so a slow step is a cost to see and fix, not to wait out.
+[private]
+steps +names:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    step_budget=${GATE_STEP_BUDGET:-60}; gate_budget=${GATE_BUDGET:-180}
+    dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
+    SECONDS=0
+    echo "gate: {{ names }} (in parallel)" >&2
+    for n in {{ names }}; do
+        ( SECONDS=0; {{ just_executable() }} "$n" > "$dir/$n.log" 2>&1; echo "$? $SECONDS" > "$dir/$n.rc" ) &
+    done
+    wait
+    total=$SECONDS; failed=(); line=()
+    for n in {{ names }}; do
+        read -r rc took < "$dir/$n.rc"
+        mark=""; [ "$took" -gt $step_budget ] && mark=" ⚠ over ${step_budget}s"
+        [ "$rc" -eq 0 ] || { failed+=("$n"); mark="$mark ✗"; }
+        line+=("$n ${took}s$mark")
+    done
+    for n in "${failed[@]}"; do echo "--- $n" >&2; cat "$dir/$n.log" >&2; done
+    summary=$(printf '%s · ' "${line[@]}"); echo "gate: ${summary% · } -- total ${total}s" >&2
+    [ "$total" -gt $gate_budget ] && echo "gate: ⚠ ${total}s is over the ${gate_budget}s gate budget: find the slow step above" >&2
+    [ "${#failed[@]}" -eq 0 ] || { echo "gate: failed: ${failed[*]}" >&2; exit 1; }
 
 test-image:
     docker build -q -f tools/gate/gate.Dockerfile -t {{ test_image }} .

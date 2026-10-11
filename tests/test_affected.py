@@ -30,8 +30,42 @@ def repo(tmp_path: Path) -> Path:
 
 
 def _pkgs(paths: list[str]) -> set[str]:
-    assert paths[0] == "tests"
-    return {p.split("/")[1] for p in paths[1:]}
+    return {p.split("/")[1] for p in paths if p.startswith("packages/")}
+
+
+def _fitness_tests(repo: Path) -> None:
+    (repo / "tests").mkdir()
+    for name in ("test_arch.py", "test_onboard_beads.py", "test_bootstrap_target.py"):
+        (repo / "tests" / name).write_text("")
+
+
+def test_an_onboarding_test_runs_alone_when_only_it_or_what_it_reads_changes(repo: Path) -> None:
+    _fitness_tests(repo)
+    for changed in (["tests/test_onboard_beads.py"], ["packages/blueprint/src/blueprint/concerns/backlog.py"]):
+        fitness = [p for p in affected.affected(repo, changed) if p.startswith("tests")]
+        assert fitness == ["tests/test_arch.py", "tests/test_onboard_beads.py"], changed
+    assert [p for p in affected.affected(repo, ["packages/blueprint/src/blueprint/x.py"]) if p.startswith("tests")] == [
+        "tests/test_arch.py"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("changed", "runs_onboarding"),
+    [
+        (["packages/leaf/src/leaf/x.py"], False),
+        (["docs/x.md", "AGENTS.md"], False),
+        (["tools/onboard/hooks.py"], True),
+        (["justfile"], True),
+        (["pyproject.toml"], True),
+        (["tests/conftest.py"], True),
+    ],
+)
+def test_the_onboarding_tests_run_only_when_an_onboarding_input_changes(repo: Path, changed: list[str], runs_onboarding: bool) -> None:
+    # They build real consumer repos (8-14 s each, 2026-10-11); every other fitness test still runs on every change.
+    _fitness_tests(repo)
+    paths = affected.affected(repo, changed)
+    fitness = [p for p in paths if p.startswith("tests")]
+    assert fitness == (["tests"] if runs_onboarding else ["tests/test_arch.py"])
 
 
 @pytest.mark.parametrize(
@@ -56,6 +90,7 @@ def test_a_suite_that_passed_is_skipped_until_it_or_a_dependency_changes(repo: P
     paths = ["tests", "packages/base/tests", "packages/middle/tests", "packages/leaf/tests"]
     affected.record(repo, paths)
     assert affected.skip_passed(repo, paths) == ["tests"]
+    assert affected.skip_passed(repo, ["tests/test_arch.py"]) == ["tests/test_arch.py"]
 
     (repo / "packages/base/src.py").write_text("x = 2\n")
     assert affected.skip_passed(repo, paths) == ["tests", "packages/base/tests", "packages/middle/tests"]

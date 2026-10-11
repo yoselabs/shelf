@@ -23,6 +23,7 @@ _METRICS_ENV = "BD_DISABLE_METRICS"
 # `bd lint` prints a bead line (`<id> [<type>]: <title>`), then one `Missing: ## <section>` line per gap.
 _LINT_BEAD = re.compile(r"^(\S+) \[[^\]]+\]:", re.MULTILINE)
 _LINT_MISSING = re.compile(r"Missing: ## (.+?)\s*$", re.MULTILINE)
+_LINT_BLOCK = re.compile(r"^(\S+) \[[^\]]+\]:.*(?:\n(?!\S+ \[).*)*", re.MULTILINE)
 _LINT_NAMED = 5
 
 
@@ -139,23 +140,39 @@ def no_local_override(ctx: Context) -> Finding:
     return passing("no local file or session env overrides bd")
 
 
-@check("backlog.lint", "every open bead carries the sections bd requires (`bd lint` exits 0)", applies=uses_beads, audit_only=True)
+# Criteria are what make a bead ready to start, so the beads still to be started are linted: `open` (bd's default) and
+# `blocked` (it turns ready when its blocker closes). Work already claimed is past that gate, and a deferred idea may stay
+# unfinished (owner, 2026-10-11).
+LINTED_STATUSES = ("open", "blocked")
+
+
+@check(
+    "backlog.lint",
+    "every bead still to be started (open or blocked) carries the sections bd requires (`bd lint` exits 0)",
+    applies=uses_beads,
+    audit_only=True,
+    version=2,
+)
 def lint(ctx: Context) -> Finding:
-    """`bd lint` passes."""
-    done = ctx.run("bd", "lint", timeout=120)
-    if done is None:
-        return not_checked("`bd lint` did not answer", _NO_BD)
-    if done.returncode != 0:
-        return failing(
-            _lint_evidence(done.stdout or done.stderr), "add the missing sections (acceptance criteria, description) to each bead named"
-        )
-    return passing("`bd lint` passes")
+    """`bd lint` passes for each status that is not deferred or closed."""
+    failed: list[str] = []
+    for status in LINTED_STATUSES:
+        done = ctx.run("bd", "lint", "--status", status, timeout=120)
+        if done is None:
+            return not_checked("`bd lint` did not answer", _NO_BD)
+        if done.returncode != 0:
+            failed.append(done.stdout or done.stderr)
+    if failed:
+        return failing(_lint_evidence("\n".join(failed)), "add the missing sections (acceptance criteria, description) to each bead named")
+    return passing(f"`bd lint` passes for {', '.join(LINTED_STATUSES)} beads")
 
 
 def _lint_evidence(output: str) -> str:
     """The count of beads and of each missing section, and the first few bead ids: enough to size the cleanup."""
-    beads = _LINT_BEAD.findall(output)
-    sections = Counter(_LINT_MISSING.findall(output))
+    # One block per bead (its header, then its Missing lines); a bead two runs both report counts once.
+    blocks = {m.group(1): m.group(0) for m in _LINT_BLOCK.finditer(output)}
+    beads = list(blocks)
+    sections = Counter(name for block in blocks.values() for name in _LINT_MISSING.findall(block))
     if not beads:
         # Not the format we know: the first non-blank lines are still better than nothing.
         lines = [line.strip() for line in output.splitlines() if line.strip()]

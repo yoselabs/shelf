@@ -29,4 +29,16 @@ jobs:
 
       - run: uv sync --locked
 
+      # The pinned tools (mise.toml, mise.lock; ADR 0024), then the beads database from refs/dolt/data, so
+      # `beads-lint` judges the beads as pushed. The repo is public: read the Dolt data over HTTPS, no SSH key.
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          install_args: --locked
+      - run: bd bootstrap
+        env:
+          BD_DISABLE_METRICS: "1"
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: url.https://github.com/.insteadOf
+          GIT_CONFIG_VALUE_0: ssh://git@github.com/
+
       - run: uv run just check-all

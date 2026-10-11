@@ -47,6 +47,6 @@ Waiting on a person or access: `--status blocked` plus a comment. Do not collaps
 
 ## Config traps
 
-- Every open bead needs acceptance criteria before it is ready; `bd lint` in the gate enforces it.
+- Every bead still to be started (open or blocked) needs acceptance criteria; `just beads-lint` in the gate enforces it. An idea without criteria yet is deferred (`bd defer`), not open; claimed work is past that gate.
 - `bd config set` edits the tracked `.beads/config.yaml`; a `git checkout` silently reverts it. Read back with `bd config get <key>`.
 - Hooks are prek's, not bd's ([gate.md](gate.md)).
