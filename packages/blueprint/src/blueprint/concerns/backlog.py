@@ -221,9 +221,10 @@ def no_tracker_file(ctx: Context) -> Finding:
     return passing("beads is the only backlog")
 
 
-# Hooks that rewrite any file they are given. bd writes .beads/ itself (`bd bootstrap` leaves metadata.json without a final
-# newline), so a fixer run over every file fails `just check` in each fresh clone (homelab, 2026-10-11).
-_FIXERS = ("end-of-file-fixer", "trailing-whitespace", "mixed-line-ending")
+# The fixer hook seen failing on bd's own files: `bd bootstrap` leaves .beads/metadata.json without a final newline, so
+# end-of-file-fixer over every file failed `just check` in each fresh clone (homelab, 2026-10-11). Other fixers join the
+# list when one is seen failing there, not before.
+_FIXERS = ("end-of-file-fixer",)
 _HOOK_ID = re.compile(r"^(\s*)-\s*id:\s*([\w-]+)", re.MULTILINE)
 
 
@@ -231,9 +232,9 @@ def _spares_beads(block: str) -> bool:
     return any(".beads" in line for line in block.splitlines() if line.strip().startswith("exclude:"))
 
 
-@check("backlog.hooks-spare-beads", "whitespace-fixer hooks exclude .beads/, which bd writes", applies=uses_beads)
+@check("backlog.hooks-spare-beads", "an end-of-file-fixer hook excludes .beads/, which bd writes", applies=uses_beads)
 def hooks_spare_beads(ctx: Context) -> Finding:
-    """A fixer hook (end-of-file-fixer, trailing-whitespace) carries `exclude: ^\\.beads/`, or the config's top-level exclude does."""
+    """end-of-file-fixer carries `exclude: ^\\.beads/`, or the config's top-level exclude does."""
     text = ctx.read(".pre-commit-config.yaml") or ""
     top = "\n".join(line for line in text.splitlines() if line.startswith("exclude:"))
     starts = list(_HOOK_ID.finditer(text))
@@ -248,4 +249,4 @@ def hooks_spare_beads(ctx: Context) -> Finding:
             f"{', '.join(bare)} run over .beads/, which bd rewrites (a fresh clone's `bd bootstrap` fails them)",
             "add `exclude: ^\\.beads/` to each of those hooks in .pre-commit-config.yaml",
         )
-    return passing("no whitespace-fixer hook reaches .beads/")
+    return passing("no end-of-file-fixer reaches .beads/")

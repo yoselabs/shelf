@@ -233,6 +233,12 @@ def test_a_whitespace_fixer_hook_over_beads_files_fails(repo: Repo) -> None:
     assert _verdicts(repo)["backlog.hooks-spare-beads"] is Verdict.FAILING
 
 
+def test_a_whitespace_hook_never_seen_failing_on_beads_files_is_not_judged(repo: Repo) -> None:
+    _beads(repo)
+    repo.write(".pre-commit-config.yaml", _FIXER.format(extra="    exclude: ^\\.beads/\n").replace("check-yaml", "trailing-whitespace"))
+    assert _verdicts(repo)["backlog.hooks-spare-beads"] is Verdict.PASSING
+
+
 def test_a_fixer_hook_that_excludes_beads_passes(repo: Repo) -> None:
     _beads(repo)
     repo.write(".pre-commit-config.yaml", _FIXER.format(extra="    exclude: ^\\.beads/\n"))
