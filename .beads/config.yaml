@@ -65,7 +65,7 @@
 # - linear.api_key  → use LINEAR_API_KEY env var instead
 # - github.token    → use GITHUB_TOKEN env var instead
 
-sync.remote: "git+https://github.com/yoselabs/shelf.git"
+# sync.remote: "git+https://github.com/yoselabs/shelf.git"
 
 # Strict beads settings (blueprint, owner decisions 2026-10-10; evidence:
 # openspec/changes/blueprint-skill/research/beads-config.md). The beads doctor
