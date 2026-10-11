@@ -40,6 +40,8 @@ def test_a_sound_harness_passes_every_agent_checkpoint(repo: Repo) -> None:
     templates.install(repo.root, detect(repo.root, load_state(repo.root)))
     for path in (repo.root / "docs/agents").glob("*.md"):
         path.write_text(templates.PLACEHOLDER.sub("filled", path.read_text()))
+    repo.write("CONTEXT.md", "# Glossary\n")
+    repo.write("docs/adr/INDEX.md", "# Index\n")
     assert set(_verdicts(repo).values()) == {Verdict.PASSING}
 
 
@@ -94,6 +96,8 @@ def _filled_harness(repo: Repo) -> None:
     templates.install(repo.root, detect(repo.root, load_state(repo.root)))
     for path in (repo.root / "docs/agents").glob("*.md"):
         path.write_text(templates.PLACEHOLDER.sub("filled", path.read_text()))
+    repo.write("CONTEXT.md", "# Glossary\n")  # domain.md names these two
+    repo.write("docs/adr/INDEX.md", "# Index\n")
 
 
 @pytest.mark.parametrize("mark", ["*", "_"])

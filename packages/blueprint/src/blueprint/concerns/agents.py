@@ -242,14 +242,42 @@ def _instruction_files(ctx: Context) -> dict[str, str]:
     return files
 
 
+_FENCE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
+_BACKTICKED = re.compile(r"`([^`\n]+)`")
+_LINKED = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
+# A repo-relative file: no scheme, placeholder, glob or command; ends in a known extension; `NNNN` and `YYYY` are patterns.
+_PATH = re.compile(r"[\w.-]+(?:/[\w.-]+)*\.(?:md|toml|ya?ml|json|py|sh|txt|just)")
+_PATTERN = re.compile(r"N{2,}|YYYY|MM-DD")
+
+
+def _named_paths(text: str) -> list[str]:
+    """The repo files a conventions file names in backticks or links, outside code fences, in first-seen order."""
+    prose = _FENCE.sub("", text)
+    named = [*_BACKTICKED.findall(prose), *(t.split("#")[0] for t in _LINKED.findall(prose))]
+    return list(dict.fromkeys(t for t in named if _PATH.fullmatch(t) and not _PATTERN.search(t)))
+
+
+def _missing_paths(ctx: Context, name: str) -> list[str]:
+    """Paths docs/agents/<name>.md names that exist neither from the repo root nor, for a link, beside the file."""
+    here = Path("docs/agents")
+    named = _named_paths(ctx.read(f"docs/agents/{name}.md") or "")
+    return [p for p in named if not ctx.path(p).exists() and not ctx.path(str(here / p)).exists()]
+
+
 @check(
     "agents.culture-files",
-    "every docs/agents/ file the repo's profile requires exists; no template placeholder is left in it, AGENTS.md or CLAUDE.md",
+    "every docs/agents/ file the repo's profile requires exists; no template placeholder is left in it, AGENTS.md or CLAUDE.md; "
+    "domain.md names only files that exist",
     layer="agent",
-    version=2,
+    version=3,
 )
 def culture_files(ctx: Context) -> Finding:
-    """Missing files are not set up (auto: copied from the templates); a leftover `{{name}}` or bd template line is failing."""
+    """Missing files are not set up (auto: copied from the templates); a leftover `{{name}}` or bd template line is failing.
+
+    domain.md also fails when it names a file the repo lacks (`docs/adr/INDEX.md`, `CONTEXT.md`): a template that
+    contradicts the repo's real layout passes the placeholder test. Only domain.md is read: the other files name
+    generated or optional paths (`.github/workflows/`, `recipes/...`) that a correct repo may not have.
+    """
     names = templates.required(ctx.profile)
     missing = [n for n in names if ctx.read(f"docs/agents/{n}.md") is None]
     if missing:
@@ -257,6 +285,13 @@ def culture_files(ctx: Context) -> Finding:
     unfilled = [n for n in names if templates.PLACEHOLDER.search(ctx.read(f"docs/agents/{n}.md") or "")]
     if unfilled:
         return failing(f"placeholders left in: {', '.join(f'{n}.md' for n in unfilled)}", "fill each {{name}} from the repo")
+    gone = _missing_paths(ctx, "domain")
+    if gone:
+        return failing(
+            f"docs/agents/domain.md names files that do not exist: {', '.join(gone)}",
+            "make the file exist (the standard layout is CONTEXT.md and docs/adr/, ADR 0017), or migrate the repo to it; "
+            "a durable different layout needs an override backed by an accepted ADR",
+        )
     left = {
         name: len(templates.PLACEHOLDER.findall(text)) + len(_BD_PLACEHOLDER.findall(text))
         for name, text in _instruction_files(ctx).items()

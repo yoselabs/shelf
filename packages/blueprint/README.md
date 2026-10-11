@@ -73,7 +73,7 @@ and the scope: concerns checked, concerns not run, and whether the audit-only ch
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
 | stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional; the toolchain row also checks every dotnet install against global.json); `python-uv.uv-tool` (audit only): an application's installed uv tool matches uv.lock; `tool-pins`: every tool the repo runs (uv, just, prek, bd, git-lfs, godot) is pinned exactly in mise.toml, locked in mise.lock and installed by a `mise install --locked` recipe, with no second pin beside .python-version, global.json or rust-just (ADR 0024); `tools-installed` (audit only): each pinned tool on PATH is its pinned version |
 | framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, unity, mcp, provisional: framework-version · project-hygiene · binary-assets · embedded-script-lint · build · tests · surface-integrity · architecture · ci · hooks · agent-guidance); paths may use `{root}` (the project folder) and globs |
-| agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `worktrees` · `culture-files` (placeholders in docs/agents/, AGENTS.md and CLAUDE.md) · `managed-block` |
+| agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `worktrees` · `culture-files` (placeholders in docs/agents/, AGENTS.md and CLAUDE.md; a domain.md naming a file the repo lacks) · `managed-block` |
 
 With `--audit`, a gate row that is failing or not set up (`one-command`, `runner`, `ci`, `ci-no-manifest-edit`, `hooks-recipe`, `runs-blueprint`, `clean-clone`) also names any remote-tracking branch (`origin/*`, local refs, no fetch) ahead of the default branch that changes a gate file (justfile, Makefile, `.github/workflows/*`, hook config), and hands the fix to the owner: merge that branch or remediate on main, not a parallel gate. The branch itself is never checked.
 
@@ -87,7 +87,10 @@ A new stack is a new `profiles/<stack>.toml`, not code.
 ## Culture templates
 
 `blueprint template --repo .` copies the `docs/agents/` files the profile requires (`templates/`)
-and writes the AGENTS.md managed block; it never overwrites a file the repo has.
+and writes the AGENTS.md managed block; it never overwrites a file the repo has. With the `no-ci` profile
+trait, `gate.md` is written with no-CI wording (`templates/agents/gate-no-ci.md` replaces its CI section).
+The decision-record layout of ADR 0017 (`CONTEXT.md`, `docs/adr/`) is the standard the templates assume: a repo
+that keeps its records elsewhere migrates, or records an override backed by an accepted ADR (ADR 0022).
 
 ## Survey
 
