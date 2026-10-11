@@ -88,3 +88,5 @@ export:
     git-add: false
 import:
     auto: false
+sync:
+    remote: "git+ssh://git@github.com/yoselabs/shelf.git"
