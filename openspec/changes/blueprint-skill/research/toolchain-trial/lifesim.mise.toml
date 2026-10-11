@@ -1,0 +1,18 @@
+[settings]
+idiomatic_version_file_enable_tools = ["dotnet"]
+
+[tools]
+just = "1.58.0"
+prek = "0.3.6"
+"github:gastownhall/beads" = { version = "1.1.2", bin = "bd" }
+
+[tools."github:godotengine/godot"]
+version = "4.7.2-stable"
+bin_path = "Godot_mono.app/Contents/MacOS"
+rename_exe = "godot"
+
+[tools."github:godotengine/godot".platforms]
+macos-arm64 = { asset_pattern = "Godot_v*_mono_macos.universal.zip", bin_path = "Godot_mono.app/Contents/MacOS" }
+macos-x64 = { asset_pattern = "Godot_v*_mono_macos.universal.zip", bin_path = "Godot_mono.app/Contents/MacOS" }
+linux-x64 = { asset_pattern = "Godot_v*_mono_linux_x86_64.zip" }
+windows-x64 = { asset_pattern = "Godot_v*_mono_win64.zip" }

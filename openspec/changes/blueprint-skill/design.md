@@ -26,28 +26,26 @@ call, recorded so he can overrule · *Fable A/B* = adopted from a consult, with 
 
 All research is one pass unless a file says otherwise.
 
-## Status — 2026-10-10, end of the design session
+## Status — 2026-10-11, handover (resume here)
 
-Resume here after compaction. Work queue: `bd show shelf-1y4` (epic) and `bd ready`.
+Work queue: `bd show shelf-1y4` (epic), `bd ready`. Decisions: `docs/adr/INDEX.md` (the shelf's standards
+are ADRs 0016-0024). Work continues on the Linux devbox (`~/Workspaces/shelf`, bd bootstrapped from the
+remote, prek installed); both machines run bd 1.3.1: keep them equal until mise pins it (ADR 0024).
 
 | part | state |
 |---|---|
-| design | done: D1-D18 + owner rounds 1-10 below; vocabulary in [CONTEXT.md](CONTEXT.md) |
-| research | done: 13 files in `research/`, all one pass; two Fable consults (advisory only) |
-| shelf prerequisites | done: `tools/` type-checked (shelf-yz4); ADR 0014 amended; plugin eval proven to reach a user-invoked skill; eval cases live in `evals/<skill>/` (plugin eval refuses them inside `skills/`); strict beads settings live in the shelf; onboarding's broken Makefile copy fixed (shelf-4mz) |
-| blueprint code | v0.1 built: engine `packages/blueprint` (stdlib, one process, profile detection, overrides, set hash, reports, exit codes), gate concern (5 checkpoints) and backlog concern (7), each with a passing and a planted-violation test; `skills/blueprint/SKILL.md` with two paired eval cases; the shelf runs `make blueprint` in its own gate and passes it. Audit-only rows (`--audit`): clean clone, installed hooks, and the two that read bd's database |
-| test speed | `make check` runs in a Linux container when Docker answers and tests only the packages a change reaches (`tools/affected.py`); `make check-all` runs everything and is what CI runs. Full gate 16m51s on the host → about 1 min in the container (2026-10-10) |
-| layers (owner, 2026-10-10) | reports group concerns by layer: generic (gate, backlog), stack-specific (profiles per language), framework-specific (profiles per engine: godot), agent harness (agents); a stack or framework with no profile is a *blueprint gap*: "no standard yet", the shelf's gap, never the repo's failure |
-| hooks (owner, 2026-10-10) | prek owns the hooks via `.pre-commit-config.yaml`; bd's five events run from it; bd never installs hooks (research/hooks-and-beads.md); the shelf migrated |
-| affected tools (owner, 2026-10-10) | Turborepo, moon, Nx, Pants trialled hands-on: none beat tools/affected.py (research/affected-trials.md); a result cache added instead |
-| survey | `blueprint survey`: experience, completeness, correctness, cost; filled after every run, checked complete by the engine |
-| consumers waiting | a2kay, lifesim, a2peer, homelab: unblocked by shelf-1y4.12 (corpus audits), which needs the engine, the gate and backlog concerns, and the skill |
+| engine | concerns gate, backlog, knowledge, stack (+ python pins), framework, agents; reads the gate graph from `just --dump`; `checkpoints.txt` grace (ADR 0018); every exception needs a reason plus an expiry or an accepted ADR (ADR 0022) |
+| profiles | python-uv (evidenced; architecture = import-linter + ruff banned-api), dotnet, godot, mcp (provisional) |
+| skill | strict and pushy; answers then returns to the run; ends with a relay block for a shelf session; grows missing profiles from inside a repo |
+| shelf | passes its own audit (all ✅); gate is `uv run just check`; `affected.py` kept, moon is the target (ADR 0021) |
+| evals | 8 cases, all passing before the just migration; their fixtures stay on make (the not-migrated case); re-run (`just eval`) not done since |
 
-Next (2026-10-11, milestone pushed): the owner runs the audit on lifesim, a2peer, a2kay, homelab and relays
-each `docs/blueprint/survey.md`. Open in flight: stricter .NET analyzers and the architecture tool (research
-appended to research/dotnet-godot-layering.md, profile edits uncommitted if any), build-tool round 2 (moon,
-Turborepo reports pending; Nx done: research/affected-trials.md + scratch trial2-*.md), eval run results.
-Later: knowledge concern (1y4.6), kickoff (1y4.9), reabsorb (1y4.10), opencode (1y4.16), Godot proof (1y4.17).
+Open, in order:
+1. ADR 0024 (mise) is **proposed**: the owner accepts it, then shelf-1y4.19 builds the pin checks and pins the shelf and lifesim.
+2. Research drafts not yet adopted: Unity profile (shelf-1y4.18), Nix and compose (shelf-v2p), .NET coverage (shelf-8eg), Godot gaps (shelf-d89, shelf-1y4.17): drafts in `research/` when filed, else rerun.
+3. Owner decisions pending: shelf-230 (judge an unmerged branch; recommended yes), shelf-lzg (templates deferring to a repo's own decision layout; recommended no).
+4. Re-audit every consumer on the new blueprint (shelf-1y4.12): a2kay, lifesim, a2peer, homelab; relay surveys.
+5. Then opencode (1y4.16), release (1y4.11), reabsorb (1y4.10), kickoff (1y4.9), shelf off OpenSpec (1y4.13), u0p.
 
 ## Owner round 10 — output contract (2026-10-10)
 
