@@ -7,14 +7,16 @@ shelf, then the role rows can judge it.
 
 from __future__ import annotations
 
+import json
 import re
+import shutil
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from blueprint.concerns.gate import reachable_recipes
-from blueprint.model import Finding, Sub, check_each, failing, not_applicable, not_checked, not_set_up, passing
+from blueprint.model import Finding, Sub, check_each, failing, is_skipped, not_applicable, not_checked, not_set_up, passing
 
 if TYPE_CHECKING:
     from blueprint.model import Context
@@ -70,6 +72,9 @@ class Role:
     alternatives: tuple[dict[str, Any], ...] = ()
     untested: str = ""
     na: str = ""
+    # Where the role's executable may live, besides PATH: `$PATH`, `$DOTNET_ROOT` or an absolute folder. A
+    # toolchain role names them when a second install can be the one a tool resolves (Godot's dotnet).
+    installs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -97,6 +102,7 @@ def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
                 alternatives=tuple(r.get("alternative", ())),
                 untested=r.get("untested", ""),
                 na=r.get("na", ""),
+                installs=tuple(r.get("installs", ())),
             )
             for r in data.get("role", [])
         }
@@ -116,7 +122,8 @@ def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
         return any(_config_holds(ctx, alt, root) for alt in spec["any"])
     path = spec["path"].replace("{root}", root).removeprefix("./")
     if any(ch in path for ch in "*?["):
-        return any(_config_holds(ctx, {**spec, "path": str(p.relative_to(ctx.repo))}) for p in sorted(ctx.repo.glob(path)))
+        hits = (p.relative_to(ctx.repo) for p in sorted(ctx.repo.glob(path)))
+        return any(_config_holds(ctx, {**spec, "path": str(rel)}) for rel in hits if not is_skipped(rel.as_posix(), ctx.profile.ignore))
     text = ctx.read(path)
     if text is None:
         return ctx.path(path).is_dir() and "contains" not in spec
@@ -154,7 +161,85 @@ def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str
     missing = [_describe(c).replace("{root}", root) for c in spec.config if not _config_holds(ctx, c, root)]
     if missing:
         return _Judged(stack, "not-set-up", f"{spec.tool} not set up (missing {'; '.join(missing)})", spec.install)
-    return _gate_verdict(ctx, stack, spec, gate_text)
+    judged = _gate_verdict(ctx, stack, spec, gate_text)
+    if judged.verdict == "pass" and spec.installs and stack == "dotnet" and role == "toolchain":
+        return _sdk_installs(ctx, stack, spec, judged)
+    return judged
+
+
+_SDK_VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
+# global.json rollForward -> how far from the requested SDK an installed one may be: 0 = same feature band,
+# 1 = any band of the same major.minor, 2 = any minor of the same major, 3 = any major; `disable` is exact.
+_ROLL_REACH = {"patch": 0, "latestpatch": 0, "feature": 1, "latestfeature": 1, "minor": 2, "latestminor": 2, "major": 3, "latestmajor": 3}
+
+
+def _sdk_ok(want: tuple[int, int, int], have: tuple[int, int, int], roll: str) -> bool:
+    """Whether an installed SDK satisfies `global.json`'s version under its rollForward policy (feature band = patch // 100)."""
+    if roll.lower() == "disable":
+        return have == want
+    reach = _ROLL_REACH.get(roll.lower(), 0)
+    if have < want:
+        return False
+    if reach == 0:
+        return have[:2] == want[:2] and have[2] // 100 == want[2] // 100
+    if reach == 1:
+        return have[:2] == want[:2]
+    return reach == 3 or have[0] == want[0]
+
+
+def _dotnet_executables(ctx: Context, spec: Role) -> list[Path]:
+    """Each distinct dotnet the tools may resolve: on PATH, under DOTNET_ROOT, in a well-known folder."""
+    found: list[Path] = []
+    for place in spec.installs:
+        if place == "$PATH":
+            exe = shutil.which("dotnet", path=ctx.env.get("PATH"))
+            candidate = Path(exe) if exe else None
+        elif place == "$DOTNET_ROOT":
+            candidate = Path(ctx.env["DOTNET_ROOT"]) / "dotnet" if ctx.env.get("DOTNET_ROOT") else None
+        else:
+            candidate = ctx.system_path(place) / "dotnet"
+        if candidate is not None and candidate.is_file() and candidate.resolve() not in {f.resolve() for f in found}:
+            found.append(candidate)
+    return found
+
+
+def _sdk_versions(ctx: Context, exe: Path) -> list[tuple[int, int, int]]:
+    done = ctx.run(str(exe), "--list-sdks", timeout=30)
+    lines: list[str] = done.stdout.splitlines() if done is not None and done.returncode == 0 else []
+    return [(int(m[1]), int(m[2]), int(m[3])) for line in lines if (m := _SDK_VERSION.match(line.strip()))]
+
+
+def _sdk_installs(ctx: Context, stack: str, spec: Role, judged: _Judged) -> _Judged:
+    """global.json must be satisfiable by an SDK of every dotnet install the tools may resolve.
+
+    Why: lifesim pinned the SDK of the dotnet on PATH, and Godot's .NET editor resolved the other install,
+    whose newer feature band the pin does not accept: `make build` passed, the editor's build exited 155.
+    """
+    try:
+        sdk = json.loads(ctx.read("global.json") or "{}").get("sdk", {})
+    except json.JSONDecodeError:
+        return judged
+    pin = _SDK_VERSION.match(str(sdk.get("version", "")))
+    exes = _dotnet_executables(ctx, spec)
+    if pin is None or not exes:
+        return judged
+    want, roll = (int(pin[1]), int(pin[2]), int(pin[3])), str(sdk.get("rollForward", "latestPatch"))
+    listed = [(exe, _sdk_versions(ctx, exe)) for exe in exes]
+    show = [f"{exe} (SDKs {', '.join('.'.join(map(str, v)) for v in versions) or 'none'})" for exe, versions in listed]
+    lacking = [i for i, (_, versions) in enumerate(listed) if not any(_sdk_ok(want, v, roll) for v in versions)]
+    if not lacking:
+        return _Judged(
+            stack, "pass", f"{judged.evidence}; global.json {sdk.get('version')} ({roll}) is met by {len(exes)} dotnet install(s)"
+        )
+    pinned = f"global.json pins {sdk.get('version')} (rollForward {roll})"
+    return _Judged(
+        stack,
+        "failing",
+        f"{pinned}: met by {', '.join(show[i] for i in range(len(show)) if i not in lacking) or 'no install'}, "
+        f"but not by {', '.join(show[i] for i in lacking)}",
+        "give every dotnet the tools resolve an SDK global.json accepts: upgrade the install that lacks it, pin a version "
+        "all installs carry, or loosen rollForward (latestFeature); an install that is not meant to build can be removed",
+    )
 
 
 def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judged:
@@ -185,7 +270,7 @@ def finding_for(judged: _Judged) -> Finding:
     return passing(judged.evidence)
 
 
-def _profile_row(stack: str, prof: StackProfile | None) -> Sub:
+def _profile_row(stack: str, prof: StackProfile | None, origin: str = "") -> Sub:
     statement = f"the shelf has a profile for {stack}: the tool for every role"
     if prof is None:
         finding = not_checked(
@@ -196,10 +281,11 @@ def _profile_row(stack: str, prof: StackProfile | None) -> Sub:
         return Sub(f"stack/{stack}", f"stack.{stack}.profile", statement, finding)
     tools = " · ".join(f"{r.role}: {r.tool or '(untested)'}" for r in prof.roles.values() if not r.na)
     note = "" if prof.status == "evidenced" else "; provisional: written, not yet proven in a second repo"
-    return Sub(f"stack/{stack}", f"stack.{stack}.profile", statement, passing(f"{prof.status} profile: {tools}{note}"))
+    seen = f"; {stack} detected from {origin}" if origin else ""
+    return Sub(f"stack/{stack}", f"stack.{stack}.profile", statement, passing(f"{prof.status} profile: {tools}{note}{seen}"))
 
 
-@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `make check`", layer="stack", version=2)
+@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `make check`", layer="stack", version=3)
 def roles(ctx: Context) -> list[Sub]:
     """Per detected stack: one profile row, then one row per role."""
     if not ctx.profile.stacks:
@@ -211,10 +297,12 @@ def roles(ctx: Context) -> list[Sub]:
         return [Sub("stack", "stack.detected", "the repo's stacks are detected", finding)]
     profiles = load_profiles()
     reached = gate_text(ctx)
+    origins = dict(ctx.profile.stack_files)
     subs: list[Sub] = []
     for stack in ctx.profile.stacks:
         prof = profiles.get(stack)
-        subs.append(_profile_row(stack, prof))
+        origin = origins.get(stack, "") + (f"; ignored paths: {', '.join(ctx.profile.ignore)}" if ctx.profile.ignore else "")
+        subs.append(_profile_row(stack, prof, origin))
         if prof is None:
             continue
         for role in ROLES:

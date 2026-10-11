@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tomllib
 from dataclasses import dataclass, field
 from enum import StrEnum
 from fnmatch import fnmatch
@@ -40,12 +41,23 @@ SKIP_DIRS = frozenset(
 )
 
 
-def walk(root: Path, pattern: str, max_depth: int | None = None) -> list[Path]:
-    """Files under `root` whose name matches `pattern`, skipping SKIP_DIRS, at most `max_depth` levels down."""
+def is_skipped(rel: str, skip: tuple[str, ...]) -> bool:
+    """Whether the repo-relative slash path `rel` is, or lies under, one of the `skip` paths (a folder or a glob)."""
+    return any(fnmatch(rel, p.rstrip("/")) or rel.startswith(p.rstrip("/") + "/") for p in skip)
+
+
+def walk(root: Path, pattern: str, max_depth: int | None = None, skip: tuple[str, ...] = ()) -> list[Path]:
+    """Files under `root` matching `pattern`, skipping SKIP_DIRS and the repo-declared `skip` paths, at most `max_depth` levels down."""
     found: list[Path] = []
     for here, dirs, files in os.walk(root):
         depth = len(Path(here).relative_to(root).parts)
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and (max_depth is None or depth + 1 < max_depth)]
+        dirs[:] = [
+            d
+            for d in dirs
+            if d not in SKIP_DIRS
+            and (max_depth is None or depth + 1 < max_depth)
+            and not is_skipped((Path(here) / d).relative_to(root).as_posix(), skip)
+        ]
         found += [Path(here) / f for f in files if fnmatch(f, pattern)]
     return sorted(found)
 
@@ -133,6 +145,11 @@ class Profile:
     # Frameworks on top of a stack (a game engine, a web framework), each with the folder it lives in
     # relative to the repo root: (("godot", "src/Game.Godot"),).
     frameworks: tuple[tuple[str, str], ...] = ()
+    # Each detected stack with the files that set it (or "declared in docs/blueprint/blueprint.toml"), so a
+    # wrong stack can be traced to the file that caused it.
+    stack_files: tuple[tuple[str, str], ...] = ()
+    # Paths the repo declared throwaway or vendored ([[profile.ignore]]): detection and role globs skip them.
+    ignore: tuple[str, ...] = ()
 
 
 def uses_beads(profile: Profile) -> bool:
@@ -149,6 +166,13 @@ class Context:
     env: dict[str, str] = field(default_factory=lambda: dict(os.environ))
     settings: dict[str, object] = field(default_factory=dict)
 
+    def system_path(self, absolute: str) -> Path:
+        """An absolute machine path (`/usr/local/share/dotnet`), under BLUEPRINT_SYSTEM_ROOT when a test sets one.
+
+        Why: a check that looks at well-known install locations would otherwise judge the developer's own machine.
+        """
+        return Path(self.env.get("BLUEPRINT_SYSTEM_ROOT", "/")) / absolute.lstrip("/")
+
     def path(self, rel: str) -> Path:
         """`rel` inside the repo."""
         return self.repo / rel
@@ -157,6 +181,13 @@ class Context:
         """The text of `rel`, or None when it is not a file."""
         p = self.repo / rel
         return p.read_text(errors="replace") if p.is_file() else None
+
+    def toml(self, rel: str) -> dict[str, object]:
+        """The parsed TOML file `rel`; empty when it is absent or not valid TOML (the checks that need it report that themselves)."""
+        try:
+            return tomllib.loads(self.read(rel) or "")
+        except tomllib.TOMLDecodeError:
+            return {}
 
     def has(self, tool: str) -> bool:
         """Whether `tool` is on this context's PATH."""
@@ -243,12 +274,25 @@ def check_each(
     statement: str,
     *,
     version: int = 1,
+    audit_only: bool = False,
+    applies: Callable[[Profile], bool] = lambda _profile: True,
     layer: str = "generic",
 ) -> Callable[[Callable[[Context], list[Sub]]], Callable[[Context], list[Sub]]]:
     """Register a function that emits several rows, each with its own concern and id (one per stack)."""
 
     def register(fn: Callable[[Context], list[Sub]]) -> Callable[[Context], list[Sub]]:
-        REGISTRY.append(Check(id=id, concern=id.split(".", 1)[0], statement=statement, run=fn, version=version, layer=layer))
+        REGISTRY.append(
+            Check(
+                id=id,
+                concern=id.split(".", 1)[0],
+                statement=statement,
+                run=fn,
+                version=version,
+                audit_only=audit_only,
+                applies=applies,
+                layer=layer,
+            )
+        )
         return fn
 
     return register

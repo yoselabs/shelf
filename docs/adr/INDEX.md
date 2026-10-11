@@ -20,6 +20,7 @@ the file holds the reasons, the rejected options and the history.
 - [0018](0018-new-checkpoints-warn-until-the-next-audit.md) **A new blueprint checkpoint warns until the repo's next audit**: Each audit records the checkpoints it judged in docs/blueprint/checkpoints.txt; between audits the gate enforces that set and a newer checkpoint only warns (🆕).
 - [0020](0020-prek-runs-every-hook.md) **prek runs every git hook, bd's included**: prek is the one hook manager; bd's events run from .pre-commit-config.yaml via `bd hooks run`; bd never installs hooks itself and core.hooksPath stays unset.
 - [0021](0021-affected-tests-stay-on-affected-py.md) **Affected-only tests stay on tools/affected.py; moon is the migration target**: make check narrows tests with tools/affected.py; no build tool yet. Migrate to moon's generic task graph when the shelf gets its first non-Python package (bead shelf-qgz).
+- [0022](0022-every-exception-is-justified.md) **Every exception to a blueprint rule is justified**: An override or ignored path in blueprint.toml needs a reason and either an expires date or an adr naming the accepted ADR that records the durable decision; the gate reports one without.
 
 ## knowledge
 

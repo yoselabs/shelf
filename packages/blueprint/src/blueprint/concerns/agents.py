@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -33,19 +34,48 @@ def _settings(ctx: Context) -> dict[str, object] | None:
     return data if isinstance(data, dict) else None
 
 
-@check("agents.instructions", "AGENTS.md is the one instructions file; CLAUDE.md points to it", layer="agent")
+def _only_in(a: str, b: str) -> int:
+    """How many distinct non-blank lines of `a` are missing from `b`."""
+    theirs = {line.strip() for line in b.splitlines()}
+    return len({line.strip() for line in a.splitlines() if line.strip()} - theirs)
+
+
+def _lines(n: int) -> str:
+    return f"{n} line{'' if n == 1 else 's'}"
+
+
+def _no_agents_md(claude_text: str | None) -> Finding:
+    if claude_text is not None:
+        return not_set_up(
+            "CLAUDE.md is the only instructions file; other agents read AGENTS.md",
+            "mv CLAUDE.md AGENTS.md, then `ln -s AGENTS.md CLAUDE.md`",
+        )
+    return not_set_up("no AGENTS.md", "write AGENTS.md (the map and the working agreement), then `ln -s AGENTS.md CLAUDE.md`")
+
+
+@check("agents.instructions", "AGENTS.md is the one instructions file; CLAUDE.md points to it", layer="agent", version=2)
 def instructions(ctx: Context) -> Finding:
     """AGENTS.md exists; CLAUDE.md is absent, a symlink to it, or imports it."""
-    if ctx.read("AGENTS.md") is None:
-        return not_set_up("no AGENTS.md", "write AGENTS.md (the map and the working agreement), then `ln -s AGENTS.md CLAUDE.md`")
+    agents = ctx.read("AGENTS.md")
+    claude_text = ctx.read("CLAUDE.md")
+    if agents is None:
+        return _no_agents_md(claude_text)
     claude = ctx.path("CLAUDE.md")
     if claude.is_symlink() and claude.resolve() == ctx.path("AGENTS.md").resolve():
         return passing("CLAUDE.md is a symlink to AGENTS.md")
     if not claude.exists():
         return failing("no CLAUDE.md, so Claude Code does not read AGENTS.md", "ln -s AGENTS.md CLAUDE.md", FixedBy.AUTO)
-    if "@AGENTS.md" in (ctx.read("CLAUDE.md") or ""):
+    if "@AGENTS.md" in (claude_text or ""):
         return passing("CLAUDE.md imports @AGENTS.md")
-    return failing("CLAUDE.md is a second instructions file", "merge it into AGENTS.md, then `ln -sf AGENTS.md CLAUDE.md`")
+    # Two files drift: each tool reads one, so the agents on one repo follow different rules.
+    theirs, ours = _only_in(claude_text or "", agents), _only_in(agents, claude_text or "")
+    if not theirs and not ours:
+        return failing("CLAUDE.md is a copy of AGENTS.md: it drifts at the next edit", "ln -sf AGENTS.md CLAUDE.md", FixedBy.AUTO)
+    return failing(
+        f"CLAUDE.md is a second instructions file: {_lines(theirs)} only in CLAUDE.md, {_lines(ours)} only in AGENTS.md, "
+        "so agents reading one get different rules than agents reading the other",
+        "move what only CLAUDE.md holds into AGENTS.md (`diff AGENTS.md CLAUDE.md`), then `ln -sf AGENTS.md CLAUDE.md`",
+    )
 
 
 @check(
@@ -137,9 +167,33 @@ def worktrees(ctx: Context) -> Finding:
 _INSTALL = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint template --repo ."
 
 
-@check("agents.culture-files", "every docs/agents/ file the repo's profile requires exists, its placeholders filled", layer="agent")
+# What `bd init` writes into CLAUDE.md/AGENTS.md for the owner to fill: `_Add your build and test commands here_`
+# (or `*...*`). Left in, agents get no build or test command.
+_BD_PLACEHOLDER = re.compile(
+    r"^[ \t>*_-]*[*_]\s*Add (?:your\b[^\n]*?\bhere|a brief overview\b[^\n]*?)[*_]\s*$", re.MULTILINE | re.IGNORECASE
+)
+
+
+def _instruction_files(ctx: Context) -> dict[str, str]:
+    """AGENTS.md and CLAUDE.md by name; a symlink to the other is read once."""
+    seen: dict[Path, str] = {}
+    files: dict[str, str] = {}
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        text = ctx.read(name)
+        if text is not None and ctx.path(name).resolve() not in seen:
+            seen[ctx.path(name).resolve()] = name
+            files[name] = text
+    return files
+
+
+@check(
+    "agents.culture-files",
+    "every docs/agents/ file the repo's profile requires exists; no template placeholder is left in it, AGENTS.md or CLAUDE.md",
+    layer="agent",
+    version=2,
+)
 def culture_files(ctx: Context) -> Finding:
-    """Missing files are not set up (auto: copied from the templates); a leftover `{{name}}` is failing."""
+    """Missing files are not set up (auto: copied from the templates); a leftover `{{name}}` or bd template line is failing."""
     names = templates.required(ctx.profile)
     missing = [n for n in names if ctx.read(f"docs/agents/{n}.md") is None]
     if missing:
@@ -147,7 +201,19 @@ def culture_files(ctx: Context) -> Finding:
     unfilled = [n for n in names if templates.PLACEHOLDER.search(ctx.read(f"docs/agents/{n}.md") or "")]
     if unfilled:
         return failing(f"placeholders left in: {', '.join(f'{n}.md' for n in unfilled)}", "fill each {{name}} from the repo")
-    return passing(f"{len(names)} conventions files: {', '.join(names)}")
+    left = {
+        name: len(templates.PLACEHOLDER.findall(text)) + len(_BD_PLACEHOLDER.findall(text))
+        for name, text in _instruction_files(ctx).items()
+    }
+    left = {name: n for name, n in left.items() if n}
+    if left:
+        where = ", ".join(f"{n} template placeholder{'' if n == 1 else 's'} in {name}" for name, n in left.items())
+        return failing(
+            where,
+            "replace each `_Add your ... here_` or `{{name}}` line with the repo's real content "
+            "(build and test: `make check`; architecture; conventions), or delete the heading",
+        )
+    return passing(f"{len(names)} conventions files: {', '.join(names)}; no placeholder in the instruction files")
 
 
 @check("agents.managed-block", "AGENTS.md carries blueprint's managed block, current for this profile", layer="agent")

@@ -22,6 +22,7 @@ class Repo:
         """`git init` at `root`, with a committer identity."""
         root.mkdir()
         bin_dir.mkdir()
+        (bin_dir.parent / "sysroot").mkdir()
         repo = cls(root, bin_dir)
         repo.git("init", "-q", "-b", "main")
         repo.git("config", "user.email", "t@example.invalid")
@@ -31,7 +32,21 @@ class Repo:
     def __init__(self, root: Path, bin_dir: Path) -> None:
         self.root = root
         self.bin_dir = bin_dir
-        self.env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+        # Checks that look at well-known install locations (/usr/local/share/dotnet) read them under this root,
+        # so a test never judges the developer's own machine.
+        self.sysroot = bin_dir.parent / "sysroot"
+        self.env = {
+            **os.environ,
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+            "BLUEPRINT_SYSTEM_ROOT": str(self.sysroot),
+        }
+        self.env.pop("DOTNET_ROOT", None)  # the developer's own install is not a fixture
+
+    def fake_tool(self, path: Path, output: str) -> None:
+        """An executable at `path` that prints `output` and exits 0, whatever it is asked."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"#!/bin/sh\ncat <<'EOF'\n{output}\nEOF\n")
+        path.chmod(0o755)
 
     def write(self, rel: str, text: str, *, executable: bool = False) -> Path:
         path = self.root / rel

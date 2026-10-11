@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 
 import pytest
@@ -312,3 +313,148 @@ def test_the_images_own_ignore_file_outranks_the_root_one(repo: Repo) -> None:
 def test_a_gate_with_no_container_is_not_judged_by_the_dockerignore(repo: Repo) -> None:
     _container_gate(repo, ".beads\n.claude\n", image="")
     assert _verdict(repo, "gate.runs-blueprint")[0] is Verdict.PASSING
+
+
+_NO_CI_ADR = (
+    "---\nid: 0003\ntitle: Builds on owner machines\nstatement: No CI; the gate runs on the owner's Mac and PC through the commit hook.\n"
+    "concerns: [gate]\nstatus: accepted\ndecided_by: owner\nupdated: 2026-10-09\n---\n# 0003\n"
+)
+_NO_CI_OVERRIDE = (
+    '[[override]]\nid = "gate.ci"\ncode = "not-applicable"\nreason = "builds and the gate run on the owner machines, no CI"\nadr = "0003"\n'
+)
+
+
+def _lifesim_shaped(repo: Repo) -> None:
+    """A repo with a settled no-CI decision: a gate, an accepted ADR, no workflows."""
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("docs/adr/0003-builds-on-owner-machines.md", _NO_CI_ADR)
+
+
+def test_no_ci_is_judged_as_before_without_an_override(repo: Repo) -> None:
+    _lifesim_shaped(repo)
+    assert _verdict(repo, "gate.ci")[0] is Verdict.NOT_SET_UP
+
+
+def test_a_settled_no_ci_decision_is_an_adr_backed_override_that_never_expires(repo: Repo) -> None:
+    _lifesim_shaped(repo)
+    repo.write("docs/blueprint/blueprint.toml", _NO_CI_OVERRIDE)
+    result = run(repo.root, concern="gate", env=repo.env, today=date(2099, 1, 1))
+    rows = {r.id: r for r in result.rows}
+    assert rows["gate.ci"].verdict is Verdict.PASSING
+    assert "ADR 0003" in rows["gate.ci"].evidence
+    assert rows["gate.ci-no-manifest-edit"].verdict is Verdict.NOT_APPLICABLE
+    assert result.problems == ()
+
+
+def test_a_no_ci_override_naming_a_missing_adr_is_a_problem_the_gate_reports(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("docs/blueprint/blueprint.toml", _NO_CI_OVERRIDE)
+    result = run(repo.root, concern="gate", env=repo.env)
+    assert {r.id: r for r in result.rows}["gate.ci"].verdict is Verdict.NOT_SET_UP
+    assert any("ADR 0003" in p for p in result.problems)
+    assert result.exit_code == 1
+
+
+def test_the_default_branch_must_be_main(repo: Repo) -> None:
+    repo.write("a", "x")
+    repo.commit()
+    assert _verdict(repo, "gate.default-branch")[0] is Verdict.PASSING
+    repo.git("branch", "-m", "main", "master")
+    verdict, evidence = _verdict(repo, "gate.default-branch")
+    assert verdict is Verdict.FAILING
+    assert "master" in evidence
+
+
+def test_a_repo_with_no_remote_is_not_set_up_and_one_with_origin_passes(repo: Repo) -> None:
+    assert _verdict(repo, "gate.git-remote")[0] is Verdict.NOT_SET_UP
+    repo.git("remote", "add", "upstream", "https://example.invalid/x.git")
+    verdict, evidence = _verdict(repo, "gate.git-remote")
+    assert verdict is Verdict.FAILING
+    assert "upstream" in evidence
+    repo.git("remote", "rename", "upstream", "origin")
+    assert _verdict(repo, "gate.git-remote")[0] is Verdict.PASSING
+
+
+def test_remote_and_branch_are_left_out_of_the_gate_run(repo: Repo) -> None:
+    ids = {r.id for r in run(repo.root, concern="gate", env=repo.env).rows}
+    assert not ids & {"gate.default-branch", "gate.git-remote"}
+
+
+_HOMELAB_HOOKS = """repos:
+  - repo: local
+    hooks:
+      - id: doctor
+        entry: uv run tools/doctor.py
+        language: system
+      - id: lock-age
+        entry: uv run tools/check-lock-age.py
+        language: system
+      - id: repo-tests
+        entry: bash -c 'for t in tools/tests/test_*.py; do uv run "$t"; done'
+        language: system
+"""
+
+
+def _homelab_shaped(repo: Repo) -> None:
+    """`make check` runs no script itself: it runs pre-commit, whose local hooks run the repo's guards."""
+    repo.write("Makefile", "check: lint\nlint:\n\tuvx pre-commit run --all-files\n")
+    repo.write(".pre-commit-config.yaml", _HOMELAB_HOOKS)
+    repo.write("tools/doctor.py", "")
+    repo.write("tools/check-lock-age.py", "")
+    repo.write("tools/tests/test_doctor.py", "# plants a violation and runs tools/doctor.py\n")
+
+
+def test_guards_run_through_pre_commit_hooks_are_judged_for_a_naming_test(repo: Repo) -> None:
+    _homelab_shaped(repo)
+    verdict, evidence = _verdict(repo, "gate.guards-have-red-tests")
+    assert verdict is Verdict.FAILING
+    assert "tools/check-lock-age.py" in evidence
+    assert "tools/doctor.py" not in evidence
+    repo.write("tools/tests/test_check_lock_age.py", "# plants a stale lock and runs check-lock-age\n")
+    verdict, evidence = _verdict(repo, "gate.guards-have-red-tests")
+    assert verdict is Verdict.PASSING
+    assert "tools/doctor.py" in evidence
+    assert "tools/tests/test_doctor.py" not in evidence
+
+
+def test_hook_scripts_are_not_followed_when_the_gate_never_runs_the_hooks(repo: Repo) -> None:
+    _homelab_shaped(repo)
+    repo.write("Makefile", "check:\n\ttrue\n")
+    assert _verdict(repo, "gate.guards-have-red-tests")[0] is Verdict.NOT_APPLICABLE
+
+
+def test_a_make_variable_in_the_recipe_is_expanded_before_scripts_are_found(repo: Repo) -> None:
+    repo.write("Makefile", "PY := uv run python\ncheck:\n\t$(PY) tools/check_design.py\n")
+    repo.write("tools/check_design.py", "")
+    verdict, evidence = _verdict(repo, "gate.guards-have-red-tests")
+    assert verdict is Verdict.FAILING
+    assert "tools/check_design.py" in evidence
+
+
+def test_a_checker_script_the_gate_never_runs_is_flagged(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\tpython3 tools/check_text.py\n")
+    repo.write("tools/check_text.py", "")
+    repo.write("tools/check_design.py", "")
+    repo.write("scripts/lint-docs.sh", "")
+    repo.write("tools/tests/check_helpers.py", "")
+    verdict, evidence = _verdict(repo, "gate.checkers-wired")
+    assert verdict is Verdict.FAILING
+    assert "tools/check_design.py" in evidence
+    assert "scripts/lint-docs.sh" in evidence
+    assert "check_text" not in evidence
+    assert "check_helpers" not in evidence
+
+
+def test_checker_scripts_run_by_the_gate_or_its_hooks_pass(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\tpython3 tools/check_text.py\n\tprek run --all-files\n")
+    repo.write(
+        ".pre-commit-config.yaml", "repos:\n  - repo: local\n    hooks:\n      - id: d\n        entry: uv run tools/check_design.py\n"
+    )
+    repo.write("tools/check_text.py", "")
+    repo.write("tools/check_design.py", "")
+    assert _verdict(repo, "gate.checkers-wired")[0] is Verdict.PASSING
+
+
+def test_no_checker_scripts_means_the_check_does_not_apply(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\ttrue\n")
+    assert _verdict(repo, "gate.checkers-wired")[0] is Verdict.NOT_APPLICABLE

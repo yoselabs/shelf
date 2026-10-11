@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -204,3 +205,103 @@ def test_an_audit_from_before_the_record_counts_as_an_empty_record(repo: Repo) -
     repo.write("docs/blueprint/README.md", "# Blueprint\n")
     rows = run(repo.root, env=repo.env).rows
     assert all(r.new for r in rows if r.verdict is not Verdict.PASSING)
+
+
+def _adr(number: str, status: str) -> str:
+    return (
+        f"---\nid: {number}\ntitle: Builds on owner machines\nstatement: No CI; the gate runs on the owner's machines.\n"
+        f"concerns: [gate]\nstatus: {status}\ndecided_by: owner\nupdated: 2026-10-11\n---\n# {number}\n"
+    )
+
+
+def _red_override(repo: Repo, fields: str) -> None:
+    repo.write("docs/blueprint/blueprint.toml", f'[[override]]\nid = "scratch.red"\ncode = "not-applicable"\n{fields}\n')
+
+
+@pytest.fixture
+def red_check(scratch_concern: None) -> None:
+    @check("scratch.red", "always red")
+    def _red(_ctx: object) -> Finding:
+        return failing("red", "nothing")
+
+
+def test_an_override_backed_by_an_accepted_adr_needs_no_expiry(repo: Repo, red_check: None) -> None:
+    repo.write("docs/adr/0003-builds-on-owner-machines.md", _adr("0003", "accepted"))
+    _red_override(repo, 'reason = "no CI by decision"\nadr = "0003"')
+    result = run(repo.root, concern="scratch", env=repo.env, today=date(2099, 1, 1))
+    assert result.rows[0].verdict is Verdict.PASSING
+    assert "ADR 0003" in result.rows[0].evidence
+    assert result.problems == ()
+
+
+@pytest.mark.parametrize(
+    ("adr_file", "fields", "named"),
+    [
+        (None, 'reason = "r"\nadr = "0003"', "ADR 0003"),
+        (("0003", "proposed"), 'reason = "r"\nadr = "0003"', "not accepted"),
+        (("0003", "superseded"), 'reason = "r"\nadr = "0003"', "not accepted"),
+        (None, 'reason = "r"', "expires"),
+        (None, 'reason = "  "\nexpires = 2099-01-01', "reason"),
+        (None, 'reason = "r"\nadr = "3"', "NNNN"),
+    ],
+)
+def test_an_unjustified_override_is_a_reported_problem_and_does_not_count(
+    repo: Repo, red_check: None, adr_file: tuple[str, str] | None, fields: str, named: str
+) -> None:
+    if adr_file:
+        repo.write(f"docs/adr/{adr_file[0]}-x.md", _adr(*adr_file))
+    _red_override(repo, fields)
+    result = run(repo.root, concern="scratch", env=repo.env)
+    assert result.rows[0].verdict is Verdict.FAILING
+    assert any(named in p for p in result.problems), result.problems
+    assert result.exit_code == 1
+
+
+def test_an_expiring_override_with_a_reason_stays_as_before(repo: Repo, red_check: None) -> None:
+    _red_override(repo, 'reason = "r"\nexpires = 2099-01-01')
+    result = run(repo.root, concern="scratch", env=repo.env, today=date(2026, 10, 11))
+    assert result.rows[0].verdict is Verdict.PASSING
+    assert "until 2099-01-01" in result.rows[0].evidence
+    assert result.problems == ()
+
+
+def _ignore(repo: Repo, fields: str) -> None:
+    repo.write("docs/blueprint/blueprint.toml", f'[[profile.ignore]]\npath = "prototype"\n{fields}\n')
+    repo.write("prototype/spike/Spike.csproj", "<Project/>")
+
+
+def test_a_declared_throwaway_dir_does_not_set_the_stack(repo: Repo) -> None:
+    _ignore(repo, 'reason = "throwaway spikes bind nothing"\nexpires = 2099-01-01')
+    result = run(repo.root, env=repo.env)
+    assert result.profile.stacks == ()
+    assert result.problems == ()
+
+
+def test_the_same_dir_without_the_ignore_sets_dotnet_and_names_the_file(repo: Repo) -> None:
+    repo.write("prototype/spike/Spike.csproj", "<Project/>")
+    profile = run(repo.root, env=repo.env).profile
+    assert profile.stacks == ("dotnet",)
+    assert dict(profile.stack_files)["dotnet"] == "prototype/spike/Spike.csproj"
+
+
+@pytest.mark.parametrize(
+    ("fields", "named"),
+    [("expires = 2099-01-01", "reason"), ('reason = "r"', "expires"), ('reason = "r"\nadr = "0009"', "ADR 0009")],
+)
+def test_an_unjustified_ignore_is_a_problem_and_ignores_nothing(repo: Repo, fields: str, named: str) -> None:
+    _ignore(repo, fields)
+    result = run(repo.root, env=repo.env)
+    assert result.profile.stacks == ("dotnet",)
+    assert any("ignore" in p and named in p for p in result.problems), result.problems
+
+
+def test_a_written_report_names_the_engine_and_the_scope(repo: Repo) -> None:
+    result = run(repo.root, concern="gate", env=repo.env)
+    report.write(result, repo.root, date(2026, 10, 11))
+    for name in ("README.md", "gate.md"):
+        head = (repo.root / "docs/blueprint" / name).read_text().split("\n\n")[:6]
+        text = "\n".join(head)
+        assert f"`{result.set_hash}`" in text
+        assert re.search(r"engine: (shelf `[0-9a-f]{7,}`|blueprint \d)", text)
+        assert "concerns checked: gate" in text
+        assert "not run:" in text

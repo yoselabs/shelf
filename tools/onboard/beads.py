@@ -3,9 +3,10 @@
 - **No hooks from bd.** `bd init --skip-hooks`: bd's events run from prek's config (the `hooks`
   operation). bd's own injection made a failing check stop blocking commits in other managers' hook
   files, and pointed `core.hooksPath` at an absolute path a fresh clone does not have.
-- **Strict settings, read back.** The blueprint's strict set (blueprint/concerns/backlog.py STRICT)
-  is `set` then `get`; `.beads/config.yaml` is tracked and a checkout can revert it silently, so the
-  readback is the proof, not the set's success message.
+- **Strict settings, written to the file, read back by the audit.** The blueprint's strict set
+  (blueprint/concerns/backlog.py STRICT) is written into `.beads/config.yaml` itself: `bd config set`
+  stores keys it does not own in bd's database, where a fresh clone never sees them (a2peer: `import.auto`
+  came back true). The proof is the audit's own `backlog.strict-config` row, not a set's success message.
 - **Quiet, primed sessions.** `.claude/settings.json` gets `BD_DISABLE_METRICS=1` (bd reads
   `metrics.disabled` only from the user config, so the repo sets it per session) and the two session
   hooks: SessionStart runs `bd prime`, Stop lists beads left in progress. Merged, never overwritten.
@@ -49,6 +50,97 @@ def _bd(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["bd", *args], cwd=repo, capture_output=True, text=True, check=False)
 
 
+_INDENT = 4  # bd writes nested keys with four spaces
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def _is_content(line: str) -> bool:
+    return bool(line.strip()) and not line.lstrip().startswith("#")
+
+
+def _find(lines: list[str], key: str, lo: int, hi: int, indent: int) -> int | None:
+    return next(
+        (i for i in range(lo, hi) if _is_content(lines[i]) and _indent(lines[i]) == indent and lines[i].lstrip().startswith(f"{key}:")),
+        None,
+    )
+
+
+def _block_end(lines: list[str], at: int, indent: int) -> int:
+    """One past the last line nested under `lines[at]`; trailing comments and blanks belong to what follows."""
+    last = at
+    for j in range(at + 1, len(lines)):
+        if not _is_content(lines[j]):
+            continue
+        if _indent(lines[j]) <= indent:
+            break
+        last = j
+    return last + 1
+
+
+def _set_key(lines: list[str], path: list[str], value: str) -> None:
+    lo, hi, indent = 0, len(lines), 0
+    for depth, key in enumerate(path):
+        at = _find(lines, key, lo, hi, indent)
+        if depth == len(path) - 1:
+            line = f"{' ' * indent}{key}: {value}"
+            if at is None:
+                lines.insert(hi, line)
+            else:
+                lines[at] = line
+            return
+        if at is None:
+            nested = [f"{' ' * (indent + _INDENT * n)}{k}:" for n, k in enumerate(path[depth:-1])]
+            nested.append(f"{' ' * (indent + _INDENT * (len(path) - 1 - depth))}{path[-1]}: {value}")
+            lines[hi:hi] = nested
+            return
+        if lines[at].split(":", 1)[1].split("#", 1)[0].strip():
+            msg = f"{'.'.join(path[: depth + 1])} is not a block in config.yaml; edit it by hand"
+            raise ValueError(msg)
+        end = _block_end(lines, at, indent)
+        children = [i for i in range(at + 1, end) if _is_content(lines[i])]
+        lo, hi, indent = at + 1, end, _indent(lines[children[0]]) if children else indent + _INDENT
+
+
+def set_yaml_keys(text: str, values: dict[str, str]) -> str:
+    """`text` with each dotted key (`export.auto`) set to its value, as nested block YAML; comments and other keys stay.
+
+    Why not a YAML library: bd's config.yaml is a commented template, and a round trip through a parser drops the comments.
+    """
+    lines = text.splitlines()
+    for dotted, value in values.items():
+        _set_key(lines, dotted.split("."), value)
+    return "\n".join(lines) + "\n"
+
+
+def _write_strict(repo: Path, strict: dict[str, str]) -> Result | None:
+    """Write the strict set into .beads/config.yaml; None on success."""
+    path = repo / ".beads" / "config.yaml"
+    if not path.is_file():
+        return Result(Outcome.FAILED, verified=False, message="bd init left no .beads/config.yaml")
+    try:
+        path.write_text(set_yaml_keys(path.read_text(), strict))
+    except ValueError as exc:
+        return Result(Outcome.FAILED, verified=False, message=str(exc))
+    return None
+
+
+def _audit_strict(repo: Path) -> str | None:
+    """Evidence of what the blueprint's `backlog.strict-config` still objects to, or None when it passes."""
+    if str(_BLUEPRINT_SRC) not in sys.path:
+        sys.path.insert(0, str(_BLUEPRINT_SRC))
+    from blueprint.model import Verdict  # noqa: PLC0415 -- resolved from the shelf clone at run time
+    from blueprint.runner import run  # noqa: PLC0415 -- same
+
+    rows = {r.id: r for r in run(repo, concern="backlog", audit=True).rows}
+    row = rows.get("backlog.strict-config")
+    if row is None:
+        return "backlog.strict-config did not run (no tracker detected)"
+    return None if row.verdict is Verdict.PASSING else row.evidence
+
+
 def _settings(repo: Path) -> Result | None:
     """Merge the metrics env and the two session hooks into .claude/settings.json; None on success."""
     path = repo / ".claude" / "settings.json"
@@ -87,13 +179,15 @@ class BeadsOperation:
                 return Result(Outcome.FAILED, verified=False, message=combined.strip())
 
         strict = _strict()
-        for key, value in strict.items():
-            _bd(self.repo, "config", "set", key, value)
-        readback = {key: _bd(self.repo, "config", "get", key).stdout.strip() for key in strict}
-        wrong = {k: v for k, v in readback.items() if v != strict[k]}
-        if wrong:
+        if (failed := _write_strict(self.repo, strict)) is not None:
+            return failed
+        if (wrong := _audit_strict(self.repo)) is not None:
             return Result(Outcome.FAILED, verified=False, message=f"config readback mismatch: {wrong}")
 
         if (failed := _settings(self.repo)) is not None:
             return failed
-        return Result(Outcome.APPLIED, verified=True, message=f"{len(strict)} strict settings read back; session env and hooks set")
+        return Result(
+            Outcome.APPLIED,
+            verified=True,
+            message=f"{len(strict)} strict settings in .beads/config.yaml, read back by the audit; session env and hooks set",
+        )

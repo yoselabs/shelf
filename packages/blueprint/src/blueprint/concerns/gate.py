@@ -10,7 +10,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from blueprint.model import Context, Finding, FixedBy, check, failing, not_applicable, not_checked, not_set_up, passing, walk
+from blueprint.model import Context, Finding, FixedBy, check, failing, is_skipped, not_applicable, not_checked, not_set_up, passing, walk
 
 if TYPE_CHECKING:
     import subprocess
@@ -42,6 +42,21 @@ def _rules(makefile: str) -> dict[str, tuple[list[str], str]]:
     return rules
 
 
+_VARIABLE = re.compile(r"^([A-Za-z_]\w*)\s*[:?]?=\s*(.*?)\s*$", re.MULTILINE)
+_VARIABLE_USE = re.compile(r"\$[({]([A-Za-z_]\w*)[)}]")
+
+
+def _expand(text: str, makefile: str) -> str:
+    """`$(PY)` and `${PY}` replaced by the Makefile's simple `PY := value` lines (three passes, for nested names).
+
+    Why: a recipe written `$(PY) tools/check_design.py` hides its script from every pattern below.
+    """
+    variables = dict(_VARIABLE.findall(makefile))
+    for _ in range(3):
+        text = _VARIABLE_USE.sub(lambda m: variables.get(m.group(1), m.group(0)), text)
+    return text
+
+
 def _reachable(makefile: str, start: str = "check") -> list[str]:
     """Recipes of every target `start` reaches: through prerequisites, or a recipe naming a target."""
     rules = _rules(makefile)
@@ -52,7 +67,7 @@ def _reachable(makefile: str, start: str = "check") -> list[str]:
         for nxt in sorted(words & rules.keys() - seen):
             seen.add(nxt)
             queue.append(nxt)
-    return [rules[t][1] for t in sorted(seen) if t in rules]
+    return [_expand(rules[t][1], makefile) for t in sorted(seen) if t in rules]
 
 
 @check("gate.one-command", "`make check` exists and every target it names resolves")
@@ -89,7 +104,8 @@ def ci(ctx: Context) -> Finding:
         return not_set_up(
             "no .github/workflows/*.yml",
             "add a workflow that runs `make check-all` (or `make check`) on push and pull request; "
-            "a repo that should have no CI records an override with its reason",
+            "a repo that decided on no CI records an override of gate.ci with its reason and "
+            '`adr = "NNNN"` (the accepted ADR that decided it)',
         )
     problems: list[str] = []
     if not any(_GATE_RUN.search(f.read_text()) for f in files):
@@ -290,8 +306,33 @@ def hooks_installed(ctx: Context) -> Finding:
     return passing("prek's hooks installed in .git/hooks; no bd block injected")
 
 
+_HOOK_RUN = re.compile(r"\b(?:pre-commit|prek)\s+run\b")
+_HOOK_ENTRY = re.compile(r"^\s*(?:-\s*)?entry:\s*(.+?)\s*$", re.MULTILINE)
+# Any `.py` path in a hook's entry (`uv run tools/x.py`, `python x.py`, a bare path); a glob such as `test_*.py` has no match.
+_HOOK_SCRIPT = re.compile(r"(?<![\w./-])((?:[\w.-]+/)*[\w.-]+\.py)\b")
+
+
+def _hook_entries(ctx: Context, recipes: str) -> list[str]:
+    """The `entry:` lines of .pre-commit-config.yaml when `make check` runs the hooks (`pre-commit run`, `prek run`).
+
+    Why: a gate that runs pre-commit runs every hook's command, and the repo's own guards are usually among them.
+    """
+    if not _HOOK_RUN.search(recipes):
+        return []
+    return _HOOK_ENTRY.findall(ctx.read(HOOK_CONFIG) or "")
+
+
+def _gate_commands(ctx: Context, makefile: str) -> str:
+    """Everything `make check` runs: its recipes (variables expanded) and the hook commands it triggers."""
+    recipes = reachable_recipes(makefile)
+    return "\n".join([recipes, *_hook_entries(ctx, recipes)])
+
+
 def _gate_scripts(ctx: Context, makefile: str) -> list[str]:
-    found = (m for recipe in _reachable(makefile) for m in _SCRIPT.findall(recipe))
+    recipes = reachable_recipes(makefile)
+    found = [m for recipe in _reachable(makefile) for m in _SCRIPT.findall(recipe)]
+    for entry in _hook_entries(ctx, recipes):
+        found += [m for m in _HOOK_SCRIPT.findall(entry) if not Path(m).name.startswith("test_")]
     return list(dict.fromkeys(m for m in found if ctx.path(m).is_file()))
 
 
@@ -389,9 +430,12 @@ def runs_blueprint(ctx: Context) -> Finding:
     return passing("`make check` reaches `blueprint check --gate`")
 
 
-@check("gate.guards-have-red-tests", "every repo-local script `make check` runs has a test that names it")
+@check("gate.guards-have-red-tests", "every repo-local script `make check` runs has a test that names it", version=2)
 def guards_have_red_tests(ctx: Context) -> Finding:
-    """Each repo `*.py` that `make check` reaches is named by some test file (a guard never seen red is a hypothesis)."""
+    """Each repo `*.py` that `make check` reaches, in a recipe or through its pre-commit hooks, is named by some test file.
+
+    A guard never seen red is a hypothesis.
+    """
     makefile = ctx.read("Makefile")
     if makefile is None:
         return not_applicable("no Makefile, so no guard scripts")
@@ -405,7 +449,7 @@ def guards_have_red_tests(ctx: Context) -> Finding:
             f"no test names {', '.join(untested)}",
             "add a test per script that plants the violation it guards against and asserts it fails",
         )
-    return passing(f"{len(scripts)} script(s), each named by a test")
+    return passing(f"{len(scripts)} script(s) ({', '.join(scripts)}), each named by a test")
 
 
 # make's own trailer (`make: *** [check] Error 2`, `make[1]: Leaving directory`) names no cause.
@@ -452,6 +496,79 @@ def clean_clone(ctx: Context) -> Finding:
         done = ctx.run("make", "check", cwd=Path(tmp), timeout=3600)
         took = round(time.monotonic() - start)
     return _judge_clone(done, took, ctx.settings.get("clean-clone-seconds"))
+
+
+_CHECKER = re.compile(r"^(?:check|lint|validate|verify)[_-].+\.(?:py|sh)$")
+_NOT_GUARDS = {"tests", "test"}
+
+
+def _checker_scripts(ctx: Context) -> list[str]:
+    """`check_*`, `lint_*`, `validate_*`, `verify_*` scripts (py, sh) under tools/ or scripts/, outside test folders and ignored paths."""
+    found: list[str] = []
+    for folder in ("tools", "scripts"):
+        if not ctx.path(folder).is_dir():
+            continue
+        for path in walk(ctx.path(folder), "*"):
+            rel = path.relative_to(ctx.repo).as_posix()
+            if _CHECKER.match(path.name) and not _NOT_GUARDS & set(Path(rel).parts) and not is_skipped(rel, ctx.profile.ignore):
+                found.append(rel)
+    return sorted(found)
+
+
+@check("gate.checkers-wired", "every check/lint script under tools/ or scripts/ is run by `make check`")
+def checkers_wired(ctx: Context) -> Finding:
+    """A checker nothing runs guards nothing: its name says check, and the repo's own docs may say run it before a commit."""
+    makefile = ctx.read("Makefile")
+    if makefile is None:
+        return not_applicable("no Makefile: gate.one-command reports the missing gate")
+    scripts = _checker_scripts(ctx)
+    if not scripts:
+        return not_applicable("no check_*/lint_* script under tools/ or scripts/")
+    commands = _gate_commands(ctx, makefile)
+    unwired = [s for s in scripts if not re.search(rf"(?<![\w.-]){re.escape(Path(s).name)}", commands)]
+    if unwired:
+        return failing(
+            f"`make check` never runs {', '.join(unwired)}",
+            "run each from a target `make check` reaches (then gate.guards-have-red-tests wants a test per script), "
+            "or delete it; a script kept on purpose is an override of gate.checkers-wired with a reason and an expiry or adr",
+        )
+    return passing(f"{len(scripts)} checker script(s), each run by the gate")
+
+
+@check("gate.default-branch", "the default branch is `main`", audit_only=True)
+def default_branch(ctx: Context) -> Finding:
+    """origin/HEAD when there is a remote, else `main` if it exists, else the branch checked out."""
+    if ctx.git("rev-parse", "--git-dir") is None:
+        return not_checked("not a git repository")
+    name = (ctx.git("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD") or "").strip().removeprefix("refs/remotes/origin/")
+    if not name and ctx.git("show-ref", "--verify", "--quiet", "refs/heads/main") is not None:
+        name = "main"
+    name = name or (ctx.git("symbolic-ref", "--quiet", "--short", "HEAD") or "").strip()
+    if not name:
+        return not_checked("detached HEAD, no origin/HEAD and no main branch: the default branch cannot be told")
+    if name != "main":
+        return failing(
+            f"the default branch is {name}, the shelf and its tools assume main",
+            f"git branch -m {name} main; with a remote: git push -u origin main, make main the host's default branch, delete {name} there",
+        )
+    return passing("the default branch is main")
+
+
+@check("gate.git-remote", "an `origin` remote exists, so pushes, CI and bd's Dolt sync have somewhere to go", audit_only=True)
+def git_remote(ctx: Context) -> Finding:
+    """`git remote` lists origin; none at all is not set up yet, others without origin is a rename."""
+    listed = ctx.git("remote")
+    if listed is None:
+        return not_checked("not a git repository")
+    remotes = listed.split()
+    if "origin" in remotes:
+        return passing("origin: " + (ctx.git("remote", "get-url", "origin") or "").strip())
+    if remotes:
+        return failing(f"remotes {', '.join(remotes)}, none called origin", f"git remote rename {remotes[0]} origin")
+    return not_set_up(
+        "no git remote",
+        "git remote add origin <url> and push; a repo kept local on purpose is an override of gate.git-remote with a reason and an adr",
+    )
 
 
 def reachable_recipes(makefile: str) -> str:

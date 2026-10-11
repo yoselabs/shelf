@@ -163,3 +163,57 @@ def test_a_filled_survey_is_complete_and_a_bare_no_is_not() -> None:
     assert survey.problems(filled) == []
     bad = filled.replace(f"| {questions[0].id} | q | yes |  |", f"| {questions[0].id} | q | no |  |")
     assert survey.problems(bad) == [f"{questions[0].id}: 'no' needs evidence"]
+
+
+def _dotnet_repo(repo: Repo, roll_forward: str = "latestPatch") -> None:
+    repo.write(
+        "global.json",
+        f'{{"sdk": {{"version": "10.0.301", "rollForward": "{roll_forward}"}}, "test": {{"runner": "Microsoft.Testing.Platform"}}}}',
+    )
+    repo.write(
+        "Directory.Build.props",
+        "<Project><PropertyGroup><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile></PropertyGroup></Project>",
+    )
+    repo.write("src/App/App.csproj", "<Project/>")
+
+
+def _two_installs(repo: Repo, *, on_path: str, elsewhere: str) -> None:
+    """Homebrew's dotnet on PATH, the official installer's in /usr/local/share/dotnet (the one Godot's editor resolves)."""
+    repo.fake_tool(repo.bin_dir / "dotnet", f"{on_path} [/opt/homebrew/sdk]")
+    repo.fake_tool(repo.sysroot / "usr/local/share/dotnet/dotnet", f"{elsewhere} [/usr/local/share/dotnet/sdk]")
+
+
+def test_the_profile_row_names_the_file_that_set_the_stack(repo: Repo) -> None:
+    _dotnet_repo(repo)
+    assert "detected from src/App/App.csproj" in _rows(repo)["stack.dotnet.profile"][1]
+
+
+def test_a_global_json_a_second_dotnet_install_cannot_satisfy_fails_naming_both(repo: Repo) -> None:
+    # lifesim: pinned the PATH install's 10.0.301 latestPatch; Godot's editor used 10.0.401 and its build exited 155.
+    _dotnet_repo(repo)
+    _two_installs(repo, on_path="10.0.301", elsewhere="10.0.401")
+    verdict, evidence, _ = _rows(repo)["stack.dotnet.toolchain"]
+    assert verdict is Verdict.FAILING
+    assert str(repo.bin_dir / "dotnet") in evidence
+    assert "usr/local/share/dotnet/dotnet" in evidence
+    assert "10.0.401" in evidence
+
+
+@pytest.mark.parametrize(
+    ("roll_forward", "on_path", "elsewhere"),
+    [
+        ("latestFeature", "10.0.301", "10.0.401"),  # the policy admits the newer feature band
+        ("latestPatch", "10.0.301", "10.0.302"),  # same feature band, a newer patch
+        ("latestPatch", "10.0.301", "10.0.301"),
+    ],
+)
+def test_installs_that_each_carry_an_accepted_sdk_pass(repo: Repo, roll_forward: str, on_path: str, elsewhere: str) -> None:
+    _dotnet_repo(repo, roll_forward)
+    _two_installs(repo, on_path=on_path, elsewhere=elsewhere)
+    assert _rows(repo)["stack.dotnet.toolchain"][0] is Verdict.PASSING
+
+
+def test_the_one_install_there_is_must_satisfy_the_pin_too(repo: Repo) -> None:
+    _dotnet_repo(repo, "disable")
+    repo.fake_tool(repo.bin_dir / "dotnet", "10.0.302 [/opt/homebrew/sdk]")
+    assert _rows(repo)["stack.dotnet.toolchain"][0] is Verdict.FAILING

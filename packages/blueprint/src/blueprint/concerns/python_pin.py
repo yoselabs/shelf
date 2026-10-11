@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import fnmatch
 import re
-import tomllib
 from typing import TYPE_CHECKING
 
 from blueprint.model import FixedBy, Sub, check_each, failing, not_set_up, passing
@@ -25,16 +24,6 @@ _LOWER = re.compile(r">=\s*(\d+)\.(\d+)")
 _WORKFLOWS = ".github/workflows"
 
 
-def _toml(ctx: Context, rel: str) -> dict[str, object]:
-    text = ctx.read(rel)
-    if text is None:
-        return {}
-    try:
-        return tomllib.loads(text)
-    except tomllib.TOMLDecodeError:
-        return {}
-
-
 def _table(data: dict[str, object], *keys: str) -> dict[str, object]:
     for key in keys:
         value = data.get(key)
@@ -44,14 +33,14 @@ def _table(data: dict[str, object], *keys: str) -> dict[str, object]:
 
 def _ranges(ctx: Context) -> dict[str, str]:
     """`requires-python` per pyproject: the root's, and each workspace member's, by folder."""
-    root = _toml(ctx, "pyproject.toml")
+    root = ctx.toml("pyproject.toml")
     found = {".": str(_table(root, "project").get("requires-python", ""))}
     members = _table(root, "tool", "uv", "workspace").get("members", [])
     patterns = [str(m) for m in members] if isinstance(members, list) else []
     for path in sorted(ctx.repo.glob("**/pyproject.toml")):
         folder = path.parent.relative_to(ctx.repo).as_posix()
         if folder != "." and any(fnmatch.fnmatch(folder, p) for p in patterns):
-            found[folder] = str(_table(_toml(ctx, f"{folder}/pyproject.toml"), "project").get("requires-python", ""))
+            found[folder] = str(_table(ctx.toml(f"{folder}/pyproject.toml"), "project").get("requires-python", ""))
     return {folder: spec for folder, spec in found.items() if spec or folder == "."}
 
 
@@ -131,7 +120,7 @@ def _ci_python(ctx: Context) -> Finding:
 
 def _uv_version(ctx: Context) -> Finding:
     for rel in ("uv.toml", "pyproject.toml"):
-        data = _toml(ctx, rel)
+        data = ctx.toml(rel)
         floor = (data if rel == "uv.toml" else _table(data, "tool", "uv")).get("required-version")
         if floor:
             return passing(f"{rel}: required-version {floor}")

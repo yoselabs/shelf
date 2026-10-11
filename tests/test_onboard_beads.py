@@ -43,7 +43,7 @@ def repo(tmp_path: Path) -> Path:
 def test_initializes_without_hooks_and_reads_back_the_strict_set(repo: Path) -> None:
     result = BeadsOperation(repo).run({})
     assert result.outcome == Outcome.APPLIED, result.message
-    assert "strict settings read back" in result.message
+    assert "strict settings in .beads/config.yaml" in result.message
     hooks_path = subprocess.run(
         ["git", "-C", str(repo), "config", "--local", "core.hooksPath"], capture_output=True, text=True, check=False
     )
@@ -75,15 +75,75 @@ def test_second_run_is_idempotent(repo: Path) -> None:
 
 
 def test_config_readback_mismatch_is_reported_not_silently_trusted(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A `bd config set` that does not survive is a failure, not a pass."""
-    real_bd = beads_mod._bd
+    """A write that does not reach config.yaml is a failure, not a pass."""
 
-    def _lying_bd(r: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        if args[:2] == ("config", "set"):
-            return subprocess.CompletedProcess(args, 0, "", "")
-        return real_bd(r, *args)
+    def _writes_nothing(*_args: object) -> None:
+        return None
 
-    monkeypatch.setattr(beads_mod, "_bd", _lying_bd)
+    monkeypatch.setattr(beads_mod, "_write_strict", _writes_nothing)
     result = BeadsOperation(repo).run({})
     assert result.outcome == Outcome.FAILED
     assert "readback mismatch" in result.message
+
+
+def test_the_blueprint_backlog_concern_passes_after_the_operation(repo: Path) -> None:
+    """a2peer: the operation left export.auto/export.git-add true and import.auto in bd's database, so the audit failed."""
+    assert BeadsOperation(repo).run({}).outcome == Outcome.APPLIED
+    sys.path.insert(0, str(_ROOT / "packages" / "blueprint" / "src"))
+    from blueprint.model import Verdict  # noqa: PLC0415 -- path-injected above
+    from blueprint.runner import run  # noqa: PLC0415
+
+    rows = {r.id: r for r in run(repo, concern="backlog", audit=True).rows}
+    assert rows["backlog.strict-config"].verdict is Verdict.PASSING, rows["backlog.strict-config"].evidence
+    config = (repo / ".beads" / "config.yaml").read_text()
+    assert "auto: true" not in config
+    assert "git-add: true" not in config
+
+
+_BD_CONFIG = """# Beads Configuration File
+# export:
+#   auto: false
+
+export:
+    auto: true
+    path: issues.jsonl
+    git-add: true
+
+# trailing comment
+issue-prefix: keep
+"""
+
+
+@pytest.mark.parametrize(
+    ("text", "values", "present", "absent"),
+    [
+        # a2peer: bd wrote export.auto/git-add true; both become false, the neighbours stay
+        (
+            _BD_CONFIG,
+            {"export.auto": "false", "export.git-add": "false"},
+            ["    auto: false", "    git-add: false", "    path: issues.jsonl", "issue-prefix: keep", "# trailing comment"],
+            ["auto: true", "git-add: true"],
+        ),
+        # a key under a missing parent is created nested
+        ("no-git-ops: true\n", {"import.auto": "false"}, ["import:", "    auto: false", "no-git-ops: true"], []),
+        # a missing child joins its existing parent block, not the end of the file
+        ("export:\n    path: x\n\nissue-prefix: p\n", {"export.git-add": "false"}, ["    path: x\n    git-add: false\n"], []),
+        # a top-level key is replaced in place
+        ("no-git-ops: false\n", {"no-git-ops": "true"}, ["no-git-ops: true"], ["false"]),
+        # three levels deep
+        ("validation:\n    metadata:\n        mode: warn\n", {"validation.metadata.mode": "error"}, ["        mode: error"], ["warn"]),
+        ("", {"validation.on-create": "error"}, ["validation:\n    on-create: error\n"], []),
+    ],
+)
+def test_the_yaml_editor_sets_dotted_keys_and_keeps_the_rest(
+    text: str, values: dict[str, str], present: list[str], absent: list[str]
+) -> None:
+    out = beads_mod.set_yaml_keys(text, values)
+    assert all(p in out for p in present), out
+    assert not any(a in out for a in absent), out
+    assert beads_mod.set_yaml_keys(out, values) == out, "not idempotent"
+
+
+def test_a_scalar_where_a_block_is_needed_is_refused_not_clobbered() -> None:
+    with pytest.raises(ValueError, match="not a block"):
+        beads_mod.set_yaml_keys("export: {auto: true}\n", {"export.auto": "false"})

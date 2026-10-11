@@ -16,6 +16,8 @@ config = [
     { path = "global.json", contains = '"rollForward"' },
     { path = "Directory.Build.props", contains = "RestorePackagesWithLockFile" },
 ]
+# Every dotnet the tools may resolve must carry an SDK global.json accepts (lifesim: Godot's editor used the other install).
+installs = ["$PATH", "$DOTNET_ROOT", "/usr/local/share/dotnet", "/usr/share/dotnet", "/usr/lib/dotnet"]
 
 [[role]]
 role = "formatter"

@@ -10,6 +10,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from blueprint import adr
 from blueprint.model import SKIP_DIRS, Profile, walk
 
 STATE_DIR = "docs/blueprint"
@@ -18,24 +19,78 @@ KINDS = ("application", "library", "infrastructure")
 OVERRIDE_CODES = ("test-data", "remediated", "not-applicable", "not-supported", "not-detected")
 
 
+_ADR_NUMBER = re.compile(r"^\d{4}$")
+
+
+def _adr_problem(repo: Path, number: str) -> str | None:
+    """Why the ADR a justification cites does not count: not a number, absent from docs/adr/, or not accepted."""
+    if not _ADR_NUMBER.match(number):
+        return f"adr {number!r} is not an NNNN number"
+    path = next(iter(sorted((repo / adr.FOLDER).glob(f"{number}-*.md"))), None)
+    if path is None:
+        return f"ADR {number} is not in {adr.FOLDER}/"
+    found = adr.parse(path)
+    status = found.fields.get("status") if found else None
+    return None if status == "accepted" else f"ADR {number} is not accepted (status: {status or 'unreadable'})"
+
+
+def justification_problem(what: str, reason: str, expires: date | None, adr_number: str, repo: Path) -> str | None:
+    """Why an exception to a blueprint rule is not justified, or None.
+
+    One rule for every exception (an override, an ignored path): a reason, and either an `expires` date
+    (a temporary exception) or an `adr` naming an accepted ADR that records the durable decision.
+    """
+    if not reason.strip():
+        return f"{what} has no reason"
+    if expires is None and not adr_number:
+        return f"{what} needs an expires date, or an adr naming the accepted ADR that records the decision"
+    if adr_number and (found := _adr_problem(repo, adr_number)):
+        return f"{what}: {found}"
+    return None
+
+
+def _date_or_none(raw: object) -> date | None:
+    return raw if isinstance(raw, date) else None
+
+
 @dataclass(frozen=True)
 class Override:
-    """A recorded, expiring decision to treat one checkpoint as passing (CONTEXT.md: override)."""
+    """A recorded, justified decision to treat one checkpoint as passing (CONTEXT.md: override)."""
 
     id: str
     code: str
     reason: str
-    expires: date
+    # An override lasts until `expires`, or without end when `adr` names the accepted ADR that decided it.
+    expires: date | None = None
+    adr: str = ""
+    # Set at load when the justification itself is wrong (no reason, no expiry or ADR, a missing ADR).
+    unjustified: str | None = None
 
     def problem(self, today: date) -> str | None:
         """Why this override does not count, or None when it does."""
         if self.code not in OVERRIDE_CODES:
             return f"override code {self.code!r} is not one of {', '.join(OVERRIDE_CODES)}"
-        if not self.reason.strip():
-            return "override has no reason"
-        if self.expires < today:
+        if self.unjustified:
+            return self.unjustified
+        if self.expires is not None and self.expires < today:
             return f"override expired {self.expires.isoformat()}"
         return None
+
+    @property
+    def lasts(self) -> str:
+        """How long it holds, for a report: `until <date>` or `by ADR NNNN`."""
+        return f"until {self.expires.isoformat()}" if self.expires is not None else f"by ADR {self.adr}"
+
+
+@dataclass(frozen=True)
+class Ignore:
+    """A path the repo declared throwaway or vendored, so detection and role globs skip it. Justified like an override."""
+
+    path: str
+    reason: str
+    expires: date | None = None
+    adr: str = ""
+    problem: str | None = None
 
 
 @dataclass(frozen=True)
@@ -46,9 +101,46 @@ class State:
     overrides: dict[str, Override]
     settings: dict[str, Any]
     problems: tuple[str, ...]
+    ignores: tuple[Ignore, ...] = ()
 
 
-def load_state(repo: Path) -> State:
+def _load_overrides(raw_list: list[dict[str, Any]], repo: Path, problems: list[str]) -> dict[str, Override]:
+    overrides: dict[str, Override] = {}
+    for raw in raw_list:
+        oid = str(raw.get("id", ""))
+        if not oid:
+            problems.append("an override has no id")
+            continue
+        expires = _date_or_none(raw.get("expires"))
+        adr_number = str(raw.get("adr", ""))
+        unjustified = justification_problem(f"override {oid!r}", str(raw.get("reason", "")), expires, adr_number, repo)
+        if unjustified:
+            problems.append(unjustified)
+        overrides[oid] = Override(oid, str(raw.get("code", "")), str(raw.get("reason", "")), expires, adr_number, unjustified)
+    return overrides
+
+
+def _load_ignores(raw_list: list[dict[str, Any]], repo: Path, today: date, problems: list[str]) -> tuple[Ignore, ...]:
+    ignores: list[Ignore] = []
+    for raw in raw_list:
+        path = str(raw.get("path", "")).strip()
+        expires = _date_or_none(raw.get("expires"))
+        adr_number = str(raw.get("adr", ""))
+        why = str(raw.get("reason", ""))
+        problem = (
+            f"ignore entry has no path (reason: {why!r})"
+            if not path
+            else justification_problem(f"ignore {path!r}", why, expires, adr_number, repo)
+        )
+        if problem is None and expires is not None and expires < today:
+            problem = f"ignore {path!r} expired {expires.isoformat()}"
+        if problem:
+            problems.append(problem)
+        ignores.append(Ignore(path, why, expires, adr_number, problem))
+    return tuple(ignores)
+
+
+def load_state(repo: Path, today: date | None = None) -> State:
     """Read `docs/blueprint/blueprint.toml`; an absent file is an empty state."""
     path = repo / STATE_FILE
     if not path.is_file():
@@ -58,30 +150,34 @@ def load_state(repo: Path) -> State:
     except tomllib.TOMLDecodeError as exc:
         return State({}, {}, {}, (f"{STATE_FILE} is not valid TOML: {exc}",))
     problems: list[str] = []
-    overrides: dict[str, Override] = {}
-    for raw in data.get("override", []):
-        expires = raw.get("expires")
-        if not isinstance(expires, date):
-            problems.append(f"override {raw.get('id')!r} has no expires date")
-            continue
-        overrides[str(raw.get("id"))] = Override(str(raw.get("id")), str(raw.get("code", "")), str(raw.get("reason", "")), expires)
-    return State(data.get("profile", {}), overrides, data.get("settings", {}), tuple(problems))
+    overrides = _load_overrides(data.get("override", []), repo, problems)
+    declared = data.get("profile", {})
+    ignores = _load_ignores(declared.get("ignore", []), repo, today or date.today(), problems)  # noqa: DTZ011 -- a calendar date in the owner's zone
+    return State(declared, overrides, data.get("settings", {}), tuple(problems), ignores)
 
 
-def detect_stacks(repo: Path) -> tuple[str, ...]:
-    """The stacks present, from their manifests."""
-    stacks: list[str] = []
+def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
+    """Each stack present with the files that set it, from their manifests."""
+    found: dict[str, list[str]] = {}
     if (repo / "pyproject.toml").is_file():
-        stacks.append("python-uv" if (repo / "uv.lock").is_file() else "python")
-    if walk(repo, "*.sln", 2) or walk(repo, "*.slnx", 2) or walk(repo, "*.csproj", 3):
-        stacks.append("dotnet")
-    if (repo / "package.json").is_file():
-        stacks.append("node")
-    if (repo / "go.mod").is_file():
-        stacks.append("go")
-    if (repo / "Cargo.toml").is_file():
-        stacks.append("rust")
-    return tuple(stacks)
+        locked = (repo / "uv.lock").is_file()
+        found["python-uv" if locked else "python"] = ["pyproject.toml", *(["uv.lock"] if locked else [])]
+    dotnet = [*walk(repo, "*.sln", 2, skip), *walk(repo, "*.slnx", 2, skip), *walk(repo, "*.csproj", 3, skip)]
+    if dotnet:
+        found["dotnet"] = [p.relative_to(repo).as_posix() for p in dotnet]
+    for stack, manifest in (("node", "package.json"), ("go", "go.mod"), ("rust", "Cargo.toml")):
+        if (repo / manifest).is_file():
+            found[stack] = [manifest]
+    return found
+
+
+def detect_stacks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[str, ...]:
+    """The stacks present, from their manifests."""
+    return tuple(_stack_files(repo, skip))
+
+
+def _evidence_files(files: list[str]) -> str:
+    return ", ".join(files[:3]) + (f" and {len(files) - 3} more" if len(files) > 3 else "")
 
 
 # A framework is found by a marker file; its folder is where the marker sits.
@@ -125,25 +221,25 @@ def _source_uses(folder: Path, needles: tuple[str, ...]) -> bool:
     return False
 
 
-def detect_frameworks(repo: Path) -> tuple[tuple[str, str], ...]:
+def detect_frameworks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[tuple[str, str], ...]:
     """Each framework found within three levels of the root, with its folder: by marker file, then by dependency."""
     found: list[tuple[str, str]] = []
     for name, marker in FRAMEWORK_MARKERS.items():
-        found += [(name, str(p.parent.relative_to(repo)) or ".") for p in walk(repo, marker, 4)]
+        found += [(name, str(p.parent.relative_to(repo)) or ".") for p in walk(repo, marker, 4, skip)]
     for name, rule in FRAMEWORK_DEPENDENCIES.items():
-        for pyproject in walk(repo, "pyproject.toml", 4):
+        for pyproject in walk(repo, "pyproject.toml", 4, skip):
             if _runtime_dependencies(pyproject) & set(rule.deps) and _source_uses(pyproject.parent, rule.used):
                 found.append((name, str(pyproject.parent.relative_to(repo)) or "."))
     return tuple(found)
 
 
-def _detect_kind(repo: Path) -> str:
+def _detect_kind(repo: Path, skip: tuple[str, ...] = ()) -> str:
     pyproject = repo / "pyproject.toml"
     if pyproject.is_file():
         data = tomllib.loads(pyproject.read_text())
         if "workspace" in data.get("tool", {}).get("uv", {}) and not data.get("project", {}).get("scripts"):
             return "library"
-    if walk(repo, "*.tf", 2) or (repo / "ansible.cfg").is_file():
+    if walk(repo, "*.tf", 2, skip) or (repo / "ansible.cfg").is_file():
         return "infrastructure"
     return "application"
 
@@ -151,11 +247,21 @@ def _detect_kind(repo: Path) -> str:
 def detect(repo: Path, state: State) -> Profile:
     """The profile: what the state declares, else what the files say."""
     declared = state.declared
+    skip = tuple(i.path for i in state.ignores if i.problem is None)
+    declared_stacks = tuple(declared.get("stacks", ()))
+    found: dict[str, list[str]] = {} if declared_stacks else _stack_files(repo, skip)
+    stack_files = (
+        tuple((s, f"declared in {STATE_FILE}") for s in declared_stacks)
+        if declared_stacks
+        else tuple((s, _evidence_files(files)) for s, files in found.items())
+    )
     return Profile(
-        kind=str(declared.get("kind") or _detect_kind(repo)),
+        kind=str(declared.get("kind") or _detect_kind(repo, skip)),
         surfaces=tuple(declared.get("surfaces", ())),
         traits=tuple(declared.get("traits", ())),
-        stacks=tuple(declared.get("stacks", ())) or detect_stacks(repo),
+        stacks=declared_stacks or tuple(found),
         tracker="beads" if (repo / ".beads").is_dir() else declared.get("tracker"),
-        frameworks=tuple((str(f), str(r)) for f, r in declared.get("frameworks", {}).items()) or detect_frameworks(repo),
+        frameworks=tuple((str(f), str(r)) for f, r in declared.get("frameworks", {}).items()) or detect_frameworks(repo, skip),
+        stack_files=stack_files,
+        ignore=skip,
     )

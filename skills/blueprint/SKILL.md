@@ -68,8 +68,11 @@ The owner's one yes covers the whole plan. Per concern, in layer order (generic,
 - `agent` rows: do them, or delegate (§5) when a concern has several.
 - `owner` rows: one batched question round, your default worded so "yes" accepts it.
 - Re-run `check --concern <c> --audit`; a fix never seen ✅ is unverified, and you say so.
-- A row right to leave failing becomes an override in `docs/blueprint/blueprint.toml` (code,
-  reason, expiry) only with the owner's yes. Rows still not ✅ at the end become beads.
+- A row right to leave failing becomes an override in `docs/blueprint/blueprint.toml` only with the
+  owner's yes. Every exception is justified: a reason, and either `expires` (temporary) or
+  `adr = "NNNN"` naming the accepted ADR that records the durable decision (no CI, builds on the
+  owner's machines). A path detection must skip (a throwaway spike) is a `[[profile.ignore]]` entry
+  under the same rule. Rows still not ✅ at the end become beads.
 - Finish with the repo's own `make check` green and `--write` again.
 
 ## 4. What the owner sees

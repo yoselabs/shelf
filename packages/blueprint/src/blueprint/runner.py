@@ -117,7 +117,7 @@ def _row(chk: Check, sub: Sub, state: State, today: date) -> Row:
         problem = override.problem(today)
         if problem is None:
             verdict = Verdict.PASSING
-            evidence = f"override {override.code} until {override.expires.isoformat()}: {override.reason} (saw: {evidence})"
+            evidence = f"override {override.code} {override.lasts}: {override.reason} (saw: {evidence})"
         else:
             evidence = f"{evidence}; {problem}"
     return Row(
@@ -141,13 +141,13 @@ def run(
 ) -> Run:
     """Run every applicable check on `repo`; the audit-only ones only when `audit`."""
     repo = repo.resolve()
-    state = load_state(repo)
+    today = today or date.today()  # noqa: DTZ011 -- override expiry is a calendar date in the owner's zone
+    state = load_state(repo, today)
     profile = detect(repo, state)
     ctx = Context(repo=repo, profile=profile, settings=state.settings)
     if env is not None:
         ctx.env = env
     checks = active(profile, concern)
-    today = today or date.today()  # noqa: DTZ011 -- override expiry is a calendar date in the owner's zone
     rows = tuple(_row(c, sub, state, today) for c in checks if audit or not c.audit_only for sub in _judge(c, ctx))
     accepted = _accepted(repo)
     if accepted is not None:

@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import functools
 import json
+import subprocess
+import tomllib
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint.model import FixedBy, Verdict
 from blueprint.profile import STATE_DIR
-from blueprint.runner import ACCEPTED
+from blueprint.runner import ACCEPTED, active
 
 if TYPE_CHECKING:
     from datetime import date
-    from pathlib import Path
 
     from blueprint.runner import Row, Run
 
@@ -46,11 +49,50 @@ def table(rows: list[Row] | tuple[Row, ...]) -> str:
     return "\n".join(lines)
 
 
+@functools.cache
+def engine() -> str:
+    """Which blueprint produced a report: the shelf commit it runs from, and the package version.
+
+    Why: a report is judged against a checkpoint set that moves with the shelf; without the commit, nobody
+    can tell whether a stale ❌ came from an old engine.
+    """
+    here = Path(__file__).resolve().parent
+    commit = ""
+    try:
+        done = subprocess.run(
+            ["git", "-C", str(here), "rev-parse", "--short=9", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        commit = done.stdout.strip() if done.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired):
+        commit = ""
+    try:
+        version = str(tomllib.loads((here.parents[1] / "pyproject.toml").read_text())["project"]["version"])
+    except (OSError, KeyError, tomllib.TOMLDecodeError):
+        version = ""
+    parts = [f"shelf `{commit}`" if commit else "", f"blueprint {version}" if version else ""]
+    return " · ".join(x for x in parts if x) or "unknown"
+
+
+def _scope(run: Run) -> str:
+    """Which concerns this run judged and which it did not: a report that hides the gap reads as full coverage."""
+    checked = list(dict.fromkeys(r.concern.split("/")[0] for r in run.rows))
+    missing = [c for c in dict.fromkeys(c.concern for c in active(run.profile)) if c not in checked]
+    audit = f"audit-only checkpoints not run ({run.skipped_audit})" if run.skipped_audit else "audit-only checkpoints included"
+    return f"concerns checked: {', '.join(checked) or 'none'} · not run: {', '.join(missing) or 'none'} · {audit}"
+
+
 def _header(run: Run) -> str:
     p = run.profile
+    files = dict(p.stack_files)
+    stacks = ", ".join(f"{s} (from {files[s]})" if s in files else s for s in p.stacks) or "none detected"
     return (
-        f"kind: {p.kind} · stacks: {', '.join(p.stacks) or 'none detected'} · surfaces: {', '.join(p.surfaces) or '-'} · "
-        f"traits: {', '.join(p.traits) or '-'} · tracker: {p.tracker or 'none'} · checkpoint set: `{run.set_hash}`"
+        f"kind: {p.kind} · stacks: {stacks} · surfaces: {', '.join(p.surfaces) or '-'} · "
+        f"traits: {', '.join(p.traits) or '-'} · tracker: {p.tracker or 'none'} · checkpoint set: `{run.set_hash}`\n\n"
+        f"engine: {engine()}\n\n{_scope(run)}"
     )
 
 

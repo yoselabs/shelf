@@ -50,6 +50,88 @@ def test_a_separate_claude_md_fails(repo: Repo) -> None:
     assert _verdicts(repo)["agents.instructions"] is Verdict.FAILING
 
 
+def _evidence(repo: Repo, check_id: str) -> tuple[Verdict, str, str]:
+    row = {r.id: r for r in run(repo.root, concern="agents", env=repo.env).rows}[check_id]
+    return row.verdict, row.evidence, row.remediation
+
+
+def test_two_diverging_instruction_files_fail_with_what_differs_and_how_to_merge(repo: Repo) -> None:
+    # a2peer: AGENTS.md carried a sync section and shell rules CLAUDE.md lacked, so two agents got two rule sets.
+    _sound(repo)
+    repo.root.joinpath("CLAUDE.md").unlink()
+    repo.write("AGENTS.md", "# map\nsync rules\nshell rules\n")
+    repo.write("CLAUDE.md", "# map\nbd template\n")
+    verdict, evidence, remediation = _evidence(repo, "agents.instructions")
+    assert verdict is Verdict.FAILING
+    assert "1 line only in CLAUDE.md" in evidence
+    assert "2 lines only in AGENTS.md" in evidence
+    assert "diff AGENTS.md CLAUDE.md" in remediation
+    assert "ln -sf AGENTS.md CLAUDE.md" in remediation
+
+
+def test_an_identical_copy_is_fixed_by_the_link_alone(repo: Repo) -> None:
+    _sound(repo)
+    repo.root.joinpath("CLAUDE.md").unlink()
+    repo.write("CLAUDE.md", "# map\n")
+    verdict, evidence, remediation = _evidence(repo, "agents.instructions")
+    assert verdict is Verdict.FAILING
+    assert "copy" in evidence
+    assert remediation == "ln -sf AGENTS.md CLAUDE.md"
+
+
+def test_only_a_claude_md_is_renamed_to_agents_md(repo: Repo) -> None:
+    repo.write("CLAUDE.md", "# map\n")
+    verdict, _, remediation = _evidence(repo, "agents.instructions")
+    assert verdict is Verdict.NOT_SET_UP
+    assert "mv CLAUDE.md AGENTS.md" in remediation
+
+
+_BD_TEMPLATE = "# Project\n\n## Build & Test\n\n{build}\n\n## Architecture Overview\n\n{arch}\n\n## Conventions & Patterns\n\n{conv}\n"
+
+
+def _filled_harness(repo: Repo) -> None:
+    _sound(repo)
+    templates.install(repo.root, detect(repo.root, load_state(repo.root)))
+    for path in (repo.root / "docs/agents").glob("*.md"):
+        path.write_text(templates.PLACEHOLDER.sub("filled", path.read_text()))
+
+
+@pytest.mark.parametrize("mark", ["*", "_"])
+def test_bd_template_placeholders_left_in_claude_md_fail_and_pass_once_replaced(repo: Repo, mark: str) -> None:
+    # a2peer: `bd init` wrote these three lines and nobody replaced them, so agents had no build or test command.
+    _filled_harness(repo)
+    repo.root.joinpath("CLAUDE.md").unlink()
+    repo.write(
+        "CLAUDE.md",
+        _BD_TEMPLATE.format(
+            build=f"{mark}Add your build and test commands here{mark}",
+            arch=f"{mark}Add a brief overview of your project architecture{mark}",
+            conv=f"{mark}Add your project-specific conventions here{mark}",
+        ),
+    )
+    verdict, evidence, _ = _evidence(repo, "agents.culture-files")
+    assert verdict is Verdict.FAILING
+    assert "CLAUDE.md" in evidence
+    assert "3 template placeholder" in evidence
+    repo.write("CLAUDE.md", _BD_TEMPLATE.format(build="`make check`", arch="a package per concern", conv="tests first"))
+    assert _evidence(repo, "agents.culture-files")[0] is Verdict.PASSING
+
+
+def test_a_mustache_placeholder_in_agents_md_fails(repo: Repo) -> None:
+    _filled_harness(repo)
+    repo.write("AGENTS.md", "# {{project_name}}\n")
+    verdict, evidence, _ = _evidence(repo, "agents.culture-files")
+    assert verdict is Verdict.FAILING
+    assert "AGENTS.md" in evidence
+
+
+def test_a_symlinked_claude_md_is_read_once(repo: Repo) -> None:
+    _filled_harness(repo)
+    repo.write("AGENTS.md", "# map\n_Add your build and test commands here_\n")
+    _, evidence, _ = _evidence(repo, "agents.culture-files")
+    assert "1 template placeholder" in evidence
+
+
 def test_worktree_folders_not_ignored_is_not_set_up(repo: Repo) -> None:
     _sound(repo)
     repo.write(".gitignore", ".claude/worktrees/\n")

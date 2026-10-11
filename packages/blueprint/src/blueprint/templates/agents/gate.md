@@ -47,6 +47,12 @@ blueprint reads: `Makefile`, `AGENTS.md`, `.gitignore`, `.pre-commit-config.yaml
 Dropping `.beads` or `.claude` whole makes the container report a false "no tracker"; keep the folder out of the
 context and re-include those files after it with `!.beads/config.yaml` lines. `gate.runs-blueprint` names a dropped file.
 
+## Exceptions
+
+An exception to a blueprint rule (an override, an ignored path in `docs/blueprint/blueprint.toml`) carries a reason and
+either `expires = <date>` or `adr = "NNNN"`, an accepted ADR in `docs/adr/` that records the durable decision. The gate
+reports an exception with neither, or naming an ADR that is missing or not accepted.
+
 ## Adding a check
 
 Plant a violation, see the gate fail, add the check to `make check` (a hook only if it takes seconds), remove the violation, see green.

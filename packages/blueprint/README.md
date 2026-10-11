@@ -42,25 +42,38 @@ traits = ["stores-data"]
 [profile.frameworks]      # overrides detection: framework -> its folder
 godot = "src/Game.Godot"
 
+[[profile.ignore]]        # a throwaway or vendored path: stack detection and role globs skip it
+path = "prototype"
+reason = "throwaway spikes bind nothing"
+expires = 2027-04-01      # or adr = "NNNN"
+
 [settings]
 clean-clone-seconds = 120 # gate.clean-clone's budget
 
-[[override]]              # counts as passing until it expires
+[[override]]              # counts as passing while it is justified
 id = "gate.ci"
 code = "not-applicable"   # test-data | remediated | not-applicable | not-supported | not-detected
-reason = "a local-only tool, never pushed"
-expires = 2027-04-01
+reason = "builds and the gate run on the owner's machines"
+adr = "0003"              # an accepted ADR in docs/adr/ records the durable decision; no expiry needed
+# expires = 2027-04-01    # a temporary exception instead of adr
 ```
+
+**Every exception is justified** ([ADR 0022](../../docs/adr/0022-every-exception-is-justified.md)): a non-empty
+`reason`, and either `expires` or `adr`. An `adr` must name an accepted ADR in `docs/adr/`; one that is missing,
+not accepted, or an exception with neither field is a problem the gate reports (exit 1), and it counts for nothing.
+
+A written report's header names the shelf commit and package version that produced it, the checkpoint-set hash,
+and the scope: concerns checked, concerns not run, and whether the audit-only checkpoints ran.
 
 ## Concerns in v0.1
 
 | layer | concern | checkpoints |
 |---|---|---|
-| generic | gate | `one-command` · `runs-blueprint` · `ci` · `ci-no-manifest-edit` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` · `clean-clone` (audit only) |
+| generic | gate | `one-command` · `runs-blueprint` · `ci` · `ci-no-manifest-edit` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` (follows `make check` into pre-commit hooks) · `checkers-wired` · `default-branch` (audit only) · `git-remote` (audit only) · `clean-clone` (audit only) |
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
-| stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional) |
+| stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional; the toolchain row also checks every dotnet install against global.json); `python-uv.uv-tool` (audit only): an application's installed uv tool matches uv.lock |
 | framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, provisional: framework-version · project-hygiene · embedded-script-lint · build · tests · surface-integrity · architecture · ci); paths may use `{root}` (the project folder) and globs |
-| agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `culture-files` · `managed-block` |
+| agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `worktrees` · `culture-files` (placeholders in docs/agents/, AGENTS.md and CLAUDE.md) · `managed-block` |
 
 Hooks follow one recipe: prek owns them through `.pre-commit-config.yaml` and bd's five events run
 from it (`blueprint recipe hooks` prints it); bd never installs hooks itself.
