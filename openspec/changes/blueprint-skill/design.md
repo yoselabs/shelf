@@ -29,22 +29,24 @@ All research is one pass unless a file says otherwise.
 ## Status — 2026-10-11, handover (resume here)
 
 Work queue: `bd show shelf-1y4` (epic), `bd ready`. Decisions: `docs/adr/INDEX.md` (the shelf's standards
-are ADRs 0016-0024). Work continues on the Linux devbox (`~/Workspaces/shelf`, bd bootstrapped from the
-remote, prek installed); both machines run bd 1.3.1: keep them equal until mise pins it (ADR 0024).
+are ADRs 0016-0024). Work continues on the Linux devbox (bd bootstrapped from the remote, prek and git-lfs
+installed); both machines run bd 1.3.1: keep them equal until mise pins it (ADR 0024, accepted).
 
 | part | state |
 |---|---|
 | engine | concerns gate, backlog, knowledge, stack (+ python pins), framework, agents; reads the gate graph from `just --dump`; `checkpoints.txt` grace (ADR 0018); every exception needs a reason plus an expiry or an accepted ADR (ADR 0022) |
-| profiles | python-uv (evidenced; architecture = import-linter + ruff banned-api), dotnet, godot, mcp (provisional) |
+| profiles | python-uv (evidenced; architecture = import-linter + ruff banned-api); dotnet (with a coverage floor), nix, compose, godot, unity, mcp (provisional); framework gate scripts ship as `blueprint recipe <name>` |
 | skill | strict and pushy; answers then returns to the run; ends with a relay block for a shelf session; grows missing profiles from inside a repo |
 | shelf | passes its own audit (all ✅); gate is `uv run just check`; `affected.py` kept, moon is the target (ADR 0021) |
-| evals | 8 cases, all passing before the just migration; their fixtures stay on make (the not-migrated case); re-run (`just eval`) not done since |
+| evals | 8 cases, all passing before the just migration. Re-run on the devbox 2026-10-11: every run failed before the skill could act, because the container forbids unprivileged user namespaces, so the eval sandbox (bwrap) cannot start a shell. Not a skill result: re-run on the Mac, or after the devbox allows user namespaces |
 
 Open, in order:
-1. ADR 0024 (mise) is **proposed**: the owner accepts it, then shelf-1y4.19 builds the pin checks and pins the shelf and lifesim.
-2. Research drafts not yet adopted: Unity profile (shelf-1y4.18), Nix and compose (shelf-v2p), .NET coverage (shelf-8eg), Godot gaps (shelf-d89, shelf-1y4.17): drafts in `research/` when filed, else rerun.
-3. Owner decisions pending: shelf-230 (judge an unmerged branch; recommended yes), shelf-lzg (templates deferring to a repo's own decision layout; recommended no).
+1. shelf-1y4.19: build the mise pin checks, pin the shelf and lifesim (ADR 0024 accepted 2026-10-11).
+2. Evals: re-run `just eval` where the sandbox works (see the evals row); the eval copy no longer includes worktrees.
+3. Owner decided 2026-10-11: shelf-230 yes, flag only (gate rows owner-decided when an unmerged branch holds gate files);
+   shelf-lzg no to deferring the decision layout, yes to the cheap half (no-ci wording, culture-files flags missing paths).
 4. Re-audit every consumer on the new blueprint (shelf-1y4.12): a2kay, lifesim, a2peer, homelab; relay surveys.
+   Unity runtime claims were seen on 6000.7.0b4 only: re-run on 6000.3 LTS. nix/compose templates: shelf-1y4.20.
 5. Then opencode (1y4.16), release (1y4.11), reabsorb (1y4.10), kickoff (1y4.9), shelf off OpenSpec (1y4.13), u0p.
 
 ## Owner round 10 — output contract (2026-10-10)

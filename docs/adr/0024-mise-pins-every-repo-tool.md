@@ -3,7 +3,7 @@ id: 0024
 title: mise pins every repo tool, locked
 statement: Each repo pins its tools exactly in mise.toml with a committed mise.lock; `mise install --locked` installs them; uv keeps Python, global.json keeps the .NET SDK; just keeps the tasks.
 concerns: [stack, gate]
-status: proposed
+status: accepted
 decided_by: owner
 updated: 2026-10-11
 distilled_into: not yet (shelf-1y4.19)
@@ -11,7 +11,7 @@ distilled_into: not yet (shelf-1y4.19)
 
 # 0024 — mise pins every repo tool
 
-## Decision (proposed; the owner accepts or rejects)
+## Decision
 
 `mise.toml` pins uv, just, prek, bd and framework editors (Godot) at exact versions; `mise.lock` holds
 per-platform checksums; `mise install --locked` is the one install command, run by `just bootstrap`.
@@ -31,3 +31,4 @@ preinstalled outside Python repos.
 ## History
 
 - 2026-10-11: proposed after the trial (`openspec/changes/blueprint-skill/research/toolchain-installer.md`).
+- 2026-10-11: accepted by the owner; shelf-1y4.19 builds the pin checks and pins the shelf and lifesim.
