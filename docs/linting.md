@@ -135,8 +135,7 @@ is not this one's. A check that fails on every consumer forever teaches everyone
 
 ## Architectural fitness rules (native, not OPA — ADR 0005)
 
-Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest (like
-`tests/test_boundary.py`), reimplementing a2kit's Rego policies without dragging OPA in:
+Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest, reimplementing a2kit's Rego policies without dragging OPA in:
 
 - **`tests/test_arch_rules.py`** (blocking, via `tools/arch_rules.py`): dependency **upper-bounds**;
   **body-duplication** and **private-name-collision** *within* a package. Suppress with a reasoned entry
@@ -144,4 +143,15 @@ Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest (lik
 - **`make advisory`** (non-blocking): *cross-package* duplication — a T0-primitive candidate, not a
   violation (constitution VI values some duplication).
 
-Still un-ported (add when a real violation appears): the import layer-DAG and the `dict[str,Any]`-ban.
+The import graph is enforced by **import-linter** (`make arch`, contracts in `[tool.importlinter]`): no
+package imports a consumer app, and packages stay independent except the workspace edges they declare.
+**Banned APIs** are ruff's `TID251` (`[tool.ruff.lint.flake8-tidy-imports.banned-api]`, a `msg` per entry);
+the shelf bans the consumer apps there, which also covers `packages/*/tests`. ADR 0005.
+
+| rule class | enforcer | run by |
+|---|---|---|
+| import edges, layers, cycles | import-linter contracts in `pyproject.toml` | `make arch` |
+| banned APIs and modules | ruff `TID251` banned-api | `make lint` |
+| AST facts (RG001-RG004) | `tools/arch_rules.py` via `tests/test_arch_rules.py` | `make test` |
+
+Still un-ported (add when a real violation appears): the `dict[str,Any]`-ban.

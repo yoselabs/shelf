@@ -19,7 +19,7 @@ only prose is not a rule.
 | Dependencies point inward only; the shell depends on the core, never the reverse | One direction makes cycles impossible |
 | Wire things in one **composition root**; the core receives what it needs | Swapping a dependency touches one file |
 | Declare the layer map in one file the tool reads (`{{layer_config}}`); do not restate it in prose | Two copies drift |
-| Banned APIs (clock, random, global state, network in the core) live in one list with a reason per entry | The list is checked; a sentence is not |
+| Banned APIs (clock, random, global state, network in the core) live in one list with a reason per entry (Python: `[tool.ruff.lint.flake8-tidy-imports.banned-api]`, run by `ruff check`) | The list is checked; a sentence is not |
 | A new dependency edge that the map forbids is a design change: ask the owner, update the map in its own commit | Silent edges rot the layers |
 | Shared domain terms live in CONTEXT.md and are used in code names ([domain.md](domain.md)) | Names are the cheapest architecture |
 
@@ -36,4 +36,4 @@ One concept per file ([constitution.md](constitution.md) article 6).
 
 ## Changing a layer
 
-Edit the map and enforcer config together; plant a forbidden edge, see the gate fail, remove it; record an ADR.
+Edit the map and enforcer config together (an exhaustive layers contract fails on a module no layer lists, so a new module is placed on purpose); plant a forbidden edge, see the gate fail, remove it; record an ADR.

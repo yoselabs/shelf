@@ -64,7 +64,7 @@ Read [docs/constitution.md](docs/constitution.md) before changing anything. The 
 
 A shelf package **must not import any consumer app** (a2kay, a2web, a2kit, …). The dependency arrow
 points UP into the apps, never down out of them. Enforced by
-[tests/test_boundary.py](tests/test_boundary.py). If you need a consumer's type, you have the arrow
+the import-linter `forbidden` contract in [pyproject.toml](pyproject.toml) (`make arch`; ruff TID251 covers `packages/*/tests`). If you need a consumer's type, you have the arrow
 backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more.
 
 ### Conventions

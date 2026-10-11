@@ -16,7 +16,7 @@ the file holds the reasons, the rejected options and the history.
 ## gate
 
 - [0004](0004-linters-are-a-config-preset.md) **Linters are a config-preset, not a CLI**: The shelf's own pyproject [tool.*] blocks and Makefile targets are the lint reference; a consumer copies them and owns the copy. No lint CLI, no runtime dependency.
-- [0005](0005-architecture-rules-are-native-fitness-tests.md) **Architecture rules are native Python fitness tests**: Architecture rules run as pure-stdlib pytest fitness tests, blocking within a package and advisory across packages; no OPA/Rego, no policy engine.
+- [0005](0005-architecture-rules-are-native-fitness-tests.md) **Architecture rules run in the toolchain; AST facts are native tests**: Import-graph rules run in-toolchain (import-linter in pyproject; ruff TID251 for banned APIs); AST-fact rules stay pure-stdlib pytest, blocking in a package, advisory across; no policy engine.
 - [0018](0018-new-checkpoints-warn-until-the-next-audit.md) **A new blueprint checkpoint warns until the repo's next audit**: Each audit records the checkpoints it judged in docs/blueprint/checkpoints.txt; between audits the gate enforces that set and a newer checkpoint only warns (🆕).
 - [0020](0020-prek-runs-every-hook.md) **prek runs every git hook, bd's included**: prek is the one hook manager; bd's events run from .pre-commit-config.yaml via `bd hooks run`; bd never installs hooks itself and core.hooksPath stays unset.
 - [0021](0021-affected-tests-stay-on-affected-py.md) **Affected-only tests stay on tools/affected.py; moon is the migration target**: make check narrows tests with tools/affected.py; no build tool yet. Migrate to moon's generic task graph when the shelf gets its first non-Python package (bead shelf-qgz).

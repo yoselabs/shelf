@@ -7,7 +7,7 @@ only prose is not a rule.
 
 | layer | holds | may depend on | enforced by |
 |---|---|---|---|
-| packages | the shelf's software, one concept per package | the standard library, third-party libraries, and sibling packages they declare | `tests/test_boundary.py` (no consumer app imported) |
+| packages | the shelf's software, one concept per package | the standard library, third-party libraries, and sibling packages they declare | `lint-imports` (`make arch`): the `forbidden` contract bars every consumer app, `independence` bars undeclared sibling edges; ruff TID251 bars consumer imports in `packages/*/tests` |
 | tools | the shelf's own scripts: onboarding, catalog, gate helpers | the standard library and `packages/blueprint` | `tools/arch_rules.py` via `tests/test_arch_rules.py` |
 | consumer apps | live in their own repos and import packages | anything | nothing here: the arrow only points from apps to packages |
 
@@ -18,8 +18,8 @@ only prose is not a rule.
 | The **core is free of frameworks**: no UI, engine, web, database or OS API in the layer that holds the rules | Core logic stays testable without the substrate and survives its replacement |
 | Dependencies point inward only; the shell depends on the core, never the reverse | One direction makes cycles impossible |
 | Wire things in one **composition root**; the core receives what it needs | Swapping a dependency touches one file |
-| Declare the layer map in one file the tool reads (`tests/arch_allowlist.toml`); do not restate it in prose | Two copies drift |
-| Banned APIs (clock, random, global state, network in the core) live in one list with a reason per entry | The list is checked; a sentence is not |
+| Declare the layer map in one place the tool reads (`[tool.importlinter]` in `pyproject.toml`); do not restate it in prose | Two copies drift |
+| Banned APIs (clock, random, global state, network in the core) live in one list with a reason per entry: `[tool.ruff.lint.flake8-tidy-imports.banned-api]`, run by `ruff check` | The list is checked; a sentence is not |
 | A new dependency edge that the map forbids is a design change: ask the owner, update the map in its own commit | Silent edges rot the layers |
 | Shared domain terms live in CONTEXT.md and are used in code names ([domain.md](domain.md)) | Names are the cheapest architecture |
 
@@ -36,4 +36,4 @@ One concept per file ([constitution.md](constitution.md) article 6).
 
 ## Changing a layer
 
-Edit the map and enforcer config together; plant a forbidden edge, see the gate fail, remove it; record an ADR.
+Edit the map and enforcer config together (an exhaustive `layers` contract fails on a module no layer lists, so a new module is placed on purpose); plant a forbidden edge, see the gate fail, remove it; record an ADR.

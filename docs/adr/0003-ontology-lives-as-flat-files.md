@@ -35,7 +35,7 @@ parallel-safe additive writes).
 ## Rejected
 
 - **A: a2kay EntityTypes.** Not a close call; two standing decisions kill it. The one invariant
-  (`tests/test_boundary.py`: a shelf package never imports a consumer) plus a2kay being a consumer
+  (the import-linter `forbidden` contract in `pyproject.toml`: a shelf package never imports a consumer) plus a2kay being a consumer
   (ADR 0001) means modelling the ontology in a2kay makes the shelf depend on a2kay to describe itself.
   ADR 0002 ("forget about Kay") removed exactly that coupling.
 

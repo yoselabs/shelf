@@ -1,22 +1,37 @@
 ---
 id: 0005
-title: Architecture rules are native Python fitness tests
-statement: Architecture rules run as pure-stdlib pytest fitness tests, blocking within a package and advisory across packages; no OPA/Rego, no policy engine.
+title: Architecture rules run in the toolchain; AST facts are native tests
+statement: Import-graph rules run in-toolchain (import-linter in pyproject; ruff TID251 for banned APIs); AST-fact rules stay pure-stdlib pytest, blocking in a package, advisory across; no policy engine.
 concerns: [gate, tooling]
 status: accepted
 decided_by: owner
-updated: 2026-07-08
+updated: 2026-10-11
 expires: 2027-01-08
-distilled_into: N/A — self-enforcing via tests/test_arch_rules.py
+distilled_into: blueprint python-uv architecture role; tests/test_arch_rules.py for the AST facts
 ---
 
-# 0005 — Architectural rules are native Python fitness tests, not OPA/Rego
+# 0005 — Architecture rules run in the toolchain; AST facts are native tests, not OPA/Rego
 
 ## Decision
 
+Two classes of rule, two enforcers:
+
+- **Import graph** (layers, dependency direction, cycles, the one invariant, undeclared sibling edges):
+  **import-linter** contracts in `[tool.importlinter]` in `pyproject.toml`, run by `make arch`. A guard
+  test keeps `root_packages` equal to `packages/*/src` and the `independence` ignore list equal to the
+  workspace dependencies the packages declare.
+- **Banned APIs** (a consumer app in a package's tests, a clock or `uuid4` in a core): ruff `TID251`
+  banned-api, one `msg` per entry, run by `make lint`.
+- **AST facts** (RG001-RG004, below): stay native, pure-stdlib pytest.
+
+The line is "no non-hermetic binary, no policy engine". A pip dev-dependency that parses imports is on the
+right side of it; OPA is not. Benched 2026-10-11 on the shelf, a2kay and a2web.
+
+### AST-fact rules
+
 a2kit's architectural rules (RG001 body-duplication, RG002 private-name-collision, RG003
 allowlist-hygiene, RG004 dependency-upper-bounds) are reimplemented by *intent* as native Python
-fitness tests, the way `tests/test_boundary.py` already enforces the one invariant: walk the AST
+fitness tests, walk the AST
 (`ast`), read the manifests (`tomllib`), pure stdlib, inside `make check`, ownable, deletable.
 
 **Scope rule** (load-bearing, departs from a2kit). Constitution VI values some duplication; a2kit was
@@ -40,6 +55,9 @@ needs cross-repo fact-sharing only a policy engine can give, that is a new fork 
 
 ## Rejected
 
+- **B: a hand-written import DAG in pytest.** It re-implements grimp and has no exhaustiveness.
+- **C: tach.** Blind to cross-package imports in a uv workspace, no exhaustiveness.
+
 - **A: migrate as Rego** (vendor the `.rego` bundle + `extract_facts.py`, add OPA). OPA is a
   non-hermetic binary substrate, the scar tissue the shelf exists to shed (R154, constitution VI,
   ADR 0004): every consumer and CI would need `brew install opa`, and fact extraction is a second
@@ -49,3 +67,6 @@ needs cross-repo fact-sharing only a policy engine can give, that is a new fork 
 ## History
 
 - 2026-07-08: decided. Expires 2027-01-08. Track: tooling / architecture fitness.
+- 2026-10-11: amended (shelf-435). The 2026-07-08 text was written for a2kit's four AST-fact rules and was read as
+  covering the import DAG too. The bench on shelf, a2kay and a2web chose import-linter and TID251; tach was refused.
+  `tests/test_boundary.py` retired in favour of the `forbidden` contract. AST rules, scope rule, allowlist and expiry unchanged.

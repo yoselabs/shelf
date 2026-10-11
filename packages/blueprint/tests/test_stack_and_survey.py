@@ -87,11 +87,22 @@ def test_a_stack_without_a_profile_is_a_blueprint_gap_not_a_repo_failure(repo: R
 
 
 def test_an_untested_role_is_a_blueprint_gap(repo: Repo) -> None:
-    _python_repo(repo)
-    verdict, evidence, gap = _rows(repo)["stack.python-uv.architecture"]
+    repo.write("App.sln", "")
+    verdict, evidence, gap = _rows(repo)["stack.dotnet.coverage"]
     assert verdict is Verdict.NOT_CHECKED
     assert gap
     assert "no standard yet" in evidence
+
+
+def test_the_architecture_role_wants_import_linter_configured_and_run_by_the_gate(repo: Repo) -> None:
+    _python_repo(repo)
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.architecture"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "[tool.importlinter" in evidence
+    repo.write("pyproject.toml", _PYPROJECT + '\n[tool.importlinter]\nroot_packages = ["x"]\n')
+    assert _rows(repo)["stack.python-uv.architecture"][0] is Verdict.FAILING  # configured, not in the gate
+    repo.write("Makefile", _MAKEFILE.replace("check: lint", "check: lint arch") + "arch:\n\tuv run lint-imports\n")
+    assert _rows(repo)["stack.python-uv.architecture"][0] is Verdict.PASSING
 
 
 def test_check_all_counts_as_the_gate(repo: Repo) -> None:

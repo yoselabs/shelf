@@ -55,12 +55,13 @@ _AXES = (
 _TARGET = re.compile(r"^([a-zA-Z][\w-]*)\s*:(?!=)")
 
 # Targets that operate on the shelf's own layout (its catalog, its cross-package
-# advisory, its any-browser lane, its gate container and affected-only run). `blueprint`
+# advisory, its import-graph contracts (`arch`: a consumer's layers are its own), its
+# any-browser lane, its gate container and affected-only run). `blueprint`
 # is copied (the per-commit blueprint checks), so it is not shelf-only. A consumer
 # has nothing for them to act on, so their absence is not drift; without this every
 # fresh consumer failed `make preset`.
 _SHELF_ONLY_TARGETS = frozenset(
-    {"catalog", "advisory", "test-browser", "check-all", "check-host", "check-all-host", "test-image", "test-affected", "eval"}
+    {"catalog", "advisory", "arch", "test-browser", "check-all", "check-host", "check-all-host", "test-image", "test-affected", "eval"}
 )
 
 

@@ -101,7 +101,7 @@ gate = "pytest"
 [[role]]
 role = "architecture"
 tool = "the domain core does not import fastmcp; the server module is a thin adapter (register tools, map errors, set annotations) that calls core functions; auth and transport options are read from one config object, not from tool bodies"
-untested = "the python-uv architecture tool is still open (import-linter vs tach); once chosen, the contract is: forbidden module `fastmcp` and `mcp` from the core package. a2kay enforces this with its own archlint; no shared check exists to point at"
+untested = "the python-uv architecture tool is import-linter; the contract is a `forbidden` one: modules `fastmcp` and `mcp` (include_external_packages = true) from the core package. Not yet proven on an MCP server repo, and no shared check exists to point at (a2kay enforces it with its own archlint)"
 
 [[role]]
 role = "ci"

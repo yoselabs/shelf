@@ -47,6 +47,7 @@ def test_copies_ruff_codespell_coverage_and_dev_group_into_a_bare_pyproject(repo
     assert "codespell" in parsed["tool"]
     assert "coverage" in parsed["tool"]
     assert "dev" in parsed["dependency-groups"]
+    assert "flake8-tidy-imports" not in parsed["tool"]["ruff"]["lint"], "the shelf's consumer-app ban must not reach a consumer"
 
 
 def test_an_existing_ruff_table_is_left_exactly_as_written(repo: Path) -> None:

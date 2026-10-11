@@ -45,6 +45,9 @@ _SHELF_MAKEFILE = _SHELF_ROOT / "Makefile"
 
 _TABLE_PREFIXES = ("tool.ruff", "tool.codespell", "tool.coverage")
 _DEV_GROUP_TABLE = "dependency-groups"
+# Shelf-specific ruff tables a consumer must not inherit: the banned-api list bans the consumer apps
+# (a2kay, ...), which would ban a consumer from importing itself.
+_SHELF_ONLY_TABLES = ("tool.ruff.lint.flake8-tidy-imports",)
 _MAKE_TARGETS = (
     "check",
     "guard",
@@ -117,7 +120,9 @@ def _missing_toml_blocks(target_text: str) -> str:
     blocks = [
         block
         for name, block in shelf_tables
-        if name.startswith(_TABLE_PREFIXES) and not any(name == p or name.startswith(p + ".") for p in owned_prefixes)
+        if name.startswith(_TABLE_PREFIXES)
+        and not name.startswith(_SHELF_ONLY_TABLES)
+        and not any(name == p or name.startswith(p + ".") for p in owned_prefixes)
     ]
     if _DEV_GROUP_TABLE not in target_names:
         blocks += [block for name, block in shelf_tables if name == _DEV_GROUP_TABLE]

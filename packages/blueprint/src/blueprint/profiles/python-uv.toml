@@ -85,7 +85,14 @@ contains = "fail_under"
 
 [[role]]
 role = "architecture"
-untested = "no layer tool chosen yet: import-linter vs tach is open (shelf-435)"
+tool = "import-linter (layers, forbidden, independence, acyclic_siblings, protected) for import edges; ruff TID251 banned-api for banned APIs; both read pyproject.toml, one declaration each"
+install = "uv add --dev 'import-linter>=2.15,<3'; [tool.importlinter] root_package(s) + [[tool.importlinter.contracts]] in pyproject.toml: a layers contract with containers and exhaustive = true, acyclic_siblings, forbidden (not-installed apps/frameworks via include_external_packages = true); banned APIs in [tool.ruff.lint.flake8-tidy-imports.banned-api] with a msg each, scoped to the core; `arch: uv run lint-imports` in make check; plant a forbidden edge and see it fail"
+config = [
+    { any = [{ path = "pyproject.toml", contains = "[tool.importlinter" }, { path = ".importlinter" }] },
+]
+# The banned-api half rides the linter role's `ruff check` gate. Banned APIs are not required in config for
+# every repo: a library collection with no core has no clock or random bans; architecture.md says when a list is needed.
+gate = "lint-imports"
 
 [[role]]
 role = "hooks"

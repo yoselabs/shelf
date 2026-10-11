@@ -4,7 +4,7 @@
 # This is the reference toolchain every consumer of the shelf inherits (ADR 0004).
 # Each target is one linter doing one job; `check` is the gate.
 
-.PHONY: check check-all check-host check-all-host test-image blueprint eval guard preset bootstrap bootstrap-verify lint format typecheck spell deps test test-affected test-browser cov catalog advisory sync
+.PHONY: check check-all check-host check-all-host test-image blueprint eval guard preset bootstrap bootstrap-verify lint format typecheck arch spell deps test test-affected test-browser cov catalog advisory sync
 
 # pytest runs one worker per core (pytest-xdist).
 PYTEST_PAR := -n auto
@@ -27,8 +27,8 @@ check:
 	@$(call GATE,check-host)
 check-all:
 	@$(call GATE,check-all-host)
-check-host: guard preset blueprint lint typecheck spell deps test-affected
-check-all-host: guard preset blueprint lint typecheck spell deps test
+check-host: guard preset blueprint lint typecheck arch spell deps test-affected
+check-all-host: guard preset blueprint lint typecheck arch spell deps test
 test-image:
 	docker build -q -f tools/gate/gate.Dockerfile -t $(TEST_IMAGE) .
 # In a git worktree `.git` is a file pointing into the main checkout's .git; the image holds only
@@ -116,6 +116,12 @@ format:
 # --error-on-warning: a type warning fails the build. No slow rot.
 typecheck:
 	uv run pyrefly check
+
+# the import graph against the contracts in [tool.importlinter] (pyproject.toml): no package
+# imports a consumer app, packages stay independent except their declared workspace edges.
+# Banned APIs are ruff's TID251 and ride `lint`. A violation prints the importing line.
+arch:
+	uv run lint-imports
 
 # typos in code, docstrings, and docs.
 spell:

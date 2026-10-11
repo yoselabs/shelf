@@ -14,7 +14,7 @@ Stack: python-uv. The gate is `make check`; this file is what to know before wri
 | dependencies | deptry (unused, missing, transitive) | `make deps` |
 | tests | pytest, strict markers, xdist | `make test` (`make test-affected` while iterating) |
 | coverage | pytest-cov with a floor just below current | in `make test` |
-| architecture | none chosen yet (import-linter vs tach is open) | see [architecture.md](architecture.md) |
+| architecture | import-linter contracts in `[tool.importlinter]`; ruff TID251 banned-api for banned APIs | `make arch` (banned APIs ride `make lint`); see [architecture.md](architecture.md) |
 | hooks | prek: ruff check and ruff format on staged `.py` | [gate.md](gate.md) |
 
 Why: one tool per role, strictest preset.

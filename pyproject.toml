@@ -60,6 +60,7 @@ dev = [
     "sse-starlette>=2,<4",  # NOT an async-scope dependency — the library whose unreset module-global the asgi lane exists to defend against, installed so that defence is actually exercised rather than suppressed away
     "pytest-xdist>=3.6,<4",
     "prek>=0.5,<1",
+    "import-linter>=2.15,<3",
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
@@ -141,6 +142,16 @@ ignore = [
     "S607",
 ]
 
+# The shelf sits below its consumers: a package (its tests included) never imports an app.
+# import-linter's `forbidden` contract covers src; this covers packages/*/tests, which the
+# import graph does not see. A submodule import (`import a2kay.x`) is matched by the same entry.
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"a2kay".msg = "A shelf package must not import a consumer app (the arrow points up into the apps); see AGENTS.md, The one invariant."
+"a2web".msg = "A shelf package must not import a consumer app (the arrow points up into the apps); see AGENTS.md, The one invariant."
+"a2kit".msg = "A shelf package must not import a consumer app (the arrow points up into the apps); see AGENTS.md, The one invariant."
+"a2db".msg = "A shelf package must not import a consumer app (the arrow points up into the apps); see AGENTS.md, The one invariant."
+"a2atlassian".msg = "A shelf package must not import a consumer app (the arrow points up into the apps); see AGENTS.md, The one invariant."
+
 [tool.ruff.lint.mccabe]
 max-complexity = 12
 
@@ -161,8 +172,6 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 # all of that is what a test is for.
 "tests/**" = ["ANN", "ARG", "S101", "S104", "S105", "S106", "PLR2004", "PLR0915", "PYI034", "TRY300", "TRY301", "FBT001", "SLF", "INP", "T201"]
 "packages/*/tests/**" = ["ANN", "ARG", "S101", "S104", "S105", "S106", "PLR2004", "PLR0915", "PYI034", "TRY300", "TRY301", "FBT001", "SLF", "INP", "T201", "FBT"]
-# the boundary fitness test walks the tree; it needs paths + prints.
-"tests/lib/**" = ["ANN", "T20", "S101"]
 # tools are CLI scripts: printing is their job, `git`/`opa` on PATH is deliberate,
 # and a module docstring is enough (no per-function D).
 "tools/**" = ["T201"]
@@ -253,6 +262,202 @@ markers = [
     "net: binds a real loopback TCP port and serves HTTP over it (async-scope's asgi lane). Names the slice, does NOT carve one out: it runs in the default gate and in `make check`, because the behaviours it covers are invisible without a real socket and a promotion that ships them unverified ships a blind spot to every consumer. `-m net` runs just this lane.",
 ]
 asyncio_mode = "auto"
+
+# ── import-linter — the import graph, enforced (ADR 0005) ─────────────────────
+# Two contracts. The root_packages list is every package's import name; a guard test
+# (tests/test_arch_rules.py) fails when a package is added to packages/ and not here, and
+# when `ignore_imports` below differs from the workspace dependencies the packages declare.
+# `make arch` runs it; a violation prints the importing line.
+[tool.importlinter]
+root_packages = [
+    "a2effect",
+    "any_browser",
+    "any_file",
+    "any_frontmatter",
+    "any_markdown",
+    "any_proc",
+    "anyembed",
+    "anyllm",
+    "asgi_token_gate",
+    "async_scope",
+    "atomic_io",
+    "bdd_tags",
+    "blueprint",
+    "browser_cookies",
+    "content_extract",
+    "convert_md",
+    "dir_trust",
+    "dom_schema",
+    "duckdb_sidecar",
+    "due_schedule",
+    "event_bus",
+    "fts_query",
+    "git_porcelain",
+    "html_fragment",
+    "http_cache",
+    "http_fetch",
+    "json_in_html",
+    "json_match",
+    "jsonl_log",
+    "launchd_agent",
+    "lean_wire",
+    "llm_cache",
+    "llm_wobble",
+    "managed_region",
+    "mcp_arg_errors",
+    "mcp_bridge",
+    "mcp_clients",
+    "mcp_feedback",
+    "mcp_result_wire",
+    "mcp_steps",
+    "page_tsv",
+    "partial_time",
+    "path_pattern",
+    "plugin_surface",
+    "process_lock",
+    "record_mine",
+    "settings_base",
+    "sqlite_resource",
+    "sqlite_sidecar",
+    "timefmt",
+    "verb_cli",
+    "yaml_merge",
+]
+include_external_packages = true
+
+# The one invariant: the arrow points up into the apps, never down out of them. The consumers
+# are not installed here, so they are external packages the graph can still name. Test files
+# are outside the graph; ruff's TID251 banned-api (below) covers packages/*/tests.
+[[tool.importlinter.contracts]]
+name = "no shelf package imports a consumer app"
+type = "forbidden"
+source_modules = [
+    "a2effect",
+    "any_browser",
+    "any_file",
+    "any_frontmatter",
+    "any_markdown",
+    "any_proc",
+    "anyembed",
+    "anyllm",
+    "asgi_token_gate",
+    "async_scope",
+    "atomic_io",
+    "bdd_tags",
+    "blueprint",
+    "browser_cookies",
+    "content_extract",
+    "convert_md",
+    "dir_trust",
+    "dom_schema",
+    "duckdb_sidecar",
+    "due_schedule",
+    "event_bus",
+    "fts_query",
+    "git_porcelain",
+    "html_fragment",
+    "http_cache",
+    "http_fetch",
+    "json_in_html",
+    "json_match",
+    "jsonl_log",
+    "launchd_agent",
+    "lean_wire",
+    "llm_cache",
+    "llm_wobble",
+    "managed_region",
+    "mcp_arg_errors",
+    "mcp_bridge",
+    "mcp_clients",
+    "mcp_feedback",
+    "mcp_result_wire",
+    "mcp_steps",
+    "page_tsv",
+    "partial_time",
+    "path_pattern",
+    "plugin_surface",
+    "process_lock",
+    "record_mine",
+    "settings_base",
+    "sqlite_resource",
+    "sqlite_sidecar",
+    "timefmt",
+    "verb_cli",
+    "yaml_merge",
+]
+forbidden_modules = ["a2kay", "a2web", "a2kit", "a2db", "a2atlassian"]
+allow_indirect_imports = true
+
+# Shelf packages are deliberately independent (constitution VI). The only edges are the
+# workspace dependencies a package declares in its own pyproject; each is listed here
+# per importing module (exact paths: `a.*` matches submodules, not the package's own
+# __init__), and the guard test keeps the package-level pairs equal to the declared ones.
+[[tool.importlinter.contracts]]
+name = "shelf packages are independent except declared edges"
+type = "independence"
+modules = [
+    "a2effect",
+    "any_browser",
+    "any_file",
+    "any_frontmatter",
+    "any_markdown",
+    "any_proc",
+    "anyembed",
+    "anyllm",
+    "asgi_token_gate",
+    "async_scope",
+    "atomic_io",
+    "bdd_tags",
+    "blueprint",
+    "browser_cookies",
+    "content_extract",
+    "convert_md",
+    "dir_trust",
+    "dom_schema",
+    "duckdb_sidecar",
+    "due_schedule",
+    "event_bus",
+    "fts_query",
+    "git_porcelain",
+    "html_fragment",
+    "http_cache",
+    "http_fetch",
+    "json_in_html",
+    "json_match",
+    "jsonl_log",
+    "launchd_agent",
+    "lean_wire",
+    "llm_cache",
+    "llm_wobble",
+    "managed_region",
+    "mcp_arg_errors",
+    "mcp_bridge",
+    "mcp_clients",
+    "mcp_feedback",
+    "mcp_result_wire",
+    "mcp_steps",
+    "page_tsv",
+    "partial_time",
+    "path_pattern",
+    "plugin_surface",
+    "process_lock",
+    "record_mine",
+    "settings_base",
+    "sqlite_resource",
+    "sqlite_sidecar",
+    "timefmt",
+    "verb_cli",
+    "yaml_merge",
+]
+ignore_imports = [
+    "any_frontmatter.document -> yaml_merge",
+    "content_extract -> convert_md",
+    "http_cache -> sqlite_resource",
+    "llm_cache -> anyllm",
+    "mcp_result_wire._format_routing -> page_tsv",
+    "page_tsv.page -> lean_wire",
+    "page_tsv.render -> lean_wire",
+]
 
 # ── ty — type checking ─────────────────────────────────────────────────────
 # ── pyrefly — type checking ───────────────────────────────────────────────────

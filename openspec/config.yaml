@@ -21,7 +21,7 @@ context: |
     - Decay is mandatory: unreused past TTL → deprecate. Deletion is a virtue.
 
   The one invariant: a shelf package NEVER imports a consumer app (a2kay, a2web,
-  ...). The dependency arrow points UP into the apps. Enforced by tests/test_boundary.py.
+  ...). The dependency arrow points UP into the apps. Enforced by the import-linter `forbidden` contract in pyproject.toml (make arch).
 
   Versions are namespaced git tags (`anyllm-v0.2.0`); never delete an old tag.
 
