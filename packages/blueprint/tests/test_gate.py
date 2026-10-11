@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint.__main__ import RECIPES
-from blueprint.model import Verdict
+from blueprint.model import FixedBy, Verdict
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -378,6 +378,66 @@ def test_a_repo_with_no_remote_is_not_set_up_and_one_with_origin_passes(repo: Re
 def test_remote_and_branch_are_left_out_of_the_gate_run(repo: Repo) -> None:
     ids = {r.id for r in run(repo.root, concern="gate", env=repo.env).rows}
     assert not ids & {"gate.default-branch", "gate.git-remote"}
+
+
+def _remote_branch(repo: Repo, name: str, files: dict[str, str]) -> None:
+    """A remote-tracking `origin/<name>` one commit ahead of main holding `files`; main keeps `origin/main` at its tip."""
+    repo.write("README", name)
+    repo.commit()
+    repo.git("update-ref", "refs/remotes/origin/main", "main")
+    repo.git("checkout", "-q", "-b", "scratch")
+    for rel, text in files.items():
+        repo.write(rel, text)
+    repo.commit()
+    repo.git("update-ref", f"refs/remotes/origin/{name}", "scratch")
+    repo.git("checkout", "-q", "main")
+    repo.git("branch", "-q", "-D", "scratch")
+
+
+def test_a_gate_row_names_a_remote_branch_ahead_that_holds_gate_files(repo: Repo) -> None:
+    _remote_branch(repo, "wip/bootstrap", {"justfile": "check:\n\ttrue\n", "lefthook.yml": "x: 1\n", "src/a.py": ""})
+    rows = {r.id: r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows}
+    for check_id in ("gate.one-command", "gate.ci"):
+        row = rows[check_id]
+        assert row.verdict is Verdict.NOT_SET_UP
+        assert "origin/wip/bootstrap" in row.evidence
+        assert "justfile" in row.evidence
+        assert "lefthook.yml" in row.evidence
+        assert "src/a.py" not in row.evidence
+        assert "merge that branch or remediate on main" in row.remediation
+        assert row.fixed_by is FixedBy.OWNER
+
+
+def test_a_passing_gate_row_and_a_branch_with_no_gate_files_are_left_alone(repo: Repo) -> None:
+    _remote_branch(repo, "feature", {"src/a.py": ""})
+    row = {r.id: r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows}["gate.one-command"]
+    assert "origin/feature" not in row.evidence
+    assert "merge that branch" not in row.remediation
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.commit()
+    repo.git("update-ref", "refs/remotes/origin/main", "main")
+    _remote_branch(repo, "wip/gate", {"justfile": "check:\n\ttrue\n"})
+    rows = {r.id: r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows}
+    assert rows["gate.one-command"].verdict is Verdict.PASSING
+    assert "wip/gate" not in rows["gate.one-command"].evidence
+
+
+def test_a_branch_already_merged_into_main_is_not_flagged(repo: Repo) -> None:
+    repo.write("README", "x")
+    repo.commit()
+    repo.git("update-ref", "refs/remotes/origin/main", "main")
+    repo.write("justfile", "check:\n\ttrue\n")
+    repo.commit()
+    repo.git("update-ref", "refs/remotes/origin/old", "main")
+    repo.git("update-ref", "refs/remotes/origin/main", "main")
+    row = {r.id: r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows}["gate.ci"]
+    assert "origin/old" not in row.evidence
+
+
+def test_the_branch_note_is_audit_only(repo: Repo) -> None:
+    _remote_branch(repo, "wip/bootstrap", {"justfile": "check:\n\ttrue\n"})
+    row = {r.id: r for r in run(repo.root, concern="gate", env=repo.env).rows}["gate.one-command"]
+    assert "wip/bootstrap" not in row.evidence
 
 
 _HOMELAB_HOOKS = """repos:

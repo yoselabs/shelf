@@ -8,6 +8,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from blueprint import concerns
+from blueprint.concerns import gate
 from blueprint.model import REGISTRY, Check, Context, Finding, FixedBy, Profile, Sub, Verdict, not_checked
 from blueprint.profile import State, detect, load_state
 
@@ -136,6 +137,14 @@ def _row(chk: Check, sub: Sub, state: State, today: date) -> Row:
     )
 
 
+def _branch_aware(row: Row, branches: dict[str, list[str]]) -> Row:
+    """An unmerged branch holding gate files makes the gate rows' fix the owner's call (merge it, or remediate main)."""
+    if row.id not in gate.BRANCH_AWARE or row.verdict not in {Verdict.FAILING, Verdict.NOT_SET_UP}:
+        return row
+    evidence, remediation = gate.branch_note(row.evidence, row.remediation, branches)
+    return replace(row, evidence=evidence, remediation=remediation, fixed_by=FixedBy.OWNER)
+
+
 def run(
     repo: Path, *, concern: str | None = None, audit: bool = False, today: date | None = None, env: dict[str, str] | None = None
 ) -> Run:
@@ -152,5 +161,7 @@ def run(
     accepted = _accepted(repo)
     if accepted is not None:
         rows = tuple(replace(r, new=True) if r.key not in accepted and r.verdict is not Verdict.PASSING else r for r in rows)
+    if audit and (branches := gate.unmerged_gate_branches(ctx)):
+        rows = tuple(_branch_aware(r, branches) for r in rows)
     skipped = 0 if audit else sum(c.audit_only for c in checks)
     return Run(profile=profile, set_hash=set_hash(active(profile)), rows=rows, problems=state.problems, skipped_audit=skipped)
