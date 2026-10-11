@@ -10,6 +10,7 @@
 - **Quiet, primed sessions.** `.claude/settings.json` gets `BD_DISABLE_METRICS=1` (bd reads
   `metrics.disabled` only from the user config, so the repo sets it per session) and the two session
   hooks: SessionStart runs `bd prime`, Stop lists beads left in progress. Merged, never overwritten.
+- **bd's root lock ignored.** bd 1.3 writes `.beads.gate.lock` beside `.beads/`; `.gitignore` gets a line for it.
 """
 
 from __future__ import annotations
@@ -159,6 +160,18 @@ def _settings(repo: Path) -> Result | None:
     return None
 
 
+_ROOT_LOCK = ".beads.gate.lock"
+
+
+def _ignore_root_lock(repo: Path) -> None:
+    """bd 1.3 writes .beads.gate.lock at the repo root on every run: git-ignore it (blueprint's backlog.lock-ignored)."""
+    ignored = subprocess.run(["git", "check-ignore", "-q", "--no-index", _ROOT_LOCK], cwd=repo, check=False).returncode == 0
+    if not ignored:
+        gitignore = repo / ".gitignore"
+        text = gitignore.read_text() if gitignore.exists() else ""
+        gitignore.write_text(text + ("" if not text or text.endswith("\n") else "\n") + f"{_ROOT_LOCK}*\n")
+
+
 @dataclass
 class BeadsOperation:
     """`bd init --skip-hooks`, the strict settings with readback, and the session settings."""
@@ -186,6 +199,7 @@ class BeadsOperation:
 
         if (failed := _settings(self.repo)) is not None:
             return failed
+        _ignore_root_lock(self.repo)
         return Result(
             Outcome.APPLIED,
             verified=True,

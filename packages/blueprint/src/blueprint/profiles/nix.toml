@@ -11,7 +11,15 @@ tool = """flake.lock committed beside every flake.nix (pins nixpkgs and every in
 `nix flake lock --no-update-lock-file` fails when flake.nix and flake.lock disagree; a lock-age check bounds how stale nixpkgs may get"""
 install = """commit flake.lock (`nix flake lock`); gate: `nix flake lock --no-update-lock-file path:<flake dir>` per flake; pin the container: `nixos/nix:2.34.7@sha256:<digest>`; \
 homelab already has tools/check-lock-age.py for the age bound. Open: the lock-drift command was not seen red here (the plant needed a GitHub fetch and hit the API rate limit, an unrelated failure)"""
-config = [{ any = [{ path = "flake.lock" }, { path = "*/flake.lock" }, { path = "*/*/flake.lock" }] }]
+config = [
+    { any = [{ path = "flake.lock" }, { path = "*/flake.lock" }, { path = "*/*/flake.lock" }] },
+    # The Nix that runs the gate is never an unpinned image (homelab's check-host.sh ran nixos/nix:latest, shelf-2hs).
+    { path = "justfile", lacks = "nixos/nix:latest" },
+    { path = "Makefile", lacks = "nixos/nix:latest" },
+    { path = "tools/*.sh", lacks = "nixos/nix:latest" },
+    { path = "scripts/*.sh", lacks = "nixos/nix:latest" },
+    { path = ".github/workflows/*.y*ml", lacks = "nixos/nix:latest" },
+]
 gate = "--no-update-lock-file"
 
 [[role]]

@@ -518,3 +518,15 @@ def test_checker_scripts_run_by_the_gate_or_its_hooks_pass(repo: Repo) -> None:
 def test_no_checker_scripts_means_the_check_does_not_apply(repo: Repo) -> None:
     repo.write("Makefile", "check:\n\ttrue\n")
     assert _verdict(repo, "gate.checkers-wired")[0] is Verdict.NOT_APPLICABLE
+
+
+def test_the_hooks_fix_merges_into_an_existing_config_and_never_overwrites_it(repo: Repo) -> None:
+    # homelab (shelf-3gl): ~20 hooks of its own, and the fix said `blueprint recipe hooks > .pre-commit-config.yaml`.
+    repo.write(".beads/config.yaml", "")
+    repo.write(".pre-commit-config.yaml", "repos:\n- repo: local\n  hooks:\n  - id: doctor\n    entry: uv run tools/doctor.py\n")
+    repo.write("Makefile", "check: lint\nlint:\n\tuvx pre-commit run --all-files\n")
+    row = next(r for r in run(repo.root, concern="gate", env=repo.env).rows if r.id == "gate.hooks-recipe")
+    assert row.verdict is Verdict.FAILING
+    assert "> .pre-commit-config.yaml" not in row.remediation
+    assert "keep every hook" in row.remediation
+    assert "leave out the recipe's `gate` hook" in row.remediation

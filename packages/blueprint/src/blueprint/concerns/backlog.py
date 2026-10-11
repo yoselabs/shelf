@@ -105,6 +105,20 @@ def _remediation(wrong: list[str]) -> str:
     )
 
 
+_ROOT_LOCK = ".beads.gate.lock"
+
+
+@check("backlog.lock-ignored", "bd's lock file beside .beads/ (.beads.gate.lock) is git-ignored", applies=uses_beads)
+def lock_ignored(ctx: Context) -> Finding:
+    """bd 1.3 writes it at the repo root on every run; unignored, it shows in `git status` and gets committed."""
+    done = ctx.run("git", "check-ignore", "-q", "--no-index", _ROOT_LOCK)
+    if done is None or done.returncode > 1:
+        return not_checked("not a git repository")
+    if done.returncode == 0:
+        return passing(f"{_ROOT_LOCK} is git-ignored")
+    return failing(f"{_ROOT_LOCK} is not git-ignored: bd writes it at the repo root", f"add `{_ROOT_LOCK}*` to .gitignore", FixedBy.AUTO)
+
+
 @check("backlog.no-tracked-export", "no beads JSONL export is tracked by git (the Dolt history is the record)", applies=uses_beads)
 def no_tracked_export(ctx: Context) -> Finding:
     """`git ls-files .beads` lists no `*.jsonl`."""

@@ -11,6 +11,7 @@ import pytest
 from blueprint import report
 from blueprint.__main__ import main
 from blueprint.model import REGISTRY, Check, Finding, Profile, Verdict, check, failing, not_checked, passing
+from blueprint.report import clip
 from blueprint.runner import Row, Run, active, run, set_hash
 
 if TYPE_CHECKING:
@@ -305,3 +306,14 @@ def test_a_written_report_names_the_engine_and_the_scope(repo: Repo) -> None:
         assert re.search(r"engine: (shelf `[0-9a-f]{7,}`|blueprint \d)", text)
         assert "concerns checked: gate" in text
         assert "not run:" in text
+
+
+def test_the_summary_cuts_a_long_first_to_fix_at_a_word_and_marks_the_cut() -> None:
+    # homelab (shelf-3oe): cells ended mid-word ("validation.on-", "the Nix that r").
+    text = "flake.lock committed beside every flake.nix (pins nixpkgs and every input); the Nix that runs the gate is pinned"
+    cut = clip(text, 90)
+    assert len(cut) <= 90
+    assert cut.endswith("…")
+    assert text.startswith(cut.removesuffix("…").rstrip())
+    assert text[len(cut.removesuffix("…").rstrip())] == " "
+    assert clip("short", 90) == "short"

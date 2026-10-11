@@ -13,7 +13,7 @@ questions = [
     { id = "E1", text = "The report says, per stack, which tools the repo will use for each role (formatter, linter, types, tests, coverage) and what gets installed" },
     { id = "E2", text = "Every finding sits under its concern (gate, backlog, stack, ...), one table per concern, not one mixed list" },
     { id = "E3", text = "Each failing row names its remediation and who applies it (auto, agent, owner)" },
-    { id = "E4", text = "The chat carried only the plan table, owner decisions and mistakes; no prose recap of the report" },
+    { id = "E4", text = "The chat carried only the summary table, at most three owner decisions and any mistakes (SKILL.md section 4); no prose recap of the report" },
     { id = "E5", text = "Nothing was asked of the owner that the agent could have found itself" },
     { id = "E6", text = "The audit changed nothing outside docs/blueprint/ before the owner's yes" },
     { id = "E7", text = "The report and the chat kept the layers apart: generic, stack-specific, framework-specific, agent harness" },

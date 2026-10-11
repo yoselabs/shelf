@@ -280,3 +280,57 @@ def test_dotnet_coverage_floor_outside_the_gate_fails(repo: Repo) -> None:
     _coverage_files(repo)
     repo.write("justfile", "check:\n    true\ncoverage:\n    python3 tools/check_coverage.py cov/Summary.json coverage-floor.json\n")
     assert _rows(repo)["stack.dotnet.coverage"][0] is Verdict.FAILING
+
+
+def test_a_role_nothing_configures_and_the_gate_never_runs_is_not_set_up(repo: Repo) -> None:
+    # homelab (shelf-8bi): no deptry anywhere, yet the row read "deptry set up, but the gate never runs it".
+    _python_repo(repo)
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.dependencies"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "set up, but" not in evidence
+
+
+_HOOKS = """repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      - id: ruff
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: deps
+        entry: uv run deptry .
+        language: system
+"""
+
+
+def test_checks_a_make_gate_runs_through_pre_commit_count_as_run(repo: Repo) -> None:
+    # homelab (shelf-0kz): `make check` -> `make lint` -> `pre-commit run --all-files`; every tool lives in the hook config.
+    _python_repo(repo)
+    repo.write("Makefile", "check: lint\nlint:\n\tuvx pre-commit run --all-files\n")
+    repo.write(".pre-commit-config.yaml", _HOOKS)
+    rows = _rows(repo)
+    assert rows["stack.python-uv.linter"][0] is Verdict.PASSING
+    assert rows["stack.python-uv.formatter"][0] is Verdict.PASSING
+    assert rows["stack.python-uv.dependencies"][0] is Verdict.PASSING
+
+
+def test_a_hook_config_the_gate_never_runs_counts_for_nothing(repo: Repo) -> None:
+    _python_repo(repo)
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write(".pre-commit-config.yaml", _HOOKS)
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.linter"]
+    assert verdict is Verdict.FAILING
+    assert "the gate never runs" in evidence
+
+
+def test_an_unpinned_nix_image_fails_the_nix_toolchain(repo: Repo) -> None:
+    # homelab (shelf-2hs): tools/check-host.sh ran `nixos/nix:latest`, which the row's own statement forbids.
+    repo.write("hosts/bee/flake.nix", "{ }")
+    repo.write("hosts/bee/flake.lock", "{}")
+    repo.write("justfile", "check:\n    nix flake lock --no-update-lock-file path:hosts/bee\n")
+    assert _rows(repo)["stack.nix.toolchain"][0] is Verdict.PASSING
+    repo.write("tools/check-host.sh", "docker run --rm nixos/nix:latest nix eval x\n")
+    verdict, evidence, _ = _rows(repo)["stack.nix.toolchain"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "nixos/nix:latest" in evidence

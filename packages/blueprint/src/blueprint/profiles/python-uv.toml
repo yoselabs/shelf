@@ -1,6 +1,8 @@
 # Stack profile: the per-stack answer to every concern that has one (CONTEXT.md: stack profile).
 # Each [[role]] says which tool, how it is installed, the config that proves it is set up
-# (every entry must hold; `{ any = [...] }` holds when one alternative does), and the text `just check` must reach to prove it runs (a regex).
+# (every entry must hold; `{ any = [...] }` holds when one alternative does; `{ path, lacks = "x" }` holds when no file the path
+# matches contains x), and the text `just check` must reach to prove it runs (a regex). A role with no config is set up only
+# when the gate runs it. The gate's text includes the hook config when the gate runs it (`pre-commit run`, `prek run`).
 # A role with `untested` has no proven answer yet; one with `na` does not apply to the stack.
 #
 # Choosing a tool (owner, 2026-10-10): age alone never disqualifies one. A tool untouched for years
@@ -30,12 +32,20 @@ install = "uv add --dev ruff; copy [tool.ruff] from the shelf (just bootstrap)"
 config = [{ path = "pyproject.toml", contains = "[tool.ruff" }]
 gate = "ruff format --check"
 
+[[role.alternative]]
+label = "ruff-pre-commit's `ruff-format` hook, run by the gate's `pre-commit run`"
+gate = '(?m)id:\s*ruff-format\b'
+
 [[role]]
 role = "linter"
 tool = "ruff check, the shelf's rule set"
 install = "copy [tool.ruff.lint] from the shelf (just bootstrap)"
 config = [{ path = "pyproject.toml", contains = "[tool.ruff.lint]" }]
 gate = "ruff check"
+
+[[role.alternative]]
+label = "ruff-pre-commit's `ruff` hook, run by the gate's `pre-commit run`"
+gate = '(?m)id:\s*ruff\s*$'
 
 [[role]]
 role = "types"
@@ -68,6 +78,15 @@ gate = "pytest"
 role = "coverage"
 tool = "pytest-cov with a floor"
 install = "uv add --dev pytest-cov; run pytest with --cov-fail-under=<just below current>"
+# Coverage is set up when something measures it; a gate that measures without a floor is the failing case.
+config = [{ any = [
+    { path = "pyproject.toml", contains = "pytest-cov" },
+    { path = "pyproject.toml", contains = "[tool.coverage" },
+    { path = "justfile", contains = "coverage run" },
+    { path = "Makefile", contains = "coverage run" },
+    { path = "justfile", contains = "--cov" },
+    { path = "Makefile", contains = "--cov" },
+] }]
 gate = "cov-fail-under"
 
 # coverage.py's own floor is as good: a repo whose C extensions break under the pytest-cov plugin

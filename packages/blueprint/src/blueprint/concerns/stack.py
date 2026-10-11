@@ -111,9 +111,12 @@ def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
 
 
 def gate_text(ctx: Context) -> str:
-    """Everything `just check` reaches (a Makefile's `check`, for a repo not yet migrated), plus a lefthook config if present."""
+    """Everything `just check` reaches (a Makefile's `check`, for one not yet migrated), the hook config it runs, lefthook's."""
     gate = gate_graph.load(ctx)
     parts = [gate.gate_recipes() if gate else ""]
+    # Hooks the gate runs (`make lint` -> `pre-commit run --all-files`) are the gate's checks too (homelab, shelf-0kz).
+    if gate_graph.HOOK_RUN.search(parts[0]):
+        parts.append(ctx.read(gate_graph.HOOK_CONFIG) or "")
     parts += [ctx.read(f) or "" for f in ("lefthook.yml", "lefthook.yaml")]
     return "\n".join(parts)
 
@@ -129,6 +132,14 @@ def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
     if text is None:
         return ctx.path(path).is_dir() and "contains" not in spec
     return spec.get("contains", "") in text
+
+
+def _offenders(ctx: Context, spec: dict[str, Any], root: str = ".") -> list[str]:
+    """For a `lacks` entry: each file `path` matches that holds the forbidden text (an unpinned `:latest` image)."""
+    path = spec["path"].replace("{root}", root).removeprefix("./")
+    hits = sorted(ctx.repo.glob(path)) if any(ch in path for ch in "*?[") else [ctx.path(path)]
+    rels = [h.relative_to(ctx.repo).as_posix() for h in hits if h.is_file()]
+    return [r for r in rels if not is_skipped(r, ctx.profile.ignore) and spec["lacks"] in (ctx.read(r) or "")]
 
 
 def _describe(spec: dict[str, Any]) -> str:
@@ -159,9 +170,11 @@ def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str
         return _Judged(stack, "untested", f"no standard yet: {spec.untested if spec else 'the profile does not cover this role'}")
     if spec.na:
         return _Judged(stack, "na", spec.na)
-    missing = [_describe(c).replace("{root}", root) for c in spec.config if not _config_holds(ctx, c, root)]
-    if missing:
-        return _Judged(stack, "not-set-up", f"{spec.tool} not set up (missing {'; '.join(missing)})", spec.install)
+    missing = [_describe(c).replace("{root}", root) for c in spec.config if "lacks" not in c and not _config_holds(ctx, c, root)]
+    forbidden = [f"{hit} has {c['lacks']!r}" for c in spec.config if "lacks" in c for hit in _offenders(ctx, c, root)]
+    if missing or forbidden:
+        why = "; ".join([*([f"missing {'; '.join(missing)}"] if missing else []), *forbidden])
+        return _Judged(stack, "not-set-up", f"{spec.tool} not set up ({why})", spec.install)
     judged = _gate_verdict(ctx, stack, spec, gate_text)
     if judged.verdict == "pass" and spec.installs and stack == "dotnet" and role == "toolchain":
         return _sdk_installs(ctx, stack, spec, judged)
@@ -251,10 +264,18 @@ def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judg
     if via is not None:
         return _Judged(stack, "pass", f"{via['label']}, run by the gate")
     others = "".join(f", or {a['label']}" for a in spec.alternatives)
+    if not spec.config:
+        # Nothing to find in the repo's files, so a gate that never runs the tool means nothing sets it up (shelf-8bi).
+        return _Judged(
+            stack,
+            "not-set-up",
+            f"{spec.tool} not set up: nothing in the repo configures it, and the gate never runs `{spec.gate}`{others}",
+            spec.install or f"run `{spec.gate}` from `just check`{others}",
+        )
     return _Judged(
         stack,
         "failing",
-        f"{spec.tool} set up, but `just check` never runs `{spec.gate}`{others}",
+        f"{spec.tool} set up, but the gate never runs `{spec.gate}`{others}",
         f"run `{spec.gate}` from `just check`{others}",
     )
 

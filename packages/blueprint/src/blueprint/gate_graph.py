@@ -23,6 +23,9 @@ MAKEFILE = "Makefile"
 _MAKE_TARGET = re.compile(r"^([A-Za-z][A-Za-z0-9_.-]*)\s*:(?!=)", re.MULTILINE)
 _MAKE_VARIABLE = re.compile(r"^([A-Za-z_]\w*)\s*[:?]?=\s*(.*?)\s*$", re.MULTILINE)
 _MAKE_VARIABLE_USE = re.compile(r"\$[({]([A-Za-z_]\w*)[)}]")
+# A gate that runs the hook config (`pre-commit run --all-files`, `prek run`): every hook in it is part of the gate.
+HOOK_RUN = re.compile(r"\b(?:pre-commit|prek)\s+run\b")
+HOOK_CONFIG = ".pre-commit-config.yaml"
 # `just container check-host`, `uv run just check`, `{{just_executable()}} test`: a body that runs another recipe.
 _JUST_CALL = re.compile(r"\bjust\s+(?:--?[\w-]+(?:=\S+)?\s+)*([A-Za-z_][\w-]*)")
 

@@ -36,6 +36,15 @@ def _cell(text: str) -> str:
     return text.replace("|", "\\|").replace("\n", " ")
 
 
+def clip(text: str, limit: int) -> str:
+    """`text` cut to at most `limit` characters at a word boundary, the cut marked with `…`; whole when it fits."""
+    if len(text) <= limit:
+        return text
+    head = text[: limit - 1]
+    space = head.rfind(" ")
+    return (head[:space] if space > limit // 2 else head).rstrip(" ,;:") + "…"
+
+
 def table(rows: list[Row] | tuple[Row, ...]) -> str:
     """The rows as one markdown table."""
     lines = ["| | checkpoint | set up | working | evidence | remediation | fixed by |", "|---|---|---|---|---|---|---|"]
@@ -114,7 +123,7 @@ def summary(run: Run) -> str:
         count = {m: sum(mark(r) == m for r in rows) for m in ("✅", "❌", "⚠️", "🔒")}
         first = next((r for r in rows if mark(r) in {"❌", "⚠️"}), None)
         gaps = sum(r.blueprint_gap for r in rows)
-        note = f"`{first.id}`: {_cell(first.evidence)[:90]}" if first else ("blueprint gap" if gaps else "-")
+        note = f"`{first.id}`: {clip(_cell(first.evidence), 90)}" if first else ("blueprint gap" if gaps else "-")
         title = LAYER_TITLES.get(layer, layer) if layer != last_layer else ""
         last_layer = layer
         lines.append(f"| {title} | {concern} | {count['✅']} | {count['❌']} | {count['⚠️']} | {count['🔒']} | {note} |")

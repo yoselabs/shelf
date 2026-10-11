@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 def _beads(repo: Repo, *, config: dict[str, str] | None = None, lint_exit: int = 0) -> None:
     repo.write(".beads/config.yaml", "")
+    repo.write(".gitignore", ".beads.gate.lock*\n")
     repo.write(".claude/settings.json", json.dumps({"env": {"BD_DISABLE_METRICS": "1"}}))
     repo.fake_bd(STRICT if config is None else config, lint_exit=lint_exit, lint_out="shelf-1 missing acceptance criteria")
 
@@ -178,3 +179,13 @@ def test_the_gate_run_leaves_out_what_needs_bds_database(repo: Repo) -> None:
     assert "backlog.strict-config" not in ids
     assert "backlog.lint" not in ids
     assert "backlog.no-tracked-export" in ids
+
+
+def test_bds_root_lock_file_must_be_git_ignored(repo: Repo) -> None:
+    # bd 1.3.1 writes .beads.gate.lock beside .beads/; homelab's audit found it untracked in `git status` (2026-10-11).
+    _beads(repo)
+    (repo.root / ".gitignore").unlink()
+    verdict = _verdicts(repo)["backlog.lock-ignored"]
+    assert verdict is Verdict.FAILING
+    repo.write(".gitignore", ".beads.gate.lock*\n")
+    assert _verdicts(repo)["backlog.lock-ignored"] is Verdict.PASSING
