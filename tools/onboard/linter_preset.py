@@ -4,7 +4,7 @@ Implements `docs/linting.md`'s own copy list, mechanically:
 
 1. The `[tool.ruff]`, `[tool.ruff.lint]` (+ subtables), `[tool.codespell]`,
    `[tool.coverage.*]` blocks from shelf's `pyproject.toml`.
-2. The `justfile` recipes (`check guard preset bootstrap bootstrap-verify lint format typecheck spell deps test`),
+2. The `justfile` recipes (`check guard preset bootstrap bootstrap-verify tools lint format typecheck spell deps test`),
    with the attributes and comments that sit directly above each (ADR 0023: the gate runner is just);
    `check` is the plain gate (the shelf's own dispatches to its container), and `deps` is rewritten
    for a single-package repo, since the shelf's own loops over `packages/*`.
@@ -57,6 +57,7 @@ _RECIPES = (
     "preset",
     "bootstrap",
     "bootstrap-verify",
+    "tools",
     "lint",
     "format",
     "typecheck",

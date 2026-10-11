@@ -1,0 +1,7 @@
+# Every tool the shelf runs, pinned exactly (ADR 0024); mise.lock holds a checksum per platform.
+# Install: `just tools`. Python is uv's (.python-version); just is the rust-just dev dependency (ADR 0023).
+# Bump a pin by commit: edit the version, run `mise lock`, commit both files.
+[tools]
+uv = "0.13.0"
+prek = "0.5.5"
+"github:gastownhall/beads" = { version = "1.3.1", bin = "bd" }

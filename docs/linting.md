@@ -92,7 +92,7 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
    `pyproject.toml`, and each package's `[tool.deptry]` if it needs ignores. `[tool.pyrefly]` and
    `[tool.pytest.ini_options]` are generated for the consumer: the strict preset, the same error
    severities and the lighter test bar, without the shelf's own paths.
-2. The `justfile` recipes (`check guard preset blueprint bootstrap bootstrap-verify lint format typecheck
+2. The `justfile` recipes (`check guard preset blueprint bootstrap bootstrap-verify tools lint format typecheck
    spell deps test cov sync`); `deps` becomes a single-package `uv run deptry .`. The shelf-only
    recipes (`catalog advisory test-browser`) are not copied and are not drift. Pin the runner with
    `uv add --dev rust-just` and run it as `uv run just check` (the `dev` group below carries it). Copy `guard` and `bootstrap`/`bootstrap-verify` **verbatim** — each resolves the

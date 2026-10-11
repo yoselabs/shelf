@@ -44,6 +44,13 @@ SKIP_DIRS = frozenset(
 UNITY_CACHES = frozenset({"Library", "Temp", "Logs", "UserSettings"})
 
 
+def toml_table(data: object, *keys: str) -> dict[str, object]:
+    """The table at `keys` inside parsed TOML; empty when a key is missing or not a table."""
+    for key in keys:
+        data = data.get(key) if isinstance(data, dict) else None
+    return data if isinstance(data, dict) else {}
+
+
 def is_skipped(rel: str, skip: tuple[str, ...]) -> bool:
     """Whether the repo-relative slash path `rel` is, or lies under, one of the `skip` paths (a folder or a glob)."""
     return any(fnmatch(rel, p.rstrip("/")) or rel.startswith(p.rstrip("/") + "/") for p in skip)

@@ -119,6 +119,12 @@ preset:
     if [ -f "$g" ]; then python3 "$g" --repo .
     else echo "preset: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
 
+# The pinned tools (mise.toml, locked by mise.lock; ADR 0024). The user's own config is left out: its
+# unlocked tools (`latest`) would make `--locked` refuse the whole install.
+tools:
+    mise trust --yes .
+    MISE_IGNORED_CONFIG_PATHS="$HOME/.config/mise" mise install --locked
+
 # One-time (idempotent, safe to re-run) setup for a CONSUMER repo: wires the commit guard,
 # resolver block, beads (opt-out), and this linter preset via the operations in
 # tools/onboard/ -- ordering and verification are enforced there (run_all()'s precondition
