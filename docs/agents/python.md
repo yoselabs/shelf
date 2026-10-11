@@ -31,6 +31,17 @@ make test-affected       # the tests the change reaches
 Always `uv run <tool>`; never a global interpreter or `pip install`. Add a dependency with
 `uv add` (`--dev` for tooling) and commit `uv.lock`.
 
+## Versions
+
+| file | rule |
+|---|---|
+| `.python-version` | one `X.Y` line; every run uses it (dev, CI, agents) |
+| `requires-python` | `">=X.Y"` in every pyproject, no upper cap, the pin inside it |
+| CI | a lower bound below the pin runs in CI; Python comes from the pin through uv, never `setup-python` |
+| `[tool.uv] required-version` | uv's floor; a different uv rewrites `uv.lock` |
+
+Why: the shelf's ADR 0016. Change the pin and the floors together, then `uv lock`.
+
 ## Code rules
 
 | rule | why |
