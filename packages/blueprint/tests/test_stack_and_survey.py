@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
 from blueprint import survey
 from blueprint.model import Verdict
 from blueprint.runner import run
@@ -97,6 +98,45 @@ def test_check_all_counts_as_the_gate(repo: Repo) -> None:
     _python_repo(repo)
     repo.write("Makefile", _MAKEFILE + "check-all: lint cov\ncov:\n\tuv run pytest --cov-fail-under=80\n")
     assert _rows(repo)["stack.python-uv.coverage"][0] is Verdict.PASSING
+
+
+def _gate_with_cov(repo: Repo, recipe: str, *, pyproject: str = _PYPROJECT) -> None:
+    _python_repo(repo)
+    repo.write("pyproject.toml", pyproject)
+    repo.write("Makefile", f"check: lint cov\n{_MAKEFILE.split(chr(10), 1)[1]}cov:\n\t{recipe}\n")
+
+
+@pytest.mark.parametrize(
+    "recipe",
+    [
+        "coverage run -m pytest -p no:cov && coverage report --fail-under=90",
+        "coverage run -m pytest && coverage report -m --fail-under 90",
+    ],
+)
+def test_coverage_py_floor_on_the_command_line_counts_as_a_floor(repo: Repo, recipe: str) -> None:
+    # a2kay: pytest-cov breaks duckdb's lazy C-extension import, so the floor is coverage.py's own.
+    _gate_with_cov(repo, recipe)
+    assert _rows(repo)["stack.python-uv.coverage"][0] is Verdict.PASSING
+
+
+def test_coverage_py_floor_in_pyproject_counts_when_the_gate_reports(repo: Repo) -> None:
+    _gate_with_cov(repo, "coverage run -m pytest && coverage report", pyproject=_PYPROJECT + "\n[tool.coverage.report]\nfail_under = 90\n")
+    assert _rows(repo)["stack.python-uv.coverage"][0] is Verdict.PASSING
+
+
+@pytest.mark.parametrize(
+    ("recipe", "pyproject"),
+    [
+        ("coverage run -m pytest && coverage report", _PYPROJECT),
+        # a floor in pyproject is never read when the gate only measures and never reports
+        ("coverage run -m pytest", _PYPROJECT + "\n[tool.coverage.report]\nfail_under = 90\n"),
+    ],
+)
+def test_coverage_with_no_enforced_floor_still_fails(repo: Repo, recipe: str, pyproject: str) -> None:
+    _gate_with_cov(repo, recipe, pyproject=pyproject)
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.coverage"]
+    assert verdict is Verdict.FAILING
+    assert "fail-under" in evidence
 
 
 def test_the_survey_template_has_every_question_and_an_empty_one_is_incomplete() -> None:

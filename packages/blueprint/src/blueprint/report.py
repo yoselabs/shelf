@@ -75,6 +75,8 @@ def summary(run: Run) -> str:
         title = LAYER_TITLES.get(layer, layer) if layer != last_layer else ""
         last_layer = layer
         lines.append(f"| {title} | {concern} | {count['✅']} | {count['❌']} | {count['⚠️']} | {count['🔒']} | {note} |")
+    if run.skipped_audit:
+        lines += ["", f"audit-only checkpoints not run: {run.skipped_audit}; these counts omit them, add `--audit`."]
     return "\n".join(lines)
 
 

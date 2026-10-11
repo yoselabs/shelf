@@ -15,7 +15,7 @@ PYTHONPATH=../shelf/packages/blueprint/src python3 -m blueprint check --repo .
 
 | flag | effect |
 |---|---|
-| `--summary` | one row per concern, grouped by layer (generic, stack-specific, agent harness) |
+| `--summary` | one row per concern, grouped by layer (generic, stack-specific, agent harness); says how many audit-only checkpoints it left out, so pair it with `--audit` to match a README written by `--audit --write` |
 | `--gate` | one line per checkpoint that is not passing; what `make blueprint` prints |
 | `--json` | the run as JSON, for agents and evals |
 | `--write` | `docs/blueprint/README.md` (the summary) and `<concern>.md`, one table per concern |
@@ -56,7 +56,7 @@ expires = 2027-04-01
 
 | layer | concern | checkpoints |
 |---|---|---|
-| generic | gate | `one-command` · `runs-blueprint` · `ci` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` · `clean-clone` (audit only) |
+| generic | gate | `one-command` · `runs-blueprint` · `ci` · `ci-no-manifest-edit` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` · `clean-clone` (audit only) |
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
 | stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional) |
 | framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, provisional: engine-version · project-hygiene · scripts-lint · headless-build · tests · scene-integrity · architecture · ci); paths may use `{root}` (the project folder) and globs |

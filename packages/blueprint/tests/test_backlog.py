@@ -47,6 +47,43 @@ def test_a_setting_from_the_environment_fails_strict_config(repo: Repo) -> None:
     assert _verdicts(repo)["backlog.strict-config"] is Verdict.FAILING
 
 
+def _show(repo: Repo, *entries: tuple[str, str, str]) -> None:
+    """bd's `config show --json` for the strict set, with these (key, value, source) rows added or replacing the key's."""
+    keys = {k for k, _, _ in entries}
+    rows = [{"key": k, "value": v, "source": "config.yaml"} for k, v in STRICT.items() if k not in keys]
+    rows += [{"key": k, "value": v, "source": src} for k, v, src in entries]
+    (repo.bin_dir / "bd.json").write_text(json.dumps(rows))
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_a_value_only_in_bds_database_fails_whatever_order_bd_lists_it_in(repo: Repo, reverse: bool) -> None:
+    # a2kay: `bd config set import.auto false` wrote the database; bd then listed the key twice
+    # (default true, database false) in random order, and the verdict flipped between runs.
+    _beads(repo)
+    pair = [("import.auto", "true", "default"), ("import.auto", "false", "database")]
+    _show(repo, *(pair[::-1] if reverse else pair))
+    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.strict-config")
+    assert row.verdict is Verdict.FAILING
+    assert "import.auto" in row.evidence
+    assert ".beads/config.yaml" in row.evidence
+    assert ".beads/config.yaml" in row.remediation
+    assert "bd config set import.auto" not in row.remediation
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_config_yaml_outranks_a_duplicate_default_whatever_the_order(repo: Repo, reverse: bool) -> None:
+    _beads(repo)
+    pair = [("import.auto", "true", "default"), ("import.auto", "false", "config.yaml")]
+    _show(repo, *(pair[::-1] if reverse else pair))
+    assert _verdicts(repo)["backlog.strict-config"] is Verdict.PASSING
+
+
+def test_a_strict_value_that_only_the_default_supplies_fails(repo: Repo) -> None:
+    _beads(repo)
+    _show(repo, ("export.auto", "false", "default"))
+    assert _verdicts(repo)["backlog.strict-config"] is Verdict.FAILING
+
+
 def test_a_tracked_jsonl_export_fails(repo: Repo) -> None:
     _beads(repo)
     repo.write(".beads/issues.jsonl", "{}\n")
@@ -67,6 +104,42 @@ def test_a_local_override_fails(repo: Repo, plant: str) -> None:
 def test_a_bead_failing_lint_fails(repo: Repo) -> None:
     _beads(repo, lint_exit=1)
     assert _verdicts(repo)["backlog.lint"] is Verdict.FAILING
+
+
+_LINT = """Template warnings (3 issues, 4 warnings):
+
+a2kay-p6hj [epic]: Search rewrite
+  \u26a0 Missing: ## Success Criteria
+
+a2kay-aa11 [bug]: Crash on empty query
+  \u26a0 Missing: ## Steps to Reproduce
+  \u26a0 Missing: ## Acceptance Criteria
+
+a2kay-bb22 [task]: Rename the thing
+  \u26a0 Missing: ## Acceptance Criteria
+"""
+
+
+def test_lint_evidence_counts_beads_and_missing_sections_and_names_the_first_few(repo: Repo) -> None:
+    # a2kay printed `Template warnings (166 issues, 202 warnings): /  / a2kay-p6hj [epic]: ...`: blank lines as
+    # empty segments, one bead named, nothing to size the cleanup by.
+    repo.write(".beads/config.yaml", "")
+    repo.fake_bd(STRICT, lint_exit=1, lint_out=_LINT)
+    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    assert row.verdict is Verdict.FAILING
+    assert row.evidence == (
+        "3 beads miss sections: Acceptance Criteria x2, Steps to Reproduce x1, Success Criteria x1; "
+        "first: a2kay-p6hj, a2kay-aa11, a2kay-bb22"
+    )
+
+
+def test_lint_evidence_caps_the_bead_list_at_five_and_keeps_the_total(repo: Repo) -> None:
+    beads = "".join(f"x-{i} [task]: t\n  \u26a0 Missing: ## Acceptance Criteria\n\n" for i in range(8))
+    repo.write(".beads/config.yaml", "")
+    repo.fake_bd(STRICT, lint_exit=1, lint_out=f"Template warnings (8 issues, 8 warnings):\n\n{beads}")
+    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    assert row.evidence.startswith("8 beads miss sections: Acceptance Criteria x8; first: x-0, x-1, x-2, x-3, x-4")
+    assert "x-5" not in row.evidence
 
 
 def test_a_second_backlog_file_fails(repo: Repo) -> None:

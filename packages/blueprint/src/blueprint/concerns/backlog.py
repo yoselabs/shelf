@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+from collections import Counter
 
 from blueprint.model import Context, Finding, FixedBy, check, failing, not_checked, not_set_up, passing, uses_beads
 
@@ -18,6 +20,10 @@ STRICT = {
     "import.auto": "false",
 }
 _METRICS_ENV = "BD_DISABLE_METRICS"
+# `bd lint` prints a bead line (`<id> [<type>]: <title>`), then one `Missing: ## <section>` line per gap.
+_LINT_BEAD = re.compile(r"^(\S+) \[[^\]]+\]:", re.MULTILINE)
+_LINT_MISSING = re.compile(r"Missing: ## (.+?)\s*$", re.MULTILINE)
+_LINT_NAMED = 5
 
 
 def _settings_env(ctx: Context) -> dict[str, str] | None:
@@ -47,6 +53,7 @@ def tracker(ctx: Context) -> Finding:
     "bd's effective config is the strict set, none of it from the environment",
     applies=uses_beads,
     audit_only=True,
+    version=2,
 )
 def strict_config(ctx: Context) -> Finding:
     """Every STRICT key has its value, and its source is the repo's config, not an env var."""
@@ -54,23 +61,47 @@ def strict_config(ctx: Context) -> Finding:
     if done is None or done.returncode != 0:
         return not_checked("`bd config show --json` did not answer", _NO_BD)
     try:
-        entries = {e["key"]: e for e in json.loads(done.stdout)}
+        shown = [(str(e["key"]), str(e["value"]), str(e.get("source", ""))) for e in json.loads(done.stdout)]
     except (json.JSONDecodeError, KeyError, TypeError):
         return not_checked("`bd config show --json` printed something that is not its JSON")
     wrong: list[str] = []
     for key, want in STRICT.items():
-        got = entries.get(key, {})
-        if str(got.get("value")) != want:
-            wrong.append(f"{key}={got.get('value', 'unset')} (want {want})")
-        elif got.get("source") == "env":
+        seen = [(value, source) for k, value, source in shown if k == key]
+        if not seen:
+            wrong.append(f"{key} unset (want {want})")
+            continue
+        value, source = min(seen, key=_precedence)
+        if value != want:
+            wrong.append(f"{key}={value} (want {want})")
+        elif source == "env":
             wrong.append(f"{key} comes from an env var, not .beads/config.yaml")
+        elif source != "config.yaml":
+            wrong.append(f"{key} comes from {source}, not .beads/config.yaml")
     if wrong:
-        return failing(
-            "; ".join(wrong),
-            " && ".join(f"bd config set {k} {v}" for k, v in STRICT.items()) + "; then unset any BD_*/BEADS_* override",
-            FixedBy.AUTO,
-        )
+        return failing("; ".join(wrong), _remediation(wrong), FixedBy.AGENT)
     return passing(f"{len(STRICT)} strict settings in effect from .beads/config.yaml")
+
+
+def _precedence(entry: tuple[str, str]) -> tuple[int, str, str]:
+    """Sort key putting the entry bd acts on first, so the verdict never depends on the order bd lists duplicates in.
+
+    bd prints a key once per source (the same key as `default` and `database`, in random order). Its own
+    order for config keys is env, then .beads/config.yaml, then everything else. Only the first two
+    reach a fresh clone, so the rest need no order of their own beyond being stable.
+    """
+    value, source = entry
+    return ({"env": 0, "config.yaml": 1}.get(source, 2), source, value)
+
+
+def _remediation(wrong: list[str]) -> str:
+    keys = [k for k in STRICT if any(w.startswith((f"{k}=", f"{k} ")) for w in wrong)]
+    lines = "; ".join(f"{k}: {STRICT[k]}" for k in keys)
+    # `bd config set` writes bd's Dolt database for keys it does not own in config.yaml: a fresh clone never gets the value.
+    return (
+        f"edit .beads/config.yaml directly (a dotted key is nested YAML, `import.auto` is `import:` then `  auto: false`): {lines}; "
+        "not `bd config set`, which writes bd's database; unset any BD_*/BEADS_* override, then confirm `bd config show --json` "
+        'lists each with "source": "config.yaml"'
+    )
 
 
 @check("backlog.no-tracked-export", "no beads JSONL export is tracked by git (the Dolt history is the record)", applies=uses_beads)
@@ -115,11 +146,22 @@ def lint(ctx: Context) -> Finding:
     if done is None:
         return not_checked("`bd lint` did not answer", _NO_BD)
     if done.returncode != 0:
-        first = (done.stdout.strip() or done.stderr.strip()).splitlines()[:3]
         return failing(
-            f"`bd lint`: {' / '.join(first) or 'failed'}", "add the missing sections (acceptance criteria, description) to each bead named"
+            _lint_evidence(done.stdout or done.stderr), "add the missing sections (acceptance criteria, description) to each bead named"
         )
     return passing("`bd lint` passes")
+
+
+def _lint_evidence(output: str) -> str:
+    """The count of beads and of each missing section, and the first few bead ids: enough to size the cleanup."""
+    beads = _LINT_BEAD.findall(output)
+    sections = Counter(_LINT_MISSING.findall(output))
+    if not beads:
+        # Not the format we know: the first non-blank lines are still better than nothing.
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
+        return f"`bd lint`: {' / '.join(lines[:3]) or 'failed'}"
+    counts = ", ".join(f"{name} x{n}" for name, n in sorted(sections.items())) or "see `bd lint`"
+    return f"{len(beads)} beads miss sections: {counts}; first: {', '.join(beads[:_LINT_NAMED])}"
 
 
 @check("backlog.no-tracker-file", "no second backlog: no TODO.md or docs/backlog.md beside beads", applies=lambda p: p.tracker is not None)

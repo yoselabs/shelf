@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 import tempfile
 import time
+from dataclasses import dataclass
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -107,6 +109,126 @@ def ci(ctx: Context) -> Finding:
     return passing(f"{len(files)} workflow(s) run the gate, pinned, with permissions")
 
 
+@dataclass(frozen=True)
+class _Step:
+    job: str
+    name: str
+    run: str
+
+
+_JOB = re.compile(r"^ {2}([\w.-]+):\s*(?:#.*)?$")
+_ITEM = re.compile(r"^(\s*)-\s+(.*)$")
+
+
+def _step_chunks(workflow: str) -> list[tuple[str, list[str]]]:
+    """(job, lines) per step, in file order; each chunk's first line is the `- ` item with its marker blanked."""
+    job, item_indent, in_jobs = "", None, False
+    chunks: list[tuple[str, list[str]]] = []
+    for line in workflow.splitlines():
+        if re.match(r"^jobs:\s*$", line):
+            in_jobs = True
+        elif in_jobs and (m := _JOB.match(line)):
+            job, item_indent = m.group(1), None
+        elif in_jobs and re.match(r"^\s+steps:\s*$", line):
+            item_indent = None
+        elif in_jobs and job and (m := _ITEM.match(line)) and item_indent in (None, len(m.group(1))):
+            item_indent = len(m.group(1))
+            chunks.append((job, [" " * (item_indent + 2) + m.group(2)]))
+        elif chunks and item_indent is not None and (not line.strip() or len(line) - len(line.lstrip()) > item_indent):
+            chunks[-1][1].append(line)
+    return chunks
+
+
+def _block_scalar(lines: list[str], indent: int) -> str:
+    """The lines of a `|` or `>` value: everything indented deeper than its key."""
+    block: list[str] = []
+    for line in lines:
+        if line.strip() and len(line) - len(line.lstrip()) <= indent:
+            break
+        block.append(line.strip())
+    return "\n".join(block)
+
+
+def _unquoted(value: str) -> str:
+    return value[1:-1] if len(value) > 1 and value[0] == value[-1] and value[0] in "'\"" else value
+
+
+def _steps(workflow: str) -> list[_Step]:
+    """The steps of every job, in file order, with their name and `run` text.
+
+    A line-wise reading: stdlib has no YAML parser, and a workflow's steps are regular enough that the
+    `- ` items under `steps:` give each one's keys at a fixed indent.
+    """
+    steps: list[_Step] = []
+    for job, lines in _step_chunks(workflow):
+        indent = len(lines[0]) - len(lines[0].lstrip())
+        fields: dict[str, str] = {}
+        for i, line in enumerate(lines):
+            if key := re.match(rf"^ {{{indent}}}(name|run):\s*(.*)$", line):
+                value = key.group(2).strip()
+                fields[key.group(1)] = _block_scalar(lines[i + 1 :], indent) if value[:1] in {"|", ">"} else _unquoted(value)
+        steps.append(_Step(job, fields.get("name", ""), fields.get("run", "")))
+    return steps
+
+
+_MANIFESTS = (
+    r"(?:[\w./-]*/)?(?:pyproject\.toml|uv\.lock|poetry\.lock|requirements[\w.-]*\.txt|package\.json|package-lock\.json|yarn\.lock|"
+    r"pnpm-lock\.yaml|Cargo\.toml|Cargo\.lock|go\.mod|go\.sum|Directory\.Packages\.props|packages\.lock\.json|[\w.-]+\.csproj)"
+)
+_WRITES_MANIFEST = re.compile(
+    rf"\bsed\b[^\n]*\s-[A-Za-z]*i\b[^\n]*{_MANIFESTS}|\btee\b[^\n]*{_MANIFESTS}|>>?\s*{_MANIFESTS}", re.IGNORECASE
+)
+# Each rewrites the lockfile unless told not to; the installing form that fails on a stale lock is named in the remediation.
+_LOCK_REWRITERS = (
+    (re.compile(r"^uv (?:lock|sync)\b"), re.compile(r"--(?:check|locked|frozen)\b"), "uv lock/sync without --locked or --frozen"),
+    (re.compile(r"^uv (?:add|remove)\b"), None, "uv add/remove"),
+    (re.compile(r"^poetry (?:lock|update|add)\b"), None, "poetry lock/update/add"),
+    (re.compile(r"^npm (?:install|i|update)(?:\s+-{1,2}[\w-]+)*$"), re.compile(r"\s(?:-g|--global)\b"), "npm install instead of npm ci"),
+    (re.compile(r"^cargo update\b"), None, "cargo update"),
+)
+
+
+def _rewrites(run_text: str) -> str | None:
+    """What in a step's shell text rewrites the dependency set, or None."""
+    if written := _WRITES_MANIFEST.search(run_text):
+        target = re.search(_MANIFESTS, written.group(0), re.IGNORECASE)
+        return f"writes {target.group(0) if target else 'a manifest or lockfile'}"
+    for raw in re.split(r"&&|\|\||;|\n", run_text):
+        command = raw.strip()
+        for starts, exempt, label in _LOCK_REWRITERS:
+            if starts.match(command) and not (exempt and exempt.search(command)):
+                return label
+    return None
+
+
+@check("gate.ci-no-manifest-edit", "no CI step before the gate rewrites a dependency manifest or lockfile")
+def ci_no_manifest_edit(ctx: Context) -> Finding:
+    """CI gates the committed dependency set: a step ahead of `make check` that edits pyproject.toml or re-locks gates another one."""
+    files = _workflows(ctx)
+    if not files:
+        return not_applicable("no .github/workflows: gate.ci reports the missing CI")
+    parsed = {f.name: _steps(f.read_text()) for f in files}
+    gated = any(_GATE_RUN.search(step.run) for steps in parsed.values() for step in steps)
+    found: list[str] = []
+    for name, steps in parsed.items():
+        for job in dict.fromkeys(step.job for step in steps):
+            job_steps = [step for step in steps if step.job == job]
+            gate_at = next((i for i, step in enumerate(job_steps) if _GATE_RUN.search(step.run)), None)
+            if gate_at is None and gated:
+                continue  # another job is the gate; this one gates nothing
+            found += [
+                f"{name} job {job} step {step.name or step.run.splitlines()[0][:40]!r}: {what}"
+                for step in job_steps[:gate_at]
+                if (what := _rewrites(step.run)) is not None
+            ]
+    if found:
+        return failing(
+            "; ".join(found),
+            "commit the change instead of patching it in CI; install with the locked form (`uv sync --locked`, `npm ci`)",
+        )
+    return passing(f"{len(files)} workflow(s): no step before the gate edits a manifest or re-locks")
+
+
 # Hooks (research/hooks-and-beads.md): prek owns them through .pre-commit-config.yaml, and bd's hooks
 # run from that file (`bd hooks run <event>`), never installed by bd itself. bd appends its block to
 # other managers' hook files, where a failing check then no longer blocks the commit.
@@ -173,19 +295,98 @@ def _gate_scripts(ctx: Context, makefile: str) -> list[str]:
     return list(dict.fromkeys(m for m in found if ctx.path(m).is_file()))
 
 
-@check("gate.runs-blueprint", "`make check` runs blueprint's per-commit checkpoints (`make blueprint`)")
+# The tracked files blueprint reads. A container gate whose image leaves one out judges a different repo.
+_BLUEPRINT_READS = (
+    "Makefile",
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".gitignore",
+    ".pre-commit-config.yaml",
+    ".beads/config.yaml",
+    ".beads/.gitignore",
+    ".claude/settings.json",
+    "docs/blueprint/blueprint.toml",
+    "docs/agents/*",
+    ".github/workflows/*",
+)
+_DOCKER_BUILD = re.compile(r"\bdocker\s+(?:buildx\s+)?build\b")
+_DOCKER_FILE_FLAG = re.compile(r"\bdocker\s+(?:buildx\s+)?build\b[^\n]*?\s(?:-f|--file)[\s=](\S+)")
+
+
+def _ignore_regex(pattern: str) -> re.Pattern[str]:
+    """A .dockerignore pattern as a regex over a slash path (`*` stays inside a folder, `**` crosses them)."""
+    out, i = "", 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif pattern.startswith("**", i):
+            out, i = out + ".*", i + 2
+        else:
+            out += {"*": "[^/]*", "?": "[^/]"}.get(pattern[i], re.escape(pattern[i]))
+            i += 1
+    return re.compile(f"^{out}$")
+
+
+def _dropped(path: str, ignore: str) -> bool:
+    """Whether the image's ignore file leaves `path` out of the build context: the last matching line wins, `!` re-includes."""
+    parts = path.split("/")
+    prefixes = ["/".join(parts[: i + 1]) for i in range(len(parts))]
+    dropped = False
+    for raw in ignore.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        negated = line.startswith("!")
+        regex = _ignore_regex(line.lstrip("!").strip("/"))
+        # A pattern naming a folder drops everything under it, so any parent of the file counts.
+        if any(regex.match(prefix) for prefix in prefixes):
+            dropped = not negated
+    return dropped
+
+
+def _image_ignores(ctx: Context, makefile: str) -> dict[str, str]:
+    """Ignore file name -> text, for each image the Makefile builds: `<Dockerfile>.dockerignore` first, else the root one."""
+    if not _DOCKER_BUILD.search(makefile):
+        return {}
+    ignores: dict[str, str] = {}
+    for dockerfile in _DOCKER_FILE_FLAG.findall(makefile) or [""]:
+        for name in (f"{dockerfile}.dockerignore" if dockerfile else "", ".dockerignore"):
+            if name and (text := ctx.read(name)) is not None:
+                ignores[name] = text
+                break
+    return ignores
+
+
+def _dropped_reads(ctx: Context, makefile: str) -> list[str]:
+    tracked = (ctx.git("ls-files") or "").splitlines()
+    reads = [f for f in tracked if any(fnmatch(f, pattern) for pattern in _BLUEPRINT_READS)]
+    return [f"{name} drops {f}" for name, text in _image_ignores(ctx, makefile).items() for f in reads if _dropped(f, text)]
+
+
+@check(
+    "gate.runs-blueprint",
+    "`make check` runs blueprint's per-commit checkpoints (`make blueprint`), on the files blueprint reads",
+    version=2,
+)
 def runs_blueprint(ctx: Context) -> Finding:
     """Gaps come back between audits unless the repo's own gate re-checks them on every commit."""
     makefile = ctx.read("Makefile")
     if makefile is None:
         return not_applicable("no Makefile: gate.one-command reports the missing gate")
-    if "blueprint check" in reachable_recipes(makefile):
-        return passing("`make check` reaches `blueprint check --gate`")
-    return not_set_up(
-        "`make check` never runs blueprint",
-        "copy the shelf's `blueprint` target into the Makefile and add it to `check` (`make bootstrap` does both)",
-        FixedBy.AUTO,
-    )
+    if "blueprint check" not in reachable_recipes(makefile):
+        return not_set_up(
+            "`make check` never runs blueprint",
+            "copy the shelf's `blueprint` target into the Makefile and add it to `check` (`make bootstrap` does both)",
+            FixedBy.AUTO,
+        )
+    dropped = _dropped_reads(ctx, makefile)
+    if dropped:
+        return failing(
+            f"the gate image's ignore file leaves out tracked files blueprint reads: {'; '.join(dropped)}",
+            "re-include each with a `!<path>` line after the drop (a container without .beads/config.yaml reports a false 'no tracker'), "
+            "or keep the file in the build context; docs/agents/gate.md lists what a container gate must carry",
+        )
+    return passing("`make check` reaches `blueprint check --gate`")
 
 
 @check("gate.guards-have-red-tests", "every repo-local script `make check` runs has a test that names it")
@@ -207,12 +408,24 @@ def guards_have_red_tests(ctx: Context) -> Finding:
     return passing(f"{len(scripts)} script(s), each named by a test")
 
 
+# make's own trailer (`make: *** [check] Error 2`, `make[1]: Leaving directory`) names no cause.
+_MAKE_LINE = re.compile(r"^g?make(\[\d+\])?: ")
+
+
+def _cause(done: subprocess.CompletedProcess[str]) -> str:
+    """The last line of the failing run's output that make did not write itself; stderr first, it carries the error."""
+    for stream in (done.stderr, done.stdout):
+        lines = [line.strip() for line in stream.splitlines() if line.strip() and not _MAKE_LINE.match(line.strip())]
+        if lines:
+            return lines[-1]
+    return "no output"
+
+
 def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budget: object) -> Finding:
     if done is None:
         return failing("`make check` in a fresh clone did not finish within an hour", "find the step that hangs")
     if done.returncode != 0:
-        tail = (done.stderr.strip() or done.stdout.strip()).splitlines()[-1:] or ["no output"]
-        return failing(f"`make check` fails in a fresh clone ({took}s): {tail[0]}", "make the gate pass from a clean checkout")
+        return failing(f"`make check` fails in a fresh clone ({took}s): {_cause(done)}", "make the gate pass from a clean checkout")
     if not isinstance(budget, int):
         return not_set_up(
             f"fresh-clone gate passed in {took}s; no budget recorded",

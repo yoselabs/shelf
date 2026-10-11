@@ -52,10 +52,11 @@ class Repo:
         """A `bd` on PATH: `config show --json` reports `config` from config.yaml; `lint` exits `lint_exit`."""
         shown = json.dumps([{"key": k, "value": v, "source": "config.yaml"} for k, v in config.items()])
         (self.bin_dir / "bd.json").write_text(shown)
+        (self.bin_dir / "bd.lint").write_text(lint_out + "\n")
         (self.bin_dir / "bd").write_text(
             "#!/bin/sh\n"
             f'if [ "$1" = config ]; then cat "{self.bin_dir}/bd.json"; exit 0; fi\n'
-            f'if [ "$1" = lint ]; then echo "{lint_out}"; exit {lint_exit}; fi\n'
+            f'if [ "$1" = lint ]; then cat "{self.bin_dir}/bd.lint"; exit {lint_exit}; fi\n'
             "exit 0\n"
         )
         (self.bin_dir / "bd").chmod(0o755)

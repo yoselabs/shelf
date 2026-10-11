@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import templates
-from blueprint.model import FixedBy, check, failing, not_set_up, passing, uses_beads
+from blueprint.model import FixedBy, check, failing, not_checked, not_set_up, passing, uses_beads
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
@@ -79,6 +83,12 @@ def session_hooks(ctx: Context) -> Finding:
     return passing("SessionStart runs bd prime; Stop flags in-progress beads")
 
 
+def _repo_gitignores(ctx: Context) -> list[str] | None:
+    """Every .gitignore the repo tracks or would track (present and not ignored), or None outside a git repository."""
+    listed = ctx.git("ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", ".gitignore", "**/.gitignore")
+    return None if listed is None else sorted(p for p in listed.split("\0") if p)
+
+
 # Where agent worktrees go: Claude Code's own folder, and the one blueprint prescribes for any harness.
 _WORKTREE_DIRS = (".claude/worktrees/", ".worktrees/")
 
@@ -87,6 +97,7 @@ _WORKTREE_DIRS = (".claude/worktrees/", ".worktrees/")
     "agents.worktrees",
     "every agent works in its own git worktree; the worktree folders are git-ignored",
     layer="agent",
+    version=2,
 )
 def worktrees(ctx: Context) -> Finding:
     """Ignored, so no linter, test run or `git add -A` in the main checkout reaches into an agent's tree.
@@ -94,16 +105,32 @@ def worktrees(ctx: Context) -> Finding:
     Why worktrees at all: a commit hook hides uncommitted edits while it runs, so a second agent writing
     in the same checkout loses its write (reproduced with prek 0.3.6, 2026-10-11).
     """
+    shared = _repo_gitignores(ctx)
+    if shared is None:
+        return not_checked("not a git repository")
     open_dirs = []
-    for folder in _WORKTREE_DIRS:
-        done = ctx.run("git", "check-ignore", "-q", f"{folder}probe")
-        if done is None:
+    with tempfile.TemporaryDirectory(prefix="blueprint-ignore-") as tmp:
+        sandbox = Path(tmp)
+        for rel in shared:
+            (sandbox / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ctx.path(rel), sandbox / rel)
+        # A scratch repo holding only the repo's own .gitignore files: .git/info/exclude and the global
+        # excludes file are clone-local, so a rule only they carry fails in the next clone.
+        if ctx.run("git", "init", "-q", cwd=sandbox) is None:
             return failing("git did not run", "install git")
-        if done.returncode != 0:
-            open_dirs.append(folder)
+        for folder in _WORKTREE_DIRS:
+            done = ctx.run("git", "-c", f"core.excludesFile={os.devnull}", "check-ignore", "-q", f"{folder}probe", cwd=sandbox)
+            if done is None:
+                return failing("git did not run", "install git")
+            if done.returncode != 0:
+                open_dirs.append(folder)
     if open_dirs:
         lines = "\\n".join(open_dirs)
-        return not_set_up(f"not git-ignored: {', '.join(open_dirs)}", f"printf '{lines}\\n' >> .gitignore", FixedBy.AUTO)
+        return not_set_up(
+            f"not ignored by a .gitignore in the repo (.git/info/exclude and the global excludes do not count): {', '.join(open_dirs)}",
+            f"printf '{lines}\\n' >> .gitignore",
+            FixedBy.AUTO,
+        )
     return passing(f"ignored: {', '.join(_WORKTREE_DIRS)}; the rule is in docs/agents/working-with-agents.md")
 
 

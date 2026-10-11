@@ -41,7 +41,7 @@ install, any agent harness.
 ## 2. Audit
 
 1. `check --repo . --audit --write` writes `docs/blueprint/README.md` (one row per concern,
-   grouped by layer) and one table per concern. Read the README and `--summary` only; open a
+   grouped by layer) and one table per concern. Read the README and `--audit --summary` only; open a
    concern's file only to remediate it. The JSON (`--json`) is for scripts, not for reading.
 2. A `not checked` row that is not a blueprint gap: find why (a missing tool, no commits).
 3. Show the owner the plan (§4) and stop.
@@ -63,7 +63,8 @@ The owner's one yes covers the whole plan. Per concern, in layer order (generic,
 The owner sees outcomes and decisions, never the process: no tool-by-tool narration, no recap of
 the report files, no step lists. In chat, only:
 
-1. **The summary**: `check --summary` as printed, one row per concern under its layer.
+1. **The summary**: `check --audit --summary` as printed (without `--audit` it leaves out the audit-only rows and
+   shows fewer failures than the README), one row per concern under its layer.
 2. **Need from you**: decisions that are the owner's, at most three, each with your default.
 3. Mistakes that reached the owner, if any. One line each.
 

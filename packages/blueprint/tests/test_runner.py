@@ -148,3 +148,28 @@ def test_the_gate_form_lists_only_what_is_not_passing(repo: Repo, capsys: pytest
     out = capsys.readouterr().out
     assert "gate.one-command -- not set up" in out
     assert out.strip().splitlines()[-1].startswith("blueprint: ")
+
+
+def test_the_summary_without_audit_says_it_omits_audit_rows_and_matches_the_readme_with_it(
+    repo: Repo, scratch_concern: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    @check("scratch.slow", "needs this clone's state", audit_only=True)
+    def _slow(_ctx: object) -> Finding:
+        return failing("red only under audit", "fix it")
+
+    root = str(repo.root)
+    main(["check", "--repo", root, "--concern", "scratch", "--audit", "--write"])
+    capsys.readouterr()
+    readme = (repo.root / "docs/blueprint/README.md").read_text()
+
+    main(["check", "--repo", root, "--concern", "scratch", "--audit", "--summary"])
+    audited = capsys.readouterr().out
+    assert audited.strip() in readme
+    assert "| scratch | 0 | 1 |" in audited
+
+    main(["check", "--repo", root, "--concern", "scratch", "--summary"])
+    bare = capsys.readouterr().out
+    assert "| scratch |" not in bare
+    assert "audit-only checkpoints not run: 1" in bare
+    assert "--audit" in bare
+    assert "not run" not in audited

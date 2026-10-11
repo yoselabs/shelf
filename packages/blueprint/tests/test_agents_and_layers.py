@@ -6,12 +6,15 @@ import json
 from datetime import date
 from typing import TYPE_CHECKING
 
+import pytest
 from blueprint import report, templates
 from blueprint.model import Verdict
 from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from blueprint.testing import Repo
 
 _HOOKS = {
@@ -51,6 +54,28 @@ def test_worktree_folders_not_ignored_is_not_set_up(repo: Repo) -> None:
     _sound(repo)
     repo.write(".gitignore", ".claude/worktrees/\n")
     assert _verdicts(repo)["agents.worktrees"] is Verdict.NOT_SET_UP
+
+
+@pytest.mark.parametrize("where", [".git/info/exclude", "global"])
+def test_worktree_folders_ignored_only_clone_locally_is_not_set_up(repo: Repo, tmp_path: Path, where: str) -> None:
+    # a2kay: the rule sat in .git/info/exclude, so the host passed and a fresh clone (the test container) failed.
+    _sound(repo)
+    repo.root.joinpath(".gitignore").unlink()
+    if where == "global":
+        excludes = tmp_path / "global-ignore"
+        excludes.write_text(".claude/worktrees/\n.worktrees/\n")
+        repo.git("config", "core.excludesFile", str(excludes))
+    else:
+        repo.write(".git/info/exclude", "**/.claude/worktrees/\n.worktrees/\n")
+    verdicts = _verdicts(repo)
+    assert verdicts["agents.worktrees"] is Verdict.NOT_SET_UP
+
+
+def test_a_nested_gitignore_in_the_repo_counts(repo: Repo) -> None:
+    _sound(repo)
+    repo.write(".claude/.gitignore", "worktrees/\n")
+    repo.write(".gitignore", ".worktrees/\n")
+    assert _verdicts(repo)["agents.worktrees"] is Verdict.PASSING
 
 
 def test_metrics_left_on_is_not_set_up(repo: Repo) -> None:

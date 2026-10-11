@@ -58,6 +58,21 @@ def test_missing_files_are_not_set_up_and_unfilled_placeholders_fail(repo: Repo)
     assert _verdicts(repo)["agents.culture-files"] is Verdict.PASSING
 
 
+def test_the_python_template_states_no_tool_of_the_shelfs_own(repo: Repo) -> None:
+    # a2kay uses coverage.py, import-linter, make test-fast and docs/glossary.md; the template taught every
+    # agent the shelf's pytest-cov, "no architecture tool", make test-affected and CONTEXT.md instead.
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    _install(repo)
+    text = (repo.root / "docs/agents/python.md").read_text()
+    for shelf_only in ("pytest-cov", "test-affected", "CONTEXT.md", "import-linter", "none chosen", "pyrefly"):
+        assert shelf_only not in text
+    for role in ("toolchain", "formatter", "linter", "types", "spelling", "dependencies", "tests", "coverage", "architecture", "hooks"):
+        assert f"{{{{{role}_tool}}}}" in text
+        assert f"{{{{{role}_run}}}}" in text
+    assert "{{glossary_file}}" in text
+    assert _verdicts(repo)["agents.culture-files"] is Verdict.FAILING
+
+
 def test_a_stale_block_fails_and_a_fresh_one_passes(repo: Repo) -> None:
     _install(repo)
     assert _verdicts(repo)["agents.managed-block"] is Verdict.PASSING

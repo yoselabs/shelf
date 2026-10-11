@@ -6,16 +6,16 @@ Stack: python-uv. The gate is `make check`; this file is what to know before wri
 
 | role | tool | run by |
 |---|---|---|
-| toolchain | uv, committed `uv.lock`, declared Python range or `.python-version` | `uv sync` |
-| formatter | `ruff format` | `make format` (check in the gate) |
-| linter | `ruff check`, the shelf's rule set from `[tool.ruff.lint]` | `make lint` |
-| types | pyrefly, `preset = "strict"` | `make typecheck` |
-| spelling | codespell | `make spell` |
-| dependencies | deptry (unused, missing, transitive) | `make deps` |
-| tests | pytest, strict markers, xdist | `make test` (`make test-affected` while iterating) |
-| coverage | pytest-cov with a floor just below current | in `make test` |
-| architecture | none chosen yet (import-linter vs tach is open) | see [architecture.md](architecture.md) |
-| hooks | prek: ruff check and ruff format on staged `.py` | [gate.md](gate.md) |
+| toolchain | {{toolchain_tool}} | {{toolchain_run}} |
+| formatter | {{formatter_tool}} | {{formatter_run}} |
+| linter | {{linter_tool}} | {{linter_run}} |
+| types | {{types_tool}} | {{types_run}} |
+| spelling | {{spelling_tool}} | {{spelling_run}} |
+| dependencies | {{dependencies_tool}} | {{dependencies_run}} |
+| tests | {{tests_tool}} | {{tests_run}} |
+| coverage | {{coverage_tool}} | {{coverage_run}} |
+| architecture | {{architecture_tool}} | {{architecture_run}} |
+| hooks | {{hooks_tool}} | {{hooks_run}} |
 
 Why: one tool per role, strictest preset.
 
@@ -25,6 +25,7 @@ Why: one tool per role, strictest preset.
 uv sync                  # environment from the lockfile
 make check               # the gate: whole repo, same as CI
 uv run pytest path::name # one test while iterating; the gate still decides done
+{{inner_loop}}
 ```
 
 Always `uv run <tool>`; never a global interpreter or `pip install`. Add a dependency with
@@ -48,7 +49,7 @@ Always `uv run <tool>`; never a global interpreter or `pip install`. Add a depen
 |---|---|
 | Source | `src/<package>/`, one concept per module |
 | Tests | `tests/<mirrored source path>/test_<module>.py`; scenarios in `{{scenario_dir}}` |
-| Names | modules and functions `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE`; a domain term spelled as in CONTEXT.md |
+| Names | modules and functions `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE`; a domain term spelled as in `{{glossary_file}}` |
 | Test names | `test_<behaviour>`; never after a bead or fix |
 
 ## Traps
@@ -56,5 +57,5 @@ Always `uv run <tool>`; never a global interpreter or `pip install`. Add a depen
 - Mutable default arguments: use `None`, build inside.
 - A test reading `HOME`, env or git config: scrub in `conftest.py`.
 - `uv` choosing a different Python in a fresh worktree: commit `.python-version`.
-- pyrefly skips hidden worktree folders; pass paths explicitly if a worktree lives under one.
+- A linter or type checker can skip a hidden folder (a worktree under `.claude/`): pass paths explicitly there.
 - A dependency added without `uv lock` fails the gate.

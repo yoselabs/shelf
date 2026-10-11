@@ -31,9 +31,13 @@ check-host: guard preset blueprint lint typecheck spell deps test-affected
 check-all-host: guard preset blueprint lint typecheck spell deps test
 test-image:
 	docker build -q -f tools/gate/gate.Dockerfile -t $(TEST_IMAGE) .
+# In a git worktree `.git` is a file pointing into the main checkout's .git; the image holds only
+# that pointer, so the main .git is mounted read-only at its own path and git skips optional locks.
+GIT_COMMON := $(abspath $(shell git rev-parse --git-common-dir 2>/dev/null))
+WORKTREE_GIT = $(if $(wildcard .git/HEAD),,-v $(GIT_COMMON):$(GIT_COMMON):ro -e GIT_OPTIONAL_LOCKS=0)
 # The result cache lives in a named volume per checkout, so it survives between container runs.
 container-%: test-image
-	docker run --rm -v $(TEST_IMAGE)-cache:/app/.cache $(TEST_IMAGE) make $*
+	docker run --rm $(WORKTREE_GIT) -v $(TEST_IMAGE)-cache:/app/.cache $(TEST_IMAGE) make $*
 
 # The blueprint's per-commit checkpoints (packages/blueprint): one line per one that is not
 # passing. The audit-only ones (slow, or reading this clone's bd database) run in the

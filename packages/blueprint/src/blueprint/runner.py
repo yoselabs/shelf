@@ -42,6 +42,9 @@ class Run:
     set_hash: str
     rows: tuple[Row, ...]
     problems: tuple[str, ...]
+    # Audit-only checkpoints that apply but did not run (no `--audit`): a summary that hides them
+    # shows fewer failures than the audit's README holds.
+    skipped_audit: int = 0
 
     @property
     def exit_code(self) -> int:
@@ -121,4 +124,5 @@ def run(
     checks = active(profile, concern)
     today = today or date.today()  # noqa: DTZ011 -- override expiry is a calendar date in the owner's zone
     rows = tuple(_row(c, sub, state, today) for c in checks if audit or not c.audit_only for sub in _judge(c, ctx))
-    return Run(profile=profile, set_hash=set_hash(active(profile)), rows=rows, problems=state.problems)
+    skipped = 0 if audit else sum(c.audit_only for c in checks)
+    return Run(profile=profile, set_hash=set_hash(active(profile)), rows=rows, problems=state.problems, skipped_audit=skipped)

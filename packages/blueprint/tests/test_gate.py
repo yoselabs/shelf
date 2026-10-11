@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
 from blueprint.__main__ import RECIPES
 from blueprint.model import Verdict
 from blueprint.runner import run
@@ -183,3 +184,131 @@ def test_clean_clone_fails_when_an_uncommitted_file_is_what_made_it_pass(repo: R
     verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
     assert verdict is Verdict.FAILING
     assert "fresh clone" in evidence
+
+
+def test_clean_clone_evidence_is_the_failing_line_not_makes_own_error_trailer(repo: Repo) -> None:
+    # a2kay: "make: *** [check] Error 2" at 12s said nothing; the cause was the line make printed before it.
+    repo.write("Makefile", "include missing-config.mk\ncheck:\n\ttrue\n")
+    repo.commit()
+    verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
+    assert verdict is Verdict.FAILING
+    assert "missing-config.mk" in evidence
+    assert "make: ***" not in evidence
+
+
+def test_clean_clone_evidence_names_the_command_that_failed(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\t@echo compiling\n\t@echo 'lint: 3 errors' >&2; exit 1\n")
+    repo.commit()
+    assert "lint: 3 errors" in _verdict(repo, "gate.clean-clone", audit=True)[1]
+
+
+def _ci(steps: str, *, gate: bool = True) -> str:
+    """The sound workflow with `steps` (shell lines, one step each) before the gate step."""
+    body = "".join(f"      - name: step {i}\n        run: {line}\n" for i, line in enumerate(steps.splitlines()))
+    tail = "      - run: make check\n" if gate else ""
+    return _SOUND_CI.partition("      - uses:")[0] + f"      - uses: actions/checkout@{_SHA} # v4\n" + body + tail
+
+
+def test_ci_that_rewrites_the_manifest_before_the_gate_fails_naming_workflow_and_step(repo: Repo) -> None:
+    # a2kay: `sed -i` over pyproject.toml stripped a path source before `uv sync`, so CI gated another dependency set.
+    repo.write(".github/workflows/ci.yml", _ci("sed -i '/a2kit/d' pyproject.toml\nuv sync"))
+    verdict, evidence = _verdict(repo, "gate.ci-no-manifest-edit")
+    assert verdict is Verdict.FAILING
+    assert "ci.yml" in evidence
+    assert "step 0" in evidence
+    assert "pyproject.toml" in evidence
+
+
+def test_ci_that_runs_the_gate_on_the_committed_manifest_passes(repo: Repo) -> None:
+    repo.write(".github/workflows/ci.yml", _ci("uv sync --locked\nnpm ci\nuv lock --check\nnpm install -g pnpm\necho hi > notes.txt"))
+    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.PASSING
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "uv lock",
+        "uv sync",
+        "uv sync --all-extras",
+        "uv add requests",
+        "npm install",
+        "npm i --no-audit",
+        "tee package.json < new.json",
+        "echo x >> uv.lock",
+    ],
+)
+def test_a_lock_or_manifest_rewriting_command_before_the_gate_fails(repo: Repo, command: str) -> None:
+    repo.write(".github/workflows/ci.yml", _ci(command))
+    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.FAILING
+
+
+def test_a_rewrite_after_the_gate_step_is_not_before_it(repo: Repo) -> None:
+    text = _ci("true") + "      - run: uv lock --upgrade\n"
+    repo.write(".github/workflows/ci.yml", text)
+    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.PASSING
+
+
+def test_a_block_run_step_is_read_line_by_line(repo: Repo) -> None:
+    text = _ci("true").replace("run: true", "run: |\n          uv --version\n          sed -i s/a/b/ pyproject.toml")
+    repo.write(".github/workflows/ci.yml", text)
+    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.FAILING
+
+
+def test_with_no_gate_step_in_any_workflow_every_step_counts(repo: Repo) -> None:
+    repo.write(".github/workflows/ci.yml", _ci("sed -i s/a/b/ pyproject.toml", gate=False))
+    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.FAILING
+
+
+def test_a_job_that_is_not_the_gate_is_left_alone_when_another_job_runs_it(repo: Repo) -> None:
+    release = "  release:\n    runs-on: ubuntu-latest\n    steps:\n      - run: uv lock --upgrade\n"
+    repo.write(".github/workflows/ci.yml", _ci("true") + release)
+    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.PASSING
+
+
+def test_no_workflows_means_the_manifest_check_does_not_apply(repo: Repo) -> None:
+    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.NOT_APPLICABLE
+
+
+_BLUEPRINT_GATE = "check: blueprint\nblueprint:\n\tpython3 -m blueprint check --repo . --gate\n"
+_IMAGE = "image:\n\tdocker build -f tools/gate.Dockerfile -t gate .\n"
+
+
+def _container_gate(repo: Repo, dockerignore: str, *, image_ignore: str | None = None, image: str = _IMAGE) -> None:
+    repo.write("Makefile", _BLUEPRINT_GATE + image)
+    repo.write(".beads/config.yaml", "")
+    repo.write(".claude/settings.json", "{}")
+    repo.write(".dockerignore", dockerignore)
+    if image_ignore is not None:
+        repo.write("tools/gate.Dockerfile.dockerignore", image_ignore)
+    repo.commit()
+
+
+def test_a_gate_image_that_drops_files_blueprint_reads_fails_naming_them(repo: Repo) -> None:
+    # a2kay: the image's dockerignore dropped .beads and .claude, so `make blueprint` in the container reported
+    # "no .beads/config.yaml"; the Makefile text alone looked fine.
+    _container_gate(repo, ".beads\n.claude\n")
+    verdict, evidence = _verdict(repo, "gate.runs-blueprint")
+    assert verdict is Verdict.FAILING
+    assert ".beads/config.yaml" in evidence
+    assert ".claude/settings.json" in evidence
+    assert ".dockerignore" in evidence
+
+
+def test_files_re_included_after_the_drop_are_not_dropped(repo: Repo) -> None:
+    _container_gate(repo, ".beads\n.claude\n!.beads/config.yaml\n")
+    verdict, evidence = _verdict(repo, "gate.runs-blueprint")
+    assert verdict is Verdict.FAILING
+    assert ".beads/config.yaml" not in evidence
+    assert ".claude/settings.json" in evidence
+    _container_gate(repo, ".beads\n.claude\n!.beads/config.yaml\n!.claude/settings.json\n")
+    assert _verdict(repo, "gate.runs-blueprint")[0] is Verdict.PASSING
+
+
+def test_the_images_own_ignore_file_outranks_the_root_one(repo: Repo) -> None:
+    _container_gate(repo, ".beads\n.claude\n", image_ignore=".venv\n")
+    assert _verdict(repo, "gate.runs-blueprint")[0] is Verdict.PASSING
+
+
+def test_a_gate_with_no_container_is_not_judged_by_the_dockerignore(repo: Repo) -> None:
+    _container_gate(repo, ".beads\n.claude\n", image="")
+    assert _verdict(repo, "gate.runs-blueprint")[0] is Verdict.PASSING

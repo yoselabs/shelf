@@ -34,6 +34,18 @@ Install after clone: `prek install`. Recipe: blueprint's `recipes/pre-commit-con
 ## CI
 
 CI runs `make check` and nothing else of its own. A CI step missing from `make check` is a gate gap: move it in.
+CI gates the committed dependency set: install from the lockfile (`uv sync --locked`, `npm ci`), and let no step
+before the gate edit a manifest or re-lock (`sed -i` on `pyproject.toml`, `uv lock`, `npm install`). A patch CI needs
+is a commit.
+
+## A gate in a container
+
+When `make check` builds an image and runs inside it, `make blueprint` runs there too and judges only what the image
+carries. The image's ignore file (`<Dockerfile>.dockerignore`, else `.dockerignore`) must keep every tracked file
+blueprint reads: `Makefile`, `AGENTS.md`, `.gitignore`, `.pre-commit-config.yaml`, `.beads/config.yaml`,
+`.beads/.gitignore`, `.claude/settings.json`, `docs/blueprint/blueprint.toml`, `docs/agents/`, `.github/workflows/`.
+Dropping `.beads` or `.claude` whole makes the container report a false "no tracker"; keep the folder out of the
+context and re-include those files after it with `!.beads/config.yaml` lines. `gate.runs-blueprint` names a dropped file.
 
 ## Adding a check
 

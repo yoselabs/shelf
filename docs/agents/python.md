@@ -25,6 +25,7 @@ Why: one tool per role, strictest preset.
 uv sync                  # environment from the lockfile
 make check               # the gate: whole repo, same as CI
 uv run pytest path::name # one test while iterating; the gate still decides done
+make test-affected       # the tests the change reaches
 ```
 
 Always `uv run <tool>`; never a global interpreter or `pip install`. Add a dependency with
@@ -48,7 +49,7 @@ Always `uv run <tool>`; never a global interpreter or `pip install`. Add a depen
 |---|---|
 | Source | `src/<package>/`, one concept per module |
 | Tests | `tests/<mirrored source path>/test_<module>.py`; scenarios in `packages/<name>/tests/features/` |
-| Names | modules and functions `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE`; a domain term spelled as in CONTEXT.md |
+| Names | modules and functions `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE`; a domain term spelled as in `docs/glossary.md` |
 | Test names | `test_<behaviour>`; never after a bead or fix |
 
 ## Traps

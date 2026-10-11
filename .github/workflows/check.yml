@@ -31,6 +31,6 @@ jobs:
         with:
           enable-cache: true
 
-      - run: uv sync
+      - run: uv sync --locked
 
       - run: make check-all

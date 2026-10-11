@@ -70,6 +70,19 @@ tool = "pytest-cov with a floor"
 install = "uv add --dev pytest-cov; run pytest with --cov-fail-under=<just below current>"
 gate = "cov-fail-under"
 
+# coverage.py's own floor is as good: a repo whose C extensions break under the pytest-cov plugin
+# (a2kay, duckdb) measures with `coverage run` and enforces the floor with `coverage report`.
+[[role.alternative]]
+label = "coverage.py's `coverage report --fail-under=<N>`"
+gate = '\bcoverage report\b[^\n]*--fail-under'
+
+# The floor in pyproject only bites when the gate runs `coverage report`; `coverage run` alone never checks it.
+[[role.alternative]]
+label = "`fail_under` in [tool.coverage.report] with a `coverage report` step"
+gate = '\bcoverage report\b'
+path = "pyproject.toml"
+contains = "fail_under"
+
 [[role]]
 role = "architecture"
 untested = "no layer tool chosen yet: import-linter vs tach is open (shelf-435)"

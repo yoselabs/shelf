@@ -63,6 +63,9 @@ class Role:
     install: str = ""
     config: tuple[dict[str, Any], ...] = ()
     gate: str = ""
+    # Other ways to prove the role runs: each is a `label`, a `gate` regex over the gate text, and
+    # optionally a `path`/`contains` the repo's config must also hold.
+    alternatives: tuple[dict[str, Any], ...] = ()
     untested: str = ""
     na: str = ""
 
@@ -89,6 +92,7 @@ def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
                 install=r.get("install", ""),
                 config=tuple(r.get("config", ())),
                 gate=r.get("gate", ""),
+                alternatives=tuple(r.get("alternative", ())),
                 untested=r.get("untested", ""),
                 na=r.get("na", ""),
             )
@@ -123,6 +127,12 @@ def _describe(spec: dict[str, Any]) -> str:
     return spec["path"] + (f" with {spec['contains']!r}" if "contains" in spec else "")
 
 
+def _alternative_runs(ctx: Context, alt: dict[str, Any], gate_text: str) -> bool:
+    if not re.search(alt["gate"], gate_text):
+        return False
+    return "path" not in alt or _config_holds(ctx, alt)
+
+
 @dataclass(frozen=True)
 class _Judged:
     stack: str
@@ -142,14 +152,23 @@ def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str
     missing = [_describe(c).replace("{root}", root) for c in spec.config if not _config_holds(ctx, c, root)]
     if missing:
         return _Judged(stack, "not-set-up", f"{spec.tool} not set up (missing {'; '.join(missing)})", spec.install)
-    if spec.gate and not re.search(re.escape(spec.gate), gate_text):
-        return _Judged(
-            stack,
-            "failing",
-            f"{spec.tool} set up, but `make check` never runs `{spec.gate}`",
-            f"run `{spec.gate}` from `make check`",
-        )
-    return _Judged(stack, "pass", spec.tool + (f", run by the gate (`{spec.gate}`)" if spec.gate else ""))
+    return _gate_verdict(ctx, stack, spec, gate_text)
+
+
+def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judged:
+    """Pass when the gate runs the role's command, or one of its alternatives; else failing."""
+    if not spec.gate or re.search(re.escape(spec.gate), gate_text):
+        return _Judged(stack, "pass", spec.tool + (f", run by the gate (`{spec.gate}`)" if spec.gate else ""))
+    via = next((a for a in spec.alternatives if _alternative_runs(ctx, a, gate_text)), None)
+    if via is not None:
+        return _Judged(stack, "pass", f"{via['label']}, run by the gate")
+    others = "".join(f", or {a['label']}" for a in spec.alternatives)
+    return _Judged(
+        stack,
+        "failing",
+        f"{spec.tool} set up, but `make check` never runs `{spec.gate}`{others}",
+        f"run `{spec.gate}` from `make check`{others}",
+    )
 
 
 def finding_for(judged: _Judged) -> Finding:
@@ -178,7 +197,7 @@ def _profile_row(stack: str, prof: StackProfile | None) -> Sub:
     return Sub(f"stack/{stack}", f"stack.{stack}.profile", statement, passing(f"{prof.status} profile: {tools}{note}"))
 
 
-@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `make check`", layer="stack")
+@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `make check`", layer="stack", version=2)
 def roles(ctx: Context) -> list[Sub]:
     """Per detected stack: one profile row, then one row per role."""
     if not ctx.profile.stacks:
