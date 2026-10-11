@@ -165,6 +165,16 @@ COMPOSE_FILES = ("compose.yml", "compose.yaml", "docker-compose.yml", "docker-co
 _SHELL_MIN_LINES = 10
 
 
+# A few scripts beside a repo's real language are helpers (a2kay: one macOS packaging script): they get shellcheck and
+# strict mode, not a formatter, hooks and a conventions file of their own.
+_SHELL_PRIMARY_SCRIPTS = 5
+_CODE_STACKS = ("python-uv", "python", "dotnet", "node", "go", "rust")
+
+
+def _secondary(found: dict[str, list[str]], scripts: list[str]) -> bool:
+    return len(scripts) < _SHELL_PRIMARY_SCRIPTS and any(s in found for s in _CODE_STACKS)
+
+
 def _shell_scripts(repo: Path, skip: tuple[str, ...]) -> list[str]:
     found = walk(repo, "*.sh", 3, (*skip, ".beads/hooks"))
     if len(found) == 1 and len(found[0].read_text(errors="replace").splitlines()) < _SHELL_MIN_LINES:
@@ -187,11 +197,11 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
         found["compose"] = sorted(p.relative_to(repo).as_posix() for p in composes)
     if images := dockerfiles(repo, skip):
         found["dockerfile"] = [p.relative_to(repo).as_posix() for p in images]
-    if scripts := _shell_scripts(repo, skip):
-        found["shell"] = scripts
     for stack, manifest in (("node", "package.json"), ("go", "go.mod"), ("rust", "Cargo.toml")):
         if (repo / manifest).is_file():
             found[stack] = [manifest]
+    if scripts := _shell_scripts(repo, skip):
+        found["shell-scripts" if _secondary(found, scripts) else "shell"] = scripts
     return found
 
 

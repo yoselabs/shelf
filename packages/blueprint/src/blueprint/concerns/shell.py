@@ -15,7 +15,8 @@ from blueprint.model import Sub, check_each, failing, is_skipped, not_checked, p
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
 
-_STACK = "shell"
+# The full shell stack, and a few helper scripts beside another language: strict mode applies to both.
+_STACKS = ("shell", "shell-scripts")
 _SET = re.compile(r"^\s*set\s+(.+)$", re.MULTILINE)
 _LONG = {"errexit": "e", "nounset": "u", "pipefail": "pipefail"}
 # A script meant to collect failures (a probe, a report) runs on; it says so, with why.
@@ -79,8 +80,6 @@ def _strict_mode(ctx: Context) -> Finding:
 
 @check_each("stack.shell-strict", "executable shell scripts run in strict mode (-e, -u, pipefail)", layer="stack")
 def shell_strict(ctx: Context) -> list[Sub]:
-    """One row under the shell stack."""
-    if _STACK not in ctx.profile.stacks:
-        return []
+    """One row under whichever shell stack the repo has."""
     statement = "every executable script sets -e, -u and (bash) pipefail, or says why it drops -e"
-    return [Sub(f"stack/{_STACK}", f"stack.{_STACK}.strict-mode", statement, _strict_mode(ctx))]
+    return [Sub(f"stack/{s}", f"stack.{s}.strict-mode", statement, _strict_mode(ctx)) for s in _STACKS if s in ctx.profile.stacks]

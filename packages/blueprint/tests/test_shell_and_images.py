@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from blueprint import templates
 from blueprint.model import Verdict
+from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -94,3 +96,31 @@ def test_hadolint_in_the_gate_with_its_config_passes(repo: Repo) -> None:
     repo.write(".hadolint.yaml", "ignored: []\n")
     repo.write("justfile", "check: images\nimages:\n    git ls-files '*Dockerfile' | xargs hadolint\n")
     assert _rows(repo)["stack.dockerfile.linter"][0] is Verdict.PASSING
+
+
+def test_a_few_scripts_in_a_python_repo_are_secondary_shellcheck_and_strict_mode_only(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    repo.write("uv.lock", "")
+    repo.write("packaging/macos/build_app.sh", _LONG.replace("set -euo pipefail\n", "set -e\n"), executable=True)
+    rows = _rows(repo)
+    assert "stack.shell.profile" not in rows
+    assert "packaging/macos/build_app.sh" in rows["stack.shell-scripts.profile"][1]
+    assert rows["stack.shell-scripts.linter"][0] is Verdict.NOT_SET_UP
+    assert rows["stack.shell-scripts.formatter"][0] is Verdict.NOT_APPLICABLE
+    assert rows["stack.shell-scripts.agent-guidance"][0] is Verdict.NOT_APPLICABLE
+    assert rows["stack.shell-scripts.strict-mode"][0] is Verdict.FAILING
+
+
+def test_many_scripts_in_a_python_repo_are_the_full_shell_stack(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    for n in range(5):
+        repo.write(f"tools/s{n}.sh", _STRICT, executable=True)
+    rows = _rows(repo)
+    assert "stack.shell.profile" in rows
+    assert "stack.shell-scripts.profile" not in rows
+
+
+def test_secondary_scripts_need_no_shell_conventions_file(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    repo.write("build.sh", _LONG, executable=True)
+    assert "shell" not in templates.required(detect(repo.root, load_state(repo.root)))
