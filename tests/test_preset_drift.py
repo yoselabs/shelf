@@ -166,3 +166,12 @@ def test_a_shelf_only_target_missing_from_a_consumer_is_not_drift(tmp_path: Path
     consumer = _write(tmp_path / "consumer", _SHELF)
     result = _run(consumer, shelf)
     assert result.returncode == 0, result.stderr
+
+
+def test_a_consumer_that_copies_a_shelf_only_recipe_is_not_drift(tmp_path: Path) -> None:
+    # a2kay (shelf-cld): it copied the shelf's `check: (gate "check-host")` dispatch and was flagged 'extra gate'.
+    dispatch = "\n[private]\ngate target:\n    just {{ target }}\n\ncheck-host:\n    @true\n"
+    shelf = _write(tmp_path / "shelf", _SHELF, justfile=_JUSTFILE + dispatch)
+    consumer = _write(tmp_path / "consumer", _SHELF, justfile=_JUSTFILE + dispatch)
+    result = _run(consumer, shelf)
+    assert result.returncode == 0, result.stderr

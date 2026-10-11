@@ -489,6 +489,12 @@ _FRESH_CLONE_STEPS = (
 )
 
 
+_OTHER_TRANSPORT = tuple(
+    {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": f"url.{to}.insteadOf", "GIT_CONFIG_VALUE_0": frm}
+    for to, frm in (("git@github.com:", "https://github.com/"), ("https://github.com/", "ssh://git@github.com/"))
+)
+
+
 def _fresh_clone_steps(ctx: Context, clone: Path) -> Finding | None:
     """Run each step the clone's files call for; the first that fails is the finding."""
     env = {**ctx.env, "MISE_IGNORED_CONFIG_PATHS": str(Path.home() / ".config" / "mise"), "BD_DISABLE_METRICS": "1"}
@@ -496,6 +502,12 @@ def _fresh_clone_steps(ctx: Context, clone: Path) -> Finding | None:
         if not (clone / marker).is_file():
             continue
         done = ctx.run(*argv, cwd=clone, timeout=600, env=env)
+        if argv[0] == "bd" and done is not None and done.returncode != 0:
+            # The committed sync.remote may name the transport this machine lacks (https on an SSH-only box, ssh in CI).
+            for rewrite in _OTHER_TRANSPORT:
+                done = ctx.run(*argv, cwd=clone, timeout=600, env={**env, **rewrite})
+                if done is not None and done.returncode == 0:
+                    break
         if done is None or done.returncode != 0:
             why = "not installed or timed out" if done is None else _cause(done)
             return failing(

@@ -203,3 +203,17 @@ def test_a_clone_whose_bd_database_does_not_answer_fails_lint(repo: Repo) -> Non
     row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
     assert row.verdict is Verdict.FAILING
     assert "bd bootstrap" in row.remediation
+
+
+def test_an_uninitialized_database_gets_the_fix_bootstrap_alone_cannot_make(repo: Repo) -> None:
+    _beads(repo)
+    real = (repo.bin_dir / "bd").read_text()
+    (repo.bin_dir / "bd").write_text(
+        real.replace(
+            'if [ "$1" = lint ]',
+            'if [ "$1" = list ]; then echo "Error: database not initialized: issue_prefix missing" >&2; exit 1; fi\nif [ "$1" = lint ]',
+            1,
+        )
+    )
+    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    assert "embeddeddolt.broken" in row.remediation

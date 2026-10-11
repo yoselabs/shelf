@@ -170,7 +170,8 @@ def main() -> int:
         "ruff-select": (_ruff(reference, "select"), _ruff(consumer, "select")),
         "ruff-ignore": (_ruff(reference, "ignore"), _ruff(consumer, "ignore")),
         "pyrefly-errors": (_pyrefly_errors(reference), _pyrefly_errors(consumer)),
-        "recipes": (_recipes(shelf) - _SHELF_ONLY_TARGETS, _recipes(repo)),
+        # A shelf-only recipe is neither owed nor extra: a consumer may copy the dispatch pattern (`gate`, a2kay: shelf-cld).
+        "recipes": (_recipes(shelf) - _SHELF_ONLY_TARGETS, _recipes(repo) - _SHELF_ONLY_TARGETS),
     }
 
     findings = [line for axis, _ in _AXES for line in _compare(axis, *values[axis], declared)]

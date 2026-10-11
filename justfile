@@ -41,7 +41,11 @@ beads-lint:
     [ -d .beads ] || exit 0
     command -v bd >/dev/null || { echo "beads-lint: bd is not installed -- run just tools" >&2; exit 2; }
     # A clone with no (or an uninitialized) database lints 0 beads and exits 0; that is no pass (shelf-9g7).
-    BD_DISABLE_METRICS=1 bd list --limit 1 --json >/dev/null 2>&1 || { echo "beads-lint: bd's database does not answer in this clone -- run bd bootstrap" >&2; exit 1; }
+    if ! out=$(BD_DISABLE_METRICS=1 bd list --limit 1 --json 2>&1); then
+        echo "beads-lint: bd's database does not answer in this clone -- run bd bootstrap" >&2
+        case "$out" in *"not initialized"*) echo "  (bootstrap calls an uninitialized one 'nothing to do': mv .beads/embeddeddolt .beads/embeddeddolt.broken first)" >&2;; esac
+        exit 1
+    fi
     rc=0
     for status in open blocked; do BD_DISABLE_METRICS=1 bd lint --status "$status" || rc=1; done
     exit "$rc"

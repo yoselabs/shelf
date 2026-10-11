@@ -12,7 +12,7 @@ role = "framework-version"
 tool = "fastmcp (standalone, PrefectHQ) in [project].dependencies with a lower bound and a major cap, resolved in uv.lock; the negotiated protocol version is asserted in one test so an SDK bump that moves it shows as a diff"
 install = """`uv add 'fastmcp>=<x.y>,<<next major>'` (new servers: the current major, 4.x on 2026-10-11; 3.4.x is still maintained). \
 Never `mcp.server.fastmcp` (frozen v1 copy; gone in mcp 2.x) and never `from mcp.server.mcpserver import MCPServer` for a server the shelf's FastMCP packages (mcp-bridge, mcp-feedback, mcp-result-wire, mcp-arg-errors) must serve. \
-One test reads `client.initialize_result` and asserts the protocol version string"""
+One test reads `client.initialize_result` and asserts `.protocolVersion` equals the pinned revision string"""
 config = [
     { any = [
         { path = "pyproject.toml", contains = "fastmcp>=" },
@@ -20,9 +20,10 @@ config = [
         { path = "pyproject.toml", contains = "fastmcp~=" },
     ] },
     { path = "uv.lock", contains = 'name = "fastmcp"' },
+    # The assertion itself, not a read of initialize_result for something else (a2kay read .instructions: shelf-n6i).
     { any = [
-        { path = "tests/*.py", contains = "initialize_result" },
-        { path = "tests/*/*.py", contains = "initialize_result" },
+        { path = "tests/*.py", contains = "protocolVersion" },
+        { path = "tests/*/*.py", contains = "protocolVersion" },
     ] },
 ]
 

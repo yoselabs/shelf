@@ -134,7 +134,11 @@ def test_a_declared_framework_is_judged_even_when_nothing_is_detected(repo: Repo
 def _a2kay_shaped(repo: Repo) -> None:
     _mcp(repo, dependency=_DEPENDS + '\n[tool.ruff.lint]\nselect = ["T20"]')
     repo.write("uv.lock", '[[package]]\nname = "fastmcp"\n')
-    repo.write("tests/test_server.py", "async def t(c):\n    r = await c.initialize_result\n    assert Client(s) and r.is_error\n")
+    repo.write(
+        "tests/test_server.py",
+        'async def t(c):\n    r = await c.initialize_result\n    assert r.protocolVersion == "2025-11-25"\n'
+        "    assert Client(s) and r.is_error\n",
+    )
     repo.write("tests/test_stdio.py", "t = StdioTransport\n")
     repo.write("tests/contracts/test_tool_list.py", "tools = list_tools()\nhint = 'readOnlyHint'\n")
     repo.write("tests/contracts/tools.snapshot.json", "[]\n")
@@ -195,3 +199,12 @@ def test_unitys_library_cache_is_not_walked_but_a_folder_named_library_elsewhere
     assert "framework.unity.profile" in {r.id for r in report.rows}
     repo.write("src/Library/Library.csproj", "<Project/>\n")
     assert any(r.id.startswith("stack.dotnet") for r in run(repo.root, env=repo.env).rows)
+
+
+def test_reading_initialize_result_without_asserting_the_protocol_version_is_not_set_up(repo: Repo) -> None:
+    # a2kay (shelf-n6i): tests read .instructions and serverInfo.version off initialize_result; none asserted protocolVersion.
+    _a2kay_shaped(repo)
+    repo.write("tests/test_server.py", "async def t(c):\n    r = await c.initialize_result\n    assert r.instructions\n")
+    verdict, evidence = _rows(repo)["framework.mcp.framework-version"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "protocolVersion" in evidence

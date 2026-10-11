@@ -562,3 +562,14 @@ def test_clean_clone_names_a_fresh_clone_step_that_failed(repo: Repo) -> None:
     verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
     assert verdict is Verdict.FAILING
     assert "bd bootstrap" in evidence
+
+
+def test_clean_clone_retries_bd_bootstrap_over_the_other_transport(repo: Repo) -> None:
+    # a2kay: its committed remote is https, the devbox has only an SSH key; CI is the reverse.
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write(".beads/config.yaml", "")
+    repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
+    repo.commit()
+    (repo.bin_dir / "bd").write_text('#!/bin/sh\n[ -n "$GIT_CONFIG_COUNT" ] && exit 0\necho "Error: auth" >&2; exit 1\n')
+    (repo.bin_dir / "bd").chmod(0o755)
+    assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.PASSING
