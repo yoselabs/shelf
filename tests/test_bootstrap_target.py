@@ -8,19 +8,20 @@ level (not just inside the operations), and does not clobber a foreign hook mana
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from tests.tool_path import has, hermetic_path
+
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "tools"))
 
 from onboard.linter_preset import LinterPresetOperation  # noqa: E402  -- path-injected, after sys.path setup
 
-pytestmark = pytest.mark.skipif(shutil.which("bd") is None, reason="bd is not installed")
+pytestmark = pytest.mark.skipif(not has("bd"), reason="bd is not installed")
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -46,7 +47,7 @@ def _just(repo: Path, recipe: str, *, home: Path) -> subprocess.CompletedProcess
     # PATH order matters here: the justfile invokes bare `python3`, and this Mac's
     # /usr/bin/python3 predates tomllib (3.9) -- put a modern python3 first.
     env = {
-        "PATH": f"{Path(sys.executable).parent}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "PATH": hermetic_path(),
         "HOME": str(home),
         "SHELF_HOME": str(_ROOT),
     }

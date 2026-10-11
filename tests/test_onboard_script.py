@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.tool_path import has, hermetic_path
+
 _ROOT = Path(__file__).resolve().parent.parent
 _SCRIPT = _ROOT / ".agents" / "skills" / "onboard-consumer" / "scripts" / "onboard.py"
 
@@ -36,7 +38,7 @@ def repo(tmp_path: Path) -> Path:
 
 
 def _run(*args: str, home: Path) -> subprocess.CompletedProcess[str]:
-    env = {"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HOME": str(home)}
+    env = {"PATH": hermetic_path(), "HOME": str(home)}
     return subprocess.run([sys.executable, str(_SCRIPT), *args], capture_output=True, text=True, check=False, env=env)
 
 
@@ -55,7 +57,7 @@ def test_no_shelf_clone_found_is_reported_not_a_crash(repo: Path, tmp_path: Path
     isolated.parent.mkdir(parents=True)
     shutil.copy(_SCRIPT, isolated)
 
-    env = {"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HOME": str(tmp_path / "home")}
+    env = {"PATH": hermetic_path(), "HOME": str(tmp_path / "home")}
     Path(env["HOME"]).mkdir(parents=True, exist_ok=True)
     result = subprocess.run([sys.executable, str(isolated), "--repo", str(repo)], capture_output=True, text=True, check=False, env=env)
 
@@ -63,7 +65,7 @@ def test_no_shelf_clone_found_is_reported_not_a_crash(repo: Path, tmp_path: Path
     assert "could not find a shelf clone" in result.stderr
 
 
-@pytest.mark.skipif(shutil.which("bd") is None, reason="bd is not installed")
+@pytest.mark.skipif(not has("bd"), reason="bd is not installed")
 def test_onboards_a_real_consumer_repo_and_exits_zero(repo: Path, tmp_path: Path) -> None:
     (repo / "pyproject.toml").write_text('[project]\nname = "consumer"\nversion = "0.1.0"\n')
     _git(repo, "add", "pyproject.toml")
