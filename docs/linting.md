@@ -117,14 +117,16 @@ owns, so it reports *"already current"* for a repo missing two whole rule famili
 reached ten rule sets without anyone deciding to.
 
 `tools/preset_drift.py`, wired as `just preset` and copied verbatim like `guard`, compares three axes
-— `[tool.ruff.lint] select`/`ignore`, `[tool.pyrefly.errors]`, and the `justfile` recipe set — and
-fails on any difference the consumer has not declared in its own:
+— `[tool.ruff.lint] select`/`ignore`, `[tool.pyrefly.errors]`, and the `justfile` recipe set — plus the ruff and
+pyrefly versions both `uv.lock` files hold (one config under another ruff is another rule set: a2kay's ruff 0.17 raised
+30 findings the shelf's 0.15 does not), and fails on any difference the consumer has not declared in its own:
 
 ```toml
 [tool.shelf-preset]
 ruff-select-omitted = []
 pyrefly-errors-extra = ["unknown-argument-type"]  # reflective verb dispatch, a2kay only
 recipes-extra = ["archlint"]                      # import-linter contracts, no shelf equivalent
+linter-versions-differ = ["ruff"]                 # trying a newer ruff ahead of the shelf
 ```
 
 An empty list means "identical here". (`make-targets-extra`, the axis's name before ADR 0023, still counts.) The tool never edits, never proposes a value, and takes no side

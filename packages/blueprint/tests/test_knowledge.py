@@ -74,6 +74,22 @@ def test_an_id_that_differs_from_the_file_number_fails(repo: Repo) -> None:
     assert "id 0001" in evidence
 
 
+def test_an_adr_without_a_history_section_fails(repo: Repo) -> None:
+    _sound(repo)
+    repo.write("docs/adr/0001-one-gate-command.md", _ADR.split("## History", maxsplit=1)[0])
+    verdict, evidence = _verdicts(repo)["knowledge.adr-format"]
+    assert verdict is Verdict.FAILING
+    assert "no ## History" in evidence
+
+
+def test_the_format_fix_says_how_to_fold_an_amending_adr(repo: Repo) -> None:
+    _sound(repo)
+    repo.write("docs/adr/0001-one-gate-command.md", _ADR.split("## History", maxsplit=1)[0])
+    fix = next(r.remediation for r in run(repo.root, concern="knowledge", env=repo.env).rows if r.id == "knowledge.adr-format")
+    assert "amends" in fix
+    assert "History" in fix
+
+
 def test_an_unknown_status_fails(repo: Repo) -> None:
     _sound(repo)
     repo.write("docs/adr/0001-one-gate-command.md", _ADR.replace("status: accepted", "status: maybe"))

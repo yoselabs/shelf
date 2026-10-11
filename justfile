@@ -26,10 +26,10 @@ test_image := "shelf-gate-" + file_name(justfile_directory())
 # In CI, inside a container, or with SHELF_HOST_CHECK=1 they run in place; the container
 # speeds the gate up and is never required.
 [group('gate')]
-check: beads-lint (gate "check-host")
+check: beads-lint secrets images (gate "check-host")
 
 [group('gate')]
-check-all: beads-lint (gate "check-all-host")
+check-all: beads-lint secrets images (gate "check-all-host")
 
 # Every bead still to be started (open or blocked) carries its acceptance criteria: criteria are what make a bead
 # ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. Runs on the
@@ -49,6 +49,24 @@ beads-lint:
     rc=0
     for status in open blocked; do BD_DISABLE_METRICS=1 bd lint --status "$status" || rc=1; done
     exit "$rc"
+
+# No secret in the history (gitleaks, pinned in mise.toml; about a second). A false positive goes in .gitleaks.toml
+# with a description saying why. Runs on the host, before the container, beside beads-lint: the image has no gitleaks.
+[group('gate')]
+secrets:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v gitleaks >/dev/null || { echo "secrets: gitleaks is not installed -- run just tools" >&2; exit 2; }
+    gitleaks git --no-banner --redact --log-level warn .
+
+# Every Dockerfile passes hadolint (pinned in mise.toml; each ignored rule's reason is in .hadolint.yaml). On the host,
+# beside secrets: the image has no hadolint.
+[group('gate')]
+images:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v hadolint >/dev/null || { echo "images: hadolint is not installed -- run just tools" >&2; exit 2; }
+    git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\.dockerignore$' | xargs -0 -r hadolint
 
 # The dispatch sits in its own private recipe so `check` and `check-all` stay plain dependency edges
 # for the graph reader.

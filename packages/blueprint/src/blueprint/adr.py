@@ -21,6 +21,7 @@ STATUSES = ("proposed", "accepted", "superseded", "rejected")
 _IN_FORCE = "accepted"
 _FILE = re.compile(r"^(\d{4})-[a-z0-9-]+\.md$")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_HISTORY = re.compile(r"^## History\s*$", re.MULTILINE)
 # The index line is what agents load; a statement longer than this stops being one line of a list.
 STATEMENT_MAX = 200
 
@@ -78,6 +79,8 @@ def problems(path: Path) -> list[str]:
         out.append(f"statement over {STATEMENT_MAX} characters")
     if fields.get("updated") and not _DATE.match(fields["updated"]):
         out.append("updated is not YYYY-MM-DD")
+    if not _HISTORY.search(path.read_text(errors="replace")):
+        out.append("no ## History")
     return out
 
 

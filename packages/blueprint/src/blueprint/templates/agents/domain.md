@@ -20,6 +20,8 @@
   `## History` below: dated entries, each with what changed, the trigger, and why the dropped choice was dropped.
 - Changing a decision: rewrite the top, move the old decision into History. Do not open a new ADR for
   the same topic; that splits its history.
+- Found an ADR that amends another (imported records often do): fold it into the earlier file, which
+  gets the decision as it now stands and a History entry naming the amending ADR; mark the amender superseded.
 - Write one when a choice has two defensible answers and a cost, or when you overrule a default.
 - After any ADR change: `blueprint adr-index --repo . --write`; the gate fails on a stale index.
 

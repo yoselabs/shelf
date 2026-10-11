@@ -128,8 +128,10 @@ def test_creates_a_justfile_from_scratch_when_absent(repo: Path) -> None:
         "spell:",
         "deps:",
         "test:",
+        "secrets:",
     ):
         assert target in just_text
+    assert "check: beads-lint secrets (steps" in just_text
 
 
 # ── shelf-4mz: the copied gate must RUN, not merely exist ─────────────────────

@@ -1,0 +1,59 @@
+# Stack profile (see python-uv.toml for the format). Container images built from a Dockerfile / Containerfile, hadolint 2.15.1, late 2026.
+# Research: openspec/changes/blueprint-skill/research/hadolint-and-ci-uv.md (shelf-1y4.20). Detection: a Dockerfile, *.Dockerfile,
+# Dockerfile.<suffix> or Containerfile within three levels (not *.dockerignore). A stack of its own, not a compose role: a repo
+# with images and no compose file (a2kay) is still linted.
+stack = "dockerfile"
+status = "provisional"
+source = "hadolint-and-ci-uv.md (2026-10-11): hadolint 2.15.1 red (exit 1) on 4 of 4 real Dockerfiles from two consumers and on a planted file; failure-threshold and ignored seen working in .hadolint.yaml"
+
+[[role]]
+role = "toolchain"
+na = "a Dockerfile has no language version of its own; base images and tool images (`COPY --from=ghcr.io/astral-sh/uv:<ver>`) are pinned in the dependencies row, and a python-uv repo's uv-ci row checks the uv one"
+
+[[role]]
+role = "formatter"
+untested = "no Dockerfile formatter was run; hadolint reports layout rules but does not rewrite"
+
+[[role]]
+role = "linter"
+tool = """hadolint 2.15.1 (hadolint/hadolint; mise `hadolint`, pinned) over every tracked Dockerfile, with a committed .hadolint.yaml. \
+Exit 1 on any warning (the default threshold); seen red on four real files (DL3008 apt pin, DL4006 pipefail, DL3013 pip pin, DL3022 COPY --from a named build context) \
+and on a planted `FROM ubuntu:latest` with a bare `apt-get install` (DL3007, DL3008, DL3014, DL3015). Never `--failure-threshold error`: it passed a file with real warnings"""
+install = """mise.toml: hadolint = "2.15.1"; justfile: `git ls-files '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -v '\\.dockerignore$' | xargs hadolint`; \
+.hadolint.yaml with an `ignored:` list, each rule with a comment saying why. DL3022 is a false positive for `COPY --from=<name>` where <name> is a `docker build --build-context`: ignore it with that reason"""
+config = [{ path = ".hadolint.yaml" }, { any = [{ path = "justfile", contains = "hadolint" }, { path = "Makefile", contains = "hadolint" }, { path = ".pre-commit-config.yaml", contains = "hadolint" }] }]
+gate = "hadolint"
+
+[[role]]
+role = "types"
+na = "hadolint's parser is the static check (a syntax error is exit 1); the build itself needs a daemon"
+
+[[role]]
+role = "dependencies"
+untested = "every FROM as `name:tag@sha256:<64 hex>` (hadolint DL3006/DL3007 force a tag, never a digest) was not run as a recipe; consumers today pin tags only (python:<ver>-slim)"
+
+[[role]]
+role = "tests"
+untested = "container-structure-test or a build-and-run smoke needs a Docker daemon, absent where this was researched"
+
+[[role]]
+role = "coverage"
+na = "a Dockerfile has no executable lines to cover"
+
+[[role]]
+role = "spelling"
+na = "the repo-wide spell check (the main stack's spelling row) reads Dockerfile comments; there is nothing Dockerfile-specific to spell"
+
+[[role]]
+role = "architecture"
+na = "an image has no layers of code to keep apart; multi-stage builds are hadolint's and the build's concern"
+
+[[role]]
+role = "hooks"
+tool = "prek hook per commit on staged Dockerfiles: hadolint"
+install = ".pre-commit-config.yaml local hook, id hadolint / language: system / entry hadolint / files: (^|/)(Dockerfile|Containerfile)|\\.Dockerfile$"
+config = [{ path = ".pre-commit-config.yaml", contains = "hadolint" }]
+
+[[role]]
+role = "agent-guidance"
+na = "the rule ids and the reasons in .hadolint.yaml are the guidance; a convention hadolint cannot carry goes in the main stack's docs/agents file"

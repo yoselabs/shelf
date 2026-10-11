@@ -147,3 +147,11 @@ def test_an_installed_tool_at_another_version_fails_the_audit(repo: Repo) -> Non
 def test_the_installed_versions_are_audit_only(repo: Repo) -> None:
     _tools_repo(repo)
     assert "stack.tools-installed" not in _rows(repo)
+
+
+def test_a_gate_that_runs_gitleaks_must_pin_it(repo: Repo) -> None:
+    _tools_repo(repo)
+    repo.write("justfile", _JUSTFILE.replace("check:\n    true\n", "check:\n    gitleaks git --no-banner\n"))
+    verdict, evidence = _pins(repo)
+    assert verdict is Verdict.FAILING
+    assert "gitleaks is not pinned" in evidence

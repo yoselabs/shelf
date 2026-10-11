@@ -1,0 +1,64 @@
+# Stack profile (see python-uv.toml for the format). POSIX sh and bash scripts, late 2026.
+# Research: openspec/changes/blueprint-skill/research/shell-and-secrets.md (shelf-ij8). Detection: two or more *.sh within
+# three levels, or one of at least 10 lines (a lone exec wrapper is not a shell stack); bd's .beads/hooks shims are skipped.
+# Tested 2026-10-11: shellcheck 0.9.0, shfmt 3.14.1 on a scratch copy of homelab (18 scripts) and on planted files.
+stack = "shell"
+status = "provisional"
+source = "shell-and-secrets.md (2026-10-11): shellcheck and shfmt seen red on planted files and run on homelab's real scripts (shellcheck clean at -S style, shfmt 32 hunks); strict mode judged by the engine (stack.shell-strict); homelab is the only consumer"
+
+[[role]]
+role = "toolchain"
+na = "a script has no language version; the interpreter is its shebang's (bash 3.2 on macOS, 5.x on Linux). The two tools below are pinned in mise.toml (ADR 0024); a script that needs bash 4+ says so in its header"
+
+[[role]]
+role = "formatter"
+tool = "shfmt 3.14.1 (mvdan/sh; mise `shfmt`) with `-d`, its style in a committed .editorconfig ([*.sh] indent_style, indent_size, switch_case_indent)"
+install = "mise.toml: shfmt = \"3.14.1\"; .editorconfig [*.sh]; justfile: `shfmt -d $(git ls-files '*.sh')` (exit 1 and a diff when unformatted); a first adoption runs `shfmt -w` once"
+config = [{ path = ".editorconfig", contains = "[*.sh" }, { path = "mise.toml", contains = "shfmt" }]
+gate = "shfmt"
+
+[[role]]
+role = "linter"
+tool = "shellcheck 0.11.0 (koalaman/shellcheck; mise `shellcheck`) at its default severity (style and up) on every tracked script; each disable is an inline `# shellcheck disable=SCnnnn` with a reason"
+install = "mise.toml: shellcheck = \"0.11.0\"; justfile: `shellcheck $(git ls-files '*.sh')`. A red repo starts at `-S warning` and tightens; never `-S error`: on a planted script it missed SC2086 (unquoted expansion) and SC2115 (`rm -rf $DIR/*`)"
+config = [{ any = [{ path = "justfile", contains = "shellcheck" }, { path = "Makefile", contains = "shellcheck" }, { path = ".pre-commit-config.yaml", contains = "shellcheck" }] }]
+gate = "shellcheck"
+[[role.alternative]]
+label = "the shellcheck-precommit hook, run by the gate's `prek run`"
+gate = '(?m)id:\s*shellcheck\b'
+
+[[role]]
+role = "types"
+na = "a shell has no types; its strictness is strict mode, judged in its own row (stack.shell.strict-mode): every executable bash script sets -u and pipefail, and -e unless a `# strict: no -e, <reason>` comment says why; a /bin/sh one sets -eu"
+
+[[role]]
+role = "dependencies"
+na = "a script's dependencies are the binaries it calls; the ones the repo installs are pinned in mise.toml (stack.tool-pins)"
+
+[[role]]
+role = "tests"
+untested = "bats-core 1.14.0 (mise `bats`) is the candidate for tools/*.sh with stubbed binaries on PATH; no .bats file was run. Not a standard until one real script has a bats test seen red, then green"
+
+[[role]]
+role = "coverage"
+untested = "kcov can trace bash but was not run; no floor is proposed for scripts"
+
+[[role]]
+role = "spelling"
+na = "the repo-wide spell check (the main stack's spelling row) reads script comments and usage text"
+
+[[role]]
+role = "architecture"
+na = "scripts are leaf entry points; one that outgrows a screen of logic moves to the repo's main language, it does not grow layers"
+
+[[role]]
+role = "hooks"
+tool = "prek per commit on staged *.sh: shellcheck and shfmt -d, the commands the gate runs"
+install = ".pre-commit-config.yaml: the koalaman/shellcheck-precommit hook (pinned by rev, same version as mise.toml) and a local `shfmt` hook (language: system, files: \\.sh$, entry: shfmt -d)"
+config = [{ path = ".pre-commit-config.yaml", contains = "shellcheck" }]
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/shell.md (strict-mode header, quoting, the waiver rules, when a script becomes the main language), linked from AGENTS.md"
+install = "`blueprint template --repo .` writes docs/agents/shell.md; link it from AGENTS.md"
+config = [{ path = "docs/agents/shell.md" }, { path = "AGENTS.md", contains = "docs/agents/shell.md" }]

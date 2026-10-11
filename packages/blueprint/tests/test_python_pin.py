@@ -12,10 +12,11 @@ if TYPE_CHECKING:
     from blueprint.testing import Repo
 
 _PYPROJECT = '[project]\nname = "x"\nrequires-python = ">=3.12"\n\n[tool.uv]\nrequired-version = ">=0.10"\n'
-_CI = "jobs:\n  check:\n    steps:\n      - uses: astral-sh/setup-uv@abc # v6\n      - run: uv sync --locked\n      - run: just check\n"
+_CI = "jobs:\n  check:\n    steps:\n      - uses: jdx/mise-action@abc # v5.1.1\n      - run: uv sync --locked\n      - run: just check\n"
+_MISE = '[tools]\nuv = "0.13.0"\n'
 
 
-_PIN_ROWS = {f"stack.python-uv.{n}" for n in ("python-pin", "python-range", "python-range-tested", "python-ci", "uv-version")}
+_PIN_ROWS = {f"stack.python-uv.{n}" for n in ("python-pin", "python-range", "python-range-tested", "python-ci", "uv-version", "uv-ci")}
 
 
 def _rows(repo: Repo) -> dict[str, tuple[Verdict, str]]:
@@ -27,6 +28,7 @@ def _sound(repo: Repo) -> None:
     repo.write("uv.lock", "")
     repo.write(".python-version", "3.12\n")
     repo.write(".github/workflows/check.yml", _CI)
+    repo.write("mise.toml", _MISE)
 
 
 def _verdict(repo: Repo, row: str) -> Verdict:
@@ -167,3 +169,76 @@ def test_a_tool_not_installed_on_this_machine_does_not_apply(repo: Repo) -> None
 def test_the_tool_check_is_left_out_of_the_per_commit_run(repo: Repo) -> None:
     _application(repo)
     assert _TOOL_ROW not in {r.id for r in run(repo.root, concern="stack", env=repo.env).rows}
+
+
+def _setup_uv(ref: str, version: str | None = None) -> str:
+    step = f"      - uses: astral-sh/setup-uv@{ref}\n"
+    if version is not None:
+        step += f'        with:\n          enable-cache: true\n          version: "{version}"\n'
+    return "jobs:\n  check:\n    steps:\n" + step + "      - run: just check\n"
+
+
+def _uv_ci(repo: Repo) -> tuple[Verdict, str]:
+    return _rows(repo)["stack.python-uv.uv-ci"]
+
+
+def test_setup_uv_with_the_pinned_version_passes(repo: Repo) -> None:
+    _sound(repo)
+    repo.write(".github/workflows/check.yml", _setup_uv("caf0cab # v3", "0.13.0"))
+    assert _uv_ci(repo)[0] is Verdict.PASSING
+
+
+def test_setup_uv_with_another_version_fails_and_names_both(repo: Repo) -> None:
+    _sound(repo)
+    repo.write(".github/workflows/check.yml", _setup_uv("v6", "0.12.1"))
+    verdict, evidence = _uv_ci(repo)
+    assert verdict is Verdict.FAILING
+    assert "0.12.1" in evidence
+    assert "0.13.0" in evidence
+
+
+def test_an_old_setup_uv_without_a_version_installs_the_newest_uv_and_fails(repo: Repo) -> None:
+    _sound(repo)
+    repo.write(".github/workflows/check.yml", _setup_uv("caf0cab # v3"))
+    verdict, evidence = _uv_ci(repo)
+    assert verdict is Verdict.FAILING
+    assert "check.yml" in evidence
+
+
+def test_a_new_setup_uv_reads_an_exact_required_version(repo: Repo) -> None:
+    _sound(repo)
+    (repo.root / "mise.toml").unlink()
+    repo.write("pyproject.toml", _PYPROJECT.replace('">=0.10"', '"==0.13.0"'))
+    repo.write(".github/workflows/check.yml", _setup_uv("v5.2.0"))
+    assert _uv_ci(repo)[0] is Verdict.PASSING
+
+
+def test_a_new_setup_uv_with_only_a_floor_resolves_to_the_newest_and_fails(repo: Repo) -> None:
+    _sound(repo)
+    repo.write(".github/workflows/check.yml", _setup_uv("v6"))
+    assert _uv_ci(repo)[0] is Verdict.FAILING
+
+
+def test_an_image_copying_another_uv_fails(repo: Repo) -> None:
+    _sound(repo)
+    repo.write("Dockerfile", "FROM python:3.12-slim\nCOPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/\n")
+    repo.write("tests/test.Dockerfile", "FROM python:3.12-slim\nCOPY --from=ghcr.io/astral-sh/uv:0.13.0@sha256:ab /uv /bin/\n")
+    verdict, evidence = _uv_ci(repo)
+    assert verdict is Verdict.FAILING
+    assert "Dockerfile" in evidence
+    assert "latest" in evidence
+    assert "test.Dockerfile" not in evidence
+
+
+def test_no_uv_pin_with_an_installer_is_not_set_up(repo: Repo) -> None:
+    _sound(repo)
+    (repo.root / "mise.toml").unlink()
+    repo.write(".github/workflows/check.yml", _setup_uv("v6"))
+    assert _uv_ci(repo)[0] is Verdict.NOT_SET_UP
+
+
+def test_the_uv_floor_fix_no_longer_claims_setup_uv_reads_it_everywhere(repo: Repo) -> None:
+    _sound(repo)
+    repo.write("pyproject.toml", '[project]\nname = "x"\nrequires-python = ">=3.12"\n')
+    fix = next(r.remediation for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == "stack.python-uv.uv-version")
+    assert "v5.2.0" in fix

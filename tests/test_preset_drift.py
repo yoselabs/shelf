@@ -175,3 +175,37 @@ def test_a_consumer_that_copies_a_shelf_only_recipe_is_not_drift(tmp_path: Path)
     consumer = _write(tmp_path / "consumer", _SHELF, justfile=_JUSTFILE + dispatch)
     result = _run(consumer, shelf)
     assert result.returncode == 0, result.stderr
+
+
+# ── shelf-bv5: the same config under another ruff is another rule set ─────────
+# a2kay's `uv lock --upgrade` moved ruff 0.15 -> 0.17 under an identical config: 30 new findings.
+
+
+def _lock(root: Path, **versions: str) -> None:
+    packages = "".join(f'[[package]]\nname = "{name}"\nversion = "{version}"\n\n' for name, version in versions.items())
+    (root / "uv.lock").write_text(f"version = 1\n\n{packages}")
+
+
+def test_a_consumer_on_another_ruff_fails_and_names_both_versions(tmp_path: Path, shelf: Path) -> None:
+    consumer = _write(tmp_path / "consumer", _SHELF)
+    _lock(shelf, ruff="0.15.20", pyrefly="0.40.0")
+    _lock(consumer, ruff="0.17.0", pyrefly="0.40.0")
+    result = _run(consumer, shelf)
+    assert result.returncode == 1
+    assert "ruff 0.17.0" in result.stderr
+    assert "0.15.20" in result.stderr
+    assert "pyrefly" not in result.stderr
+
+
+def test_matching_linter_versions_pass(tmp_path: Path, shelf: Path) -> None:
+    consumer = _write(tmp_path / "consumer", _SHELF)
+    _lock(shelf, ruff="0.15.20")
+    _lock(consumer, ruff="0.15.20")
+    assert _run(consumer, shelf).returncode == 0
+
+
+def test_a_declared_linter_version_difference_passes(tmp_path: Path, shelf: Path) -> None:
+    consumer = _write(tmp_path / "consumer", _SHELF + '\n[tool.shelf-preset]\nlinter-versions-differ = ["ruff"]\n')
+    _lock(shelf, ruff="0.15.20")
+    _lock(consumer, ruff="0.17.0")
+    assert _run(consumer, shelf).returncode == 0

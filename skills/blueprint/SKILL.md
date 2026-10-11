@@ -28,8 +28,8 @@ holds becomes a `blueprint lacks:` bead (§6), not an exception granted in chat.
 
 | layer | what it judges | concerns in v0.1 |
 |---|---|---|
-| Generic | any repo, any language | `gate` (one command, CI, hooks, guards, clean clone), `backlog` (beads), `knowledge` (CONTEXT.md, living ADRs, the generated `docs/adr/INDEX.md`) |
-| Stack-specific | one language's tools, from the shelf's profile for it | `stack/<stack>`: toolchain, formatter, linter, types, dependencies, tests, coverage, spelling, architecture; python-uv also the Python and uv pins |
+| Generic | any repo, any language | `gate` (one command, CI, hooks, guards, clean clone), `backlog` (beads), `knowledge` (CONTEXT.md, living ADRs, the generated `docs/adr/INDEX.md`), `secrets` (gitleaks in the gate; sops files sealed and covered by a rule) |
+| Stack-specific | one language's tools, from the shelf's profile for it | `stack/<stack>`: toolchain, formatter, linter, types, dependencies, tests, coverage, spelling, architecture; python-uv also the Python and uv pins (CI and images included), shell also strict mode |
 | Framework-specific | an engine or framework on top of a stack, from its profile | `framework/<name>` (godot, unity, mcp): framework version, project hygiene, build, tests, surface integrity, architecture, CI |
 | Agent harness | what agents run inside | `agents`: AGENTS.md, session env, session hooks |
 
@@ -146,8 +146,9 @@ Friction no checkpoint covers: <one line each, or none>
   reading this clone's state (installed hooks, bd's database). The repo's `just blueprint` skips them.
 - Culture files: `template --repo .` copies only what is missing and rewrites only the AGENTS.md
   block; fill the placeholders, never delete the block's markers.
-- Concerns: `gate`, `backlog`, `knowledge`, `stack`, `framework`, `agents`; profiles python-uv
-  (evidenced); dotnet, nix, compose, godot, unity and mcp (provisional). Do not invent rows for what the engine does not check.
+- Concerns: `gate`, `backlog`, `knowledge`, `secrets`, `stack`, `framework`, `agents`; profiles python-uv
+  (evidenced); dotnet, nix, compose, dockerfile, shell, godot, unity and mcp (provisional). A repo with no code yet
+  declares its stack (`[profile] stacks = ["python-uv"]` in docs/blueprint/blueprint.toml). Do not invent rows for what the engine does not check.
 - ADRs are living: one file per decision topic, rewritten when it changes, the dropped decision and
   why in its `## History`. `adr-index --repo . --write` regenerates the index agents read.
 - Two projects of one framework (a game and a prototype spike) each get a table; the owner names

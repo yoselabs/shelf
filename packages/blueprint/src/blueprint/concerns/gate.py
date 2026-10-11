@@ -47,7 +47,13 @@ _ONBOARD = (
 def one_command(ctx: Context) -> Finding:
     """The justfile has a `check` recipe and `just --dry-run check` resolves (a Makefile: `make -n check`)."""
     python = any(s.startswith("python") for s in ctx.profile.stacks)
-    fixer = (_ONBOARD, FixedBy.AUTO) if python else ("add a justfile whose `check` recipe runs every linter and the tests", FixedBy.AGENT)
+    generic = "add a justfile whose `check` recipe runs every linter and the tests"
+    if not ctx.profile.stacks:
+        generic += (
+            '; no code yet? declare the stack it will have, `[profile] stacks = ["python-uv"]` in '
+            "docs/blueprint/blueprint.toml, for its own fix"
+        )
+    fixer = (_ONBOARD, FixedBy.AUTO) if python else (generic, FixedBy.AGENT)
     gate = gate_graph.load(ctx)
     if gate is None:
         return not_set_up("no justfile", *fixer)

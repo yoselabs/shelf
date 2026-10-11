@@ -34,6 +34,7 @@ _VERSION_ARGV = {
     "prek": ("prek", "--version"),
     "bd": ("bd", "--version"),
     "git-lfs": ("git", "lfs", "version"),
+    "gitleaks": ("gitleaks", "version"),
     "godot": ("godot", "--version"),
 }
 _INSTALL = 'a recipe (`just tools`) that runs `MISE_IGNORED_CONFIG_PATHS="$HOME/.config/mise" mise install --locked`'
@@ -56,6 +57,9 @@ def _needed(ctx: Context) -> dict[str, str]:
         needed["bd"] = ".beads/"
     if ctx.read("justfile") is not None and not _rust_just(ctx):
         needed["just"] = "justfile"
+    # A gitleaks hook from its own repo is pinned by the hook's `rev`; one the justfile runs comes from mise.
+    if "gitleaks" in (ctx.read("justfile") or ""):
+        needed["gitleaks"] = "justfile"
     if "filter=lfs" in (ctx.read(".gitattributes") or ""):
         needed["git-lfs"] = ".gitattributes"
     if any(name == "godot" for name, _ in ctx.profile.frameworks):

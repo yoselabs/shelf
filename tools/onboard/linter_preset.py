@@ -59,6 +59,7 @@ _RECIPES = (
     "bootstrap-verify",
     "tools",
     "beads-lint",
+    "secrets",
     "steps",
     "lint",
     "format",
@@ -84,7 +85,7 @@ deps:
 # (check-host, test-affected); a consumer gets the plain gate.
 _CONSUMER_CHECK = """# The gate: every step at once (`steps`), one timing line, a warning for a step over its budget.
 [group('gate')]
-check: beads-lint (steps "guard" "preset" "blueprint" "lint" "typecheck" "spell" "deps" "test")
+check: beads-lint secrets (steps "guard" "preset" "blueprint" "lint" "typecheck" "spell" "deps" "test")
 
 """
 # A new justfile starts with the shelf's shell setting: plain recipe lines fail fast and on unset pipes.

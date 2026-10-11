@@ -173,3 +173,13 @@ def test_things_that_are_not_repo_paths_are_not_checked(repo: Repo) -> None:
 
 def test_a_missing_path_inside_a_fenced_block_is_not_checked(repo: Repo) -> None:
     assert _domain(repo, "```\ncat design/missing.md\n```\n") is Verdict.PASSING
+
+
+def test_a_nix_compose_shell_repo_gets_a_conventions_file_per_stack(repo: Repo) -> None:
+    repo.write("hosts/bee/flake.nix", "{ }")
+    repo.write("stacks/web/compose.yml", "services: {}")
+    repo.write("tools/a.sh", "#!/bin/sh\nset -eu\n")
+    repo.write("tools/b.sh", "#!/bin/sh\nset -eu\n")
+    installed = _install(repo)
+    for name in ("nix", "compose", "shell"):
+        assert f"docs/agents/{name}.md" in installed

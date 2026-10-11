@@ -19,9 +19,9 @@ role = "linter"
 tool = """dclint 3.1.0 (zavoloklom/docker-compose-linter, npm `dclint`, pinned) with `--max-warnings 0` and a committed .dclintrc listing every disabled rule with a reason; on top of Docker's own schema check (the types row). \
 Seen red on a planted file: no-unbound-port-interfaces and service-image-require-explicit-tag are errors (exit 1); on real files the default exit code is 0 even with warnings, so --max-warnings 0 is what makes the gate fail. \
 It does NOT flag `privileged: true` (no such rule), so the policy row below carries that. Watch item: last release 2025-07-24 and last non-CI commit 2025-09; not abandoned yet (issues still opened 2026-04), but if it goes a full year without a release the role passes to a conftest policy. \
-Dockerfiles that sit beside compose files are linted with hadolint 2.15.1 (hadolint/hadolint, released 2026-07; exit 1 on any warning, seen on homelab's images/devbox/Dockerfile: DL3008, DL4006)"""
+Dockerfiles beside the compose files are the dockerfile stack's (its linter row: hadolint)"""
 install = """npm: `npx dclint@3.1.0 --max-warnings 0 $(git ls-files '*compose*.y*ml')` (or the dclint Docker image); .dclintrc with `rules:` overrides, each with a comment saying why. Seen on homelab: 19 compose files trip require-project-name-field, service-keys-order, require-quotes-in-ports; \
-the strict answer is to fix them, not to disable the rules. hadolint: `docker run --rm -i hadolint/hadolint < images/<n>/Dockerfile` or the binary, with .hadolint.yaml `ignored:` carrying reasons"""
+the strict answer is to fix them, not to disable the rules"""
 config = [{ any = [{ path = ".dclintrc" }, { path = ".dclintrc.json" }, { path = "dclint.config.js" }, { path = ".pre-commit-config.yaml", contains = "dclint" }, { any = [{ path = "justfile", contains = "dclint" }, { path = "Makefile", contains = "dclint" }] }] }]
 gate = "dclint"
 
@@ -70,9 +70,8 @@ untested = "the rules that matter for Compose (no privileged, no host network, n
 
 [[role]]
 role = "hooks"
-tool = "prek per commit on staged compose files: docker compose config --no-interpolate, dclint, and the digest-pin filter; hadolint on staged Dockerfiles"
-install = """.pre-commit-config.yaml local hooks (language: system, files: compose.*\\.ya?ml$): id compose-config / entry sh -c 'for f in "$@"; do docker compose -f "$f" config --no-interpolate -q || exit 1; done' -- ; id dclint / entry npx --no-install dclint --max-warnings 0; \
-id hadolint / files: Dockerfile / entry hadolint"""
+tool = "prek per commit on staged compose files: docker compose config --no-interpolate, dclint, and the digest-pin filter"
+install = """.pre-commit-config.yaml local hooks (language: system, files: compose.*\\.ya?ml$): id compose-config / entry sh -c 'for f in "$@"; do docker compose -f "$f" config --no-interpolate -q || exit 1; done' -- ; id dclint / entry npx --no-install dclint --max-warnings 0;"""
 config = [{ path = ".pre-commit-config.yaml", contains = "dclint" }]
 
 [[role]]

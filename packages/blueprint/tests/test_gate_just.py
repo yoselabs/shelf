@@ -180,3 +180,19 @@ def test_the_pinned_just_in_the_repos_venv_is_used_when_none_is_on_path(repo: Re
     repo.env["PATH"] = str(repo.bin_dir)
     rows = {r.id: r for r in run(repo.root, concern="gate", env=repo.env).rows}
     assert rows["gate.one-command"].verdict is Verdict.PASSING
+
+
+def _fix(repo: Repo, check_id: str) -> str:
+    return next(r.remediation for r in run(repo.root, concern="gate", audit=False, env=repo.env).rows if r.id == check_id)
+
+
+def test_a_repo_with_no_code_that_declares_python_gets_the_onboarding_fix(repo: Repo) -> None:
+    repo.write("docs/blueprint/blueprint.toml", '[profile]\nstacks = ["python-uv"]\n')
+    assert "onboard.py" in _fix(repo, "gate.one-command")
+
+
+def test_a_repo_with_no_stack_is_told_how_to_declare_one(repo: Repo) -> None:
+    repo.write("README.md", "# idea\n")
+    fix = _fix(repo, "gate.one-command")
+    assert "stacks = [" in fix
+    assert "docs/blueprint/blueprint.toml" in fix

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 ALWAYS = ("constitution", "working-with-agents", "gate", "testing", "architecture", "domain")
 WITH_BEADS = ("issue-tracker",)
-PER_STACK = {"python-uv": "python", "python": "python", "dotnet": "dotnet"}
+PER_STACK = {"python-uv": "python", "python": "python", "dotnet": "dotnet", "nix": "nix", "compose": "compose", "shell": "shell"}
 PER_FRAMEWORK = {"godot": "godot", "mcp": "mcp", "unity": "unity"}
 BEGIN, END = "<!-- blueprint:begin -->", "<!-- blueprint:end -->"
 _STACK_TRIGGER = "before writing or changing {name} code"

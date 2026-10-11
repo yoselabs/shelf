@@ -83,3 +83,9 @@ repos:
     files: ^pyproject\.toml$
     pass_filenames: false
     stages: [pre-commit]
+  - id: hadolint
+    name: hadolint
+    entry: hadolint
+    language: system
+    files: (^|/)(Dockerfile|Containerfile)|\.Dockerfile$
+    stages: [pre-commit]

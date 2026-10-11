@@ -1,0 +1,5 @@
+# hadolint config: every ignored rule carries why.
+ignored:
+  # Pin apt package versions: the base image tag fixes the Debian release, and Debian drops superseded
+  # package versions from its mirrors, so an exact pin breaks the build on the next security update.
+  - DL3008

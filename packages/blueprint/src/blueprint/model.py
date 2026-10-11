@@ -73,6 +73,16 @@ def walk(root: Path, pattern: str, max_depth: int | None = None, skip: tuple[str
     return sorted(found)
 
 
+# Image build files by name: `Dockerfile`, `test.Dockerfile`, `Dockerfile.dev`, `Containerfile`; not their `.dockerignore`.
+DOCKERFILES = ("Dockerfile", "*.Dockerfile", "Dockerfile.*", "Containerfile")
+
+
+def dockerfiles(root: Path, skip: tuple[str, ...] = ()) -> list[Path]:
+    """The image build files within three levels of `root`."""
+    found = {p for pattern in DOCKERFILES for p in walk(root, pattern, 3, skip) if not p.name.endswith(".dockerignore")}
+    return sorted(found)
+
+
 class Verdict(StrEnum):
     """What one run recorded for one checkpoint (CONTEXT.md: verdict)."""
 

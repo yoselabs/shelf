@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from blueprint import adr
-from blueprint.model import SKIP_DIRS, Profile, walk
+from blueprint.model import SKIP_DIRS, Profile, dockerfiles, walk
 
 STATE_DIR = "docs/blueprint"
 STATE_FILE = f"{STATE_DIR}/blueprint.toml"
@@ -160,6 +160,18 @@ def load_state(repo: Path, today: date | None = None) -> State:
 COMPOSE_FILES = ("compose.yml", "compose.yaml", "docker-compose.yml", "docker-compose.yaml")
 
 
+# A shell stack is two or more scripts, or one long enough to hold logic; a lone `exec` wrapper is not one.
+# bd writes its own hook shims under .beads/hooks.
+_SHELL_MIN_LINES = 10
+
+
+def _shell_scripts(repo: Path, skip: tuple[str, ...]) -> list[str]:
+    found = walk(repo, "*.sh", 3, (*skip, ".beads/hooks"))
+    if len(found) == 1 and len(found[0].read_text(errors="replace").splitlines()) < _SHELL_MIN_LINES:
+        return []
+    return [p.relative_to(repo).as_posix() for p in found]
+
+
 def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
     """Each stack present with the files that set it, from their manifests."""
     found: dict[str, list[str]] = {}
@@ -173,6 +185,10 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
         found["nix"] = [p.relative_to(repo).as_posix() for p in flakes]
     if composes := [p for pattern in COMPOSE_FILES for p in walk(repo, pattern, 3, skip)]:
         found["compose"] = sorted(p.relative_to(repo).as_posix() for p in composes)
+    if images := dockerfiles(repo, skip):
+        found["dockerfile"] = [p.relative_to(repo).as_posix() for p in images]
+    if scripts := _shell_scripts(repo, skip):
+        found["shell"] = scripts
     for stack, manifest in (("node", "package.json"), ("go", "go.mod"), ("rust", "Cargo.toml")):
         if (repo / manifest).is_file():
             found[stack] = [manifest]

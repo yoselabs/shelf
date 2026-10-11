@@ -23,17 +23,14 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3
-        with:
-          enable-cache: true
-
-      - run: uv sync --locked
-
-      # The pinned tools (mise.toml, mise.lock; ADR 0024), then the beads database from refs/dolt/data, so
-      # `beads-lint` judges the beads as pushed. The repo is public: read the Dolt data over HTTPS, no SSH key.
+      # The pinned tools, uv included (mise.toml, mise.lock; ADR 0024): no setup-uv, which would install the newest uv.
+      # Then the beads database from refs/dolt/data, so `beads-lint` judges the beads as pushed. The repo is public:
+      # read the Dolt data over HTTPS, no SSH key.
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
         with:
           install_args: --locked
+
+      - run: uv sync --locked
       - run: bd bootstrap
         env:
           BD_DISABLE_METRICS: "1"

@@ -18,6 +18,14 @@ _FORMAT = (
     f"status ({'/'.join(adr.STATUSES)}), decided_by, updated (YYYY-MM-DD); body: decision on top, `## History` below"
 )
 
+# The conversion that takes judgment: a repo whose ADRs amend each other (0038 "amends 0037").
+_FOLD = (
+    "Where a later ADR amends or narrows an earlier one, fold it: rewrite the earlier file's top to the decision "
+    "as it now stands, add a dated History entry naming the amending ADR, what changed and why; then mark the "
+    "amending file superseded (or delete it if it held nothing else) and point its History at the file it folded into. "
+    "A new ADR only for a new topic"
+)
+
 
 @check("knowledge.glossary", "CONTEXT.md at the root names the domain's concepts (or CONTEXT-MAP.md points to several)")
 def glossary(ctx: Context) -> Finding:
@@ -37,7 +45,7 @@ def adr_format(ctx: Context) -> Finding:
     bad = [f"{p.name} ({'; '.join(issues)})" for p in found if (issues := adr.problems(p))]
     if bad:
         shown = ", ".join(bad[:5]) + (f", and {len(bad) - 5} more" if len(bad) > 5 else "")
-        return failing(f"{len(bad)} of {len(found)} ADRs malformed: {shown}", f"rewrite each to the format: {_FORMAT}")
+        return failing(f"{len(bad)} of {len(found)} ADRs malformed: {shown}", f"rewrite each to the format: {_FORMAT}. {_FOLD}")
     return passing(f"{len(found)} ADRs, frontmatter complete")
 
 

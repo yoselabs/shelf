@@ -10,9 +10,10 @@
 # A C/C++ toolchain: anyembed's llama-cpp-python ships only an sdist and builds llama.cpp at sync.
 # just itself arrives with the venv: `rust-just` is a dev dependency, run as `just` from /opt/venv/bin.
 FROM python:3.12-slim AS base
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apt-get update && apt-get install -y --no-install-recommends git make build-essential \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=ghcr.io/astral-sh/uv:0.10.12 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     VIRTUAL_ENV=/opt/venv \
@@ -26,6 +27,7 @@ RUN git config --global --add safe.directory '*' \
  && git config --global init.defaultBranch main
 
 FROM base AS manifests
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /src
 COPY . .
 RUN mkdir /m && { find . -name pyproject.toml -not -path './.git/*'; echo uv.lock; } | tar -cf - -T - | tar -xf - -C /m

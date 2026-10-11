@@ -1,0 +1,7 @@
+# gitleaks config: the default rules, plus each false positive the shelf has seen, with why it is one.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Model ids in tests and catalogs (claude-haiku-4-5-20251001): a name and a date, not a key"
+regexes = ['''claude-(?:haiku|sonnet|opus|fable)-[0-9]+(?:-[0-9]+)*''']

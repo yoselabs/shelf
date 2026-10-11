@@ -10,13 +10,14 @@ repos here reached ten different rule sets with no one deciding to.
 
 This closes that loop without taking the ownership away. It compares three axes —
 ``[tool.ruff.lint] select``/``ignore``, ``[tool.pyrefly.errors]``, and the
-``justfile`` recipe set (a consumer still on a ``Makefile`` is compared by its targets) — and fails on any difference the consumer has not
-declared in its own::
+``justfile`` recipe set (a consumer still on a ``Makefile`` is compared by its targets) — plus the ruff and pyrefly
+versions both ``uv.lock`` files hold, and fails on any difference the consumer has not declared in its own::
 
     [tool.shelf-preset]
     ruff-select-omitted = []
     pyrefly-errors-extra = ["unknown-argument-type"]  # reflective verb dispatch
     recipes-extra = ["archlint"]                      # import-linter contracts
+    linter-versions-differ = ["ruff"]                 # trying ruff 0.17 ahead of the shelf
 
 (``make-targets-extra`` / ``make-targets-omitted``, this axis's name before ADR 0023, still count.)
 An empty list means "identical here". A declared entry is a local choice made on
@@ -77,6 +78,7 @@ _SHELF_ONLY_TARGETS = frozenset(
         "eval",
         "gate",
         "container",
+        "images",
     }
 )
 
@@ -103,6 +105,30 @@ def _recipes(repo: Path) -> set[str]:
         if (path := repo / name).is_file():
             return {m.group(1) for line in path.read_text().splitlines() if (m := _RECIPE.match(line))}
     return set()
+
+
+# The linters whose version is part of the rule set: one config under two ruff versions is two rule sets.
+_LINTERS = ("ruff", "pyrefly")
+
+
+def _locked(repo: Path) -> dict[str, str]:
+    """name -> version of each linter in the repo's uv.lock; empty when there is no lock."""
+    path = repo / "uv.lock"
+    if not path.is_file():
+        return {}
+    packages = tomllib.loads(path.read_text()).get("package", [])
+    return {str(p["name"]): str(p.get("version", "")) for p in packages if p.get("name") in _LINTERS}
+
+
+def _version_drift(shelf: Path, repo: Path, declared: dict[str, Any]) -> list[str]:
+    """Each linter both locks hold at different versions, unless `linter-versions-differ` names it."""
+    ours, theirs = _locked(shelf), _locked(repo)
+    excused = set(declared.get("linter-versions-differ", []))
+    return [
+        f"  linter-versions: {name} {theirs[name]} here, {ours[name]} in the shelf (the same config, other rules)"
+        for name in _LINTERS
+        if name in ours and name in theirs and ours[name] != theirs[name] and name not in excused
+    ]
 
 
 def _shelf_root(explicit: str | None) -> Path | None:
@@ -175,6 +201,7 @@ def main() -> int:
     }
 
     findings = [line for axis, _ in _AXES for line in _compare(axis, *values[axis], declared)]
+    findings += _version_drift(shelf, repo, declared)
     if not findings:
         print(f"preset-drift: {repo.name} matches the shelf preset (or declares every difference)")
         return 0
