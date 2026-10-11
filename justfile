@@ -26,10 +26,10 @@ test_image := "shelf-gate-" + file_name(justfile_directory())
 # In CI, inside a container, or with SHELF_HOST_CHECK=1 they run in place; the container
 # speeds the gate up and is never required.
 [group('gate')]
-check: beads-lint secrets images (gate "check-host")
+check: beads-lint secrets images scripts (gate "check-host")
 
 [group('gate')]
-check-all: beads-lint secrets images (gate "check-all-host")
+check-all: beads-lint secrets images scripts (gate "check-all-host")
 
 # Every bead still to be started (open or blocked) carries its acceptance criteria: criteria are what make a bead
 # ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. Runs on the
@@ -67,6 +67,15 @@ images:
     set -euo pipefail
     command -v hadolint >/dev/null || { echo "images: hadolint is not installed -- run just tools" >&2; exit 2; }
     git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\.dockerignore$' | xargs -0 -r hadolint
+
+# Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
+# blueprint's for this step in every repo (stack/shell, stack/shell-scripts). On the host, beside images.
+[group('gate')]
+scripts:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v shellcheck >/dev/null || { echo "scripts: shellcheck is not installed -- run just tools" >&2; exit 2; }
+    git ls-files -z '*.sh' | xargs -0 -r shellcheck
 
 # The dispatch sits in its own private recipe so `check` and `check-all` stay plain dependency edges
 # for the graph reader.

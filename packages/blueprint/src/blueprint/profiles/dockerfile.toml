@@ -19,7 +19,7 @@ role = "linter"
 tool = """hadolint 2.15.1 (hadolint/hadolint; mise `hadolint`, pinned) over every tracked Dockerfile, with a committed .hadolint.yaml. \
 Exit 1 on any warning (the default threshold); seen red on four real files (DL3008 apt pin, DL4006 pipefail, DL3013 pip pin, DL3022 COPY --from a named build context) \
 and on a planted `FROM ubuntu:latest` with a bare `apt-get install` (DL3007, DL3008, DL3014, DL3015). Never `--failure-threshold error`: it passed a file with real warnings"""
-install = """mise.toml: hadolint = "2.15.1"; justfile: `git ls-files '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -v '\\.dockerignore$' | xargs hadolint`; \
+install = """mise.toml: hadolint = "2.15.1"; justfile: an `images` recipe, `git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\\.dockerignore$' | xargs -0 -r hadolint`, a dependency of `check`; \
 .hadolint.yaml with an `ignored:` list, each rule with a comment saying why. DL3022 is a false positive for `COPY --from=<name>` where <name> is a `docker build --build-context`: ignore it with that reason"""
 config = [{ path = ".hadolint.yaml" }, { any = [{ path = "justfile", contains = "hadolint" }, { path = "Makefile", contains = "hadolint" }, { path = ".pre-commit-config.yaml", contains = "hadolint" }] }]
 gate = "hadolint"

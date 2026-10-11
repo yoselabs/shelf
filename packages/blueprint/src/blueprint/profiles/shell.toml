@@ -20,7 +20,7 @@ gate = "shfmt"
 [[role]]
 role = "linter"
 tool = "shellcheck 0.11.0 (koalaman/shellcheck; mise `shellcheck`) at its default severity (style and up) on every tracked script; each disable is an inline `# shellcheck disable=SCnnnn` with a reason"
-install = "mise.toml: shellcheck = \"0.11.0\"; justfile: `shellcheck $(git ls-files '*.sh')`. A red repo starts at `-S warning` and tightens; never `-S error`: on a planted script it missed SC2086 (unquoted expansion) and SC2115 (`rm -rf $DIR/*`)"
+install = "mise.toml: shellcheck = \"0.11.0\"; justfile: a `scripts` recipe, `git ls-files -z '*.sh' | xargs -0 -r shellcheck`, a dependency of `check`. A red repo starts at `-S warning` and tightens; never `-S error`: on a planted script it missed SC2086 (unquoted expansion) and SC2115 (`rm -rf $DIR/*`)"
 config = [{ any = [{ path = "justfile", contains = "shellcheck" }, { path = "Makefile", contains = "shellcheck" }, { path = ".pre-commit-config.yaml", contains = "shellcheck" }] }]
 gate = "shellcheck"
 [[role.alternative]]

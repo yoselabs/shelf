@@ -209,3 +209,9 @@ def test_a_declared_linter_version_difference_passes(tmp_path: Path, shelf: Path
     _lock(shelf, ruff="0.15.20")
     _lock(consumer, ruff="0.17.0")
     assert _run(consumer, shelf).returncode == 0
+
+
+def test_the_stack_conditional_recipes_are_neither_owed_nor_extra(tmp_path: Path) -> None:
+    shelf = _write(tmp_path / "shelf", _SHELF, _JUSTFILE + "images:\n    @true\n\nscripts:\n    @true\n")
+    assert _run(_write(tmp_path / "bare", _SHELF), shelf).returncode == 0
+    assert _run(_write(tmp_path / "with", _SHELF, _JUSTFILE + "scripts:\n    @true\n"), shelf).returncode == 0

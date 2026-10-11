@@ -63,7 +63,8 @@ _JUSTFILES = ("justfile", "Justfile", ".justfile")
 # any-browser lane, its gate container and affected-only run). `blueprint`
 # is copied (the per-commit blueprint checks), so it is not shelf-only. A consumer
 # has nothing for them to act on, so their absence is not drift; without this every
-# fresh consumer failed `just preset`.
+# fresh consumer failed `just preset`. `images` and `scripts` are the blueprint's names for the hadolint and
+# shellcheck steps: owed only by a repo with Dockerfiles or scripts (its stack rows say so), so never drift either way.
 _SHELF_ONLY_TARGETS = frozenset(
     {
         "catalog",
@@ -79,6 +80,7 @@ _SHELF_ONLY_TARGETS = frozenset(
         "gate",
         "container",
         "images",
+        "scripts",
     }
 )
 

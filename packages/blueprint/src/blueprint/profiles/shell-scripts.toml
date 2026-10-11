@@ -17,7 +17,7 @@ na = "helper scripts beside the main language: shfmt and its .editorconfig cost 
 [[role]]
 role = "linter"
 tool = "shellcheck 0.11.0 (koalaman/shellcheck; mise `shellcheck`) at its default severity on every tracked script; each disable inline with a reason"
-install = "mise.toml: shellcheck = \"0.11.0\"; a gate recipe `shellcheck $(git ls-files '*.sh')`. Never `-S error`: on a planted script it missed SC2086 (unquoted expansion) and SC2115 (`rm -rf $DIR/*`)"
+install = "mise.toml: shellcheck = \"0.11.0\"; a `scripts` recipe, `git ls-files -z '*.sh' | xargs -0 -r shellcheck`, a dependency of `check`. Never `-S error`: on a planted script it missed SC2086 (unquoted expansion) and SC2115 (`rm -rf $DIR/*`)"
 config = [{ any = [{ path = "justfile", contains = "shellcheck" }, { path = "Makefile", contains = "shellcheck" }, { path = ".pre-commit-config.yaml", contains = "shellcheck" }] }]
 gate = "shellcheck"
 [[role.alternative]]
