@@ -64,8 +64,9 @@ _MAKE_TARGETS = (
 
 _GENERATED_PREFIXES = ("tool.pyrefly", "tool.pytest")
 _SHELF_TESTS_SUBCONFIG = "packages/*/tests/**"
-_CONSUMER_DEPS = """# dependency hygiene: unused, missing and transitive dependencies (deptry).
+_CONSUMER_DEPS = """# dependency hygiene: the lockfile matches pyproject, then unused, missing and transitive (deptry).
 deps:
+\tuv lock --check
 \tuv run deptry .
 
 """

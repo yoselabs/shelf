@@ -21,7 +21,7 @@ line-length = 100
 [tool.ruff.lint]
 select = ["ALL"]
 """
-_MAKEFILE = "check: lint\nlint:\n\tuv run ruff format --check .\n\tuv run ruff check .\n"
+_MAKEFILE = "check: lint\nlint:\n\tuv lock --check\n\tuv run ruff format --check .\n\tuv run ruff check .\n"
 
 
 def _rows(repo: Repo) -> dict[str, tuple[Verdict, str, bool]]:
@@ -40,6 +40,14 @@ def test_a_role_configured_and_run_by_the_gate_passes(repo: Repo) -> None:
     assert rows["stack.python-uv.formatter"][0] is Verdict.PASSING
     assert rows["stack.python-uv.linter"][0] is Verdict.PASSING
     assert rows["stack.python-uv.toolchain"][0] is Verdict.PASSING
+
+
+def test_a_gate_without_the_lock_check_fails_the_toolchain(repo: Repo) -> None:
+    _python_repo(repo)
+    repo.write("Makefile", _MAKEFILE.replace("\tuv lock --check\n", ""))
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.toolchain"]
+    assert verdict is Verdict.FAILING
+    assert "uv lock --check" in evidence
 
 
 def test_a_role_configured_but_not_in_the_gate_fails(repo: Repo) -> None:

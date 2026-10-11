@@ -117,10 +117,12 @@ typecheck:
 spell:
 	uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md CLAUDE.md conftest.py
 
-# dependency hygiene per package (unused / missing / transitive). deptry reads each
+# dependency hygiene: uv.lock matches every pyproject (`uv run` alone never notices a stale lock;
+# shelf main ran green on one, 2026-10-11), then per package (unused / missing / transitive). deptry reads each
 # package's own pyproject from its dir; --known-first-party (the src import name)
 # silences the src-layout self-import DEP003 noise.
 deps:
+	env -u UV_FROZEN uv lock --check
 	@for p in packages/*/; do \
 	  imp=$$(ls "$$p/src"); \
 	  echo "-- deptry $$p (first-party: $$imp)"; \

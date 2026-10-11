@@ -20,6 +20,8 @@ config = [
     # A virtual workspace root has no [project]; .python-version pins it instead.
     { any = [{ path = "pyproject.toml", contains = "requires-python" }, { path = ".python-version" }] },
 ]
+# `uv run` and `uv sync --frozen` never notice a stale lock; only this check does.
+gate = "uv lock --check"
 
 [[role]]
 role = "formatter"
