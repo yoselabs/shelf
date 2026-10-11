@@ -34,18 +34,17 @@ installed); both machines run bd 1.3.1: keep them equal until mise pins it (ADR 
 
 | part | state |
 |---|---|
-| engine | concerns gate, backlog, knowledge, stack (+ python pins), framework, agents; reads the gate graph from `just --dump`; `checkpoints.txt` grace (ADR 0018); every exception needs a reason plus an expiry or an accepted ADR (ADR 0022) |
+| engine | concerns gate, backlog, knowledge, stack (+ python pins, mise tool pins), framework, agents; reads the gate graph from `just --dump`; `checkpoints.txt` grace (ADR 0018); every exception needs a reason plus an expiry or an accepted ADR (ADR 0022) |
 | profiles | python-uv (evidenced; architecture = import-linter + ruff banned-api); dotnet (with a coverage floor), nix, compose, godot, unity, mcp (provisional); framework gate scripts ship as `blueprint recipe <name>` |
 | skill | strict and pushy; answers then returns to the run; ends with a relay block for a shelf session; grows missing profiles from inside a repo |
 | shelf | passes its own audit (all ✅); gate is `uv run just check`; `affected.py` kept, moon is the target (ADR 0021) |
 | evals | 8 cases, all passing before the just migration. Re-run on the devbox 2026-10-11: every run failed before the skill could act, because the container forbids unprivileged user namespaces, so the eval sandbox (bwrap) cannot start a shell. Not a skill result: re-run on the Mac, or after the devbox allows user namespaces |
 
 Open, in order:
-1. shelf-1y4.19: build the mise pin checks, pin the shelf and lifesim (ADR 0024 accepted 2026-10-11).
-2. Evals: re-run `just eval` where the sandbox works (see the evals row); the eval copy no longer includes worktrees.
-3. Owner decided 2026-10-11: shelf-230 yes, flag only (gate rows owner-decided when an unmerged branch holds gate files);
-   shelf-lzg no to deferring the decision layout, yes to the cheap half (no-ci wording, culture-files flags missing paths).
-4. Re-audit every consumer on the new blueprint (shelf-1y4.12): a2kay, lifesim, a2peer, homelab; relay surveys.
+1. Evals: re-run `just eval` where the sandbox works (the devbox forbids unprivileged user namespaces); the eval copy no longer includes worktrees.
+2. Re-audit every consumer on the new blueprint (shelf-1y4.12): a2kay, lifesim, a2peer, homelab; relay surveys. New rows they will
+   meet: stack.tool-pins / tools-installed (ADR 0024; lifesim's pins, Godot editor included, land there), the unmerged-branch
+   note on gate rows (shelf-230: lifesim's wip/bootstrap), domain.md paths and the no-ci gate.md (shelf-lzg).
    Unity runtime claims were seen on 6000.7.0b4 only: re-run on 6000.3 LTS. nix/compose templates: shelf-1y4.20.
 5. Then opencode (1y4.16), release (1y4.11), reabsorb (1y4.10), kickoff (1y4.9), shelf off OpenSpec (1y4.13), u0p.
 

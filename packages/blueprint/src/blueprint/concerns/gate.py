@@ -578,10 +578,12 @@ def unmerged_gate_branches(ctx: Context) -> dict[str, list[str]]:
     """
     head = (ctx.git("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD") or "").strip().removeprefix("refs/remotes/")
     base = head or "origin/main"
+    if ctx.git("rev-parse", "--verify", "--quiet", base) is None:
+        return {}
     refs = (ctx.git("for-each-ref", "--format=%(refname:short)", "refs/remotes/origin") or "").split()
     found: dict[str, list[str]] = {}
     for ref in refs:
-        if ref in {base, "origin", "origin/HEAD"} or ctx.git("rev-parse", "--verify", "--quiet", base) is None:
+        if ref in {base, "origin", "origin/HEAD"}:
             continue
         changed = (ctx.git("diff", "--name-only", f"{base}...{ref}") or "").splitlines()
         if files := [f for f in changed if any(fnmatch(f, pattern) for pattern in _GATE_FILES)]:
