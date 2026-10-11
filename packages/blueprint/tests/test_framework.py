@@ -136,3 +136,38 @@ def test_the_framework_layer_shows_in_the_report(repo: Repo) -> None:
     report = run(repo.root, concern="framework", env=repo.env)
     assert report.rows
     assert {r.layer for r in report.rows} == {"framework"}
+
+
+def _unity(repo: Repo, root: str = "Game") -> None:
+    repo.write(f"{root}/ProjectSettings/ProjectVersion.txt", "m_EditorVersion: 6000.3.2f1\n")
+    repo.write(f"{root}/Packages/packages-lock.json", '{"dependencies": {}}\n')
+
+
+def test_a_unity_project_is_found_by_its_project_settings_and_rooted_above_them(repo: Repo) -> None:
+    _unity(repo)
+    rows = _rows(repo)
+    assert "in Game" in rows["framework.unity.profile"][1]
+    assert rows["framework.unity.framework-version"][0] is Verdict.PASSING
+
+
+def test_a_unity_project_at_the_repo_root_is_rooted_at_the_root(repo: Repo) -> None:
+    _unity(repo, ".")
+    assert "in ." in _rows(repo)["framework.unity.profile"][1]
+
+
+def test_unity_tests_outside_the_gate_fail(repo: Repo) -> None:
+    _unity(repo)
+    repo.write("justfile", "check:\n    true\n\nunity-test:\n    unity -batchmode -runTests -testPlatform EditMode\n")
+    repo.write("Game/Assets/Tests/EditMode/Game.Tests.asmdef", '{"references": ["UnityEngine.TestRunner"]}\n')
+    assert _rows(repo)["framework.unity.tests"][0] is Verdict.FAILING
+
+
+def test_unitys_library_cache_is_not_walked_but_a_folder_named_library_elsewhere_is(repo: Repo) -> None:
+    _unity(repo, ".")
+    repo.write("Library/Bee/Generated.csproj", "<Project/>\n")
+    repo.write("Library/PackageCache/ProjectSettings/ProjectVersion.txt", "m_EditorVersion: 6000.3.2f1\n")
+    report = run(repo.root, env=repo.env)
+    assert not any(r.id.startswith("stack.dotnet") for r in report.rows)
+    assert "framework.unity.profile" in {r.id for r in report.rows}
+    repo.write("src/Library/Library.csproj", "<Project/>\n")
+    assert any(r.id.startswith("stack.dotnet") for r in run(repo.root, env=repo.env).rows)

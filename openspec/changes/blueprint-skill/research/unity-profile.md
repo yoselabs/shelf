@@ -1,6 +1,6 @@
 # Unity framework profile (draft) layered on the .NET stack profile
 
-Date 2026-10-11. Deliverables beside this file: `unity.toml` (status provisional), `unity.md` (agent template), `unity_integrity.py` (hygiene gate, stdlib).
+Date 2026-10-11. Adopted as `packages/blueprint/src/blueprint/profiles/frameworks/unity.toml`, `templates/agents/unity.md` and the `unity-integrity` recipe (`recipes/unity_integrity.py`).
 Labels: **T** = run here on Unity **6000.7.0b4** (6.7 BETA; the only editor on this Mac, /Applications/Unity/Hub/Editor), macOS arm64, .NET SDK 10.0.401, scratch project under the session scratchpad (`lab/g1`); **R** = read (URL, 2026-10-11); **J** = judgement; **U** = untested.
 Every T result is for 6000.7.0b4, NOT for the 6000.3 LTS the profile recommends. No consumer repo exists; no repo was modified; nothing committed. No file was downloaded: analyzers came from the local NuGet cache (~/.nuget/packages), so Microsoft.Unity.Analyzers (not cached) is U.
 

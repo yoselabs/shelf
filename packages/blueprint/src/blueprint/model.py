@@ -39,6 +39,9 @@ SKIP_DIRS = frozenset(
         "target",
     }
 )
+# A Unity project's caches and per-user state, skipped only beside its ProjectSettings/: elsewhere a
+# folder named Library can be source.
+UNITY_CACHES = frozenset({"Library", "Temp", "Logs", "UserSettings"})
 
 
 def is_skipped(rel: str, skip: tuple[str, ...]) -> bool:
@@ -55,6 +58,7 @@ def walk(root: Path, pattern: str, max_depth: int | None = None, skip: tuple[str
             d
             for d in dirs
             if d not in SKIP_DIRS
+            and not (d in UNITY_CACHES and (Path(here) / "ProjectSettings").is_dir())
             and (max_depth is None or depth + 1 < max_depth)
             and not is_skipped((Path(here) / d).relative_to(root).as_posix(), skip)
         ]

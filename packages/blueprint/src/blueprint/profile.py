@@ -180,8 +180,22 @@ def _evidence_files(files: list[str]) -> str:
     return ", ".join(files[:3]) + (f" and {len(files) - 3} more" if len(files) > 3 else "")
 
 
-# A framework is found by a marker file; its folder is where the marker sits.
-FRAMEWORK_MARKERS = {"godot": "project.godot"}
+@dataclass(frozen=True)
+class Marker:
+    """The file that marks a framework project; `folder`, when set, is the folder it must sit in."""
+
+    file: str
+    folder: str = ""
+
+    def root(self, found: Path) -> Path | None:
+        """The project folder for a matching file: where it sits, or the parent of its `folder`; None when it is elsewhere."""
+        if not self.folder:
+            return found.parent
+        return found.parent.parent if found.parent.name == self.folder else None
+
+
+# Godot's marker sits in the project folder, Unity's one folder down (ProjectSettings/).
+FRAMEWORK_MARKERS = {"godot": Marker("project.godot"), "unity": Marker("ProjectVersion.txt", "ProjectSettings")}
 
 
 @dataclass(frozen=True)
@@ -225,7 +239,8 @@ def detect_frameworks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[tuple[str
     """Each framework found within three levels of the root, with its folder: by marker file, then by dependency."""
     found: list[tuple[str, str]] = []
     for name, marker in FRAMEWORK_MARKERS.items():
-        found += [(name, str(p.parent.relative_to(repo)) or ".") for p in walk(repo, marker, 4, skip)]
+        roots = (marker.root(p) for p in walk(repo, marker.file, 5 if marker.folder else 4, skip))
+        found += [(name, str(r.relative_to(repo)) or ".") for r in roots if r is not None]
     for name, rule in FRAMEWORK_DEPENDENCIES.items():
         for pyproject in walk(repo, "pyproject.toml", 4, skip):
             if _runtime_dependencies(pyproject) & set(rule.deps) and _source_uses(pyproject.parent, rule.used):

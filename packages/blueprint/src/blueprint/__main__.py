@@ -21,7 +21,7 @@ from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
 RECIPES = Path(__file__).resolve().parent / "recipes"
-RECIPE_FILES = {"hooks": "pre-commit-config.yaml"}
+RECIPE_FILES = {"hooks": "pre-commit-config.yaml", "unity-integrity": "unity_integrity.py"}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -50,7 +50,11 @@ def main(argv: list[str] | None = None) -> int:
     idx.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     idx.add_argument("--write", action="store_true", help="write it to docs/adr/INDEX.md instead")
     rcp = sub.add_parser("recipe", help="print a blueprint recipe file")
-    rcp.add_argument("name", choices=sorted(RECIPE_FILES), help="hooks: the .pre-commit-config.yaml prek reads")
+    rcp.add_argument(
+        "name",
+        choices=sorted(RECIPE_FILES),
+        help="hooks: the .pre-commit-config.yaml prek reads; unity-integrity: tools/unity_integrity.py",
+    )
     args = parser.parse_args(argv)
 
     commands = {"template": _template, "adr-index": _adr_index, "recipe": _recipe, "survey": lambda a: _survey(a.repo, a.check)}

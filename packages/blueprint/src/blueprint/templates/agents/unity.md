@@ -2,7 +2,7 @@
 
 Framework layer on top of [dotnet.md](dotnet.md) for a Unity 6 C# game. `{{unity_root}}` is the folder holding `ProjectSettings/`.
 Unity compiles at C# 9 (`netstandard2.1`) through 6000.7; rules that need newer C# do not apply to Unity code.
-Draft note: a rule marked (seen) was reproduced on 6000.7.0b4; the rest is engine knowledge from Unity docs, not re-run here.
+A rule marked (seen) was reproduced on 6000.7.0b4; the rest is from the Unity docs.
 
 ## Tools per role
 
@@ -18,15 +18,15 @@ Draft note: a rule marked (seen) was reproduced on 6000.7.0b4; the rest is engin
 | analyzers | strict .NET set on `Game.*` generated projects, exemptions in `Assets/Unity.globalconfig` | `dotnet build -warnaserror` |
 | hooks | prek `unity-integrity`, `csharpier check` | hook |
 | embedded-script-lint | none proven for shaders | - |
-| ci | none for now: agents run `make check` where the pinned editor is installed (`UNITY` var) | - |
+| ci | none for now: agents run `just check` where the pinned editor is installed (`UNITY` var) | - |
 
 ## Run
 
 ```bash
-make check          # unity-build, unity-test, unity-validate, dotnet build + test, integrity script
-make unity-build    # compile + import; then the tree must be clean
-make unity-test     # EditMode + PlayMode; read results-*.xml
-make unity-validate # missing scripts in scenes and prefabs
+just check          # unity-build, unity-test, unity-validate, dotnet build + test, integrity script
+just unity-build    # compile + import; then the tree must be clean
+just unity-test     # EditMode + PlayMode; read results-*.xml
+just unity-validate # missing scripts in scenes and prefabs
 ```
 
 The editor in `ProjectVersion.txt` must be installed; any other version fails the gate. Close the editor GUI first: a project open in
@@ -83,7 +83,7 @@ one editor cannot be opened by a second.
 
 - With Enter Play Mode Options (domain reload off), statics and events survive between runs. Reset them in `[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]`.
 - Editor-only code goes in an Editor asmdef (or `#if UNITY_EDITOR`); `UnityEditor` in a runtime asmdef breaks the player build, not the editor.
-- Script compile and domain reload happen on every change; a long `make` loop in an open editor will fight it. Run the gate with the editor closed.
+- Script compile and domain reload happen on every change; a long `just` loop in an open editor will fight it. Run the gate with the editor closed.
 
 ## Async
 

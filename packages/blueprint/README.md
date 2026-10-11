@@ -72,11 +72,11 @@ and the scope: concerns checked, concerns not run, and whether the audit-only ch
 | generic | gate | `one-command` · `runner` (a Makefile-only gate fails: the runner is just, ADR 0023; the graph is read from `just --dump --dump-format json`, a Makefile still being judged) · `runs-blueprint` · `ci` · `ci-no-manifest-edit` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` (follows `just check` into pre-commit hooks) · `checkers-wired` · `default-branch` (audit only) · `git-remote` (audit only) · `clean-clone` (audit only) |
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
 | stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional; the toolchain row also checks every dotnet install against global.json); `python-uv.uv-tool` (audit only): an application's installed uv tool matches uv.lock |
-| framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, provisional: framework-version · project-hygiene · embedded-script-lint · build · tests · surface-integrity · architecture · ci); paths may use `{root}` (the project folder) and globs |
+| framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, unity, mcp, provisional: framework-version · project-hygiene · binary-assets · embedded-script-lint · build · tests · surface-integrity · architecture · ci · hooks · agent-guidance); paths may use `{root}` (the project folder) and globs |
 | agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `worktrees` · `culture-files` (placeholders in docs/agents/, AGENTS.md and CLAUDE.md) · `managed-block` |
 
 Hooks follow one recipe: prek owns them through `.pre-commit-config.yaml` and bd's five events run
-from it (`blueprint recipe hooks` prints it); bd never installs hooks itself.
+from it (`blueprint recipe hooks` prints it); bd never installs hooks itself. A framework's own gate script is a recipe too (`blueprint recipe unity-integrity`): the repo copies it into `tools/` and owns the copy.
 
 A stack with no profile, or a role its profile leaves untested, is a **blueprint gap**: reported
 every run, never a pass, but left out of the exit code, since the shelf lacks the answer, not the repo.

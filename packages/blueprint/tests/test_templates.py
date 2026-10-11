@@ -32,6 +32,11 @@ def test_a_dotnet_godot_beads_repo_gets_every_file_it_needs(repo: Repo) -> None:
     assert "docs/agents/godot.md" in block
 
 
+def test_a_unity_project_gets_the_unity_conventions_file(repo: Repo) -> None:
+    repo.write("Game/ProjectSettings/ProjectVersion.txt", "m_EditorVersion: 6000.3.2f1\n")
+    assert "docs/agents/unity.md" in _install(repo)
+
+
 def test_an_existing_file_is_never_overwritten_and_a_second_run_changes_nothing(repo: Repo) -> None:
     repo.write("docs/agents/constitution.md", "ours\n")
     _install(repo)
