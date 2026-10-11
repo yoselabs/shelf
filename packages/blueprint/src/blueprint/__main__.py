@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         text = report.markdown(result)
     sys.stdout.write(text + "\n")
     if args.write:
-        for path in report.write(result, args.repo.resolve(), date.today()):  # noqa: DTZ011 -- a report date, the owner's calendar
+        for path in report.write(result, args.repo.resolve(), date.today(), prune=args.concern is None):  # noqa: DTZ011 -- a report date, the owner's calendar
             sys.stderr.write(f"wrote {path}\n")
     return result.exit_code
 

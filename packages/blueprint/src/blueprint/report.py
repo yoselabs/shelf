@@ -192,13 +192,20 @@ def as_json(run: Run) -> str:
     )
 
 
-def write(run: Run, repo: Path, today: date) -> list[Path]:
-    """Write `docs/blueprint/README.md` (the summary) and `<concern>.md` per concern; return the paths."""
+_STAMP_OPENING = "Written by `blueprint check --write` on "
+
+
+def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path]:
+    """Write `docs/blueprint/README.md` (the summary) and `<concern>.md` per concern; return the paths.
+
+    `prune` removes the reports this command wrote for a concern the run no longer has (a stack that became
+    another, a2kay's stack-shell.md beside stack-shell-scripts.md); a run of one concern passes False.
+    """
     out_dir = repo / STATE_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     # Not "Generated ...; do not edit": a repo's own generated-file guard fails a tracked file that claims a generator it does
     # not know (homelab's tools/generate.py did).
-    stamp = f"Written by `blueprint check --write` on {today.isoformat()}; rewritten on every run."
+    stamp = f"{_STAMP_OPENING}{today.isoformat()}; rewritten on every run."
     index = out_dir / "README.md"
     index.write_text(f"# Blueprint\n\n{stamp}\n\n{_header(run)}\n\n{summary(run)}\n")
     written = [index]
@@ -211,4 +218,8 @@ def write(run: Run, repo: Path, today: date) -> list[Path]:
         path = out_dir / f"{concern.replace('/', '-')}.md"
         path.write_text(f"# Blueprint: {concern} ({LAYER_TITLES.get(layer, layer)})\n\n{stamp}\n\n{_header(run)}\n\n{table(rows)}\n")
         written.append(path)
+    if prune:
+        for stale in sorted(set(out_dir.glob("*.md")) - set(written)):
+            if stale.read_text(errors="replace").startswith("# Blueprint: ") and _STAMP_OPENING in stale.read_text(errors="replace"):
+                stale.unlink()
     return written

@@ -139,6 +139,26 @@ def test_write_produces_one_table_per_concern(repo: Repo) -> None:
     assert "`gate.one-command`" in text
 
 
+def test_write_removes_the_report_of_a_concern_that_no_longer_applies(repo: Repo) -> None:
+    result = run(repo.root, env=repo.env)
+    report.write(result, repo.root, date(2026, 10, 10))
+    stale = repo.root / "docs/blueprint/stack-shell.md"
+    stale.write_text(
+        "# Blueprint: stack/shell (Stack-specific)\n\nWritten by `blueprint check --write` on 2026-10-09; rewritten on every run.\n"
+    )
+    own = repo.root / "docs/blueprint/notes.md"
+    own.write_text("# Notes the owner keeps here\n")
+    report.write(result, repo.root, date(2026, 10, 10))
+    assert not stale.exists()
+    assert own.exists()
+
+
+def test_a_run_of_one_concern_keeps_the_other_reports(repo: Repo) -> None:
+    report.write(run(repo.root, env=repo.env), repo.root, date(2026, 10, 10))
+    report.write(run(repo.root, concern="gate", env=repo.env), repo.root, date(2026, 10, 10), prune=False)
+    assert (repo.root / "docs/blueprint/knowledge.md").exists()
+
+
 def test_the_cli_prints_json_and_exits_with_the_runs_code(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
     code = main(["check", "--repo", str(repo.root), "--json"])
     rows = json.loads(capsys.readouterr().out)["rows"]
