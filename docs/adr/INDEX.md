@@ -6,7 +6,7 @@ the file holds the reasons, the rejected options and the history.
 
 ## agents
 
-- [0019](0019-one-agent-per-worktree.md) **One agent per git worktree**: Every agent session works in its own git worktree and branch; the main checkout is the owner's; worktree folders (.claude/worktrees/, .worktrees/) are ignored by a tracked .gitignore.
+- [0019](0019-one-agent-per-worktree.md) **One agent per git worktree**: Every agent session works in its own worktree and branch; worktree folders are git-ignored; no worktree stays more than a day out of step with main, either way.
 
 ## doctrine
 

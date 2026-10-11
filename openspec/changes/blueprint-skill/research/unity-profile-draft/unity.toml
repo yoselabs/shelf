@@ -1,0 +1,142 @@
+# Framework profile (see ../python-uv.toml for the format). Layers on dotnet.toml for a Unity 6 C# game: the dotnet.toml rules
+# apply to the Unity-facing code through the generated solution (`dotnet build <name>.slnx`), and to the engine-free core
+# through a hand-written test csproj. The rows here add what is Unity's. DRAFT, not wired into the shelf.
+# `{root}` is the folder holding ProjectSettings/ (the Unity project); repo-level files (.gitignore, .gitattributes, Makefile,
+# .github/workflows, Directory.Build.props, global.json, .editorconfig) stay at the repo root. Paths may be globs (no `**`).
+# Detection (profile.py FRAMEWORK_MARKERS): marker `ProjectSettings/ProjectVersion.txt`; the framework root is the marker's
+# GRANDPARENT, not its parent (Godot's marker sits in the root, this one sits one folder down): REQUIRES a profile.py change.
+# Research: research.md beside this file (to move to openspec/changes/blueprint-skill/research/unity-profile.md).
+stack = "unity"
+status = "provisional"
+source = "unity-profile research (2026-10-11): Unity 6000.7.0b4 (6.7 beta, the only editor installed) run headless on a scratch project: EditMode and PlayMode -runTests, compile-error and failing-test exit codes, meta and GUID behaviour, Roslyn analyzer scoping, rsp forwarding, standalone build; .NET 10.0.401 builds of the generated slnx; docs.unity.com 6000.3/6000.6/6000.7 read. Every runtime claim is for 6000.7.0b4, not for the recommended 6000.3 LTS pin. No consumer yet"
+
+[[role]]
+role = "framework-version"
+tool = "ProjectSettings/ProjectVersion.txt pins the editor (m_EditorVersion 6000.x.y with revision), the newest LTS stream; Packages/packages-lock.json committed; CI and the Makefile read the pin from ProjectVersion.txt, never retype it"
+install = """Pin = the newest Unity 6 LTS stream: 6000.3.x LTS on 2026-10-11 (support to Dec 2027); move to 6000.7 LTS when it ships (expected Q4 2026, the last Mono release). \
+Not 6000.0 LTS (support ends Oct 2026), not the 6.4-6.6 update releases for a product repo (supported only until the next release). Open the project once in the pinned editor: \
+Unity writes ProjectVersion.txt (`m_EditorVersion: 6000.3.x`, `m_EditorVersionWithRevision`) and Packages/packages-lock.json; commit both. \
+Makefile: `UNITY_VERSION := $(shell sed -n 's/^m_EditorVersion: //p' {root}/ProjectSettings/ProjectVersion.txt)` and `UNITY ?= /Applications/Unity/Hub/Editor/$(UNITY_VERSION)/Unity.app/Contents/MacOS/Unity` \
+An editor older or newer than the pin must fail the gate: the build target checks `$(UNITY) -version` against UNITY_VERSION"""
+config = [
+    { path = "{root}/ProjectSettings/ProjectVersion.txt", contains = "m_EditorVersion: 6000." },
+    { path = "{root}/Packages/packages-lock.json", contains = "dependencies" },
+]
+
+[[role]]
+role = "project-hygiene"
+tool = "Library/Temp/Logs/UserSettings/Builds and the generated csproj/slnx ignored (anchored, so a hand-written tests csproj is not); Force Text serialization and Visible Meta Files set; every asset has a committed .meta and every .meta an asset; GUIDs unique (tools/unity_integrity.py, stdlib, in the gate and in prek); .gitattributes with LF"
+install = """.gitignore (anchored to the Unity project folder; prefix {root}/ when the project is not the repo root): `/[Ll]ibrary/`, `/[Tt]emp/`, `/[Oo]bj/`, `/[Bb]uild/`, `/[Bb]uilds/`, `/[Ll]ogs/`, `/[Uu]ser[Ss]ettings/`, `/[Mm]emoryCaptures/`, `/*.csproj`, `/*.sln`, `/*.slnx`, `*.pdb`, `*.mdb`, `.vs/`, `.idea/`, `.vscode/`; \
+NEVER ignore *.meta, ProjectSettings/, Packages/manifest.json or Packages/packages-lock.json. Never an unanchored `*.csproj` (it would ignore the hand-written tests csproj the dotnet rows need). \
+Editor > Project Settings > Editor: Asset Serialization = Force Text, Version Control Mode = Visible Meta Files (both are the 6000.7 defaults; the file then holds `m_SerializationMode: 2` and `m_Mode: Visible Meta Files`). \
+.gitattributes: `* text=auto eol=lf`, `*.unity text eol=lf`, `*.prefab text eol=lf`, `*.asset text eol=lf`, `*.meta text eol=lf`. \
+tools/unity_integrity.py <root> (draft script: unity_integrity.py beside this profile; seen red on a missing .meta, an orphan .meta, a duplicate GUID, Force Text off, Hidden Meta Files) runs from `make check`. \
+Smart merge (UnityYAMLMerge) is NOT part of this row: the git driver hung opening Apple FileMerge in the trial; see research.md"""
+config = [
+    { path = ".gitignore", contains = "ibrary/" },
+    { path = ".gitignore", contains = "ser[Ss]ettings/" },
+    { path = ".gitattributes", contains = "eol=lf" },
+    { path = "{root}/ProjectSettings/EditorSettings.asset", contains = "m_SerializationMode: 2" },
+    { path = "{root}/ProjectSettings/VersionControlSettings.asset", contains = "Visible Meta Files" },
+    { path = "tools/unity_integrity.py" },
+]
+gate = "unity_integrity.py"
+
+[[role]]
+role = "binary-assets"
+tool = "Git LFS for binary asset types via .gitattributes (textures, models, audio, video, fonts, plugins, .unitypackage never committed); every binary's .meta stays a plain text file in git, only the asset goes to LFS"
+install = """.gitattributes lines `<pattern> filter=lfs diff=lfs merge=lfs -text` for: png, jpg, jpeg, tga, psd, tif, exr, hdr, fbx, obj, blend, glb, wav, mp3, ogg, mp4, mov, ttf, otf, a, dylib, dll, so, bank. Do NOT list *.meta, *.unity, *.prefab, *.asset, *.mat, *.anim, *.controller (text YAML: LFS would break merge and the integrity script). \
+`git lfs install --skip-repo` (prek owns the hooks); CI checkout with `lfs: true`. Size budget: untested (no tool run); candidate `git lfs ls-files --size` against a budget in a Makefile target. \
+Open, same as Godot: the pre-push LFS upload under prek is unproven"""
+config = [{ path = ".gitattributes", contains = "filter=lfs" }]
+
+[[role]]
+role = "embedded-script-lint"
+untested = "Unity embeds shaders (ShaderLab/HLSL) and UI Toolkit USS/UXML, plus Burst-compiled C# subsets. No HLSL linter was proven. Tried: a shader with an undefined symbol imports with exit 0 and no log line under -batchmode -nographics, and ShaderUtil.ShaderHasError stays false, so the headless editor cannot see shader errors (tested on 6000.7.0b4). A real shader check needs a graphics-enabled editor run; not run here"
+
+[[role]]
+role = "build"
+tool = "headless editor compile and import: `Unity -batchmode -nographics -quit -projectPath <root> -logFile -` inside make check (exit 1 on a C# compile error, seen), then the tree must stay clean (a new or changed .meta means something was not committed); player build through an -executeMethod script (BuildPipeline.BuildPlayer, exit code from the BuildResult)"
+install = """Unity Hub installs the pinned editor (`unityhub -- --headless install --version <v> --changeset <rev>`; the Hub CLI was not run here); UNITY env var points at its binary. Makefile: \
+`unity-build:` runs `"$(UNITY)" -batchmode -nographics -quit -projectPath {root} -logFile unity-build.log` then `git diff --exit-code -- {root}/Assets {root}/Packages {root}/ProjectSettings && test -z "$(git status --porcelain -- {root}/Assets {root}/Packages {root}/ProjectSettings)"`; add unity-build to the `check` prerequisites. \
+Cold Library import of a near-empty project took 95 s, warm run about 30 s (6000.7.0b4); real projects take longer, so a team caches Library per ProjectVersion and per git ref in CI. \
+Deleting a .meta and importing with a COLD Library gives the asset a NEW GUID (seen: every reference to it breaks); with a warm Library Unity restores the same GUID. So the clean-tree check is only reliable on a cold clone or after `rm -rf Library`. \
+Player build: Assets/Editor/CiBuild.cs with `BuildPlayer(...)` and `EditorApplication.Exit(summary.result == Succeeded ? 0 : 1)`, run by `make unity-player` (not in check; macOS Mono standalone built in 2 min 21 s from a cold Library, 6000.7.0b4). Needs the platform module installed. \
+License: the Personal license activated in the Hub works headless on a desktop (the log shows a licensing handshake error and still runs, Unity Personal); a CI runner needs GameCI activation (see ci)"""
+config = [{ path = "Makefile", contains = "-batchmode" }]
+gate = "-batchmode"
+
+[[role]]
+role = "tests"
+tool = "Unity Test Framework (com.unity.test-framework, builtin 1.9.0 in 6000.7) through `Unity -runTests -testPlatform EditMode|PlayMode -testResults <xml>` in make check; a missing results file is a failure (compile error exits 1 with no XML; failing test exits 2); engine-free logic in noEngineReferences assemblies is tested outside the editor with the dotnet profile's xunit.v3 project (linked sources, LangVersion 9)"
+install = """Test assemblies: Assets/Tests/EditMode/<Name>.Tests.EditMode.asmdef (includePlatforms [Editor], references UnityEngine.TestRunner and UnityEditor.TestRunner, overrideReferences true with precompiledReferences nunit.framework.dll, defineConstraints [UNITY_INCLUDE_TESTS]); Assets/Tests/PlayMode/... the same without includePlatforms. \
+Makefile: `unity-test:` runs `"$(UNITY)" -batchmode -nographics -projectPath {root} -runTests -testPlatform EditMode -testResults $(CURDIR)/results-editmode.xml -logFile unity-editmode.log`, same for PlayMode (no -quit: -runTests exits itself; seen), then `test -s results-editmode.xml` and a check that result="Passed". Exit codes seen: 0 pass, 2 a test failed, 1 compile error and no XML written. -testResults needs an absolute path. PlayMode ran headless with -nographics (an `async Awaitable Start()` ran). \
+Pure core: tests/<Name>.Core.Tests (xunit.v3, Microsoft.Testing.Platform, global.json runner MTP, `dotnet test --project`) with `<Compile Include="../../{root}/Assets/Scripts/Core/**/*.cs" />`, `<LangVersion>9.0</LangVersion>` (seen green; the link makes C# 10+ syntax fail there and in Unity alike). Coverage floor: the dotnet profile's coverage role applies to that project only; Unity-side coverage (com.unity.testtools.codecoverage) is untested"""
+config = [
+    { path = "Makefile", contains = "-runTests" },
+    { any = [
+        { path = "{root}/Assets/*/*.asmdef", contains = "UnityEngine.TestRunner" },
+        { path = "{root}/Assets/*/*/*.asmdef", contains = "UnityEngine.TestRunner" },
+        { path = "{root}/Assets/*/*/*/*.asmdef", contains = "UnityEngine.TestRunner" },
+    ] },
+]
+gate = "-runTests"
+
+[[role]]
+role = "surface-integrity"
+tool = "an editor script run by -executeMethod loads every scene and prefab and fails (exit 3, seen) on a MonoBehaviour with a missing script; with the .meta/GUID checks of project-hygiene this is the whole reference surface the headless editor can see"
+install = """Assets/Editor/CiValidate.cs (Editor-only asmdef): for each `t:Scene t:Prefab` under Assets, open it (EditorSceneManager.OpenScene / PrefabUtility.LoadPrefabContents) and sum GameObjectUtility.GetMonoBehavioursWithMissingScriptCount over every Transform; Debug.LogError("MISSING-SCRIPT <path>") and `EditorApplication.Exit(bad == 0 ? 0 : 3)`. \
+Makefile: `unity-validate:` runs `"$(UNITY)" -batchmode -nographics -quit -projectPath {root} -executeMethod Game.EditorTools.CiValidate.Run -logFile unity-validate.log`; add to check. Seen red on a scene whose MonoBehaviour pointed at a GUID with no script. \
+Not covered, by test: broken texture/material/prefab-variant references (no editor API tried), shader compile errors (headless editor does not compile shaders), Addressables group integrity (not installed). \
+-quit with -executeMethod: the method's Exit code wins; without Exit() a throwing method gives exit 1 and a quiet one 0"""
+config = [{ path = "Makefile", contains = "CiValidate" }]
+gate = "CiValidate"
+
+[[role]]
+role = "architecture"
+tool = "assembly definitions are the layer map: one .asmdef per layer with explicit `references`, autoReferenced false, and `noEngineReferences: true` on the engine-free core (a UnityEngine use there is a compile error, seen); analyzers run through `dotnet build` of the generated solution with project-scoped PackageReferences and ONE Unity.globalconfig for both the editor compile (-analyzerconfig in an .rsp) and dotnet; BannedApiAnalyzers and NsDepCop run on the dotnet side only"
+install = """Layers: Game.Core (noEngineReferences true, references []), Game.Runtime (references Game.Core; MonoBehaviours), Game.Editor (includePlatforms [Editor]), tests per layer. A wrong edge is CS0246 at compile; a cycle is an error. This replaces dotnet.toml's AllowedRefs MSBuild guard, which would duplicate the asmdef graph; ArchUnitNET (cycles, naming) stays untested in-editor and runs on the Core test project like any .NET repo. \
+Directory.Build.props: every Unity analyzer item is conditioned on the generated project names (`Condition="$(MSBuildProjectName.StartsWith('Game.'))"`), so package projects (UnityEngine.TestRunner, Unity.Rider.Editor) never inherit them; `<GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory){root}/Assets/Unity.globalconfig" />`. \
+{root}/Assets/Unity.globalconfig (`is_global = true`) holds ONLY the Unity exemptions below as `dotnet_diagnostic.<ID>.severity = none`; repo-wide strictness stays in .editorconfig (seen: an ID line in the globalconfig beats the bulk `dotnet_analyzer_diagnostic.severity = warning` in .editorconfig; CA1051 still fired, CA1822 did not). \
+Editor compile uses the same file: {root}/Assets/Scripts/Core/Game.Core.rsp (one per asmdef, next to it) with `-analyzerconfig:Assets/Unity.globalconfig`; Assets/csc.rsp with `-nullable:enable` and `-warnaserror+` (seen forwarded, CS8602 became an error, package assemblies untouched). The per-assembly rsp forwards ONLY -analyzerconfig (seen); -nullable, -warnaserror, -additionalfile there are dropped. .editorconfig is ignored by the Unity compiler (seen). \
+Exemptions (each `none`, each seen firing on Unity code in a dotnet build, unless marked): CA1822 S2325 MA0038 (message methods Awake/Update/OnTriggerEnter look static), RCS1213 (unused private message and field), CS0649 CA1823 RCS1169 (seen) and IDE0044 (unseen) (SerializeField fields; CS0649 and the generated NoWarn: Unity's compile has /nowarn:0649, the generated csproj does not), CA1051 (public fields are Unity's serialized API; prefer [SerializeField] private), RCS1146 IDE0031 IDE0270 (null-conditional on a UnityEngine.Object skips its fake null; IDE ones unseen), CA1508 (flags `go == null` after Destroy as always false, seen), CA2007 MA0004 VSTHRD111 (ConfigureAwait(false) leaves the UnitySynchronizationContext; seen), CA1016 (generated csproj has no assembly version), NSDEPCOP03, IDE0161 and every rule needing C# 10+ (LangVersion is 9.0 through 6000.7). Kept ON: VSTHRD100 EPC27 SS001 S3168 (async void), MA0040 (names destroyCancellationToken), MA0084. \
+Tests projects in Unity: CA1707 (underscored test names), CA2211 MA0069 (static probe fields), MA0048 (file name must match type) get a path-scoped `none` in the tests section of .editorconfig. \
+Untested: Microsoft.Unity.Analyzers 1.28.0 (2026-09-29; UNT rules plus suppressors for the same message-method warnings), because running it needs a NuGet download; add it as a PackageReference on the Game.* condition and delete every exemption its DiagnosticSuppressors already cover"""
+config = [
+    { any = [
+        { path = "{root}/Assets/*/*.asmdef", contains = '"noEngineReferences": true' },
+        { path = "{root}/Assets/*/*/*.asmdef", contains = '"noEngineReferences": true' },
+        { path = "{root}/Assets/*/*/*/*.asmdef", contains = '"noEngineReferences": true' },
+    ] },
+    { path = "Directory.Build.props", contains = "GlobalAnalyzerConfigFiles" },
+    { path = "{root}/Assets/Unity.globalconfig", contains = "is_global = true" },
+    { path = "{root}/Assets/Unity.globalconfig", contains = "CA1822" },
+    { path = "{root}/Assets/Unity.globalconfig", contains = "CA2007" },
+    { path = "{root}/Assets/csc.rsp", contains = "-nullable:enable" },
+    { path = "{root}/Assets/csc.rsp", contains = "-warnaserror+" },
+]
+gate = "dotnet build"
+
+[[role]]
+role = "ci"
+# License activation could not be exercised here. GameCI is live; TBD until the owner decides whether Unity projects get CI.
+tool = "TBD; when CI comes: game-ci/unity-test-runner@v4 and game-ci/unity-builder (v4.8.2 / v5.0.1), both read the editor version from ProjectSettings/ProjectVersion.txt; Library cached by hash of Assets, Packages, ProjectSettings; then the dotnet build and dotnet test steps"
+untested = "TBD by the owner: license activation is the blocker. GameCI documents a Personal .ulf file in secret UNITY_LICENSE (with UNITY_EMAIL and UNITY_PASSWORD), a Pro serial UNITY_SERIAL, or a license server input (read 2026-10-11, game.ci/docs/github/activation); none was run. Until then agents run `make check` where the pinned editor is installed"
+
+[[role]]
+role = "hooks"
+tool = "prek local hooks: unity-integrity (python3 tools/unity_integrity.py <root>, stdlib, fast, pre-commit, always_run) and the dotnet profile's csharpier check on staged .cs; make check on pre-push"
+install = """.pre-commit-config.yaml local hooks: id: unity-integrity / entry: python3 tools/unity_integrity.py {root} / language: system / always_run: true / pass_filenames: false (it walks Assets and Packages in well under a second on a small project; time it on a big one). \
+csharpier is the dotnet.toml hook; `.csharpierignore` gets Library/, Temp/, Logs/, UserSettings/, Builds/, obj/ (seen: `dotnet csharpier check Assets` red on an unformatted file, green on formatted, csharpier 1.3.0). Never a hook that starts the editor"""
+config = [{ path = ".pre-commit-config.yaml", contains = "unity-integrity" }]
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/unity.md (editor pin, headless commands, meta/GUID rules, serialization and fake-null traps, asmdef layer map, analyzer exemptions, what never to edit), linked from AGENTS.md"
+install = """create docs/agents/unity.md (<= 140 lines) from the shelf template (templates/agents/unity.md): the make targets; never hand-edit .meta, Library/, Temp/, generated csproj/slnx; new file means commit its .meta in the same commit; \
+`obj == null` on a UnityEngine.Object is the fake-null check, `is null` and `?.` skip it; serialization rules; message-method traps; asmdef layer table; async/Awaitable. \
+Link from AGENTS.md: `Unity conventions: docs/agents/unity.md`"""
+config = [
+    { path = "docs/agents/unity.md" },
+    { path = "AGENTS.md", contains = "docs/agents/unity.md" },
+]

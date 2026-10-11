@@ -1,0 +1,416 @@
+diff -ruN --exclude=__pycache__ ~/Workspaces/shelf/packages/blueprint/src/blueprint/profile.py engine/blueprint/src/blueprint/profile.py
+--- ~/Workspaces/shelf/packages/blueprint/src/blueprint/profile.py	2026-10-11 19:07:55
++++ engine/blueprint/src/blueprint/profile.py	2026-10-11 20:17:45
+@@ -156,6 +156,10 @@
+     return State(declared, overrides, data.get("settings", {}), tuple(problems), ignores)
+ 
+ 
++# Compose files by name; a repo with many (one per service folder) still gets one `compose` table.
++COMPOSE_FILES = ("compose.yml", "compose.yaml", "docker-compose.yml", "docker-compose.yaml")
++
++
+ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
+     """Each stack present with the files that set it, from their manifests."""
+     found: dict[str, list[str]] = {}
+@@ -165,6 +169,12 @@
+     dotnet = [*walk(repo, "*.sln", 2, skip), *walk(repo, "*.slnx", 2, skip), *walk(repo, "*.csproj", 3, skip)]
+     if dotnet:
+         found["dotnet"] = [p.relative_to(repo).as_posix() for p in dotnet]
++    flakes = walk(repo, "flake.nix", 3, skip)
++    if flakes:
++        found["nix"] = [p.relative_to(repo).as_posix() for p in flakes]
++    composes = [p for pattern in COMPOSE_FILES for p in walk(repo, pattern, 3, skip)]
++    if composes:
++        found["compose"] = sorted(p.relative_to(repo).as_posix() for p in composes)
+     for stack, manifest in (("node", "package.json"), ("go", "go.mod"), ("rust", "Cargo.toml")):
+         if (repo / manifest).is_file():
+             found[stack] = [manifest]
+diff -ruN --exclude=__pycache__ ~/Workspaces/shelf/packages/blueprint/src/blueprint/profiles/compose.toml engine/blueprint/src/blueprint/profiles/compose.toml
+--- ~/Workspaces/shelf/packages/blueprint/src/blueprint/profiles/compose.toml	1970-01-01 02:00:00
++++ engine/blueprint/src/blueprint/profiles/compose.toml	2026-10-11 20:17:45
+@@ -0,0 +1,86 @@
++# Stack profile (see python-uv.toml for the format). Docker Compose files (compose.y*ml / docker-compose.y*ml), Compose v5, late 2026.
++# Research: openspec/changes/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a compose file within three levels.
++# A stack, not a framework: a repo with 19 compose files should get one table, and framework detection yields one table per marker folder.
++# Tested 2026-10-11 with Docker Compose v5.1.2 and dclint 3.1.0 on a scratch copy of homelab (19 stacks/*/compose.yml).
++stack = "compose"
++status = "provisional"
++source = "nix-compose-profile.md (2026-10-11): `docker compose config --no-interpolate`, a jq digest-pin check and dclint 3.1.0 seen red on planted violations and green on homelab's real files; hadolint 2.15.1 run on images/devbox/Dockerfile (2 real warnings, exit 1); homelab is the only consumer"
++
++[[role]]
++role = "toolchain"
++na = "Compose has no language or SDK version: the top-level `version:` key is obsolete, and the engine and compose plugin are properties of the host (homelab: the NixOS docker module in the pinned nixpkgs). Image digests are the lockfile; see the dependencies row"
++
++[[role]]
++role = "formatter"
++untested = "no compose-specific formatter exists; yamlfmt and prettier were not run. Compose files in practice carry long explanatory comments and hand-aligned blocks (homelab excludes compose.yml from yamllint and keeps them hand-formatted), so a formatter needs a trial on real files before it is a standard. dclint's key-order rule (service-keys-order) covers the one ordering convention Compose has"
++
++[[role]]
++role = "linter"
++tool = """dclint 3.1.0 (zavoloklom/docker-compose-linter, npm `dclint`, pinned) with `--max-warnings 0` and a committed .dclintrc listing every disabled rule with a reason; on top of Docker's own schema check (the types row). \
++Seen red on a planted file: no-unbound-port-interfaces and service-image-require-explicit-tag are errors (exit 1); on real files the default exit code is 0 even with warnings, so --max-warnings 0 is what makes the gate fail. \
++It does NOT flag `privileged: true` (no such rule), so the policy row below carries that. Watch item: last release 2025-07-24 and last non-CI commit 2025-09; not abandoned yet (issues still opened 2026-04), but if it goes a full year without a release the role passes to a conftest policy. \
++Dockerfiles that sit beside compose files are linted with hadolint 2.15.1 (hadolint/hadolint, released 2026-07; exit 1 on any warning, seen on homelab's images/devbox/Dockerfile: DL3008, DL4006)"""
++install = """npm: `npx dclint@3.1.0 --max-warnings 0 $(git ls-files '*compose*.y*ml')` (or the dclint Docker image); .dclintrc with `rules:` overrides, each with a comment saying why. Seen on homelab: 19 compose files trip require-project-name-field, service-keys-order, require-quotes-in-ports; \
++the strict answer is to fix them, not to disable the rules. hadolint: `docker run --rm -i hadolint/hadolint < images/<n>/Dockerfile` or the binary, with .hadolint.yaml `ignored:` carrying reasons"""
++config = [{ any = [{ path = ".dclintrc" }, { path = ".dclintrc.json" }, { path = "dclint.config.js" }, { path = ".pre-commit-config.yaml", contains = "dclint" }, { any = [{ path = "justfile", contains = "dclint" }, { path = "Makefile", contains = "dclint" }] }] }]
++gate = "dclint"
++
++[[role]]
++role = "types"
++tool = """`docker compose -f <file> config --no-interpolate -q` per compose file: Docker's own schema validation (unknown keys, wrong types), no environment needed. Seen red on a planted unknown key (`additional properties 'bogus_key' not allowed`) and on a wrong type (`restart must be a string`), green on three real stacks. \
++Without --no-interpolate the command fails on any `${VAR:?}` (homelab: A2WEB_ZYTE_KEY missing) and warns on every unset ${VAR}; homelab's own tools/doctor.py instead fills each referenced variable with a placeholder so types are checked after interpolation, which is stricter and also acceptable"""
++install = """justfile: `for f in $(git ls-files '*compose*.y*ml'); do docker compose -f $$f config --no-interpolate -q || exit 1; done`. Needs a Docker CLI with the compose plugin (Compose v2+); no daemon connection is made"""
++config = [{ any = [{ any = [{ path = "justfile", contains = "config --no-interpolate" }, { path = "Makefile", contains = "config --no-interpolate" }] }, { path = "tools/doctor.py", contains = "compose" }] }]
++gate = "config --no-interpolate"
++[[role.alternative]]
++label = "tools/doctor.py runs `docker compose config` on every rendered compose"
++gate = "doctor"
++path = "tools/doctor.py"
++
++[[role]]
++role = "dependencies"
++tool = """every `image:` is `name:tag@sha256:<64 hex>` (tag for the human, digest for the machine): `docker compose -f <file> config --no-interpolate --format json | jq -e '[.services[].image // empty | select(test("@sha256:[0-9a-f]{64}$") | not)] | length == 0'`. Seen red on a planted `nginx:latest`, green on two real stacks; homelab has 0 unpinned images across its 19 files and already enforces the same rule in tools/doctor.py (DIGEST_RE), which CI runs but `just check` does not. \
++Staying current is a separate, reported job (homelab: tools/check-updates.py, read-only report of images behind upstream) so a pin never means a frozen stack"""
++install = "justfile recipe looping over compose files with the jq filter above (jq is preinstalled on macOS and the GitHub runners); an updater (Renovate's docker-compose manager or the repo's own check-updates) proposes digest bumps as reviewable commits"
++config = [{ any = [{ any = [{ path = "justfile", contains = "@sha256" }, { path = "Makefile", contains = "@sha256" }] }, { path = "tools/check-updates.py" }, { path = "renovate.json" }, { path = ".github/renovate.json" }] }]
++gate = "sha256"
++[[role.alternative]]
++label = "tools/doctor.py refuses an image not pinned by digest (DIGEST_RE)"
++gate = "doctor"
++path = "tools/doctor.py"
++
++[[role]]
++role = "tests"
++untested = "a smoke test per stack (`docker compose up --wait` against a throwaway daemon, then a health probe) was not run: homelab's stacks need sealed secrets and host-specific mounts, so a generic recipe would be invented. container-structure-test and Testcontainers are the candidates; homelab has tools/deploy-smoke for the live deploy"
++
++[[role]]
++role = "coverage"
++na = "a compose file has no executable lines to cover"
++
++[[role]]
++role = "spelling"
++tool = "typos (crate-ci) with a committed config; it reads comments and service names in compose files"
++install = "brew install typos-cli; typos.toml with [default.extend-words] for image and host names; just check runs `typos`"
++config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
++gate = "typos"
++
++[[role]]
++role = "architecture"
++untested = "the rules that matter for Compose (no privileged, no host network, no docker.sock mount, no unbound published port, every service on a declared network) are policy over the resolved config: conftest (OPA, `docker compose config --format json | conftest test -`) is the candidate and was not run. homelab enforces its own deny-list in tools/stack_policy.py (read, not exercised here); dclint covers only the unbound-port rule"
++
++[[role]]
++role = "hooks"
++tool = "prek per commit on staged compose files: docker compose config --no-interpolate, dclint, and the digest-pin filter; hadolint on staged Dockerfiles"
++install = """.pre-commit-config.yaml local hooks (language: system, files: compose.*\\.ya?ml$): id compose-config / entry sh -c 'for f in "$@"; do docker compose -f "$f" config --no-interpolate -q || exit 1; done' -- ; id dclint / entry npx --no-install dclint --max-warnings 0; \
++id hadolint / files: Dockerfile / entry hadolint"""
++config = [{ path = ".pre-commit-config.yaml", contains = "dclint" }]
++
++[[role]]
++role = "agent-guidance"
++tool = "docs/agents/compose.md (how a stack is validated, the pin rule, how to bump an image, what never to hand-edit), linked from AGENTS.md"
++install = """create docs/agents/compose.md (<= 100 lines): the recipes; images are pinned `tag@digest`, bump with the repo's updater and re-run the config check; never paste a secret into a compose file (use `${VAR:?}` and the sealed env); \
++rendered/generated compose files are edited at their source. Link from AGENTS.md: `Compose conventions: docs/agents/compose.md`"""
++config = [
++    { path = "docs/agents/compose.md" },
++    { path = "AGENTS.md", contains = "docs/agents/compose.md" },
++]
+diff -ruN --exclude=__pycache__ ~/Workspaces/shelf/packages/blueprint/src/blueprint/profiles/dotnet.toml engine/blueprint/src/blueprint/profiles/dotnet.toml
+--- ~/Workspaces/shelf/packages/blueprint/src/blueprint/profiles/dotnet.toml	2026-10-11 20:06:10
++++ engine/blueprint/src/blueprint/profiles/dotnet.toml	2026-10-11 20:19:56
+@@ -91,7 +91,27 @@
+ 
+ [[role]]
+ role = "coverage"
+-untested = "no .NET coverage floor proven: coverlet.MTP 10.1.0 lists --coverlet-threshold but its own page also says threshold validation is unsupported, and Microsoft.Testing.Extensions.CodeCoverage 18.12.0 documents none; never run red/green"
++tool = """coverlet.MTP 10.1.0 (MIT) collects cobertura under Microsoft.Testing.Platform; ReportGenerator 5.5.11 (local dotnet tool) merges every test project's report into one Summary.json; \
++a 15-line script fails the gate when merged line or branch coverage is under the committed floor (coverage-floor.json). First-party assemblies only (`--coverlet-include '[Prefix.*]*'`). \
++A repo with ONE test project may use coverlet's own `--coverlet-threshold N --coverlet-threshold-type line,branch --coverlet-threshold-stat total` instead (exit code 14 under the floor). \
++Refused: Microsoft.Testing.Extensions.CodeCoverage as the default (no threshold option, so it needs the same script, and its engine is closed source; it does run on macOS arm64 and gave the same numbers, so it is the fallback if coverlet.MTP is ever abandoned)"""
++install = """Directory.Packages.props: <PackageVersion Include="coverlet.MTP" Version="10.1.0" />; tests/Directory.Build.props: <PackageReference Include="coverlet.MTP" PrivateAssets="all" /> \
++(builds clean under latest-all + warnings as errors; regenerate the packages.lock.json files). dotnet new tool-manifest (if none) && dotnet tool install dotnet-reportgenerator-globaltool --version 5.5.11. \
++Commit coverage-floor.json = {"line": <floor>, "branch": <floor>} (start at the current value rounded down) and tools/check_coverage.py (shelf: packages/blueprint/scripts/check_coverage.py). \
++justfile: `coverage: build` / `rm -rf TestResults cov` / `dotnet test --solution X.slnx --no-build -- --coverlet --coverlet-output-format cobertura --coverlet-include '[Sim.*]*'` / \
++`dotnet reportgenerator "-reports:TestResults/coverage.cobertura*.xml" -targetdir:cov -reporttypes:JsonSummary` / `python3 tools/check_coverage.py cov/Summary.json coverage-floor.json`; \
++let `check` run `coverage` INSTEAD of the plain test run so the suite runs once. Add TestResults/ and cov/ to .gitignore. \
++The floor only rises: a PR that raises coverage raises coverage-floor.json in the same commit. Gotchas (all seen): without --coverlet-include the total is dominated by NuGet assemblies (Humanizer: 23.5% instead of 89.9%); \
++the default --coverlet-threshold-stat is Minimum, so one assembly at 0% fails a per-project threshold; an architecture-test project covers ~0% of the code it inspects, so a per-project threshold cannot be the floor of a multi-project solution; \
++`dotnet test` prints no reason for exit 14 (run the test exe directly to read the 'Coverage Threshold Results' block); `--results-directory` after `--` crashed `dotnet test` (use the default TestResults/); \
++the coverlet.MTP package's own Known Limitations section still says 'Threshold validation is not yet supported': it is out of date, the option works (tested red and green)"""
++config = [
++    { path = "Directory.Packages.props", contains = "coverlet.MTP" },
++    { path = ".config/dotnet-tools.json", contains = "dotnet-reportgenerator-globaltool" },
++    { path = "coverage-floor.json" },
++    { path = "tools/check_coverage.py" },
++]
++gate = "check_coverage"
+ 
+ [[role]]
+ role = "spelling"
+diff -ruN --exclude=__pycache__ ~/Workspaces/shelf/packages/blueprint/src/blueprint/profiles/frameworks/godot.toml engine/blueprint/src/blueprint/profiles/frameworks/godot.toml
+--- ~/Workspaces/shelf/packages/blueprint/src/blueprint/profiles/frameworks/godot.toml	2026-10-11 20:06:10
++++ engine/blueprint/src/blueprint/profiles/frameworks/godot.toml	2026-10-11 20:17:53
+@@ -31,10 +31,17 @@
+ 
+ [[role]]
+ role = "binary-assets"
+-tool = "Git LFS for binary assets via .gitattributes; export_presets.cfg committed, credentials only in .godot/export_credentials.cfg"
+-install = """.gitattributes: `*.png filter=lfs diff=lfs merge=lfs -text` for png, jpg, webp, wav, ogg, mp3, glb, gltf-bin, fbx, ttf, otf; \
+-`git lfs install --skip-repo` (prek owns the hooks); CI checkout with `lfs: true`. Open: the pre-push LFS upload hook under prek is unproven (see research doc)"""
+-config = [{ path = ".gitattributes", contains = "filter=lfs" }]
++tool = """Git LFS for every binary blob, proven by a deterministic check, not by a pattern list: `git ls-files --eol` marks a blob git sees as binary `i/-text`, and each such path must carry `filter: lfs` (`git check-attr filter`). \
++.gitattributes patterns (png, jpg, webp, wav, ogg, mp3, glb, ttf, otf, exr, hdr, blend, fbx, bin, ...) are the setup; the check is what catches an extension nobody listed. export_presets.cfg committed, credentials only in .godot/export_credentials.cfg. \
++Upload under prek is proven: a local pre-push hook `git lfs push --all "$PRE_COMMIT_REMOTE_NAME"` sent all 19 LFS objects to a bare file:// remote and a fresh clone checked out real content (git-lfs 3.7.1, prek, macOS; bead shelf-d89 comment, 2026-10-11)"""
++install = """.gitattributes: `*.png filter=lfs diff=lfs merge=lfs -text` for each binary extension in the repo; `git lfs install --skip-repo` (prek owns the hooks); .pre-commit-config.yaml local hook id git-lfs-push (entry sh -c 'git lfs push --all "$PRE_COMMIT_REMOTE_NAME"', always_run, pass_filenames false, stages [pre-push]); CI checkout with `lfs: true`. \
++justfile recipe `lfs-check` (shebang recipe, no backticks in the file): `bad=$(git ls-files --eol | grep '^i/-text' | cut -f2 | git check-attr --stdin filter | grep -v 'filter: lfs'); test -z "$bad" || { echo "binary outside LFS:" >&2; echo "$bad" >&2; exit 1; }` (the pipe filters on git's own text/binary verdict; LFS pointer files are text in the index, so a correctly tracked asset never appears). \
++Seen red on lifesim (read-only git): design/research/character-pipeline-spike/sliders-live.mp4 is a binary blob with `filter: unspecified` (mp4 was in no pattern); every other binary there is LFS"""
++config = [
++    { path = ".gitattributes", contains = "filter=lfs" },
++    { path = ".pre-commit-config.yaml", contains = "git lfs push" },
++]
++gate = "check-attr"
+ 
+ [[role]]
+ role = "embedded-script-lint"
+@@ -42,23 +49,43 @@
+ 
+ [[role]]
+ role = "build"
+-tool = "godot --headless --path <root> --import, then --build-solutions --quit, both inside just check; the import log is scanned for ERROR lines and the tree must stay clean"
+-install = """Godot binary on the agent's machine, the .NET build of the version the csproj pins (macOS: `brew install --cask godot-mono`, or the official .NET zip from godotengine.org into ~/Applications; set GODOT to its binary). justfile: `godot := env('GODOT', 'godot')`; `godot-build` is a shebang recipe (bash) that runs `"{{godot}}" --headless --path {root} --import 2>&1 | tee import.log`, then \
++tool = "godot --headless --path <root> --import, then --build-solutions --quit, both inside make check; the SECOND import log is scanned for ERROR lines (the first pass of a fresh clone prints about 190 false ERROR lines) and the tree must stay clean"
++install = """Godot binary on the agent's machine, the .NET build of the version the csproj pins (macOS: `brew install --cask godot-mono`, or the official .NET zip from godotengine.org into ~/Applications; set GODOT to its binary). justfile: `godot := env('GODOT', 'godot')`; `godot-build` is a shebang recipe (bash) that runs `"{{godot}}" --headless --path {root} --import >/dev/null 2>&1` once to warm .godot/ (a cold first import prints about 190 ERROR lines on a clean repo: `Unable to open file: res://.godot/imported/*.ctex`, and theme font references parsed before the font is imported; seen on a fresh copy of lifesim, Godot 4.7.2, 2026-10-11; the second pass is clean), then AGAIN as `"{{godot}}" --headless --path {root} --import 2>&1 | tee import.log`, then \
+ `! grep -q 'ERROR:' import.log` (import exits 0 even on broken scene references), then `"{{godot}}" --headless --path {root} --build-solutions --quit` \
+ (exit 1 on a C# compile error), then `git diff --exit-code && test -z "$(git status --porcelain)"`; no backticks in the justfile (`just --dry-run` runs them); add godot-build to the `check` dependencies"""
+-config = [{ any = [{ path = "justfile", contains = "--build-solutions" }, { path = "Makefile", contains = "--build-solutions" }] }]
++config = [
++    { any = [{ path = "justfile", contains = "--build-solutions" }, { path = "Makefile", contains = "--build-solutions" }] },
++    { any = [{ path = "justfile", contains = "ERROR:" }, { path = "Makefile", contains = "ERROR:" }] },
++]
+ gate = "--build-solutions"
+ 
+ [[role]]
+ role = "tests"
+-untested = "two candidates, neither run here: Chickensoft GoDotTest 2.0.47 (2026-09-09; self-contained runner, --run-tests --quit-on-finish, not VSTest or MTP so no clash with the MTP-only global.json) or GdUnit4Net 5.0.0 (VSTest adapter, stable release 2025-06-21; may clash with an MTP-only global.json). Engine-free logic stays in the xunit.v3 projects; in-engine tests only for thin views"
++tool = """Chickensoft GoDotTest 2.0.47 (MIT; releases 2026-08-15, 2026-08-18, 2026-09-09) runs C# tests inside the engine headless: `godot --headless --path <root> res://viewtests/TestEntry.tscn --run-tests --quit-on-finish`. \
++Seen green (exit 0, 1.2 s) and red (planted failing assertion: exit 1) on a scratch copy of lifesim with the strict analyzer set and warnings as errors, Godot 4.7.2 .NET, net10.0, MTP-only global.json (it is not a VSTest or MTP project, so there is no clash). \
++The gate must also read the log: a broken ext_resource in the scene under test leaves the exit code at 0 (only ERROR: lines show it), and a missing --run-tests, a renamed entry scene or a scene that fails to load runs zero tests and exits 0, so the recipe fails on any ERROR: line and when `Test results: Passed: N` has N < 1 (all seen red). \
++Engine-free logic stays in the xunit.v3 projects; in-engine tests only for thin views. Refused: GdUnit4Net 5.0.0 (godot-gdunit-labs/gdUnit4Net) as the default, see the install note"""
++install = """Directory.Packages.props <PackageVersion Include="Chickensoft.GoDotTest" Version="2.0.47" />; Game.Godot.csproj <PackageReference Include="Chickensoft.GoDotTest" />. In {root}/viewtests/: TestEntry.cs (a Node whose _Ready calls `GoTest.RunTests(Assembly.GetExecutingAssembly(), this, env)` when `TestEnvironment.From(OS.GetCmdlineArgs()).ShouldRunTests`), TestEntry.tscn, and `public class XTest(Node testScene) : TestClass(testScene)` with `[Test]` methods that `GD.Load<PackedScene>(...)`, instantiate, assert on the tree. \
++The strict stack needs three adjustments (all hit): config.nsdepcop gets `<Allowed From="Game.ViewTests.*" To="..." />` lines for Game.ViewTests, System, Godot and Chickensoft.GoDotTest (default-deny whitelist); a `res://` literal in a method trips S1075, so scene paths are `const string` fields; the tests compile into the game assembly, so export_presets.cfg excludes `viewtests/*` from the exported pack. justfile recipe `godot-test` (drafts/godot-test.just, tested with just 1.58): runs the command, strips ANSI, fails on ERROR:, fails when no `Passed: [1-9]`, else returns the engine's exit code; add it to `check`. \
++GdUnit4Net, tested: its VSTest adapter makes `dotnet test --solution` refuse the solution under global.json's Microsoft.Testing.Platform runner (message: All projects must use that test runner. The following test projects are using VSTest); non-engine logic tests do run through `dotnet vstest <dll>` (1 passed), an engine-runtime test was not run. README targets Godot 4.4; last stable v5.0.0 2025-06-21, 5.1.0 has been a release candidate since 2025-09 (rc5 2026-06-21). It becomes an option only if MTP support lands"""
++config = [
++    { path = "Directory.Packages.props", contains = "Chickensoft.GoDotTest" },
++    { path = "{root}/viewtests/TestEntry.cs", contains = "ShouldRunTests" },
++    { any = [{ path = "justfile", contains = "--run-tests" }, { path = "Makefile", contains = "--run-tests" }] },
++]
++gate = "--run-tests"
+ 
+ [[role]]
+ role = "surface-integrity"
+-tool = "the headless import log scan: any `ERROR:` line fails the gate (broken ext_resource, missing script, parse errors)"
+-install = "same recipe as `build`; the pattern is `ERROR:` after stripping ANSI codes (`sed 's/\\x1b\\[[0-9;]*m//g'`); seen red on a broken ext_resource and a bad scene line, green on a clean import (Godot 4.7.2)"
+-config = [{ any = [{ path = "justfile", contains = "ERROR:" }, { path = "Makefile", contains = "ERROR:" }] }]
+-gate = "ERROR:"
++tool = """tools/check_godot.py (stdlib python, no editor): every .tscn/.tres has a valid header and no garbage line, every ext_resource path exists and its uid equals the target's .uid/.import/header uid, every ExtResource/SubResource id is declared, no ext_resource is unused; every .cs/.gd/.gdshader has its .uid; Godot.NET.Sdk major.minor equals project.godot config/features. \
++Why not the import log alone: `godot --headless --import` only loads what the editor loads (run/main_scene and gui/theme/custom). Tested on 4.7.2 against a scratch copy of lifesim: a broken script ext_resource, a garbage line or an undeclared ExtResource in NeedPanel.tscn (not the main scene) printed NO error; the same broken ext_resource in the main scene or theme.tres did, but a garbage line in the main scene did not. The script was seen red on all of these plus a missing .uid, a bad uid and a version skew, green on lifesim's 6 scenes/resources (theme.tres is 900+ lines). \
++Known gap: the script cannot see a wrong resource type or an unknown node class; only the engine can, so the ERROR: scan of the import (build row) and of the test run (tests row) stay"""
++install = """copy drafts/check_godot.py to tools/check_godot.py; justfile: `godot-surface:` `python3 -I tools/check_godot.py {root} {root}/Game.Godot.csproj`, in `check` (needs no Godot binary, so it also runs where the editor is absent). Run with `python3 -I` so a stray module in the folder cannot shadow the stdlib"""
++config = [
++    { path = "tools/check_godot.py" },
++    { any = [{ path = "justfile", contains = "check_godot" }, { path = "Makefile", contains = "check_godot" }] },
++]
++gate = "check_godot"
+ 
+ [[role]]
+ role = "architecture"
+diff -ruN --exclude=__pycache__ ~/Workspaces/shelf/packages/blueprint/src/blueprint/profiles/nix.toml engine/blueprint/src/blueprint/profiles/nix.toml
+--- ~/Workspaces/shelf/packages/blueprint/src/blueprint/profiles/nix.toml	1970-01-01 02:00:00
++++ engine/blueprint/src/blueprint/profiles/nix.toml	2026-10-11 20:17:45
+@@ -0,0 +1,85 @@
++# Stack profile (see python-uv.toml for the format). Nix flakes (NixOS hosts, dev shells), nixos-26.05 / Nix 2.34, late 2026.
++# Research: openspec/changes/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a flake.nix within three levels.
++# Tested 2026-10-11 inside the nixos/nix Docker image (arm64 Linux on a Mac, no local Nix) against a scratch copy of homelab (hosts/bee, hosts/sol).
++stack = "nix"
++status = "provisional"
++source = "nix-compose-profile.md (2026-10-11): nixfmt 1.5.0, statix, deadnix 1.3.2 and `nix eval ...toplevel.drvPath` run in nixos/nix (Nix 2.34.7) on homelab's 28 .nix files; the eval seen red on a planted misspelled option and green on the real host; homelab is the only consumer"
++
++[[role]]
++role = "toolchain"
++tool = """flake.lock committed beside every flake.nix (pins nixpkgs and every input); the Nix that runs the gate is pinned too (the nixos/nix image by digest, or the host's own pinned Nix), never `:latest`; \
++`nix flake lock --no-update-lock-file` fails when flake.nix and flake.lock disagree; a lock-age check bounds how stale nixpkgs may get"""
++install = """commit flake.lock (`nix flake lock`); gate: `nix flake lock --no-update-lock-file path:<flake dir>` per flake; pin the container: `nixos/nix:2.34.7@sha256:<digest>`; \
++homelab already has tools/check-lock-age.py for the age bound. Open: the lock-drift command was not seen red here (the plant needed a GitHub fetch and hit the API rate limit, an unrelated failure)"""
++config = [{ any = [{ path = "flake.lock" }, { path = "*/flake.lock" }, { path = "*/*/flake.lock" }] }]
++gate = "--no-update-lock-file"
++
++[[role]]
++role = "formatter"
++tool = """nixfmt 1.5.0 (the official RFC 166 formatter, NixOS/nixfmt, released 2026-09, in nixpkgs as `nixfmt`): `nixfmt --check` over every .nix file. Refused: nixpkgs-fmt (archived 2024-07); alejandra 4.0.0 (maintained, but not the official style, so a second opinion on layout nobody else shares)"""
++install = "run through the flake's pinned nixpkgs: `nix shell nixpkgs/<locked rev>#nixfmt -c nixfmt --check $(git ls-files '*.nix')`; just fmt runs `nixfmt` without --check. Seen on homelab: 27 of 28 files are not nixfmt-clean (hand-formatted), so adoption is one reformat commit"
++config = [{ any = [{ path = ".pre-commit-config.yaml", contains = "nixfmt" }, { any = [{ path = "justfile", contains = "nixfmt" }, { path = "Makefile", contains = "nixfmt" }] }, { path = "flake.nix", contains = "nixfmt" }] }]
++gate = "nixfmt --check"
++
++[[role]]
++role = "linter"
++tool = """statix (anti-pattern lints, `statix check`, exit 1 on any finding) AND deadnix (`deadnix --fail`, unused bindings and lambda arguments; without --fail it always exits 0). Use the nixpkgs build of statix: upstream (oppiliappan) moved to tangled.org and its README points at the Molybdenum Software fork that nixpkgs packages. \
++Findings are fixed or switched off in statix.toml `disabled = [...]` with a reason; never a blanket disable"""
++install = """justfile: `statix check .` and `deadnix --fail .`, both through the same pinned nixpkgs as the formatter. Seen on homelab: statix 7 warnings (empty pattern `{ ... }:`, repeated attribute keys), deadnix unused lambda patterns (`{ config, lib, pkgs, ... }:` with config unused), exit 1 on both. \
++Open: for module files that take `{ config, lib, pkgs, ... }:` by convention, decide between `deadnix --no-lambda-pattern-names` (-L) and trimming the arguments; trimming is the strict answer"""
++config = [{ any = [{ path = "justfile", contains = "deadnix --fail" }, { path = "Makefile", contains = "deadnix --fail" }] }]
++gate = "statix check"
++
++[[role]]
++role = "types"
++tool = """evaluating every output the repo deploys: `nix eval "path:<repo>?dir=hosts/<h>#nixosConfigurations.<h>.config.system.build.toplevel.drvPath" --raw` per host. The module system type-checks every option value, rejects unknown/misspelled options, fires module assertions and undefined variables; evaluation is architecture-independent, so an x86_64 host evaluates on an arm64 Mac. Seen red on a planted misspelled option (exit 1, `The option services.avahi.enabel does not exist`), green on the real host. A `path:` flake ref checks the working tree, a `git+file:` ref misses uncommitted files"""
++install = """a `just check-hosts` that loops over hosts/*/flake.nix and runs the eval (inside the pinned nixos/nix image when Nix is not installed), and is reached by `just check` and by CI. homelab has the command (tools/check-host.sh, `make check-host HOST=` (homelab is still on make)) but `just check` never reaches it and no workflow runs it. \
++Cost: 40 s warm to 3 min cold per host, so CI caches /nix. `nix flake check --no-build "path:<repo>?dir=hosts/<h>"` is the equal alternative (tested green on bee: it evaluates `nixosConfigurations.bee`, 2 min cold; not seen red) and also runs `checks.*` if the flake defines any"""
++config = [{ any = [{ path = "tools/check-host.sh" }, { any = [{ path = "justfile", contains = "nixosConfigurations" }, { path = "Makefile", contains = "nixosConfigurations" }] }, { path = "flake.nix", contains = "checks" }] }]
++gate = "nixosConfigurations"
++[[role.alternative]]
++label = "tools/check-host.sh evaluates each host"
++gate = "check-host"
++path = "tools/check-host.sh"
++
++[[role]]
++role = "dependencies"
++tool = "flake inputs: every input pinned by flake.lock and followed from one nixpkgs (`inputs.<x>.inputs.nixpkgs.follows`); `nix flake update` is a reviewed commit; the repo's lock-age check bounds staleness"
++install = "in every flake.nix: each non-nixpkgs input sets `inputs.nixpkgs.follows = \"nixpkgs\"`; bump with `nix flake update` in its own commit and re-run the host eval before merging"
++config = [{ any = [{ path = "flake.nix", contains = "follows" }, { path = "*/flake.nix", contains = "follows" }, { path = "*/*/flake.nix", contains = "follows" }] }]
++
++[[role]]
++role = "tests"
++untested = "NixOS VM tests (`pkgs.testers.runNixOSTest`, one QEMU VM per test) are the best-in-world answer for module behaviour but need KVM on a Linux builder; this Mac's Docker (arm64 Linux VM) has no /dev/kvm, so none was run. Evaluation is the gate until a builder exists"
++
++[[role]]
++role = "coverage"
++na = "Nix has no line or branch coverage tool; evaluation of every deployed output is the closest measure (the types row)"
++
++[[role]]
++role = "spelling"
++tool = "typos (crate-ci) with a committed config; it splits identifiers and reads .nix comments and strings"
++install = "brew install typos-cli (or via the flake's pinned nixpkgs); typos.toml with [default.extend-words] for hostnames and domain terms; just check runs `typos`"
++config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
++gate = "typos"
++
++[[role]]
++role = "architecture"
++na = "no import-linter equivalent exists for Nix modules; layering (host over _shared roles over _shared modules) is carried by the module system's option interface, and an evaluation that crosses a layer wrongly fails the types row"
++
++[[role]]
++role = "hooks"
++tool = "prek per commit on staged .nix files: nixfmt --check, statix check, deadnix --fail; the host evaluation stays in the pre-push gate (tens of seconds)"
++install = """.pre-commit-config.yaml local hooks (language: system, files: \\.nix$): id nixfmt / entry nixfmt --check; id statix / entry statix check (pass_filenames: false: statix takes a path, not a list); id deadnix / entry deadnix --fail; \
++the pre-push `just check` hook already runs the evaluation"""
++config = [{ path = ".pre-commit-config.yaml", contains = "nixfmt" }, { path = ".pre-commit-config.yaml", contains = "deadnix" }]
++
++[[role]]
++role = "agent-guidance"
++tool = "docs/agents/nix.md (how a host is evaluated, the formatter and lint commands, flake.lock rules, what never to hand-edit), linked from AGENTS.md"
++install = """create docs/agents/nix.md (<= 120 lines): the recipes; never hand-edit flake.lock (use `nix flake update <input>`); a new module is imported from nixosModules/default.nix; \
++evaluate before deploy (`just check-hosts`); secrets are sealed, never in the Nix store. Link from AGENTS.md: `Nix conventions: docs/agents/nix.md`"""
++config = [
++    { path = "docs/agents/nix.md" },
++    { path = "AGENTS.md", contains = "docs/agents/nix.md" },
++]
+diff -ruN --exclude=__pycache__ ~/Workspaces/shelf/packages/blueprint/tests/test_framework.py engine/blueprint/tests/test_framework.py
+--- ~/Workspaces/shelf/packages/blueprint/tests/test_framework.py	2026-10-11 17:54:14
++++ engine/blueprint/tests/test_framework.py	2026-10-11 20:19:49
+@@ -34,8 +34,32 @@
+ 
+ def test_headless_build_outside_the_gate_fails(repo: Repo) -> None:
+     _godot(repo)
+-    repo.write("Makefile", "check:\n\ttrue\nimport:\n\tgodot --headless --import --build-solutions\n")
++    repo.write("Makefile", "check:\n\ttrue\nimport:\n\tgodot --headless --import | grep ERROR: ; godot --headless --build-solutions\n")
+     assert _rows(repo)["framework.godot.build"][0] is Verdict.FAILING
++
++
++def test_godot_surface_check_and_in_engine_tests_in_the_gate_pass(repo: Repo) -> None:
++    _godot(repo)
++    repo.write("tools/check_godot.py", "")
++    repo.write("Directory.Packages.props", '<PackageVersion Include="Chickensoft.GoDotTest" Version="2.0.47" />')
++    repo.write("src/Game/viewtests/TestEntry.cs", "env.ShouldRunTests")
++    repo.write(
++        "justfile",
++        "check: godot-surface godot-test\n"
++        "godot-surface:\n    python3 -I tools/check_godot.py src/Game\n"
++        "godot-test:\n    godot --headless --run-tests --quit-on-finish\n",
++    )
++    rows = _rows(repo)
++    assert rows["framework.godot.surface-integrity"][0] is Verdict.PASSING
++    assert rows["framework.godot.tests"][0] is Verdict.PASSING
++
++
++def test_godot_tests_configured_but_outside_the_gate_fail(repo: Repo) -> None:
++    _godot(repo)
++    repo.write("Directory.Packages.props", '<PackageVersion Include="Chickensoft.GoDotTest" Version="2.0.47" />')
++    repo.write("src/Game/viewtests/TestEntry.cs", "env.ShouldRunTests")
++    repo.write("justfile", "check:\n    true\ngodot-test:\n    godot --run-tests\n")
++    assert _rows(repo)["framework.godot.tests"][0] is Verdict.FAILING
+ 
+ 
+ def test_two_projects_get_one_table_each_and_a_declared_one_wins(repo: Repo) -> None:
+diff -ruN --exclude=__pycache__ ~/Workspaces/shelf/packages/blueprint/tests/test_stack_and_survey.py engine/blueprint/tests/test_stack_and_survey.py
+--- ~/Workspaces/shelf/packages/blueprint/tests/test_stack_and_survey.py	2026-10-11 20:06:10
++++ engine/blueprint/tests/test_stack_and_survey.py	2026-10-11 20:22:13
+@@ -97,8 +97,8 @@
+ 
+ 
+ def test_an_untested_role_is_a_blueprint_gap(repo: Repo) -> None:
+-    repo.write("App.sln", "")
+-    verdict, evidence, gap = _rows(repo)["stack.dotnet.coverage"]
++    repo.write("stacks/a/compose.yml", "services: {}")
++    verdict, evidence, gap = _rows(repo)["stack.compose.formatter"]
+     assert verdict is Verdict.NOT_CHECKED
+     assert gap
+     assert "no standard yet" in evidence
+@@ -227,3 +227,49 @@
+     _dotnet_repo(repo, "disable")
+     repo.fake_tool(repo.bin_dir / "dotnet", "10.0.302 [/opt/homebrew/sdk]")
+     assert _rows(repo)["stack.dotnet.toolchain"][0] is Verdict.FAILING
++
++
++def test_flake_nix_in_a_subfolder_detects_the_nix_stack(repo: Repo) -> None:
++    # homelab: hosts/bee/flake.nix and hosts/sol/flake.nix, none at the root.
++    repo.write("hosts/bee/flake.nix", "{ }")
++    repo.write("hosts/sol/flake.nix", "{ }")
++    repo.write("hosts/bee/flake.lock", "{}")
++    rows = _rows(repo)
++    assert "detected from hosts/bee/flake.nix, hosts/sol/flake.nix" in rows["stack.nix.profile"][1]
++    assert rows["stack.nix.coverage"][0] is Verdict.NOT_APPLICABLE
++    assert rows["stack.nix.tests"][2] is True  # an untested role is a blueprint gap
++
++
++def test_many_compose_files_make_one_compose_table(repo: Repo) -> None:
++    for name in ("a2web", "traefik", "conan"):
++        repo.write(f"stacks/{name}/compose.yml", "services: {}")
++    rows = _rows(repo)
++    assert [k for k in rows if k.endswith(".profile")] == ["stack.compose.profile"]
++    assert "stacks/a2web/compose.yml" in rows["stack.compose.profile"][1]
++
++
++def test_a_nix_host_eval_in_the_gate_passes_the_types_row(repo: Repo) -> None:
++    repo.write("hosts/bee/flake.nix", "{ }")
++    repo.write("tools/check-host.sh", "#!/bin/sh\n")
++    repo.write("justfile", "check: check-host\ncheck-host:\n    bash tools/check-host.sh bee\n")
++    assert _rows(repo)["stack.nix.types"][0] is Verdict.PASSING
++
++
++def _coverage_files(repo: Repo) -> None:
++    repo.write("App.sln", "")
++    repo.write("Directory.Packages.props", '<PackageVersion Include="coverlet.MTP" Version="10.1.0" />')
++    repo.write(".config/dotnet-tools.json", '{"tools": {"dotnet-reportgenerator-globaltool": {"version": "5.5.11"}}}')
++    repo.write("coverage-floor.json", '{"line": 89.0, "branch": 75.0}')
++    repo.write("tools/check_coverage.py", "")
++
++
++def test_dotnet_coverage_floor_run_by_the_gate_passes(repo: Repo) -> None:
++    _coverage_files(repo)
++    repo.write("justfile", "check: coverage\ncoverage:\n    python3 tools/check_coverage.py cov/Summary.json coverage-floor.json\n")
++    assert _rows(repo)["stack.dotnet.coverage"][0] is Verdict.PASSING
++
++
++def test_dotnet_coverage_floor_outside_the_gate_fails(repo: Repo) -> None:
++    _coverage_files(repo)
++    repo.write("justfile", "check:\n    true\ncoverage:\n    python3 tools/check_coverage.py cov/Summary.json coverage-floor.json\n")
++    assert _rows(repo)["stack.dotnet.coverage"][0] is Verdict.FAILING

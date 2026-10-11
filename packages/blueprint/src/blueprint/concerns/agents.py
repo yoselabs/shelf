@@ -7,11 +7,12 @@ import os
 import re
 import shutil
 import tempfile
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import templates
-from blueprint.model import FixedBy, check, failing, not_checked, not_set_up, passing, uses_beads
+from blueprint.model import FixedBy, check, failing, not_applicable, not_checked, not_set_up, passing, uses_beads
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
@@ -162,6 +163,61 @@ def worktrees(ctx: Context) -> Finding:
             FixedBy.AUTO,
         )
     return passing(f"ignored: {', '.join(_WORKTREE_DIRS)}; the rule is in docs/agents/working-with-agents.md")
+
+
+# A day: past it, a worktree's branch and main have moved apart far enough that merging is a
+# second job. Overridable per repo (`worktree-sync-hours` in docs/blueprint/blueprint.toml settings).
+_SYNC_HOURS = 24
+
+
+def _branches(ctx: Context) -> list[str]:
+    """The branches checked out in linked worktrees (the main checkout is not one)."""
+    text = ctx.git("worktree", "list", "--porcelain") or ""
+    blocks = [b for b in text.split("\n\n") if b.strip()][1:]
+    return [line.removeprefix("branch refs/heads/") for b in blocks for line in b.splitlines() if line.startswith("branch ")]
+
+
+def _oldest(ctx: Context, span: str) -> int | None:
+    """Commit time of the oldest commit in `span` (`a..b`), or None when the span is empty."""
+    out = ctx.git("log", "--format=%ct", span) or ""
+    stamps = [int(s) for s in out.split()]
+    return min(stamps) if stamps else None
+
+
+@check(
+    "agents.worktrees-in-sync",
+    "every agent worktree merges into main and takes main's changes within a day",
+    audit_only=True,
+    layer="agent",
+)
+def worktrees_in_sync(ctx: Context) -> Finding:
+    """Audit-only: reads this clone's worktrees. Fails on unmerged work, or missing main commits, older than a day.
+
+    Why: worktrees that drift for days turn every merge into conflict resolution and let agents build
+    on a main that no longer exists (owner, 2026-10-11).
+    """
+    branches = _branches(ctx)
+    if not branches:
+        return not_applicable("no linked worktrees")
+    limit = time.time() - float(str(ctx.settings.get("worktree-sync-hours", _SYNC_HOURS))) * 3600
+    stale: list[str] = []
+    for branch in branches:
+        unmerged = _oldest(ctx, f"main..{branch}")
+        missing = _oldest(ctx, f"{branch}..main")
+        if unmerged is not None and unmerged < limit:
+            stale.append(f"{branch}: work unmerged since {_ago(unmerged)}")
+        if missing is not None and missing < limit:
+            stale.append(f"{branch}: behind main since {_ago(missing)}")
+    if stale:
+        return failing(
+            "; ".join(stale),
+            "in each worktree: rebase on main, `just check`, merge to main on the owner's yes; remove worktrees whose work is done",
+        )
+    return passing(f"{len(branches)} worktrees, each within {_SYNC_HOURS}h of main both ways")
+
+
+def _ago(stamp: int) -> str:
+    return f"{(time.time() - stamp) / 3600:.0f}h ago"
 
 
 _INSTALL = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint template --repo ."

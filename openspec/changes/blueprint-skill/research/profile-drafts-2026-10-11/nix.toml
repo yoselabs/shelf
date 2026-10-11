@@ -1,0 +1,85 @@
+# Stack profile (see python-uv.toml for the format). Nix flakes (NixOS hosts, dev shells), nixos-26.05 / Nix 2.34, late 2026.
+# Research: openspec/changes/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a flake.nix within three levels.
+# Tested 2026-10-11 inside the nixos/nix Docker image (arm64 Linux on a Mac, no local Nix) against a scratch copy of homelab (hosts/bee, hosts/sol).
+stack = "nix"
+status = "provisional"
+source = "nix-compose-profile.md (2026-10-11): nixfmt 1.5.0, statix, deadnix 1.3.2 and `nix eval ...toplevel.drvPath` run in nixos/nix (Nix 2.34.7) on homelab's 28 .nix files; the eval seen red on a planted misspelled option and green on the real host; homelab is the only consumer"
+
+[[role]]
+role = "toolchain"
+tool = """flake.lock committed beside every flake.nix (pins nixpkgs and every input); the Nix that runs the gate is pinned too (the nixos/nix image by digest, or the host's own pinned Nix), never `:latest`; \
+`nix flake lock --no-update-lock-file` fails when flake.nix and flake.lock disagree; a lock-age check bounds how stale nixpkgs may get"""
+install = """commit flake.lock (`nix flake lock`); gate: `nix flake lock --no-update-lock-file path:<flake dir>` per flake; pin the container: `nixos/nix:2.34.7@sha256:<digest>`; \
+homelab already has tools/check-lock-age.py for the age bound. Open: the lock-drift command was not seen red here (the plant needed a GitHub fetch and hit the API rate limit, an unrelated failure)"""
+config = [{ any = [{ path = "flake.lock" }, { path = "*/flake.lock" }, { path = "*/*/flake.lock" }] }]
+gate = "--no-update-lock-file"
+
+[[role]]
+role = "formatter"
+tool = """nixfmt 1.5.0 (the official RFC 166 formatter, NixOS/nixfmt, released 2026-09, in nixpkgs as `nixfmt`): `nixfmt --check` over every .nix file. Refused: nixpkgs-fmt (archived 2024-07); alejandra 4.0.0 (maintained, but not the official style, so a second opinion on layout nobody else shares)"""
+install = "run through the flake's pinned nixpkgs: `nix shell nixpkgs/<locked rev>#nixfmt -c nixfmt --check $(git ls-files '*.nix')`; just fmt runs `nixfmt` without --check. Seen on homelab: 27 of 28 files are not nixfmt-clean (hand-formatted), so adoption is one reformat commit"
+config = [{ any = [{ path = ".pre-commit-config.yaml", contains = "nixfmt" }, { any = [{ path = "justfile", contains = "nixfmt" }, { path = "Makefile", contains = "nixfmt" }] }, { path = "flake.nix", contains = "nixfmt" }] }]
+gate = "nixfmt --check"
+
+[[role]]
+role = "linter"
+tool = """statix (anti-pattern lints, `statix check`, exit 1 on any finding) AND deadnix (`deadnix --fail`, unused bindings and lambda arguments; without --fail it always exits 0). Use the nixpkgs build of statix: upstream (oppiliappan) moved to tangled.org and its README points at the Molybdenum Software fork that nixpkgs packages (pushed 2026-10-09) \
+Findings are fixed or switched off in statix.toml `disabled = [...]` with a reason; never a blanket disable"""
+install = """justfile: `statix check .` and `deadnix --fail .`, both through the same pinned nixpkgs as the formatter. Seen on homelab: statix 7 warnings (empty pattern `{ ... }:`, repeated attribute keys), deadnix unused lambda patterns (`{ config, lib, pkgs, ... }:` with config unused), exit 1 on both. \
+Open: for module files that take `{ config, lib, pkgs, ... }:` by convention, decide between `deadnix --no-lambda-pattern-names` (-L) and trimming the arguments; trimming is the strict answer"""
+config = [{ any = [{ path = "justfile", contains = "deadnix --fail" }, { path = "Makefile", contains = "deadnix --fail" }] }]
+gate = "statix check"
+
+[[role]]
+role = "types"
+tool = """evaluating every output the repo deploys: `nix eval "path:<repo>?dir=hosts/<h>#nixosConfigurations.<h>.config.system.build.toplevel.drvPath" --raw` per host. The module system type-checks every option value, rejects unknown/misspelled options, fires module assertions and undefined variables; evaluation is architecture-independent, so an x86_64 host evaluates on an arm64 Mac. Seen red on a planted misspelled option (exit 1, `The option services.avahi.enabel does not exist`), green on the real host. A `path:` flake ref checks the working tree, a `git+file:` ref misses uncommitted files"""
+install = """a `just check-hosts` that loops over hosts/*/flake.nix and runs the eval (inside the pinned nixos/nix image when Nix is not installed), and is reached by `just check` and by CI. homelab has the command (tools/check-host.sh, `make check-host HOST=` (homelab is still on make)) but `just check` never reaches it and no workflow runs it. \
+Cost: 40 s warm to 3 min cold per host, so CI caches /nix. `nix flake check --no-build "path:<repo>?dir=hosts/<h>"` is the equal alternative (tested green on bee: it evaluates `nixosConfigurations.bee`, 2 min cold; not seen red) and also runs `checks.*` if the flake defines any"""
+config = [{ any = [{ path = "tools/check-host.sh" }, { any = [{ path = "justfile", contains = "nixosConfigurations" }, { path = "Makefile", contains = "nixosConfigurations" }] }, { path = "flake.nix", contains = "checks" }] }]
+gate = "nixosConfigurations"
+[[role.alternative]]
+label = "tools/check-host.sh evaluates each host"
+gate = "check-host"
+path = "tools/check-host.sh"
+
+[[role]]
+role = "dependencies"
+tool = "flake inputs: every input pinned by flake.lock and followed from one nixpkgs (`inputs.<x>.inputs.nixpkgs.follows`); `nix flake update` is a reviewed commit; the repo's lock-age check bounds staleness"
+install = "in every flake.nix: each non-nixpkgs input sets `inputs.nixpkgs.follows = \"nixpkgs\"`; bump with `nix flake update` in its own commit and re-run the host eval before merging"
+config = [{ any = [{ path = "flake.nix", contains = "follows" }, { path = "*/flake.nix", contains = "follows" }, { path = "*/*/flake.nix", contains = "follows" }] }]
+
+[[role]]
+role = "tests"
+untested = "NixOS VM tests (`pkgs.testers.runNixOSTest`, one QEMU VM per test) are the best-in-world answer for module behaviour but need KVM on a Linux builder; this Mac's Docker (arm64 Linux VM) has no /dev/kvm, so none was run. Evaluation is the gate until a builder exists"
+
+[[role]]
+role = "coverage"
+na = "Nix has no line or branch coverage tool; evaluation of every deployed output is the closest measure (the types row)"
+
+[[role]]
+role = "spelling"
+tool = "typos (crate-ci) with a committed config; it splits identifiers and reads .nix comments and strings"
+install = "brew install typos-cli (or via the flake's pinned nixpkgs); typos.toml with [default.extend-words] for hostnames and domain terms; just check runs `typos`"
+config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
+gate = "typos"
+
+[[role]]
+role = "architecture"
+na = "no import-linter equivalent exists for Nix modules; layering (host over _shared roles over _shared modules) is carried by the module system's option interface, and an evaluation that crosses a layer wrongly fails the types row"
+
+[[role]]
+role = "hooks"
+tool = "prek per commit on staged .nix files: nixfmt --check, statix check, deadnix --fail; the host evaluation stays in the pre-push gate (tens of seconds)"
+install = """.pre-commit-config.yaml local hooks (language: system, files: \\.nix$): id nixfmt / entry nixfmt --check; id statix / entry statix check (pass_filenames: false: statix takes a path, not a list); id deadnix / entry deadnix --fail; \
+the pre-push `just check` hook already runs the evaluation"""
+config = [{ path = ".pre-commit-config.yaml", contains = "nixfmt" }, { path = ".pre-commit-config.yaml", contains = "deadnix" }]
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/nix.md (how a host is evaluated, the formatter and lint commands, flake.lock rules, what never to hand-edit), linked from AGENTS.md"
+install = """create docs/agents/nix.md (<= 120 lines): the recipes; never hand-edit flake.lock (use `nix flake update <input>`); a new module is imported from nixosModules/default.nix; \
+evaluate before deploy (`just check-hosts`); secrets are sealed, never in the Nix store. Link from AGENTS.md: `Nix conventions: docs/agents/nix.md`"""
+config = [
+    { path = "docs/agents/nix.md" },
+    { path = "AGENTS.md", contains = "docs/agents/nix.md" },
+]

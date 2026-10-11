@@ -1,0 +1,86 @@
+# Stack profile (see python-uv.toml for the format). Docker Compose files (compose.y*ml / docker-compose.y*ml), Compose v5, late 2026.
+# Research: openspec/changes/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a compose file within three levels.
+# A stack, not a framework: a repo with 19 compose files should get one table, and framework detection yields one table per marker folder.
+# Tested 2026-10-11 with Docker Compose v5.1.2 and dclint 3.1.0 on a scratch copy of homelab (19 stacks/*/compose.yml).
+stack = "compose"
+status = "provisional"
+source = "nix-compose-profile.md (2026-10-11): `docker compose config --no-interpolate`, a jq digest-pin check and dclint 3.1.0 seen red on planted violations and green on homelab's real files; hadolint 2.15.1 run on images/devbox/Dockerfile (2 real warnings, exit 1); homelab is the only consumer"
+
+[[role]]
+role = "toolchain"
+na = "Compose has no language or SDK version: the top-level `version:` key is obsolete, and the engine and compose plugin are properties of the host (homelab: the NixOS docker module in the pinned nixpkgs). Image digests are the lockfile; see the dependencies row"
+
+[[role]]
+role = "formatter"
+untested = "no compose-specific formatter exists; yamlfmt and prettier were not run. Compose files in practice carry long explanatory comments and hand-aligned blocks (homelab excludes compose.yml from yamllint and keeps them hand-formatted), so a formatter needs a trial on real files before it is a standard. dclint's key-order rule (service-keys-order) covers the one ordering convention Compose has"
+
+[[role]]
+role = "linter"
+tool = """dclint 3.1.0 (zavoloklom/docker-compose-linter, npm `dclint`, pinned) with `--max-warnings 0` and a committed .dclintrc listing every disabled rule with a reason; on top of Docker's own schema check (the types row). \
+Seen red on a planted file: no-unbound-port-interfaces and service-image-require-explicit-tag are errors (exit 1); on real files the default exit code is 0 even with warnings, so --max-warnings 0 is what makes the gate fail. \
+It does NOT flag `privileged: true` (no such rule), so the policy row below carries that. Watch item: last release 2025-07-24 and last non-CI commit 2025-09; not abandoned yet (issues still opened 2026-04), but if it goes a full year without a release the role passes to a conftest policy. \
+Dockerfiles that sit beside compose files are linted with hadolint 2.15.1 (hadolint/hadolint, released 2026-07; exit 1 on any warning, seen on homelab's images/devbox/Dockerfile: DL3008, DL4006)"""
+install = """npm: `npx dclint@3.1.0 --max-warnings 0 $(git ls-files '*compose*.y*ml')` (or the dclint Docker image); .dclintrc with `rules:` overrides, each with a comment saying why. Seen on homelab: 19 compose files trip require-project-name-field, service-keys-order, require-quotes-in-ports; \
+the strict answer is to fix them, not to disable the rules. hadolint: `docker run --rm -i hadolint/hadolint < images/<n>/Dockerfile` or the binary, with .hadolint.yaml `ignored:` carrying reasons"""
+config = [{ any = [{ path = ".dclintrc" }, { path = ".dclintrc.json" }, { path = "dclint.config.js" }, { path = ".pre-commit-config.yaml", contains = "dclint" }, { any = [{ path = "justfile", contains = "dclint" }, { path = "Makefile", contains = "dclint" }] }] }]
+gate = "dclint"
+
+[[role]]
+role = "types"
+tool = """`docker compose -f <file> config --no-interpolate -q` per compose file: Docker's own schema validation (unknown keys, wrong types), no environment needed. Seen red on a planted unknown key (`additional properties 'bogus_key' not allowed`) and on a wrong type (`restart must be a string`), green on three real stacks. \
+Without --no-interpolate the command fails on any `${VAR:?}` (homelab: A2WEB_ZYTE_KEY missing) and warns on every unset ${VAR}; homelab's own tools/doctor.py instead fills each referenced variable with a placeholder so types are checked after interpolation, which is stricter and also acceptable"""
+install = """justfile: `for f in $(git ls-files '*compose*.y*ml'); do docker compose -f $$f config --no-interpolate -q || exit 1; done`. Needs a Docker CLI with the compose plugin (Compose v2+); no daemon connection is made"""
+config = [{ any = [{ any = [{ path = "justfile", contains = "config --no-interpolate" }, { path = "Makefile", contains = "config --no-interpolate" }] }, { path = "tools/doctor.py", contains = "compose" }] }]
+gate = "config --no-interpolate"
+[[role.alternative]]
+label = "tools/doctor.py runs `docker compose config` on every rendered compose"
+gate = "doctor"
+path = "tools/doctor.py"
+
+[[role]]
+role = "dependencies"
+tool = """every `image:` is `name:tag@sha256:<64 hex>` (tag for the human, digest for the machine): `docker compose -f <file> config --no-interpolate --format json | jq -e '[.services[].image // empty | select(test("@sha256:[0-9a-f]{64}$") | not)] | length == 0'`. Seen red on a planted `nginx:latest`, green on two real stacks; homelab has 0 unpinned images across its 19 files and already enforces the same rule in tools/doctor.py (DIGEST_RE), which CI runs but `just check` does not. \
+Staying current is a separate, reported job (homelab: tools/check-updates.py, read-only report of images behind upstream) so a pin never means a frozen stack"""
+install = "justfile recipe looping over compose files with the jq filter above (jq is preinstalled on macOS and the GitHub runners); an updater (Renovate's docker-compose manager or the repo's own check-updates) proposes digest bumps as reviewable commits"
+config = [{ any = [{ any = [{ path = "justfile", contains = "@sha256" }, { path = "Makefile", contains = "@sha256" }] }, { path = "tools/check-updates.py" }, { path = "renovate.json" }, { path = ".github/renovate.json" }] }]
+gate = "sha256"
+[[role.alternative]]
+label = "tools/doctor.py refuses an image not pinned by digest (DIGEST_RE)"
+gate = "doctor"
+path = "tools/doctor.py"
+
+[[role]]
+role = "tests"
+untested = "a smoke test per stack (`docker compose up --wait` against a throwaway daemon, then a health probe) was not run: homelab's stacks need sealed secrets and host-specific mounts, so a generic recipe would be invented. container-structure-test and Testcontainers are the candidates; homelab has tools/deploy-smoke for the live deploy"
+
+[[role]]
+role = "coverage"
+na = "a compose file has no executable lines to cover"
+
+[[role]]
+role = "spelling"
+tool = "typos (crate-ci) with a committed config; it reads comments and service names in compose files"
+install = "brew install typos-cli; typos.toml with [default.extend-words] for image and host names; just check runs `typos`"
+config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
+gate = "typos"
+
+[[role]]
+role = "architecture"
+untested = "the rules that matter for Compose (no privileged, no host network, no docker.sock mount, no unbound published port, every service on a declared network) are policy over the resolved config: conftest (OPA, `docker compose config --format json | conftest test -`) is the candidate and was not run. homelab enforces its own deny-list in tools/stack_policy.py (read, not exercised here); dclint covers only the unbound-port rule"
+
+[[role]]
+role = "hooks"
+tool = "prek per commit on staged compose files: docker compose config --no-interpolate, dclint, and the digest-pin filter; hadolint on staged Dockerfiles"
+install = """.pre-commit-config.yaml local hooks (language: system, files: compose.*\\.ya?ml$): id compose-config / entry sh -c 'for f in "$@"; do docker compose -f "$f" config --no-interpolate -q || exit 1; done' -- ; id dclint / entry npx --no-install dclint --max-warnings 0; \
+id hadolint / files: Dockerfile / entry hadolint"""
+config = [{ path = ".pre-commit-config.yaml", contains = "dclint" }]
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/compose.md (how a stack is validated, the pin rule, how to bump an image, what never to hand-edit), linked from AGENTS.md"
+install = """create docs/agents/compose.md (<= 100 lines): the recipes; images are pinned `tag@digest`, bump with the repo's updater and re-run the config check; never paste a secret into a compose file (use `${VAR:?}` and the sealed env); \
+rendered/generated compose files are edited at their source. Link from AGENTS.md: `Compose conventions: docs/agents/compose.md`"""
+config = [
+    { path = "docs/agents/compose.md" },
+    { path = "AGENTS.md", contains = "docs/agents/compose.md" },
+]

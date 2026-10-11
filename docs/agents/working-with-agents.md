@@ -27,6 +27,7 @@ in the same folder during that time is lost, and the commit fails (reproduced wi
 | beads | `bd` in a worktree uses the main checkout's database; never `bd init` there |
 | hooks | prek's hooks are installed once for the repo and run in every worktree; never install per worktree |
 | finish | `just check` green in the worktree; on the owner's yes, rebase on main and merge fast-forward; then `git worktree remove` |
+| sync | at least daily: rebase on main, and merge finished slices to main the same day. No worktree is a day out of step with main either way (`agents.worktrees-in-sync`); a long task lands in small merged steps |
 
 Both folders are git-ignored (`agents.worktrees`), so no linter, test run or `git add -A` reaches into another tree.
 
