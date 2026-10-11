@@ -198,3 +198,9 @@ def test_new_rows_alone_do_not_fail_the_exit_code(repo: Repo) -> None:
     report.write(result, repo.root, date(2026, 10, 10))
     (repo.root / "docs/blueprint/checkpoints.txt").write_text("")
     assert run(repo.root, env=repo.env).exit_code in {0, 2}
+
+
+def test_an_audit_from_before_the_record_counts_as_an_empty_record(repo: Repo) -> None:
+    repo.write("docs/blueprint/README.md", "# Blueprint\n")
+    rows = run(repo.root, env=repo.env).rows
+    assert all(r.new for r in rows if r.verdict is not Verdict.PASSING)

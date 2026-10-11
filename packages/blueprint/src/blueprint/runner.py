@@ -72,9 +72,15 @@ ACCEPTED = "docs/blueprint/checkpoints.txt"
 
 
 def _accepted(repo: Path) -> set[str] | None:
-    """The `id@version` lines the last audit wrote; None before the first audit, so all is enforced."""
+    """The `id@version` lines the last audit wrote; None before the first audit, so all is enforced.
+
+    An audit from before the record existed (a README, no record) counts as an empty record: every
+    row it did not see passing is new, so consumers audited earlier are not turned red by an upgrade.
+    """
     path = repo / ACCEPTED
-    return set(path.read_text().split()) if path.is_file() else None
+    if path.is_file():
+        return set(path.read_text().split())
+    return set() if (repo / ACCEPTED).with_name("README.md").is_file() else None
 
 
 def active(profile: Profile, concern: str | None = None) -> list[Check]:
