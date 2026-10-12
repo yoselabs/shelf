@@ -161,3 +161,18 @@ def test_a_justfile_comment_naming_gitleaks_does_not_need_a_pin(repo: Repo) -> N
     _tools_repo(repo)
     repo.write("justfile", "# All prek hooks over every file (ruff, shellcheck, gitleaks).\n" + _JUSTFILE)
     assert _pins(repo)[0] is Verdict.PASSING
+
+
+def test_git_lfs_is_not_asked_for_in_mise_even_when_gitattributes_uses_lfs(repo: Repo) -> None:
+    # lifesim: a mise shim for git-lfs breaks `git clone` of an untrusted checkout (git runs it as a filter before `mise trust`).
+    _tools_repo(repo)
+    repo.write(".gitattributes", "*.png filter=lfs diff=lfs merge=lfs -text\n")
+    assert _rows(repo)["stack.tool-pins"][0] is Verdict.PASSING
+
+
+def test_git_lfs_pinned_in_mise_is_flagged_with_the_reason(repo: Repo) -> None:
+    _tools_repo(repo, _PINS + 'git-lfs = "3.7.1"\n', _LOCK + '\n[[tools.git-lfs]]\nversion = "3.7.1"\n')
+    verdict, evidence = _rows(repo)["stack.tool-pins"]
+    assert verdict is Verdict.FAILING
+    assert "git-lfs" in evidence
+    assert "git clone" in evidence

@@ -13,12 +13,12 @@ distilled_into: blueprint stack.tool-pins, stack.tools-installed (concerns/tool_
 
 ## Decision
 
-`mise.toml` pins uv, just, prek, bd, git-lfs and framework editors (Godot) at exact versions; `mise.lock` holds
+`mise.toml` pins uv, just, prek, bd and framework editors (Godot) at exact versions; `mise.lock` holds
 per-platform checksums; `mise install --locked` is the one install command, run by a `just tools` recipe
 with the user's own mise config ignored (`MISE_IGNORED_CONFIG_PATHS`: its `latest` tools would make
 `--locked` refuse). mise reads `global.json` for .NET instead of a second pin, and installs no Python
 (`.python-version` is uv's). Where just is the `rust-just` dev dependency (ADR 0023) mise does not pin it
-again: one pin per tool. mise's tasks and env features are not used. Blueprint checks the pins without network and,
+again: one pin per tool. git-lfs is not pinned here: it comes from the system package manager (History, 2026-10-12). mise's tasks and env features are not used. Blueprint checks the pins without network and,
 in the audit, that installed versions equal them.
 
 Why: tools drifted across machines (bd 1.1.2 vs 1.3.1 migrated a shared database), and just is not
@@ -35,3 +35,4 @@ preinstalled outside Python repos.
 - 2026-10-11: proposed after the trial (`openspec/changes/blueprint-skill/research/toolchain-installer.md`).
 - 2026-10-11: accepted by the owner; shelf-1y4.19 builds the pin checks and pins the shelf and lifesim.
 - 2026-10-11: built (shelf-1y4.19): the install recipe is `just tools`, since `bootstrap` already names consumer onboarding; just stays with uv where rust-just pins it.
+- 2026-10-12: git-lfs leaves mise: its shim breaks git clone in an untrusted checkout (lifesim audit).

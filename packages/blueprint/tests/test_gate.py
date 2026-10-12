@@ -731,3 +731,20 @@ def test_clean_clone_does_not_count_a_dirty_submodule_as_uncommitted(repo: Repo,
     evidence = _verdict(repo, "gate.clean-clone", audit=True)[1]
     assert "generated.txt" in evidence
     assert "third_party/uma" not in evidence
+
+
+def test_clean_clone_is_not_failed_by_an_lfs_smudge_filter(repo: Repo, tmp_path: Path) -> None:
+    # lifesim: git ran the git-lfs shim as the smudge filter during clone and it errored; the clone skips smudge.
+    repo.fake_tool(repo.bin_dir / "git-lfs", "")
+    (repo.bin_dir / "git-lfs").write_text('#!/bin/sh\n[ -n "$GIT_LFS_SKIP_SMUDGE" ] && cat && exit 0\nexit 1\n')
+    config = tmp_path / "gitconfig"
+    config.write_text('[filter "lfs"]\n\tsmudge = git-lfs smudge -- %f\n\trequired = true\n')
+    repo.env |= {"GIT_CONFIG_GLOBAL": str(config), "GIT_CONFIG_NOSYSTEM": "1"}
+    repo.write(".gitattributes", "*.bin filter=lfs\n")
+    repo.write("a.bin", "x")
+    repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.git("-c", "filter.lfs.clean=cat", "add", "-A")
+    repo.git("-c", "filter.lfs.clean=cat", "commit", "-qm", "x")
+    verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
+    assert verdict is Verdict.PASSING, evidence

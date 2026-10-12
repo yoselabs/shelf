@@ -89,3 +89,13 @@ def test_a_clone_with_the_filter_and_git_lfs_passes_the_audit(repo: Repo) -> Non
 def test_the_installed_filter_is_audit_only(repo: Repo) -> None:
     _lfs_repo(repo)
     assert "gate.lfs-installed" not in _rows(repo)
+
+
+def test_a_missing_git_lfs_is_fixed_through_the_system_package_manager_not_mise(repo: Repo) -> None:
+    repo.write(".gitattributes", "*.png filter=lfs diff=lfs merge=lfs -text\n")
+    repo.env["PATH"] = "/nonexistent"
+    verdict, remediation = next(
+        (r.verdict, r.remediation) for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows if r.id == "gate.lfs-installed"
+    )
+    assert verdict is Verdict.NOT_SET_UP
+    assert "system package manager" in remediation

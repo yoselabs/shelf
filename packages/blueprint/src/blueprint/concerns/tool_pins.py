@@ -61,8 +61,8 @@ def _needed(ctx: Context) -> dict[str, str]:
     recipes = "\n".join(line for line in (ctx.read("justfile") or "").splitlines() if not line.lstrip().startswith("#"))
     if "gitleaks" in recipes:
         needed["gitleaks"] = "justfile"
-    if "filter=lfs" in (ctx.read(".gitattributes") or ""):
-        needed["git-lfs"] = ".gitattributes"
+    # git-lfs is deliberately absent: git runs it as a filter during `git clone`, before `mise trust` can run, so a mise
+    # shim breaks cloning an untrusted checkout (lifesim, 2026-10-12). It comes from the system package manager.
     if any(name == "godot" for name, _ in ctx.profile.frameworks):
         needed["godot"] = "project.godot"
     return needed
@@ -140,7 +140,7 @@ def tool_pins(ctx: Context) -> Finding:
     """Read mise.toml and mise.lock against the tools the repo's files say it runs; no network."""
     needed = _needed(ctx)
     if not needed:
-        return not_applicable("the repo runs no tool blueprint pins (uv, just, prek, bd, git-lfs, godot)")
+        return not_applicable("the repo runs no tool blueprint pins (uv, just, prek, bd, godot)")
     wanted = ", ".join(f"{tool} ({why})" for tool, why in needed.items())
     if ctx.read(_MISE) is None:
         return not_set_up(
@@ -152,6 +152,11 @@ def tool_pins(ctx: Context) -> Finding:
     problems = [f"{tool} is not pinned (the repo runs it: {why})" for tool, why in needed.items() if tool not in pins]
     problems += [f"{tool} {version!r} is not an exact version" for tool, (_, version) in pins.items() if not _EXACT.match(version)]
     problems += _cross_file(ctx, pins)
+    if "git-lfs" in pins:
+        problems.append(
+            "git-lfs is pinned in mise.toml: its shim breaks `git clone` in an untrusted checkout "
+            "(git calls it as a filter before `mise trust` can run); remove the pin and install git-lfs with the system package manager"
+        )
     if ctx.read(_LOCK) is None:
         problems.append("no mise.lock: run `mise lock` and commit it")
     else:

@@ -577,7 +577,8 @@ def clean_clone(ctx: Context) -> Finding:
     word = "make" if gate_graph.has_makefile_only(ctx) else "just"
     budget = ctx.settings.get("clean-clone-seconds")
     with tempfile.TemporaryDirectory(prefix="blueprint-clone-") as tmp:
-        clone = ctx.run("git", "clone", "--quiet", str(ctx.repo), tmp, timeout=300)
+        # GIT_LFS_SKIP_SMUDGE: a git-lfs on PATH that fails (a mise shim in an untrusted checkout) must not fail the clone itself.
+        clone = ctx.run("git", "clone", "--quiet", str(ctx.repo), tmp, timeout=300, env={**ctx.env, "GIT_LFS_SKIP_SMUDGE": "1"})
         if clone is None or clone.returncode != 0:
             return not_checked("could not clone the repository")
         judged = _gate_in(ctx, Path(tmp), word, budget)
@@ -704,6 +705,10 @@ def git_remote(ctx: Context) -> Finding:
 _LFS_ATTR = "filter=lfs"
 _NO_LFS = "the repo declares no LFS pattern (.gitattributes has no filter=lfs)"
 _POINTER_HEAD, _POINTER_MAX = "version https://git-lfs.github.com/spec/v1", 1024
+_LFS_PACKAGE = (
+    "install git-lfs with the system package manager (apt-get install git-lfs, brew install git-lfs), "
+    "not through mise: its shim breaks `git clone`"
+)
 _LFS_INSTALL = "git lfs install --skip-repo (prek owns the hooks); then re-add each raw file: git rm --cached <path> && git add <path>"
 
 
@@ -811,7 +816,10 @@ def lfs_installed(ctx: Context) -> Finding:
     if not _uses_lfs(ctx):
         return not_applicable(_NO_LFS)
     if ctx.run("git", "lfs", "version") is None or not ctx.has("git-lfs"):
-        return not_set_up("git-lfs is not installed", "pin git-lfs in mise.toml and run `just tools`; then " + _LFS_INSTALL)
+        return not_set_up(
+            "git-lfs is not installed",
+            _LFS_PACKAGE + "; then " + _LFS_INSTALL,
+        )
     if not (ctx.git("config", "--get", "filter.lfs.process") or ctx.git("config", "--get", "filter.lfs.clean")):
         return failing("the LFS filter is not configured: git lfs install was never run for this user", _LFS_INSTALL, FixedBy.AUTO)
     return passing("git-lfs installed and its filter configured")
