@@ -72,3 +72,45 @@ def test_a_docstring_or_comment_naming_the_pattern_is_not_parsing(repo: Repo) ->
     text = '"""Never `parse_known_args` or `add_help=False`."""\n# add_help=False swallows --help\nX = "p.parse_known_args()"\n'
     repo.write("src/x/doc.py", text)
     assert _row(repo)[0] is Verdict.PASSING
+
+
+_HELP_ROW = "stack.python-uv.cli-help-tested"
+
+
+def _help_row(repo: Repo, scripts: str) -> tuple[Verdict, str]:
+    repo.write("pyproject.toml", f'[project]\nname = "x"\n\n[project.scripts]\n{scripts}')
+    repo.write("uv.lock", "")
+    repo.commit()
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == _HELP_ROW)
+    return row.verdict, row.evidence
+
+
+def test_each_console_script_needs_a_test_running_it_with_help(repo: Repo) -> None:
+    repo.write("tests/test_cli.py", 'def test_help(run):\n    assert run("tool", "--help").code == 0\n')
+    verdict, evidence = _help_row(repo, 'tool = "x.cli:main"\nserve = "x.serve:main"\n')
+    assert verdict is Verdict.FAILING
+    assert "serve" in evidence
+    assert "tool," not in evidence
+
+
+def test_scripts_with_help_tests_pass(repo: Repo) -> None:
+    repo.write("tests/test_cli.py", 'import subprocess\nsubprocess.run(["tool", "--help"], check=True)\n')
+    assert _help_row(repo, 'tool = "x.cli:main"\n')[0] is Verdict.PASSING
+
+
+def test_a_repo_without_console_scripts_has_nothing_to_help(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    repo.write("uv.lock", "")
+    repo.commit()
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == _HELP_ROW)
+    assert row.verdict is Verdict.NOT_APPLICABLE
+
+
+def test_a_workspace_members_console_scripts_count_too(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "root"\n\n[tool.uv.workspace]\nmembers = ["packages/*"]\n')
+    repo.write("uv.lock", "")
+    repo.write("packages/tool/pyproject.toml", '[project]\nname = "tool"\n\n[project.scripts]\ntool = "tool.cli:main"\n')
+    repo.commit()
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == _HELP_ROW)
+    assert row.verdict is Verdict.FAILING
+    assert "tool" in row.evidence
