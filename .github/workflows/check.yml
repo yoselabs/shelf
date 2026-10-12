@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HYPOTHESIS_PROFILE: ci
+      # uv's own Python, as on every dev machine: the runner's /usr/bin/python3.12 (3.12.3) differs in stdlib behaviour
+      # (argparse exit_on_error), and that kept this job red from 0f21079 to the fix.
+      UV_PYTHON_PREFERENCE: only-managed
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 

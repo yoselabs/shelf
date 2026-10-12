@@ -79,7 +79,9 @@ def test_a_json_flag_left_out_keeps_its_default() -> None:
 def test_a_missing_required_flag_is_a_usage_error() -> None:
     async def sample(name: str) -> None: ...
 
-    with pytest.raises(argparse.ArgumentError):
+    assert flags_of(sample)[0].required  # type: ignore[arg-type]
+    # The rejection is the stdlib's: CPython 3.12.3 exits even under exit_on_error=False, later patches raise.
+    with pytest.raises((argparse.ArgumentError, SystemExit)):
         _parse(sample, [])
 
 
