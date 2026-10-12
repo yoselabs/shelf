@@ -677,6 +677,18 @@ def test_a_red_workflow_on_the_default_branch_head_fails_and_is_named(repo: Repo
     assert "Dependabot" not in evidence
 
 
+def test_a_pushed_head_with_no_run_yet_is_not_judged_by_an_older_green(repo: Repo) -> None:
+    # a2kay 2026-10-12: right after a push, the newest run on main is still the previous commit's.
+    _gh_runs(repo, [{"workflowName": "check", "headSha": "old0000", "status": "completed", "conclusion": "success", "event": "push"}])
+    repo.write(".github/workflows/check.yml", "on: [push]\n")
+    repo.commit()
+    repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+    head = repo.git("rev-parse", "--short=7", "HEAD").strip()
+    verdict, evidence = _ci_green(repo)
+    assert verdict is Verdict.NOT_CHECKED
+    assert f"no CI run on {head} yet" in evidence
+
+
 def test_a_run_still_going_is_not_checked(repo: Repo) -> None:
     _gh_runs(repo, [{"workflowName": "check", "headSha": "abc1234", "status": "in_progress", "conclusion": "", "event": "push"}])
     assert _ci_green(repo)[0] is Verdict.NOT_CHECKED

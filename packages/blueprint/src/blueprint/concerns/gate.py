@@ -744,7 +744,10 @@ def _head_runs(ctx: Context) -> tuple[str, str, dict[str, dict[str, str]]] | Fin
     runs = [r for r in json.loads(done.stdout or "[]") if r.get("event") != "dynamic"]
     if not runs:
         return not_checked(f"no CI runs on {branch} yet")
-    head = runs[0]["headSha"]
+    # The pushed tip, as this clone last fetched it: right after a push the newest run is the previous commit's.
+    head = (ctx.git("rev-parse", "--verify", "--quiet", f"refs/remotes/origin/{branch}") or "").strip() or runs[0]["headSha"]
+    if not any(r["headSha"] == head for r in runs):
+        return not_checked(f"no CI run on {head[:7]} yet; `gh run watch` once it starts, and re-run")
     latest: dict[str, dict[str, str]] = {}
     for r in runs:
         if r["headSha"] == head:
