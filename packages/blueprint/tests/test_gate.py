@@ -601,3 +601,30 @@ def test_a_config_whose_pre_push_runs_no_gate_fails(repo: Repo) -> None:
     verdict, evidence = _verdict(repo, "gate.hooks-recipe")
     assert verdict is Verdict.FAILING
     assert "pre-push" in evidence
+
+
+# a2kay, 2026-10-12: `python3 -I tools/check_dockerfile_pins.py` was not seen as a gate script at all.
+def _pins_recipe() -> str:
+    return (RECIPES / "check_dockerfile_pins.py").read_text()
+
+
+def test_an_interpreter_flag_does_not_hide_a_gate_script(repo: Repo) -> None:
+    repo.write("Makefile", "check: images\nimages:\n\tpython3 -I tools/own_guard.py\n")
+    repo.write("tools/own_guard.py", "")
+    verdict, evidence = _verdict(repo, "gate.guards-have-red-tests")
+    assert verdict is Verdict.FAILING
+    assert "tools/own_guard.py" in evidence
+
+
+def test_an_unchanged_blueprint_recipe_counts_as_tested_in_the_shelf(repo: Repo) -> None:
+    repo.write("Makefile", "check: images\nimages:\n\tpython3 -I tools/check_dockerfile_pins.py\n")
+    repo.write("tools/check_dockerfile_pins.py", _pins_recipe())
+    verdict, evidence = _verdict(repo, "gate.guards-have-red-tests")
+    assert verdict is Verdict.PASSING
+    assert "blueprint recipe" in evidence
+
+
+def test_an_edited_copy_of_a_recipe_needs_its_own_test(repo: Repo) -> None:
+    repo.write("Makefile", "check: images\nimages:\n\tpython3 -I tools/check_dockerfile_pins.py\n")
+    repo.write("tools/check_dockerfile_pins.py", _pins_recipe() + "\n# local change\n")
+    assert _verdict(repo, "gate.guards-have-red-tests")[0] is Verdict.FAILING

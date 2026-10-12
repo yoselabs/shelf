@@ -38,7 +38,8 @@ _GATE_RUN = re.compile(r"\b(?:make|just|rust-just(?:@\S+)?)\s+(?:-\S+\s+)*check(
 _USES = re.compile(r"^\s*-?\s*uses:\s*['\"]?([^\s'\"#]+)", re.MULTILINE)
 _SHA = re.compile(r"@[0-9a-f]{40}$")
 # A script a recipe runs: `python3 x.py`, `uv run python x.py`, or `g=x.py` handed to python later.
-_SCRIPT = re.compile(r"(?:python3?\s+|uv run python\s+|\b[A-Za-z_]\w*=)((?:[\w.-]+/)*[\w.-]+\.py)\b")
+# `python3 -I tools/x.py`: interpreter flags before the script (the recipes are run isolated) still name it.
+_SCRIPT = re.compile(r"(?:python3?(?:\s+-\w+)*\s+|uv run python(?:\s+-\w+)*\s+|\b[A-Za-z_]\w*=)((?:[\w.-]+/)*[\w.-]+\.py)\b")
 _ONBOARD = (
     "the shelf onboarding writes the gate: `just bootstrap`, or python3 <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo ."
 )
@@ -472,7 +473,9 @@ def guards_have_red_tests(ctx: Context) -> Finding:
     if not scripts:
         return not_applicable("`just check` runs no repo-local Python script")
     tests = [p.read_text(errors="replace") for p in walk(ctx.repo, "test_*.py")]
-    untested = [s for s in scripts if not any(Path(s).stem in t or Path(s).stem.replace("-", "_") in t for t in tests)]
+    # An unchanged copy of a blueprint recipe is tested where it is written, in the shelf; an edited copy is the repo's own.
+    recipes = [s for s in scripts if _is_recipe_copy(ctx, s)]
+    untested = [s for s in scripts if s not in recipes and not any(Path(s).stem in t or Path(s).stem.replace("-", "_") in t for t in tests)]
     if untested:
         return failing(
             f"no test names {', '.join(untested)}",
@@ -480,7 +483,16 @@ def guards_have_red_tests(ctx: Context) -> Finding:
             "add a test per script: for a guard, plant the violation it guards against and assert it fails; "
             "for a helper (a queue, a generator, a launcher), test the behaviour the gate relies on",
         )
-    return passing(f"{len(scripts)} script(s) ({', '.join(scripts)}), each named by a test")
+    copied = f"; {', '.join(recipes)} unchanged from a blueprint recipe, tested in the shelf" if recipes else ""
+    return passing(f"{len(scripts)} script(s) ({', '.join(scripts)}), each named by a test{copied}")
+
+
+_RECIPES = Path(__file__).resolve().parent.parent / "recipes"
+
+
+def _is_recipe_copy(ctx: Context, script: str) -> bool:
+    shipped = _RECIPES / Path(script).name
+    return shipped.is_file() and ctx.read(script) == shipped.read_text()
 
 
 # The runner's own trailer (`make: *** [check] Error 2`, "error: Recipe `lint` failed on line 9 ...") names no cause.

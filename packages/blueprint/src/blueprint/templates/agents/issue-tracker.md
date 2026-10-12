@@ -18,6 +18,7 @@ work tracking only, never for project memory (`bd remember` is not used).
 | Close | `bd close <id> --reason "..."` |
 | Link to a decision | `bd update <id> --spec-id docs/adr/NNNN-slug.md` |
 | Provenance | `bd update <id> --set-metadata branch=<name> --set-metadata commit=<sha>` |
+| Sync remote over SSH | `bd dolt remote remove origin && bd dolt remote add origin git+ssh://git@github.com/<owner>/<repo>.git --allow-git-origin` (bd refuses a remote matching the git origin without the flag); the pre-push hook fails when the push does not land |
 | Supersede | `bd dep add <new> <old> --type supersedes`; never delete the old bead |
 
 ## Specs and tickets
