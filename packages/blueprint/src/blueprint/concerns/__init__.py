@@ -4,7 +4,20 @@ from __future__ import annotations
 
 import importlib
 
-MODULES = ("gate", "backlog", "knowledge", "secrets", "stack", "python_pin", "shell", "uv_tool", "tool_pins", "framework", "agents")
+MODULES = (
+    "gate",
+    "backlog",
+    "knowledge",
+    "secrets",
+    "stack",
+    "python_pin",
+    "cli_parse",
+    "shell",
+    "uv_tool",
+    "tool_pins",
+    "framework",
+    "agents",
+)
 
 
 def load() -> None:
