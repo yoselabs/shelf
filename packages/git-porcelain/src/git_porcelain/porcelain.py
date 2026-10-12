@@ -22,9 +22,15 @@ if TYPE_CHECKING:
 _GIT = "git"
 
 
+# Set by git for a hook. Inherited, they send `git -C <vault>` to the hook's repository instead of the one at
+# <vault> (a2kay 2026-10-12: a pre-push gate's server identity came from the wrong repo); a caller's `env=` may
+# still set them on purpose.
+_REDIRECTS = frozenset({"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_PREFIX"})
+
+
 def _git_env() -> dict[str, str]:
-    """Child env that fails loud instead of prompting for credentials."""
-    env = dict(os.environ)
+    """Child env that fails loud instead of prompting for credentials, and acts on the repo it is pointed at."""
+    env = {k: v for k, v in os.environ.items() if k not in _REDIRECTS}
     env["GIT_TERMINAL_PROMPT"] = "0"
     env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
     return env
@@ -58,7 +64,8 @@ def run_git(
     env: Mapping[str, str] | None = None,
     timeout: float | None = None,
 ) -> str:
-    """Run ``git -C <vault> <args>`` fail-loud; return stdout.
+    """Run ``git -C <vault> <args>`` fail-loud; return stdout. The repo is always the one at ``vault``:
+    a ``GIT_DIR`` or ``GIT_WORK_TREE`` the process inherited (a git hook sets them) is dropped.
 
     ``env`` adds variables for this call only (an author identity, say). ``timeout``
     bounds a network call; running out raises a retryable :class:`GitError`.

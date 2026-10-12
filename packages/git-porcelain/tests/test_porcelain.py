@@ -143,3 +143,24 @@ def test_git_porcelain_imports_no_host() -> None:
             elif isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] in {"a2kay", "a2effect", "a2kit"}:
                 offenders.append(f"{py.name}: from {node.module}")
     assert not offenders, f"git_porcelain must stay host-agnostic; found: {offenders}"
+
+
+def test_a_leaked_git_dir_never_redirects_a_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Inside a git hook git exports GIT_DIR; `git -C <repo>` then acts on the hook's repo (a2kay 2026-10-12: a
+    # pre-push gate's server identity came from the wrong repo, and a commit would have landed there).
+    repo, other = tmp_path / "repo", tmp_path / "other"
+    _init_repo(repo)
+    _init_repo(other)
+    monkeypatch.setenv("GIT_DIR", str(other / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(other))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(other / ".git/index"))
+    assert Path(git.run_git(repo, "rev-parse", "--show-toplevel").strip()).resolve() == repo.resolve()
+    assert git.git_returncode(repo, "rev-parse", "--is-inside-work-tree") == 0
+
+
+def test_an_explicit_env_still_wins(tmp_path: Path) -> None:
+    repo, other = tmp_path / "repo", tmp_path / "other"
+    _init_repo(repo)
+    _init_repo(other)
+    top = git.run_git(repo, "rev-parse", "--absolute-git-dir", env={"GIT_DIR": str(other / ".git")}).strip()
+    assert Path(top).resolve() == (other / ".git").resolve()

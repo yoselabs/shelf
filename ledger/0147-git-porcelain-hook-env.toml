@@ -1,0 +1,10 @@
+seq = 147
+date = "2026-10-12"
+event = "delivery"
+software = "git-porcelain"
+release = "git-porcelain-v0.6.1"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """FIX. Every git call drops GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, GIT_COMMON_DIR, GIT_OBJECT_DIRECTORY and GIT_PREFIX from the inherited environment, so `git -C <vault>` always acts on the repo at <vault>. Inside a git hook git exports them: a2kay's pre-push gate computed its server identity from the hook's repo (`rev-list HEAD -- .` gave 731 commits, not 378), and a commit made from inside a hook would have landed in the hook's repo. A caller's explicit `env=` still sets them on purpose."""
