@@ -26,15 +26,26 @@ config = [
 [[role]]
 role = "project-hygiene"
 tool = "Library/Temp/Logs/UserSettings/Builds and the generated csproj/slnx ignored (anchored, so a hand-written tests csproj is not); Force Text serialization and Visible Meta Files set; every asset has a committed .meta and every .meta an asset; GUIDs unique (tools/unity_integrity.py, stdlib, in the gate and in prek); .gitattributes with LF"
-install = """.gitignore (anchored to the Unity project folder; prefix {root}/ when the project is not the repo root): `/[Ll]ibrary/`, `/[Tt]emp/`, `/[Oo]bj/`, `/[Bb]uild/`, `/[Bb]uilds/`, `/[Ll]ogs/`, `/[Uu]ser[Ss]ettings/`, `/[Mm]emoryCaptures/`, `/*.csproj`, `/*.sln`, `/*.slnx`, `*.pdb`, `*.mdb`, `.vs/`, `.idea/`, `.vscode/`; \
+install = """.gitignore (anchored to the Unity project folder; in the repo's .gitignore prefix {root}/ when the project is not the repo root, or put it in {root}/.gitignore, which is read too): `/[Ll]ibrary/`, `/[Tt]emp/`, `/[Oo]bj/`, `/[Bb]uild/`, `/[Bb]uilds/`, `/[Ll]ogs/`, `/[Uu]ser[Ss]ettings/`, `/[Mm]emoryCaptures/`, `/*.csproj`, `/*.sln`, `/*.slnx`, `*.pdb`, `*.mdb`, `.vs/`, `.idea/`, `.vscode/`; \
 NEVER ignore *.meta, ProjectSettings/, Packages/manifest.json or Packages/packages-lock.json. Never an unanchored `*.csproj` (it would ignore the hand-written tests csproj the dotnet rows need). \
 Editor > Project Settings > Editor: Asset Serialization = Force Text, Version Control Mode = Visible Meta Files (both are the 6000.7 defaults; the file then holds `m_SerializationMode: 2` and `m_Mode: Visible Meta Files`). \
 .gitattributes: `* text=auto eol=lf`, `*.unity text eol=lf`, `*.prefab text eol=lf`, `*.asset text eol=lf`, `*.meta text eol=lf`. \
 `blueprint recipe unity-integrity > tools/unity_integrity.py` (stdlib; seen red on a missing .meta, an orphan .meta, a duplicate GUID, Force Text off, Hidden Meta Files), run as `python3 tools/unity_integrity.py {root}` from `just check`. \
 Smart merge (UnityYAMLMerge) is NOT part of this row: the git driver hung opening Apple FileMerge in the trial; see research.md"""
 config = [
-    { any = [{ path = ".gitignore", contains = "[Ll]ibrary/" }, { path = ".gitignore", contains = "Library/" }] },
-    { any = [{ path = ".gitignore", contains = "[Uu]ser[Ss]ettings/" }, { path = ".gitignore", contains = "UserSettings/" }] },
+    # The patterns may live in the repo's .gitignore (prefixed with {root}/) or in {root}/.gitignore (anchored there).
+    { any = [
+        { path = ".gitignore", contains = "[Ll]ibrary/" },
+        { path = ".gitignore", contains = "Library/" },
+        { path = "{root}/.gitignore", contains = "[Ll]ibrary/" },
+        { path = "{root}/.gitignore", contains = "Library/" },
+    ] },
+    { any = [
+        { path = ".gitignore", contains = "[Uu]ser[Ss]ettings/" },
+        { path = ".gitignore", contains = "UserSettings/" },
+        { path = "{root}/.gitignore", contains = "[Uu]ser[Ss]ettings/" },
+        { path = "{root}/.gitignore", contains = "UserSettings/" },
+    ] },
     { path = ".gitattributes", contains = "eol=lf" },
     { path = "{root}/ProjectSettings/EditorSettings.asset", contains = "m_SerializationMode: 2" },
     { path = "{root}/ProjectSettings/VersionControlSettings.asset", contains = "Visible Meta Files" },

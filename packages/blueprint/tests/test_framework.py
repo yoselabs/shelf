@@ -291,3 +291,21 @@ def test_unity_assets_csc_rsp_is_flagged_because_it_hits_packages_too(repo: Repo
     assert verdict is not Verdict.PASSING
     assert "Game/Assets/csc.rsp" in evidence
     assert "packages" in evidence
+
+
+def _hygiene(repo: Repo) -> tuple[Verdict, str]:
+    return _rows(repo)["framework.unity.project-hygiene"]
+
+
+def test_unity_ignores_in_the_project_folders_own_gitignore_count(repo: Repo) -> None:
+    # lifesim keeps client/.gitignore with Library/ and UserSettings/; the repo-root .gitignore has none of them.
+    _unity(repo, "client")
+    repo.write(".gitignore", "*.log\n")
+    repo.write("client/.gitignore", "/[Ll]ibrary/\n/[Uu]ser[Ss]ettings/\n")
+    assert "Library" not in _hygiene(repo)[1].partition("not set up (")[2]
+
+
+def test_unity_ignores_missing_everywhere_still_fail(repo: Repo) -> None:
+    _unity(repo, "client")
+    repo.write(".gitignore", "*.log\n")
+    assert "Library/" in _hygiene(repo)[1]
