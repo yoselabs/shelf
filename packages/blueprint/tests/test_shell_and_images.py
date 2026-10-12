@@ -211,3 +211,12 @@ def test_one_compose_file_in_a_python_repo_is_the_full_compose_stack(repo: Repo)
     assert "stack.compose.profile" in rows
     assert not any(row.startswith("stack.compose-lite.") for row in rows)
     assert "compose" in templates.required(detect(repo.root, load_state(repo.root)))
+
+
+def test_an_ignored_script_is_not_a_shell_stack(repo: Repo) -> None:
+    # a2kay 2026-10-12: two macOS-only, hand-run scripts; an ignore naming a file (not a folder) must hold.
+    repo.write("packaging/macos/build_app.sh", _LONG, executable=True)
+    reason = 'reason = "macOS-only tool the owner runs by hand"\nexpires = 2099-01-01\n'
+    repo.write("docs/blueprint/blueprint.toml", f'[[profile.ignore]]\npath = "packaging/macos/build_app.sh"\n{reason}')
+    assert "stack.shell.profile" not in _rows(repo)
+    assert "shell" not in templates.required(detect(repo.root, load_state(repo.root)))

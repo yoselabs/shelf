@@ -71,7 +71,9 @@ def walk(root: Path, pattern: str, max_depth: int | None = None, skip: tuple[str
             and (max_depth is None or depth + 1 < max_depth)
             and not is_skipped((Path(here) / d).relative_to(root).as_posix(), skip)
         ]
-        found += [Path(here) / f for f in files if fnmatch(f, pattern)]
+        found += [
+            Path(here) / f for f in files if fnmatch(f, pattern) and not is_skipped((Path(here) / f).relative_to(root).as_posix(), skip)
+        ]
     return sorted(found)
 
 
