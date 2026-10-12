@@ -1,6 +1,6 @@
 ## Why
 
-Denis wants the shelf to cover skills (Claude Code's judgment-layer artifacts) alongside Python
+The owner wants the shelf to cover skills (Claude Code's judgment-layer artifacts) alongside Python
 packages — triggered by `shelf-n63`/`shelf-c2s` about to author actual skills with no shelf contract
 to conform to yet, and by a real, measured constraint: a skill is a permanent per-session token tax
 (`claude plugin details <name>` prints it exactly) paid by every consumer that installs it, whether

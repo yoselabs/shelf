@@ -127,7 +127,7 @@ select = [
     # `D` (pydocstyle) is deliberately absent. Docstrings are written where they carry
     # a decision — why this exists, what breaks without it — not on every public name.
     # The full google convention would have a2kay writing 379 of them, 110 of those on
-    # methods whose signature already says everything. Denis's call, 2026-09-12. The
+    # methods whose signature already says everything. The owner's call, 2026-09-12. The
     # docstrings already written here stay; they just stop being mandatory.
     "ERA",  # no commented-out code (leave it smaller, constitution III/VIII)
     "ARG",  # no unused arguments

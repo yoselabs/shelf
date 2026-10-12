@@ -11,7 +11,7 @@ See `proposal.md` for motivation. Relevant current state:
 - The shelf's own machine has a working precedent for a marketplace living in a distribution-neutral
   repo (`context7-marketplace`'s `marketplace.json` points a plugin at a relative in-repo path,
   `"./plugins/claude/context7"`), and for a personal multi-plugin marketplace with per-plugin
-  versioning (`iorlas-marketplace`).
+  versioning (`<owner>-marketplace`).
 - `claude plugin` ships first-party subcommands that map directly onto shelf mechanics already:
   `tag` (git tag validated against `plugin.json`/`marketplace.json` agreement), `update` (pull, not
   hot-reload — "restart required to apply"), `details` (exact always-on/on-invoke token cost per

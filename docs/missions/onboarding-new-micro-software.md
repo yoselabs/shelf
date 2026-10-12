@@ -8,7 +8,7 @@
 
 ## The questions this mission must answer
 
-Raised by Denis. Four distinct entry paths, one shared lifecycle gate.
+Raised by the owner. Four distinct entry paths, one shared lifecycle gate.
 
 1. **Create a NEW micro-software from scratch** (a library / framework / CLI / new `Kind`).
    - What are the key steps? The procedure/checklist: name → capability → contract file (born

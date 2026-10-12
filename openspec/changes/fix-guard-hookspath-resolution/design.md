@@ -32,7 +32,7 @@ git's resolution, asked directly.
 
 | repo state | `git rev-parse --git-path hooks` |
 |---|---|
-| `core.hooksPath = /…/.beads/hooks` | `/Users/iorlas/Workspaces/shelf/.beads/hooks` |
+| `core.hooksPath = /…/.beads/hooks` | `/Users/<you>/Workspaces/shelf/.beads/hooks` |
 | fresh `git init`, unset | `.git/hooks` |
 
 Returns relative or absolute depending on the target, so `install.py`'s existing
