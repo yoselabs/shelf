@@ -1,7 +1,7 @@
 ---
 id: 0025
 title: every command answers --help and refuses what it does not know
-statement: Every CLI command answers `--help` with its usage and changes nothing; an unknown flag is refused; a command acts only on the action it was given. Built on a CLI library that does this by default.
+statement: Every command and script answers `--help` with its usage and changes nothing, refuses an unknown flag, and acts only on the action given; built on a CLI library.
 concerns: [stack, gate]
 status: accepted
 decided_by: owner
@@ -22,8 +22,10 @@ A CLI is how agents use software, so its surface is a contract:
   the action given.
 - The CLI is built on a library that gives this by default (argparse with `parse_args` and `add_help` kept, click,
   Typer). A hand-rolled parser, `parse_known_args`, or `add_help=False` is a bug. The one allowed shape is a two-stage
-  pre-parser for global flags whose rest goes to a parser that keeps `--help`, and it says so with
-  `# lenient: <reason>`.
+  pre-parser for global flags whose rest goes to a parser that keeps `--help`, recorded as an override of
+  `stack.python-uv.cli-parse` scoped to its file (ADR 0026).
+- A script run directly (`uv run tools/x.py`, a `__main__` block that parses arguments) counts as a command: it
+  answers `--help` too, so an agent can read what it does before running it.
 - Each console script has a test that runs it with `--help` (exit 0, usage printed, nothing changed) and with an
   unknown flag (refused).
 
@@ -45,6 +47,8 @@ did not know; five sibling commands had the same shape, and strict parsing then 
 
 - 2026-10-12: a2kay-1k99 (`serve --help` started a server); shelf-2gv wrote the rule into python.md.
 - 2026-10-12: second sighting (five owner commands); shelf-s2w made it the cli-parse row with a `# lenient:` waiver.
+- 2026-10-12: amended by ADR 0026: scripts run directly are commands too, and the `# lenient:` comment becomes an
+  override in blueprint.toml.
 - 2026-10-12: accepted by the owner as a rule for every CLI ("every CLI should have --help"; a command that starts or
   mutates on its own is a bug), homelab's refusing parser included; the waiver narrowed to a pre-parser, and the
   cli-help-tested row added.
