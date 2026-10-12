@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "a2kay"
+software = "mcp-call"
+why = "Beside a running server, an `a2kay` CLI command calls the server's CLI endpoint; importing the MCP SDK and fastmcp for that call cost ~1 s of a ~2 s command (a2kay-6789)."
+needs = "McpEndpoint(url, headers={token}) as a context manager; server.version for the version-skew check; call(name, args) with is_error and the text or structured result; EndpointRefused to tell a stale endpoint file from a server that answered."
+sponsor = "yoselabs"
+requester = "a2kay"
+status = "active"          # active | retired

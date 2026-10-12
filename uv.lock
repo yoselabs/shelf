@@ -48,6 +48,7 @@ members = [
     "managed-region",
     "mcp-arg-errors",
     "mcp-bridge",
+    "mcp-call",
     "mcp-clients",
     "mcp-feedback",
     "mcp-result-wire",
@@ -2395,6 +2396,17 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "httpx", specifier = ">=0.28,<1" },
 ]
+
+[[package]]
+name = "mcp-call"
+version = "0.1.0"
+source = { editable = "packages/mcp-call" }
+dependencies = [
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "httpx", specifier = ">=0.28,<1" }]
 
 [[package]]
 name = "mcp-clients"

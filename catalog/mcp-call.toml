@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
+name = "mcp-call"
+kind = "primitive"
+tier = "T0"
+release = "mcp-call-v0.1.0"
+capability = "Stop paying a second of imports to make one MCP call — a session with a Streamable HTTP MCP server over httpx alone (initialize, tools/list, tools/call), reading JSON or SSE replies, sending the session header back, a refused connection as its own exception and a tool's failure as a result."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from a2kay's CLI fast path (a2kay-6789, OpenSpec cli-fast-path): beside a running server every CLI command spent ~2 s importing mcp_bridge/fastmcp (855 ms) and the app for a ~10 ms call. mcp-bridge is the stdio-to-HTTP relay, a server role; this is the client side with no SDK. Tested against a real FastMCP server in all four reply modes (SSE or JSON, session or stateless). Sync only: its first callers (a CLI, a job process) are sync. Born candidate."
