@@ -592,7 +592,7 @@ def clean_clone(ctx: Context) -> Finding:
         clone = ctx.run("git", "clone", "--quiet", str(ctx.repo), tmp, timeout=300, env={**ctx.env, "GIT_LFS_SKIP_SMUDGE": "1"})
         if clone is None or clone.returncode != 0:
             return not_checked("could not clone the repository")
-        judged = _gate_in(ctx, Path(tmp), word, budget)
+        judged = (_pull_lfs(ctx, Path(tmp)) if _uses_lfs(ctx) else None) or _gate_in(ctx, Path(tmp), word, budget)
     uncommitted = [
         line[3:] for line in (ctx.git("status", "--porcelain", "--untracked-files=all", "--ignore-submodules=all") or "").splitlines()
     ]
@@ -609,6 +609,20 @@ def clean_clone(ctx: Context) -> Finding:
         "commit the changes on the owner's yes and re-run the audit; a file the gate needs but nobody commits belongs in the gate",
         FixedBy.OWNER,
     )
+
+
+def _pull_lfs(ctx: Context, clone: Path) -> Finding | None:
+    """The clone skipped the LFS smudge; fetch the real files so the gate does not run on pointers."""
+    version = ctx.run("git", "lfs", "version")
+    if version is None or version.returncode != 0:
+        return not_checked("the repo uses LFS and git-lfs is not installed: the fresh clone holds pointers, not files", _LFS_PACKAGE)
+    done = ctx.run("git", "lfs", "pull", cwd=clone, timeout=1800, env={**ctx.env, "GIT_LFS_SKIP_SMUDGE": "1"})
+    if done is None or done.returncode != 0:
+        why = "timed out" if done is None else _cause(done)
+        return not_checked(
+            f"the repo uses LFS and `git lfs pull` in the fresh clone failed: {why}", "make `git lfs pull` work from a new clone"
+        )
+    return None
 
 
 def _gate_in(ctx: Context, folder: Path, word: str, budget: object) -> Finding:

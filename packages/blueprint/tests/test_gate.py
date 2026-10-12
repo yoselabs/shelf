@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from datetime import date
 from typing import TYPE_CHECKING
@@ -736,7 +737,9 @@ def test_clean_clone_does_not_count_a_dirty_submodule_as_uncommitted(repo: Repo,
 def test_clean_clone_is_not_failed_by_an_lfs_smudge_filter(repo: Repo, tmp_path: Path) -> None:
     # lifesim: git ran the git-lfs shim as the smudge filter during clone and it errored; the clone skips smudge.
     repo.fake_tool(repo.bin_dir / "git-lfs", "")
-    (repo.bin_dir / "git-lfs").write_text('#!/bin/sh\n[ -n "$GIT_LFS_SKIP_SMUDGE" ] && cat && exit 0\nexit 1\n')
+    (repo.bin_dir / "git-lfs").write_text(
+        '#!/bin/sh\n[ "$1" = pull ] || [ "$1" = version ] && exit 0\n[ -n "$GIT_LFS_SKIP_SMUDGE" ] && cat && exit 0\nexit 1\n'
+    )
     config = tmp_path / "gitconfig"
     config.write_text('[filter "lfs"]\n\tsmudge = git-lfs smudge -- %f\n\trequired = true\n')
     repo.env |= {"GIT_CONFIG_GLOBAL": str(config), "GIT_CONFIG_NOSYSTEM": "1"}
@@ -774,3 +777,40 @@ def test_core_bare_true_in_a_non_bare_clone_fails_with_the_fix(repo: Repo) -> No
     assert verdict is Verdict.FAILING
     assert "core.bare" in evidence
     assert fix == "git config core.bare false"
+
+
+def _lfs_gate_repo(repo: Repo, lfs_script: str | None) -> None:
+    if lfs_script is not None:
+        (repo.bin_dir / "git-lfs").write_text(lfs_script)
+        (repo.bin_dir / "git-lfs").chmod(0o755)
+    repo.write(".gitattributes", "*.bin filter=lfs diff=lfs merge=lfs -text\n")
+    repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.commit()
+
+
+def test_clean_clone_pulls_lfs_files_in_the_clone_before_the_gate(repo: Repo, tmp_path: Path) -> None:
+    log = tmp_path / "pulled.txt"
+    _lfs_gate_repo(repo, f'#!/bin/sh\necho "$@ skip=$GIT_LFS_SKIP_SMUDGE cwd=$PWD" >> {log}\nexit 0\n')
+    assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.PASSING
+    assert "pull skip=1" in log.read_text()
+    assert "blueprint-clone-" in log.read_text()
+
+
+def test_clean_clone_is_not_checked_when_the_lfs_pull_fails(repo: Repo) -> None:
+    _lfs_gate_repo(repo, "#!/bin/sh\n[ \"$1\" = pull ] && { echo 'batch response: 404' >&2; exit 2; }\nexit 0\n")
+    verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
+    assert verdict is Verdict.NOT_CHECKED
+    assert "git lfs pull" in evidence
+
+
+def test_clean_clone_is_not_checked_when_an_lfs_repo_has_no_git_lfs(repo: Repo, tmp_path: Path) -> None:
+    _lfs_gate_repo(repo, None)
+    only_git = tmp_path / "only-git"
+    only_git.mkdir()
+    (only_git / "git").symlink_to(shutil.which("git") or "git")
+    (only_git / "make").symlink_to(shutil.which("make") or "make")
+    repo.env["PATH"] = str(only_git)
+    verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
+    assert verdict is Verdict.NOT_CHECKED
+    assert "git-lfs is not installed" in evidence
