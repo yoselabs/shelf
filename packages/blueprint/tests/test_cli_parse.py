@@ -114,3 +114,46 @@ def test_a_workspace_members_console_scripts_count_too(repo: Repo) -> None:
     row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == _HELP_ROW)
     assert row.verdict is Verdict.FAILING
     assert "tool" in row.evidence
+
+
+_PARSING_SCRIPT = "import argparse\n\ndef main():\n    argparse.ArgumentParser().parse_args()\n\nif __name__ == '__main__':\n    main()\n"
+
+
+def _direct_row(repo: Repo) -> tuple[Verdict, str]:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    repo.write("uv.lock", "")
+    repo.commit()
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == _HELP_ROW)
+    return row.verdict, row.evidence
+
+
+def test_a_directly_run_script_that_parses_arguments_needs_a_help_test(repo: Repo) -> None:
+    repo.write("tools/x.py", _PARSING_SCRIPT)
+    verdict, evidence = _direct_row(repo)
+    assert verdict is Verdict.FAILING
+    assert "tools/x.py" in evidence
+
+
+def test_a_test_running_the_script_with_help_passes(repo: Repo) -> None:
+    repo.write("tools/x.py", _PARSING_SCRIPT)
+    repo.write("tests/test_x.py", 'import subprocess\nsubprocess.run(["python", "tools/x.py", "--help"], check=True)\n')
+    assert _direct_row(repo)[0] is Verdict.PASSING
+
+
+def test_a_main_script_that_parses_nothing_is_not_a_command(repo: Repo) -> None:
+    repo.write("tools/y.py", "def main():\n    print('hi')\n\nif __name__ == '__main__':\n    main()\n")
+    assert _direct_row(repo)[0] is Verdict.NOT_APPLICABLE
+
+
+def test_sys_argv_and_typer_count_as_parsing(repo: Repo) -> None:
+    repo.write("tools/a.py", "import sys\nif __name__ == '__main__':\n    print(sys.argv)\n")
+    repo.write("tools/b.py", "import typer\nif __name__ == '__main__':\n    typer.run(print)\n")
+    verdict, evidence = _direct_row(repo)
+    assert verdict is Verdict.FAILING
+    assert "tools/a.py" in evidence
+    assert "tools/b.py" in evidence
+
+
+def test_a_script_under_tests_is_not_counted(repo: Repo) -> None:
+    repo.write("tests/helper.py", _PARSING_SCRIPT)
+    assert _direct_row(repo)[0] is Verdict.NOT_APPLICABLE
