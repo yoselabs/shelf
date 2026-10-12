@@ -84,6 +84,15 @@ repos:
     files: ^pyproject\.toml$
     pass_filenames: false
     stages: [pre-commit]
+  - id: gate
+    name: just check
+    # The whole gate before code leaves the machine (blueprint gate.hooks-recipe); the per-commit hooks above stay fast.
+    # 2026-10-12: without it a red typecheck reached main.
+    entry: uv run just check
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [pre-push]
   - id: hadolint
     name: hadolint
     entry: hadolint

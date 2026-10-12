@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 import shutil
 import tempfile
@@ -272,7 +273,21 @@ _MERGE_FIX = (
 )
 
 
-@check("gate.hooks-recipe", "prek owns the git hooks through .pre-commit-config.yaml, and bd's hooks run from it", version=2)
+_HOOK_START = re.compile(r"^\s*-\s*id:", re.MULTILINE)
+
+
+def _pre_push_gate(config: str) -> bool:
+    """Whether a hook staged on pre-push runs the gate (`just check`, or `make check` before the runner moved)."""
+    starts = [m.start() for m in _HOOK_START.finditer(config)] + [len(config)]
+    blocks = (config[a:b] for a, b in itertools.pairwise(starts))
+    return any(re.search(r"\b(?:just|make) check\b", b) and re.search(r"stages:.*pre-push", b) for b in blocks)
+
+
+@check(
+    "gate.hooks-recipe",
+    "prek owns the git hooks through .pre-commit-config.yaml, bd's hooks run from it, pre-push runs the gate",
+    version=3,
+)
 def hooks_recipe(ctx: Context) -> Finding:
     """The versioned half of the recipe: one config, bd's five events in it, no bd-owned hook files tracked."""
     others = [name for name, files in _OTHER_MANAGERS.items() if any(ctx.path(f).exists() for f in files)]
@@ -291,6 +306,8 @@ def hooks_recipe(ctx: Context) -> Finding:
             problems.append(f"bd events not run from {HOOK_CONFIG}: {', '.join(missing)}")
         if "default_install_hook_types" not in config:
             problems.append("no default_install_hook_types, so `prek install` installs pre-commit only")
+    if not _pre_push_gate(config):
+        problems.append("no pre-push hook runs `just check`, so a push skips the gate (the recipe's `gate` hook)")
     if problems:
         return failing("; ".join(problems), _MERGE_FIX)
     return passing(f"{HOOK_CONFIG} owns the hooks" + (", bd's five events run from it" if ctx.profile.tracker == "beads" else ""))

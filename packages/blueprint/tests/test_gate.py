@@ -592,3 +592,12 @@ def test_the_untested_script_fix_tells_a_guard_from_a_helper(repo: Repo) -> None
     row = next(r for r in run(repo.root, concern="gate", env=repo.env).rows if r.id == "gate.guards-have-red-tests")
     assert row.verdict is Verdict.FAILING
     assert "for a helper" in row.remediation
+
+
+# 2026-10-12: the shelf's own hook config ran no gate on pre-push, so a red typecheck reached main.
+def test_a_config_whose_pre_push_runs_no_gate_fails(repo: Repo) -> None:
+    gate_hook = _recipe()[_recipe().index("  - id: gate") :]
+    repo.write(".pre-commit-config.yaml", _recipe().replace(gate_hook, ""))
+    verdict, evidence = _verdict(repo, "gate.hooks-recipe")
+    assert verdict is Verdict.FAILING
+    assert "pre-push" in evidence
