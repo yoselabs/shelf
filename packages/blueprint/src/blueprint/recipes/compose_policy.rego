@@ -1,6 +1,9 @@
 # Compose policy (blueprint recipe `compose-policy`): architecture (five deny rules) and the healthcheck rule tests read. conftest reads the compose YAML directly,
 # no Docker CLI needed: `conftest test --policy policy compose.yml [more files]`.
-# A service is excused from one rule by a reason in its own file: `x-policy-exempt: {privileged: "why"}`.
+# A service is excused from one rule by a reason: in its own config, `x-policy-exempt: {privileged: "why"}`, or in a
+# top-level block, `x-policy-exempt: {<service>: {privileged: "why"}}`. The top-level form sits outside the service
+# config compose hashes, so recording an exemption recreates no container (homelab 2026-10: a rendered key on every
+# service would have redeployed 19 placements, the devbox among them).
 package main
 
 import rego.v1
@@ -9,8 +12,11 @@ services contains name if some name, _ in input.services
 
 svc(name) := input.services[name]
 
-exempt(name, rule) if {
-	reason := svc(name)["x-policy-exempt"][rule]
+exempt(name, rule) if reasoned(svc(name)["x-policy-exempt"][rule])
+
+exempt(name, rule) if reasoned(input["x-policy-exempt"][name][rule])
+
+reasoned(reason) if {
 	is_string(reason)
 	trim_space(reason) != ""
 }
@@ -106,13 +112,10 @@ net_names(s) := {n | some n, _ in s.networks} if is_object(s.networks)
 deny contains msg if {
 	some name, s in input.services
 	not s.healthcheck
-	not exempt_health(s)
+	not exempt_health(name, s)
 	msg := sprintf("service %q: no healthcheck: the deploy cannot wait for it; add one or x-policy-exempt.healthcheck with a reason", [name])
 }
 
-exempt_health(s) if {
-	reason := s["x-policy-exempt"].healthcheck
-	trim_space(reason) != ""
-}
+exempt_health(name, _) if exempt(name, "healthcheck")
 
-exempt_health(s) if s.healthcheck.disable == true
+exempt_health(_, s) if s.healthcheck.disable == true
