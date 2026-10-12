@@ -51,16 +51,17 @@ gate = "check_dockerfile_pins"
 
 [[role]]
 role = "tests"
-tool = """CI builds every product image and runs one command that proves it starts, as its own job beside `check` (buildx, `load: true`, then `docker run --rm <image> <cmd>`). \
-A product image is one that is shipped or deployed (a2kay's root Dockerfile, homelab's images/*); a test image the gate builds (a2kay's scripts/prune/test.Dockerfile, the shelf's tools/gate/gate.Dockerfile) is exercised by that gate instead. \
-The smoke is the product's own cheap command (`--help`, the image's test.sh), not its CMD. Seen on GitHub's ubuntu-latest (https://github.com/yoselabs/shelf/actions/runs/38184048761): a good image built and its smoke passed; a COPY of a file the context lacks (a2kay's 2026-10 incident) failed the build; an image that builds but cannot start failed its smoke. \
+tool = """every image is built by something that also runs it: CI or the gate. \
+A product image (shipped or deployed: a2kay's root Dockerfile, homelab's images/*) gets a CI job beside `check` (buildx, `load: true`, then `docker run --rm <image> <cmd>`); \
+the smoke is the product's own cheap command (`--help`, the image's test.sh), not its CMD. Seen on GitHub's ubuntu-latest (https://github.com/yoselabs/shelf/actions/runs/38184048761): a good image built and its smoke passed; a COPY of a file the context lacks (a2kay's 2026-10 incident) failed the build; an image that builds but cannot start failed its smoke. \
+A test image the gate builds (a2kay's scripts/prune/test.Dockerfile, the shelf's tools/gate/gate.Dockerfile) is exercised by that gate: a recipe `just check` reaches names its path (`docker build -f <path>`). \
+Each Dockerfile is judged on its own: CI names its path (`file:` or `-f`, a `${{ matrix.* }}` template matching it; a root Dockerfile is the default), or the gate does. \
 Trigger: pull_request, so a broken image blocks the merge; push-to-main only where the repo merges straight to main, said in the workflow"""
-install = """a workflow job: actions/checkout, docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 (v4.4.1), docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc (v7.4.0) with `load: true`, `push: false`, `cache-from/cache-to: type=gha`, \
-then `docker run --rm <tag> <smoke>`; one build-and-smoke per product image"""
-config = [
-    { any = [{ path = ".github/workflows/*.y*ml", contains = "docker/build-push-action" }, { path = ".github/workflows/*.y*ml", contains = "docker build" }] },
-    { any = [{ path = ".github/workflows/*.y*ml", contains = "docker run" }, { path = ".github/workflows/*.y*ml", contains = "test.sh" }] },
-]
+install = """an image nothing builds is first a question, not a CI job: if nothing deploys it, delete it (a2kay 2026-10: the first full CI build of a heavy, undeployed image filled the runner's disk; the finding was the image, not the disk). \
+A product image: a workflow job with actions/checkout, docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 (v4.4.1), docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc (v7.4.0) with `load: true`, `push: false`, `cache-from/cache-to: type=gha`, \
+then `docker run --rm <tag> <smoke>`; one build-and-smoke per product image. A heavy image that is used may need room first: `sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL` before buildx (about 25 GB). \
+A test image: a recipe `just check` reaches builds it with `-f <path>`"""
+config = [{ built = "dockerfiles" }]
 
 [[role]]
 role = "coverage"

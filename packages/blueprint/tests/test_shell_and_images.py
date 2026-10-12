@@ -136,6 +136,46 @@ def test_a_ci_job_that_builds_and_runs_the_image_passes_the_tests_row(repo: Repo
     assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING
 
 
+def test_a_test_image_the_gate_builds_passes_the_tests_row_without_ci(repo: Repo) -> None:
+    repo.write("scripts/prune/test.Dockerfile", "FROM python:3.12-slim\n")
+    repo.write("justfile", "check: test-image\ntest-image:\n    docker build -q -f scripts/prune/test.Dockerfile .\n")
+    assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING
+
+
+def test_an_image_nothing_builds_fails_the_tests_row_by_name(repo: Repo) -> None:
+    repo.write("Dockerfile", "FROM python:3.12-slim\n")
+    repo.write(".github/workflows/image.yml", _WORKFLOW)
+    repo.write("images/worker/Dockerfile", "FROM python:3.12-slim\n")
+    verdict, evidence = _rows(repo)["stack.dockerfile.tests"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "nothing builds images/worker/Dockerfile" in evidence
+    assert "nothing builds Dockerfile" not in evidence
+
+
+def test_ci_that_builds_an_image_without_running_it_does_not_pass(repo: Repo) -> None:
+    repo.write("Dockerfile", "FROM python:3.12-slim\n")
+    repo.write(".github/workflows/image.yml", "jobs:\n  image:\n    steps:\n      - uses: docker/build-push-action@abc\n")
+    assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.NOT_SET_UP
+
+
+def test_ci_names_a_nested_image_by_its_file(repo: Repo) -> None:
+    repo.write("images/worker/Dockerfile", "FROM python:3.12-slim\n")
+    named = "# v7\n        with:\n          file: images/worker/Dockerfile\n"
+    repo.write(".github/workflows/image.yml", _WORKFLOW.replace("# v7\n", named))
+    assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING
+
+
+def test_a_matrix_ci_job_builds_each_image_its_template_matches(repo: Repo) -> None:
+    repo.write("images/devbox/Dockerfile", "FROM ubuntu:24.04\n")
+    repo.write("images/frigate/Dockerfile", "FROM ubuntu:24.04\n")
+    repo.write("tools/x.Dockerfile", "FROM ubuntu:24.04\n")
+    matrix = "        with:\n          file: images/${{ matrix.image }}/Dockerfile\n"
+    repo.write(".github/workflows/image.yml", _WORKFLOW.replace("# v7\n", "# v7\n" + matrix))
+    verdict, evidence = _rows(repo)["stack.dockerfile.tests"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert evidence.endswith("(missing nothing builds tools/x.Dockerfile)")
+
+
 def test_bats_tests_run_by_the_gate_pass_the_shell_tests_row(repo: Repo) -> None:
     repo.write("tools/a.sh", _STRICT, executable=True)
     repo.write("tools/b.sh", _STRICT, executable=True)

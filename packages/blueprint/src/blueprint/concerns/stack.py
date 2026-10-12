@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from blueprint import gate_graph
-from blueprint.model import Finding, Sub, check_each, failing, is_skipped, not_applicable, not_checked, not_set_up, passing
+from blueprint.model import Finding, Sub, check_each, dockerfiles, failing, is_skipped, not_applicable, not_checked, not_set_up, passing
 
 if TYPE_CHECKING:
     from blueprint.model import Context
@@ -142,6 +142,27 @@ def _offenders(ctx: Context, spec: dict[str, Any], root: str = ".") -> list[str]
     return [r for r in rels if not is_skipped(r, ctx.profile.ignore) and spec["lacks"] in (ctx.read(r) or "")]
 
 
+_CI_BUILD = re.compile(r"docker/build-push-action|docker build")
+_CI_RUN = re.compile(r"docker run|test\.sh")
+_CI_FILE = re.compile(r"(?:[\w./-]|\$\{\{[^}]*\}\})*Dockerfile")
+_EXPR = re.compile(r"\$\{\{[^}]*\}\}")
+
+
+def _names(text: str, rel: str) -> bool:
+    """`text` names `rel`, or a templated path in it (`images/${{ matrix.image }}/Dockerfile`) matches `rel`."""
+    templated = (_EXPR.split(m.group().removeprefix("./")) for m in _CI_FILE.finditer(text) if "${{" in m.group())
+    return rel in text or any(re.fullmatch("[^/]+".join(map(re.escape, parts)), rel) for parts in templated)
+
+
+def _unbuilt(ctx: Context) -> list[str]:
+    """The Dockerfiles neither the gate nor a CI job that also runs the image names; a root Dockerfile is CI's default."""
+    gate = gate_text(ctx)
+    jobs = [t for f in sorted(ctx.repo.glob(".github/workflows/*.y*ml")) if (t := ctx.read(f.relative_to(ctx.repo).as_posix()))]
+    ci = [t for t in jobs if _CI_BUILD.search(t) and _CI_RUN.search(t)]
+    rels = [p.relative_to(ctx.repo).as_posix() for p in dockerfiles(ctx.repo, ctx.profile.ignore)]
+    return [r for r in rels if r not in gate and not any(r == "Dockerfile" or _names(t, r) for t in ci)]
+
+
 def _describe(spec: dict[str, Any]) -> str:
     if "any" in spec:
         return " or ".join(_describe(alt) for alt in spec["any"])
@@ -170,7 +191,9 @@ def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str
         return _Judged(stack, "untested", f"no standard yet: {spec.untested if spec else 'the profile does not cover this role'}")
     if spec.na:
         return _Judged(stack, "na", spec.na)
-    missing = [_describe(c).replace("{root}", root) for c in spec.config if "lacks" not in c and not _config_holds(ctx, c, root)]
+    plain = [c for c in spec.config if not {"lacks", "built"} & c.keys()]
+    missing = [_describe(c).replace("{root}", root) for c in plain if not _config_holds(ctx, c, root)]
+    missing += [f"nothing builds {r}" for c in spec.config if "built" in c for r in _unbuilt(ctx)]
     forbidden = [f"{hit} has {c['lacks']!r}" for c in spec.config if "lacks" in c for hit in _offenders(ctx, c, root)]
     if missing or forbidden:
         why = "; ".join([*([f"missing {'; '.join(missing)}"] if missing else []), *forbidden])
