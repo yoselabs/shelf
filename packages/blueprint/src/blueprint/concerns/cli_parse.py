@@ -180,7 +180,7 @@ def _help_tested(ctx: Context) -> Finding:
     untested += [rel for rel in direct if not any(rel in t or PurePosixPath(rel).stem in t for t in tests)]
     if untested:
         return failing(
-            f"no test runs {', '.join(untested)} with --help",
+            f"no test runs {', '.join(untested)} with --help (only tracked test files are read: `git add` a new one)",
             "add a scenario per console script and per directly run script: `<script> --help` exits 0, prints its usage "
             "and changes nothing (no server started, no file written); an unknown flag exits 2 (ADR 0025)",
         )

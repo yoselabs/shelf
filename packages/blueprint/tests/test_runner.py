@@ -319,12 +319,12 @@ def test_an_unjustified_ignore_is_a_problem_and_ignores_nothing(repo: Repo, fiel
     assert any("ignore" in p and named in p for p in result.problems), result.problems
 
 
-def test_an_override_needs_no_code_and_decided_by_defaults_to_agent(repo: Repo, red_check: None) -> None:
+def test_an_override_needs_no_code_and_a_missing_decided_by_reads_unknown(repo: Repo, red_check: None) -> None:
     repo.write("docs/blueprint/blueprint.toml", '[[override]]\nid = "scratch.red"\nreason = "r"\nexpires = 2099-01-01\n')
     result = run(repo.root, concern="scratch", env=repo.env)
     assert result.rows[0].verdict is Verdict.PASSING
     assert result.problems == ()
-    assert [(o.id, o.decided_by) for o in result.overrides] == [("scratch.red", "agent")]
+    assert [(o.id, o.decided_by) for o in result.overrides] == [("scratch.red", "unknown")]
 
 
 def test_a_scoped_override_leaves_the_row_to_its_check(repo: Repo, red_check: None) -> None:
@@ -428,7 +428,7 @@ def test_the_markdown_report_lists_every_override_before_the_facts(repo: Repo, r
     assert "ADR 0003" in block
     assert "`stack.shell.strict-mode`" in block
     assert "tools/probe.sh" in block
-    assert "agent" in block
+    assert "unknown" in block
     assert "until 2099-01-01" in block
     assert "a probe" in block
 
@@ -455,7 +455,7 @@ def test_the_json_report_lists_the_same_overrides(repo: Repo, red_check: None) -
             "id": "stack.shell.strict-mode",
             "scope": "tools/probe.sh",
             "reason": "a probe",
-            "decided_by": "agent",
+            "decided_by": "unknown",
             "expires": "2099-01-01",
             "adr": "",
             "problem": None,

@@ -64,7 +64,7 @@ clean-clone-seconds = 120 # gate.clean-clone's budget
 [[override]]              # counts as passing while it is justified
 id = "gate.ci"            # a checkpoint id (`blueprint checkpoints`)
 reason = "builds and the gate run on the owner's machines"
-decided_by = "owner"      # owner | agent (default agent); shown in the report
+decided_by = "owner"      # owner | agent; missing reads "unknown" in the report
 adr = "0003"              # an accepted ADR in docs/adr/ records the durable decision; no expiry needed
 # expires = 2027-04-01    # a temporary exception instead of adr
 # code = "not-applicable" # optional, legacy: test-data | remediated | not-applicable | not-supported | not-detected

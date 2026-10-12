@@ -72,7 +72,7 @@ class Override:
     scope: str = ""
     # Legacy and optional: one of OVERRIDE_CODES, when given.
     code: str = ""
-    decided_by: str = "agent"
+    decided_by: str = "unknown"
     # An override lasts until `expires`, or without end when `adr` names the accepted ADR that decided it.
     expires: date | None = None
     adr: str = ""
@@ -157,10 +157,11 @@ def _load_override(raw: dict[str, Any], repo: Path, problems: list[str]) -> Over
     reason = str(raw.get("reason", ""))
     expires = _date_or_none(raw.get("expires"))
     adr_number = str(raw.get("adr", ""))
-    decided_by = str(raw.get("decided_by", "agent"))
+    # Missing means nobody recorded who decided; "agent" would claim it (a2kay 2026-10-12: an owner's yes read as agent).
+    decided_by = str(raw.get("decided_by", "unknown"))
     what = f"override {oid!r}" + (f" ({scope})" if scope else "")
     unjustified = justification_problem(what, reason, expires, adr_number, repo)
-    if unjustified is None and decided_by not in DECIDERS:
+    if unjustified is None and decided_by not in (*DECIDERS, "unknown"):
         unjustified = f"{what}: decided_by {decided_by!r} is not one of {', '.join(DECIDERS)}"
     if unjustified is None and oid == DETECTION and not scope:
         unjustified = f"{what} needs a scope: the path glob detection skips"

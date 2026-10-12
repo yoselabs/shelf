@@ -235,3 +235,8 @@ def test_sys_argv_and_typer_count_as_parsing(repo: Repo) -> None:
 def test_a_script_under_tests_is_not_counted(repo: Repo) -> None:
     repo.write("tests/helper.py", _PARSING_SCRIPT)
     assert _direct_row(repo)[0] is Verdict.NOT_APPLICABLE
+
+
+def test_the_finding_says_untracked_tests_are_not_read(repo: Repo) -> None:
+    # a2kay 2026-10-12: a new, not yet added test file read as "no test runs X".
+    assert "tracked" in _help_row(repo, 'tool = "x.cli:main"\n')[1]
