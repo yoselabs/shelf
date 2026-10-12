@@ -40,27 +40,21 @@ role = "dependencies"
 tool = """every FROM, `COPY --from=<image>` and `RUN --mount=from=<image>` is `name:tag@sha256:<64 hex>` (tag for the human, digest for the machine; hadolint DL3006/DL3007 force a tag, never a digest), \
 judged by the `dockerfile-pins` recipe (stdlib, no network). Exempt: `scratch`, an earlier stage alias, a stage number, and a bare name in COPY --from (a `--build-context`, e.g. `--from=shelf`). An ARG default before the first FROM is substituted; an ARG with no default is a finding. \
 Seen red (exit 1) on a planted file (`:latest`, a bare `nginx`, an ARG-built `python:${PY}-slim`, a `COPY --from=uv:0.13.0`) and on 9 real unpinned references in 4 Dockerfiles; green (exit 0) on homelab's images/devbox (digest-pinned) and on a planted file of pinned forms. \
-A pin must not freeze the image: the standard names an updater, Dependabot's docker ecosystem (built into GitHub; whether it reads a `*.Dockerfile` name is not verified, so its first PR is the check), Renovate `pinDigests`, or the repo's own report of images behind upstream. The digest to write comes from `crane digest <image:tag>` (network; seen: exit 0, one sha256 line)"""
-install = "`blueprint recipe dockerfile-pins > tools/check_dockerfile_pins.py`; justfile: `python3 -I tools/check_dockerfile_pins.py --context <name>...` (a dependency of `check`); pin with `crane digest`; an updater: .github/dependabot.yml with a `docker` entry per Dockerfile folder, renovate.json with `pinDigests: true`, or a check-updates script"
-config = [
-    { any = [{ path = "justfile", contains = "check_dockerfile_pins" }, { path = "Makefile", contains = "check_dockerfile_pins" }] },
-    # The updater: a digest pin without one freezes the image.
-    { any = [{ path = ".github/dependabot.yml", contains = "docker" }, { path = "renovate.json", contains = "pinDigests" }, { path = ".github/renovate.json", contains = "pinDigests" }, { path = "tools/check-updates.py" }] },
-]
+The digest to write comes from `crane digest <image:tag>` (network; seen: exit 0, one sha256 line). Keeping a pin from freezing a shipped image is the ship-updater row's"""
+install = "`blueprint recipe dockerfile-pins > tools/check_dockerfile_pins.py`; justfile: `python3 -I tools/check_dockerfile_pins.py --context <name>...` (a dependency of `check`); pin with `crane digest`"
+config = [{ any = [{ path = "justfile", contains = "check_dockerfile_pins" }, { path = "Makefile", contains = "check_dockerfile_pins" }] }]
 gate = "check_dockerfile_pins"
 
 [[role]]
 role = "tests"
-tool = """every image is built by something that also runs it: CI or the gate. \
-A product image (shipped or deployed: a2kay's root Dockerfile, homelab's images/*) gets a CI job beside `check` (buildx, `load: true`, then `docker run --rm <image> <cmd>`); \
-the smoke is the product's own cheap command (`--help`, the image's test.sh), not its CMD. Seen on GitHub's ubuntu-latest (https://github.com/yoselabs/shelf/actions/runs/38184048761): a good image built and its smoke passed; a COPY of a file the context lacks (a2kay's 2026-10 incident) failed the build; an image that builds but cannot start failed its smoke. \
+tool = """every image is built by something: CI or the gate (a Dockerfile nothing builds is untested, and a build that breaks is found at the merge, not at the deploy). \
 A test image the gate builds (a2kay's scripts/prune/test.Dockerfile, the shelf's tools/gate/gate.Dockerfile) is exercised by that gate: a recipe `just check` reaches names its path (`docker build -f <path>`). \
 Each Dockerfile is judged on its own: CI names its path (`file:` or `-f`, a `${{ matrix.* }}` template matching it; a root Dockerfile is the default), or the gate does. \
+Running the built image is the ship-smoke row's, for an image that is shipped. \
 Trigger: pull_request, so a broken image blocks the merge; push-to-main only where the repo merges straight to main, said in the workflow"""
 install = """an image nothing builds is first a question, not a CI job: if nothing deploys it, delete it (a2kay 2026-10: the first full CI build of a heavy, undeployed image filled the runner's disk; the finding was the image, not the disk). \
-A product image: a workflow job with actions/checkout, docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 (v4.4.1), docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc (v7.4.0) with `load: true`, `push: false`, `cache-from/cache-to: type=gha`, \
-then `docker run --rm <tag> <smoke>`; one build-and-smoke per product image. A heavy image that is used may need room first: `sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL` before buildx (about 25 GB). \
-A test image: a recipe `just check` reaches builds it with `-f <path>`"""
+A test image: a recipe `just check` reaches builds it with `-f <path>`. Otherwise a workflow job with actions/checkout, docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 (v4.4.1) and docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc (v7.4.0) with `load: true`, `push: false`, `cache-from/cache-to: type=gha`. \
+A heavy image that is used may need room first: `sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL` before buildx (about 25 GB)"""
 config = [{ built = "dockerfiles" }]
 
 [[role]]
@@ -84,3 +78,21 @@ config = [{ path = ".pre-commit-config.yaml", contains = "hadolint" }]
 [[role]]
 role = "agent-guidance"
 na = "the rule ids and the reasons in .hadolint.yaml are the guidance; a convention hadolint cannot carry goes in the main stack's docs/agents file"
+
+# Purpose rows (ADR 0026): they apply per file, to a Dockerfile a `push: true` step builds (docker/build-push-action, in a workflow that logs in to a registry).
+
+[[role]]
+role = "ship-smoke"
+requires = "shipped-image"
+tool = """every shipped image is run in CI after it is built, so a push never publishes an image that builds but cannot start: a CI job beside `check` (buildx, `load: true`, then `docker run --rm <image> <cmd>`), or the image's test.sh. \
+The smoke is the product's own cheap command (`--help`, the image's test.sh), not its CMD. Seen on GitHub's ubuntu-latest (https://github.com/yoselabs/shelf/actions/runs/38184048761): a good image built and its smoke passed; a COPY of a file the context lacks (a2kay's 2026-10 incident) failed the build; an image that builds but cannot start failed its smoke. \
+Each shipped Dockerfile is judged on its own: a job that builds and runs an image names its path (`file:` or `-f`, a `${{ matrix.* }}` template matching it; a root Dockerfile is the default)"""
+install = "a workflow job with actions/checkout, docker/setup-buildx-action, docker/build-push-action with `load: true`, `push: false`, then `docker run --rm <tag> <smoke>`; one build-and-smoke per shipped image"
+config = [{ smoked = "shipped" }]
+
+[[role]]
+role = "ship-updater"
+requires = "shipped-image"
+tool = """a pinned base image does not freeze a shipped image: an updater proposes the digest bumps, Dependabot's docker ecosystem (built into GitHub; whether it reads a `*.Dockerfile` name is not verified, so its first PR is the check), Renovate `pinDigests`, or the repo's own report of images behind upstream (homelab: tools/check-updates.py)"""
+install = ".github/dependabot.yml with a `docker` entry per Dockerfile folder, renovate.json with `pinDigests: true`, or a check-updates script"
+config = [{ any = [{ path = ".github/dependabot.yml", contains = "docker" }, { path = "renovate.json", contains = "pinDigests" }, { path = ".github/renovate.json", contains = "pinDigests" }, { path = "tools/check-updates.py" }] }]

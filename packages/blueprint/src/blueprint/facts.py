@@ -21,7 +21,7 @@ from blueprint.concerns.secrets import _RULES, _sops_files
 from blueprint.model import walk
 
 if TYPE_CHECKING:
-    from blueprint.model import Context
+    from blueprint.model import Context, Profile
 
 # The closed lists (ADR 0026); they grow by an ADR.
 KINDS = ("library", "application", "infrastructure")
@@ -138,16 +138,54 @@ def _step(lines: list[tuple[int, str]], at: int) -> list[tuple[int, str]]:
     return lines[start:end]
 
 
-def _ships_image(rel: str, lines: list[str]) -> list[Fact]:
+def _push_steps(lines: list[str]) -> list[tuple[int, list[tuple[int, str]]]]:
+    """Each `docker/build-push-action` step with `push: true`, as `(line, step lines)`, in a workflow that logs in to a registry."""
     code = _code(lines)
     if not any("docker/login-action" in t or "docker login" in t for _, t in code):
         return []
-    pushes = [
-        n
-        for i, (n, t) in enumerate(code)
-        if "docker/build-push-action" in t and any(re.match(r"\s*push:\s*true\s*(#.*)?$", s) for _, s in _step(code, i))
-    ]
-    return [Fact("ships-image", _where(rel, pushes[0]))] if pushes else []
+    found = []
+    for i, (n, t) in enumerate(code):
+        step = _step(code, i)
+        if "docker/build-push-action" in t and any(re.match(r"\s*push:\s*true\s*(#.*)?$", s) for _, s in step):
+            found.append((n, step))
+    return found
+
+
+def _ships_image(rel: str, lines: list[str]) -> list[Fact]:
+    pushes = _push_steps(lines)
+    return [Fact("ships-image", _where(rel, pushes[0][0]))] if pushes else []
+
+
+def _option(step: list[tuple[int, str]], key: str) -> str:
+    for _, t in step:
+        if m := re.match(rf"\s*{key}:\s*(.+?)\s*(?:\s#.*)?$", t):
+            return m.group(1).strip("\"'").removeprefix("./")
+    return ""
+
+
+def shipped_images(ctx: Context, dockerfiles: list[str]) -> dict[str, str]:
+    """Which of `dockerfiles` a `push: true` step builds (ADR 0026), each with the `path:line` of that step.
+
+    The step names its file by `file:`, else by `context:` (its `Dockerfile`), else the root one; a `${{ matrix.* }}`
+    template matches every file its pattern fits.
+    """
+    from blueprint.concerns.stack import _names  # noqa: PLC0415 -- stack imports the model, not this module
+
+    shipped: dict[str, str] = {}
+    for rel, lines in _workflow_files(ctx):
+        for n, step in _push_steps(lines):
+            file = _option(step, "file")
+            context = _option(step, "context").rstrip("/")
+            named = file or (f"{context}/Dockerfile" if context and context != "." else "Dockerfile")
+            for d in dockerfiles:
+                if d not in shipped and (d == named or ("${{" in named and _names(named, d))):
+                    shipped[d] = _where(rel, n)
+    return shipped
+
+
+def is_deployed(profile: Profile) -> bool:
+    """Whether the repo is deployed: high-confidence deploy evidence, or the classified `deployed` trait (ADR 0026)."""
+    return "deployed" in profile.traits or any(e.claim == "deployed" and e.confidence == "high" for e in profile.evidence)
 
 
 def _scheduled(rel: str, lines: list[str]) -> list[Fact]:

@@ -11,7 +11,7 @@ import json
 import re
 import shutil
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -75,6 +75,8 @@ class Role:
     # Where the role's executable may live, besides PATH: `$PATH`, `$DOTNET_ROOT` or an absolute folder. A
     # toolchain role names them when a second install can be the one a tool resolves (Godot's dotnet).
     installs: tuple[str, ...] = ()
+    # A purpose (ADR 0026): the row applies only to a repo with this fact, `shipped-image` or `deployed`, else it is not applicable.
+    requires: str = ""
 
 
 @dataclass(frozen=True)
@@ -103,6 +105,7 @@ def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
                 untested=r.get("untested", ""),
                 na=r.get("na", ""),
                 installs=tuple(r.get("installs", ())),
+                requires=r.get("requires", ""),
             )
             for r in data.get("role", [])
         }
@@ -155,12 +158,54 @@ def _names(text: str, rel: str) -> bool:
 
 
 def _unbuilt(ctx: Context) -> list[str]:
-    """The Dockerfiles neither the gate nor a CI job that also runs the image names; a root Dockerfile is CI's default."""
+    """The Dockerfiles neither the gate nor a CI job that builds an image names; a root Dockerfile is CI's default."""
     gate = gate_text(ctx)
-    jobs = [t for f in sorted(ctx.repo.glob(".github/workflows/*.y*ml")) if (t := ctx.read(f.relative_to(ctx.repo).as_posix()))]
-    ci = [t for t in jobs if _CI_BUILD.search(t) and _CI_RUN.search(t)]
-    rels = [p.relative_to(ctx.repo).as_posix() for p in dockerfiles(ctx.repo, ctx.profile.ignore)]
-    return [r for r in rels if r not in gate and not any(r == "Dockerfile" or _names(t, r) for t in ci)]
+    ci = [t for t in _workflow_texts(ctx) if _CI_BUILD.search(t)]
+    return [r for r in _dockerfile_rels(ctx) if r not in gate and not any(r == "Dockerfile" or _names(t, r) for t in ci)]
+
+
+def _workflow_texts(ctx: Context) -> list[str]:
+    return [t for f in sorted(ctx.repo.glob(".github/workflows/*.y*ml")) if (t := ctx.read(f.relative_to(ctx.repo).as_posix()))]
+
+
+def _dockerfile_rels(ctx: Context) -> list[str]:
+    return [p.relative_to(ctx.repo).as_posix() for p in dockerfiles(ctx.repo, ctx.profile.ignore)]
+
+
+def _shipped(ctx: Context) -> list[str]:
+    from blueprint.facts import shipped_images  # noqa: PLC0415 -- facts imports the concerns
+
+    return list(shipped_images(ctx, _dockerfile_rels(ctx)))
+
+
+def _unsmoked(ctx: Context, shipped: list[str]) -> list[str]:
+    """The shipped images no CI job that builds and runs an image names (a root Dockerfile is CI's default)."""
+    ci = [t for t in _workflow_texts(ctx) if _CI_BUILD.search(t) and _CI_RUN.search(t)]
+    return [r for r in shipped if not any(r == "Dockerfile" or _names(t, r) for t in ci)]
+
+
+_PURPOSE_FACT = {
+    "shipped-image": "a Dockerfile a `push: true` workflow step builds (with a registry login)",
+    "deployed": "the repo is deployed: high deploy evidence or a classified deployed trait",
+}
+
+
+def purpose_fact(requires: str) -> str:
+    """The fact that turns a purpose row on, for `blueprint checkpoints` and the not-applicable reason."""
+    return _PURPOSE_FACT[requires]
+
+
+def _purpose(ctx: Context, requires: str) -> tuple[bool, str]:
+    """Whether the fact holds, and what it is about: the shipped files, or the deploy evidence."""
+    from blueprint.facts import is_deployed, shipped_images  # noqa: PLC0415 -- facts imports the concerns
+
+    if requires == "shipped-image":
+        shipped = shipped_images(ctx, _dockerfile_rels(ctx))
+        return bool(shipped), ", ".join(f"{d} (`{w}`)" for d, w in shipped.items())
+    deploy = [e.where for e in ctx.profile.evidence if e.claim == "deployed" and e.confidence == "high"]
+    if "deployed" in ctx.profile.traits:
+        deploy.insert(0, "classified trait")
+    return is_deployed(ctx.profile), ", ".join(deploy)
 
 
 def _describe(spec: dict[str, Any]) -> str:
@@ -191,9 +236,21 @@ def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str
         return _Judged(stack, "untested", f"no standard yet: {spec.untested if spec else 'the profile does not cover this role'}")
     if spec.na:
         return _Judged(stack, "na", spec.na)
-    plain = [c for c in spec.config if not {"lacks", "built"} & c.keys()]
+    if spec.requires:
+        applies, about = _purpose(ctx, spec.requires)
+        if not applies:
+            return _Judged(stack, "na", f"not applicable here: it applies to {purpose_fact(spec.requires)}, and none is found")
+        judged = _judge_set_up(ctx, stack, spec, role, gate_text, root=root)
+        return replace(judged, evidence=f"{judged.evidence} [{spec.requires}: {about}]")
+    return _judge_set_up(ctx, stack, spec, role, gate_text, root=root)
+
+
+def _judge_set_up(ctx: Context, stack: str, spec: Role, role: str, gate_text: str, *, root: str) -> _Judged:
+    plain = [c for c in spec.config if not {"lacks", "built", "smoked"} & c.keys()]
     missing = [_describe(c).replace("{root}", root) for c in plain if not _config_holds(ctx, c, root)]
     missing += [f"nothing builds {r}" for c in spec.config if "built" in c for r in _unbuilt(ctx)]
+    shipped = _shipped(ctx) if any("smoked" in c for c in spec.config) else []
+    missing += [f"no CI job builds and runs {r}" for c in spec.config if "smoked" in c for r in _unsmoked(ctx, shipped)]
     forbidden = [f"{hit} has {c['lacks']!r}" for c in spec.config if "lacks" in c for hit in _offenders(ctx, c, root)]
     if missing or forbidden:
         why = "; ".join([*([f"missing {'; '.join(missing)}"] if missing else []), *forbidden])
@@ -350,7 +407,7 @@ def roles(ctx: Context) -> list[Sub]:
         subs.append(_profile_row(stack, prof, origin))
         if prof is None:
             continue
-        for role in ROLES:
+        for role in (*ROLES, *(r for r in prof.roles if r not in ROLES)):
             judged = judge_role(ctx, stack, prof, role, reached)
             statement = f"{stack} {role}: the profile's tool is set up and run by `just check`"
             subs.append(Sub(f"stack/{stack}", f"stack.{stack}.{role}", statement, finding_for(judged)))

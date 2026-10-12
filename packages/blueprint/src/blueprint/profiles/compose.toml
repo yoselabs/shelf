@@ -60,6 +60,7 @@ path = "tools/doctor.py"
 
 [[role]]
 role = "tests"
+requires = "deployed"
 tool = """two static checks over what is deployed, because a stack smoke (`docker compose up --wait`) needs a daemon and the stacks' secrets. \
 (1) healthcheck policy: every service has a healthcheck (conftest rule in the compose-policy recipe), because the deploy waits on health; seen red on a planted file and on 8 real homelab services (cadvisor, vector x2 hosts, openobserve, keys, qbittorrent-mcp, oauth2-proxy), exit 1. \
 (2) a pytest over the deploy bundle: build the bundle and assert each tracked executable file ships executable (the 2026-10-01 abiotic-factor incident: a 0644 start script crash-looped). Seen red (exit 1) on a planted mode-644 start script and green at 755; homelab's existing 44 deploy tests stayed GREEN on the same plant, so they do not cover it"""
@@ -85,6 +86,7 @@ gate = "typos"
 
 [[role]]
 role = "architecture"
+requires = "deployed"
 tool = """conftest 0.71.1 (OPA 1.21.1; mise `conftest`, pinned) with policy/compose.rego (recipe `compose-policy`), run on the compose YAML directly: `conftest test --combine --policy policy docs/blueprint/blueprint.toml $(git ls-files 'hosts/*/rendered/*/compose.y*ml')` (--combine hands the policy the compose files and blueprint.toml together; conftest 0.71.1 loads only .json/.yaml through `--data`, so the TOML is an input, not `data.override`); no Docker CLI or `compose config` needed. \
 Five deny rules: privileged, network_mode: host, docker socket mount (short and long volume syntax), a published port with no host IP (short and long syntax), a service on no declared network (no `networks:` key, or a name absent from top-level `networks:`). \
 An exception is an `[[override]]` in docs/blueprint/blueprint.toml (the one override format): `id = "compose.<rule>"` (privileged, host_network, docker_socket, unbound_port, default_network, healthcheck), `scope = "service:<name>"`, a reason, `decided_by`, and `expires` or `adr`; a blank reason or an expired date does not count. It sits outside the compose files, so recording an exemption recreates no container (homelab 2026-10: a per-service key would have redeployed 19 placements). The old `x-policy-exempt` key still excuses, with a conftest warning that names the override to write; a run without `--combine` warns too and reads no overrides. Seen green on a clean planted file (exit 0), red on 6 of 6 planted violations (exit 1; the exempted 7th service passed), and the rego unit tests pass (`conftest verify`). \
