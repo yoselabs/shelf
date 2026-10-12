@@ -5,24 +5,35 @@
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "",
         "hooks": [
           {
-            "command": "bd prime --hook-json",
-            "type": "command"
+            "type": "command",
+            "command": "bd prime --hook-json"
           }
-        ],
-        "matcher": ""
+        ]
       }
     ],
     "Stop": [
       {
         "hooks": [
           {
-            "command": "(bd list --status in_progress --json 2>/dev/null || echo '[]') | jq -c 'if length > 0 then {systemMessage: (\"⚠️  \" + (length|tostring) + \" bd issue(s) left in_progress — close or update before ending the session:\\n\" + ([.[] | \"  - \" + .id + \": \" + .title] | join(\"\\n\")))} else empty end'",
-            "type": "command"
+            "type": "command",
+            "command": "(bd list --status in_progress --json 2>/dev/null || echo '[]') | jq -c 'if length > 0 then {systemMessage: (\"⚠️  \" + (length|tostring) + \" bd issue(s) left in_progress — close or update before ending the session:\\n\" + ([.[] | \"  - \" + .id + \": \" + .title] | join(\"\\n\")))} else empty end'"
           }
         ]
       }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "mattpocock": {
+      "source": {
+        "source": "github",
+        "repo": "mattpocock/skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "mattpocock-skills@mattpocock": true
   }
 }
