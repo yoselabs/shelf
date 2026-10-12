@@ -6,7 +6,7 @@ concerns: [stack, gate, workflow]
 status: accepted
 decided_by: owner
 updated: 2026-10-12
-distilled_into: pending; built under bead shelf-6q1
+distilled_into: blueprint facts.py (facts, evidence, closed lists, classification), profile.py ([[override]] with scope, [profile] classified/rejected), checkpoints.py (`blueprint checkpoints`), stack.py (requires = shipped-image | deployed), tools/changed.py and the justfile (changed-file linting); bead shelf-6q1
 ---
 
 # 0026 — checkpoints follow facts about the repo, never its size; one override format
@@ -59,3 +59,7 @@ five shapes in two days.
 - 2026-10-12: grilled with the owner (grill-with-docs) after the size tiers shipped; accepted. Replaces the tiers in
   shell-scripts.toml, dockerfile-lite.toml and compose-lite.toml; amends ADR 0025 (scripts answer `--help`, its
   `# lenient:` waiver becomes an override).
+- 2026-10-12: built (shelf-6q1.1-.8): size tiers deleted, `blueprint checkpoints`, scripts answer `--help`, facts and evidence
+  in the report, one scoped `[[override]]` (old markers still honoured, each reported with its replacement), the
+  classification in `[profile]`, ship-smoke/ship-updater and deploy-only compose policy, changed-file linting in the
+  shelf. Consumers' changed-file recipe is shelf-6q1.9.
