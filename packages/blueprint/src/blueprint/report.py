@@ -10,6 +10,7 @@ import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from blueprint import facts
 from blueprint.model import FixedBy, Verdict, without_git_location
 from blueprint.profile import STATE_DIR
 from blueprint.runner import ACCEPTED, active
@@ -136,7 +137,7 @@ def summary(run: Run) -> str:
 
 def markdown(run: Run) -> str:
     """The whole run: the summary, then one table per concern under its layer."""
-    out = [_header(run), ""]
+    out = [_header(run), "", "## Facts and evidence", "", *facts.lines(run.profile.facts, run.profile.evidence), ""]
     out += [f"⚠️ {p}" for p in run.problems]
     out += [summary(run), ""]
     last_layer = ""
@@ -170,6 +171,7 @@ def as_json(run: Run) -> str:
     return json.dumps(
         {
             "profile": {"kind": p.kind, "surfaces": p.surfaces, "traits": p.traits, "stacks": p.stacks, "tracker": p.tracker},
+            "facts_and_evidence": facts.as_dict(p.facts, p.evidence),
             "set_hash": run.set_hash,
             "problems": run.problems,
             "rows": [

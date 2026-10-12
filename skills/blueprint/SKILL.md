@@ -54,7 +54,11 @@ install, any agent harness.
    grouped by layer) and one table per concern. Read the README and `--audit --summary` only; open a
    concern's file only to remediate it. The JSON (`--json`) is for scripts, not for reading.
 2. A `not checked` row that is not a blueprint gap: find why (a missing tool, no commits).
-3. Show the owner the plan (§4) and stop.
+3. Read the report's "Facts and evidence" (also `facts_and_evidence` in the JSON): accept facts and high-confidence
+   evidence and record them; judge low-confidence evidence yourself, or ask the owner when unsure; ask the owner what
+   nothing detects (a game, a desktop app, library versus application). One numbered question round, grouped, each
+   with your recommended answer.
+4. Show the owner the plan (§4) and stop.
 
 The audit writes `docs/blueprint/checkpoints.txt`, the set it judged. Between audits the repo's gate
 enforces that set; a checkpoint the shelf added later shows as 🆕 and warns without failing, until

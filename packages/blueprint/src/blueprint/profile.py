@@ -5,17 +5,17 @@ from __future__ import annotations
 import os
 import re
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 from blueprint import adr
-from blueprint.model import SKIP_DIRS, Profile, dockerfiles, walk
+from blueprint.facts import detect_facts
+from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, walk
 
 STATE_DIR = "docs/blueprint"
 STATE_FILE = f"{STATE_DIR}/blueprint.toml"
-KINDS = ("application", "library", "infrastructure")
 OVERRIDE_CODES = ("test-data", "remediated", "not-applicable", "not-supported", "not-detected")
 
 
@@ -294,7 +294,7 @@ def detect(repo: Path, state: State) -> Profile:
         if declared_stacks
         else tuple((s, _evidence_files(files)) for s, files in found.items())
     )
-    return Profile(
+    profile = Profile(
         kind=str(declared.get("kind") or _detect_kind(repo, skip)),
         surfaces=tuple(declared.get("surfaces", ())),
         traits=tuple(declared.get("traits", ())),
@@ -304,3 +304,5 @@ def detect(repo: Path, state: State) -> Profile:
         stack_files=stack_files,
         ignore=skip,
     )
+    facts, evidence = detect_facts(Context(repo, profile))
+    return replace(profile, facts=facts, evidence=evidence)
