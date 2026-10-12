@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 import re
 import shutil
 import tempfile
@@ -722,6 +723,55 @@ def _raw(ctx: Context, staged: dict[str, str], under: set[str]) -> list[str]:
         if int(size) > _POINTER_MAX or not (ctx.git("cat-file", "blob", staged[path]) or "").startswith(_POINTER_HEAD):
             raw.append(path)
     return raw
+
+
+_GITHUB_REMOTE = re.compile(r"github\.com[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$")
+
+
+def _head_runs(ctx: Context) -> tuple[str, str, dict[str, dict[str, str]]] | Finding:
+    """(branch, head sha, the latest run per workflow on that sha), or the reason they cannot be read."""
+    found = _GITHUB_REMOTE.search((ctx.git("remote", "get-url", "origin") or "").strip())
+    if found is None:
+        return not_checked("origin is not a GitHub repository; this row reads GitHub Actions")
+    slug = found.group(1)
+    branch = (ctx.git("symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD") or "origin/main").strip().removeprefix("origin/")
+    fields = "workflowName,headSha,status,conclusion,event"
+    done = ctx.run("gh", "run", "list", "--repo", slug, "--branch", branch, "--limit", "30", "--json", fields, timeout=60)
+    if done is None or done.returncode != 0:
+        why = (done.stderr.strip().splitlines() or ["no output"])[-1] if done else "gh is not installed or timed out"
+        return not_checked(f"gh could not list the runs ({why}): `gh auth login` once on this machine")
+    # Dependabot's own update runs (event `dynamic`) are not the repo's CI.
+    runs = [r for r in json.loads(done.stdout or "[]") if r.get("event") != "dynamic"]
+    if not runs:
+        return not_checked(f"no CI runs on {branch} yet")
+    head = runs[0]["headSha"]
+    latest: dict[str, dict[str, str]] = {}
+    for r in runs:
+        if r["headSha"] == head:
+            latest.setdefault(r["workflowName"], r)
+    return branch, head, latest
+
+
+@check("gate.ci-green", "CI is green on the default branch's latest commit", audit_only=True)
+def ci_green(ctx: Context) -> Finding:
+    """A repo blueprint passes can still be red where it ships: the shelf's own CI failed every push for hours unread.
+
+    Read through `gh` (logged in once per machine).
+    """
+    if not _workflows(ctx):
+        return not_applicable("no GitHub Actions workflows")
+    read = _head_runs(ctx)
+    if not isinstance(read, tuple):
+        return read
+    branch, head, latest = read
+    going = [name for name, r in latest.items() if r["status"] != "completed"]
+    if going:
+        return not_checked(f"{', '.join(going)} still running on {head[:7]}; `gh run watch` and re-run")
+    red = [f"{name} ({r['conclusion']})" for name, r in latest.items() if r["conclusion"] != "success"]
+    if red:
+        fix = "`gh run view --log-failed` on the red run; fix it before anything else ships"
+        return failing(f"{branch} {head[:7]}: {', '.join(red)}", fix)
+    return passing(f"{branch} {head[:7]}: {', '.join(latest)} green")
 
 
 @check("gate.lfs-binaries", "in a repo that uses LFS, every binary blob in git is an LFS pointer")

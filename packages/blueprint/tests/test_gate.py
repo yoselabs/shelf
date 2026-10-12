@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -628,3 +629,71 @@ def test_an_edited_copy_of_a_recipe_needs_its_own_test(repo: Repo) -> None:
     repo.write("Makefile", "check: images\nimages:\n\tpython3 -I tools/check_dockerfile_pins.py\n")
     repo.write("tools/check_dockerfile_pins.py", _pins_recipe() + "\n# local change\n")
     assert _verdict(repo, "gate.guards-have-red-tests")[0] is Verdict.FAILING
+
+
+# 2026-10-12: the shelf's CI was red on every push for hours and no row said so.
+def _gh_runs(repo: Repo, runs: list[dict[str, str]]) -> None:
+    # A fake gh first on PATH, so no test asks GitHub; the origin names the repo it would ask about.
+    repo.git("remote", "add", "origin", "git@github.com:owner/app.git")
+    repo.fake_tool(repo.bin_dir / "gh", json.dumps(runs))
+
+
+def _ci_green(repo: Repo) -> tuple[Verdict, str]:
+    repo.write(".github/workflows/check.yml", "on: [push]\n")
+    rows = {r.id: r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows}
+    return rows["gate.ci-green"].verdict, rows["gate.ci-green"].evidence
+
+
+def test_the_default_branch_head_green_in_ci_passes(repo: Repo) -> None:
+    _gh_runs(
+        repo,
+        [
+            {"workflowName": "check", "headSha": "abc1234", "status": "completed", "conclusion": "success", "event": "push"},
+            {"workflowName": "check", "headSha": "old0000", "status": "completed", "conclusion": "failure", "event": "push"},
+        ],
+    )
+    assert _ci_green(repo)[0] is Verdict.PASSING
+
+
+def test_a_red_workflow_on_the_default_branch_head_fails_and_is_named(repo: Repo) -> None:
+    _gh_runs(
+        repo,
+        [
+            {"workflowName": "check", "headSha": "abc1234", "status": "completed", "conclusion": "failure", "event": "push"},
+            {"workflowName": "image", "headSha": "abc1234", "status": "completed", "conclusion": "success", "event": "push"},
+            {
+                "workflowName": "Dependabot Updates",
+                "headSha": "abc1234",
+                "status": "completed",
+                "conclusion": "failure",
+                "event": "dynamic",
+            },
+        ],
+    )
+    verdict, evidence = _ci_green(repo)
+    assert verdict is Verdict.FAILING
+    assert "check" in evidence
+    assert "abc1234" in evidence
+    assert "Dependabot" not in evidence
+
+
+def test_a_run_still_going_is_not_checked(repo: Repo) -> None:
+    _gh_runs(repo, [{"workflowName": "check", "headSha": "abc1234", "status": "in_progress", "conclusion": "", "event": "push"}])
+    assert _ci_green(repo)[0] is Verdict.NOT_CHECKED
+
+
+def test_a_repo_not_on_github_is_not_checked_never_a_pass(repo: Repo) -> None:
+    assert _ci_green(repo)[0] is Verdict.NOT_CHECKED
+
+
+def test_gh_failing_is_not_checked_never_a_pass(repo: Repo) -> None:
+    repo.git("remote", "add", "origin", "git@github.com:owner/app.git")
+    (repo.bin_dir / "gh").write_text("#!/bin/sh\necho 'not logged in' >&2\nexit 4\n")
+    (repo.bin_dir / "gh").chmod(0o755)
+    verdict, evidence = _ci_green(repo)
+    assert verdict is Verdict.NOT_CHECKED
+    assert "gh auth login" in evidence
+
+
+def test_ci_green_is_audit_only(repo: Repo) -> None:
+    assert "gate.ci-green" not in {r.id for r in run(repo.root, concern="gate", env=repo.env).rows}

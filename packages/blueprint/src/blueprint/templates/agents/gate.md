@@ -57,6 +57,10 @@ CI runs `just check` and nothing else of its own. A CI step missing from `just c
 CI gates the committed dependency set: install from the lockfile (`uv sync --locked`, `npm ci`), and let no step
 before the gate edit a manifest or re-lock (`sed -i` on `pyproject.toml`, `uv lock`, `npm install`). A patch CI needs
 is a commit.
+CI reads the beads database before the gate: `bd bootstrap` with git's HTTPS rewrite of the SSH remote in its env
+(`GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0=ssh://git@github.com/`). A public repo rewrites to
+`url.https://github.com/.insteadOf`; a private one carries the job token,
+`url.https://x-access-token:${{ github.token }}@github.com/.insteadOf`, or the anonymous clone asks for a username.
 
 ## A gate in a container
 
