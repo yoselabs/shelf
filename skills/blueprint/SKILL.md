@@ -147,7 +147,7 @@ Friction no checkpoint covers: <one line each, or none>
 - Culture files: `template --repo .` copies only what is missing and rewrites only the AGENTS.md
   block; fill the placeholders, never delete the block's markers.
 - Concerns: `gate`, `backlog`, `knowledge`, `secrets`, `stack`, `framework`, `agents`; profiles python-uv
-  (evidenced); dotnet, nix, compose, dockerfile, shell (shell-scripts: under five scripts beside another language, shellcheck and strict mode only), godot, unity and mcp (provisional). A repo with no code yet
+  (evidenced); dotnet, nix, compose, dockerfile, shell, godot, unity and mcp (provisional). A repo with no code yet
   declares its stack (`[profile] stacks = ["python-uv"]` in docs/blueprint/blueprint.toml). Do not invent rows for what the engine does not check.
 - ADRs are living: one file per decision topic, rewritten when it changes, the dropped decision and
   why in its `## History`. `adr-index --repo . --write` regenerates the index agents read.

@@ -15,8 +15,7 @@ from blueprint.model import Sub, check_each, failing, is_skipped, not_checked, p
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
 
-# The full shell stack, and a few helper scripts beside another language: strict mode applies to both.
-_STACKS = ("shell", "shell-scripts")
+_STACKS = ("shell",)
 _SET = re.compile(r"^\s*set\s+(.+)$", re.MULTILINE)
 _LONG = {"errexit": "e", "nounset": "u", "pipefail": "pipefail"}
 # A script meant to collect failures (a probe, a report) runs on; it says so, with why.

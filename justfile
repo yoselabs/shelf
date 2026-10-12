@@ -75,7 +75,7 @@ images:
     files | xargs -0 -r python3 -I packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
-# blueprint's for this step in every repo (stack/shell, stack/shell-scripts). On the host, beside images.
+# blueprint's for this step in every repo (stack/shell). On the host, beside images.
 [group('gate')]
 scripts:
     #!/usr/bin/env bash

@@ -201,7 +201,7 @@ def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path
     """Write `docs/blueprint/README.md` (the summary) and `<concern>.md` per concern; return the paths.
 
     `prune` removes the reports this command wrote for a concern the run no longer has (a stack that became
-    another, a2kay's stack-shell.md beside stack-shell-scripts.md); a run of one concern passes False.
+    another, a report left by a stack name that no longer exists); a run of one concern passes False.
     """
     out_dir = repo / STATE_DIR
     out_dir.mkdir(parents=True, exist_ok=True)

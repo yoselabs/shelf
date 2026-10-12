@@ -32,3 +32,5 @@ gitleaks is required in every repo, not only sops repos: one pinned binary, abou
 Not tested: binary-format sops files; a `.sops.yaml` using `key_groups` or `encrypted_regex` (a partially encrypted dotenv would read as plaintext); `.gitleaks.toml` allowlists on homelab's findings; Windows line endings.
 
 Tier split (a2kay, 2026-10-11): under five scripts in a repo whose main stack is another language is `shell-scripts` (shellcheck and strict mode only; no shfmt, hooks or shell.md). a2kay's one 88-line packaging script would otherwise have brought four new rows.
+
+2026-10-12: ADR 0026 replaced this tier; a shell script of any count turns on the whole `shell` stack.

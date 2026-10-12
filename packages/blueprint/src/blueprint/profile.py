@@ -165,16 +165,6 @@ COMPOSE_FILES = ("compose.yml", "compose.yaml", "docker-compose.yml", "docker-co
 _SHELL_MIN_LINES = 10
 
 
-# A few scripts beside a repo's real language are helpers (a2kay: one macOS packaging script): they get shellcheck and
-# strict mode, not a formatter, hooks and a conventions file of their own.
-_SHELL_PRIMARY_SCRIPTS = 5
-_CODE_STACKS = ("python-uv", "python", "dotnet", "node", "go", "rust")
-
-
-def _secondary(found: dict[str, list[str]], scripts: list[str]) -> bool:
-    return len(scripts) < _SHELL_PRIMARY_SCRIPTS and any(s in found for s in _CODE_STACKS)
-
-
 def _shell_scripts(repo: Path, skip: tuple[str, ...]) -> list[str]:
     found = walk(repo, "*.sh", 3, (*skip, ".beads/hooks"))
     if len(found) == 1 and len(found[0].read_text(errors="replace").splitlines()) < _SHELL_MIN_LINES:
@@ -201,13 +191,7 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
         if (repo / manifest).is_file():
             found[stack] = [manifest]
     if scripts := _shell_scripts(repo, skip):
-        found["shell-scripts" if _secondary(found, scripts) else "shell"] = scripts
-    # One image or one compose file beside a repo's main language is a helper (the shelf's gate image, a test database):
-    # it keeps the lint, pin and build rows, not a formatter, hooks, policy and a conventions file. Declare the full stack
-    # in blueprint.toml to opt back in.
-    for stack in ("dockerfile", "compose"):
-        if len(found.get(stack, ())) == 1 and any(s in found for s in _CODE_STACKS):
-            found[f"{stack}-lite"] = found.pop(stack)
+        found["shell"] = scripts
     return found
 
 
