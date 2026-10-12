@@ -1,0 +1,67 @@
+# Stack profile (see python-uv.toml for the format). One compose file beside a repo's main language (python, dotnet, node, go
+# or rust): a helper (a dev database, a test service), not a deployed fleet. The full answer is compose.toml; this keeps Docker's
+# schema check and digest pins and drops dclint, the formatter, the policy rows, hooks and docs/agents/compose.md. Declare
+# `compose` in docs/blueprint/blueprint.toml's [profile] stacks to take the full tier. Raised 2026-10-12, after shell's tier split.
+stack = "compose-lite"
+status = "provisional"
+source = "compose.toml's types and dependencies rows (nix-compose-profile.md); the tier split follows shell-scripts.toml"
+
+[[role]]
+role = "toolchain"
+na = "Compose has no language or SDK version: the top-level `version:` key is obsolete, and the engine and compose plugin are properties of the host (homelab: the NixOS docker module in the pinned nixpkgs). Image digests are the lockfile; see the dependencies row"
+
+[[role]]
+role = "formatter"
+na = "one compose file beside the repo's main language (a dev database, a test service): yamlfmt costs more than one file's layout is worth"
+
+[[role]]
+role = "linter"
+na = "one helper compose file: Docker's own schema check (the types row) catches what breaks it; dclint is a separate npm tool, owed by the full compose stack"
+
+[[role]]
+role = "types"
+tool = """`docker compose -f <file> config --no-interpolate -q` per compose file: Docker's own schema validation (unknown keys, wrong types), no environment needed. Seen red on a planted unknown key (`additional properties 'bogus_key' not allowed`) and on a wrong type (`restart must be a string`), green on three real stacks. \
+Without --no-interpolate the command fails on any `${VAR:?}` (homelab: A2WEB_ZYTE_KEY missing) and warns on every unset ${VAR}; homelab's own tools/doctor.py instead fills each referenced variable with a placeholder so types are checked after interpolation, which is stricter and also acceptable"""
+install = """justfile: `for f in $(git ls-files '*compose*.y*ml'); do docker compose -f $$f config --no-interpolate -q || exit 1; done`. Needs a Docker CLI with the compose plugin (Compose v2+); no daemon connection is made"""
+config = [{ any = [{ any = [{ path = "justfile", contains = "config --no-interpolate" }, { path = "Makefile", contains = "config --no-interpolate" }] }, { path = "tools/doctor.py", contains = "compose" }] }]
+gate = "config --no-interpolate"
+[[role.alternative]]
+label = "tools/doctor.py runs `docker compose config` on every rendered compose"
+gate = "doctor"
+path = "tools/doctor.py"
+
+[[role]]
+role = "dependencies"
+tool = """every `image:` is `name:tag@sha256:<64 hex>` (tag for the human, digest for the machine): `docker compose -f <file> config --no-interpolate --format json | jq -e '[.services[].image // empty | select(test("@sha256:[0-9a-f]{64}$") | not)] | length == 0'`. Seen red on a planted `nginx:latest`, green on two real stacks; homelab has 0 unpinned images across its 19 files and already enforces the same rule in tools/doctor.py (DIGEST_RE), which CI runs but `just check` does not. \
+Staying current is a separate, reported job (homelab: tools/check-updates.py, read-only report of images behind upstream) so a pin never means a frozen stack"""
+install = "justfile recipe looping over compose files with the jq filter above (jq is preinstalled on macOS and the GitHub runners); an updater (Renovate's docker-compose manager or the repo's own check-updates) proposes digest bumps as reviewable commits"
+config = [{ any = [{ any = [{ path = "justfile", contains = "@sha256" }, { path = "Makefile", contains = "@sha256" }] }, { path = "tools/check-updates.py" }, { path = "renovate.json" }, { path = ".github/renovate.json" }] }]
+gate = "sha256"
+[[role.alternative]]
+label = "tools/doctor.py refuses an image not pinned by digest (DIGEST_RE)"
+gate = "doctor"
+path = "tools/doctor.py"
+
+[[role]]
+role = "tests"
+na = "a helper compose file is not deployed, so there is no deploy to wait on a healthcheck; the full compose stack's healthcheck policy applies to deployed stacks"
+
+[[role]]
+role = "coverage"
+na = "a compose file has no executable lines to cover"
+
+[[role]]
+role = "spelling"
+na = "the main language's spelling row reads the repo, a helper compose file included; typos per compose file is the full compose stack's"
+
+[[role]]
+role = "architecture"
+na = "one helper compose file has no fleet of services to keep apart; the full compose stack carries the deny-rule policy"
+
+[[role]]
+role = "hooks"
+na = "the gate's config check is enough for one file; the full compose stack adds commit hooks"
+
+[[role]]
+role = "agent-guidance"
+na = "the main language's conventions file covers one helper compose file; the full compose stack gets docs/agents/compose.md"

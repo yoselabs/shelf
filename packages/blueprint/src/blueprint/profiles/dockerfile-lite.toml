@@ -1,0 +1,77 @@
+# Stack profile (see python-uv.toml for the format). One Dockerfile beside a repo's main language (python, dotnet, node, go
+# or rust): a helper image (the shelf's gate image, a test image), not a stack of its own. The full answer is dockerfile.toml;
+# this keeps its linter, digest pins and "something builds it" rows and drops the formatter and hooks. Declare `dockerfile` in
+# blueprint.toml's [profile] stacks to take the full tier. Raised 2026-10-12, after shell's tier split (shell-scripts.toml).
+stack = "dockerfile-lite"
+status = "provisional"
+source = "dockerfile.toml's linter, dependencies and tests rows (hadolint-and-ci-uv.md, dockerfile-gaps.md); the tier split follows shell-scripts.toml"
+
+[[role]]
+role = "toolchain"
+na = "a Dockerfile has no language version of its own; base images and tool images (`COPY --from=ghcr.io/astral-sh/uv:<ver>`) are pinned in the dependencies row, and a python-uv repo's uv-ci row checks the uv one"
+
+[[role]]
+role = "formatter"
+na = "one image beside the repo's main language: dockerfmt and its one-time reformat cost more than one file's layout is worth; a repo with two or more images, or with images as its main stack, is the full dockerfile stack"
+
+[[role]]
+role = "linter"
+tool = """hadolint 2.15.1 (hadolint/hadolint; mise `hadolint`, pinned) over every tracked Dockerfile, with a committed .hadolint.yaml. \
+Exit 1 on any warning (the default threshold); seen red on four real files (DL3008 apt pin, DL4006 pipefail, DL3013 pip pin, DL3022 COPY --from a named build context) \
+and on a planted `FROM ubuntu:latest` with a bare `apt-get install` (DL3007, DL3008, DL3014, DL3015). Never `--failure-threshold error`: it passed a file with real warnings"""
+install = """mise.toml: hadolint = "2.15.1"; justfile: an `images` recipe, `git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\\.dockerignore$' | xargs -0 -r hadolint`, a dependency of `check`; \
+.hadolint.yaml with an `ignored:` list, each rule with a comment saying why. DL3022 is a false positive for `COPY --from=<name>` where <name> is a `docker build --build-context`: ignore it with that reason"""
+config = [{ path = ".hadolint.yaml" }, { any = [{ path = "justfile", contains = "hadolint" }, { path = "Makefile", contains = "hadolint" }, { path = ".pre-commit-config.yaml", contains = "hadolint" }] }]
+gate = "hadolint"
+
+[[role]]
+role = "types"
+na = "hadolint's parser is the static check (a syntax error is exit 1); the build itself needs a daemon"
+
+[[role]]
+role = "dependencies"
+tool = """every FROM, `COPY --from=<image>` and `RUN --mount=from=<image>` is `name:tag@sha256:<64 hex>` (tag for the human, digest for the machine; hadolint DL3006/DL3007 force a tag, never a digest), \
+judged by the `dockerfile-pins` recipe (stdlib, no network). Exempt: `scratch`, an earlier stage alias, a stage number, and a bare name in COPY --from (a `--build-context`, e.g. `--from=shelf`). An ARG default before the first FROM is substituted; an ARG with no default is a finding. \
+Seen red (exit 1) on a planted file (`:latest`, a bare `nginx`, an ARG-built `python:${PY}-slim`, a `COPY --from=uv:0.13.0`) and on 9 real unpinned references in 4 Dockerfiles; green (exit 0) on homelab's images/devbox (digest-pinned) and on a planted file of pinned forms. \
+A pin must not freeze the image: the standard names an updater, Dependabot's docker ecosystem (built into GitHub; whether it reads a `*.Dockerfile` name is not verified, so its first PR is the check), Renovate `pinDigests`, or the repo's own report of images behind upstream. The digest to write comes from `crane digest <image:tag>` (network; seen: exit 0, one sha256 line)"""
+install = "`blueprint recipe dockerfile-pins > tools/check_dockerfile_pins.py`; justfile: `python3 -I tools/check_dockerfile_pins.py --context <name>...` (a dependency of `check`); pin with `crane digest`; an updater: .github/dependabot.yml with a `docker` entry per Dockerfile folder, renovate.json with `pinDigests: true`, or a check-updates script"
+config = [
+    { any = [{ path = "justfile", contains = "check_dockerfile_pins" }, { path = "Makefile", contains = "check_dockerfile_pins" }] },
+    # The updater: a digest pin without one freezes the image.
+    { any = [{ path = ".github/dependabot.yml", contains = "docker" }, { path = "renovate.json", contains = "pinDigests" }, { path = ".github/renovate.json", contains = "pinDigests" }, { path = "tools/check-updates.py" }] },
+]
+gate = "check_dockerfile_pins"
+
+[[role]]
+role = "tests"
+tool = """every image is built by something that also runs it: CI or the gate. \
+A product image (shipped or deployed: a2kay's root Dockerfile, homelab's images/*) gets a CI job beside `check` (buildx, `load: true`, then `docker run --rm <image> <cmd>`); \
+the smoke is the product's own cheap command (`--help`, the image's test.sh), not its CMD. Seen on GitHub's ubuntu-latest (https://github.com/yoselabs/shelf/actions/runs/38184048761): a good image built and its smoke passed; a COPY of a file the context lacks (a2kay's 2026-10 incident) failed the build; an image that builds but cannot start failed its smoke. \
+A test image the gate builds (a2kay's scripts/prune/test.Dockerfile, the shelf's tools/gate/gate.Dockerfile) is exercised by that gate: a recipe `just check` reaches names its path (`docker build -f <path>`). \
+Each Dockerfile is judged on its own: CI names its path (`file:` or `-f`, a `${{ matrix.* }}` template matching it; a root Dockerfile is the default), or the gate does. \
+Trigger: pull_request, so a broken image blocks the merge; push-to-main only where the repo merges straight to main, said in the workflow"""
+install = """an image nothing builds is first a question, not a CI job: if nothing deploys it, delete it (a2kay 2026-10: the first full CI build of a heavy, undeployed image filled the runner's disk; the finding was the image, not the disk). \
+A product image: a workflow job with actions/checkout, docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 (v4.4.1), docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc (v7.4.0) with `load: true`, `push: false`, `cache-from/cache-to: type=gha`, \
+then `docker run --rm <tag> <smoke>`; one build-and-smoke per product image. A heavy image that is used may need room first: `sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL` before buildx (about 25 GB). \
+A test image: a recipe `just check` reaches builds it with `-f <path>`"""
+config = [{ built = "dockerfiles" }]
+
+[[role]]
+role = "coverage"
+na = "a Dockerfile has no executable lines to cover"
+
+[[role]]
+role = "spelling"
+na = "the repo-wide spell check (the main stack's spelling row) reads Dockerfile comments; there is nothing Dockerfile-specific to spell"
+
+[[role]]
+role = "architecture"
+na = "an image has no layers of code to keep apart; multi-stage builds are hadolint's and the build's concern"
+
+[[role]]
+role = "hooks"
+na = "the gate's hadolint is enough for one image; the full dockerfile stack adds a commit hook"
+
+[[role]]
+role = "agent-guidance"
+na = "the rule ids and the reasons in .hadolint.yaml are the guidance; a convention hadolint cannot carry goes in the main stack's docs/agents file"

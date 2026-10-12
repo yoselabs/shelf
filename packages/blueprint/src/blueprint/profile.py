@@ -202,6 +202,12 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
             found[stack] = [manifest]
     if scripts := _shell_scripts(repo, skip):
         found["shell-scripts" if _secondary(found, scripts) else "shell"] = scripts
+    # One image or one compose file beside a repo's main language is a helper (the shelf's gate image, a test database):
+    # it keeps the lint, pin and build rows, not a formatter, hooks, policy and a conventions file. Declare the full stack
+    # in blueprint.toml to opt back in.
+    for stack in ("dockerfile", "compose"):
+        if len(found.get(stack, ())) == 1 and any(s in found for s in _CODE_STACKS):
+            found[f"{stack}-lite"] = found.pop(stack)
     return found
 
 

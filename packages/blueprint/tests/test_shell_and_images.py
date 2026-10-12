@@ -202,3 +202,53 @@ def test_nix_eval_tests_in_the_gate_pass_the_nix_tests_row(repo: Repo) -> None:
     repo.write("tests/nix/udev.nix", "assert true; true\n")
     repo.write("justfile", "check: nix-test\nnix-test:\n    for t in tests/nix/*.nix; do nix eval --impure --raw --file $t; done\n")
     assert _rows(repo)["stack.nix.tests"][0] is Verdict.PASSING
+
+
+# Size tiers (2026-10-12): one image or one compose file beside a repo's main language is a helper, not a stack.
+def _python(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    repo.write("uv.lock", "")
+
+
+def test_one_dockerfile_in_a_python_repo_is_the_lite_tier(repo: Repo) -> None:
+    _python(repo)
+    repo.write("tools/gate.Dockerfile", "FROM python:3.12-slim\n")
+    rows = _rows(repo)
+    assert "stack.dockerfile.profile" not in rows
+    assert "tools/gate.Dockerfile" in rows["stack.dockerfile-lite.profile"][1]
+    assert rows["stack.dockerfile-lite.formatter"][0] is Verdict.NOT_APPLICABLE
+    assert rows["stack.dockerfile-lite.hooks"][0] is Verdict.NOT_APPLICABLE
+    assert rows["stack.dockerfile-lite.linter"][0] is Verdict.NOT_SET_UP
+    assert rows["stack.dockerfile-lite.tests"][0] is Verdict.NOT_SET_UP
+
+
+def test_two_dockerfiles_or_no_code_stack_are_the_full_dockerfile_stack(repo: Repo) -> None:
+    repo.write("images/a/Dockerfile", "FROM ubuntu:24.04\n")
+    assert "stack.dockerfile.profile" in _rows(repo)
+    _python(repo)
+    repo.write("images/b/Dockerfile", "FROM ubuntu:24.04\n")
+    rows = _rows(repo)
+    assert "stack.dockerfile.profile" in rows
+    assert "stack.dockerfile-lite.profile" not in rows
+
+
+def test_one_compose_file_in_a_python_repo_is_the_lite_tier(repo: Repo) -> None:
+    _python(repo)
+    repo.write("compose.yml", "services:\n  db:\n    image: postgres:17\n")
+    rows = _rows(repo)
+    assert "stack.compose.profile" not in rows
+    assert rows["stack.compose-lite.linter"][0] is Verdict.NOT_APPLICABLE
+    assert rows["stack.compose-lite.architecture"][0] is Verdict.NOT_APPLICABLE
+    assert rows["stack.compose-lite.agent-guidance"][0] is Verdict.NOT_APPLICABLE
+    assert rows["stack.compose-lite.types"][0] is Verdict.NOT_SET_UP
+    assert rows["stack.compose-lite.dependencies"][0] is Verdict.NOT_SET_UP
+    assert "compose" not in templates.required(detect(repo.root, load_state(repo.root)))
+
+
+def test_a_declared_full_stack_overrides_the_tier(repo: Repo) -> None:
+    _python(repo)
+    repo.write("Dockerfile", "FROM python:3.12-slim\n")
+    repo.write("docs/blueprint/blueprint.toml", '[profile]\nstacks = ["python-uv", "dockerfile"]\n')
+    rows = _rows(repo)
+    assert "stack.dockerfile.profile" in rows
+    assert "stack.dockerfile-lite.profile" not in rows
