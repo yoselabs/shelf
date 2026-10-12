@@ -62,7 +62,10 @@ def one_command(ctx: Context) -> Finding:
         return not_set_up("no justfile", *fixer)
     if not gate.has_recipe("check"):
         if gate.unread and gate.runner == "just":
-            return not_checked(f"the justfile cannot be read: {gate.unread} (pin the runner: `uv add --dev rust-just`)")
+            return not_checked(
+                f"the justfile cannot be read: {gate.unread} "
+                "(pin the runner: `uv add --dev rust-just` with a pyproject.toml, else just in mise.toml)"
+            )
         return not_set_up(f"the {gate.path} has no `check` {'recipe' if gate.runner == 'just' else 'target'}", *fixer)
     argv = _DRY_RUN[gate.runner]
     dry = ctx.run(gate_graph.just_command(ctx) if gate.runner == "just" else argv[0], *argv[1:], timeout=60)
@@ -78,11 +81,19 @@ def one_command(ctx: Context) -> Finding:
 
 
 _DRY_RUN = {"just": ("just", "--dry-run", "check"), "make": ("make", "-n", "check")}
-_MIGRATION = (
-    "move the Makefile to a justfile (ADR 0023): `uv add --dev rust-just`, port each target to a recipe "
-    "(same names; loops go in shebang recipes; no backticks), run it as `uv run just check`, delete the Makefile; "
-    "the shelf's own justfile is the reference"
-)
+_PORT = "port each target to a recipe (same names; loops go in shebang recipes; no backticks)"
+
+
+def _migration(ctx: Context) -> str:
+    """Pin just where the repo already pins things: the pyproject's dev group for Python, mise.toml for every other stack."""
+    if ctx.read("pyproject.toml") is not None:
+        pin, run_it = "`uv add --dev rust-just`", "run it as `uv run just check`"
+    else:
+        pin, run_it = '`just = "<version>"` under [tools] in mise.toml, then `mise lock` (ADR 0024)', "run it as `just check`"
+    return (
+        f"move the Makefile to a justfile (ADR 0023): pin just with {pin}, {_PORT}, {run_it}, "
+        "delete the Makefile; the shelf's own justfile is the reference"
+    )
 
 
 @check("gate.runner", "the gate runner is just: a justfile holds the gate, not a Makefile")
@@ -91,7 +102,7 @@ def runner(ctx: Context) -> Finding:
     if gate_graph.load(ctx) is None:
         return not_applicable("no gate: gate.one-command reports the missing one")
     if gate_graph.has_makefile_only(ctx):
-        return failing("the gate is a Makefile; the shelf's runner is just (a justfile)", _MIGRATION)
+        return failing("the gate is a Makefile; the shelf's runner is just (a justfile)", _migration(ctx))
     return passing("a justfile holds the gate")
 
 

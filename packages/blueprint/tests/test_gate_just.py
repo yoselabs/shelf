@@ -196,3 +196,26 @@ def test_a_repo_with_no_stack_is_told_how_to_declare_one(repo: Repo) -> None:
     fix = _fix(repo, "gate.one-command")
     assert "stacks = [" in fix
     assert "docs/blueprint/blueprint.toml" in fix
+
+
+def _runner_fix(repo: Repo) -> str:
+    return next(r.remediation for r in run(repo.root, concern="gate", env=repo.env).rows if r.id == "gate.runner")
+
+
+def test_the_runner_fix_in_a_python_repo_is_uv_add_rust_just(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("pyproject.toml", '[project]\nname = "x"\nversion = "0"\n')
+    fix = _runner_fix(repo)
+    assert "uv add --dev rust-just" in fix
+    assert "uv run just check" in fix
+
+
+def test_the_runner_fix_without_a_pyproject_pins_just_in_mise(repo: Repo) -> None:
+    # lifesim (Unity/.NET): no pyproject, so `uv add` has nothing to add to.
+    repo.write("Makefile", "check:\n\ttrue\n")
+    fix = _runner_fix(repo)
+    assert "uv add" not in fix
+    assert "uv run" not in fix
+    assert 'just = "' in fix
+    assert "mise.toml" in fix
+    assert "ADR 0024" in fix
