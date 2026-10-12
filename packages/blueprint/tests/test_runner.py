@@ -353,6 +353,7 @@ def test_a_hooks_git_variables_never_reach_the_repo_they_name(repo: Repo, tmp_pa
     before = (victim / ".git/config").read_text()
     repo.write(".gitignore", ".worktrees/\n")
     repo.commit()
-    leaked = {**repo.env, "GIT_DIR": str(victim / ".git/worktrees/wt")}
+    # homelab saw the other symptom: with the work tree inherited too, the init wrote core.worktree instead.
+    leaked = {**repo.env, "GIT_DIR": str(victim / ".git/worktrees/wt"), "GIT_WORK_TREE": str(tmp_path / "wt")}
     run(repo.root, env=leaked)
     assert (victim / ".git/config").read_text() == before
