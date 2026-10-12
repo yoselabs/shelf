@@ -3,7 +3,7 @@ name = "atomic-io"
 version = "0.1.0"
 description = "Atomic text write — tempfile + fsync + os.replace, so a crash or a concurrent reader never sees a partial file."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 

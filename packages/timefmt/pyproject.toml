@@ -3,7 +3,7 @@ name = "timefmt"
 version = "0.1.0"
 description = "Adaptive duration formatter — units match magnitude, no wasted precision (ms / s / m·s)."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 

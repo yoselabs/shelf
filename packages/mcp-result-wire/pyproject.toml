@@ -3,7 +3,7 @@ name = "mcp-result-wire"
 version = "0.2.0"
 description = "FastMCP result middleware — re-derive a tool's content channel from an encoding plan (token-lean TSV/page-tsv) and project/paginate list results, driven by per-tool registries not framework metadata."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [

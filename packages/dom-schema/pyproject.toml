@@ -3,7 +3,7 @@ name = "dom-schema"
 version = "0.1.0"
 description = "Declared CSS extraction that reports WHY it yielded nothing — separating an empty page from a schema that stopped matching, so a rotted site scraper fails loudly instead of answering 'nothing here' forever."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [

@@ -3,7 +3,7 @@ name = "yaml-merge"
 version = "0.1.0"
 description = "Stop caring that writing a config back destroys the file its author wrote — carry a payload's values into the existing YAML document, keeping every comment, blank line and key the human put there."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = ["ruamel.yaml>=0.18,<1"]

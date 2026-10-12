@@ -3,7 +3,7 @@ name = "mcp-feedback"
 version = "0.3.0"
 description = "A fixed-schema, agent-invoked feedback tool for any FastMCP server — report_feedback(subject, note, request, response, wanted), OTLP/HTTP-logs transport, two consumer knobs only."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [

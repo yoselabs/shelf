@@ -3,7 +3,7 @@ name = "http-cache"
 version = "0.1.0"
 description = "A conditional-GET HTTP response cache on sqlite: ETag / Last-Modified / TTL / gzip body, keyed by (url, variant)."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [

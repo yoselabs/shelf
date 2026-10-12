@@ -3,7 +3,7 @@ name = "http-fetch"
 version = "0.3.0"
 description = "One HTTP-GET primitive over curl_cffi with browser TLS impersonation, conditional GET, injected proxy + breaker, and closed-verdict error mapping."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [

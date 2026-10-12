@@ -5,6 +5,6 @@ consumer = "a2web"
 software = "llm-cache"
 why = "a2web's extraction pipeline re-asks the same (content, question, model, template) repeatedly across a session; the metered LLM call is the scarce cost. a2web wants a sqlite-backed TTL cache whose hit is a drop-in for a completion (original cost/tokens/latency preserved for honest accounting) and which shares a2web's single sqlite connection rather than opening its own — generic cache mechanics a2web should stop caring about."
 needs = "The connection-injected get/put speaking anyllm.Completion, make_key(*parts) to fold a2web's 4-part composite key into the opaque (key, model), and the on-open table creation — over the aiosqlite.Connection a2web already owns via sqlite-resource."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2web"
 status = "active"          # active | retired

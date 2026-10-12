@@ -3,7 +3,7 @@ name = "llm-cache"
 version = "0.1.2"
 description = "A sqlite-backed TTL cache for LLM completions, keyed on (key, model) and speaking anyllm.Completion."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [

@@ -3,7 +3,7 @@ name = "record-mine"
 version = "0.2.0"
 description = "Locate the dominant repeated-record region on a listing / index / threaded-discussion page (which article extractors discard as boilerplate) and render it to link-preserving markdown."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [

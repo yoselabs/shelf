@@ -3,7 +3,7 @@ name = "page-tsv"
 version = "0.2.1"
 description = "Type-driven, consumer-aware rendering of tool results — Page[T] + a render(value, *, consumer) seam that compresses scalar tables to lean-wire TSV for an LLM and stays plain JSON for code/machine callers."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [

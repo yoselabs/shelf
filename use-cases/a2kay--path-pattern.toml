@@ -6,6 +6,6 @@ consumer = "a2kay"
 software = "path-pattern"
 why = "Every a2kay kind declares where its entities live as one file_pattern; writes resolve it forward, and the index walk, reconcile and watcher read a found path back into id, slug, parent and position."
 needs = "resolve(pattern, args) raising PatternError (a2kay turns it into invalid_argument in services/files/placement.py), reverse_match(pattern, path), placeholders, parse (widths), pattern_specificity; {n:N} as a minimum width and {parent_path} spanning folders."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

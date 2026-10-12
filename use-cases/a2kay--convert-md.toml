@@ -6,6 +6,6 @@ consumer = "a2kay"
 software = "convert-md"
 why = "a2kay ingests heterogeneous documents (pdf/docx/pptx/html) into the vault as markdown; it must not own per-format conversion quirks."
 needs = "The dispatch entrypoint + the model-free fidelity grade to gate low-quality conversions."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

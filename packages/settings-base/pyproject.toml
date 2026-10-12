@@ -3,7 +3,7 @@ name = "settings-base"
 version = "0.1.0"
 description = "Generic env/YAML machinery for pydantic-settings config — ${VAR} interpolation, optional-config-path resolution, and a secret-stripping YAML source."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [

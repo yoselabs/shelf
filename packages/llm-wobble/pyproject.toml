@@ -3,7 +3,7 @@ name = "llm-wobble"
 version = "0.5.1"
 description = "Stop caring that an LLM's JSON envelope arrives fenced, prose-wrapped, or missing fields — one funnel decodes it, applies a per-field recovery policy, logs every recovery, and returns a token no hand-rolled parse can forge."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = []

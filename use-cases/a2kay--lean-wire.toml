@@ -6,6 +6,6 @@ consumer = "a2kay"
 software = "lean-wire"
 why = "a2kay serves a knowledge base over MCP; agent-facing list/page results must be token-lean and line-oriented so a model reads rows, not quoted-newline noise."
 needs = "encode_tsv (line-oriented TSV, cells never hold a raw tab/newline) + PruneEmpty/prune_dict/dump_model_for_wire for empty-field pruning on the wire."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

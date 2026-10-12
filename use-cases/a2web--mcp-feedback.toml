@@ -6,7 +6,7 @@ consumer = "a2web"
 software = "mcp-feedback"
 why = "a2web's own agent-invoked report_feedback tool (archived change add-agent-invoked-feedback-tool) was built a2web-only, scoped around a fetch-specific `url` parameter. Generalizing it here lets a2web drop its local reimplementation and lets any future FastMCP project reuse the same mechanism verbatim."
 needs = "register_feedback_tool(mcp, endpoint, api_key, extra_instructions) mounting the fixed report_feedback(subject, note, wanted) tool a2web already validated the shape of against real drift data (feedback-telemetry's severity attribute)."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2web"
 status = "active"          # active | retired
 # a2web's own adoption is tracked in a2web's repo as change `adopt-shelf-mcp-feedback`,

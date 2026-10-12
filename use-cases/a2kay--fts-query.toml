@@ -6,6 +6,6 @@ consumer = "a2kay"
 software = "fts-query"
 why = "a2kay's search tiers route a query by what it asks for: identifier-only queries get exact grep -w matching and never load the embedding model; word queries are matched stemmed against a SQLite FTS5 index whose text folds ё to е."
 needs = "parse(query) -> ParsedQuery(words, exact, is_identifier); boundary_pattern/word_start regexes and fts_terms(text, stopwords) under a2kay's Fold({ё: е, Ё: Е}); Fold.sql for the index's content view and triggers; Tokens for the porter-stemmed query side."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

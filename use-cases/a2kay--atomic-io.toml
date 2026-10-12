@@ -6,6 +6,6 @@ consumer = "a2kay"
 software = "atomic-io"
 why = "a2kay's frontmatter and ontology-store writes must be crash-safe -- a partial write must never corrupt a vault file a human or another process might read concurrently."
 needs = "A tempfile+fsync+os.replace write so a crash or concurrent reader never sees a truncated file, and a failed write never destroys a pre-existing target."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2kay"
 status = "active"          # active | retired

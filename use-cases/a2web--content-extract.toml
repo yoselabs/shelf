@@ -5,6 +5,6 @@ consumer = "a2web"
 software = "content-extract"
 why = "For a normal article page, a2web wants the main content as markdown plus the structural facts a caller reasons over: title, byline, publish date, the heading outline, and the outbound links with a role (content vs nav vs boilerplate). This is generic page-to-structure substrate; which parts answer the question is a2web's policy. The body conversion is delegated to convert-md's convert_html so the trafilatura call is not hand-rolled twice."
 needs = "extract_markdown(html, url) -> ExtractedContent (async) and parse_metadata(html) -> dict; ExtractedContent / ExtractedHeading / ExtractedLink boundary types; body markdown sourced from convert_html so it stays consistent with the shelf's conversion mechanism."
-sponsor = "Denis Tomilin"
+sponsor = "yoselabs"
 requester = "a2web"
 status = "active"          # active | retired

@@ -3,7 +3,7 @@ name = "any-browser"
 version = "0.1.0"
 description = "Stop caring which headless browser renders a JS page — one BrowserBackend seam over Playwright-API and raw-CDP engines."
 readme = "README.md"
-authors = [{ name = "Denis Tomilin" }]
+authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 # The seam itself is stdlib-only. The rendering engines are optional: a consumer
