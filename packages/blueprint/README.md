@@ -112,7 +112,7 @@ and the scope: concerns checked, concerns not run, and whether the audit-only ch
 With `--audit`, a gate row that is failing or not set up (`one-command`, `runner`, `ci`, `ci-no-manifest-edit`, `hooks-recipe`, `runs-blueprint`, `clean-clone`) also names any remote-tracking branch (`origin/*`, local refs, no fetch) ahead of the default branch that changes a gate file (justfile, Makefile, `.github/workflows/*`, hook config), and hands the fix to the owner: merge that branch or remediate on main, not a parallel gate. The branch itself is never checked.
 
 Hooks follow one recipe: prek owns them through `.pre-commit-config.yaml` and bd's five events run
-from it (`blueprint recipe hooks` prints it); bd never installs hooks itself. A framework's or stack's own gate script is a recipe too (`blueprint recipe unity-integrity`, `dockerfile-pins`, `compose-policy`): the repo copies it into `tools/` (a rego policy into `policy/`) and owns the copy.
+from it (`blueprint recipe hooks` prints it); bd never installs hooks itself. A framework's or stack's own gate script is a recipe too (`blueprint recipe unity-integrity`, `dockerfile-pins`, `compose-policy`, `changed`): the repo copies it into `tools/` (a rego policy into `policy/`) and owns the copy.
 
 A stack with no profile, or a role its profile leaves untested, is a **blueprint gap**: reported
 every run, never a pass, but left out of the exit code, since the shelf lacks the answer, not the repo.

@@ -298,3 +298,25 @@ def test_a_dolt_push_may_be_skipped_only_by_saying_so(repo: Repo) -> None:
 
 def test_a_good_dolt_push_passes(repo: Repo) -> None:
     assert _run_hook(repo, 0, {}).returncode == 0
+
+
+# shelf-6q1.9: the shelf runs the very script it ships, so the two never drift.
+def test_the_shipped_changed_selector_is_the_one_the_shelf_runs() -> None:
+    shelf = Path(__file__).resolve().parents[3] / "tools" / "changed.py"
+    assert shelf.read_text() == (RECIPES / RECIPE_FILES["changed"]).read_text()
+
+
+def test_the_changed_selector_answers_help_and_names_no_shelf_path() -> None:
+    script = RECIPES / RECIPE_FILES["changed"]
+    out = subprocess.run(["python3", "-I", str(script), "--help"], capture_output=True, text=True, check=False)
+    assert out.returncode == 0
+    assert "--scope" in out.stdout
+    assert "shelf" not in script.read_text().lower()
+
+
+def test_the_changed_selector_prints_only_matching_files_when_there_is_no_base(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    repo.write("a.py", "x = 1\n")
+    repo.write("b.txt", "x\n")
+    code, out = _run("changed", ["--repo", str(repo.root), "*.py"], capsys)
+    assert code == 0
+    assert out == "a.py\0"

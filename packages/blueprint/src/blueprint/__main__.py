@@ -29,6 +29,7 @@ RECIPE_FILES = {
     "godot-test": "godot-test.just",
     "dockerfile-pins": "check_dockerfile_pins.py",
     "compose-policy": "compose_policy.rego",
+    "changed": "changed.py",
 }
 
 
@@ -63,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         choices=sorted(RECIPE_FILES),
         help=(
             "hooks: .pre-commit-config.yaml; godot-test: a justfile recipe; compose-policy: a policy/ rego file; "
+            "changed: tools/changed.py, the changed-file selector per-file recipes call; "
             "the others: a tools/ script, named in the profile"
         ),
     )

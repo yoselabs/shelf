@@ -104,6 +104,9 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
    `bootstrap-verify` is the same call under a name that signals intent (checking, not setting up)
    — neither is a `check` prerequisite, since they assert this working copy's environment, not
    the repo's committed content.
+   For gate speed, copy the changed-file selector (`blueprint recipe changed > tools/changed.py`) and add
+   `lint-changed` and `spell-changed` twins of `lint` and `spell`, as the pattern in `docs/agents/gate.md` shows; the
+   preset treats them as shelf-only recipes, neither owed nor extra.
 3. The `dev` dependency-group (pytest, pytest-cov, ruff, pyrefly, codespell, deptry).
 
 Then **own it**: override any rule your project genuinely needs to, on purpose. Divergence is a local

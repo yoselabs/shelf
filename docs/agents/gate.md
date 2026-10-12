@@ -16,6 +16,24 @@ deleted one. A linter with nothing to look at is skipped and says so in one line
 config runs it over everything. A check that reads across files (types, architecture, dependencies, secrets) always
 covers the whole repo, and so does the gate in CI (`just check-all`). No base found means everything runs.
 
+`blueprint recipe changed > tools/changed.py` copies the selector (stdlib only; `--help` documents it). It prints the
+changed files matching its globs, NUL-separated, or everything on `--scope all`, when a `--config` file changed, or with
+no base. A repo adds a `-changed` twin of each per-file recipe and `check` calls the twins:
+
+```just
+lint-changed:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    list=$(mktemp); trap 'rm -f "$list"' EXIT
+    python3 -I tools/changed.py --config pyproject.toml --config ruff.toml 'src/*.py' 'tests/*.py' > "$list"
+    [ -s "$list" ] || { echo "skipped lint: no Python file changed"; exit 0; }
+    xargs -0 uv run ruff check --force-exclude < "$list"
+    xargs -0 uv run ruff format --check --force-exclude < "$list"
+```
+
+`spell-changed` is the same with `--config .codespellrc` and `xargs -0 uv run codespell < "$list"`. Keep the whole-repo
+`lint` and `spell`; `check-all` and CI call those.
+
 ## The runner
 
 The gate is a `justfile`, and `just` is the runner (shelf ADR 0023). Pin it per repo: Python `uv add --dev rust-just`,

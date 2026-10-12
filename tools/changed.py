@@ -82,14 +82,14 @@ def select(repo: Path, patterns: list[str], configs: Sequence[str] = (), *, skip
     return [p for p in pool if wanted(p)]
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", default=".", help="the repo (default: cwd)")
     parser.add_argument("--scope", choices=("changed", "all"), default="changed")
     parser.add_argument("--config", action="append", default=[], help="a file (or glob) whose change selects everything")
     parser.add_argument("--not", dest="skip", action="append", default=[], metavar="GLOB", help="never select a path matching this")
     parser.add_argument("patterns", nargs="+", metavar="GLOB")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     files = select(Path(args.repo).resolve(), args.patterns, args.config, skip=args.skip, scope=args.scope)
     sys.stdout.write("".join(f"{p}\0" for p in files))
     return 0
