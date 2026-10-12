@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,8 @@ from blueprint.model import FixedBy, Verdict
 from blueprint.runner import run
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from blueprint.testing import Repo
 
 _SHA = "11d5960a326750d5838078e36cf38b85af677262"
@@ -709,3 +712,22 @@ def test_gh_failing_is_not_checked_never_a_pass(repo: Repo) -> None:
 
 def test_ci_green_is_audit_only(repo: Repo) -> None:
     assert "gate.ci-green" not in {r.id for r in run(repo.root, concern="gate", env=repo.env).rows}
+
+
+def test_clean_clone_does_not_count_a_dirty_submodule_as_uncommitted(repo: Repo, tmp_path: Path) -> None:
+    # lifesim: Unity's import rewrote materials inside a licensed submodule; that is not this repo's uncommitted work.
+    vendor = tmp_path / "vendor"
+    vendor.mkdir()
+    for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@example.invalid"], ["config", "user.name", "t"]):
+        subprocess.run(["git", *args], cwd=vendor, check=True)
+    (vendor / "mat.txt").write_text("a")
+    subprocess.run(["git", "add", "."], cwd=vendor, check=True)
+    subprocess.run(["git", "commit", "-qm", "v"], cwd=vendor, check=True)
+    repo.git("-c", "protocol.file.allow=always", "submodule", "add", "-q", str(vendor), "third_party/uma")
+    repo.write("Makefile", "check:\n\ttest -f generated.txt\n")
+    repo.commit()
+    repo.write("third_party/uma/mat.txt", "rewritten by the import")
+    repo.write("generated.txt", "only on this machine")
+    evidence = _verdict(repo, "gate.clean-clone", audit=True)[1]
+    assert "generated.txt" in evidence
+    assert "third_party/uma" not in evidence

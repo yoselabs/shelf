@@ -581,7 +581,9 @@ def clean_clone(ctx: Context) -> Finding:
         if clone is None or clone.returncode != 0:
             return not_checked("could not clone the repository")
         judged = _gate_in(ctx, Path(tmp), word, budget)
-    uncommitted = [line[3:] for line in (ctx.git("status", "--porcelain", "--untracked-files=all") or "").splitlines()]
+    uncommitted = [
+        line[3:] for line in (ctx.git("status", "--porcelain", "--untracked-files=all", "--ignore-submodules=all") or "").splitlines()
+    ]
     if judged.verdict is not Verdict.FAILING or not uncommitted:
         return judged
     with tempfile.TemporaryDirectory(prefix="blueprint-snapshot-") as tmp:
