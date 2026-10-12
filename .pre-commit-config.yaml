@@ -30,8 +30,9 @@ repos:
   - id: bd-dolt-push
     name: bd dolt push
     # `bd hooks run pre-push` does not push the Dolt data ref (refs/dolt/data); git push and bd dolt
-    # push are two remote syncs. Non-fatal: a Dolt hiccup must not block the code push.
-    entry: sh -c 'bd dolt push || echo "bd dolt push failed, push it by hand" >&2'
+    # push are two remote syncs. Fatal: a hook that cannot fail says nothing (a2kay's push "Passed" while the
+    # Dolt push failed over HTTPS). Offline, BD_DOLT_PUSH_OPTIONAL=1 pushes the code and still prints FAILED.
+    entry: sh -c 'bd dolt push && exit 0; echo "FAILED - bd dolt push did not reach the remote (refs/dolt/data); fix the remote or its credentials and push again, or set BD_DOLT_PUSH_OPTIONAL=1 to push the code without it" >&2; test -n "${BD_DOLT_PUSH_OPTIONAL:-}"'
     language: system
     always_run: true
     pass_filenames: false

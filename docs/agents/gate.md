@@ -38,7 +38,7 @@ prek owns the hooks, from `.pre-commit-config.yaml`. bd never installs its own (
 |---|---|---|
 | pre-commit | `bd hooks run pre-commit`, then the stack's fast checks on staged files | Fast: seconds |
 | prepare-commit-msg, post-merge, post-checkout | `bd hooks run <event>` | bd keeps its data in step |
-| pre-push | `bd hooks run pre-push`, `bd dolt push` (non-fatal), then `just check` | Heavy checks once per push |
+| pre-push | `bd hooks run pre-push`, `bd dolt push` (fatal; `BD_DOLT_PUSH_OPTIONAL=1` to push offline), then `just check` | Heavy checks once per push |
 
 After a clone, in this order, as plain commands (until `mise trust` every mise shim refuses, uv and just included):
 `mise trust --yes && mise install --locked` (the exact tools mise.toml pins, from mise.lock; ADR 0024), the stack's sync

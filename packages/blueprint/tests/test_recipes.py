@@ -193,3 +193,37 @@ def test_each_rule_is_denied_unless_exempted_with_a_reason(repo: Repo) -> None:
     exempt = '    networks: [front]\n    x-policy-exempt: {privileged: "the exporter reads host counters"}\n'
     repo.write("compose.yml", bad.replace("    networks: [front]\n", exempt))
     assert "privileged" not in _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root).stdout
+
+
+# a2kay's owner, 2026-10-12: a hook that cannot fail tells nothing. `bd dolt push` failed over HTTPS on an SSH-only box and
+# the pre-push hook still printed Passed.
+def _dolt_push_entry() -> str:
+    text = (RECIPES / RECIPE_FILES["hooks"]).read_text()
+    block = text[text.index("id: bd-dolt-push") :]
+    line = next(ln for ln in block.splitlines() if ln.strip().startswith("entry:"))
+    return line.split("entry:", 1)[1].strip()
+
+
+def _run_hook(repo: Repo, bd_exit: int, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    repo.fake_tool(repo.bin_dir / "bd", "")
+    (repo.bin_dir / "bd").write_text(f"#!/bin/sh\nexit {bd_exit}\n")
+    entry = _dolt_push_entry()
+    assert entry.startswith("sh -c '"), entry
+    script = entry.removeprefix("sh -c '").removesuffix("'")
+    return subprocess.run(["sh", "-c", script], env={**repo.env, **env}, capture_output=True, text=True, check=False)
+
+
+def test_a_failed_dolt_push_fails_the_push(repo: Repo) -> None:
+    result = _run_hook(repo, 1, {})
+    assert result.returncode != 0
+    assert "FAILED" in result.stderr
+
+
+def test_a_dolt_push_may_be_skipped_only_by_saying_so(repo: Repo) -> None:
+    result = _run_hook(repo, 1, {"BD_DOLT_PUSH_OPTIONAL": "1"})
+    assert result.returncode == 0
+    assert "FAILED" in result.stderr
+
+
+def test_a_good_dolt_push_passes(repo: Repo) -> None:
+    assert _run_hook(repo, 0, {}).returncode == 0
