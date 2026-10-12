@@ -228,32 +228,42 @@ def test_an_expired_override_excuses_nothing(repo: Repo) -> None:
     assert "privileged" in _test_with_data(repo).stdout
 
 
-def test_x_policy_exempt_is_denied_and_names_the_move(repo: Repo) -> None:
+def test_x_policy_exempt_still_excuses_and_warns_with_the_move(repo: Repo) -> None:
     _policy(repo)
     repo.write(
         "compose.yml",
-        _CLEAN_COMPOSE.replace("    networks: [front]\n", '    networks: [front]\n    x-policy-exempt: {privileged: "why"}\n'),
+        _CLEAN_COMPOSE.replace(
+            "    networks: [front]\n", '    networks: [front]\n    privileged: true\n    x-policy-exempt: {privileged: "why"}\n'
+        ),
     )
     repo.write(_OVERRIDES, "[settings]\nx = 1\n")
     out = _test_with_data(repo)
-    assert out.returncode == 1
+    assert out.returncode == 0, out.stdout
     assert "x-policy-exempt" in out.stdout
     assert 'id = "compose.privileged"' in out.stdout
     assert 'scope = "service:web"' in out.stdout
 
 
-def test_the_policy_runs_without_a_blueprint_toml(repo: Repo) -> None:
+def test_the_old_command_line_warns_and_still_judges(repo: Repo) -> None:
     _policy(repo)
     repo.write("compose.yml", _CLEAN_COMPOSE)
-    assert _conftest("test", "--combine", "--policy", "policy", "compose.yml", cwd=repo.root).returncode == 0
+    clean = _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root)
+    assert clean.returncode == 0
+    assert "--combine" in clean.stdout
+    repo.write("compose.yml", _BAD_COMPOSE)
+    assert _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root).returncode == 1
 
 
-def test_the_policy_refuses_to_pass_silently_without_combine(repo: Repo) -> None:
+def test_the_old_command_line_still_reads_a_top_level_exempt_block(repo: Repo) -> None:
     _policy(repo)
-    repo.write("compose.yml", _CLEAN_COMPOSE)
+    bad = (
+        _CLEAN_COMPOSE.replace('    ports: ["127.0.0.1:8080:80"]\n', "    privileged: true\n")
+        + 'x-policy-exempt: {web: {privileged: "why"}}\n'
+    )
+    repo.write("compose.yml", bad)
     out = _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root)
-    assert out.returncode == 1
-    assert "--combine" in out.stdout
+    assert out.returncode == 0, out.stdout
+    assert "compose.privileged" in out.stdout
 
 
 # a2kay's owner, 2026-10-12: a hook that cannot fail tells nothing. `bd dolt push` failed over HTTPS on an SSH-only box and

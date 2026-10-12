@@ -96,23 +96,27 @@ def test_an_expired_scoped_override_excuses_nothing(repo: Repo) -> None:
     assert _row(repo)[0] is Verdict.FAILING
 
 
-def test_a_lenient_marker_is_no_longer_honoured_and_names_the_override_to_write(repo: Repo) -> None:
+def _notices(repo: Repo) -> tuple[str, ...]:
+    return run(repo.root, concern="stack", env=repo.env).notices
+
+
+def test_a_lenient_marker_is_still_honoured_and_notices_the_override_to_write(repo: Repo) -> None:
     repo.write(
         "src/x/verbs.py",
         "import argparse\n"
         "pre = argparse.ArgumentParser(add_help=False)  # lenient: globals pre-parser; the rest goes to a strict parse_args\n"
         "known, rest = pre.parse_known_args()\n",
     )
-    verdict, evidence = _row(repo)
-    assert verdict is Verdict.FAILING
-    assert "move this to an [[override]] in docs/blueprint/blueprint.toml" in evidence
-    assert f'id = "{_ROW}"' in evidence
-    assert 'scope = "src/x/verbs.py:2"' in evidence
-    assert 'reason = "globals pre-parser; the rest goes to a strict parse_args"' in evidence
-    assert "expires = " in evidence
+    assert _row(repo)[0] is Verdict.PASSING
+    (notice,) = _notices(repo)
+    assert "move this to an [[override]] in docs/blueprint/blueprint.toml" in notice
+    assert f'id = "{_ROW}"' in notice
+    assert 'scope = "src/x/verbs.py"' in notice  # one whole-file scope, not one per line
+    assert 'reason = "globals pre-parser; the rest goes to a strict parse_args"' in notice
+    assert "expires = " in notice
 
 
-def test_a_marker_earlier_in_the_function_is_reported_for_each_line_it_covered(repo: Repo) -> None:
+def test_a_marker_covers_its_function_and_names_one_file_override(repo: Repo) -> None:
     repo.write(
         "tools/stack.py",
         "import argparse\n"
@@ -125,10 +129,16 @@ def test_a_marker_earlier_in_the_function_is_reported_for_each_line_it_covered(r
     )
     verdict, evidence = _row(repo)
     assert verdict is Verdict.FAILING
-    assert 'scope = "tools/stack.py:4"' in evidence
-    assert 'scope = "tools/stack.py:5"' in evidence
-    assert 'scope = "tools/stack.py:7"' not in evidence  # `other` carried no marker
-    assert "tools/stack.py:7" in evidence
+    assert evidence.endswith("tools/stack.py:7")
+    (notice,) = _notices(repo)
+    assert 'scope = "tools/stack.py"' in notice
+    assert "an SSH forced command" in notice
+
+
+def test_no_marker_no_notice(repo: Repo) -> None:
+    repo.write("src/x/cli.py", "import argparse\nargparse.ArgumentParser().parse_args()\n")
+    _row(repo)
+    assert _notices(repo) == ()
 
 
 def test_tests_may_parse_leniently(repo: Repo) -> None:

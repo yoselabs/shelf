@@ -45,9 +45,11 @@ test_no_override_means_no_exemption if {
 	count(deny) == 1 with input as files({"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "privileged": true, "networks": ["n"]}}, "networks": {"n": {}}}, [])
 }
 
-# x-policy-exempt is no longer read: it is denied, with the move.
-test_service_x_policy_exempt_is_denied_with_the_move if {
-	msgs := deny with input as files({"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "networks": ["n"], "x-policy-exempt": {"privileged": "why"}}}, "networks": {"n": {}}}, [])
+# x-policy-exempt still excuses (with a warning that names the move).
+test_service_x_policy_exempt_still_excuses_and_warns if {
+	doc := {"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "privileged": true, "networks": ["n"], "x-policy-exempt": {"privileged": "why"}}}, "networks": {"n": {}}}
+	count(deny) == 0 with input as files(doc, [])
+	msgs := warn with input as files(doc, [])
 	count(msgs) == 1
 	some m in msgs
 	contains(m, "x-policy-exempt")
@@ -56,31 +58,31 @@ test_service_x_policy_exempt_is_denied_with_the_move if {
 	contains(m, "service:a")
 }
 
-test_x_policy_exempt_no_longer_excuses if {
-	count(deny) == 2 with input as files({"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "privileged": true, "networks": ["n"], "x-policy-exempt": {"privileged": "why"}}}, "networks": {"n": {}}}, [])
-}
-
-test_top_level_x_policy_exempt_is_denied_with_the_move if {
-	msgs := deny with input as files({"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "networks": ["n"]}}, "networks": {"n": {}}, "x-policy-exempt": {"a": {"healthcheck": "why"}}}, [])
+test_top_level_x_policy_exempt_still_excuses_and_warns if {
+	doc := {"services": {"a": {"networks": ["n"]}}, "networks": {"n": {}}, "x-policy-exempt": {"a": {"healthcheck": "why"}}}
+	count(deny) == 0 with input as files(doc, [])
+	msgs := warn with input as files(doc, [])
 	count(msgs) == 1
 	some m in msgs
 	contains(m, "compose.healthcheck")
 	contains(m, "service:a")
 }
 
-test_undeclared_network_denied if {
-	count(deny) == 1 with input as files({"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "networks": ["ghost"]}}}, [])
+test_x_policy_exempt_needs_a_reason if {
+	count(deny) == 1 with input as files({"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "privileged": true, "networks": ["n"], "x-policy-exempt": {"privileged": " "}}}, "networks": {"n": {}}}, [])
 }
 
-test_missing_healthcheck_denied if {
-	count(deny) == 1 with input as files({"services": {"a": {"networks": ["n"]}}, "networks": {"n": {}}}, [])
-}
-
-test_without_combine_the_policy_says_so if {
-	msgs := deny with input as {"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "networks": ["n"]}}, "networks": {"n": {}}}
+test_without_combine_the_policy_warns_and_still_judges if {
+	doc := {"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "networks": ["n"], "privileged": true}}, "networks": {"n": {}}}
+	count(deny) == 1 with input as doc
+	msgs := warn with input as doc
 	count(msgs) == 1
 	some m in msgs
 	contains(m, "--combine")
+}
+
+test_without_combine_a_clean_file_passes if {
+	count(deny) == 0 with input as {"services": {"a": {"healthcheck": {"test": ["CMD", "true"]}, "networks": ["n"]}}, "networks": {"n": {}}}
 }
 
 test_an_expired_override_excuses_nothing if {

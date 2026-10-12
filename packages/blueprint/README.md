@@ -70,8 +70,8 @@ expires = 2027-04-01
 Excusing a file or folder from detection (`id = "detection"`) is also how to except a whole stack for it: a script kept out of detection is judged by no `stack.shell.*` row.
 
 Replaced shapes: `[[profile.ignore]]` still works and is reported with the `[[override]]` to write instead;
-`# lenient:` (cli-parse), `# strict: no -e` (shell strict mode) and the compose policy's `x-policy-exempt` are no
-longer honoured, and the failing row prints the override to paste. The compose policy reads this same file:
+`# lenient:` (cli-parse), `# strict: no -e` (shell strict mode) and the compose policy's `x-policy-exempt` still
+work for now, each reported (a notice, a conftest warning) with the override to paste; they will stop being honoured. The compose policy reads this same file:
 `conftest test --combine --policy policy docs/blueprint/blueprint.toml <compose files>` with ids `compose.<rule>`
 (`privileged`, `host_network`, `docker_socket`, `unbound_port`, `default_network`, `healthcheck`) and
 `scope = "service:<name>"`. A scoped override is only read by a check that asks for it (`Context.excused`).

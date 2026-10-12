@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 _STACKS = ("shell",)
 _SET = re.compile(r"^\s*set\s+(.+)$", re.MULTILINE)
 _LONG = {"errexit": "e", "nounset": "u", "pipefail": "pipefail"}
-# The old marker of a script meant to collect failures (a probe, a report): no longer honoured. Such a script is
-# excused by an [[override]] id = "stack.shell.strict-mode" scoped to its path, in docs/blueprint/blueprint.toml.
+# The old marker of a script meant to collect failures (a probe, a report): still honoured, with a notice. Such a script
+# is excused by an [[override]] id = "stack.shell.strict-mode" scoped to its path, in docs/blueprint/blueprint.toml.
 _MARKER = re.compile(r"#\s*strict:\s*no -e\b[\s,:;-]*(.*)")
 _ID = "stack.shell.strict-mode"
 _SHEBANG = re.compile(r"^#!\s*(?:/usr/bin/env\s+)?\S*?(bash|sh|dash)\b")
@@ -61,7 +61,6 @@ def _strict_mode(ctx: Context) -> Finding:
     judged = 0
     loose: list[str] = []
     excused: list[str] = []
-    moves: list[str] = []
     for rel in scripts:
         text = ctx.read(rel) or ""
         if _SHEBANG.match(text) is None:
@@ -72,17 +71,20 @@ def _strict_mode(ctx: Context) -> Finding:
         if (override := ctx.excused(_ID, rel)) is not None:
             excused.append(f"{rel} by override ({override.reason})")
             continue
-        loose.append(f"{rel} (no {', '.join(missing)})")
-        if marker := _MARKER.search(text):
+        if (marker := _MARKER.search(text)) and "-e" in missing:
             reason = marker.group(1).strip() or "<why this script runs on after a failure>"
-            moves.append(override_toml(_ID, rel, reason, expires=ctx.expiry_hint()))
+            toml = override_toml(_ID, rel, reason, expires=ctx.expiry_hint())
+            ctx.notices.append(
+                f"{rel} carries `# strict: no -e`, still honoured but the old shape: {MOVE}, then delete the comment:\n{toml}"
+            )
+            missing = [m for m in missing if m != "-e"]
+            excused.append(f"{rel} by an old `# strict: no -e` comment (see the notice)")
+        if missing:
+            loose.append(f"{rel} (no {', '.join(missing)})")
     if loose:
         shown = ", ".join(loose[:6]) + (f", and {len(loose) - 6} more" if len(loose) > 6 else "")
-        evidence = f"{len(loose)} of {judged} scripts not in strict mode: {shown}"
-        if moves:
-            evidence += f"; `# strict: no -e` is no longer honoured, {MOVE}:\n" + "\n\n".join(moves)
         return failing(
-            evidence,
+            f"{len(loose)} of {judged} scripts not in strict mode: {shown}",
             "`set -euo pipefail` after the header (a /bin/sh script: `set -eu`); a script that must run on after a failure "
             f'is excused by an [[override]] id = "{_ID}" with scope = "<script path>" in docs/blueprint/blueprint.toml',
         )

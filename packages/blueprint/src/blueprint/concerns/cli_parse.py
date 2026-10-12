@@ -6,7 +6,7 @@ shape (`bridge --help` would have started a relay). Strict parsing then caught `
 ruff's banned-api cannot see a method on an instance, so this row reads the source. A deliberate two-stage pre-parser
 (globals first, then a strict `parse_args` of the rest) says so with an `[[override]]` in docs/blueprint/blueprint.toml:
 this checkpoint's id, `scope` the file (or `file:line`), a reason. The old `# lenient: <reason>` comment is no longer
-honoured; where one is still found the evidence prints the override to write in its place.
+honoured yet: it still excuses, and the run reports a notice with the override to write in its place.
 """
 
 from __future__ import annotations
@@ -36,28 +36,35 @@ def _uses_python_uv(profile: Profile) -> bool:
     return "python-uv" in profile.stacks
 
 
-def _lenient(ctx: Context) -> tuple[list[str], list[tuple[str, Override]], list[str]] | None:
-    """The offenders (`path:line`), those a scoped override excuses, and the override text for each old marker found."""
+def _lenient(ctx: Context) -> tuple[list[str], list[tuple[str, Override | None]]] | None:
+    """The offenders (`path:line`), and those a scoped override or an old marker excuses (the override, None for a marker)."""
     listed = ctx.git("ls-files", "-z", "*.py")
     if listed is None:
         return None
     hits: list[str] = []
-    excused: list[tuple[str, Override]] = []
-    moves: list[str] = []
+    excused: list[tuple[str, Override | None]] = []
     for rel in sorted(filter(None, listed.split("\0"))):
         if _TESTS.search(rel) or is_skipped(rel, ctx.profile.ignore):
             continue
         text = ctx.read(rel) or ""
         lines = text.splitlines()
+        marker_reason: str | None = None
         for n in _lenient_lines(text):
             where = f"{rel}:{n}"
             if (override := ctx.excused(_ID, rel, n)) is not None:
                 excused.append((where, override))
                 continue
-            hits.append(where)
             if (reason := _marker_reason(lines, n)) is not None:
-                moves.append(override_toml(_ID, where, reason, expires=ctx.expiry_hint()))
-    return hits, excused, moves
+                marker_reason = marker_reason or reason
+                excused.append((where, None))
+            else:
+                hits.append(where)
+        if marker_reason is not None:
+            toml = override_toml(_ID, rel, marker_reason, expires=ctx.expiry_hint())
+            ctx.notices.append(
+                f"{rel} carries a `# lenient:` comment, still honoured but the old shape: {MOVE}, then delete the comment:\n{toml}"
+            )
+    return hits, excused
 
 
 def _lenient_lines(text: str) -> list[int]:
@@ -90,17 +97,16 @@ def _finding(ctx: Context) -> Finding:
     found = _lenient(ctx)
     if found is None:
         return not_checked("not a git repository")
-    hits, excused, moves = found
+    hits, excused = found
     if not hits:
-        used = "; ".join(f"{where} by override ({o.reason})" for where, o in excused)
+        used = "; ".join(
+            f"{where} by {f'override ({o.reason})' if o else 'an old `# lenient:` comment (see the notice)'}" for where, o in excused
+        )
         return passing(
             "no parse_known_args or add_help=False outside tests" + (f", or each one excused by an [[override]]: {used}" if excused else "")
         )
-    evidence = f"lenient parsing swallows unknown flags, --help included: {', '.join(hits)}"
-    if moves:
-        evidence += f"; `# lenient:` is no longer honoured, {MOVE}:\n" + "\n\n".join(moves)
     return failing(
-        evidence,
+        f"lenient parsing swallows unknown flags, --help included: {', '.join(hits)}",
         "use parse_args and keep add_help (ADR 0025: every command answers --help with its usage and changes nothing); "
         "only a two-stage pre-parser, whose rest goes to a parser that keeps --help, is excused: an [[override]] "
         f'id = "{_ID}" with scope = "<file>" (or "<file>:<line>") in docs/blueprint/blueprint.toml',

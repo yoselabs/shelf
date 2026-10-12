@@ -11,16 +11,23 @@
 #   reason = "reads host counters"
 #   decided_by = "owner"
 #   expires = 2027-04-01               # or adr = "NNNN"
-# An override past its `expires` excuses nothing. The old `x-policy-exempt` key is not read; it is denied, with the move.
+# An override past its `expires` excuses nothing.
+# Still honoured, with a warning that names the move: the old `x-policy-exempt` key (per service, or one top-level block
+# {<service>: {<rule>: "why"}}) with a non-blank reason, and a run without --combine (the old command line; no overrides
+# can be read then). Neither fails; both say what to change.
 package main
 
 import rego.v1
 
 is_blueprint(f) if endswith(f.path, "blueprint.toml")
 
-compose_files := [f | some f in input; not is_blueprint(f)]
+compose_files := [f | some f in input; not is_blueprint(f)] if is_array(input)
 
-overrides := [o | some f in input; is_blueprint(f); some o in f.contents.override]
+compose_files := [{"path": "compose", "contents": input}] if not is_array(input)
+
+overrides := [o | some f in input; is_blueprint(f); some o in f.contents.override] if is_array(input)
+
+overrides := [] if not is_array(input)
 
 # every (file, service name) pair
 services contains [f.path, name] if {
@@ -47,6 +54,17 @@ exempt(name, rule) if {
 	not lapsed(o)
 }
 
+# the old forms
+exempt(name, rule) if {
+	some f in compose_files
+	reasoned(f.contents.services[name]["x-policy-exempt"][rule])
+}
+
+exempt(name, rule) if {
+	some f in compose_files
+	reasoned(f.contents["x-policy-exempt"][name][rule])
+}
+
 reasoned(reason) if {
 	is_string(reason)
 	trim_space(reason) != ""
@@ -58,9 +76,9 @@ lapsed(o) if {
 	time.parse_ns("2006-01-02", substring(o.expires, 0, 10)) < time.now_ns()
 }
 
-deny contains msg if {
+warn contains msg if {
 	not is_array(input)
-	msg := "conftest ran without --combine: the policy reads docs/blueprint/blueprint.toml beside the compose files; run `conftest test --combine --policy policy docs/blueprint/blueprint.toml <compose files>`"
+	msg := "conftest ran without --combine, so docs/blueprint/blueprint.toml [[override]] entries are not read; run `conftest test --combine --policy policy docs/blueprint/blueprint.toml <compose files>`"
 }
 
 deny contains msg if {
@@ -161,14 +179,14 @@ exempt_health(name, _) if exempt(name, "healthcheck")
 
 exempt_health(_, s) if s.healthcheck.disable == true
 
-# x-policy-exempt (the old per-service and top-level exemption) is not read any more: one override format, one file.
-deny contains msg if {
+# x-policy-exempt (the old per-service and top-level exemption) still excuses, with a warning: one override format, one file.
+warn contains msg if {
 	some [path, name] in services
 	some rule, _ in svc(path, name)["x-policy-exempt"]
 	msg := moved(path, name, rule)
 }
 
-deny contains msg if {
+warn contains msg if {
 	some f in compose_files
 	some name, rules in f.contents["x-policy-exempt"]
 	is_object(rules)
@@ -176,4 +194,4 @@ deny contains msg if {
 	msg := moved(f.path, name, rule)
 }
 
-moved(path, name, rule) := sprintf("%s: service %q: x-policy-exempt is not read any more and excuses nothing; move it to docs/blueprint/blueprint.toml: [[override]] id = \"compose.%s\" scope = \"service:%s\" reason = \"...\" decided_by = \"owner\" expires = <date> (or adr = \"NNNN\")", [path, name, rule, name])
+moved(path, name, rule) := sprintf("%s: service %q: x-policy-exempt still excuses %s but is the old shape; move it to docs/blueprint/blueprint.toml: [[override]] id = \"compose.%s\" scope = \"service:%s\" reason = \"...\" decided_by = \"owner\" expires = <date> (or adr = \"NNNN\")", [path, name, rule, rule, name])

@@ -177,5 +177,5 @@ def run(
         problems=state.problems,
         skipped_audit=skipped,
         overrides=state.overrides,
-        notices=state.notices,
+        notices=(*state.notices, *ctx.notices),
     )

@@ -106,15 +106,23 @@ def test_an_unjustified_strict_override_excuses_nothing(repo: Repo) -> None:
     assert _strict(repo)[0] is Verdict.FAILING
 
 
-def test_a_strict_marker_is_no_longer_honoured_and_names_the_override_to_write(repo: Repo) -> None:
+def test_a_strict_marker_is_still_honoured_and_notices_the_override_to_write(repo: Repo) -> None:
     repo.write("tools/a.sh", _STRICT, executable=True)
     repo.write("tools/probe.sh", "#!/usr/bin/env bash\n# strict: no -e, reports every failing host\nset -uo pipefail\n", executable=True)
+    assert _strict(repo)[0] is Verdict.PASSING
+    (notice,) = run(repo.root, concern="stack", env=repo.env).notices
+    assert "move this to an [[override]] in docs/blueprint/blueprint.toml" in notice
+    assert 'id = "stack.shell.strict-mode"' in notice
+    assert 'scope = "tools/probe.sh"' in notice
+    assert 'reason = "reports every failing host"' in notice
+
+
+def test_a_strict_marker_still_needs_u_and_pipefail(repo: Repo) -> None:
+    repo.write("tools/a.sh", _STRICT, executable=True)
+    repo.write("tools/probe.sh", "#!/usr/bin/env bash\n# strict: no -e, probe\nset -u\n", executable=True)
     verdict, evidence = _strict(repo)
     assert verdict is Verdict.FAILING
-    assert "move this to an [[override]] in docs/blueprint/blueprint.toml" in evidence
-    assert 'id = "stack.shell.strict-mode"' in evidence
-    assert 'scope = "tools/probe.sh"' in evidence
-    assert 'reason = "reports every failing host"' in evidence
+    assert "tools/probe.sh (no pipefail)" in evidence
 
 
 def test_a_sourced_library_is_not_judged(repo: Repo) -> None:

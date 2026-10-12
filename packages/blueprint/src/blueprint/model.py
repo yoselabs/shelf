@@ -228,6 +228,8 @@ class Context:
     # Every [[override]] of docs/blueprint/blueprint.toml, and the day it is judged on (an expired one excuses nothing).
     overrides: tuple[Override, ...] = ()
     today: date | None = None
+    # Old shapes a check still honoured, each with the text that replaces it: reported, never failing (Run.notices).
+    notices: list[str] = field(default_factory=list)
 
     def excused(self, checkpoint_id: str, path: str | None = None, line: int | None = None, service: str | None = None) -> Override | None:
         """The justified, unexpired, scoped override that excuses this offender of `checkpoint_id`, or None.
