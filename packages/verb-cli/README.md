@@ -23,7 +23,8 @@ await read(**kwargs)
 - One flag per parameter; `self`, `*args` and `**kwargs` are skipped. `dest` is the
   parameter's own name, so the function is called by its real signature.
 - The flag is `Annotated[..., Field(alias=...)]`'s alias when present, else the parameter
-  name, `_` → `-` (`type_` → `--type`). `Field(description=...)` is the help.
+  name, `_` → `-` (`type_` → `--type`). `Field(description=...)` is the help; without one the help is a type label (`text`,
+  `integer`, `number`, `path`, `true or false`, `JSON object`, `JSON array`, `JSON value`).
 - `T | None` is `T`. Required is "has no default".
 - `bool` → a paired `--flag/--no-flag`. `int`, `float`, `Path` are converted; `str` and
   any other scalar stay text.
@@ -34,3 +35,10 @@ await read(**kwargs)
 
 Metadata is read by duck typing (`alias`, `description`, `model_validate`): stdlib only,
 pydantic optional.
+
+## Testing the --help tree
+
+`verb_cli.testing.assert_help_tree(parser)` walks `--help` on the parser and every subcommand
+(exit 0, a description between usage and arguments, no option or positional without help, every
+subcommand listed with text). A subparser added with `help=None` is left out of argparse's listing,
+so give `add_parser` both `help=` and `description=` (ADR 0025). Stdlib only.

@@ -26,8 +26,15 @@ A CLI is how agents use software, so its surface is a contract:
   `stack.python-uv.cli-parse` scoped to its file (ADR 0026).
 - A script run directly (`uv run tools/x.py`, a `__main__` block that parses arguments) counts as a command: it
   answers `--help` too, so an agent can read what it does before running it.
+- Every command and subcommand has a description, and every flag and positional has help text. With argparse,
+  `add_subparsers().add_parser(name)` with `help=None` (the default) leaves that subcommand out of the parent's
+  listing, so it looks absent; give `add_parser` both `help=` (the listing line) and `description=` (the body of its
+  own `--help`). A parameter with no stated purpose still shows a type label.
 - Each console script has a test that runs it with `--help` (exit 0, usage printed, nothing changed) and with an
   unknown flag (refused).
+
+A test walks the whole tree (`verb_cli.testing.assert_help_tree`): exit 0, a description between usage and
+arguments, no option or positional without help, every leaf command listed with text.
 
 Exceptions, named per repo with a reason: programs without a command line (a Windows GUI app, a Unity or Godot game).
 
@@ -52,3 +59,6 @@ did not know; five sibling commands had the same shape, and strict parsing then 
 - 2026-10-12: accepted by the owner as a rule for every CLI ("every CLI should have --help"; a command that starts or
   mutates on its own is a bug), homelab's refusing parser included; the waiver narrowed to a pre-parser, and the
   cli-help-tested row added.
+- 2026-10-12: a2kay 3fafcbf found the `help=None` subparser trap (argparse omits it from its parent's listing);
+  amended with the description rule, and shelf-knp lifted a2kay's tree walk into `verb_cli.testing` and made
+  verb-cli show a type label for a parameter with no description.

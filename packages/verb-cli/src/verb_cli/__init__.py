@@ -1,7 +1,7 @@
 """A function signature becomes CLI flags, and parsed flags become its keyword arguments.
 
 - :func:`flags_of` reads one :class:`FlagSpec` per parameter: ``Annotated[..., Field(alias=)]``
-  names the flag, ``Field(description=)`` is the help, ``T | None`` is ``T``, and a type
+  names the flag, ``Field(description=)`` is the help (else a type label such as ``text``), ``T | None`` is ``T``, and a type
   outside the scalars (``str``, ``int``, ``float``, ``bool``, ``Path``) is one JSON flag.
 - :func:`to_argparse` adds the flags to a parser; ``bool`` is a paired ``--flag/--no-flag``.
 - :func:`kwargs_of` turns the parsed namespace into keyword arguments, decoding JSON flags
@@ -27,6 +27,15 @@ if TYPE_CHECKING:
 
 _SCALAR_TYPES = (str, int, float, bool, Path)
 _CONVERTED = (int, float, Path)
+_LABELS: tuple[tuple[type, str], ...] = (
+    (bool, "true or false"),
+    (Path, "path"),
+    (int, "integer"),
+    (float, "number"),
+    (str, "text"),
+    ((list, tuple, set, frozenset), "JSON array"),  # type: ignore[arg-type]
+    (dict, "JSON object"),
+)
 
 
 class VerbCliError(Exception):
@@ -64,6 +73,17 @@ def _strip_optional(ann: Any) -> Any:
     return ann
 
 
+def _type_label(base: Any) -> str:
+    """The help of a parameter with no description: what kind of value the flag takes."""
+    origin = typing.get_origin(base) or base
+    if not isinstance(origin, type):
+        return "JSON value"
+    for kind, label in _LABELS:  # bool before int: bool is an int
+        if issubclass(origin, kind):
+            return label
+    return "JSON object" if hasattr(origin, "model_validate") else "JSON value"
+
+
 def _analyze(pname: str, ann: Any) -> tuple[str, Any, bool, str | None]:
     """One parameter → ``(flag, base type, needs JSON, help)``."""
     alias: str | None = None
@@ -74,6 +94,7 @@ def _analyze(pname: str, ann: Any) -> tuple[str, Any, bool, str | None]:
             help_text = help_text or getattr(meta, "description", None)
         ann = ann.__origin__
     base = _strip_optional(ann)
+    help_text = help_text or _type_label(base)
     flag = f"--{(alias or pname).replace('_', '-')}"
     is_scalar = isinstance(base, type) and issubclass(base, _SCALAR_TYPES)
     return flag, base, not is_scalar, help_text
@@ -115,7 +136,7 @@ def to_argparse(parser: argparse.ArgumentParser, specs: list[FlagSpec]) -> None:
         elif spec.needs_json:
             # No default here: a flag left out is left out of the call, so the function's
             # own default applies, and a default is never decoded as JSON.
-            parser.add_argument(spec.flag, dest=spec.dest, default=None, required=spec.required, help=spec.help or "a JSON value")
+            parser.add_argument(spec.flag, dest=spec.dest, default=None, required=spec.required, help=spec.help)
         else:
             convert = spec.base if spec.base in _CONVERTED else str
             parser.add_argument(spec.flag, dest=spec.dest, type=convert, default=spec.default, required=spec.required, help=spec.help)

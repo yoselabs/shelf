@@ -38,8 +38,8 @@ def test_the_alias_names_the_flag_and_the_description_is_the_help() -> None:
     specs = flags_of(_Router().read)
     assert [(s.dest, s.flag, s.required, s.help) for s in specs] == [
         ("type_", "--type", True, "the kind"),
-        ("id_", "--id", True, None),
-        ("where", "--where", False, None),
+        ("id_", "--id", True, "text"),
+        ("where", "--where", False, "JSON object"),
     ]
 
 
@@ -101,3 +101,42 @@ def test_an_unannotated_parameter_is_text() -> None:
         ...
 
     assert _parse(sample, ["--name", "x"]) == {"name": "x", "count": 1}
+
+
+class _Doc(BaseModel):
+    a: int
+
+
+def _typed(  # noqa: PLR0917
+    name: str,
+    count: int,
+    ratio: float,
+    where: Path,
+    flag: bool,
+    doc: _Doc,
+    items: list[str],
+    mode: Literal["a", "b"],
+    *,
+    note: Annotated[str, Field(description="given")] = "",
+) -> None: ...
+
+
+def test_a_param_without_a_description_shows_its_type_label() -> None:
+    helps = {s.dest: s.help for s in flags_of(_typed)}
+    assert helps == {
+        "name": "text",
+        "count": "integer",
+        "ratio": "number",
+        "where": "path",
+        "flag": "true or false",
+        "doc": "JSON object",
+        "items": "JSON array",
+        "mode": "JSON value",
+        "note": "given",
+    }
+
+
+def test_every_flag_of_a_parser_has_help_text() -> None:
+    parser = argparse.ArgumentParser()
+    to_argparse(parser, flags_of(_typed))
+    assert all(a.help for a in parser._actions if a.dest != "help")
