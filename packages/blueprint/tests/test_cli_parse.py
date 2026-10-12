@@ -34,38 +34,106 @@ def test_lenient_parsing_fails_and_names_the_line(repo: Repo) -> None:
     assert "src/x/serve.py:3" in evidence
 
 
-def test_a_waived_two_stage_pre_parser_passes(repo: Repo) -> None:
+_PRE = "import argparse\npre = argparse.ArgumentParser(add_help=False)\nknown, rest = pre.parse_known_args()\n"
+
+
+def _override(repo: Repo, scope: str, extra: str = "expires = 2099-01-01\n") -> None:
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        f'[[override]]\nid = "{_ROW}"\nscope = "{scope}"\nreason = "globals pre-parser; the rest goes to a strict parse_args"\n{extra}',
+    )
+
+
+def test_a_scoped_override_excuses_a_two_stage_pre_parser(repo: Repo) -> None:
+    repo.write("src/x/verbs.py", _PRE)
+    _override(repo, "src/x/verbs.py")
+    verdict, evidence = _row(repo)
+    assert verdict is Verdict.PASSING
+    assert "override" in evidence
+    assert "globals pre-parser" in evidence
+
+
+def test_a_scoped_override_excuses_only_its_path(repo: Repo) -> None:
+    repo.write("src/x/verbs.py", _PRE)
+    repo.write("src/x/serve.py", _PRE)
+    _override(repo, "src/x/verbs.py")
+    verdict, evidence = _row(repo)
+    assert verdict is Verdict.FAILING
+    assert "src/x/serve.py:2" in evidence
+    assert "src/x/verbs.py" not in evidence
+
+
+def test_a_path_and_line_scope_excuses_that_line_only(repo: Repo) -> None:
+    repo.write("src/x/verbs.py", _PRE)
+    _override(repo, "src/x/verbs.py:2")
+    verdict, evidence = _row(repo)
+    assert verdict is Verdict.FAILING
+    assert evidence.count("src/x/verbs.py:3") == 1
+    assert "src/x/verbs.py:2," not in evidence
+
+
+def test_a_glob_scope_covers_the_files_it_matches(repo: Repo) -> None:
+    repo.write("tools/a.py", _PRE)
+    repo.write("tools/b.py", _PRE)
+    _override(repo, "tools/*.py")
+    assert _row(repo)[0] is Verdict.PASSING
+
+
+def test_an_unjustified_scoped_override_excuses_nothing(repo: Repo) -> None:
+    repo.write("src/x/verbs.py", _PRE)
+    _override(repo, "src/x/verbs.py", extra="")  # no expires, no adr
+    assert _row(repo)[0] is Verdict.FAILING
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        f'[[override]]\nid = "{_ROW}"\nscope = "src/x/verbs.py"\nreason = " "\nexpires = 2099-01-01\n',
+    )
+    assert _row(repo)[0] is Verdict.FAILING
+
+
+def test_an_expired_scoped_override_excuses_nothing(repo: Repo) -> None:
+    repo.write("src/x/verbs.py", _PRE)
+    _override(repo, "src/x/verbs.py", extra="expires = 2020-01-01\n")
+    assert _row(repo)[0] is Verdict.FAILING
+
+
+def test_a_lenient_marker_is_no_longer_honoured_and_names_the_override_to_write(repo: Repo) -> None:
     repo.write(
         "src/x/verbs.py",
         "import argparse\n"
         "pre = argparse.ArgumentParser(add_help=False)  # lenient: globals pre-parser; the rest goes to a strict parse_args\n"
-        "# lenient: globals pre-parser, see above\n"
         "known, rest = pre.parse_known_args()\n",
     )
-    assert _row(repo)[0] is Verdict.PASSING
+    verdict, evidence = _row(repo)
+    assert verdict is Verdict.FAILING
+    assert "move this to an [[override]] in docs/blueprint/blueprint.toml" in evidence
+    assert f'id = "{_ROW}"' in evidence
+    assert 'scope = "src/x/verbs.py:2"' in evidence
+    assert 'reason = "globals pre-parser; the rest goes to a strict parse_args"' in evidence
+    assert "expires = " in evidence
 
 
-def test_tests_may_parse_leniently(repo: Repo) -> None:
-    repo.write("tests/test_cli.py", "import argparse\nargparse.ArgumentParser().parse_known_args([])\n")
-    assert _row(repo)[0] is Verdict.PASSING
-
-
-def test_one_waiver_covers_the_rest_of_its_function_and_no_further(repo: Repo) -> None:
+def test_a_marker_earlier_in_the_function_is_reported_for_each_line_it_covered(repo: Repo) -> None:
     repo.write(
         "tools/stack.py",
         "import argparse\n"
         "def parse(argv):\n"
-        "    # lenient: an SSH forced command; leftovers are refused below, --help would only echo usage to the client\n"
+        "    # lenient: an SSH forced command\n"
         "    p = argparse.ArgumentParser(add_help=False)\n"
-        "    sub = p.add_subparsers()\n"
-        "    sub.add_parser('deploy', add_help=False)\n"
         "    ns, extra = p.parse_known_args(argv)\n"
         "def other(argv):\n"
         "    return argparse.ArgumentParser().parse_known_args(argv)\n",
     )
     verdict, evidence = _row(repo)
     assert verdict is Verdict.FAILING
-    assert evidence.endswith("tools/stack.py:9")
+    assert 'scope = "tools/stack.py:4"' in evidence
+    assert 'scope = "tools/stack.py:5"' in evidence
+    assert 'scope = "tools/stack.py:7"' not in evidence  # `other` carried no marker
+    assert "tools/stack.py:7" in evidence
+
+
+def test_tests_may_parse_leniently(repo: Repo) -> None:
+    repo.write("tests/test_cli.py", "import argparse\nargparse.ArgumentParser().parse_known_args([])\n")
+    assert _row(repo)[0] is Verdict.PASSING
 
 
 def test_a_docstring_or_comment_naming_the_pattern_is_not_parsing(repo: Repo) -> None:

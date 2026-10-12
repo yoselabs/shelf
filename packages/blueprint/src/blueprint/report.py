@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import tomllib
+from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,8 +17,6 @@ from blueprint.profile import STATE_DIR
 from blueprint.runner import ACCEPTED, active
 
 if TYPE_CHECKING:
-    from datetime import date
-
     from blueprint.runner import Row, Run
 
 _MARK = {Verdict.PASSING: "✅", Verdict.NOT_CHECKED: "🔒", Verdict.NOT_APPLICABLE: "-"}
@@ -108,6 +107,25 @@ def _header(run: Run) -> str:
     )
 
 
+def overrides_section(run: Run, today: date | None = None) -> str:
+    """Every override the repo records, scoped or not: what is excused, by whom, for how long. First in every report."""
+    day = today or date.today()  # noqa: DTZ011 -- override expiry is a calendar date in the owner's zone
+    lines = ["## Overrides", ""]
+    if not run.overrides:
+        lines.append("none")
+    for o in run.overrides:
+        scope = f" scope `{o.scope}`" if o.scope else " (whole checkpoint)"
+        status = o.problem(day)
+        lines.append(
+            f"- `{o.id}`{scope}: {o.reason.strip() or 'no reason'} · decided by {o.decided_by} · {o.lasts}"
+            + (f" · not counted: {status}" if status else "")
+        )
+    for notice in run.notices:
+        head, _, toml = notice.partition("\n")
+        lines += ["", f"⚠️ {head}", "", "```toml", toml, "```"]
+    return "\n".join(lines)
+
+
 LAYER_TITLES = {"generic": "Generic: any repo", "stack": "Stack-specific", "framework": "Framework-specific", "agent": "Agent harness"}
 
 
@@ -137,7 +155,16 @@ def summary(run: Run) -> str:
 
 def markdown(run: Run) -> str:
     """The whole run: the summary, then one table per concern under its layer."""
-    out = [_header(run), "", "## Facts and evidence", "", *facts.lines(run.profile.facts, run.profile.evidence), ""]
+    out = [
+        _header(run),
+        "",
+        overrides_section(run),
+        "",
+        "## Facts and evidence",
+        "",
+        *facts.lines(run.profile.facts, run.profile.evidence),
+        "",
+    ]
     out += [f"⚠️ {p}" for p in run.problems]
     out += [summary(run), ""]
     last_layer = ""
@@ -152,6 +179,7 @@ def markdown(run: Run) -> str:
 def gate(run: Run) -> str:
     """The `just blueprint` form: one line per checkpoint that is not passing."""
     lines = [f"blueprint: {p}" for p in run.problems]
+    lines += [f"blueprint: warning: {n}" for n in run.notices]
     lines += [
         f"blueprint: {'🆕' if r.new else mark(r)} {r.id} -- {r.verdict}"
         + (" (new since the last audit: warns until /blueprint runs)" if r.new else "")
@@ -171,6 +199,8 @@ def as_json(run: Run) -> str:
     return json.dumps(
         {
             "profile": {"kind": p.kind, "surfaces": p.surfaces, "traits": p.traits, "stacks": p.stacks, "tracker": p.tracker},
+            "overrides": [o.as_dict() for o in run.overrides],
+            "notices": run.notices,
             "facts_and_evidence": facts.as_dict(p.facts, p.evidence),
             "set_hash": run.set_hash,
             "problems": run.problems,
@@ -211,7 +241,7 @@ def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path
     # not know (homelab's tools/generate.py did).
     stamp = f"{_STAMP_OPENING}{today.isoformat()}; rewritten on every run."
     index = out_dir / "README.md"
-    index.write_text(f"# Blueprint\n\n{stamp}\n\n{_header(run)}\n\n{summary(run)}\n")
+    index.write_text(f"# Blueprint\n\n{stamp}\n\n{_header(run)}\n\n{overrides_section(run, today)}\n\n{summary(run)}\n")
     written = [index]
     # The audit record: what the gate enforces until the next audit (runner.ACCEPTED).
     accepted = repo / ACCEPTED
@@ -220,7 +250,8 @@ def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path
     for layer, concern in _concerns(run):
         rows = [r for r in run.rows if r.concern == concern]
         path = out_dir / f"{concern.replace('/', '-')}.md"
-        path.write_text(f"# Blueprint: {concern} ({LAYER_TITLES.get(layer, layer)})\n\n{stamp}\n\n{_header(run)}\n\n{table(rows)}\n")
+        title = f"# Blueprint: {concern} ({LAYER_TITLES.get(layer, layer)})"
+        path.write_text(f"{title}\n\n{stamp}\n\n{_header(run)}\n\n{overrides_section(run, today)}\n\n{table(rows)}\n")
         written.append(path)
     if prune:
         for stale in sorted(set(out_dir.glob("*.md")) - set(written)):

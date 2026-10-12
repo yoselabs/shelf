@@ -42,21 +42,40 @@ traits = ["stores-data"]
 [profile.frameworks]      # overrides detection: framework -> its folder
 godot = "src/Game.Godot"
 
-[[profile.ignore]]        # a throwaway or vendored path: stack detection and role globs skip it
-path = "prototype"
-reason = "throwaway spikes bind nothing"
-expires = 2027-04-01      # or adr = "NNNN"
-
 [settings]
 clean-clone-seconds = 120 # gate.clean-clone's budget
 
+# Every exception to a checkpoint is one [[override]] (ADR 0026); nothing else excuses a row.
 [[override]]              # counts as passing while it is justified
-id = "gate.ci"
-code = "not-applicable"   # test-data | remediated | not-applicable | not-supported | not-detected
+id = "gate.ci"            # a checkpoint id (`blueprint checkpoints`)
 reason = "builds and the gate run on the owner's machines"
+decided_by = "owner"      # owner | agent (default agent); shown in the report
 adr = "0003"              # an accepted ADR in docs/adr/ records the durable decision; no expiry needed
 # expires = 2027-04-01    # a temporary exception instead of adr
+# code = "not-applicable" # optional, legacy: test-data | remediated | not-applicable | not-supported | not-detected
+
+[[override]]              # with a scope the check still runs; only the offenders the scope names are dropped
+id = "stack.python-uv.cli-parse"
+scope = "tools/verbs.py:12"   # a path glob, "path:line", or "service:<compose service>"
+reason = "globals pre-parser; the rest goes to a strict parse_args"
+expires = 2027-04-01
+
+[[override]]              # a throwaway or vendored path: stack detection and role globs skip it
+id = "detection"
+scope = "prototype"
+reason = "throwaway spikes bind nothing"
+expires = 2027-04-01
 ```
+
+Excusing a file or folder from detection (`id = "detection"`) is also how to except a whole stack for it: a script kept out of detection is judged by no `stack.shell.*` row.
+
+Replaced shapes: `[[profile.ignore]]` still works and is reported with the `[[override]]` to write instead;
+`# lenient:` (cli-parse), `# strict: no -e` (shell strict mode) and the compose policy's `x-policy-exempt` are no
+longer honoured, and the failing row prints the override to paste. The compose policy reads this same file:
+`conftest test --combine --policy policy docs/blueprint/blueprint.toml <compose files>` with ids `compose.<rule>`
+(`privileged`, `host_network`, `docker_socket`, `unbound_port`, `default_network`, `healthcheck`) and
+`scope = "service:<name>"`. A scoped override is only read by a check that asks for it (`Context.excused`).
+Every report starts, after its header, with the list of all overrides (id, scope, reason, decided by, expiry or ADR).
 
 **Every exception is justified** ([ADR 0022](../../docs/adr/0022-every-exception-is-justified.md)): a non-empty
 `reason`, and either `expires` or `adr`. An `adr` must name an accepted ADR in `docs/adr/`; one that is missing,

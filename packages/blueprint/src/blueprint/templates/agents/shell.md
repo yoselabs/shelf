@@ -19,7 +19,7 @@ Both tools are pinned in `mise.toml`.
 | rule | why |
 |---|---|
 | `set -euo pipefail` on the line after the header comment | A failed command, an unset variable or a failed pipe stops the script, not the next step |
-| A script that must run on after a failure (a probe, a report) keeps `-u` and `pipefail` and says `# strict: no -e, <reason>` | The engine accepts the waiver only with a reason |
+| A script that must run on after a failure (a probe, a report) keeps `-u` and `pipefail` and is excused by an `[[override]]` (`id = "stack.shell.strict-mode"`, `scope` = the script path, a reason, `expires` or `adr`) in `docs/blueprint/blueprint.toml`; the old `# strict: no -e` comment is not honoured | One override format for every exception; the engine accepts it only with a reason |
 | Quote every expansion: `"$var"`, `"$@"`; `rm -rf "${dir:?}"/*` | Word splitting and an empty variable turn a delete into `rm -rf /*` |
 | A library meant to be sourced is not executable (mode 644) and sets no modes | The caller owns the modes |
 | `#!/usr/bin/env bash` for bash; bash 4+ features only if the header says so | macOS ships bash 3.2 |

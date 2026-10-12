@@ -177,22 +177,83 @@ def test_the_compose_policy_passes_its_own_unit_tests(repo: Repo) -> None:
 def test_a_clean_compose_file_passes_the_policy(repo: Repo) -> None:
     _policy(repo)
     repo.write("compose.yml", _CLEAN_COMPOSE)
-    result = _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root)
+    result = _conftest("test", "--combine", "--policy", "policy", "compose.yml", cwd=repo.root)
     assert result.returncode == 0, result.stdout
 
 
-def test_each_rule_is_denied_unless_exempted_with_a_reason(repo: Repo) -> None:
+_BAD_COMPOSE = _CLEAN_COMPOSE.replace('    ports: ["127.0.0.1:8080:80"]\n', '    ports: ["8080:80"]\n    privileged: true\n').replace(
+    '    healthcheck: {test: ["CMD", "true"]}\n', "    volumes: [/var/run/docker.sock:/var/run/docker.sock]\n"
+)
+_OVERRIDES = "docs/blueprint/blueprint.toml"
+
+
+def _override_toml(rule: str, service: str, reason: str = "the exporter reads host counters") -> str:
+    return f'[[override]]\nid = "compose.{rule}"\nscope = "service:{service}"\nreason = "{reason}"\nexpires = 2099-01-01\n'
+
+
+def _test_with_data(repo: Repo) -> subprocess.CompletedProcess[str]:
+    return _conftest("test", "--combine", "--policy", "policy", _OVERRIDES, "compose.yml", cwd=repo.root)
+
+
+def test_each_rule_is_denied_unless_an_override_excuses_it_with_a_reason(repo: Repo) -> None:
     _policy(repo)
-    bad = _CLEAN_COMPOSE.replace('    ports: ["127.0.0.1:8080:80"]\n', '    ports: ["8080:80"]\n    privileged: true\n')
-    bad = bad.replace('    healthcheck: {test: ["CMD", "true"]}\n', "    volumes: [/var/run/docker.sock:/var/run/docker.sock]\n")
-    repo.write("compose.yml", bad)
-    out = _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root)
+    repo.write("compose.yml", _BAD_COMPOSE)
+    repo.write(_OVERRIDES, "[settings]\nx = 1\n")
+    out = _test_with_data(repo)
     assert out.returncode == 1
     for rule in ("privileged", "docker socket", "every interface", "no healthcheck"):
         assert rule in out.stdout, rule
-    exempt = '    networks: [front]\n    x-policy-exempt: {privileged: "the exporter reads host counters"}\n'
-    repo.write("compose.yml", bad.replace("    networks: [front]\n", exempt))
-    assert "privileged" not in _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root).stdout
+    repo.write(_OVERRIDES, _override_toml("privileged", "web"))
+    assert "privileged" not in _test_with_data(repo).stdout
+
+
+def test_an_override_for_another_service_or_rule_excuses_nothing(repo: Repo) -> None:
+    _policy(repo)
+    repo.write("compose.yml", _BAD_COMPOSE)
+    repo.write(_OVERRIDES, _override_toml("privileged", "db") + _override_toml("host_network", "web"))
+    assert "privileged" in _test_with_data(repo).stdout
+
+
+def test_an_override_with_a_blank_reason_excuses_nothing(repo: Repo) -> None:
+    _policy(repo)
+    repo.write("compose.yml", _BAD_COMPOSE)
+    repo.write(_OVERRIDES, _override_toml("privileged", "web", reason=" "))
+    assert "privileged" in _test_with_data(repo).stdout
+
+
+def test_an_expired_override_excuses_nothing(repo: Repo) -> None:
+    _policy(repo)
+    repo.write("compose.yml", _BAD_COMPOSE)
+    repo.write(_OVERRIDES, _override_toml("privileged", "web").replace("2099-01-01", "2020-01-01"))
+    assert "privileged" in _test_with_data(repo).stdout
+
+
+def test_x_policy_exempt_is_denied_and_names_the_move(repo: Repo) -> None:
+    _policy(repo)
+    repo.write(
+        "compose.yml",
+        _CLEAN_COMPOSE.replace("    networks: [front]\n", '    networks: [front]\n    x-policy-exempt: {privileged: "why"}\n'),
+    )
+    repo.write(_OVERRIDES, "[settings]\nx = 1\n")
+    out = _test_with_data(repo)
+    assert out.returncode == 1
+    assert "x-policy-exempt" in out.stdout
+    assert 'id = "compose.privileged"' in out.stdout
+    assert 'scope = "service:web"' in out.stdout
+
+
+def test_the_policy_runs_without_a_blueprint_toml(repo: Repo) -> None:
+    _policy(repo)
+    repo.write("compose.yml", _CLEAN_COMPOSE)
+    assert _conftest("test", "--combine", "--policy", "policy", "compose.yml", cwd=repo.root).returncode == 0
+
+
+def test_the_policy_refuses_to_pass_silently_without_combine(repo: Repo) -> None:
+    _policy(repo)
+    repo.write("compose.yml", _CLEAN_COMPOSE)
+    out = _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root)
+    assert out.returncode == 1
+    assert "--combine" in out.stdout
 
 
 # a2kay's owner, 2026-10-12: a hook that cannot fail tells nothing. `bd dolt push` failed over HTTPS on an SSH-only box and

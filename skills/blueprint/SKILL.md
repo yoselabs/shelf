@@ -75,8 +75,13 @@ The owner's one yes covers the whole plan. Per concern, in layer order (generic,
 - A row right to leave failing becomes an override in `docs/blueprint/blueprint.toml` only with the
   owner's yes. Every exception is justified: a reason, and either `expires` (temporary) or
   `adr = "NNNN"` naming the accepted ADR that records the durable decision (no CI, builds on the
-  owner's machines). A path detection must skip (a throwaway spike) is a `[[profile.ignore]]` entry
-  under the same rule. Rows still not ✅ at the end become beads.
+  owner's machines). **Every exception is this one `[[override]]` table**: `id` (a checkpoint id), optional `scope`
+  (a path glob, `path:line`, or `service:<compose service>`: the check still runs and drops only what the scope
+  names), `reason`, `decided_by` (`owner` or `agent`), and `expires` or `adr`. A path detection must skip (a
+  throwaway spike) is the same table with `id = "detection"` and `scope` = the path (the old `[[profile.ignore]]`,
+  `# lenient:`, `# strict: no -e` and `x-policy-exempt` are no longer honoured: the report prints the override to
+  write in their place). A linter's own suppression (`# noqa`, hadolint `ignored:`, `# shellcheck disable`) stays
+  where the linter reads it. Every report lists all overrides first. Rows still not ✅ at the end become beads.
 - `blueprint checkpoints [id-prefix] [--json]` lists every checkpoint id, its statement and the fact that turns it on: read it before writing an override or declaring a missed fact.
 - Finish with the repo's own `just check` green and `--write` again.
 

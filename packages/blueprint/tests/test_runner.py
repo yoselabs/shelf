@@ -319,6 +319,135 @@ def test_an_unjustified_ignore_is_a_problem_and_ignores_nothing(repo: Repo, fiel
     assert any("ignore" in p and named in p for p in result.problems), result.problems
 
 
+def test_an_override_needs_no_code_and_decided_by_defaults_to_agent(repo: Repo, red_check: None) -> None:
+    repo.write("docs/blueprint/blueprint.toml", '[[override]]\nid = "scratch.red"\nreason = "r"\nexpires = 2099-01-01\n')
+    result = run(repo.root, concern="scratch", env=repo.env)
+    assert result.rows[0].verdict is Verdict.PASSING
+    assert result.problems == ()
+    assert [(o.id, o.decided_by) for o in result.overrides] == [("scratch.red", "agent")]
+
+
+def test_a_scoped_override_leaves_the_row_to_its_check(repo: Repo, red_check: None) -> None:
+    repo.write(
+        "docs/blueprint/blueprint.toml", '[[override]]\nid = "scratch.red"\nscope = "src/x.py"\nreason = "r"\nexpires = 2099-01-01\n'
+    )
+    assert run(repo.root, concern="scratch", env=repo.env).rows[0].verdict is Verdict.FAILING
+
+
+@pytest.mark.parametrize(
+    ("fields", "named"), [("expires = 2099-01-01", "reason"), ('reason = " "\nexpires = 2099-01-01', "reason"), ('reason = "r"', "expires")]
+)
+def test_a_scoped_override_is_justified_like_any_other(repo: Repo, red_check: None, fields: str, named: str) -> None:
+    repo.write("docs/blueprint/blueprint.toml", f'[[override]]\nid = "scratch.red"\nscope = "src/x.py"\n{fields}\n')
+    result = run(repo.root, concern="scratch", env=repo.env)
+    assert any(named in p for p in result.problems), result.problems
+    assert result.exit_code == 1
+
+
+def test_an_unknown_decided_by_is_a_problem(repo: Repo, red_check: None) -> None:
+    repo.write(
+        "docs/blueprint/blueprint.toml", '[[override]]\nid = "scratch.red"\nreason = "r"\nexpires = 2099-01-01\ndecided_by = "bot"\n'
+    )
+    assert any("decided_by" in p for p in run(repo.root, concern="scratch", env=repo.env).problems)
+
+
+def _detection(repo: Repo, fields: str) -> None:
+    repo.write("docs/blueprint/blueprint.toml", f'[[override]]\nid = "detection"\nscope = "prototype"\n{fields}\n')
+    repo.write("prototype/spike/Spike.csproj", "<Project/>")
+
+
+def test_a_detection_override_skips_its_path(repo: Repo) -> None:
+    _detection(repo, 'reason = "throwaway spikes bind nothing"\nexpires = 2099-01-01')
+    result = run(repo.root, env=repo.env)
+    assert result.profile.stacks == ()
+    assert result.problems == ()
+    assert result.notices == ()
+
+
+@pytest.mark.parametrize(("fields", "named"), [("expires = 2099-01-01", "reason"), ('reason = "r"', "expires")])
+def test_an_unjustified_detection_override_skips_nothing(repo: Repo, fields: str, named: str) -> None:
+    _detection(repo, fields)
+    result = run(repo.root, env=repo.env)
+    assert result.profile.stacks == ("dotnet",)
+    assert any(named in p for p in result.problems), result.problems
+
+
+def test_a_detection_override_needs_a_scope(repo: Repo) -> None:
+    repo.write("docs/blueprint/blueprint.toml", '[[override]]\nid = "detection"\nreason = "r"\nexpires = 2099-01-01\n')
+    assert any("scope" in p for p in run(repo.root, env=repo.env).problems)
+
+
+def test_an_old_ignore_still_works_and_is_reported_with_its_replacement(repo: Repo) -> None:
+    _ignore(repo, 'reason = "throwaway spikes bind nothing"\nexpires = 2099-01-01')
+    result = run(repo.root, env=repo.env)
+    assert result.profile.stacks == ()
+    assert result.problems == ()
+    (notice,) = result.notices
+    assert "[[profile.ignore]]" in notice
+    assert "move it to an [[override]] in docs/blueprint/blueprint.toml" in notice
+    for line in ('id = "detection"', 'scope = "prototype"', 'reason = "throwaway spikes bind nothing"', "expires = 2099-01-01"):
+        assert line in notice
+    text = report.markdown(result)
+    assert "[[profile.ignore]]" in text
+    assert '```toml\n[[override]]\nid = "detection"\nscope = "prototype"' in text
+    assert notice in json.loads(report.as_json(result))["notices"]
+
+
+def _two_overrides(repo: Repo) -> None:
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        '[[override]]\nid = "scratch.red"\nreason = "no CI by design"\ndecided_by = "owner"\nadr = "0003"\n\n'
+        '[[override]]\nid = "stack.shell.strict-mode"\nscope = "tools/probe.sh"\nreason = "a probe"\nexpires = 2099-01-01\n',
+    )
+    repo.write("docs/adr/0003-x.md", _adr("0003", "accepted"))
+
+
+def test_the_markdown_report_lists_every_override_before_the_facts(repo: Repo, red_check: None) -> None:
+    _two_overrides(repo)
+    text = report.markdown(run(repo.root, concern="scratch", env=repo.env))
+    assert text.index("## Overrides") < text.index("## Facts and evidence")
+    assert text.index("engine:") < text.index("## Overrides")
+    block = text[text.index("## Overrides") : text.index("## Facts and evidence")]
+    assert "`scratch.red`" in block
+    assert "owner" in block
+    assert "ADR 0003" in block
+    assert "`stack.shell.strict-mode`" in block
+    assert "tools/probe.sh" in block
+    assert "agent" in block
+    assert "until 2099-01-01" in block
+    assert "a probe" in block
+
+
+def test_the_markdown_report_says_so_when_there_are_no_overrides(repo: Repo) -> None:
+    text = report.markdown(run(repo.root, concern="gate", env=repo.env))
+    assert "## Overrides\n\nnone" in text
+
+
+def test_the_json_report_lists_the_same_overrides(repo: Repo, red_check: None) -> None:
+    _two_overrides(repo)
+    data = json.loads(report.as_json(run(repo.root, concern="scratch", env=repo.env)))
+    assert data["overrides"] == [
+        {
+            "id": "scratch.red",
+            "scope": "",
+            "reason": "no CI by design",
+            "decided_by": "owner",
+            "expires": None,
+            "adr": "0003",
+            "problem": None,
+        },
+        {
+            "id": "stack.shell.strict-mode",
+            "scope": "tools/probe.sh",
+            "reason": "a probe",
+            "decided_by": "agent",
+            "expires": "2099-01-01",
+            "adr": "",
+            "problem": None,
+        },
+    ]
+
+
 def test_a_written_report_names_the_engine_and_the_scope(repo: Repo) -> None:
     result = run(repo.root, concern="gate", env=repo.env)
     report.write(result, repo.root, date(2026, 10, 11))

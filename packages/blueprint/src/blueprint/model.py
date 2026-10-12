@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
 import tomllib
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from enum import StrEnum
 from fnmatch import fnmatch
 from pathlib import Path
@@ -16,6 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
     from blueprint.facts import Evidence, Fact
+    from blueprint.profile import Override
 
 # Never walked: tool caches, environments and build output hold no repo decisions, and a
 # virtualenv alone can be gigabytes.
@@ -85,6 +88,22 @@ def dockerfiles(root: Path, skip: tuple[str, ...] = ()) -> list[Path]:
     """The image build files within three levels of `root`."""
     found = {p for pattern in DOCKERFILES for p in walk(root, pattern, 3, skip) if not p.name.endswith(".dockerignore")}
     return sorted(found)
+
+
+# What a check tells the owner when it finds an old in-file marker.
+MOVE = "move this to an [[override]] in docs/blueprint/blueprint.toml"
+
+
+def override_toml(
+    oid: str, scope: str, reason: str, *, decided_by: str = "agent", expires: date | None = None, adr_number: str = ""
+) -> str:
+    """The `[[override]]` table to paste into blueprint.toml."""
+    lines = ["[[override]]", f"id = {json.dumps(oid)}"]
+    if scope:
+        lines.append(f"scope = {json.dumps(scope)}")
+    lines += [f"reason = {json.dumps(reason)}", f"decided_by = {json.dumps(decided_by)}"]
+    lines.append(f"expires = {expires.isoformat()}" if expires is not None else f"adr = {json.dumps(adr_number)}")
+    return "\n".join(lines)
 
 
 class Verdict(StrEnum):
@@ -173,7 +192,7 @@ class Profile:
     # Each detected stack with the files that set it (or "declared in docs/blueprint/blueprint.toml"), so a
     # wrong stack can be traced to the file that caused it.
     stack_files: tuple[tuple[str, str], ...] = ()
-    # Paths the repo declared throwaway or vendored ([[profile.ignore]]): detection and role globs skip them.
+    # Paths the repo declared throwaway or vendored (a `detection` [[override]]): detection and role globs skip them.
     ignore: tuple[str, ...] = ()
     # What detection read (blueprint.facts): reported, not yet acted on. Declared surfaces and traits stay as declared.
     facts: tuple[Fact, ...] = ()
@@ -206,6 +225,25 @@ class Context:
     profile: Profile
     env: dict[str, str] = field(default_factory=lambda: dict(os.environ))
     settings: dict[str, object] = field(default_factory=dict)
+    # Every [[override]] of docs/blueprint/blueprint.toml, and the day it is judged on (an expired one excuses nothing).
+    overrides: tuple[Override, ...] = ()
+    today: date | None = None
+
+    def excused(self, checkpoint_id: str, path: str | None = None, line: int | None = None, service: str | None = None) -> Override | None:
+        """The justified, unexpired, scoped override that excuses this offender of `checkpoint_id`, or None.
+
+        A check asks per offender (a file, a line, a compose service) and drops the ones excused, then names the
+        override in its evidence. An override without a scope is not asked here: the runner applies it to the whole row.
+        """
+        day = self.today or date.today()  # noqa: DTZ011 -- override expiry is a calendar date in the owner's zone
+        return next(
+            (o for o in self.overrides if o.id == checkpoint_id and o.problem(day) is None and o.covers(path, line, service)),
+            None,
+        )
+
+    def expiry_hint(self, days: int = 180) -> date:
+        """A date to put in the override a check tells the owner to write: a temporary exception, `days` out."""
+        return (self.today or date.today()) + timedelta(days=days)  # noqa: DTZ011 -- a calendar date in the owner's zone
 
     def system_path(self, absolute: str) -> Path:
         """An absolute machine path (`/usr/local/share/dotnet`), under BLUEPRINT_SYSTEM_ROOT when a test sets one.

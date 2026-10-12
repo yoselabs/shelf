@@ -4,8 +4,9 @@
 command: a2kay 2026-10, `serve --help` started a server that committed to main, and five sibling commands had the same
 shape (`bridge --help` would have started a relay). Strict parsing then caught `serve` dropping the global `--instance`.
 ruff's banned-api cannot see a method on an instance, so this row reads the source. A deliberate two-stage pre-parser
-(globals first, then a strict `parse_args` of the rest) says so with `# lenient: <reason>` on its line or earlier in
-its function, which the waiver then covers.
+(globals first, then a strict `parse_args` of the rest) says so with an `[[override]]` in docs/blueprint/blueprint.toml:
+this checkpoint's id, `scope` the file (or `file:line`), a reason. The old `# lenient: <reason>` comment is no longer
+honoured; where one is still found the evidence prints the override to write in its place.
 """
 
 from __future__ import annotations
@@ -15,16 +16,17 @@ import re
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
-from blueprint.model import Sub, check_each, failing, is_skipped, not_applicable, not_checked, passing, toml_table
+from blueprint.model import MOVE, Sub, check_each, failing, is_skipped, not_applicable, not_checked, override_toml, passing, toml_table
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding, Profile
+    from blueprint.profile import Override
 
 _ID = "stack.python-uv.cli-parse"
 _STATEMENT = "a CLI rejects flags it does not know: parse_args, not parse_known_args, and --help kept"
 _HELP_ID = "stack.python-uv.cli-help-tested"
 _HELP_STATEMENT = "every console script and directly run script has a test that runs it with --help (ADR 0025)"
-_WAIVER = re.compile(r"#\s*lenient:\s*\S")
+_MARKER = re.compile(r"#\s*lenient:\s*(\S.*)")
 _DEF = re.compile(r"\s*(async\s+)?def\s")
 _TESTS = re.compile(r"(^|/)(tests?/|test_[^/]*\.py$|[^/]*_test\.py$|conftest\.py$)")
 
@@ -34,18 +36,28 @@ def _uses_python_uv(profile: Profile) -> bool:
     return "python-uv" in profile.stacks
 
 
-def _lenient(ctx: Context) -> list[str] | None:
+def _lenient(ctx: Context) -> tuple[list[str], list[tuple[str, Override]], list[str]] | None:
+    """The offenders (`path:line`), those a scoped override excuses, and the override text for each old marker found."""
     listed = ctx.git("ls-files", "-z", "*.py")
     if listed is None:
         return None
-    hits = []
+    hits: list[str] = []
+    excused: list[tuple[str, Override]] = []
+    moves: list[str] = []
     for rel in sorted(filter(None, listed.split("\0"))):
         if _TESTS.search(rel) or is_skipped(rel, ctx.profile.ignore):
             continue
         text = ctx.read(rel) or ""
         lines = text.splitlines()
-        hits += [f"{rel}:{n}" for n in _lenient_lines(text) if not _waived(lines, n)]
-    return hits
+        for n in _lenient_lines(text):
+            where = f"{rel}:{n}"
+            if (override := ctx.excused(_ID, rel, n)) is not None:
+                excused.append((where, override))
+                continue
+            hits.append(where)
+            if (reason := _marker_reason(lines, n)) is not None:
+                moves.append(override_toml(_ID, where, reason, expires=ctx.expiry_hint()))
+    return hits, excused, moves
 
 
 def _lenient_lines(text: str) -> list[int]:
@@ -64,27 +76,34 @@ def _lenient_lines(text: str) -> list[int]:
     return sorted(found)
 
 
-def _waived(lines: list[str], n: int) -> bool:
-    """A waiver on the line, or earlier in the same function (back to its `def`)."""
+def _marker_reason(lines: list[str], n: int) -> str | None:
+    """The reason of an old `# lenient:` comment on line `n` or earlier in the same function (back to its `def`), else None."""
     for line in reversed(lines[:n]):
-        if _WAIVER.search(line):
-            return True
+        if m := _MARKER.search(line):
+            return m.group(1).strip()
         if _DEF.match(line):
-            return False
-    return False
+            return None
+    return None
 
 
 def _finding(ctx: Context) -> Finding:
-    hits = _lenient(ctx)
-    if hits is None:
+    found = _lenient(ctx)
+    if found is None:
         return not_checked("not a git repository")
+    hits, excused, moves = found
     if not hits:
-        return passing("no parse_known_args or add_help=False outside tests, or each one waived with `# lenient: <reason>`")
+        used = "; ".join(f"{where} by override ({o.reason})" for where, o in excused)
+        return passing(
+            "no parse_known_args or add_help=False outside tests" + (f", or each one excused by an [[override]]: {used}" if excused else "")
+        )
+    evidence = f"lenient parsing swallows unknown flags, --help included: {', '.join(hits)}"
+    if moves:
+        evidence += f"; `# lenient:` is no longer honoured, {MOVE}:\n" + "\n\n".join(moves)
     return failing(
-        f"lenient parsing swallows unknown flags, --help included: {', '.join(hits)}",
+        evidence,
         "use parse_args and keep add_help (ADR 0025: every command answers --help with its usage and changes nothing); "
-        "only a two-stage pre-parser, whose rest goes to a parser that keeps --help, carries `# lenient: <reason>` on its "
-        "line or earlier in its function",
+        "only a two-stage pre-parser, whose rest goes to a parser that keeps --help, is excused: an [[override]] "
+        f'id = "{_ID}" with scope = "<file>" (or "<file>:<line>") in docs/blueprint/blueprint.toml',
     )
 
 

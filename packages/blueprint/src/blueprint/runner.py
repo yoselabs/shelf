@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from blueprint import concerns
 from blueprint.concerns import gate
 from blueprint.model import REGISTRY, Check, Context, Finding, FixedBy, Profile, Sub, Verdict, not_checked
-from blueprint.profile import State, detect, load_state
+from blueprint.profile import Override, State, detect, load_state
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -55,6 +55,10 @@ class Run:
     # Audit-only checkpoints that apply but did not run (no `--audit`): a summary that hides them
     # shows fewer failures than the audit's README holds.
     skipped_audit: int = 0
+    # Every [[override]] the repo records, scoped or not: each report lists them first.
+    overrides: tuple[Override, ...] = ()
+    # Old shapes still read, each with the text that replaces it: reported, never failing.
+    notices: tuple[str, ...] = ()
 
     @property
     def exit_code(self) -> int:
@@ -113,12 +117,14 @@ def _judge(chk: Check, ctx: Context) -> list[Sub]:
 def _row(chk: Check, sub: Sub, state: State, today: date) -> Row:
     finding = sub.finding
     verdict, evidence = finding.verdict, finding.evidence
-    override = state.overrides.get(sub.id)
+    # A scoped override acts inside its check (Context.excused); only an unscoped one overrides the whole row.
+    override = next((o for o in state.overrides if o.id == sub.id and not o.scope), None)
     if override is not None and verdict is not Verdict.PASSING:
         problem = override.problem(today)
         if problem is None:
             verdict = Verdict.PASSING
-            evidence = f"override {override.code} {override.lasts}: {override.reason} (saw: {evidence})"
+            kind = f" {override.code}" if override.code else ""
+            evidence = f"override{kind} {override.lasts}, decided by {override.decided_by}: {override.reason} (saw: {evidence})"
         else:
             evidence = f"{evidence}; {problem}"
     return Row(
@@ -153,7 +159,7 @@ def run(
     today = today or date.today()  # noqa: DTZ011 -- override expiry is a calendar date in the owner's zone
     state = load_state(repo, today)
     profile = detect(repo, state)
-    ctx = Context(repo=repo, profile=profile, settings=state.settings)
+    ctx = Context(repo=repo, profile=profile, settings=state.settings, overrides=state.overrides, today=today)
     if env is not None:
         ctx.env = env
     checks = active(profile, concern)
@@ -164,4 +170,12 @@ def run(
     if audit and (branches := gate.unmerged_gate_branches(ctx)):
         rows = tuple(_branch_aware(r, branches) for r in rows)
     skipped = 0 if audit else sum(c.audit_only for c in checks)
-    return Run(profile=profile, set_hash=set_hash(active(profile)), rows=rows, problems=state.problems, skipped_audit=skipped)
+    return Run(
+        profile=profile,
+        set_hash=set_hash(active(profile)),
+        rows=rows,
+        problems=state.problems,
+        skipped_audit=skipped,
+        overrides=state.overrides,
+        notices=state.notices,
+    )

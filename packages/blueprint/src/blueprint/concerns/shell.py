@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from blueprint.model import Sub, check_each, failing, is_skipped, not_checked, passing
+from blueprint.model import MOVE, Sub, check_each, failing, is_skipped, not_checked, override_toml, passing
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
@@ -18,8 +18,10 @@ if TYPE_CHECKING:
 _STACKS = ("shell",)
 _SET = re.compile(r"^\s*set\s+(.+)$", re.MULTILINE)
 _LONG = {"errexit": "e", "nounset": "u", "pipefail": "pipefail"}
-# A script meant to collect failures (a probe, a report) runs on; it says so, with why.
-_WAIVER = re.compile(r"#\s*strict:\s*no -e\b")
+# The old marker of a script meant to collect failures (a probe, a report): no longer honoured. Such a script is
+# excused by an [[override]] id = "stack.shell.strict-mode" scoped to its path, in docs/blueprint/blueprint.toml.
+_MARKER = re.compile(r"#\s*strict:\s*no -e\b[\s,:;-]*(.*)")
+_ID = "stack.shell.strict-mode"
 _SHEBANG = re.compile(r"^#!\s*(?:/usr/bin/env\s+)?\S*?(bash|sh|dash)\b")
 
 
@@ -43,9 +45,7 @@ def _missing(text: str) -> list[str]:
     if shell is None:
         return []
     modes = _modes(text)
-    want = ["u"] if shell.group(1) != "bash" else ["u", "pipefail"]
-    if not _WAIVER.search(text):
-        want.insert(0, "e")
+    want = ["e", "u"] if shell.group(1) != "bash" else ["e", "u", "pipefail"]
     return [f"-{m}" if len(m) == 1 else m for m in want if m not in modes]
 
 
@@ -60,21 +60,34 @@ def _strict_mode(ctx: Context) -> Finding:
     ]
     judged = 0
     loose: list[str] = []
+    excused: list[str] = []
+    moves: list[str] = []
     for rel in scripts:
         text = ctx.read(rel) or ""
         if _SHEBANG.match(text) is None:
             continue
         judged += 1
-        if missing := _missing(text):
-            loose.append(f"{rel} (no {', '.join(missing)})")
+        if not (missing := _missing(text)):
+            continue
+        if (override := ctx.excused(_ID, rel)) is not None:
+            excused.append(f"{rel} by override ({override.reason})")
+            continue
+        loose.append(f"{rel} (no {', '.join(missing)})")
+        if marker := _MARKER.search(text):
+            reason = marker.group(1).strip() or "<why this script runs on after a failure>"
+            moves.append(override_toml(_ID, rel, reason, expires=ctx.expiry_hint()))
     if loose:
         shown = ", ".join(loose[:6]) + (f", and {len(loose) - 6} more" if len(loose) > 6 else "")
+        evidence = f"{len(loose)} of {judged} scripts not in strict mode: {shown}"
+        if moves:
+            evidence += f"; `# strict: no -e` is no longer honoured, {MOVE}:\n" + "\n\n".join(moves)
         return failing(
-            f"{len(loose)} of {judged} scripts not in strict mode: {shown}",
+            evidence,
             "`set -euo pipefail` after the header (a /bin/sh script: `set -eu`); a script that must run on after a failure "
-            "keeps -u and pipefail and says `# strict: no -e, <reason>`",
+            f'is excused by an [[override]] id = "{_ID}" with scope = "<script path>" in docs/blueprint/blueprint.toml',
         )
-    return passing(f"{judged} executable scripts, each in strict mode")
+    note = f", {len(excused)} excused: {'; '.join(excused)}" if excused else ""
+    return passing(f"{judged} executable scripts, each in strict mode{note}")
 
 
 @check_each("stack.shell-strict", "executable shell scripts run in strict mode (-e, -u, pipefail)", layer="stack")

@@ -32,8 +32,8 @@ distilled_into: pending; built under bead shelf-6q1
   checkpoint is always an override.
 - **One override format.** Every exception to a blueprint checkpoint is an `[[override]]` in `blueprint.toml`: the
   checkpoint id, an optional scope (a path, a line, a compose service), the reason, who decided, and an expiry or an
-  ADR. It replaces `[[ignore]]` and the in-file markers (`# lenient:`, `# strict: no -e`, `x-policy-exempt`); the
-  compose policy reads the same file (`conftest --data docs/blueprint/blueprint.toml`, tried 2026-10-12). A linter's
+  ADR. It replaces `[[profile.ignore]]` and the in-file markers (`# lenient:`, `# strict: no -e`, `x-policy-exempt`); the
+  compose policy reads the same file (`conftest test --combine --policy policy docs/blueprint/blueprint.toml <compose files>`; conftest 0.71.1 loads only `.json`/`.yaml` through `--data`, so the TOML goes in as an input, tried 2026-10-12). A linter's
   own suppression (`# noqa`, hadolint `ignored:`, `# shellcheck disable`) stays where the linter reads it and carries
   a reason. Every report lists every override at the top.
 - **`blueprint checkpoints`** lists each checkpoint, what it checks and the fact that turns it on, so an agent knows
