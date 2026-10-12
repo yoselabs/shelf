@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,7 @@ from blueprint.runner import Row, Run, active, run, set_hash
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from pathlib import Path
 
     from blueprint.testing import Repo
 
@@ -338,3 +340,19 @@ def test_the_summary_cuts_a_long_first_to_fix_at_a_word_and_marks_the_cut() -> N
     assert text.startswith(cut.removesuffix("…").rstrip())
     assert text[len(cut.removesuffix("…").rstrip())] == " "
     assert clip("short", 90) == "short"
+
+
+def test_a_hooks_git_variables_never_reach_the_repo_they_name(repo: Repo, tmp_path: Path) -> None:
+    # 2026-10-12: under a pre-push hook in a worktree, the sandbox `git init` behind a gate row ran against the
+    # hook's GIT_DIR and set core.bare on the shelf itself.
+    victim = tmp_path / "victim"
+    git = ["git", "-c", "user.email=t@invalid", "-c", "user.name=t"]
+    subprocess.run(["git", "init", "-q", str(victim)], check=True)
+    subprocess.run([*git, "-C", str(victim), "commit", "-q", "--allow-empty", "-m", "root"], check=True)
+    subprocess.run(["git", "-C", str(victim), "worktree", "add", "-q", str(tmp_path / "wt")], check=True)
+    before = (victim / ".git/config").read_text()
+    repo.write(".gitignore", ".worktrees/\n")
+    repo.commit()
+    leaked = {**repo.env, "GIT_DIR": str(victim / ".git/worktrees/wt")}
+    run(repo.root, env=leaked)
+    assert (victim / ".git/config").read_text() == before

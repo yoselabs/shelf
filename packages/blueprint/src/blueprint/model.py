@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
 # Never walked: tool caches, environments and build output hold no repo decisions, and a
 # virtualenv alone can be gigabytes.
@@ -178,6 +178,19 @@ def uses_beads(profile: Profile) -> bool:
     return profile.tracker == "beads"
 
 
+# Set by git for a hook (the pre-push gate runs blueprint): inherited, they send every `git` blueprint runs, a sandbox's
+# `git init` included, to the hook's repository instead of the folder it runs in. From a worktree that set core.bare on
+# the main clone (2026-10-12). Each check finds its repo by its cwd instead.
+_GIT_LOCATION = frozenset(
+    {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_NAMESPACE"}
+)
+
+
+def without_git_location(env: Mapping[str, str]) -> dict[str, str]:
+    """`env` minus the variables that pin git to one repository: each git call finds its own from its cwd."""
+    return {k: v for k, v in env.items() if k not in _GIT_LOCATION}
+
+
 @dataclass
 class Context:
     """What a check reads through: the repo, its profile, and processes run with a timeout."""
@@ -218,7 +231,7 @@ class Context:
         self, *argv: str, timeout: float = 120, cwd: Path | None = None, env: dict[str, str] | None = None
     ) -> subprocess.CompletedProcess[str] | None:
         """Run `argv` in the repo (or `cwd`), with this context's env or `env`; None when the program is missing or times out."""
-        env = env or self.env
+        env = without_git_location(env or self.env)
         exe = shutil.which(argv[0], path=env.get("PATH"))
         if exe is None:
             return None

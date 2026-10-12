@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import functools
 import json
+import os
 import subprocess
 import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from blueprint.model import FixedBy, Verdict
+from blueprint.model import FixedBy, Verdict, without_git_location
 from blueprint.profile import STATE_DIR
 from blueprint.runner import ACCEPTED, active
 
@@ -74,6 +75,7 @@ def engine() -> str:
             text=True,
             timeout=10,
             check=False,
+            env=without_git_location(os.environ),  # a consumer's hook GIT_DIR would stamp the consumer's commit
         )
         commit = done.stdout.strip() if done.returncode == 0 else ""
     except (OSError, subprocess.TimeoutExpired):
