@@ -4,7 +4,7 @@
 # with images and no compose file (a2kay) is still linted.
 stack = "dockerfile"
 status = "provisional"
-source = "hadolint-and-ci-uv.md (2026-10-11): hadolint 2.15.1 red (exit 1) on 4 of 4 real Dockerfiles from two consumers and on a planted file; failure-threshold and ignored seen working in .hadolint.yaml"
+source = "hadolint-and-ci-uv.md and dockerfile-gaps.md (2026-10-11): hadolint 2.15.1 red (exit 1) on 4 of 4 real Dockerfiles from two consumers and on a planted file; failure-threshold and ignored seen working in .hadolint.yaml"
 
 [[role]]
 role = "toolchain"
@@ -12,7 +12,14 @@ na = "a Dockerfile has no language version of its own; base images and tool imag
 
 [[role]]
 role = "formatter"
-untested = "no Dockerfile formatter was run; hadolint reports layout rules but does not rewrite"
+tool = """dockerfmt 0.5.4 (reteps/dockerfmt, mise `aqua:reteps/dockerfmt`, pinned) as `dockerfmt --check -n <file>` per tracked Dockerfile (the default indent, 4); `-w -n` rewrites. \
+It formats directives and the shell inside RUN (shfmt). Seen red (exit 1, no diff printed: it prints `<file> is not formatted`) on a planted file (lower-case keywords, blank runs) and on 5 of 5 real Dockerfiles from three repos \
+(5 to 55 changed lines each: indent of continued lines, `&&` aligned, `> file` to `>file`, a RUN --mount line split); green (exit 0) on all of them after `-w`, and a second `-w` changes nothing (idempotent). \
+Maintained: v0.5.4 released 2026-06-27, 4 open issues. dockerfile-utils (last release 2025-07) and prettier-plugin-dockerfile (no such npm package found) are out. \
+Adopting is a one-time reformat of every Dockerfile; a repo that will not reformat keeps `untested` rather than a gate that is red from day one"""
+install = "mise.toml: \"aqua:reteps/dockerfmt\" = \"0.5.4\"; justfile: `git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\\.dockerignore$' | xargs -0 -n1 dockerfmt --check -n` (it takes one file per call when mixed with errors, and a missing file kills the whole run); run `dockerfmt -w -n` once first"
+config = [{ any = [{ path = "justfile", contains = "dockerfmt" }, { path = "Makefile", contains = "dockerfmt" }, { path = ".pre-commit-config.yaml", contains = "dockerfmt" }] }]
+gate = "dockerfmt"
 
 [[role]]
 role = "linter"
@@ -30,11 +37,30 @@ na = "hadolint's parser is the static check (a syntax error is exit 1); the buil
 
 [[role]]
 role = "dependencies"
-untested = "every FROM as `name:tag@sha256:<64 hex>` (hadolint DL3006/DL3007 force a tag, never a digest) was not run as a recipe; consumers today pin tags only (python:<ver>-slim)"
+tool = """every FROM, `COPY --from=<image>` and `RUN --mount=from=<image>` is `name:tag@sha256:<64 hex>` (tag for the human, digest for the machine; hadolint DL3006/DL3007 force a tag, never a digest), \
+judged by the `dockerfile-pins` recipe (stdlib, no network). Exempt: `scratch`, an earlier stage alias, a stage number, and a bare name in COPY --from (a `--build-context`, e.g. `--from=shelf`). An ARG default before the first FROM is substituted; an ARG with no default is a finding. \
+Seen red (exit 1) on a planted file (`:latest`, a bare `nginx`, an ARG-built `python:${PY}-slim`, a `COPY --from=uv:0.13.0`) and on 9 real unpinned references in 4 Dockerfiles; green (exit 0) on homelab's images/devbox (digest-pinned) and on a planted file of pinned forms. \
+A pin must not freeze the image: the standard names an updater, Dependabot's docker ecosystem (built into GitHub; whether it reads a `*.Dockerfile` name is not verified, so its first PR is the check), Renovate `pinDigests`, or the repo's own report of images behind upstream. The digest to write comes from `crane digest <image:tag>` (network; seen: exit 0, one sha256 line)"""
+install = "`blueprint recipe dockerfile-pins > tools/check_dockerfile_pins.py`; justfile: `python3 -I tools/check_dockerfile_pins.py --context <name>...` (a dependency of `check`); pin with `crane digest`; an updater: .github/dependabot.yml with a `docker` entry per Dockerfile folder, renovate.json with `pinDigests: true`, or a check-updates script"
+config = [
+    { any = [{ path = "justfile", contains = "check_dockerfile_pins" }, { path = "Makefile", contains = "check_dockerfile_pins" }] },
+    # The updater: a digest pin without one freezes the image.
+    { any = [{ path = ".github/dependabot.yml", contains = "docker" }, { path = "renovate.json", contains = "pinDigests" }, { path = ".github/renovate.json", contains = "pinDigests" }, { path = "tools/check-updates.py" }] },
+]
+gate = "check_dockerfile_pins"
 
 [[role]]
 role = "tests"
-untested = "container-structure-test or a build-and-run smoke needs a Docker daemon, absent where this was researched"
+tool = """CI builds every product image and runs one command that proves it starts, as its own job beside `check` (buildx, `load: true`, then `docker run --rm <image> <cmd>`). \
+A product image is one that is shipped or deployed (a2kay's root Dockerfile, homelab's images/*); a test image the gate builds (a2kay's scripts/prune/test.Dockerfile, the shelf's tools/gate/gate.Dockerfile) is exercised by that gate instead. \
+The smoke is the product's own cheap command (`--help`, the image's test.sh), not its CMD. Seen on GitHub's ubuntu-latest (https://github.com/yoselabs/shelf/actions/runs/38184048761): a good image built and its smoke passed; a COPY of a file the context lacks (a2kay's 2026-10 incident) failed the build; an image that builds but cannot start failed its smoke. \
+Trigger: pull_request, so a broken image blocks the merge; push-to-main only where the repo merges straight to main, said in the workflow"""
+install = """a workflow job: actions/checkout, docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 (v4.4.1), docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc (v7.4.0) with `load: true`, `push: false`, `cache-from/cache-to: type=gha`, \
+then `docker run --rm <tag> <smoke>`; one build-and-smoke per product image"""
+config = [
+    { any = [{ path = ".github/workflows/*.y*ml", contains = "docker/build-push-action" }, { path = ".github/workflows/*.y*ml", contains = "docker build" }] },
+    { any = [{ path = ".github/workflows/*.y*ml", contains = "docker run" }, { path = ".github/workflows/*.y*ml", contains = "test.sh" }] },
+]
 
 [[role]]
 role = "coverage"

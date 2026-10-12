@@ -97,11 +97,12 @@ def test_a_stack_without_a_profile_is_a_blueprint_gap_not_a_repo_failure(repo: R
 
 
 def test_an_untested_role_is_a_blueprint_gap(repo: Repo) -> None:
-    repo.write("stacks/a/compose.yml", "services: {}")
-    verdict, evidence, gap = _rows(repo)["stack.compose.formatter"]
-    assert verdict is Verdict.NOT_CHECKED
-    assert gap
-    assert "no standard yet" in evidence
+    # Unity's embedded shader lint has no tested standard; framework rows share the stack rows' judging.
+    repo.write("Game/ProjectSettings/ProjectVersion.txt", "m_EditorVersion: 6000.3.2f1\n")
+    row = next(r for r in run(repo.root, concern="framework", env=repo.env).rows if r.id == "framework.unity.embedded-script-lint")
+    assert row.verdict is Verdict.NOT_CHECKED
+    assert row.blueprint_gap
+    assert "no standard yet" in row.evidence
 
 
 def test_the_architecture_role_wants_import_linter_configured_and_run_by_the_gate(repo: Repo) -> None:
@@ -237,7 +238,7 @@ def test_flake_nix_in_a_subfolder_detects_the_nix_stack(repo: Repo) -> None:
     rows = _rows(repo)
     assert "detected from hosts/bee/flake.nix, hosts/sol/flake.nix" in rows["stack.nix.profile"][1]
     assert rows["stack.nix.coverage"][0] is Verdict.NOT_APPLICABLE
-    assert rows["stack.nix.tests"][2] is True  # an untested role is a blueprint gap
+    assert rows["stack.nix.tests"][0] is Verdict.NOT_SET_UP  # the eval tier: tests/nix/*.nix
 
 
 def test_many_compose_files_make_one_compose_table(repo: Repo) -> None:

@@ -58,7 +58,10 @@ config = [{ any = [{ path = "flake.nix", contains = "follows" }, { path = "*/fla
 
 [[role]]
 role = "tests"
-untested = "NixOS VM tests (`pkgs.testers.runNixOSTest`, one QEMU VM per test) are the best-in-world answer for module behaviour but need KVM on a Linux builder; this Mac's Docker (arm64 Linux VM) has no /dev/kvm, so none was run. Evaluation is the gate until a builder exists"
+tool = "two tiers. (1) eval tests, no KVM: `nix eval --impure --raw --file tests/nix/<name>.nix`, a nix file that reads nixosConfigurations.<host>.config and `assert`s/throws on the values a past incident depended on (udev rule filters, firewall rules, option values); exit 1 and the throw text when one is gone. (2) NixOS VM tests (`pkgs.testers.runNixOSTest`, exposed as flake `checks.x86_64-linux.<name>`) for what only a booted system shows (udev coldplug, mount order, unit ordering), run by CI on a runner with /dev/kvm. Seen: the eval tier red and green on a homelab host module (the udev automount filters behind a recorded incident) under nix 2.20; the VM tier not yet run. KVM is there: a standard GitHub ubuntu-latest runner has /dev/kvm, usable after one udev rule (`KERNEL==\"kvm\", GROUP=\"kvm\", MODE=\"0666\"`, then `udevadm trigger --name-match=kvm`), seen in https://github.com/yoselabs/shelf/actions/runs/38185504352"
+install = "tests/nix/*.nix + a `nix-test` recipe looping them (a dependency of `check`); VM tier: flake checks + a CI job on a KVM runner running `nix build .#checks.x86_64-linux.<name>`, not part of the local `just check` (needs KVM)"
+config = [{ path = "tests/nix/*.nix" }]
+gate = "nix eval"
 
 [[role]]
 role = "coverage"

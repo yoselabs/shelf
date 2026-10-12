@@ -37,11 +37,14 @@ na = "a script's dependencies are the binaries it calls; the ones the repo insta
 
 [[role]]
 role = "tests"
-untested = "bats-core 1.14.0 (mise `bats`) is the candidate for tools/*.sh with stubbed binaries on PATH; no .bats file was run. Not a standard until one real script has a bats test seen red, then green"
+tool = "bats-core 1.14.0 (mise `bats`, aqua:bats-core/bats-core) on tests/shell/*.bats: one file per script with logic, every external binary (ssh, python3, curl) a stub on PATH from tests/shell/stubs/, plain `[ ]` / `[[ ]]` assertions (no bats-support or bats-assert: nothing to pin or vendor); a sourced helper is sourced in a child `bash -c` so its `exit` fails the case, not the run"
+install = "mise.toml: bats = \"1.14.0\"; tests/shell/<script>.bats + tests/shell/stubs/<binary> (chmod +x); justfile: a `shell-test` recipe, `bats tests/shell`, a dependency of `check` (exit 1 on any failed case, 1 also when the directory is missing). Scripts that only wrap a command have no logic to test: no file. A deploy-path property (exec bit surviving a bundle) is not a bats test"
+config = [{ path = "tests/shell/*.bats" }, { path = "mise.toml", contains = "bats" }]
+gate = "bats"
 
 [[role]]
 role = "coverage"
-untested = "kcov can trace bash but was not run; no floor is proposed for scripts"
+na = "kcov 43 traces bash under bats without root (84.21% of host-target.sh, a 80% floor red at 34.21%), but it has no mise or aqua release: upstream ships source only (last release v43, 2024-07), so it cannot be pinned by ADR 0024 and building it needs libdw. Scripts are leaf entry points with a few branches each; revisit when aqua carries kcov"
 
 [[role]]
 role = "spelling"

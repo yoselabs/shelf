@@ -27,6 +27,8 @@ RECIPE_FILES = {
     "dotnet-coverage": "check_coverage.py",
     "godot-integrity": "check_godot.py",
     "godot-test": "godot-test.just",
+    "dockerfile-pins": "check_dockerfile_pins.py",
+    "compose-policy": "compose_policy.rego",
 }
 
 
@@ -59,7 +61,10 @@ def main(argv: list[str] | None = None) -> int:
     rcp.add_argument(
         "name",
         choices=sorted(RECIPE_FILES),
-        help="hooks: .pre-commit-config.yaml; godot-test: a justfile recipe; the others: a tools/ script, named in the profile",
+        help=(
+            "hooks: .pre-commit-config.yaml; godot-test: a justfile recipe; compose-policy: a policy/ rego file; "
+            "the others: a tools/ script, named in the profile"
+        ),
     )
     args = parser.parse_args(argv)
 

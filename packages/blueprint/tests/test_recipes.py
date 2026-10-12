@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
+import shutil
+import subprocess
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint.__main__ import RECIPE_FILES, RECIPES, main
@@ -107,3 +110,86 @@ def test_the_godot_check_fails_where_the_import_log_stays_quiet(repo: Repo, caps
     assert code == 1
     for needle in ("Panel.cs has no committed .uid", "does not exist", "not a section", "never used", "says Godot.NET.Sdk 4.6"):
         assert needle in out, needle
+
+
+_DIGEST = "@sha256:" + "a" * 64
+
+
+def _pins(repo: Repo, text: str, capsys: pytest.CaptureFixture[str], *extra: str) -> tuple[int, str]:
+    path = repo.write("Dockerfile", text)
+    return _run("dockerfile-pins", [*extra, str(path)], capsys)
+
+
+def test_digest_pinned_images_pass(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    text = (
+        f"ARG PY=3.12\nFROM --platform=linux/amd64 python:${{PY}}-slim{_DIGEST} AS base\n"
+        f"COPY --from=ghcr.io/astral-sh/uv:0.13.0{_DIGEST} /uv /bin/\nFROM base\nCOPY --from=base /x /y\nFROM scratch\n"
+    )
+    assert _pins(repo, text, capsys)[0] == 0
+
+
+def test_a_tag_without_a_digest_fails_and_names_the_line(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    code, out = _pins(repo, "FROM python:3.12-slim\nCOPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/\n", capsys)
+    assert code == 1
+    assert ":1 'python:3.12-slim'" in out
+    assert ":2 'ghcr.io/astral-sh/uv:latest'" in out
+
+
+def test_a_build_context_is_not_an_image(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    text = f"FROM python:3.12-slim{_DIGEST}\nCOPY --from=shelf pyproject.toml /shelf/\n"
+    assert _pins(repo, text, capsys)[0] == 0
+
+
+def test_an_image_from_an_unset_arg_cannot_be_judged_and_fails(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    code, out = _pins(repo, "FROM python:${PYTHON_VERSION}-slim\n", capsys)
+    assert code == 1
+    assert "PYTHON_VERSION" in out
+
+
+_CLEAN_COMPOSE = """services:
+  web:
+    image: nginx:1.27@sha256:{d}
+    ports: ["127.0.0.1:8080:80"]
+    networks: [front]
+    healthcheck: {{test: ["CMD", "true"]}}
+networks:
+  front: {{}}
+""".format(d="a" * 64)
+
+
+def _conftest(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+    # Pinned in the shelf's mise.toml; a missing conftest is a failure, never a skipped test.
+    assert shutil.which("conftest"), "conftest is not installed: run `just tools`"
+    return subprocess.run(["conftest", *args], cwd=cwd, capture_output=True, text=True, check=False)
+
+
+def _policy(repo: Repo) -> None:
+    repo.write("policy/compose.rego", (RECIPES / RECIPE_FILES["compose-policy"]).read_text())
+
+
+def test_the_compose_policy_passes_its_own_unit_tests(repo: Repo) -> None:
+    _policy(repo)
+    repo.write("policy/compose_test.rego", (Path(__file__).parent / "fixtures/compose_policy_test.rego").read_text())
+    result = _conftest("verify", "--policy", "policy", cwd=repo.root)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_a_clean_compose_file_passes_the_policy(repo: Repo) -> None:
+    _policy(repo)
+    repo.write("compose.yml", _CLEAN_COMPOSE)
+    result = _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root)
+    assert result.returncode == 0, result.stdout
+
+
+def test_each_rule_is_denied_unless_exempted_with_a_reason(repo: Repo) -> None:
+    _policy(repo)
+    bad = _CLEAN_COMPOSE.replace('    ports: ["127.0.0.1:8080:80"]\n', '    ports: ["8080:80"]\n    privileged: true\n')
+    bad = bad.replace('    healthcheck: {test: ["CMD", "true"]}\n', "    volumes: [/var/run/docker.sock:/var/run/docker.sock]\n")
+    repo.write("compose.yml", bad)
+    out = _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root)
+    assert out.returncode == 1
+    for rule in ("privileged", "docker socket", "every interface", "no healthcheck"):
+        assert rule in out.stdout, rule
+    exempt = '    networks: [front]\n    x-policy-exempt: {privileged: "the exporter reads host counters"}\n'
+    repo.write("compose.yml", bad.replace("    networks: [front]\n", exempt))
+    assert "privileged" not in _conftest("test", "--policy", "policy", "compose.yml", cwd=repo.root).stdout

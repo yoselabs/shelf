@@ -1,0 +1,8 @@
+# Dependabot bumps the digest-pinned images the gate image pulls (blueprint stack.dockerfile.dependencies): a pin by
+# digest is the lockfile, and this keeps it from freezing. Weekly, one PR per image.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /tools/gate
+    schedule:
+      interval: weekly

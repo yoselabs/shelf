@@ -12,7 +12,14 @@ na = "Compose has no language or SDK version: the top-level `version:` key is ob
 
 [[role]]
 role = "formatter"
-untested = "no compose-specific formatter exists; yamlfmt and prettier were not run. Compose files in practice carry long explanatory comments and hand-aligned blocks (homelab excludes compose.yml from yamllint and keeps them hand-formatted), so a formatter needs a trial on real files before it is a standard. dclint's key-order rule (service-keys-order) covers the one ordering convention Compose has"
+tool = """yamlfmt 0.21.0 (google/yamlfmt; mise `yamlfmt`, pinned) `-lint` over hand-written compose files, with a committed .yamlfmt.yaml (`formatter: {type: basic, retain_line_breaks_single: true}`). \
+Seen red on a planted badly indented file (exit 1) and green after `yamlfmt` rewrote it (exit 0); comments are kept (comment count unchanged on all 19 homelab stacks/*/compose.yml) \
+but trailing comments are re-spaced to one space, so hand-aligned comment columns are lost. Prettier 3.6.2 behaves the same and also expands flow lists `[..]` into block form (201 diff lines against yamlfmt's 116). \
+Generated compose (homelab hosts/*/rendered, 20 of 20 files not clean) is not formatted: the renderer is its formatter, and it is changed at its source"""
+install = """mise.toml: yamlfmt = "0.21.0"; justfile recipe `yamlfmt -lint $(git ls-files 'stacks/*/compose.y*ml')` (exclude generated files); fix with `yamlfmt`. \
+Adopting on a repo whose compose files are deploy inputs (homelab: 14 of 19 not clean, 83 diff lines with retain_line_breaks_single) costs one redeploy-triggering reformat commit: plan it, do not disable the gate"""
+config = [{ any = [{ path = ".yamlfmt.yaml" }, { path = ".yamlfmt" }] }, { any = [{ path = "justfile", contains = "yamlfmt" }, { path = "Makefile", contains = "yamlfmt" }, { path = ".pre-commit-config.yaml", contains = "yamlfmt" }] }]
+gate = "yamlfmt"
 
 [[role]]
 role = "linter"
@@ -53,7 +60,17 @@ path = "tools/doctor.py"
 
 [[role]]
 role = "tests"
-untested = "a smoke test per stack (`docker compose up --wait` against a throwaway daemon, then a health probe) was not run: homelab's stacks need sealed secrets and host-specific mounts, so a generic recipe would be invented. container-structure-test and Testcontainers are the candidates; homelab has tools/deploy-smoke for the live deploy"
+tool = """two static checks over what is deployed, because a stack smoke (`docker compose up --wait`) needs a daemon and the stacks' secrets. \
+(1) healthcheck policy: every service has a healthcheck (conftest rule in the compose-policy recipe), because the deploy waits on health; seen red on a planted file and on 8 real homelab services (cadvisor, vector x2 hosts, openobserve, keys, qbittorrent-mcp, oauth2-proxy), exit 1. \
+(2) a pytest over the deploy bundle: build the bundle and assert each tracked executable file ships executable (the 2026-10-01 abiotic-factor incident: a 0644 start script crash-looped). Seen red (exit 1) on a planted mode-644 start script and green at 755; homelab's existing 44 deploy tests stayed GREEN on the same plant, so they do not cover it"""
+install = """conftest test --policy <dir> over the deployed compose files (see architecture); a pytest over the deploy bundle (homelab: tools/tests/test_bundle_modes.py) calls the bundle builder and asserts `tarinfo.mode & 0o111` for every executable tracked file. Both run in `just check`. \
+Still untested: a real `up --wait` (no Docker daemon was available)"""
+config = [{ path = "policy/*.rego", contains = "healthcheck" }]
+gate = "conftest"
+[[role.alternative]]
+label = "pytest over the deploy bundle (file modes) beside the healthcheck policy"
+gate = "pytest"
+path = "tools/tests/test_bundle_modes.py"
 
 [[role]]
 role = "coverage"
@@ -68,7 +85,18 @@ gate = "typos"
 
 [[role]]
 role = "architecture"
-untested = "the rules that matter for Compose (no privileged, no host network, no docker.sock mount, no unbound published port, every service on a declared network) are policy over the resolved config: conftest (OPA, `docker compose config --format json | conftest test -`) is the candidate and was not run. homelab enforces its own deny-list in tools/stack_policy.py (read, not exercised here); dclint covers only the unbound-port rule"
+tool = """conftest 0.71.1 (OPA 1.21.1; mise `conftest`, pinned) with policy/compose.rego (recipe `compose-policy`), run on the compose YAML directly: `conftest test --policy policy $(git ls-files 'hosts/*/rendered/*/compose.y*ml')`; no Docker CLI or `compose config` needed. \
+Five deny rules: privileged, network_mode: host, docker socket mount (short and long volume syntax), a published port with no host IP (short and long syntax), a service on no declared network (no `networks:` key, or a name absent from top-level `networks:`). \
+An exception is a reason in the service itself: `x-policy-exempt: {rule: "why"}` (a blank reason does not count). Seen green on a clean planted file (exit 0), red on 6 of 6 planted violations (exit 1; the exempted 7th service passed), and 4 rego unit tests pass (`conftest verify`). \
+On homelab's 20 rendered files it reports 34 findings (privileged and host network: cadvisor/node-exporter/vector/victoria x2 hosts; docker.sock: traefik, vector, game-ops logs; unbound ports: traefik 80, game UDP ports; no network: 16 services), all of which homelab accepts today through stack.toml allow entries, so adopting means copying those into x-policy-exempt reasons. \
+The caveat: it reads the file as written, so `${VAR}`-built ports and multi-file merges (compose.override) are not resolved; run it on the merged `config --format json` where those exist"""
+install = """mise.toml: conftest = "0.71.1"; `blueprint recipe compose-policy > policy/compose.rego`; justfile recipe `conftest test --policy policy <compose files>`, a dependency of `check`; `conftest verify --policy policy` for the unit tests. Copy each existing allowance into an x-policy-exempt reason"""
+config = [{ path = "policy/*.rego", contains = "deny contains" }, { any = [{ path = "justfile", contains = "conftest" }, { path = "Makefile", contains = "conftest" }, { path = ".pre-commit-config.yaml", contains = "conftest" }] }]
+gate = "conftest"
+[[role.alternative]]
+label = "tools/stack_policy.py: deny-list (privileged, cap_add, docker.sock, host network/pid, host path, devices) at deploy time, with dated [[stack.exempt]]"
+gate = "stack_policy"
+path = "tools/stack_policy.py"
 
 [[role]]
 role = "hooks"

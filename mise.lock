@@ -2,6 +2,83 @@
 
 lockfile_version = 3
 
+[[tools."aqua:reteps/dockerfmt"]]
+version = "0.5.4"
+backend = "aqua:reteps/dockerfmt"
+specifiers = ["0.5.4"]
+
+[tools."aqua:reteps/dockerfmt"."platforms.linux-arm64"]
+checksum = "sha256:f8b37047f35a24fe09df7c7341b826acd7f25917f5757fd72c3e8eef17b66e5d"
+url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759353"
+
+[tools."aqua:reteps/dockerfmt"."platforms.linux-arm64-musl"]
+checksum = "sha256:f8b37047f35a24fe09df7c7341b826acd7f25917f5757fd72c3e8eef17b66e5d"
+url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759353"
+
+[tools."aqua:reteps/dockerfmt"."platforms.linux-x64"]
+checksum = "sha256:0a0f5eafd81a76c8a5d04be8d9b5a5fc00c0054a0ea5cc0512377c13c86859bc"
+url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759354"
+
+[tools."aqua:reteps/dockerfmt"."platforms.linux-x64-musl"]
+checksum = "sha256:0a0f5eafd81a76c8a5d04be8d9b5a5fc00c0054a0ea5cc0512377c13c86859bc"
+url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759354"
+
+[tools."aqua:reteps/dockerfmt"."platforms.macos-arm64"]
+checksum = "sha256:161b00d14c9b8851e601b665412ae2e9229aa2754e329ce632d60df3d0661c9e"
+url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759365"
+
+[[tools.conftest]]
+version = "0.71.1"
+backend = "aqua:open-policy-agent/conftest"
+specifiers = ["0.71.1"]
+
+[tools.conftest."platforms.linux-arm64"]
+checksum = "sha256:218c682e110ae7e826dc14a746a6f9b43eb782643dbe730b771fd305634e3f47"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/conftest_0.71.1_Linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/614476733"
+provenance = "github-attestations"
+
+[tools.conftest."platforms.linux-arm64-musl"]
+checksum = "sha256:218c682e110ae7e826dc14a746a6f9b43eb782643dbe730b771fd305634e3f47"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/conftest_0.71.1_Linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/614476733"
+provenance = "github-attestations"
+
+[tools.conftest."platforms.linux-x64"]
+checksum = "sha256:c3f6b2a753bd56e377a1e51a95ae3e057f926f2e9139f7d5b5dfbbaf810f7985"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/conftest_0.71.1_Linux_x86_64.tar.gz"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/614476638"
+provenance = "github-attestations"
+
+[tools.conftest."platforms.linux-x64-musl"]
+checksum = "sha256:c3f6b2a753bd56e377a1e51a95ae3e057f926f2e9139f7d5b5dfbbaf810f7985"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/conftest_0.71.1_Linux_x86_64.tar.gz"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/614476638"
+provenance = "github-attestations"
+
+[tools.conftest."platforms.macos-arm64"]
+checksum = "sha256:e1cc50d2590b6c5e3da6912666a71264bae82d60bdd62d7ae2b99971ccc8eedd"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/conftest_0.71.1_Darwin_arm64.tar.gz"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/614476647"
+provenance = "github-attestations"
+
+[tools.conftest."platforms.macos-x64"]
+checksum = "sha256:a309853b5763c18486768157442d440248ee683b20a2aa1f6b28214e818bd780"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/conftest_0.71.1_Darwin_x86_64.tar.gz"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/614476639"
+provenance = "github-attestations"
+
+[tools.conftest."platforms.windows-x64"]
+checksum = "sha256:34d623334b5e7ed4465bf62a4cb3b092684859cd3d224bbd390925a0852b922a"
+url = "https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/conftest_0.71.1_Windows_x86_64.zip"
+url_api = "https://api.github.com/repos/open-policy-agent/conftest/releases/assets/614476742"
+provenance = "github-attestations"
+
 [[tools."github:gastownhall/beads"]]
 version = "1.3.1"
 backend = "github:gastownhall/beads"

@@ -59,14 +59,20 @@ secrets:
     command -v gitleaks >/dev/null || { echo "secrets: gitleaks is not installed -- run just tools" >&2; exit 2; }
     gitleaks git --no-banner --redact --log-level warn .
 
-# Every Dockerfile passes hadolint (pinned in mise.toml; each ignored rule's reason is in .hadolint.yaml). On the host,
-# beside secrets: the image has no hadolint.
+# Every Dockerfile passes hadolint (each ignored rule's reason is in .hadolint.yaml), is dockerfmt-formatted, and pins
+# every image by digest (Dependabot bumps them). The tools are pinned in mise.toml. On the host, beside secrets: the
+# image has neither tool.
 [group('gate')]
 images:
     #!/usr/bin/env bash
     set -euo pipefail
-    command -v hadolint >/dev/null || { echo "images: hadolint is not installed -- run just tools" >&2; exit 2; }
-    git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\.dockerignore$' | xargs -0 -r hadolint
+    for tool in hadolint dockerfmt; do
+        command -v "$tool" >/dev/null || { echo "images: $tool is not installed -- run just tools" >&2; exit 2; }
+    done
+    files() { git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\.dockerignore$'; }
+    files | xargs -0 -r hadolint
+    files | xargs -0 -r -n1 dockerfmt --check -n
+    files | xargs -0 -r python3 -I packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
 # blueprint's for this step in every repo (stack/shell, stack/shell-scripts). On the host, beside images.
