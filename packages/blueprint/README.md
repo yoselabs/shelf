@@ -39,6 +39,21 @@ kind = "application"      # application | library | infrastructure
 surfaces = ["cli"]
 traits = ["stores-data"]
 
+# The classification (ADR 0026): what the agent or owner judged about the report's "Facts and evidence".
+# A declaration only adds. Claims come from the closed lists: kinds library | application | infrastructure;
+# surfaces http-server | mcp-server | cli | web-ui | desktop-app | game; traits deployed | ships-image |
+# holds-secrets | stores-data | llm-backed | scheduled-jobs. A claim off the lists, or a blank reason, is a state problem.
+[[profile.classified]]    # accept a claim: it joins the profile (surfaces, traits, or the kind)
+claim = "mcp-server"
+decided_by = "agent"      # detected | agent | owner (default agent)
+reason = "a FastMCP server; MCP is its main surface"
+
+[[profile.rejected]]      # silence evidence; never removes a fact
+claim = "mcp-server"
+where = "packages/mcp-bridge/pyproject.toml:11"   # the evidence it rejects; matched by claim and file, so a move to another file is reported again
+decided_by = "agent"
+reason = "a client library, not a server"
+
 [profile.frameworks]      # overrides detection: framework -> its folder
 godot = "src/Game.Godot"
 

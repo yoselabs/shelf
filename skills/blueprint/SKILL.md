@@ -54,10 +54,14 @@ install, any agent harness.
    grouped by layer) and one table per concern. Read the README and `--audit --summary` only; open a
    concern's file only to remediate it. The JSON (`--json`) is for scripts, not for reading.
 2. A `not checked` row that is not a blueprint gap: find why (a missing tool, no commits).
-3. Read the report's "Facts and evidence" (also `facts_and_evidence` in the JSON): accept facts and high-confidence
-   evidence and record them; judge low-confidence evidence yourself, or ask the owner when unsure; ask the owner what
-   nothing detects (a game, a desktop app, library versus application). One numbered question round, grouped, each
-   with your recommended answer.
+3. Read the report's "Facts and evidence" (also `facts_and_evidence` in the JSON); each item is accepted, rejected or
+   awaiting judgement, and the "To classify" list holds the awaiting ones (they do not fail the gate; resolve
+   them). Write each judgement in `docs/blueprint/blueprint.toml`: `[[profile.classified]]` (`claim`, `decided_by`,
+   `reason`) accepts a fact or evidence; `[[profile.rejected]]` (`claim`, `where` = the evidence's `path:line`,
+   `decided_by`, `reason`) silences evidence and never removes a fact. Claims come from the closed lists; `decided_by`
+   is `agent`, or `owner` with the reason in the owner's words. Accept facts and high-confidence evidence; judge
+   low-confidence evidence yourself, or ask the owner when unsure; ask the owner what nothing detects (a game, a
+   desktop app, library versus application). One numbered question round, grouped, each with your recommended answer.
 4. Show the owner the plan (§4) and stop.
 
 The audit writes `docs/blueprint/checkpoints.txt`, the set it judged. Between audits the repo's gate

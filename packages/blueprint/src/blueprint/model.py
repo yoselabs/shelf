@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
-    from blueprint.facts import Evidence, Fact
+    from blueprint.facts import Evidence, Fact, Judgement
     from blueprint.profile import Override
 
 # Never walked: tool caches, environments and build output hold no repo decisions, and a
@@ -197,6 +197,9 @@ class Profile:
     # What detection read (blueprint.facts): reported, not yet acted on. Declared surfaces and traits stay as declared.
     facts: tuple[Fact, ...] = ()
     evidence: tuple[Evidence, ...] = ()
+    # The recorded judgement on them (`[[profile.classified]]`, `[[profile.rejected]]`).
+    classified: tuple[Judgement, ...] = ()
+    rejected: tuple[Judgement, ...] = ()
 
 
 def uses_beads(profile: Profile) -> bool:

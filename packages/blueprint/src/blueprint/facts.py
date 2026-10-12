@@ -30,6 +30,8 @@ TRAITS = ("deployed", "ships-image", "holds-secrets", "stores-data", "llm-backed
 CLAIMS = (*KINDS, *SURFACES, *TRAITS)
 
 Confidence = Literal["high", "low"]
+DECIDERS = ("detected", "agent", "owner")
+ACCEPTED, REJECTED, AWAITING = "accepted", "rejected", "awaiting judgement"
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,50 @@ class Evidence:
     claim: str
     where: str
     confidence: Confidence
+
+
+@dataclass(frozen=True)
+class Judgement:
+    """A recorded decision on a claim: `[[profile.classified]]` accepts it, `[[profile.rejected]]` rejects the evidence at `where`."""
+
+    claim: str
+    decided_by: str
+    reason: str
+    where: str = ""
+
+
+def _file(where: str) -> str:
+    """The file part of `path:line`."""
+    head, sep, tail = where.rpartition(":")
+    return head if sep and tail.isdigit() else where
+
+
+def judgement_problem(kind: str, raw: object) -> tuple[Judgement | None, str | None]:
+    """The decision a `[[profile.<kind>]]` entry records, or why it is refused (a claim off the closed lists, no reason...)."""
+    if not isinstance(raw, dict):
+        return None, f"a profile.{kind} entry is not a table"
+    claim, reason = str(raw.get("claim", "")), str(raw.get("reason", ""))
+    where, by = str(raw.get("where", "")), str(raw.get("decided_by", "agent"))
+    if claim not in CLAIMS:
+        lists = f"kinds {', '.join(KINDS)}; surfaces {', '.join(SURFACES)}; traits {', '.join(TRAITS)}"
+        return None, f"profile.{kind} claim {claim!r} is not on the closed lists: {lists}"
+    what = f"profile.{kind} {claim!r}"
+    if not reason.strip():
+        return None, f"{what} has no reason"
+    if by not in DECIDERS:
+        return None, f"{what}: decided_by {by!r} is not one of {', '.join(DECIDERS)}"
+    if kind == "rejected" and not where.strip():
+        return None, f"{what} needs where: the evidence it rejects (path:line)"
+    return Judgement(claim, by, reason, where.strip()), None
+
+
+def status(claim: str, where: str, *, evidence: bool, classified: tuple[Judgement, ...], rejected: tuple[Judgement, ...]) -> str:
+    """Where one fact or piece of evidence stands: accepted (classified), rejected (evidence only), or awaiting judgement."""
+    if any(j.claim == claim for j in classified):
+        return ACCEPTED
+    if evidence and any(j.claim == claim and _file(j.where) == _file(where) for j in rejected):
+        return REJECTED
+    return AWAITING
 
 
 # Runtime dependencies that point at a surface or trait, each low: a client library carries the same dependency.
@@ -174,13 +220,55 @@ def detect_facts(ctx: Context) -> tuple[tuple[Fact, ...], tuple[Evidence, ...]]:
     return tuple(dict.fromkeys(facts)), tuple(dict.fromkeys(evidence))
 
 
-def as_dict(facts: tuple[Fact, ...], evidence: tuple[Evidence, ...]) -> dict[str, list[dict[str, str]]]:
-    """The JSON shape, under the report's `facts_and_evidence` key."""
-    return {"facts": [asdict(f) for f in facts], "evidence": [asdict(e) for e in evidence]}
+def as_dict(
+    facts: tuple[Fact, ...],
+    evidence: tuple[Evidence, ...],
+    classified: tuple[Judgement, ...] = (),
+    rejected: tuple[Judgement, ...] = (),
+) -> dict[str, list[dict[str, str]]]:
+    """The JSON shape, under the report's `facts_and_evidence` key; each item says its status."""
+    return {
+        "facts": [
+            {**asdict(f), "status": status(f.claim, f.where, evidence=False, classified=classified, rejected=rejected)} for f in facts
+        ],
+        "evidence": [
+            {**asdict(e), "status": status(e.claim, e.where, evidence=True, classified=classified, rejected=rejected)} for e in evidence
+        ],
+    }
 
 
-def lines(facts: tuple[Fact, ...], evidence: tuple[Evidence, ...]) -> list[str]:
-    """The report's section body: facts first, then evidence with its confidence."""
-    out = [f"- fact: {f.claim} (`{f.where}`)" for f in facts]
-    out += [f"- evidence, {e.confidence} confidence: {e.claim} (`{e.where}`)" for e in evidence]
-    return out or ["- none detected"]
+def to_classify(
+    facts: tuple[Fact, ...], evidence: tuple[Evidence, ...], classified: tuple[Judgement, ...], rejected: tuple[Judgement, ...]
+) -> list[str]:
+    """The claims still awaiting judgement, each once, as `claim (where)`."""
+    items = [(f.claim, f.where, False) for f in facts] + [(e.claim, e.where, True) for e in evidence]
+    return [f"{c} (`{w}`)" for c, w, ev in items if status(c, w, evidence=ev, classified=classified, rejected=rejected) == AWAITING]
+
+
+def lines(
+    facts: tuple[Fact, ...],
+    evidence: tuple[Evidence, ...],
+    classified: tuple[Judgement, ...] = (),
+    rejected: tuple[Judgement, ...] = (),
+) -> list[str]:
+    """The report's section body: facts first, then evidence with its confidence, each marked; rejected evidence is not listed again."""
+    out: list[str] = []
+    for f in facts:
+        st = status(f.claim, f.where, evidence=False, classified=classified, rejected=rejected)
+        out.append(f"- fact, {st}: {f.claim} (`{f.where}`)")
+    for e in evidence:
+        st = status(e.claim, e.where, evidence=True, classified=classified, rejected=rejected)
+        if st != REJECTED:
+            out.append(f"- evidence, {e.confidence} confidence, {st}: {e.claim} (`{e.where}`)")
+    out += [f"- rejected: {j.claim} (`{j.where}`), by {j.decided_by}: {j.reason.strip()}" for j in rejected if _rejects(j, evidence)]
+    out += [f"- accepted: {j.claim}, by {j.decided_by}: {j.reason.strip()}" for j in classified]
+    pending = to_classify(facts, evidence, classified, rejected)
+    if pending:
+        out += ["", f"To classify ({len(pending)}), write each as `[[profile.classified]]` or `[[profile.rejected]]` in the state file:"]
+        out += [f"- {p}" for p in pending]
+    return out if facts or evidence or classified else ["- none detected"]
+
+
+def _rejects(j: Judgement, evidence: tuple[Evidence, ...]) -> bool:
+    """Whether a rejection still silences something now detected."""
+    return any(e.claim == j.claim and _file(e.where) == _file(j.where) for e in evidence)

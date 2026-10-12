@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from blueprint import adr
-from blueprint.facts import detect_facts
+from blueprint.facts import KINDS, SURFACES, TRAITS, Judgement, detect_facts, judgement_problem
 from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, is_skipped, override_toml, walk
 
 STATE_DIR = "docs/blueprint"
@@ -131,6 +131,21 @@ class State:
     skip: tuple[str, ...] = ()
     # Not failures: an old shape still read, with the exact text to replace it.
     notices: tuple[str, ...] = ()
+    # The justified classification: `[[profile.classified]]` and `[[profile.rejected]]`, the refused ones left out.
+    classified: tuple[Judgement, ...] = ()
+    rejected: tuple[Judgement, ...] = ()
+
+
+def _load_judgements(declared: dict[str, Any], problems: list[str]) -> tuple[tuple[Judgement, ...], tuple[Judgement, ...]]:
+    loaded: dict[str, list[Judgement]] = {"classified": [], "rejected": []}
+    for kind, found in loaded.items():
+        for raw in declared.get(kind, []):
+            judgement, problem = judgement_problem(kind, raw)
+            if problem:
+                problems.append(problem)
+            elif judgement is not None:
+                found.append(judgement)
+    return tuple(loaded["classified"]), tuple(loaded["rejected"])
 
 
 def _load_override(raw: dict[str, Any], repo: Path, problems: list[str]) -> Override | None:
@@ -204,7 +219,8 @@ def load_state(repo: Path, today: date | None = None) -> State:
         for o in overrides
         if o.id == DETECTION and o.scope and o.unjustified is None and o.problem(today)
     ]
-    return State(declared, tuple(overrides), data.get("settings", {}), tuple(problems), skip, tuple(notices))
+    classified, rejected = _load_judgements(declared, problems)
+    return State(declared, tuple(overrides), data.get("settings", {}), tuple(problems), skip, tuple(notices), classified, rejected)
 
 
 # Compose files by name; a repo with many (one per service folder) still gets one `compose` table.
@@ -356,4 +372,19 @@ def detect(repo: Path, state: State) -> Profile:
         ignore=skip,
     )
     facts, evidence = detect_facts(Context(repo, profile))
-    return replace(profile, facts=facts, evidence=evidence)
+    # A declaration only adds: detected facts, classified claims and the simple declared values join; nothing is removed.
+    claims = (*(f.claim for f in facts), *(j.claim for j in state.classified))
+    return replace(
+        profile,
+        kind=profile.kind if declared.get("kind") else next((j.claim for j in state.classified if j.claim in KINDS), profile.kind),
+        surfaces=_joined(profile.surfaces, claims, SURFACES),
+        traits=_joined(profile.traits, claims, TRAITS),
+        facts=facts,
+        evidence=evidence,
+        classified=state.classified,
+        rejected=state.rejected,
+    )
+
+
+def _joined(declared: tuple[str, ...], claims: tuple[str, ...], among: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys((*declared, *(c for c in claims if c in among))))

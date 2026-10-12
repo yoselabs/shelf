@@ -162,7 +162,7 @@ def markdown(run: Run) -> str:
         "",
         "## Facts and evidence",
         "",
-        *facts.lines(run.profile.facts, run.profile.evidence),
+        *facts.lines(run.profile.facts, run.profile.evidence, run.profile.classified, run.profile.rejected),
         "",
     ]
     out += [f"⚠️ {p}" for p in run.problems]
@@ -201,7 +201,7 @@ def as_json(run: Run) -> str:
             "profile": {"kind": p.kind, "surfaces": p.surfaces, "traits": p.traits, "stacks": p.stacks, "tracker": p.tracker},
             "overrides": [o.as_dict() for o in run.overrides],
             "notices": run.notices,
-            "facts_and_evidence": facts.as_dict(p.facts, p.evidence),
+            "facts_and_evidence": facts.as_dict(p.facts, p.evidence, p.classified, p.rejected),
             "set_hash": run.set_hash,
             "problems": run.problems,
             "rows": [
