@@ -25,6 +25,7 @@ _SCRIPTS = [
     "packages/convert-md/bench/run_bench.py",
     "tools/affected.py",
     "tools/catalog.py",
+    "tools/changed.py",
     "tools/hooks/forbid-local-shelf-source.py",
     "tools/preset_drift.py",
 ]

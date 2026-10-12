@@ -68,6 +68,8 @@ _JUSTFILES = ("justfile", "Justfile", ".justfile")
 _SHELF_ONLY_TARGETS = frozenset(
     {
         "catalog",
+        "lint-changed",
+        "spell-changed",
         "advisory",
         "arch",
         "test-browser",

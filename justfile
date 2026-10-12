@@ -21,6 +21,12 @@ test_image := "shelf-gate-" + file_name(justfile_directory())
 # touches (`test-affected`); `check-all` runs every test with the coverage floor, and CI runs
 # `check-all`.
 #
+# The per-file linters (images, scripts, lint-changed, spell-changed) check only the files changed against the base
+# in `check` (tools/changed.py; a changed config file, or no base, selects everything). `check-all` runs them on every
+# file (`images "all"`, `scripts "all"`, `lint`, `spell`). The cross-file checks (typecheck, arch, deps, blueprint,
+# secrets) always cover the whole repo. A linter with nothing changed prints "skipped <linter>: ..." and the gate
+# repeats that line.
+#
 # Both run inside a Linux container when Docker answers: on the macOS host an endpoint scanner
 # inspects every process start and file write, and the suite took 10-17 min there (2026-10-10).
 # In CI, inside a container, or with SHELF_HOST_CHECK=1 they run in place; the container
@@ -29,7 +35,7 @@ test_image := "shelf-gate-" + file_name(justfile_directory())
 check: beads-lint secrets images scripts (gate "check-host")
 
 [group('gate')]
-check-all: beads-lint secrets images scripts (gate "check-all-host")
+check-all: beads-lint secrets (images "all") (scripts "all") (gate "check-all-host")
 
 # Every bead still to be started (open or blocked) carries its acceptance criteria: criteria are what make a bead
 # ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. Runs on the
@@ -63,25 +69,30 @@ secrets:
 # every image by digest (Dependabot bumps them). The tools are pinned in mise.toml. On the host, beside secrets: the
 # image has neither tool.
 [group('gate')]
-images:
+images scope="changed":
     #!/usr/bin/env bash
     set -euo pipefail
     for tool in hadolint dockerfmt; do
         command -v "$tool" >/dev/null || { echo "images: $tool is not installed -- run just tools" >&2; exit 2; }
     done
-    files() { git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\.dockerignore$'; }
-    files | xargs -0 -r hadolint
-    files | xargs -0 -r -n1 dockerfmt --check -n
-    files | xargs -0 -r python3 -I packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py
+    list=$(mktemp); trap 'rm -f "$list"' EXIT
+    python3 -I tools/changed.py --scope {{ scope }} --config .hadolint.yaml --not '*.dockerignore' '*Dockerfile' '*Dockerfile.*' '*Containerfile' > "$list"
+    [ -s "$list" ] || { echo "skipped images: no Dockerfile changed"; exit 0; }
+    xargs -0 hadolint < "$list"
+    xargs -0 -n1 dockerfmt --check -n < "$list"
+    xargs -0 python3 -I packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py < "$list"
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
 # blueprint's for this step in every repo (stack/shell). On the host, beside images.
 [group('gate')]
-scripts:
+scripts scope="changed":
     #!/usr/bin/env bash
     set -euo pipefail
     command -v shellcheck >/dev/null || { echo "scripts: shellcheck is not installed -- run just tools" >&2; exit 2; }
-    git ls-files -z '*.sh' | xargs -0 -r shellcheck
+    list=$(mktemp); trap 'rm -f "$list"' EXIT
+    python3 -I tools/changed.py --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
+    [ -s "$list" ] || { echo "skipped scripts: no shell script changed"; exit 0; }
+    xargs -0 shellcheck < "$list"
 
 # The dispatch sits in its own private recipe so `check` and `check-all` stay plain dependency edges
 # for the graph reader.
@@ -96,7 +107,7 @@ gate target:
     fi
 
 [group('gate')]
-check-host: (steps "guard" "preset" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test-affected")
+check-host: (steps "guard" "preset" "blueprint" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test-affected")
 
 [group('gate')]
 check-all-host: (steps "guard" "preset" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test")
@@ -124,6 +135,7 @@ steps +names:
         [ "$rc" -eq 0 ] || { failed+=("$n"); mark="$mark ✗"; }
         line+=("$n ${took}s$mark")
     done
+    grep -h '^skipped ' "$dir"/*.log >&2 || true
     for n in "${failed[@]}"; do echo "--- $n" >&2; cat "$dir/$n.log" >&2; done
     summary=$(printf '%s · ' "${line[@]}"); echo "gate: ${summary% · } -- total ${total}s" >&2
     [ "$total" -gt $gate_budget ] && echo "gate: ⚠ ${total}s is over the ${gate_budget}s gate budget: find the slow step above" >&2
@@ -234,6 +246,17 @@ lint:
     uv run ruff check packages tests tools conftest.py
     uv run ruff format --check packages tests tools conftest.py
 
+# `lint` over the files changed against the base (tools/changed.py), for `check`. Shelf-only: consumers copy `lint`.
+[group('gate')]
+lint-changed:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    list=$(mktemp); trap 'rm -f "$list"' EXIT
+    python3 -I tools/changed.py --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' 'tools/*.py' conftest.py > "$list"
+    [ -s "$list" ] || { echo "skipped lint: no Python file changed"; exit 0; }
+    xargs -0 uv run ruff check --force-exclude < "$list"
+    xargs -0 uv run ruff format --check --force-exclude < "$list"
+
 format:
     uv run ruff format packages tests tools conftest.py
 
@@ -253,6 +276,16 @@ arch:
 [group('gate')]
 spell:
     uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md CLAUDE.md conftest.py
+
+# `spell` over the files changed against the base, for `check`. Shelf-only: consumers copy `spell`.
+[group('gate')]
+spell-changed:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    list=$(mktemp); trap 'rm -f "$list"' EXIT
+    python3 -I tools/changed.py --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md CLAUDE.md conftest.py > "$list"
+    [ -s "$list" ] || { echo "skipped spell: no file changed"; exit 0; }
+    xargs -0 uv run codespell < "$list"
 
 # dependency hygiene: uv.lock matches every pyproject (`uv run` alone never notices a stale lock;
 # shelf main ran green on one, 2026-10-11), then per package (unused / missing / transitive). deptry reads each
