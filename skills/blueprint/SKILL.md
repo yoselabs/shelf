@@ -73,6 +73,7 @@ The owner's one yes covers the whole plan. Per concern, in layer order (generic,
   `adr = "NNNN"` naming the accepted ADR that records the durable decision (no CI, builds on the
   owner's machines). A path detection must skip (a throwaway spike) is a `[[profile.ignore]]` entry
   under the same rule. Rows still not ✅ at the end become beads.
+- `blueprint checkpoints [id-prefix] [--json]` lists every checkpoint id, its statement and the fact that turns it on: read it before writing an override or declaring a missed fact.
 - Finish with the repo's own `just check` green and `--write` again.
 
 ## 4. What the owner sees

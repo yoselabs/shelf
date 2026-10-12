@@ -16,7 +16,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from blueprint import adr, report, survey, templates
+from blueprint import adr, checkpoints, report, survey, templates
 from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
@@ -66,9 +66,25 @@ def main(argv: list[str] | None = None) -> int:
             "the others: a tools/ script, named in the profile"
         ),
     )
+    cps = sub.add_parser(
+        "checkpoints",
+        help="list every checkpoint: its id, statement and the fact that turns it on",
+        description=(
+            "List every checkpoint blueprint can report: the id (what an override or a declared fact names), "
+            "the statement, and the fact that turns it on. Profile rows are listed per stack and role."
+        ),
+    )
+    cps.add_argument("prefix", nargs="?", default="", help="only checkpoints whose id starts with this (e.g. stack.dockerfile)")
+    cps.add_argument("--json", action="store_true", help="print JSON")
     args = parser.parse_args(argv)
 
-    commands = {"template": _template, "adr-index": _adr_index, "recipe": _recipe, "survey": lambda a: _survey(a.repo, a.check)}
+    commands = {
+        "checkpoints": _checkpoints,
+        "template": _template,
+        "adr-index": _adr_index,
+        "recipe": _recipe,
+        "survey": lambda a: _survey(a.repo, a.check),
+    }
     if args.command in commands:
         return commands[args.command](args)
     result = run(args.repo, concern=args.concern, audit=args.audit)
@@ -85,6 +101,12 @@ def main(argv: list[str] | None = None) -> int:
         for path in report.write(result, args.repo.resolve(), date.today(), prune=args.concern is None):  # noqa: DTZ011 -- a report date, the owner's calendar
             sys.stderr.write(f"wrote {path}\n")
     return result.exit_code
+
+
+def _checkpoints(args: argparse.Namespace) -> int:
+    rows = checkpoints.listing(args.prefix)
+    sys.stdout.write((checkpoints.as_json(rows) if args.json else checkpoints.as_table(rows)) + "\n")
+    return 0
 
 
 def _template(args: argparse.Namespace) -> int:
