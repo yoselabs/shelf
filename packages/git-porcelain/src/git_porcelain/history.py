@@ -226,27 +226,40 @@ def classify_remote_failure(stderr: str) -> RemoteFailure:
     return "other"
 
 
-def _remote(repo: Path, *args: str, timeout: float) -> None:
+def _remote(repo: Path, *args: str, timeout: float, config: Mapping[str, str] | None = None) -> None:
     try:
-        run_git(repo, *args, timeout=timeout)
+        run_git(repo, *_config_args(config), *args, timeout=timeout)
     except GitError as exc:
         reason = "offline" if exc.retryable else classify_remote_failure(str(exc))
         raise RemoteError(str(exc), reason=reason) from exc
 
 
-def push(repo: Path, remote: str | None = None, refspec: str | None = None, *, timeout: float = 120) -> None:
-    """Push the current branch to its upstream, or ``refspec`` to ``remote``. Never forces."""
+def push(
+    repo: Path,
+    remote: str | None = None,
+    refspec: str | None = None,
+    *,
+    timeout: float = 120,
+    config: Mapping[str, str] | None = None,
+) -> None:
+    """Push the current branch to its upstream, or ``refspec`` to ``remote``. Never forces.
+
+    ``git push`` runs the repo's ``pre-push`` hook (git-lfs installs one); ``config`` turns it
+    off (``{"core.hooksPath": "/dev/null"}``) — each entry is a ``git -c key=value``."""
     args = ["push", "--porcelain"]
     if remote is not None:
         args.append(remote)
         if refspec is not None:
             args.append(refspec)
-    _remote(repo, *args, timeout=timeout)
+    _remote(repo, *args, timeout=timeout, config=config)
 
 
-def fetch(repo: Path, remote: str | None = None, *, timeout: float = 120) -> None:
-    """Fetch the remote's refs. Never touches the working tree or the current branch."""
-    _remote(repo, "fetch", "--quiet", *([remote] if remote else []), timeout=timeout)
+def fetch(repo: Path, remote: str | None = None, *, timeout: float = 120, config: Mapping[str, str] | None = None) -> None:
+    """Fetch the remote's refs. Never touches the working tree or the current branch.
+
+    A fetch that brings new commits starts a detached ``git maintenance run --auto``; ``config``
+    turns that off (``{"maintenance.auto": "false"}``) — each entry is a ``git -c key=value``."""
+    _remote(repo, "fetch", "--quiet", *([remote] if remote else []), timeout=timeout, config=config)
 
 
 @dataclass(frozen=True)

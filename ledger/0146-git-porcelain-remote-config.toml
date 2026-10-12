@@ -1,0 +1,10 @@
+seq = 146
+date = "2026-10-12"
+event = "delivery"
+software = "git-porcelain"
+release = "git-porcelain-v0.6.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE, for a sync job that talks to the remote on a timer. `push`, `fetch`, `lfs_push` and `lfs_fetch` take `config=` (each entry a `git -c key=value`, placed before the subcommand), the contract `commit_paths`, `merge` and `finish_merge` already had. A `git fetch` that brings new commits starts a detached `git maintenance run --auto` in the vault, which races the server's own commits for locks (`maintenance.auto=false` stops it); `git push` runs the vault's `pre-push` hook, git-lfs's `git lfs pre-push` included (`core.hooksPath=/dev/null` skips it). Omitting `config` keeps the old behaviour."""

@@ -188,3 +188,21 @@ def test_lfs_fetch_of_a_missing_object_raises_remote_error(tmp_path: Path, monke
         git.lfs_fetch(repo, "origin", "origin/main")
 
     assert not (repo / "deck.png").exists()
+
+
+def test_lfs_calls_pass_config_to_git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``config`` reaches git-lfs through ``-c``: an ``lfs.url`` pointing nowhere breaks both calls."""
+    _isolate(tmp_path, monkeypatch)
+    repo, remote = _with_remote(tmp_path)
+    other = _clone(tmp_path, remote, "other")
+    _commit_png(other, "deck.png", bytes(reversed(PNG)))
+    nowhere = {"lfs.url": str(tmp_path / "nowhere")}
+
+    with pytest.raises(RemoteError):
+        git.lfs_push(other, "origin", "main", config=nowhere)
+    git.lfs_push(other, "origin", "main")  # without config, the same call works
+    _git(other, "push", "-q", "origin", "main")
+    git.fetch(repo, "origin")
+    with pytest.raises(RemoteError):
+        git.lfs_fetch(repo, "origin", "origin/main", config=nowhere)
+    git.lfs_fetch(repo, "origin", "origin/main")

@@ -233,3 +233,85 @@ def test_a_rewrite_with_the_same_bytes_is_nothing_to_commit(tmp_path: Path) -> N
     tmp.replace(repo / "seed.md")
 
     assert git.commit_paths(repo, ["seed.md"], "noop", author=ROBIN, committer=BOT) is None
+
+
+# --- config= reaches the remote calls ----------------------------------------------
+
+
+def _with_origin(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """A repo, its bare origin, and a second clone that can publish commits to fetch."""
+    repo = _repo(tmp_path)
+    origin = tmp_path / "origin.git"
+    _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
+    _git(repo, "remote", "add", "origin", str(origin))
+    _git(repo, "push", "-q", "-u", "origin", "main")
+    other = tmp_path / "other"
+    _git(tmp_path, "clone", "-q", str(origin), str(other))
+    return repo, origin, other
+
+
+def _publish(other: Path) -> None:
+    (other / "new.md").write_text("new\n", encoding="utf-8")
+    _git(other, "add", "-A")
+    _git(other, "-c", "user.name=O", "-c", "user.email=o@example.com", "commit", "-qm", "new")
+    _git(other, "push", "-q", "origin", "main")
+
+
+def _maintenance_runs(trace: Path) -> int:
+    return sum("maintenance" in line and "--auto" in line for line in trace.read_text(encoding="utf-8").splitlines())
+
+
+def _fetch_traced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[str, str] | None) -> int:
+    repo, _, other = _with_origin(tmp_path)
+    _git(repo, "config", "gc.auto", "1")  # auto-maintenance is due; fetch asks for it after new objects
+    _publish(other)
+    trace = tmp_path / "trace.log"
+    monkeypatch.setenv("GIT_TRACE", str(trace))
+    git.fetch(repo, "origin", config=config)
+    monkeypatch.delenv("GIT_TRACE")
+    return _maintenance_runs(trace)
+
+
+def test_fetch_starts_auto_maintenance_by_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    assert _fetch_traced(tmp_path, monkeypatch, None) >= 1
+
+
+def test_fetch_config_turns_auto_maintenance_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    assert _fetch_traced(tmp_path, monkeypatch, {"maintenance.auto": "false"}) == 0
+
+
+def _pre_push_hook(repo: Path, tmp_path: Path) -> Path:
+    hooks = tmp_path / "hooks"
+    hooks.mkdir()
+    marker = tmp_path / "pushed"
+    hook = hooks / "pre-push"
+    hook.write_text(f"#!/bin/sh\necho ran >> '{marker}'\n", encoding="utf-8")
+    hook.chmod(0o755)
+    _git(repo, "config", "core.hooksPath", str(hooks))
+    return marker
+
+
+def _commit_more(repo: Path) -> None:
+    (repo / "more.md").write_text("more\n", encoding="utf-8")
+    assert git.commit_paths(repo, ["more.md"], "more", author=ROBIN, committer=BOT, config=QUIET)
+
+
+def test_push_runs_the_pre_push_hook_by_default(tmp_path: Path) -> None:
+    repo, _, _ = _with_origin(tmp_path)
+    marker = _pre_push_hook(repo, tmp_path)
+    _commit_more(repo)
+
+    git.push(repo)
+
+    assert marker.exists()
+
+
+def test_push_config_skips_the_pre_push_hook(tmp_path: Path) -> None:
+    repo, origin, _ = _with_origin(tmp_path)
+    marker = _pre_push_hook(repo, tmp_path)
+    _commit_more(repo)
+
+    git.push(repo, config={"core.hooksPath": "/dev/null"})
+
+    assert not marker.exists()
+    assert _git(origin, "log", "-1", "--format=%s", "main").strip() == "more"

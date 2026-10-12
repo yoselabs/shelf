@@ -36,7 +36,8 @@ try:
     git.push(repo)                                               # never forces
 except git.RemoteError as e:
     e.reason                                                     # offline | auth | rejected | other
-git.fetch(repo)
+git.fetch(repo, config={"maintenance.auto": "false"})          # no detached `git maintenance` after it
+git.push(repo, config={"core.hooksPath": "/dev/null"})          # skip pre-push (git-lfs); same on lfs_push/lfs_fetch
 r = git.merge(repo, "origin/main", author=me, committer=me)     # up_to_date | fast_forward |
                                                                  # merged | conflict | blocked
 if r.state == "conflict":                                        # markers left, base shown
