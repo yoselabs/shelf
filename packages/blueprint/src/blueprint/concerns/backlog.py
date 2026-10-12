@@ -6,7 +6,7 @@ import json
 import re
 from collections import Counter
 
-from blueprint.model import Context, Finding, FixedBy, check, failing, not_checked, not_set_up, passing, uses_beads
+from blueprint.model import Context, Finding, FixedBy, Profile, check, failing, not_checked, not_set_up, passing, uses_beads
 
 # Effective values bd must report (`bd config show --json`), owner rounds 5-8.
 STRICT = {
@@ -212,7 +212,12 @@ def _lint_evidence(output: str) -> str:
     return f"{len(beads)} beads miss sections: {counts}; first: {', '.join(beads[:_LINT_NAMED])}"
 
 
-@check("backlog.no-tracker-file", "no second backlog: no TODO.md or docs/backlog.md beside beads", applies=lambda p: p.tracker is not None)
+def _has_tracker(profile: Profile) -> bool:
+    """The repo names an issue tracker."""
+    return profile.tracker is not None
+
+
+@check("backlog.no-tracker-file", "no second backlog: no TODO.md or docs/backlog.md beside beads", applies=_has_tracker)
 def no_tracker_file(ctx: Context) -> Finding:
     """Work lives in beads only."""
     found = [f for f in ("TODO.md", "TODO", "docs/backlog.md", "BACKLOG.md", "docs/todo.md") if ctx.path(f).exists()]

@@ -25,6 +25,7 @@ _INSTALL_RECIPES = ("install", "reinstall", "tool-install", "install-tool")
 
 
 def _applies(profile: Profile) -> bool:
+    """The repo is an application on the python-uv stack."""
     return profile.kind == "application" and "python-uv" in profile.stacks
 
 

@@ -5,13 +5,18 @@ longer a real dependency. Invoked only via `uv run --with docling` (isolated,
 transient install per D4), kept so future re-verification stays possible.
 """
 
+import argparse
 import sys
 import time
 from pathlib import Path
 
 
 def main() -> None:
-    src, dst = sys.argv[1], sys.argv[2]
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("src", help="the file to convert")
+    parser.add_argument("dst", help="where to write the markdown")
+    args = parser.parse_args()
+    src, dst = args.src, args.dst
     from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.pipeline_options import PdfPipelineOptions

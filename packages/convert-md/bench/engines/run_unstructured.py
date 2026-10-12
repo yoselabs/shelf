@@ -8,6 +8,7 @@ degrade or fail without it. That itself is a fidelity data point: unstructured's
 best PDF quality requires system binaries beyond what a pure `uv add` gets you.
 """
 
+import argparse
 import sys
 import time
 from pathlib import Path
@@ -19,7 +20,11 @@ _CATEGORY_PREFIX = {
 
 
 def main() -> None:
-    src, dst = sys.argv[1], sys.argv[2]
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("src", help="the file to convert")
+    parser.add_argument("dst", help="where to write the markdown")
+    args = parser.parse_args()
+    src, dst = args.src, args.dst
     from unstructured.partition.pdf import partition_pdf
 
     t0 = time.monotonic()

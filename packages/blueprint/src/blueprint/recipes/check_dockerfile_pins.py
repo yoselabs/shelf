@@ -19,6 +19,7 @@ Exit 1 with one `path:line message` per image that lacks a digest.
 
 from __future__ import annotations
 
+import argparse
 import re
 import subprocess
 import sys
@@ -120,15 +121,12 @@ def tracked() -> list[Path]:
 
 def main(argv: list[str]) -> int:
     """Check the given Dockerfiles, or every tracked one."""
-    contexts: set[str] = set()
-    files: list[Path] = []
-    it = iter(argv)
-    for a in it:
-        if a == "--context":
-            contexts.add(next(it, "").lower())
-        else:
-            files.append(Path(a))
-    files = files or tracked()
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--context", action="append", default=[], metavar="NAME", help="a build context name, exempt; repeatable")
+    parser.add_argument("files", nargs="*", type=Path, help="Dockerfiles to check; default: every tracked one")
+    args = parser.parse_args(argv)
+    contexts = {c.lower() for c in args.context}
+    files: list[Path] = args.files or tracked()
     errors = [e for f in files for e in check_file(f, f.as_posix(), contexts)]
     sys.stdout.write(("\n".join(errors) or f"dockerfile pins: {len(files)} file(s) clean") + "\n")
     return 1 if errors else 0

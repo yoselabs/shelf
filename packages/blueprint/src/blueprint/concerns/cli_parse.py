@@ -30,6 +30,7 @@ _TESTS = re.compile(r"(^|/)(tests?/|test_[^/]*\.py$|[^/]*_test\.py$|conftest\.py
 
 
 def _uses_python_uv(profile: Profile) -> bool:
+    """The python-uv stack is detected."""
     return "python-uv" in profile.stacks
 
 

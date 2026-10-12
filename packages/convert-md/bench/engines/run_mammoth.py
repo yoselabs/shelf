@@ -8,13 +8,18 @@ carries. mammoth renders the accepted final text (no tracked-changes support),
 same as markitdown, which wraps mammoth internally.
 """
 
+import argparse
 import sys
 import time
 from pathlib import Path
 
 
 def main() -> None:
-    src, dst = sys.argv[1], sys.argv[2]
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("src", help="the file to convert")
+    parser.add_argument("dst", help="where to write the markdown")
+    args = parser.parse_args()
+    src, dst = args.src, args.dst
 
     import html2text
     import mammoth

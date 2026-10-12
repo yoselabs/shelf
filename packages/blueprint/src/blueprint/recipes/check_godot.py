@@ -18,6 +18,7 @@ Fails (exit 1) on:
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -123,8 +124,12 @@ def check_version(root: Path, csproj: Path | None) -> list[str]:
 
 def main(argv: list[str]) -> int:
     """Check the Godot project at argv[0], its csproj at argv[1] or the first one beside project.godot."""
-    root = Path(argv[0]).resolve()
-    csproj = Path(argv[1]) if len(argv) > 1 else next(iter(sorted(root.glob("*.csproj"))), None)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("project", type=Path, help="the folder holding project.godot")
+    parser.add_argument("csproj", nargs="?", type=Path, help="the csproj to compare; default: the first one beside project.godot")
+    args = parser.parse_args(argv)
+    root = args.project.resolve()
+    csproj = args.csproj or next(iter(sorted(root.glob("*.csproj"))), None)
     files = (p for p in sorted(root.rglob("*")) if p.suffix in {".tscn", ".tres"} and not SKIP & set(p.relative_to(root).parts))
     errors = [e for f in files for e in check_file(root, f)] + check_uids(root) + check_version(root, csproj)
     sys.stdout.write(("\n".join(errors) or "godot surface: clean") + "\n")

@@ -9,6 +9,7 @@ Usage: unity_integrity.py [project_root]; prints one line per finding and exits 
 
 from __future__ import annotations
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -69,7 +70,9 @@ def _setting_problems(root: Path) -> list[str]:
 
 def main(argv: list[str]) -> int:
     """Check the Unity project at argv[0] (default: cwd)."""
-    root = Path(argv[0] if argv else ".").resolve()
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("project_root", nargs="?", default=".", type=Path, help="the Unity project folder, default: the current one")
+    root = parser.parse_args(argv).project_root.resolve()
     problems = _meta_problems(root) + _setting_problems(root)
     for line in problems:
         sys.stdout.write(line + "\n")

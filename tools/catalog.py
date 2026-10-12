@@ -16,6 +16,7 @@ decay candidate (Article VIII).
 
 from __future__ import annotations
 
+import argparse
 import sys
 import tomllib
 from pathlib import Path
@@ -120,7 +121,9 @@ def projections() -> dict[Path, str]:
 
 def main() -> int:
     """Regenerate every derived index in place. `--check` verifies freshness instead."""
-    check = "--check" in sys.argv[1:]
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--check", action="store_true", help="verify the indexes are fresh instead of writing them")
+    check = parser.parse_args().check
     stale: list[str] = []
     for path, content in projections().items():
         current = path.read_text() if path.exists() else ""

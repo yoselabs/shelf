@@ -14,6 +14,7 @@ can appear twice (accept vs all track-changes modes) sharing one runner.
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
@@ -116,12 +117,17 @@ def main() -> None:
 
     format defaults to .pdf (back-compat); pass `.docx` for the docx grid.
     """
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("format", nargs="?", default=".pdf", help="corpus format, default .pdf; .docx for the docx grid")
+    parser.add_argument("engine", nargs="?", default=None, help="run only this engine")
+    parser.add_argument("files", nargs="?", default=None, help="comma-separated corpus file names to run")
+    args = parser.parse_args()
     OUTPUTS_DIR.mkdir(exist_ok=True)
-    fmt = sys.argv[1] if len(sys.argv) > 1 else ".pdf"
+    fmt = args.format
     if not fmt.startswith("."):
         fmt = "." + fmt
-    only_engine = sys.argv[2] if len(sys.argv) > 2 else None
-    only_files = sys.argv[3].split(",") if len(sys.argv) > 3 else None
+    only_engine = args.engine
+    only_files = args.files.split(",") if args.files else None
 
     engines = _FORMATS.get(fmt, [])
     corpus = _corpus_for(fmt)

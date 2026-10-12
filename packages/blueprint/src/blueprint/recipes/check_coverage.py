@@ -9,6 +9,7 @@ Usage: check_coverage.py cov/Summary.json coverage-floor.json   (coverage-floor.
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -16,8 +17,12 @@ from pathlib import Path
 
 def main(argv: list[str]) -> int:
     """Compare the summary at argv[0] with the floor at argv[1]; exit 1 when any metric is under it."""
-    summary = json.loads(Path(argv[0]).read_text())["summary"]
-    floor: dict[str, float] = json.loads(Path(argv[1]).read_text())
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("summary", type=Path, help="ReportGenerator's Summary.json, e.g. cov/Summary.json")
+    parser.add_argument("floor", type=Path, help='the committed floor, e.g. coverage-floor.json: {"line": 89.0, "branch": 75.0}')
+    args = parser.parse_args(argv)
+    summary = json.loads(args.summary.read_text())["summary"]
+    floor: dict[str, float] = json.loads(args.floor.read_text())
     actual = {name: float(summary[f"{name}coverage"]) for name in floor}
     sys.stdout.write("coverage: " + ", ".join(f"{k} {actual[k]}% (floor {v}%)" for k, v in floor.items()) + "\n")
     bad = [f"{k} coverage {actual[k]}% < floor {v}%" for k, v in floor.items() if actual[k] < v]

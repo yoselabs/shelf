@@ -4,13 +4,18 @@ NOT a convert-md dependency — invoked only via `uv run --with pymupdf4llm`
 (isolated, transient install per D4).
 """
 
+import argparse
 import sys
 import time
 from pathlib import Path
 
 
 def main() -> None:
-    src, dst = sys.argv[1], sys.argv[2]
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("src", help="the file to convert")
+    parser.add_argument("dst", help="where to write the markdown")
+    args = parser.parse_args()
+    src, dst = args.src, args.dst
     import pymupdf4llm
 
     t0 = time.monotonic()
