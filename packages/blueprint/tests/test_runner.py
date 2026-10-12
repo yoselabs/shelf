@@ -372,6 +372,21 @@ def test_an_unjustified_detection_override_skips_nothing(repo: Repo, fields: str
     assert any(named in p for p in result.problems), result.problems
 
 
+def test_a_detection_override_naming_one_file_keeps_that_file_out_of_the_stack(repo: Repo) -> None:
+    for name in ("tools/a.sh", "scripts/b.sh"):
+        repo.write(name, "#!/usr/bin/env bash\nset -euo pipefail\n" + "echo x\n" * 12, executable=True)
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        '[[profile.ignore]]\npath = "tools/a.sh"\nreason = "r"\nexpires = 2099-01-01\n'
+        '[[override]]\nid = "detection"\nscope = "scripts/b.sh"\nreason = "r"\nexpires = 2099-01-01\n',
+    )
+    result = run(repo.root, env=repo.env)
+    assert "shell" not in result.profile.stacks
+    assert result.problems == ()
+    assert len(result.notices) == 1
+    assert 'scope = "tools/a.sh"' in result.notices[0]
+
+
 def test_a_detection_override_needs_a_scope(repo: Repo) -> None:
     repo.write("docs/blueprint/blueprint.toml", '[[override]]\nid = "detection"\nreason = "r"\nexpires = 2099-01-01\n')
     assert any("scope" in p for p in run(repo.root, env=repo.env).problems)

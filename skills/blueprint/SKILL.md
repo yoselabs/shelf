@@ -80,7 +80,7 @@ The owner's one yes covers the whole plan. Per concern, in layer order (generic,
   names), `reason`, `decided_by` (`owner` or `agent`), and `expires` or `adr`. A path detection must skip (a
   throwaway spike) is the same table with `id = "detection"` and `scope` = the path (the old `[[profile.ignore]]`,
   `# lenient:`, `# strict: no -e` and `x-policy-exempt` are no longer honoured: the report prints the override to
-  write in their place). A linter's own suppression (`# noqa`, hadolint `ignored:`, `# shellcheck disable`) stays
+  write in their place). Excusing a file from detection is also how to except a whole stack for it. A linter's own suppression (`# noqa`, hadolint `ignored:`, `# shellcheck disable`) stays
   where the linter reads it. Every report lists all overrides first. Rows still not ✅ at the end become beads.
 - `blueprint checkpoints [id-prefix] [--json]` lists every checkpoint id, its statement and the fact that turns it on: read it before writing an override or declaring a missed fact.
 - Finish with the repo's own `just check` green and `--write` again.
