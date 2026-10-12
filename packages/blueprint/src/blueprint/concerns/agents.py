@@ -114,6 +114,42 @@ def session_hooks(ctx: Context) -> Finding:
     return passing("SessionStart runs bd prime; Stop flags in-progress beads")
 
 
+_POCOCK_FIX = (
+    "claude plugin marketplace add mattpocock/skills --scope project && "
+    "claude plugin install mattpocock-skills@mattpocock --scope project (writes .claude/settings.json; commit it)"
+)
+
+
+@check(
+    "agents.pocock-skills",
+    "Matt Pocock's skills are installed at project scope: .claude/settings.json declares the mattpocock marketplace "
+    "and enables mattpocock-skills",
+    layer="agent",
+)
+def pocock_skills(ctx: Context) -> Finding:
+    """Every repo carries the same skills, so every clone and every agent session has them (owner, 2026-10-12).
+
+    The skills' setup and domain-modeling write docs/agents/*.md, GLOSSARY.md and their own ADR format;
+    blueprint's domain.md tells them not to (ADR 0017).
+    """
+    settings = _settings(ctx)
+    if settings is None:
+        return failing(".claude/settings.json is not a JSON object", "fix the JSON")
+    markets, plugins = settings.get("extraKnownMarketplaces"), settings.get("enabledPlugins")
+    market = markets.get("mattpocock") if isinstance(markets, dict) else None
+    source = market.get("source") if isinstance(market, dict) else None
+    declared = isinstance(source, dict) and source.get("source") == "github" and source.get("repo") == "mattpocock/skills"
+    enabled = isinstance(plugins, dict) and plugins.get("mattpocock-skills@mattpocock") is True
+    if declared and enabled:
+        return passing("mattpocock marketplace declared and mattpocock-skills enabled in .claude/settings.json")
+    gaps = [
+        *([] if declared else ["no extraKnownMarketplaces.mattpocock from github mattpocock/skills"]),
+        *([] if enabled else ['enabledPlugins["mattpocock-skills@mattpocock"] is not true']),
+    ]
+    build = failing if ctx.read(".claude/settings.json") is not None else not_set_up
+    return build(f"{'; '.join(gaps)} in .claude/settings.json", _POCOCK_FIX)
+
+
 def _repo_gitignores(ctx: Context) -> list[str] | None:
     """Every .gitignore the repo tracks or would track (present and not ignored), or None outside a git repository."""
     listed = ctx.git("ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", ".gitignore", "**/.gitignore")

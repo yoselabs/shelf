@@ -5,8 +5,8 @@ statement: CONTEXT.md is the glossary; each decision topic is one docs/adr/NNNN-
 concerns: [knowledge]
 status: accepted
 decided_by: owner
-updated: 2026-10-11
-distilled_into: blueprint knowledge.glossary, knowledge.adr-format, knowledge.adr-index; templates/agents/domain.md
+updated: 2026-10-12
+distilled_into: blueprint knowledge.glossary, knowledge.adr-format, knowledge.adr-index, agents.pocock-skills; templates/agents/domain.md
 ---
 
 # 0017 — Living ADRs and a generated index
@@ -32,3 +32,9 @@ distilled_into: blueprint knowledge.glossary, knowledge.adr-format, knowledge.ad
 
 - 2026-10-11: built as the knowledge concern (shelf-1y4.6, shelf-u43); the shelf moved
   `docs/resolutions/` to `docs/adr/` and `docs/glossary.md` to `CONTEXT.md`.
+- 2026-10-12: every repo installs Matt Pocock's skills at project scope (checkpoint `agents.pocock-skills`,
+  shelf-ykd, the owner). The skills' setup rewrites `docs/agents/domain.md` and `issue-tracker.md`, which blueprint
+  manages, and domain-modeling writes `GLOSSARY.md` and its own ADR format. We keep ours: `CONTEXT.md` stays the
+  glossary and ADRs keep frontmatter and History, because the index, the gate and the one-file-per-topic history
+  depend on them. Blueprint's `domain.md` tells the skills so and forbids running the setup skill over its files.
+  Dropped: adopting the skills' layouts, which would split the glossary and the decision history across two formats.

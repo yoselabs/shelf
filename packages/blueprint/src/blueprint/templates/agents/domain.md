@@ -26,3 +26,12 @@
 - After any ADR change: `blueprint adr-index --repo . --write`; the gate fails on a stale index.
 
 Ask the owner before recording a decision as accepted; draft it as `proposed`.
+
+## Matt Pocock's skills
+
+Every repo installs them at project scope (in .claude/settings.json, checkpoint `agents.pocock-skills`). Where they
+meet this layout, this layout wins:
+
+- `CONTEXT.md` is the glossary. Read and extend it; do not create a second glossary file (GLOSSARY.md or any other).
+- `docs/adr/` keeps the format above (frontmatter, decision on top, `## History`), not the skills' own ADR format.
+- Do not run `setup-matt-pocock-skills` over this repo: it rewrites the files in `docs/agents/` (issue-tracker, domain and the rest), which blueprint manages. Change those through the blueprint template, not the skill.

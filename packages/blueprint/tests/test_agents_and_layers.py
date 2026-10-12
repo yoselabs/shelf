@@ -24,6 +24,12 @@ _HOOKS = {
 }
 
 
+_POCOCK = {
+    "extraKnownMarketplaces": {"mattpocock": {"source": {"source": "github", "repo": "mattpocock/skills"}}},
+    "enabledPlugins": {"mattpocock-skills@mattpocock": True},
+}
+
+
 def _verdicts(repo: Repo) -> dict[str, Verdict]:
     return {r.id: r.verdict for r in run(repo.root, concern="agents", env=repo.env).rows}
 
@@ -32,7 +38,7 @@ def _sound(repo: Repo) -> None:
     repo.write(".beads/config.yaml", "")
     repo.write("AGENTS.md", "# map\n")
     repo.root.joinpath("CLAUDE.md").symlink_to("AGENTS.md")
-    repo.write(".claude/settings.json", json.dumps({"env": {"BD_DISABLE_METRICS": "1"}, "hooks": _HOOKS}))
+    repo.write(".claude/settings.json", json.dumps({"env": {"BD_DISABLE_METRICS": "1"}, "hooks": _HOOKS, **_POCOCK}))
     repo.write(".gitignore", ".claude/worktrees/\n.worktrees/\n")
 
 
@@ -272,3 +278,36 @@ def test_an_unreadable_gitignore_is_reported_not_checked_instead_of_raising(repo
     assert "crashed" not in evidence
     assert verdict is Verdict.NOT_CHECKED
     assert ".gitignore" in evidence
+
+
+def test_the_pocock_skills_row_passes_when_marketplace_and_plugin_are_declared(repo: Repo) -> None:
+    repo.write(".claude/settings.json", json.dumps(_POCOCK))
+    assert _verdicts(repo)["agents.pocock-skills"] is Verdict.PASSING
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {},
+        {"enabledPlugins": _POCOCK["enabledPlugins"]},
+        {"extraKnownMarketplaces": _POCOCK["extraKnownMarketplaces"]},
+        {**_POCOCK, "enabledPlugins": {"mattpocock-skills@mattpocock": False}},
+        {**_POCOCK, "extraKnownMarketplaces": {"mattpocock": {"source": {"source": "github", "repo": "someone/else"}}}},
+    ],
+)
+def test_the_pocock_skills_row_fails_with_both_fix_commands(repo: Repo, settings: dict[str, object]) -> None:
+    repo.write(".claude/settings.json", json.dumps(settings))
+    verdict, _, remediation = _evidence(repo, "agents.pocock-skills")
+    assert verdict is not Verdict.PASSING
+    assert "claude plugin marketplace add mattpocock/skills --scope project" in remediation
+    assert "claude plugin install mattpocock-skills@mattpocock --scope project" in remediation
+
+
+def test_the_pocock_skills_row_is_not_set_up_without_settings(repo: Repo) -> None:
+    assert _evidence(repo, "agents.pocock-skills")[0] is Verdict.NOT_SET_UP
+
+
+def test_the_domain_template_keeps_the_skills_off_blueprints_files() -> None:
+    text = (templates.TEMPLATES / "agents" / "domain.md").read_text()
+    assert "GLOSSARY.md" in text
+    assert "Do not run `setup-matt-pocock-skills`" in text
