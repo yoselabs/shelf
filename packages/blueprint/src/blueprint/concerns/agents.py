@@ -142,9 +142,17 @@ def worktrees(ctx: Context) -> Finding:
     open_dirs = []
     with tempfile.TemporaryDirectory(prefix="blueprint-ignore-") as tmp:
         sandbox = Path(tmp)
-        for rel in shared:
-            (sandbox / rel).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(ctx.path(rel), sandbox / rel)
+        try:
+            for rel in shared:
+                source = ctx.path(rel)
+                # Git reads only a regular file as a rule list: a symlinked .gitignore (dangling, to a folder, or to a
+                # file) is ignored by git, and a listed file this tree lacks (git answering for another worktree) is no rule.
+                if source.is_symlink() or not source.is_file():
+                    continue
+                (sandbox / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, sandbox / rel)
+        except OSError as err:
+            return not_checked(f"could not read the repo's .gitignore files: {type(err).__name__}: {err}")
         # A scratch repo holding only the repo's own .gitignore files: .git/info/exclude and the global
         # excludes file are clone-local, so a rule only they carry fails in the next clone.
         if ctx.run("git", "init", "-q", cwd=sandbox) is None:
