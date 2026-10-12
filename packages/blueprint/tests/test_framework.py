@@ -232,3 +232,62 @@ def test_the_mcp_architecture_row_wants_a_contract_keeping_the_framework_out_of_
     repo.write("pyproject.toml", (repo.root / "pyproject.toml").read_text() + _NO_MCP_IN_CORE)
     repo.write("Makefile", "check:\n\tuv run pytest\n\tuv run lint-imports\n")
     assert _rows(repo)["framework.mcp.architecture"][0] is Verdict.PASSING
+
+
+def _unity_architecture(repo: Repo, root: str = "Game") -> None:
+    """Everything the architecture role wants except the per-assembly compiler files."""
+    _unity(repo, root)
+    repo.write(f"{root}/Assets/Scripts/Core/Lifesim.Core.asmdef", '{"noEngineReferences": true}\n')
+    repo.write(f"{root}/Assets/Scripts/Runtime/Lifesim.Runtime.asmdef", '{"references": ["Lifesim.Core"]}\n')
+    repo.write("Directory.Build.props", "<GlobalAnalyzerConfigFiles />\n")
+    exemptions = "is_global = true\ndotnet_diagnostic.CA1822.severity = none\ndotnet_diagnostic.CA2007.severity = none\n"
+    repo.write(f"{root}/Assets/Unity.globalconfig", exemptions)
+    repo.write("justfile", "check:\n    dotnet build\n")
+
+
+_STRICT = "-nullable:enable\n-warnaserror+\n"
+
+
+def test_unity_strict_compile_needs_a_csc_rsp_next_to_each_project_asmdef_and_names_the_missing_one(repo: Repo) -> None:
+    _unity_architecture(repo)
+    repo.write("Game/Assets/Scripts/Core/csc.rsp", _STRICT)
+    verdict, evidence = _rows(repo)["framework.unity.architecture"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "Game/Assets/Scripts/Runtime" in evidence
+    assert "Game/Assets/Scripts/Core" not in evidence
+
+
+def test_unity_strict_compile_passes_with_a_csc_rsp_beside_every_project_asmdef(repo: Repo) -> None:
+    _unity_architecture(repo)
+    repo.write("Game/Assets/Scripts/Core/csc.rsp", _STRICT)
+    repo.write("Game/Assets/Scripts/Runtime/csc.rsp", _STRICT + "-analyzerconfig:Assets/Unity.globalconfig\n")
+    assert _rows(repo)["framework.unity.architecture"][0] is Verdict.PASSING
+
+
+def test_unity_rsp_without_the_strict_flags_does_not_count(repo: Repo) -> None:
+    _unity_architecture(repo)
+    repo.write("Game/Assets/Scripts/Core/csc.rsp", _STRICT)
+    repo.write("Game/Assets/Scripts/Runtime/csc.rsp", "-nullable:enable\n")
+    verdict, evidence = _rows(repo)["framework.unity.architecture"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "Runtime" in evidence
+
+
+def test_unity_package_asmdefs_are_not_asked_for_an_rsp(repo: Repo) -> None:
+    _unity_architecture(repo)
+    repo.write("Game/Assets/Scripts/Core/csc.rsp", _STRICT)
+    repo.write("Game/Assets/Scripts/Runtime/csc.rsp", _STRICT)
+    repo.write("Game/Packages/com.vendor.x/Runtime/X.asmdef", "{}\n")
+    repo.write("Game/Library/PackageCache/y/Y.asmdef", "{}\n")
+    assert _rows(repo)["framework.unity.architecture"][0] is Verdict.PASSING
+
+
+def test_unity_assets_csc_rsp_is_flagged_because_it_hits_packages_too(repo: Repo) -> None:
+    _unity_architecture(repo)
+    repo.write("Game/Assets/Scripts/Core/csc.rsp", _STRICT)
+    repo.write("Game/Assets/Scripts/Runtime/csc.rsp", _STRICT)
+    repo.write("Game/Assets/csc.rsp", _STRICT)
+    verdict, evidence = _rows(repo)["framework.unity.architecture"]
+    assert verdict is not Verdict.PASSING
+    assert "Game/Assets/csc.rsp" in evidence
+    assert "packages" in evidence

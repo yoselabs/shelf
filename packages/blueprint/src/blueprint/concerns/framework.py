@@ -9,9 +9,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from blueprint.concerns.stack import FRAMEWORK_ROLES, PROFILE_DIR, finding_for, gate_text, judge_role, load_profiles
-from blueprint.model import Sub, check_each, not_checked, passing
+from blueprint.model import Finding, Sub, check_each, is_skipped, not_checked, not_set_up, passing
 
 if TYPE_CHECKING:
+    from blueprint.concerns.stack import _Judged
     from blueprint.model import Context
 
 FRAMEWORK_DIR = PROFILE_DIR / "frameworks"
@@ -45,7 +46,37 @@ def roles(ctx: Context) -> list[Sub]:
         subs.append(Sub(concern, f"framework.{key}.profile", statement, passing(f"{prof.status} profile, in {root}: {tools}{note}")))
         for role in FRAMEWORK_ROLES:
             judged = judge_role(ctx, name, prof, role, reached, root=root)
-            subs.append(
-                Sub(concern, f"framework.{key}.{role}", f"{name} {role}: the profile's tool is set up and run", finding_for(judged))
-            )
+            finding = finding_for(judged)
+            if name == "unity" and role == "architecture" and judged.verdict in {"pass", "not-set-up"}:
+                finding = _with_rsp_problems(ctx, root, judged, finding)
+            subs.append(Sub(concern, f"framework.{key}.{role}", f"{name} {role}: the profile's tool is set up and run", finding))
     return subs
+
+
+_STRICT_FLAGS = ("-nullable:enable", "-warnaserror+")
+_RSP_FIX = (
+    "put a csc.rsp next to each project .asmdef with `-nullable:enable` and `-warnaserror+` "
+    "(optionally `-analyzerconfig:Assets/Unity.globalconfig`); never one at Assets/csc.rsp"
+)
+
+
+def _with_rsp_problems(ctx: Context, root: str, judged: _Judged, finding: Finding) -> Finding:
+    """Unity's strict compile is per assembly: every project asmdef needs its own csc.rsp, and Assets/csc.rsp hits packages too."""
+    base = "" if root in {"", "."} else f"{root}/"
+    assets = ctx.repo / base / "Assets"
+    problems: list[str] = []
+    if assets.is_dir():
+        for asmdef in sorted(assets.rglob("*.asmdef")):
+            folder = asmdef.parent.relative_to(ctx.repo).as_posix()
+            if is_skipped(folder, ctx.profile.ignore):
+                continue
+            rsp = ctx.read(f"{folder}/csc.rsp") or ""
+            if not all(flag in rsp for flag in _STRICT_FLAGS):
+                problems.append(f"{folder}/csc.rsp lacks {' and '.join(f for f in _STRICT_FLAGS if f not in rsp)} (for {asmdef.name})")
+    if (assets / "csc.rsp").is_file():
+        problems.append(f"{base}Assets/csc.rsp exists: it applies to packages compiled from source too (1,026 errors measured); delete it")
+    if not problems:
+        return finding
+    if judged.verdict == "not-set-up":
+        return not_set_up(f"{judged.evidence}; " + "; ".join(problems), judged.remediation)
+    return not_set_up("strict compile is per assembly: " + "; ".join(problems), _RSP_FIX)
