@@ -161,4 +161,4 @@ and locked with per-platform checksums in `mise.lock` ([ADR 0024](adr/0024-mise-
 clone run `mise trust --yes && mise install --locked` as plain commands (until the trust every mise shim refuses, uv
 included), then the stack's sync and `bd bootstrap`; after a pin bump, `just tools`. `gate.clean-clone` runs the same steps. blueprint's `stack.tool-pins` checks the pins on every commit and
 `stack.tools-installed` checks this machine's versions in the audit. A repo that declares LFS patterns is also checked
-for binaries outside LFS (`gate.lfs-binaries`) and, in the audit, for this clone's LFS filter (`gate.lfs-installed`).
+for binaries outside LFS (`gate.lfs-binaries`) and, in the audit, for this clone's LFS filter (`gate.lfs-installed`); `gate.git-config-clean` flags a stray `core.worktree` or `core.bare` in the clone's config.

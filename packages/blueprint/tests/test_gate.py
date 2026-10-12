@@ -748,3 +748,29 @@ def test_clean_clone_is_not_failed_by_an_lfs_smudge_filter(repo: Repo, tmp_path:
     repo.git("-c", "filter.lfs.clean=cat", "commit", "-qm", "x")
     verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
     assert verdict is Verdict.PASSING, evidence
+
+
+def _git_config_row(repo: Repo) -> tuple[Verdict, str, str]:
+    row = next(r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows if r.id == "gate.git-config-clean")
+    return row.verdict, row.evidence, row.remediation
+
+
+def test_a_clean_git_config_passes(repo: Repo) -> None:
+    assert _git_config_row(repo)[0] is Verdict.PASSING
+
+
+def test_a_stray_core_worktree_in_the_clone_config_fails_with_the_unset_command(repo: Repo, tmp_path: Path) -> None:
+    # A leaked GIT_WORK_TREE once wrote core.worktree: git then ran against another tree (homelab, lifesim).
+    repo.git("config", "--local", "core.worktree", str(tmp_path))
+    verdict, evidence, fix = _git_config_row(repo)
+    assert verdict is Verdict.FAILING
+    assert "core.worktree" in evidence
+    assert fix == "git config --unset core.worktree"
+
+
+def test_core_bare_true_in_a_non_bare_clone_fails_with_the_fix(repo: Repo) -> None:
+    repo.git("config", "--local", "core.bare", "true")
+    verdict, evidence, fix = _git_config_row(repo)
+    assert verdict is Verdict.FAILING
+    assert "core.bare" in evidence
+    assert fix == "git config core.bare false"

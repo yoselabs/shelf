@@ -821,6 +821,24 @@ def lfs_binaries(ctx: Context) -> Finding:
     )
 
 
+@check("gate.git-config-clean", "this clone's own git config sets neither core.worktree nor core.bare", audit_only=True)
+def git_config_clean(ctx: Context) -> Finding:
+    """A leaked GIT_WORK_TREE once wrote core.worktree into .git/config (homelab, lifesim): every worktree then ran git against one tree."""
+    if not ctx.path(".git").is_dir():
+        return not_applicable("not the main checkout of a non-bare clone (a linked worktree or no git repository)")
+    worktree = (ctx.git("config", "--local", "--get", "core.worktree") or "").strip()
+    bare = (ctx.git("config", "--local", "--get", "core.bare") or "").strip().lower()
+    if worktree:
+        return failing(
+            f"core.worktree is set to {worktree!r} in .git/config: git answers for that tree, not this one",
+            "git config --unset core.worktree",
+            FixedBy.AUTO,
+        )
+    if bare in {"true", "yes", "on", "1"}:
+        return failing("core.bare is true in a clone that has a working tree", "git config core.bare false", FixedBy.AUTO)
+    return passing("no core.worktree and no core.bare in .git/config")
+
+
 @check("gate.lfs-installed", "in a repo that uses LFS, this clone has git-lfs and its filter installed", audit_only=True)
 def lfs_installed(ctx: Context) -> Finding:
     """Without the filter, git stores the bytes and a fresh clone checks out pointers: the clone-local half of LFS."""
