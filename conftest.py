@@ -28,6 +28,12 @@ import os
 
 from hypothesis import HealthCheck, settings
 
+# A git hook (pre-push runs `just check`) exports the variables that locate its repository. Inherited, they point
+# every test's `git -C <tmp repo>` at the shelf itself: from a worktree, guard tests wrote into its README and
+# pyproject (2026-10-12). Tests make their own repos, so none of these may reach them.
+for _var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"):
+    os.environ.pop(_var, None)
+
 # too_slow times input generation by the wall clock. With one pytest worker per core
 # (`just test`, pytest-xdist) a cold first draw on a loaded machine trips it -- a red
 # caused by the machine, not the change.
