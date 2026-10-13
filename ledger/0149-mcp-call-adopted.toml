@@ -1,0 +1,10 @@
+seq = 149
+date = "2026-10-13"
+event = "verdict"
+software = "mcp-call"
+release = "mcp-call-v0.1.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "kept"
+cost = "n/a"
+note = "a2kay adopted mcp-call-v0.1.0 for its CLI fast path (a2kay-6789, a2kay main 11d596b, gate green). Reported by a2kay: admin history_status beside a running server went from ~1.6 s to ~0.3 s, and the CLI child imports no app, fastmcp or mcp. Adopter verdict: kept."
