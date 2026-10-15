@@ -233,6 +233,7 @@ class Context:
     today: date | None = None
     # Old shapes a check still honoured, each with the text that replaces it: reported, never failing (Run.notices).
     notices: list[str] = field(default_factory=list)
+    timeouts: list[tuple[tuple[str, ...], float]] = field(default_factory=list, compare=False, repr=False)
 
     def excused(self, checkpoint_id: str, path: str | None = None, line: int | None = None, service: str | None = None) -> Override | None:
         """The justified, unexpired, scoped override that excuses this offender of `checkpoint_id`, or None.
@@ -281,6 +282,7 @@ class Context:
         self, *argv: str, timeout: float = 120, cwd: Path | None = None, env: dict[str, str] | None = None
     ) -> subprocess.CompletedProcess[str] | None:
         """Run `argv` in the repo (or `cwd`), with this context's env or `env`; None when the program is missing or times out."""
+        timeout = max(timeout, float(self.env.get("BLUEPRINT_TIMEOUT", timeout)))
         env = without_git_location(env or self.env)
         exe = shutil.which(argv[0], path=env.get("PATH"))
         if exe is None:
@@ -297,7 +299,15 @@ class Context:
                 check=False,
             )
         except subprocess.TimeoutExpired:
+            self.timeouts.append((argv, timeout))
             return None
+
+    def not_a_repository(self) -> Finding:
+        """Explain a failed repository probe, preserving any git timeout."""
+        for argv, seconds in reversed(self.timeouts):
+            if argv[0] == "git":
+                return not_checked(f"timed out after {seconds:g}s running `{' '.join(argv)}` (machine under load? raise BLUEPRINT_TIMEOUT)")
+        return not_checked("not a git repository")
 
     def git(self, *args: str) -> str | None:
         """stdout of a git command, or None when it failed."""

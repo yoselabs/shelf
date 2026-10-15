@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 from blueprint.__main__ import RECIPES
 from blueprint.model import FixedBy, Verdict
+from blueprint.report import gate as gate_report
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -814,3 +815,40 @@ def test_clean_clone_is_not_checked_when_an_lfs_repo_has_no_git_lfs(repo: Repo, 
     verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
     assert verdict is Verdict.NOT_CHECKED
     assert "git-lfs is not installed" in evidence
+
+
+@pytest.mark.parametrize("configured,expected", [(None, 120), ("240.5", 240.5), ("1", 120)])
+def test_git_timeout_reports_command_and_checkpoint(
+    repo: Repo, monkeypatch: pytest.MonkeyPatch, configured: str | None, expected: float
+) -> None:
+    """lifesim-gfr.12: a loaded machine is not a missing repository."""
+    repo.env.pop("BLUEPRINT_TIMEOUT", None)
+    if configured is not None:
+        repo.env["BLUEPRINT_TIMEOUT"] = configured
+
+    cmd = "git"
+
+    def slow_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        # Detection runs its own git calls before the caller's env is attached; the row under test is `git remote`.
+        argv = args[0] if args else ()
+        if argv and argv[-1] == "remote":
+            assert kwargs["timeout"] == expected
+        raise subprocess.TimeoutExpired(cmd, expected)
+
+    monkeypatch.setattr(subprocess, "run", slow_run)
+    result = run(repo.root, concern="gate", audit=True, env=repo.env)
+    row = next(r for r in result.rows if r.id == "gate.git-remote")
+    assert row.verdict is Verdict.NOT_CHECKED
+    assert f"timed out after {expected:g}s running `git remote`" in row.evidence
+    assert "BLUEPRINT_TIMEOUT" in row.evidence
+    assert "not a git repository" not in row.evidence
+    output = gate_report(result)
+    assert "gate.git-remote" in output
+    assert row.evidence in output
+
+
+def test_non_repository_reports_missing_repository(tmp_path: Path) -> None:
+    result = run(tmp_path, concern="gate", audit=True)
+    row = next(r for r in result.rows if r.id == "gate.git-remote")
+    assert row.verdict is Verdict.NOT_CHECKED
+    assert row.evidence == "not a git repository"

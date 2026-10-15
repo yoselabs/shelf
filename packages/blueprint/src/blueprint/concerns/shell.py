@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from blueprint.model import MOVE, Sub, check_each, failing, is_skipped, not_checked, override_toml, passing
+from blueprint.model import MOVE, Sub, check_each, failing, is_skipped, override_toml, passing
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
@@ -52,7 +52,7 @@ def _missing(text: str) -> list[str]:
 def _strict_mode(ctx: Context) -> Finding:
     staged = ctx.git("ls-files", "-s", "-z")
     if staged is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     scripts = [
         entry.split("\t", 1)[1]
         for entry in staged.split("\0")

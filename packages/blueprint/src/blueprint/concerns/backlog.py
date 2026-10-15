@@ -119,7 +119,7 @@ def lock_ignored(ctx: Context) -> Finding:
     """bd 1.3 writes it at the repo root on every run; unignored, it shows in `git status` and gets committed."""
     done = ctx.run("git", "check-ignore", "-q", "--no-index", _ROOT_LOCK)
     if done is None or done.returncode > 1:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     if done.returncode == 0:
         return passing(f"{_ROOT_LOCK} is git-ignored")
     return failing(f"{_ROOT_LOCK} is not git-ignored: bd writes it at the repo root", f"add `{_ROOT_LOCK}*` to .gitignore", FixedBy.AUTO)
@@ -130,7 +130,7 @@ def no_tracked_export(ctx: Context) -> Finding:
     """`git ls-files .beads` lists no `*.jsonl`."""
     listed = ctx.git("ls-files", ".beads")
     if listed is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     tracked = [p for p in listed.splitlines() if p.endswith(".jsonl")]
     if tracked:
         return failing(

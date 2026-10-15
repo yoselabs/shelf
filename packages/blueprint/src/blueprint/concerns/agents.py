@@ -174,7 +174,7 @@ def worktrees(ctx: Context) -> Finding:
     """
     shared = _repo_gitignores(ctx)
     if shared is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     open_dirs = []
     with tempfile.TemporaryDirectory(prefix="blueprint-ignore-") as tmp:
         sandbox = Path(tmp)

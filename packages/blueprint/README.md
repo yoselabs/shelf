@@ -25,6 +25,8 @@ PYTHONPATH=../shelf/packages/blueprint/src python3 -m blueprint check --repo .
 Exit codes: `0` everything passes or does not apply · `1` something fails or is not set up ·
 `2` nothing fails but something could not be checked — never a pass.
 
+Processes default to a 120-second timeout. Set `BLUEPRINT_TIMEOUT` to a number of seconds (a float) to raise the timeout on loaded machines. Each call uses the greater of its own timeout and this environment value; the variable never lowers a call's timeout. Git timeouts are reported with the command and elapsed timeout.
+
 ## Verdicts
 
 `not set up` · `failing` · `passing` · `not applicable` · `not checked`, from two answers per

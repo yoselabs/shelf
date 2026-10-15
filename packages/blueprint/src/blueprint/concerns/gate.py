@@ -330,7 +330,7 @@ def hooks_recipe(ctx: Context) -> Finding:
 def hooks_installed(ctx: Context) -> Finding:
     """The clone-local half: core.hooksPath unset, prek's (or pre-commit's) script installed, no bd marker."""
     if ctx.git("rev-parse", "--git-dir") is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     fix = "bd hooks uninstall; git config --unset core.hooksPath; prek install"
     hooks_path = (ctx.git("config", "--local", "core.hooksPath") or "").strip()
     if hooks_path:
@@ -694,7 +694,7 @@ def checkers_wired(ctx: Context) -> Finding:
 def default_branch(ctx: Context) -> Finding:
     """origin/HEAD when there is a remote, else `main` if it exists, else the branch checked out."""
     if ctx.git("rev-parse", "--git-dir") is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     name = (ctx.git("symbolic-ref", "--quiet", "refs/remotes/origin/HEAD") or "").strip().removeprefix("refs/remotes/origin/")
     if not name and ctx.git("show-ref", "--verify", "--quiet", "refs/heads/main") is not None:
         name = "main"
@@ -714,7 +714,7 @@ def git_remote(ctx: Context) -> Finding:
     """`git remote` lists origin; none at all is not set up yet, others without origin is a rename."""
     listed = ctx.git("remote")
     if listed is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     remotes = listed.split()
     if "origin" in remotes:
         return passing("origin: " + (ctx.git("remote", "get-url", "origin") or "").strip())
@@ -819,7 +819,7 @@ def lfs_binaries(ctx: Context) -> Finding:
         return not_applicable(_NO_LFS)
     listed, staged_out = ctx.git("ls-files", "--eol", "-z"), ctx.git("ls-files", "-s", "-z")
     if listed is None or staged_out is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     staged = {e.split("\t", 1)[1]: e.split()[1] for e in staged_out.split("\0") if "\t" in e}
     binary = [e.split("\t", 1)[1] for e in listed.split("\0") if e.startswith("i/-text") and "\t" in e]
     under = _lfs_paths(ctx, sorted(staged))

@@ -16,7 +16,7 @@ import re
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
-from blueprint.model import MOVE, Sub, check_each, failing, is_skipped, not_applicable, not_checked, override_toml, passing, toml_table
+from blueprint.model import MOVE, Sub, check_each, failing, is_skipped, not_applicable, override_toml, passing, toml_table
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding, Profile
@@ -96,7 +96,7 @@ def _marker_reason(lines: list[str], n: int) -> str | None:
 def _finding(ctx: Context) -> Finding:
     found = _lenient(ctx)
     if found is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     hits, excused = found
     if not hits:
         used = "; ".join(
@@ -166,7 +166,7 @@ def _help_tested(ctx: Context) -> Finding:
     scripts = _scripts(ctx)
     listed = ctx.git("ls-files", "-z", "*.py")
     if listed is None:
-        return not_checked("not a git repository") if scripts else not_applicable("no [project.scripts] in pyproject.toml")
+        return ctx.not_a_repository() if scripts else not_applicable("no [project.scripts] in pyproject.toml")
     files = sorted(filter(None, listed.split("\0")))
     direct = _direct_scripts(ctx, files)
     if not scripts and not direct:

@@ -56,7 +56,7 @@ def encrypted(ctx: Context) -> Finding:
     """Read without a key: dotenv values are all `ENC[...]` with a `sops_mac`; yaml/json carry a `sops:` block."""
     files = _sops_files(ctx)
     if files is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     if not files and ctx.read(_RULES) is None:
         return not_applicable(_NO_SOPS)
     bad = [rel for rel in files if not _sealed(ctx.read(rel) or "")]
@@ -73,7 +73,7 @@ def rule_coverage(ctx: Context) -> Finding:
     """sops picks recipients by the first matching rule; a file no rule matches cannot be re-keyed (`sops updatekeys`)."""
     files = _sops_files(ctx)
     if files is None:
-        return not_checked("not a git repository")
+        return ctx.not_a_repository()
     rules = ctx.read(_RULES)
     if not files and rules is None:
         return not_applicable(_NO_SOPS)
