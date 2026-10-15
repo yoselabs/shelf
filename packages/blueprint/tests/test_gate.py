@@ -6,7 +6,7 @@ import json
 import shutil
 import subprocess
 from datetime import date
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from blueprint.__main__ import RECIPES
@@ -830,7 +830,7 @@ def test_git_timeout_reports_command_and_checkpoint(
 
     def slow_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
         # Detection runs its own git calls before the caller's env is attached; the row under test is `git remote`.
-        argv = args[0] if args else ()
+        argv = cast("list[str]", args[0]) if args else []
         if argv and argv[-1] == "remote":
             assert kwargs["timeout"] == expected
         raise subprocess.TimeoutExpired(cmd, expected)
