@@ -743,8 +743,12 @@ def _uses_lfs(ctx: Context) -> bool:
 
 def _lfs_paths(ctx: Context, paths: list[str]) -> set[str]:
     """The paths an LFS pattern covers."""
-    attrs = ctx.run("git", "check-attr", "filter", "--", *paths) if paths else None
-    return {line.split(": ")[0] for line in (attrs.stdout if attrs else "").splitlines() if line.endswith(": filter: lfs")}
+    found: set[str] = set()
+    # why: one argument per tracked path overruns Windows' ~32k command line (WinError 206); batch them.
+    for start in range(0, len(paths), 200):
+        attrs = ctx.run("git", "check-attr", "filter", "--", *paths[start : start + 200])
+        found |= {line.split(": ")[0] for line in (attrs.stdout if attrs else "").splitlines() if line.endswith(": filter: lfs")}
+    return found
 
 
 def _raw(ctx: Context, staged: dict[str, str], under: set[str]) -> list[str]:
