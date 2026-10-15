@@ -72,14 +72,15 @@ secrets:
 images scope="changed":
     #!/usr/bin/env bash
     set -euo pipefail
-    for tool in hadolint dockerfmt; do
-        command -v "$tool" >/dev/null || { echo "images: $tool is not installed -- run just tools" >&2; exit 2; }
-    done
+    command -v hadolint >/dev/null || { echo "images: hadolint is not installed -- run just tools" >&2; exit 2; }
+    # dockerfmt is optional (no Windows build): a missing one is a warning, the format check is skipped.
+    have_dockerfmt=1
+    command -v dockerfmt >/dev/null || { have_dockerfmt=0; echo "images: warning: dockerfmt is not installed, skipping the format check" >&2; }
     list=$(mktemp); trap 'rm -f "$list"' EXIT
     python3 -I tools/changed.py --scope {{ scope }} --config .hadolint.yaml --not '*.dockerignore' '*Dockerfile' '*Dockerfile.*' '*Containerfile' > "$list"
     [ -s "$list" ] || { echo "skipped images: no Dockerfile changed"; exit 0; }
     xargs -0 hadolint < "$list"
-    xargs -0 -n1 dockerfmt --check -n < "$list"
+    [ "$have_dockerfmt" = 0 ] || xargs -0 -n1 dockerfmt --check -n < "$list"
     xargs -0 python3 -I packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py < "$list"
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
