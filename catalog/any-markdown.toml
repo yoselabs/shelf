@@ -2,7 +2,7 @@
 name = "any-markdown"
 kind = "primitive"
 tier = "T0"
-release = "any-markdown-v0.3.0"
+release = "any-markdown-v0.3.1"
 capability = "Stop caring where markdown hides its code and how it divides — read and rewrite the [[wikilinks]] a document actually makes, with code blocks and code spans excluded by the CommonMark grammar rather than by a regex that approximates it; and address its sections by heading slug or line range, with stable ids; and fit a body into a size budget as its opening plus an outline of the rest, every outline id addressable."
 implementation = "markdown-it-py"
 status = "candidate"

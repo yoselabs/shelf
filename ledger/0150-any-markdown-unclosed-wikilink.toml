@@ -1,0 +1,10 @@
+seq = 150
+date = "2026-10-16"
+event = "delivery"
+software = "any-markdown"
+release = "any-markdown-v0.3.1"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """FIX, found renaming ids across a real vault (a2kay-6g7p.9). `WIKILINK_RE` let an unclosed `[[x|` opener run on into the next link, so `wikilinks` dropped the link that followed. A link after an unclosed opener is now its own link. No contract change."""
