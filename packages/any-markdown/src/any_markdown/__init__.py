@@ -47,7 +47,7 @@ from any_markdown.sections import ATX_HEADING_RE, Section, clip, find, line_part
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]*))?\]\]")
+WIKILINK_RE = re.compile(r"\[\[([^\[\]|]+)(?:\|([^\[\]]*))?\]\]")
 """The ``[[anchor|name]]`` grammar. Exposed because a caller sometimes holds one
 authored value rather than a document — see :func:`parse_one` and :func:`anchor_of`,
 which are usually what that caller wants instead."""

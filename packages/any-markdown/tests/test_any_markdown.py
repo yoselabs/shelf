@@ -171,3 +171,9 @@ def test_parse_one_accepts_only_a_whole_wikilink() -> None:
     assert parse_one("  [[a|B]]  ") == WikiLink(anchor="a", name="B", span=(0, 7), text="[[a|B]]")
     assert parse_one("prose with [[a]] inside") is None
     assert parse_one("136") is None
+
+
+def test_a_link_after_an_unclosed_opener_is_still_found() -> None:
+    doc = Markdown("broken [[x|never closed, then [[real|Name]] and [[also]].\n")
+    assert [link.anchor for link in doc.wikilinks] == ["real", "also"]
+    assert doc.replace_wikilinks(lambda link: f"<{link.anchor}>").text == "broken [[x|never closed, then <real> and <also>.\n"
