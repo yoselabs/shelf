@@ -1,0 +1,10 @@
+seq = 153
+date = "2026-10-21"
+event = "verdict"
+software = "any-proc"
+release = "any-proc-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "adopted"
+cost = ""
+note = """a2kay 5a4ecf1 pins any-proc-v0.2.0: OwnerDaemon's probe reads /healthz when MCP does not answer and returns Health("starting") for a stage short of ready; the menu shows the stage. a2kay's gate green; a scenario that fails on v0.1.1 (the child stays a terminal "starting" and never comes up) passes."""
