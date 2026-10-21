@@ -45,6 +45,23 @@ Makefile fails `gate.runner`. Three rules keep the file readable by blueprint, w
 - Loops and multi-line shell go in a shebang recipe (`#!/usr/bin/env bash`, then `set -euo pipefail`); just has no loops.
 - A dependency, or a recipe argument that names a recipe (`check: (gate "check-host")`), is an edge in the graph.
 
+## One box, many gates
+
+Several agents share one machine, and each test run takes every core: on 2026-10-20 four gates at once on a 6-CPU box
+took 11-14 min each instead of 2, and a push was killed. `blueprint recipe gate-state > tools/gate_state.py` copies the
+script that prevents both halves of that (stdlib only; `--help` documents it):
+
+| piece | in the justfile | does |
+|---|---|---|
+| the test lock | the test command runs as `python3 -I tools/gate_state.py lock -- <command>` | one test run per box at a time; a second gate waits and says who holds it. Off when `CI` is set or `GATE_LOCK=off` |
+| the green record | `check` takes a first dependency running `gate_state.py start`, and its body runs `gate_state.py passed --gate check` | records the tree a green `check` saw, if no file changed during the run |
+| the pre-push skip | the hook's entry is `python3 -I tools/gate_state.py pre-push --gate check -- uv run just check` | no second run when the working tree is clean and HEAD's tree is recorded; any doubt runs it |
+
+Only the expensive step takes the lock, so the gate's parallel steps never wait on one another. `steps` points
+`GATE_NOTICE_FD` at its terminal (`exec 3>&2; export GATE_NOTICE_FD=3`), so the "waiting" line shows while the step's
+own output goes to its log. The record keys on the tree and the upstream merge-base: a rebase changes the tree, and the
+gate runs again.
+
 ## Never bypass
 
 | forbidden | do instead |
@@ -64,7 +81,7 @@ prek owns the hooks, from `.pre-commit-config.yaml`. bd never installs its own (
 |---|---|---|
 | pre-commit | `bd hooks run pre-commit`, then the stack's fast checks on staged files | Fast: seconds |
 | prepare-commit-msg, post-merge, post-checkout | `bd hooks run <event>` | bd keeps its data in step |
-| pre-push | `bd hooks run pre-push`, `bd dolt push` (fatal; `BD_DOLT_PUSH_OPTIONAL=1` to push offline), then `just check` | Heavy checks once per push |
+| pre-push | `bd hooks run pre-push`, `bd dolt push` (fatal; `BD_DOLT_PUSH_OPTIONAL=1` to push offline), then `just check` unless HEAD's tree already passed it | Heavy checks once per push, and not twice per tree |
 
 After a clone, in this order, as plain commands (until `mise trust` every mise shim refuses, uv and just included):
 `mise trust --yes && mise install --locked` (the exact tools mise.toml pins, from mise.lock; ADR 0024), the stack's sync

@@ -55,7 +55,9 @@ repos:
   - id: gate
     name: just check
     # just is pinned as the `rust-just` dev dependency (ADR 0023); a repo without uv runs `just check` from brew.
-    entry: uv run just check
+    # Skipped only when the working tree is clean and HEAD's tree already passed `just check` (tools/gate_state.py,
+    # `blueprint recipe gate-state`); any doubt runs it.
+    entry: python3 -I tools/gate_state.py pre-push --gate check -- uv run just check
     language: system
     always_run: true
     pass_filenames: false

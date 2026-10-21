@@ -30,6 +30,7 @@ RECIPE_FILES = {
     "dockerfile-pins": "check_dockerfile_pins.py",
     "compose-policy": "compose_policy.rego",
     "changed": "changed.py",
+    "gate-state": "gate_state.py",
 }
 
 
@@ -65,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "hooks: .pre-commit-config.yaml; godot-test: a justfile recipe; compose-policy: a policy/ rego file; "
             "changed: tools/changed.py, the changed-file selector per-file recipes call; "
+            "gate-state: tools/gate_state.py, the box-wide test lock and the record of trees that passed; "
             "the others: a tools/ script, named in the profile"
         ),
     )

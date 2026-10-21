@@ -31,11 +31,21 @@ test_image := "shelf-gate-" + file_name(justfile_directory())
 # inspects every process start and file write, and the suite took 10-17 min there (2026-10-10).
 # In CI, inside a container, or with SHELF_HOST_CHECK=1 they run in place; the container
 # speeds the gate up and is never required.
+#
+# A green `check` records the tree it checked (tools/gate_state.py, `blueprint recipe gate-state`): `gate-start` notes the
+# working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
+# pre-push hook then skips the gate for that exact tree.
 [group('gate')]
-check: beads-lint secrets images scripts (gate "check-host")
+check: gate-start beads-lint secrets images scripts (gate "check-host")
+    python3 -I tools/gate_state.py passed --gate check
 
 [group('gate')]
 check-all: beads-lint secrets (images "all") (scripts "all") (gate "check-all-host")
+
+# Notes the working tree as the gate starts, for `check` to record when it passes.
+[private]
+gate-start:
+    python3 -I tools/gate_state.py start
 
 # Every bead still to be started (open or blocked) carries its acceptance criteria: criteria are what make a bead
 # ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. Runs on the
@@ -123,6 +133,8 @@ steps +names:
     set -uo pipefail
     step_budget=${GATE_STEP_BUDGET:-60}; gate_budget=${GATE_BUDGET:-180}
     dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
+    # A step's output goes to its log; a notice it must show now (the test lock's "waiting") goes to fd 3, this terminal.
+    exec 3>&2; export GATE_NOTICE_FD=3
     SECONDS=0
     echo "gate: {{ names }} (in parallel)" >&2
     for n in {{ names }}; do
@@ -302,12 +314,15 @@ deps:
         'p={}; imp=$(ls "$p/src"); out=$(cd "$p" && uv run deptry . --known-first-party "$imp" 2>&1) || { printf -- "-- deptry %s\n%s\n" "$p" "$out"; exit 1; }'
     echo "deptry: every package clean"
 
+# The test runs take the box-wide test lock (tools/gate_state.py lock): each takes every core, so gates started at once
+# on one box queue for it instead of thrashing (2026-10-20: four at once took 11-14 min each). Off in CI or GATE_LOCK=off.
+#
 # tests with coverage; the floor guards against REGRESSION (set just below current).
 # Substrate adapters (docling/torch/subprocess) are legitimately hard to unit-test,
 # so the floor is a rot-guard, not a vanity number. Raise it as coverage climbs.
 [group('gate')]
 test:
-    uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
+    python3 -I tools/gate_state.py lock -- uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
 
 # Only the tests a change can reach: the changed packages, every package depending on them,
 # and the fitness tests (tools/affected.py). A package whose inputs are unchanged since its suite
@@ -318,7 +333,7 @@ test-affected:
     #!/usr/bin/env bash
     set -euo pipefail
     paths="$(python3 tools/affected.py --explain --skip-passed)"
-    uv run pytest {{ pytest_par }} -p no:cov $paths && python3 tools/affected.py --record $paths
+    python3 -I tools/gate_state.py lock -- uv run pytest {{ pytest_par }} -p no:cov $paths && python3 tools/affected.py --record $paths
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. CI runs

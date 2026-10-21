@@ -25,6 +25,7 @@ from .operations import Outcome, Result
 
 _SHELF_ROOT = Path(__file__).resolve().parent.parent.parent
 _RECIPE = _SHELF_ROOT / "packages" / "blueprint" / "src" / "blueprint" / "recipes" / "pre-commit-config.yaml"
+_GATE_STATE = _SHELF_ROOT / "packages" / "blueprint" / "src" / "blueprint" / "recipes" / "gate_state.py"
 _CONFIG = ".pre-commit-config.yaml"
 _BEADS_MARKER = "BEGIN BEADS INTEGRATION"
 _GATE_BLOCK = "- repo: local\n  hooks:\n  - id: gate\n"
@@ -66,6 +67,16 @@ def config_text(*, beads: bool, python: bool) -> str:
         head = head[: head.index("repos:")] + "repos:\n"
     shelf = _SHELF_HOOKS if python else _SHELF_HOOKS.split("  - id: ruff-check", 1)[0]
     return head + shelf + _GATE_BLOCK + gate
+
+
+def ensure_gate_state(repo: Path) -> bool:
+    """Copy the gate-state recipe to `tools/gate_state.py` when absent (the pre-push hook and `test` call it); True if written."""
+    target = repo / "tools" / "gate_state.py"
+    if target.exists():
+        return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(_GATE_STATE.read_text())
+    return True
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -129,6 +140,7 @@ class HooksOperation:
         kept = config.exists()
         if not kept:
             config.write_text(config_text(beads=self.beads, python=(self.repo / "pyproject.toml").exists()))
+            ensure_gate_state(self.repo)
         if self.beads and shutil.which("bd"):
             subprocess.run(["bd", "hooks", "uninstall"], cwd=self.repo, capture_output=True, text=True, check=False)
         _git(self.repo, "config", "--local", "--unset", "core.hooksPath")

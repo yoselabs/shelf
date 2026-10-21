@@ -4,10 +4,11 @@ Implements `docs/linting.md`'s own copy list, mechanically:
 
 1. The `[tool.ruff]`, `[tool.ruff.lint]` (+ subtables), `[tool.codespell]`,
    `[tool.coverage.*]` blocks from shelf's `pyproject.toml`.
-2. The `justfile` recipes (`check guard preset bootstrap bootstrap-verify tools lint format typecheck spell deps test`),
+2. The `justfile` recipes (`check gate-start guard preset bootstrap bootstrap-verify tools lint format typecheck spell deps test`),
    with the attributes and comments that sit directly above each (ADR 0023: the gate runner is just);
    `check` is the plain gate (the shelf's own dispatches to its container), and `deps` is rewritten
-   for a single-package repo, since the shelf's own loops over `packages/*`.
+   for a single-package repo, since the shelf's own loops over `packages/*`. `check` and `test` call
+   `tools/gate_state.py` (the blueprint's gate-state recipe), copied when absent.
 3. The `dev` dependency-group.
 4. A `[tool.pyrefly]` and a `[tool.pytest.ini_options]` built for a consumer: the shelf's strict
    preset and error severities (the axis `just preset` compares), its lighter bar for tests, and
@@ -39,6 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .hooks import ensure_gate_state
 from .operations import Outcome, Result
 
 _SHELF_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -53,6 +55,7 @@ _DEV_GROUP_TABLE = "dependency-groups"
 _SHELF_ONLY_TABLES = ("tool.ruff.lint.flake8-tidy-imports",)
 _RECIPES = (
     "check",
+    "gate-start",
     "guard",
     "preset",
     "bootstrap",
@@ -84,8 +87,10 @@ deps:
 # The shelf's `check` dispatches to a container and to recipes a consumer is not given
 # (check-host, test-affected); a consumer gets the plain gate.
 _CONSUMER_CHECK = """# The gate: every step at once (`steps`), one timing line, a warning for a step over its budget.
+# A green run records the tree it checked (tools/gate_state.py), so the pre-push hook does not run it again on that tree.
 [group('gate')]
-check: beads-lint secrets (steps "guard" "preset" "blueprint" "lint" "typecheck" "spell" "deps" "test")
+check: gate-start beads-lint secrets (steps "guard" "preset" "blueprint" "lint" "typecheck" "spell" "deps" "test")
+    python3 -I tools/gate_state.py passed --gate check
 
 """
 # A new justfile starts with the shelf's shell setting: plain recipe lines fail fast and on unset pipes.
@@ -252,6 +257,8 @@ class LinterPresetOperation:
             head = existing.rstrip("\n") + "\n\n" if existing else _JUSTFILE_HEADER
             justfile.write_text(head + "".join(shelf_recipes[name] for name in to_copy))
             applied.append(f"{justfile.name} recipes")
+        if ensure_gate_state(self.repo):
+            applied.append("tools/gate_state.py")
 
         return _verify(self.repo, applied, to_copy, justfile)
 

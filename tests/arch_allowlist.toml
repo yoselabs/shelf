@@ -16,6 +16,7 @@ page-tsv = "Intra-shelf workspace dependency (mcp-result-wire composes its rende
 [name_collision]
 # _example_helper = "why this convergence is by design"
 _client = "anyllm: each SDK provider's lazy client-builder method (anthropic vs openai). Same intent, genuinely different bodies — a convergence of concept, not a re-implementation."
+_git = "blueprint recipes (changed.py, gate_state.py): each is a standalone script a repo copies alone into tools/, so none can import a shared helper; their git calls differ in output shape (NUL list vs stripped text)."
 
 # [[body_dup]]
 # names = ["_foo", "_bar"]

@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import importlib.util
+import os
 import shutil
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pytest
 from blueprint.__main__ import RECIPE_FILES, RECIPES, main
 
 if TYPE_CHECKING:
-    import pytest
+    from collections.abc import Generator
+
     from blueprint.testing import Repo
 
 _GUID = "0123456789abcdef0123456789abcdef"
@@ -320,3 +325,157 @@ def test_the_changed_selector_prints_only_matching_files_when_there_is_no_base(r
     code, out = _run("changed", ["--repo", str(repo.root), "*.py"], capsys)
     assert code == 0
     assert out == "a.py\0"
+
+
+# shelf-3xm, shelf-dof (incident 2026-10-20): four gates at once on one box took 11-14 min each, and a push re-ran
+# the gate on the tree that had just passed it.
+def test_the_shipped_gate_state_is_the_one_the_shelf_runs() -> None:
+    shelf = Path(__file__).resolve().parents[3] / "tools" / "gate_state.py"
+    assert shelf.read_text() == (RECIPES / RECIPE_FILES["gate-state"]).read_text()
+    assert "shelf" not in shelf.read_text().lower()
+
+
+_GATE_ENV = ("CI", "GATE_LOCK", "GATE_LOCK_FILE", "GATE_LOCK_HELD", "GATE_NOTICE_FD", "PRE_COMMIT_TO_REF")
+
+
+@pytest.fixture
+def gate_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
+    """The environment with no gate or hook variable leaked from the shell, the lock in `tmp_path`."""
+    for name in _GATE_ENV:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GATE_LOCK_FILE", str(tmp_path / "gate-test.lock"))
+    return dict(os.environ)
+
+
+def _locked(env: dict[str, str], *cmd: str) -> subprocess.Popen[str]:
+    script = RECIPES / RECIPE_FILES["gate-state"]
+    return subprocess.Popen(
+        ["python3", "-I", str(script), "lock", "--", *cmd], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+
+
+@contextlib.contextmanager
+def _held(path: str) -> Generator[None]:
+    """The lock held by another run, as the waiting run sees it."""
+    with Path(path).open("a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        handle.write("pid 1 in /elsewhere since then\n")
+        handle.flush()
+        yield
+
+
+def test_a_gate_waits_for_the_lock_and_names_who_holds_it(gate_env: dict[str, str]) -> None:
+    with _held(gate_env["GATE_LOCK_FILE"]):
+        run = _locked(gate_env, "sh", "-c", "echo ran; exit 3")
+        assert run.stderr is not None
+        waiting = run.stderr.readline()
+        assert "gate-lock: waiting" in waiting
+        assert "pid 1 in /elsewhere" in waiting
+        assert run.poll() is None
+    out, err = run.communicate(timeout=10)
+    assert (run.returncode, out) == (3, "ran\n")
+    assert "gate-lock: acquired after" in err
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "notice"),
+    [("CI", "true", "gate-lock: off (CI)"), ("GATE_LOCK", "off", "gate-lock: off (GATE_LOCK=off)"), ("GATE_LOCK_HELD", "", "")],
+)
+def test_a_run_skips_the_lock_in_ci_when_opted_out_or_already_under_it(
+    gate_env: dict[str, str], name: str, value: str, notice: str
+) -> None:
+    env = {**gate_env, name: value or gate_env["GATE_LOCK_FILE"]}
+    with _held(gate_env["GATE_LOCK_FILE"]):
+        out, err = _locked(env, "echo", "ran").communicate(timeout=10)
+    assert out == "ran\n"
+    assert err.strip() == notice
+
+
+def test_a_command_under_the_lock_can_take_it_again_without_waiting_on_itself(gate_env: dict[str, str]) -> None:
+    script = RECIPES / RECIPE_FILES["gate-state"]
+    out, err = _locked(gate_env, "python3", "-I", str(script), "lock", "--", "echo", "nested").communicate(timeout=10)
+    assert (out, err) == ("nested\n", "")
+
+
+def _gate(repo: Repo, *args: str, capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:
+    code, _ = _run("gate-state", ["--repo", str(repo.root), *args], capsys)
+    return code, capsys.readouterr().err
+
+
+def _green_run(repo: Repo, capsys: pytest.CaptureFixture[str], *, edit: str = "") -> None:
+    assert _gate(repo, "start", capsys=capsys)[0] == 0
+    if edit:
+        repo.write(edit, "edited during the run\n")
+    assert _gate(repo, "passed", "--gate", "check", capsys=capsys)[0] == 0
+
+
+def _push(repo: Repo, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    script = RECIPES / RECIPE_FILES["gate-state"]
+    cmd = ["python3", "-I", str(script), "pre-push", "--gate", "check", "--", "sh", "-c", "echo gate ran; exit 9"]
+    return subprocess.run(cmd, cwd=repo.root, env=env, capture_output=True, text=True, check=False)
+
+
+def _committed(repo: Repo) -> None:
+    repo.write("app.py", "x = 1\n")
+    repo.commit()
+
+
+def test_a_push_skips_the_gate_on_a_clean_tree_that_passed_it(
+    repo: Repo, gate_env: dict[str, str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    _committed(repo)
+    _green_run(repo, capsys)
+    pushed = _push(repo, {**gate_env, "PRE_COMMIT_TO_REF": repo.git("rev-parse", "HEAD").strip()})
+    assert (pushed.returncode, pushed.stdout) == (0, "")
+    assert "passed `check`" in pushed.stderr
+
+
+def test_a_tree_checked_dirty_then_committed_whole_is_the_tree_that_passed(
+    repo: Repo, gate_env: dict[str, str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    _committed(repo)
+    repo.write("app.py", "x = 2\n")
+    repo.write("new.py", "y = 1\n")
+    _green_run(repo, capsys)
+    repo.commit()
+    assert _push(repo, gate_env).returncode == 0
+
+
+@pytest.mark.parametrize(
+    "doubt",
+    ["no green run", "failed", "edited during the run", "untracked file", "another commit", "pushing another commit", "other gate"],
+)
+def test_a_push_runs_the_gate_on_any_doubt(repo: Repo, gate_env: dict[str, str], capsys: pytest.CaptureFixture[str], doubt: str) -> None:
+    _committed(repo)
+    env = dict(gate_env)
+    if doubt == "failed":
+        assert _gate(repo, "start", capsys=capsys)[0] == 0  # a failed step stops the gate before `passed`
+    elif doubt == "edited during the run":
+        _green_run(repo, capsys, edit="app.py")
+        repo.commit()  # the edited content is what is pushed, and no gate saw it whole
+    elif doubt == "other gate":
+        assert _gate(repo, "start", capsys=capsys)[0] == 0
+        assert _gate(repo, "passed", "--gate", "check-all", capsys=capsys)[0] == 0
+    elif doubt != "no green run":
+        _green_run(repo, capsys)
+    if doubt == "untracked file":
+        repo.write("scratch.py", "z = 1\n")
+    if doubt == "another commit":
+        repo.write("app.py", "x = 3\n")
+        repo.commit()
+    if doubt == "pushing another commit":
+        env["PRE_COMMIT_TO_REF"] = "0" * 40
+    pushed = _push(repo, env)
+    assert (pushed.returncode, pushed.stdout) == (9, "gate ran\n")
+
+
+def test_outside_a_git_repo_nothing_is_recorded_and_the_gate_runs(
+    tmp_path: Path, gate_env: dict[str, str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, _ = _run("gate-state", ["--repo", str(tmp_path), "start"], capsys)
+    assert code == 0
+    code, _ = _run("gate-state", ["--repo", str(tmp_path), "passed"], capsys)
+    assert code == 0
+    script = RECIPES / RECIPE_FILES["gate-state"]
+    cmd = ["python3", "-I", str(script), "pre-push", "--", "sh", "-c", "exit 9"]
+    assert subprocess.run(cmd, cwd=tmp_path, env=gate_env, check=False).returncode == 9
