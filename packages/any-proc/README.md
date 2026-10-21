@@ -53,10 +53,13 @@ sup.stop()       # SIGTERM, SIGKILL after the wait
 sup.state, sup.reason, sup.version, sup.terminal
 ```
 
-- **A probe answers with `Health`.** `"up"` and `"down"` are the supervisor's. Any other
+- **A probe answers with `Health`.** `"up"`, `"starting"` and `"down"` are the supervisor's. Any other
   status is terminal: a verdict no respawn changes (a lock another owner holds, a version
   others are attached to). The supervisor stops touching the child and keeps the name in
   `sup.terminal`. `classify_exit(code)` is where an exit becomes terminal.
+- **Answering but not ready is `starting`, waited for however long it takes.** `start` returns
+  at once on it, and `supervise` neither kills nor respawns it: a server pulling gigabytes of
+  models is slow, not dead. `startup_timeout` bounds only the silence before a first answer.
 - **Alive but silent is `unresponsive`, never respawned.** A second child next to a live one
   could only fight it for what it holds.
 - **Respawns are bounded.** Capped exponential backoff, and at most `restart_budget`

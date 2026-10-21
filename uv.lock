@@ -240,7 +240,7 @@ requires-dist = [{ name = "markdown-it-py", specifier = ">=3,<5" }]
 
 [[package]]
 name = "any-proc"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "packages/any-proc" }
 
 [[package]]

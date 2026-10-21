@@ -5,11 +5,13 @@ passes, stops it gracefully (SIGTERM, then SIGKILL after a wait), and on a recov
 death respawns it under capped exponential backoff and a restart budget over a rolling
 window. It never raises out of ``start``: every failure settles a state with a reason.
 
-A probe answers with a :class:`Health`. ``"up"`` and ``"down"`` are the supervisor's
-own; any other status is **terminal** — a verdict a respawn cannot change (another owner
+A probe answers with a :class:`Health`. ``"up"``, ``"down"`` and ``"starting"`` are the
+supervisor's own; any other status is **terminal** — a verdict a respawn cannot change (another owner
 holds a lock, the running version is not ours while others are attached) — and the
 supervisor stops touching the child until a person acts. The consumer names its terminal
-verdicts; the supervisor only keeps the name.
+verdicts; the supervisor only keeps the name. ``"starting"`` is a live child that answers
+but is not ready yet (pulling models, recovering): ``start`` returns at once, and the child
+is waited for, however long it takes, until it answers ``"up"``, exits or goes silent.
 
 All effects are injected (spawn, probe, exit classification, sleep, clock), so the state
 machine is tested with a fake child and a scripted probe. :func:`rotate_log` is the
@@ -45,8 +47,8 @@ class State(StrEnum):
 
 @dataclass(frozen=True)
 class Health:
-    """One verdict about the child: ``"up"``, ``"down"``, or the consumer's name for a
-    terminal verdict."""
+    """One verdict about the child: ``"up"``, ``"starting"`` (alive, answering, not ready),
+    ``"down"``, or the consumer's name for a terminal verdict."""
 
     status: str
     version: str | None = None
@@ -111,9 +113,11 @@ class Supervisor:
         self._backoff_until: float = 0.0  # earliest clock-time the next respawn may fire
 
     def start(self) -> State:
-        """Spawn the child and poll until it is up, settling ``down`` on failure.
+        """Spawn the child and poll until it answers, settling ``down`` on failure.
 
-        A spawn failure, an early exit and a start timeout all settle ``down`` with a
+        It answers ``up``, ``starting`` (then :meth:`supervise` waits for it to be ready;
+        ``startup_timeout`` bounds only the silence before a first answer) or a terminal
+        verdict. A spawn failure, an early exit and a start timeout all settle ``down`` with a
         reason (or terminal, when the exit classifies so). Never spawns over a live child.
         """
         if self.state in (State.up, State.starting) or (self._proc is not None and self._proc.poll() is None):
@@ -191,7 +195,8 @@ class Supervisor:
 
         Respawns under capped exponential backoff and at most ``restart_budget`` times per
         ``restart_window``; an exhausted budget settles ``down`` with the count. A healthy
-        ``up`` forgives the past. Terminal, unresponsive, idle and stopping are left alone.
+        ``up`` forgives the past. Terminal, unresponsive, starting, idle and stopping are left
+        alone: a starting child is waited for, never respawned for being slow.
         """
         if self.state in (State.terminal, State.stopping, State.idle):
             return self.state
@@ -200,7 +205,7 @@ class Supervisor:
             self._restart_times.clear()
             self._backoff_until = 0.0
             return self.state
-        if self.state in (State.terminal, State.unresponsive):
+        if self.state in (State.terminal, State.unresponsive, State.starting):
             return self.state
         now = self._clock()
         if now < self._backoff_until:
@@ -216,6 +221,8 @@ class Supervisor:
     def _apply(self, health: Health) -> Health:
         if health.status == "up":
             self.state, self.terminal = State.up, None
+        elif health.status == "starting":
+            self.state, self.terminal = State.starting, None
         elif health.status == "down":
             self.state, self.terminal = State.down, None
         else:

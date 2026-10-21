@@ -1,0 +1,10 @@
+seq = 152
+date = "2026-10-21"
+event = "delivery"
+software = "any-proc"
+release = "any-proc-v0.2.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """EVOLVE: a probe may answer "starting" (alive, answering, not ready). start() returns at once in State.starting and supervise() leaves the child alone until it answers up, exits or goes silent; startup_timeout bounds only the silence before a first answer. Found deploying a2kay on the owner's Mac: serve pulls 2.3 GB of models before it is ready, and the 300 s start timeout killed and respawned it every five minutes (a2kay-k2pq). Breaking only for a consumer that named a terminal verdict "starting": minor bump (0.x)."""

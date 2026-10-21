@@ -140,6 +140,53 @@ def test_a_terminal_probe_verdict_during_start_is_terminal() -> None:
     assert (s.terminal, s.version, s.reason) == ("skewed", "0.9", "older")
 
 
+def test_a_child_that_answers_starting_returns_from_start_starting_with_its_reason() -> None:
+    proc = FakeProc(alive=True)
+    s = _sup(lambda: proc, ScriptedProbe(Health("starting", reason="pulling models")), startup_timeout=1.0, clock=FakeClock(0.0, 0.0))
+    assert s.start() is State.starting
+    assert (s.terminal, s.reason) == (None, "pulling models")
+    assert not proc.terminated
+
+
+def test_a_starting_child_is_waited_for_past_the_start_timeout_and_never_respawned() -> None:
+    clock = MutClock()
+    spawn, spawned = _counting_spawn([FakeProc(), FakeProc()])
+    s = _sup(spawn, ScriptedProbe(Health("starting", reason="pulling models")), startup_timeout=1.0, clock=clock)
+    s.start()
+    for t in (10.0, 300.0, 3600.0):
+        clock.t = t
+        assert s.supervise() is State.starting
+    assert len(spawned) == 1
+    assert not spawned[0].terminated
+
+
+def test_a_starting_child_that_gets_ready_is_up() -> None:
+    spawn, spawned = _counting_spawn([FakeProc()])
+    s = _sup(spawn, ScriptedProbe(Health("starting"), Health("starting"), Health("up", version="2.0")))
+    assert s.start() is State.starting
+    assert s.supervise() is State.starting
+    assert s.supervise() is State.up
+    assert s.version == "2.0"
+    assert len(spawned) == 1
+
+
+def test_a_starting_child_that_exits_is_respawned() -> None:
+    spawn, spawned = _counting_spawn([FakeProc(), FakeProc()])
+    s = _sup(spawn, ScriptedProbe(Health("starting"), Health("up")))
+    s.start()
+    spawned[0].alive, spawned[0].exit_code = False, 1
+    assert s.supervise() is State.up
+    assert len(spawned) == 2
+
+
+def test_a_starting_child_that_stops_answering_is_unresponsive() -> None:
+    spawn, spawned = _counting_spawn([FakeProc(), FakeProc()])
+    s = _sup(spawn, ScriptedProbe(Health("starting"), Health("down", reason="probe timed out")))
+    s.start()
+    assert s.supervise() is State.unresponsive
+    assert len(spawned) == 1
+
+
 def test_poll_detects_child_death() -> None:
     proc = FakeProc(alive=True)
     s = _sup(lambda: proc, ScriptedProbe(Health("up")))
