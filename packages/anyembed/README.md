@@ -1,7 +1,8 @@
 # anyembed
 
 Stop caring which embedding backend is underneath. A neutral `Embedder` interface
-plus an in-process `LocalEmbedder` (the BGE `transformers` recipe). No dependency
+plus two in-process backends, each an extra: `LocalEmbedder` (the BGE `transformers` recipe,
+`anyembed[transformers]`) and `LlamaCppEmbedder` (GGUF on `llama.cpp`, `anyembed[llamacpp]`). No dependency
 on any host framework — failures raise `AnyEmbedError`, which you translate at the
 seam.
 
@@ -23,9 +24,12 @@ Compute (`embed_documents` / `embed_query`) is hidden and swappable. The **state
 — `(model_id, dim)` — is surfaced deliberately: persist it alongside your index, and
 when either changes, rebuild rather than silently mixing incompatible vectors.
 
-## `LocalEmbedder`
+## `LocalEmbedder` (the `[transformers]` extra)
 
-CLS-token pooling + L2-normalize (the BGE recipe), loaded once and lazily. By default
+CLS-token pooling + L2-normalize (the BGE recipe), loaded once and lazily. torch and
+`transformers` come with the `[transformers]` extra, not the base install: without it,
+`anyembed` and everything else in it still import and run, and the first `LocalEmbedder` embed
+raises `AnyEmbedError` naming the extra. By default
 `offline=True`: the weights are expected to be a baked, on-disk asset, and a missing
 model fails loud (`AnyEmbedError`) instead of downloading in the request path.
 

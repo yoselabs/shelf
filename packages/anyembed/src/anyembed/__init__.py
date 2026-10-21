@@ -1,7 +1,7 @@
 """anyembed — stop caring which embedding backend is underneath.
 
 A neutral :class:`Embedder` interface, two in-process backends — :class:`LocalEmbedder`
-(the BGE `transformers` recipe) and :class:`LlamaCppEmbedder` (a GGUF file on `llama.cpp`,
+(the BGE `transformers` recipe, the ``[transformers]`` extra) and :class:`LlamaCppEmbedder` (a GGUF file on `llama.cpp`,
 the ``[llamacpp]`` extra) — and :class:`EmbeddingCache`, vectors kept by
 ``(model_id, text)`` across index rebuilds. Compute (``embed_documents`` / ``embed_query``) is
 hidden and swappable; the state — ``(model_id, dim)`` — is surfaced so a host can

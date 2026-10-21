@@ -1,10 +1,11 @@
-"""In-process local embedder via `transformers` — the BGE recipe.
+"""In-process local embedder via `transformers` — the BGE recipe (the ``[transformers]`` extra).
 
 CLS-token pooling + L2-normalize (the BGE recipe). Documents embed raw; queries
 get the configured instruction prefix. Loads once, lazily. By default it never
 reaches the network (``offline=True``): the weights are expected to be a baked,
 on-disk asset, and a missing model fails loud (``AnyEmbedError``) rather than
-triggering a download in the request path.
+triggering a download in the request path. Without the extra installed, the first embed
+raises ``AnyEmbedError`` naming it; constructing one needs nothing.
 """
 
 from __future__ import annotations
@@ -43,14 +44,18 @@ class LocalEmbedder:
         """Lazily load the tokenizer + model once. Fail loud if unavailable."""
         if self._model is not None:
             return
+        if self._offline:
+            import os  # noqa: PLC0415 — set offline env before transformers loads
+
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
         try:
-            if self._offline:
-                import os  # noqa: PLC0415 — set offline env before transformers loads
-
-                os.environ.setdefault("HF_HUB_OFFLINE", "1")
-                os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+            import torch  # noqa: F401, PLC0415 — heavy, lazy; _encode uses it
             from transformers import AutoModel, AutoTokenizer  # noqa: PLC0415 — heavy, lazy
-
+        except ImportError as exc:
+            msg = f"LocalEmbedder needs torch and transformers, which are not installed: install anyembed[transformers] ({exc})"
+            raise AnyEmbedError(msg) from exc
+        try:
             self._tokenizer = AutoTokenizer.from_pretrained(self.model_id)
             self._model = AutoModel.from_pretrained(self.model_id)
             self._model.eval()
@@ -59,10 +64,10 @@ class LocalEmbedder:
             raise AnyEmbedError(msg) from exc
 
     def _encode(self, texts: list[str]) -> np.ndarray:
-        import numpy as np  # noqa: PLC0415
-        import torch  # noqa: PLC0415
-
         self._ensure_model()
+        import numpy as np  # noqa: PLC0415
+        import torch  # noqa: PLC0415 — present: _ensure_model checked it
+
         tok, model = self._tokenizer, self._model
         if tok is None or model is None:  # pragma: no cover -- _ensure_model guarantees load
             msg = "tokenizer/model not initialised after _ensure_model()"

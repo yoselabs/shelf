@@ -70,7 +70,7 @@ members = [
 [manifest.dependency-groups]
 dev = [
     { name = "any-frontmatter", extras = ["merge"], editable = "packages/any-frontmatter" },
-    { name = "anyembed", extras = ["llamacpp"], editable = "packages/anyembed" },
+    { name = "anyembed", extras = ["llamacpp", "transformers"], editable = "packages/anyembed" },
     { name = "anyllm", extras = ["anthropic", "openai", "claude-code-sdk"], editable = "packages/anyllm" },
     { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
     { name = "browser-cookie3", specifier = ">=0.20,<1" },
@@ -254,12 +254,10 @@ wheels = [
 
 [[package]]
 name = "anyembed"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "packages/anyembed" }
 dependencies = [
     { name = "numpy" },
-    { name = "torch" },
-    { name = "transformers" },
 ]
 
 [package.optional-dependencies]
@@ -267,16 +265,20 @@ llamacpp = [
     { name = "huggingface-hub" },
     { name = "llama-cpp-python" },
 ]
+transformers = [
+    { name = "torch" },
+    { name = "transformers" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'llamacpp'", specifier = ">=0.24,<2" },
     { name = "llama-cpp-python", marker = "extra == 'llamacpp'", specifier = ">=0.3.36,<0.4" },
     { name = "numpy", specifier = ">=1.24,<3" },
-    { name = "torch", specifier = ">=2.4,<3" },
-    { name = "transformers", specifier = ">=4.40,<6" },
+    { name = "torch", marker = "extra == 'transformers'", specifier = ">=2.4,<3" },
+    { name = "transformers", marker = "extra == 'transformers'", specifier = ">=4.40,<6" },
 ]
-provides-extras = ["llamacpp"]
+provides-extras = ["transformers", "llamacpp"]
 
 [[package]]
 name = "anyio"
