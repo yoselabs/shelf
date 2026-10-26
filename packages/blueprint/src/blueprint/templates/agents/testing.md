@@ -6,6 +6,7 @@ Stack-neutral doctrine. The stack file names the tools.
 
 | rule | why |
 |---|---|
+| **The planner states the acceptance as scenarios; the writer implements them.** Scenario text (Given/When/Then, tagged by layer) comes with the bead; the writer writes the step code, then the feature code. | A writer who invents the tests also invents what "done" means |
 | **Scenario first, at the public surface.** Write the behaviour as a scenario an actor would state (a user task, a request, a command) and run it through the real surface, in process. | In one codebase most closed bugs were workflow-shaped; unit tests stayed green through them |
 | **Test at the highest level that can observe the behaviour.** | Lowest-convenient-level tests let sibling paths break later |
 | **Few unit tests.** Only for one function's own rule: a parser edge, a refused value, a table of shapes. Write them as tables from the start. | Test count does not measure complexity; duplicates assert one rule many times |

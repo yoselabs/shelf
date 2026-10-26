@@ -10,6 +10,7 @@ everything else is fixed text. Edit here, never in a consumer's copy of an unmod
 | `agents/gate.md` | `docs/agents/gate.md` | always |
 | `agents/testing.md` | `docs/agents/testing.md` | always (fill `scenario_dir`, `unit_dir`, `architecture_dir`) |
 | `agents/architecture.md` | `docs/agents/architecture.md` | always (fill `layers`, `layer_config`) |
+| `agents/health.md` | `docs/agents/health.md` | always (fill `hot_files`, `core`) |
 | `agents/issue-tracker.md` | `docs/agents/issue-tracker.md` | always while the tracker is beads |
 | `agents/domain.md` | `docs/agents/domain.md` | always |
 | `agents/python.md` | `docs/agents/python.md` | per stack: python-uv (fill `<role>_tool` and `<role>_run` for each role in the table, `inner_loop`, `scenario_dir`, `glossary_file`) |
