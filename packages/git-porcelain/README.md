@@ -85,6 +85,46 @@ git.merge(repo, "origin/main", author=me, committer=me); git.lfs_checkout(repo)
   makes git restore the tree, and that restore can fail too, leaving a dirty tree and no
   `MERGE_HEAD`. `lfs_checkout` fills pointer files whose objects are already local.
 
+## One `Git` object per checkout (`Git`, `RealGit`, `FakeGit`)
+
+A driver that makes dozens of git calls a run (task-loop's engine) takes a `Git` and does not care
+whether a subprocess or a dictionary answers.
+
+```python
+from git_porcelain import Git, RealGit
+from git_porcelain.testing import FakeGit
+
+def land(git: Git) -> bool:
+    git.fetch()
+    if git.rev_list_count("HEAD..origin/main") == 0:
+        return True
+    return git.rebase("origin/main")            # False: stopped on a conflict, see git.unmerged()
+
+land(RealGit(repo))                             # the binary, memoized
+land(FakeGit.init(Path("/virtual")))            # memory, no subprocess
+```
+
+- **The operations** (what task-loop's `engine.py`, `tl.py` and `loop.py` call, nothing more): reads
+  `head resolve branch common_dir toplevel is_inside_work_tree remote_url config_get tree_hash status
+  unmerged rebase_in_progress merge_base is_ancestor rev_list_count log_subjects diff diff_names
+  diff_stat show ls_tree ls_files grep_files ignored worktree_list`; writes `add commit checkout
+  checkout_new detach branch_rename reset rebase rebase_abort clean worktree_add worktree_remove
+  worktree_prune fetch push`. `at(path)` is the same repository from another worktree.
+- **`RealGit` memoizes** `common_dir`, `toplevel`, `is_inside_work_tree`, `remote_url`, `config_get`
+  and `branch`: one process each, however often asked. Its own writes clear the memo; a change made
+  behind its back (another process, a hand edit) needs `git.invalidate()`. `RealGit(path, env={...})`
+  adds variables to every call (a pinned `GIT_DIR`); `memoize=False` turns the memo off; `fetch`
+  tries again while it loses a ref lock to a concurrent fetch.
+- **`FakeGit`** (`git_porcelain.testing`) keeps refs, objects (hashed as git hashes them, so
+  `tree_hash` and diff `index` lines equal git's), index, files, config, worktrees and remotes in
+  memory. `FakeGit.init(path)`, `FakeGit.clone(FakeRemote(url), path)`, `write_file`, `remove_file`,
+  `set_config`, `add_remote` arrange a test. Paths are virtual; nothing touches the disk.
+- **It cannot drift:** `tests/features/git_contract.feature` (`@contract`) runs one set of scenarios
+  against `RealGit` on temp repos and against `FakeGit`; real git is touched by that suite and by
+  `@smoke` tests only. What the fake does not model: hooks, signing, rename detection in a diff, a
+  `.gitignore` below the root, merges other than a rebase, the commit's author. Add a scenario before
+  teaching the fake a new behaviour.
+
 ## Surface
 
 `run_git`, `git_returncode`, `is_repo`, `git_dir`, `has_upstream`, `upstream`, `head`,
@@ -92,7 +132,8 @@ git.merge(repo, "origin/main", author=me, committer=me); git.lfs_checkout(repo)
 `has_conflict_markers`, `show_stage`, `show_at`, `commit_paths`, `log_grep`, `push`,
 `fetch`, `merge`, `finish_merge`, `is_ancestor`, `classify_remote_failure`, `lfs_available`,
 `lfs_setup`, `lfs_checkout`, `lfs_paths`, `lfs_push`, `lfs_fetch`, and the types
-`Identity`, `Commit`, `MergeResult`, `StatusEntry`, `GitError`, `RemoteError`. Interpreting the git data (mapping conflicts to
+`Identity`, `Commit`, `MergeResult`, `StatusEntry`, `GitError`, `RemoteError`, and the `Git`
+protocol with `RealGit`, `Worktree`, `FileStat` (above). Interpreting the git data (mapping conflicts to
 your domain, etc.) is the caller's job.
 
 ## Testing helpers
@@ -111,4 +152,5 @@ git(repo, "init", "-q", "-b", "main")   # stdout; a failure raises with git's st
 - `QUIET` (no hooks, no auto-maintenance, no signing, no template) is the default; a test of a
   hook or of maintenance passes `config={}`. The identity is a parameter; `None` leaves git
   with no `user.*`. Neither imports pytest.
+- `FakeGit` and `FakeRemote` live here too (see above).
 - This package's own tests use these helpers.

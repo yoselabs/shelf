@@ -17,6 +17,7 @@ into its own error type at the seam.
 
 from __future__ import annotations
 
+from git_porcelain.api import FileStat, Git, ResetMode, Worktree
 from git_porcelain.errors import GitError
 from git_porcelain.history import (
     Commit,
@@ -54,16 +55,22 @@ from git_porcelain.porcelain import (
     sync_status,
     unmerged_paths,
 )
+from git_porcelain.real import RealGit
 
 __all__ = [
     "Commit",
+    "FileStat",
+    "Git",
     "GitError",
     "Identity",
     "MergeResult",
     "MergeState",
+    "RealGit",
     "RemoteError",
     "RemoteFailure",
+    "ResetMode",
     "StatusEntry",
+    "Worktree",
     "classify_remote_failure",
     "commit_paths",
     "dirty_rels",

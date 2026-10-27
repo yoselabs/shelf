@@ -36,7 +36,13 @@ def _git_env() -> dict[str, str]:
     return env
 
 
-def _run(vault: Path, args: tuple[str, ...], env: Mapping[str, str] | None, timeout: float | None) -> subprocess.CompletedProcess[str]:
+def _run(
+    vault: Path,
+    args: tuple[str, ...],
+    env: Mapping[str, str] | None,
+    timeout: float | None,
+    stdin: str | None = None,
+) -> subprocess.CompletedProcess[str]:
     if shutil.which(_GIT) is None:
         msg = "git not found on PATH"
         raise GitError(msg, retryable=False, hint="install git")
@@ -48,6 +54,7 @@ def _run(vault: Path, args: tuple[str, ...], env: Mapping[str, str] | None, time
             text=True,
             env={**_git_env(), **(env or {})},
             timeout=timeout,
+            input=stdin,
         )
     except subprocess.TimeoutExpired as exc:
         msg = f"git {args[0] if args else ''} timed out after {timeout}s"
@@ -63,14 +70,15 @@ def run_git(
     check: bool = True,
     env: Mapping[str, str] | None = None,
     timeout: float | None = None,
+    stdin: str | None = None,
 ) -> str:
     """Run ``git -C <vault> <args>`` fail-loud; return stdout. The repo is always the one at ``vault``:
     a ``GIT_DIR`` or ``GIT_WORK_TREE`` the process inherited (a git hook sets them) is dropped.
 
     ``env`` adds variables for this call only (an author identity, say). ``timeout``
-    bounds a network call; running out raises a retryable :class:`GitError`.
+    bounds a network call; running out raises a retryable :class:`GitError`. ``stdin`` is fed to git.
     """
-    proc = _run(vault, args, env, timeout)
+    proc = _run(vault, args, env, timeout, stdin)
     if check and proc.returncode != 0:
         msg = f"git {args[0] if args else ''} exited {proc.returncode}: {proc.stderr.strip()[:300]}"
         raise GitError(msg, retryable=False)
@@ -194,9 +202,9 @@ def readiness(vault: Path, *, check_push: bool = True) -> dict[str, Any]:
     return {"is_repo": True, "identity": bool(email), "remote": bool(remote), "push_access": push_access}
 
 
-def unmerged_paths(vault: Path) -> list[str]:
+def unmerged_paths(vault: Path, *, env: Mapping[str, str] | None = None) -> list[str]:
     """Return the repo-relative paths that are currently unmerged (conflicted)."""
-    out = run_git(vault, "diff", "--name-only", "--diff-filter=U", check=False)
+    out = run_git(vault, "diff", "--name-only", "--diff-filter=U", check=False, env=env)
     return [ln.strip() for ln in out.splitlines() if ln.strip()]
 
 
@@ -237,9 +245,9 @@ class StatusEntry:
         return self.code not in {"??", "!!"}
 
 
-def status(vault: Path) -> list[StatusEntry]:
+def status(vault: Path, *, env: Mapping[str, str] | None = None) -> list[StatusEntry]:
     """Every changed, staged and untracked path, one entry per file, paths unquoted."""
-    fields = run_git(vault, "status", "--porcelain=v1", "-z", "-uall", check=False).split("\0")
+    fields = run_git(vault, "status", "--porcelain=v1", "-z", "-uall", check=False, env=env).split("\0")
     entries: list[StatusEntry] = []
     i = 0
     while i < len(fields):

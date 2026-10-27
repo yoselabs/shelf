@@ -1,4 +1,9 @@
-"""Test helpers: git that answers to the test alone, and a runner for the commands a test sets up with.
+"""Test helpers: git that answers to the test alone, an in-memory ``FakeGit``, and a runner for set-up commands.
+
+``FakeGit`` (with ``FakeRemote``) implements the same :class:`~git_porcelain.api.Git` protocol as
+``RealGit`` with refs, trees, index, config and worktrees in memory and no subprocess. A host's tests
+take a ``Git`` and pass a ``FakeGit``; the package's contract suite runs one set of scenarios against both
+so the fake cannot drift from the binary.
 
 ``hermetic_env`` returns the environment that shuts the machine's git out of a test: no system or
 global config, no variable pointing git at another repository, and the settings a test needs
@@ -15,13 +20,15 @@ from __future__ import annotations
 import subprocess
 from typing import TYPE_CHECKING, Final, Protocol
 
+from git_porcelain.fake import FakeGit, FakeRemote
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
     from git_porcelain.history import Identity
 
-__all__ = ["LEAKS", "QUIET", "apply_hermetic_env", "git", "hermetic_env"]
+__all__ = ["LEAKS", "QUIET", "FakeGit", "FakeRemote", "apply_hermetic_env", "git", "hermetic_env"]
 
 #: Settings every test git process runs with unless the test asks otherwise.
 QUIET: Final[Mapping[str, str]] = {

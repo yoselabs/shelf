@@ -1,0 +1,10 @@
+seq = 154
+date = "2026-10-27"
+event = "delivery"
+software = "git-porcelain"
+release = "git-porcelain-v0.7.0"
+actor = "task-loop"
+consumer = "task-loop"
+verdict = "pass"
+cost = ""
+note = """FEATURE. A typed `Git` protocol for the git operations task-loop's engine, tl and loop make on one checkout (grep of their git calls, nothing beyond), `RealGit` over the binary with a memo for read-only answers (common_dir, toplevel, branch, config, remote URL) and an explicit `invalidate`, and `FakeGit`/`FakeRemote` in git_porcelain.testing (refs, trees, index, config, worktrees, remotes in memory; objects hashed as git hashes them). One @contract Gherkin suite runs the same scenarios against RealGit on temp repos and against FakeGit, so the fake cannot drift. Not adopted by task-loop yet: the verdict is the delivery's own gate."""
