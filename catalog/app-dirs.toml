@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
+name = "app-dirs"
+kind = "primitive"
+tier = "T0"
+release = "app-dirs-v0.1.0"
+capability = "Stop copying the XDG lookup — an app's config, state and cache folders on POSIX from XDG_CONFIG_HOME, XDG_STATE_HOME and XDG_CACHE_HOME with the spec's fallbacks (a relative or empty value ignored), or, when asked, the folder Claude Code hands a plugin in CLAUDE_PLUGIN_DATA; created only on request, the environment and home passed in so a test patches nothing."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from the four config-dir copies in iorlas-task-loop (tl.py, dash/server.py) and iorlas-delegate (agent_runs.py, route.py), POSIX only: the APPDATA branches are not carried. macOS uses the XDG layout, as both consumers already do. CLAUDE_PLUGIN_DATA is opt-in because delegate deliberately refuses to follow it. Zero-dependency stdlib. Born candidate."

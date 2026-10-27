@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "iorlas-task-loop"
+software = "app-dirs"
+why = "task-loop and delegate each re-derive their per-user config folder (XDG_CONFIG_HOME, else ~/.config) in four places: tl.py, dash/server.py and delegate's agent_runs.py and route.py. The rewrite (arch-study 88, S1) vendors one lookup into both plugins. Not yet adopted: the retention claim is the planned vendoring."
+needs = "app_dirs.config_dir/state_dir/cache_dir(app, plugin_data=, create=, env=, home=) -> Path, POSIX only; plugin_data_dir() for CLAUDE_PLUGIN_DATA."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired
