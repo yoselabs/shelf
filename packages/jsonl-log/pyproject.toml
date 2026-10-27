@@ -1,7 +1,7 @@
 [project]
 name = "jsonl-log"
-version = "0.1.0"
-description = "An append-only JSON-lines log with size rotation: one line per write, never split across files, at most N files kept; reads newest file first and skip a line that does not decode."
+version = "0.2.0"
+description = "An append-only JSON-lines log: one line per write (safe across processes), size and age retention, newest-first reads that skip a line that does not decode, and a byte-cursor reader whose torn last line waits."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
