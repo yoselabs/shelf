@@ -28,7 +28,7 @@ holds becomes a `blueprint lacks:` bead (§6), not an exception granted in chat.
 
 | layer | what it judges | concerns in v0.1 |
 |---|---|---|
-| Generic | any repo, any language | `gate` (one command, CI, hooks, guards, clean clone), `backlog` (beads), `knowledge` (CONTEXT.md, living ADRs, the generated `docs/adr/INDEX.md`), `secrets` (gitleaks in the gate; sops files sealed and covered by a rule) |
+| Generic | any repo, any language | `gate` (one command, CI, hooks, guards, clean clone), `backlog` (beads), `knowledge` (CONTEXT.md, living ADRs, the generated `docs/adr/INDEX.md`), `secrets` (sops files sealed and covered by a rule) |
 | Stack-specific | one language's tools, from the shelf's profile for it | `stack/<stack>`: toolchain, formatter, linter, types, dependencies, tests, coverage, spelling, architecture; python-uv also the Python and uv pins (CI and images included), shell also strict mode |
 | Framework-specific | an engine or framework on top of a stack, from its profile | `framework/<name>` (godot, unity, mcp): framework version, project hygiene, build, tests, surface integrity, architecture, CI |
 | Agent harness | what agents run inside | `agents`: AGENTS.md, session env, session hooks |

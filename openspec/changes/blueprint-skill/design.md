@@ -263,7 +263,7 @@ question.
 
 Candidate pillars (counted, not required until a checkpoint reads them): mutation testing,
 persistence and migrations, workspace / monorepo layout, dev host and target OS.
-Universal tools, answered once outside the packs: codespell, gitleaks.
+Universal tools, answered once outside the packs: codespell.
 
 **Non-stack pillars:** security (secrets, PII, visibility) · gate (clean clone, one command, CI
 parity, guards proven red) · decisions and knowledge · backlog · agent instructions · shelf · review.
@@ -488,7 +488,7 @@ unprompted.
 | 10 | `test.placement` | scenarios |
 | 11 | `test.lanes` — every hermetic test in the gate | test runner |
 | 12 | `stack.pins` — toolchain file, lockfile frozen, upper bounds | toolchain |
-| 13 | `ws.secrets` — ignored, gitleaks tree + history, visibility recorded before the first push | security |
+| 13 | `ws.secrets` — ignored, visibility recorded before the first push | security |
 | 14 | `agents.one-file` — AGENTS.md canonical, a map, no dated data, context measured | agent instructions |
 | 15 | `kb.homes` — beads only, decision files with the frontmatter gate, one home for requirements | knowledge |
 

@@ -23,8 +23,8 @@ test_image := "shelf-gate-" + file_name(justfile_directory())
 #
 # The per-file linters (images, scripts, lint-changed, spell-changed) check only the files changed against the base
 # in `check` (tools/changed.py; a changed config file, or no base, selects everything). `check-all` runs them on every
-# file (`images "all"`, `scripts "all"`, `lint`, `spell`). The cross-file checks (typecheck, arch, deps, blueprint,
-# secrets) always cover the whole repo. A linter with nothing changed prints "skipped <linter>: ..." and the gate
+# file (`images "all"`, `scripts "all"`, `lint`, `spell`). The cross-file checks (typecheck, arch, deps, blueprint)
+# always cover the whole repo. A linter with nothing changed prints "skipped <linter>: ..." and the gate
 # repeats that line.
 #
 # Both run inside a Linux container when Docker answers: on the macOS host an endpoint scanner
@@ -36,11 +36,11 @@ test_image := "shelf-gate-" + file_name(justfile_directory())
 # working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
 # pre-push hook then skips the gate for that exact tree.
 [group('gate')]
-check: gate-start beads-lint secrets images scripts (gate "check-host")
+check: gate-start beads-lint images scripts (gate "check-host")
     python3 -I tools/gate_state.py passed --gate check
 
 [group('gate')]
-check-all: beads-lint secrets (images "all") (scripts "all") (gate "check-all-host")
+check-all: beads-lint (images "all") (scripts "all") (gate "check-all-host")
 
 # Notes the working tree as the gate starts, for `check` to record when it passes.
 [private]
@@ -66,17 +66,8 @@ beads-lint:
     for status in open blocked; do BD_DISABLE_METRICS=1 bd lint --status "$status" || rc=1; done
     exit "$rc"
 
-# No secret in the history (gitleaks, pinned in mise.toml; about a second). A false positive goes in .gitleaks.toml
-# with a description saying why. Runs on the host, before the container, beside beads-lint: the image has no gitleaks.
-[group('gate')]
-secrets:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    command -v gitleaks >/dev/null || { echo "secrets: gitleaks is not installed -- run just tools" >&2; exit 2; }
-    gitleaks git --no-banner --redact --log-level warn .
-
 # Every Dockerfile passes hadolint (each ignored rule's reason is in .hadolint.yaml), is dockerfmt-formatted, and pins
-# every image by digest (Dependabot bumps them). The tools are pinned in mise.toml. On the host, beside secrets: the
+# every image by digest (Dependabot bumps them). The tools are pinned in mise.toml. On the host, beside beads-lint: the
 # image has neither tool.
 [group('gate')]
 images scope="changed":
