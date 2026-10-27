@@ -20,6 +20,7 @@ members = [
     "any-proc",
     "anyembed",
     "anyllm",
+    "app-dirs",
     "asgi-token-gate",
     "async-scope",
     "atomic-io",
@@ -316,6 +317,11 @@ requires-dist = [
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.50" },
 ]
 provides-extras = ["anthropic", "openai", "claude-code-sdk"]
+
+[[package]]
+name = "app-dirs"
+version = "0.1.0"
+source = { editable = "packages/app-dirs" }
 
 [[package]]
 name = "asgi-token-gate"
