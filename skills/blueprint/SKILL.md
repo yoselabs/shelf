@@ -150,6 +150,13 @@ Profile drafts: <paths in docs/blueprint/proposals/, or none>
 Friction no checkpoint covers: <one line each, or none>
 ```
 
+## 8. Agentic delivery audit
+
+On request ("audit how agents build and test here"), or when the repo runs an agent loop: judge it against
+[agentic-delivery.md](agentic-delivery.md) (roles, agent context, test layers and cost, test radius, machine speed,
+determinism, review, gate). The engine does not check these rules yet; the audit is by evidence, row by row, as that
+file's §10 says. Its ❌ rows become beads like any other finding.
+
 ## Gotchas
 
 - Writing ✅ for a row the engine reported otherwise is the failure this skill exists to prevent.
