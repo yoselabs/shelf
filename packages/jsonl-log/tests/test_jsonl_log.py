@@ -4,11 +4,13 @@ rotation, the in-process size count, reopen, torn line, read-only and append-onl
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
 
 import jsonl_log
 import pytest
-from jsonl_log import JsonlLog, LineError, LogClosedError, read, read_lines
+from jsonl_log import JsonlLog, LineError, LogClosedError, expire, read, read_lines
 
 _LIMIT = 1024
 
@@ -130,11 +132,57 @@ def test_a_read_only_log_appends_nothing(tmp_path: Path) -> None:
 
 
 def test_the_module_only_appends() -> None:
-    """No rewrite path exists: the log is opened in append mode only."""
+    """No rewrite path exists: the log is opened with O_APPEND, never truncating or rewriting."""
     body = Path(jsonl_log.__file__).read_text(encoding="utf-8")
-    assert '"ab"' in body
-    for mode in ('"w"', '"wb"', '"r+"', '"r+b"', '"w+"'):
-        assert f"open({mode}" not in body
-        assert f", {mode})" not in body
-    assert "write_text" not in body
-    assert "write_bytes" not in body
+    appender = Path(jsonl_log.__file__).with_name("_append.py").read_text(encoding="utf-8")
+    assert "os.O_APPEND" in appender
+    for text in (body, appender):
+        assert "O_TRUNC" not in text
+        for mode in ('"w"', '"wb"', '"r+"', '"r+b"', '"w+"'):
+            assert f"open({mode}" not in text
+            assert f", {mode})" not in text
+        assert "write_text" not in text
+        assert "write_bytes" not in text
+
+
+def test_a_rotation_by_another_process_is_noticed(tmp_path: Path) -> None:
+    path = tmp_path / "log.jsonl"
+    with JsonlLog.open(path) as mine:
+        assert mine.append(_row(1))
+        path.replace(tmp_path / "log.jsonl.1")  # what another process's rotation does
+        assert mine.append(_row(2))
+    assert [r["n"] for r in read(path, json.loads)] == [2]
+
+
+def test_append_at_reports_the_offset(tmp_path: Path) -> None:
+    with JsonlLog.open(tmp_path / "log.jsonl") as log:
+        first = log.append_at(b'{"n": 1}')
+        second = log.append_at(b'{"n": 2}')
+    assert (first, second) == (0, len(b'{"n": 1}\n'))
+
+
+def test_rotation_prunes_the_files_past_max_age(tmp_path: Path) -> None:
+    path = tmp_path / "log.jsonl"
+    old = tmp_path / "log.jsonl.3"
+    old.write_text("{}\n", encoding="utf-8")
+    os.utime(old, (1.0, 1.0))
+    with JsonlLog.open(path, max_age=60.0, rotate_bytes=_LIMIT) as log:
+        assert not old.exists()  # open prunes
+        keep = tmp_path / "log.jsonl.2"
+        keep.write_text("{}\n", encoding="utf-8")
+        assert log.prune() == []
+        assert keep.exists()
+        assert log.prune(now=time.time() + 120) == [keep]
+
+
+def test_no_max_age_prunes_nothing(tmp_path: Path) -> None:
+    old = tmp_path / "log.jsonl.1"
+    old.write_text("{}\n", encoding="utf-8")
+    os.utime(old, (1.0, 1.0))
+    with JsonlLog.open(tmp_path / "log.jsonl") as log:
+        assert log.prune() == []
+    assert old.exists()
+
+
+def test_expire_skips_a_missing_file(tmp_path: Path) -> None:
+    assert expire([tmp_path / "nope"], 1.0) == []
