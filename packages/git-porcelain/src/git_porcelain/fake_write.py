@@ -20,9 +20,9 @@ from git_porcelain.api import (
     UpToDate,
     WorktreeInfo,
 )
-from git_porcelain.errors import GitUnavailable
-from git_porcelain.fake_ops import branch_ref, clean, hard_to, is_clean, make_commit, require_index, some, stage, switch_tree, tracked_dirty
-from git_porcelain.fake_read import dirty, relate
+from git_porcelain.errors import some
+from git_porcelain.fake_ops import branch_ref, clean, hard_to, is_clean, make_commit, require_index, stage, switch_tree, tracked_dirty
+from git_porcelain.fake_read import dirty, relate, resolve_commit
 from git_porcelain.fake_store import ancestors
 
 if TYPE_CHECKING:
@@ -41,14 +41,6 @@ def _head(repo: RepoState, wt: CheckoutState) -> str:
     if sha is None:
         msg = "HEAD is unborn"
         raise ValueError(msg)
-    return sha
-
-
-def _resolve(repo: RepoState, wt: CheckoutState, rev: str) -> str:
-    sha = repo.commit_named(rev, wt)
-    if sha is None:
-        msg = f"git: bad revision '{rev}'"
-        raise GitUnavailable(msg)
     return sha
 
 
@@ -138,7 +130,7 @@ def take_branch(
     if mode == "resume" and exists:
         _land(repo, wt, repo.refs[ref], ref)
     else:
-        target = _resolve(repo, wt, base)
+        target = resolve_commit(repo, wt, base)
         if mode == "fresh" and exists and keep_aside_as is not None:
             ahead = ancestors(repo.store, repo.refs[ref]) - ancestors(repo.store, target)
             if ahead:
@@ -176,7 +168,7 @@ def release_branch(repo: RepoState, wt: CheckoutState, holder: Path) -> Released
 
 def park(repo: RepoState, wt: CheckoutState, base: str, clean_keep: Sequence[str] | None) -> Sha:
     require_index(wt)
-    sha = _resolve(repo, wt, base)
+    sha = resolve_commit(repo, wt, base)
     _land(repo, wt, sha, None)
     if clean_keep is not None:
         clean(repo, wt, clean_keep)
@@ -191,7 +183,7 @@ def rebase_onto(repo: RepoState, wt: CheckoutState, base: str, squash_message: s
         msg = "dirty: the tree has tracked changes"
         raise ValueError(msg)
     require_index(wt)
-    head, target = _head(repo, wt), _resolve(repo, wt, base)
+    head, target = _head(repo, wt), resolve_commit(repo, wt, base)
     if not ancestors(repo.store, target) - ancestors(repo.store, head):
         return UpToDate()
     squashed = False

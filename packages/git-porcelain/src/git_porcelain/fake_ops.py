@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 from git_porcelain.errors import GitUnavailable
 from git_porcelain.fake_diff import status_entries
@@ -23,7 +23,6 @@ __all__ = [
     "is_clean",
     "make_commit",
     "require_index",
-    "some",
     "stage",
     "switch_tree",
     "tracked_dirty",
@@ -151,14 +150,3 @@ def clean(repo: RepoState, wt: CheckoutState, keep: Sequence[str]) -> None:
 def is_clean(repo: RepoState, wt: CheckoutState) -> bool:
     """True when ``status`` would list nothing (untracked files count)."""
     return not status_entries(repo.head_files(wt), wt, ignore_of(repo, wt))
-
-
-_T = TypeVar("_T")
-
-
-def some(value: _T | None) -> _T:
-    """Narrow a value git or the model must have; its absence is an internal failure."""
-    if value is None:
-        msg = "internal: an expected value is missing"
-        raise GitUnavailable(msg)
-    return value

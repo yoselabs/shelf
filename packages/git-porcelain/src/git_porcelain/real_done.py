@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final, TypeVar
+from typing import TYPE_CHECKING, Final
 
 from git_porcelain.errors import GitUnavailable
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-__all__ = ["Done", "some", "unavailable"]
+__all__ = ["Done", "unavailable"]
 
 _TAIL: Final = 600
 _LOCKED: Final = ("index.lock", "cannot lock ref", "unable to create '", ".lock'")
@@ -42,14 +42,3 @@ def unavailable(args: Sequence[str], done: Done) -> GitUnavailable:
         retryable=any(mark in low for mark in _LOCKED),
         hint=hint,
     )
-
-
-_T = TypeVar("_T")
-
-
-def some(value: _T | None) -> _T:
-    """Narrow a value git or the model must have; its absence is an internal failure."""
-    if value is None:
-        msg = "internal: an expected value is missing"
-        raise GitUnavailable(msg)
-    return value

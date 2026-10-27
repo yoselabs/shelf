@@ -85,45 +85,62 @@ git.merge(repo, "origin/main", author=me, committer=me); git.lfs_checkout(repo)
   makes git restore the tree, and that restore can fail too, leaving a dirty tree and no
   `MERGE_HEAD`. `lfs_checkout` fills pointer files whose objects are already local.
 
-## One `Git` object per checkout (`Git`, `RealGit`, `FakeGit`)
+## `Repo` and `Worktree` (`RealRepo`, `FakeRepo`)
 
-A driver that makes dozens of git calls a run (task-loop's engine) takes a `Git` and does not care
-whether a subprocess or a dictionary answers.
+A driver that makes dozens of git calls a run (task-loop's engine) takes a `Repo` and a `Worktree`.
+It names an intent ("take this branch", "rebase onto base", "push to dst") and gets a typed result;
+it never sees an argv, an exit code or git's English text. Whether a subprocess or a dictionary
+answers is not its concern.
 
 ```python
-from git_porcelain import Git, RealGit
-from git_porcelain.testing import FakeGit
+from git_porcelain import Pushed, RealRepo, Rebased, Worktree
+from git_porcelain.testing import FakeRepo
 
-def land(git: Git) -> bool:
-    git.fetch()
-    if git.rev_list_count("HEAD..origin/main") == 0:
-        return True
-    return git.rebase("origin/main")            # False: stopped on a conflict, see git.unmerged()
+def land(wt: Worktree) -> bool:
+    match wt.rebase_onto("origin/main"):
+        case Rebased():
+            return isinstance(wt.push("main"), Pushed)
+        case _:
+            return False                        # Conflict: finish_rebase("continue" | "abort")
 
-land(RealGit(repo))                             # the binary, memoized
-land(FakeGit.init(Path("/virtual")))            # memory, no subprocess
+land(RealRepo(path).worktree(path))             # the binary, memoized
+land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no subprocess
 ```
 
-- **The operations** (what task-loop's `engine.py`, `tl.py` and `loop.py` call, nothing more): reads
-  `head resolve branch common_dir toplevel is_inside_work_tree remote_url config_get tree_hash status
-  unmerged rebase_in_progress merge_base is_ancestor rev_list_count log_subjects diff diff_names
-  diff_stat show ls_tree ls_files grep_files ignored worktree_list`; writes `add commit checkout
-  checkout_new detach branch_rename reset rebase rebase_abort clean worktree_add worktree_remove
-  worktree_prune fetch push`. `at(path)` is the same repository from another worktree.
-- **`RealGit` memoizes** `common_dir`, `toplevel`, `is_inside_work_tree`, `remote_url`, `config_get`
-  and `branch`: one process each, however often asked. Its own writes clear the memo; a change made
-  behind its back (another process, a hand edit) needs `git.invalidate()`. `RealGit(path, env={...})`
-  adds variables to every call (a pinned `GIT_DIR`); `memoize=False` turns the memo off; `fetch`
-  tries again while it loses a ref lock to a concurrent fetch.
-- **`FakeGit`** (`git_porcelain.testing`) keeps refs, objects (hashed as git hashes them, so
-  `tree_hash` and diff `index` lines equal git's), index, files, config, worktrees and remotes in
-  memory. `FakeGit.init(path)`, `FakeGit.clone(FakeRemote(url), path)`, `write_file`, `remove_file`,
-  `set_config`, `add_remote` arrange a test. Paths are virtual; nothing touches the disk.
-- **It cannot drift:** `tests/features/git_contract.feature` (`@contract`) runs one set of scenarios
-  against `RealGit` on temp repos and against `FakeGit`; real git is touched by that suite and by
-  `@smoke` tests only. What the fake does not model: hooks, signing, rename detection in a diff, a
-  `.gitignore` below the root, merges other than a rebase, the commit's author. Add a scenario before
-  teaching the fake a new behaviour.
+- **`Repo`** (23 operations in all, with `Worktree`): `identity sync relate history branches tree
+  worktrees add_worktree drop_worktree exclude_locally worktree`.
+- **`Worktree`**: `health snapshot diff dirty record take_branch release_branch park rebase_onto
+  finish_rebase push landed grep_tracked`.
+- **Results are frozen unions** (`Recorded | NothingToRecord | HookRejected`, `BranchTaken |
+  BranchHeld`, `UpToDate | Rebased | Conflict`, `Pushed | Rejected | Transient`, `Synced | Offline`,
+  ...), shared records live in `git_porcelain.api`. An expected condition is a variant. An
+  infrastructure failure raises `GitUnavailable` (`.tail`, `.retryable`, `.hint`). A caller
+  precondition raises `ValueError`.
+- **`RealRepo` owns the environment**: it strips the variables that make `-C` lie, forbids prompts,
+  pins `GIT_DIR`/`GIT_WORK_TREE` from the checkout's `.git`, sets `LC_ALL=C`, and runs hooks:
+  `record(hooks=False)` skips them, `push` always runs `pre-push`. Under `user.useConfigOnly` a
+  missing identity is a `GitUnavailable` whose hint says to set `user.name` and `user.email`.
+- **`RealRepo` memoizes inside**: identity and shas are kept for good; `worktrees` until the
+  repo's own write or `invalidate()`; ref-named answers are checked against file signatures of
+  HEAD, loose refs, `packed-refs` and `shallow` (a reftable repo skips the memo); `health`,
+  `snapshot` and `dirty` are never served blind. `snapshot` skips the index work when the status
+  text and each listed file's (size, mtime_ns, mode, inode, sha1) are unchanged, so a same-size
+  edit in the same clock tick is still seen. A change made by another process to something the
+  signatures do not cover needs `invalidate()`.
+- **`push(dst)` only.** The old `cfg['land']` configurability is gone (decision 13.1): a repo that
+  needs more (a different remote ref, extra checks) does it in its `pre-push` hook.
+- **`FakeRepo`** (`git_porcelain.testing`) models the domain state (refs, objects hashed as git
+  hashes them, index, files, config, worktrees, remotes, a paused rebase). Arrange with
+  `FakeRepo.init/clone`, `add_remote`, `set_remote_url`, `set_config`, `hooks`, `drop_checkout`,
+  `FakeRemote.advance/offline`, and on the worktree `write_file`, `read_file`, `remove_file`,
+  `write_markers`, `redirect_toplevel`, `lock_index`. Paths are virtual.
+- **Fidelity gaps of the fake** (documented, not hidden): no signing, no rename detection in a
+  diff (`Change.kind` is never `R`), a `.gitignore` below the root is not read, only rebases merge,
+  the commit's author is not kept, and the five `real_only` scenarios (ref-lock races, a broken
+  `core.worktree`, git missing) run on real git only.
+- **It cannot drift:** `tests/features/git_contract.feature` (`@contract`) holds one scenario per
+  behaviour and runs against `RealRepo` on temp repos and against `FakeRepo`. Add a scenario before
+  teaching the fake a new behaviour. `tests/test_real_git_cache.py` covers the memo rules on real git.
 
 ## Surface
 
@@ -132,8 +149,8 @@ land(FakeGit.init(Path("/virtual")))            # memory, no subprocess
 `has_conflict_markers`, `show_stage`, `show_at`, `commit_paths`, `log_grep`, `push`,
 `fetch`, `merge`, `finish_merge`, `is_ancestor`, `classify_remote_failure`, `lfs_available`,
 `lfs_setup`, `lfs_checkout`, `lfs_paths`, `lfs_push`, `lfs_fetch`, and the types
-`Identity`, `Commit`, `MergeResult`, `StatusEntry`, `GitError`, `RemoteError`, and the `Git`
-protocol with `RealGit`, `Worktree`, `FileStat` (above). Interpreting the git data (mapping conflicts to
+`Identity`, `Commit`, `MergeResult`, `StatusEntry`, `GitError`, `RemoteError`, and the
+`Repo`/`Worktree` protocols with `RealRepo` (above). Interpreting the git data (mapping conflicts to
 your domain, etc.) is the caller's job.
 
 ## Testing helpers
@@ -152,5 +169,5 @@ git(repo, "init", "-q", "-b", "main")   # stdout; a failure raises with git's st
 - `QUIET` (no hooks, no auto-maintenance, no signing, no template) is the default; a test of a
   hook or of maintenance passes `config={}`. The identity is a parameter; `None` leaves git
   with no `user.*`. Neither imports pytest.
-- `FakeGit` and `FakeRemote` live here too (see above).
+- `FakeRepo`, `FakeWorktree` and `FakeRemote` live here too (see above).
 - This package's own tests use these helpers.

@@ -27,8 +27,8 @@ from git_porcelain.api import (
     Transient,
     UpToDate,
 )
-from git_porcelain.errors import GitUnavailable
-from git_porcelain.real_done import some, unavailable
+from git_porcelain.errors import GitUnavailable, some
+from git_porcelain.real_done import unavailable
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence

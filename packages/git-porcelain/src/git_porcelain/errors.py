@@ -8,6 +8,8 @@ not a repository, a timeout), never an expected outcome.
 
 from __future__ import annotations
 
+from typing import TypeVar
+
 
 class GitError(Exception):
     """A git invocation failed. ``retryable`` marks transient failures; ``hint`` is optional."""
@@ -26,4 +28,15 @@ class GitUnavailable(GitError):  # noqa: N818 — the name the design gives the 
         return str(self)
 
 
-__all__ = ["GitError", "GitUnavailable"]
+__all__ = ["GitError", "GitUnavailable", "some"]
+
+
+_T = TypeVar("_T")
+
+
+def some(value: _T | None) -> _T:
+    """Narrow a value git or the model must have; its absence is an internal failure."""
+    if value is None:
+        msg = "internal: an expected value is missing"
+        raise GitUnavailable(msg)
+    return value

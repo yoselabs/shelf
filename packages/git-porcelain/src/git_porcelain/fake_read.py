@@ -20,7 +20,20 @@ if TYPE_CHECKING:
 
     from git_porcelain.fake_store import CheckoutState, CommitObj, RepoState
 
-__all__ = ["branches", "diff", "dirty", "grep", "health", "history", "identity", "relate", "snapshot", "tree", "worktrees"]
+__all__ = [
+    "branches",
+    "diff",
+    "dirty",
+    "grep",
+    "health",
+    "history",
+    "identity",
+    "relate",
+    "resolve_commit",
+    "snapshot",
+    "tree",
+    "worktrees",
+]
 
 
 def identity(repo: RepoState) -> RepoIdentity:
@@ -52,7 +65,7 @@ def health(repo: RepoState, wt: CheckoutState | None, path: Path) -> Health:
     return Health(ok=True, problem=None, detail="", set_in=None, worktree_config=per_worktree)
 
 
-def _commit(repo: RepoState, wt: CheckoutState, rev: str) -> str:
+def resolve_commit(repo: RepoState, wt: CheckoutState, rev: str) -> str:
     sha = repo.commit_named(rev, wt)
     if sha is None:
         msg = f"git: bad revision '{rev}'"
@@ -72,7 +85,7 @@ def snapshot(repo: RepoState, wt: CheckoutState, base: str) -> Snapshot:
         if path in files or not ignore.ignores(path):
             files[path] = repo.store.put_blob(data)
     work = repo.store.put_tree({p: s for p, s in files.items() if p in wt.files})
-    tip = _commit(repo, wt, base)
+    tip = resolve_commit(repo, wt, base)
     head = repo.head_sha(wt)
     branch = wt.head_ref.removeprefix("refs/heads/") if wt.head_ref else None
     if head is None:
@@ -105,7 +118,7 @@ def dirty(repo: RepoState, wt: CheckoutState, *, base: str | None, ignored_under
     untracked = tuple(sorted(e.path for e in entries if e.code == "??"))
     ignored_by_base: frozenset[str] = frozenset()
     if base is not None and untracked:
-        rules = Ignore(ignore_rules.flatten(_ignore_files(repo, _commit(repo, wt, base))))
+        rules = Ignore(ignore_rules.flatten(_ignore_files(repo, resolve_commit(repo, wt, base))))
         ignored_by_base = frozenset(p for p in untracked if rules.ignores(p))
     ignored: tuple[str, ...] = ()
     if ignored_under:
@@ -123,7 +136,7 @@ def _ignore_files(repo: RepoState, commit: str) -> dict[str, str]:
 
 
 def relate(repo: RepoState, wt: CheckoutState, a: str, b: str) -> Relation:
-    left, right = _commit(repo, wt, a), _commit(repo, wt, b)
+    left, right = resolve_commit(repo, wt, a), resolve_commit(repo, wt, b)
     mine, theirs = ancestors(repo.store, left), ancestors(repo.store, right)
     fork = _merge_base(repo, left, right)
     return Relation(Sha(fork) if fork else None, len(mine - theirs), len(theirs - mine))
@@ -149,16 +162,16 @@ def history(
         raise ValueError(msg)
     keep: set[str] = set()
     for rev in revs:
-        keep |= ancestors(repo.store, _commit(repo, wt, rev))
+        keep |= ancestors(repo.store, resolve_commit(repo, wt, rev))
     for rev in not_on:
-        keep -= ancestors(repo.store, _commit(repo, wt, rev))
+        keep -= ancestors(repo.store, resolve_commit(repo, wt, rev))
     commits = sorted((repo.store.commits[s] for s in keep), key=lambda c: -c.order)[:limit]
     on_base: set[str] = set()
     ids: set[frozenset[tuple[str, tuple[str, ...]]]] = set()
     if patch_equivalent_to is not None:
-        up = ancestors(repo.store, _commit(repo, wt, patch_equivalent_to))
+        up = ancestors(repo.store, resolve_commit(repo, wt, patch_equivalent_to))
         on_base = up
-        ids = {_patch_id(repo, repo.store.commits[s]) for s in up - ancestors(repo.store, _commit(repo, wt, revs[0]))}
+        ids = {_patch_id(repo, repo.store.commits[s]) for s in up - ancestors(repo.store, resolve_commit(repo, wt, revs[0]))}
     return tuple(
         LogEntry(
             Sha(c.sha),

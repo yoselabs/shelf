@@ -6,9 +6,9 @@ import re
 from typing import TYPE_CHECKING, Final
 
 from git_porcelain.api import Conflict, HookRejected, Offline, Pushed, Rebased, Rejected, Sha, Synced, Transient
-from git_porcelain.errors import GitUnavailable
+from git_porcelain.errors import GitUnavailable, some
 from git_porcelain.fake_merge import merge_trees, replay_list
-from git_porcelain.fake_ops import hard_to, is_clean, make_commit, require_index, some, switch_tree
+from git_porcelain.fake_ops import hard_to, is_clean, make_commit, require_index, switch_tree
 from git_porcelain.fake_store import CheckoutState, Rebase, ancestors
 
 if TYPE_CHECKING:
@@ -123,7 +123,7 @@ def worktree_remove(repo: RepoState, path: Path, *, force: bool) -> None:
     del repo.worktrees[path]
 
 
-def _remote(repo: RepoState, name: str) -> RepoState | str:
+def _remote_state(repo: RepoState, name: str) -> RepoState | str:
     """The remote's repository, or why it cannot be reached."""
     found = repo.remote_repos.get(name)
     if found is None:
@@ -135,7 +135,7 @@ def _remote(repo: RepoState, name: str) -> RepoState | str:
 
 def fetch(repo: RepoState, name: str) -> SyncResult:
     """Copy the remote's objects and set ``refs/remotes/<name>/<branch>`` for each of its branches."""
-    there = _remote(repo, name)
+    there = _remote_state(repo, name)
     if isinstance(there, str):
         return Offline(there)
     repo.store.absorb(there.store)
@@ -154,7 +154,7 @@ def push(repo: RepoState, wt: CheckoutState, dst: str, name: str, env: Mapping[s
     refusal = _hook_refusal(repo, env)
     if refusal is not None:
         return refusal
-    there = _remote(repo, name)
+    there = _remote_state(repo, name)
     if isinstance(there, str):
         return Transient(there)
     ref = f"refs/heads/{dst}"
