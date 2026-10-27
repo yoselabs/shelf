@@ -39,7 +39,7 @@ plain commands, `mise trust --yes && mise install --locked` (the exact uv, prek 
 Both run in a Linux container when Docker answers (the macOS endpoint scanner made the host run
 10-17 min); `SHELF_HOST_CHECK=1` forces the host. Locally the per-file linters (ruff, codespell, hadolint,
 dockerfmt, shellcheck) run on the changed files only (`tools/changed.py`; a changed linter config selects
-everything). The cross-file checks (types, architecture, dependencies, blueprint, secrets) always cover the whole
+everything). The cross-file checks (types, architecture, dependencies, blueprint) always cover the whole
 repo, and the tests are narrowed to the changed packages and every package depending on them (`tools/affected.py`).
 CI (`just check-all`) runs everything.
 

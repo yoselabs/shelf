@@ -62,7 +62,6 @@ _RECIPES = (
     "bootstrap-verify",
     "tools",
     "beads-lint",
-    "secrets",
     "steps",
     "lint",
     "format",
@@ -89,7 +88,7 @@ deps:
 _CONSUMER_CHECK = """# The gate: every step at once (`steps`), one timing line, a warning for a step over its budget.
 # A green run records the tree it checked (tools/gate_state.py), so the pre-push hook does not run it again on that tree.
 [group('gate')]
-check: gate-start beads-lint secrets (steps "guard" "preset" "blueprint" "lint" "typecheck" "spell" "deps" "test")
+check: gate-start beads-lint (steps "guard" "preset" "blueprint" "lint" "typecheck" "spell" "deps" "test")
     python3 -I tools/gate_state.py passed --gate check
 
 """

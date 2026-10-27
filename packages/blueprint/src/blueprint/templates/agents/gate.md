@@ -13,7 +13,7 @@ One command decides done. Humans, agents, hooks and CI all call the same one.
 Locally, a linter that judges one file at a time (formatter, per-file linter, shellcheck, hadolint, spelling) runs on
 the files changed against the base: committed on the branch, staged, unstaged, untracked and not ignored; never a
 deleted one. A linter with nothing to look at is skipped and says so in one line. A change to a linter's own
-config runs it over everything. A check that reads across files (types, architecture, dependencies, secrets) always
+config runs it over everything. A check that reads across files (types, architecture, dependencies) always
 covers the whole repo, and so does the gate in CI (`just check-all`). No base found means everything runs.
 
 `blueprint recipe changed > tools/changed.py` copies the selector (stdlib only; `--help` documents it). It prints the

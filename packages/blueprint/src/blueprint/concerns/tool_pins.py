@@ -34,7 +34,6 @@ _VERSION_ARGV = {
     "prek": ("prek", "--version"),
     "bd": ("bd", "--version"),
     "git-lfs": ("git", "lfs", "version"),
-    "gitleaks": ("gitleaks", "version"),
     "godot": ("godot", "--version"),
 }
 _INSTALL = 'a recipe (`just tools`) that runs `MISE_IGNORED_CONFIG_PATHS="$HOME/.config/mise" mise install --locked`'
@@ -57,10 +56,6 @@ def _needed(ctx: Context) -> dict[str, str]:
         needed["bd"] = ".beads/"
     if ctx.read("justfile") is not None and not _rust_just(ctx):
         needed["just"] = "justfile"
-    # A gitleaks hook from its own repo is pinned by the hook's `rev`; one the justfile runs comes from mise.
-    recipes = "\n".join(line for line in (ctx.read("justfile") or "").splitlines() if not line.lstrip().startswith("#"))
-    if "gitleaks" in recipes:
-        needed["gitleaks"] = "justfile"
     # git-lfs is deliberately absent: git runs it as a filter during `git clone`, before `mise trust` can run, so a mise
     # shim breaks cloning an untrusted checkout (lifesim, 2026-10-12). It comes from the system package manager.
     if any(name == "godot" for name, _ in ctx.profile.frameworks):

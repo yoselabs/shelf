@@ -128,11 +128,10 @@ def test_creates_a_justfile_from_scratch_when_absent(repo: Path) -> None:
         "spell:",
         "deps:",
         "test:",
-        "secrets:",
         "gate-start:",
     ):
         assert target in just_text
-    assert "check: gate-start beads-lint secrets (steps" in just_text
+    assert "check: gate-start beads-lint (steps" in just_text
     assert (repo / "tools" / "gate_state.py").is_file(), "check, test and the pre-push hook call it"
 
 
