@@ -6,7 +6,7 @@ Covers each of the four magnitude tiers and every boundary between them.
 from __future__ import annotations
 
 import pytest
-from timefmt import fmt_dur
+from timefmt import fmt_dur, fmt_until, human_count
 
 
 @pytest.mark.parametrize(
@@ -40,3 +40,15 @@ def test_fmt_dur(ms: int, expected: str) -> None:
 def test_zero_is_never_a_float() -> None:
     # The integer-ms floor exists so a zero duration reads "0ms", not "0.0s".
     assert fmt_dur(0) == "0ms"
+
+
+def test_fmt_until_defaults_to_the_current_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("timefmt.time.time", lambda: 100.0)
+    assert fmt_until(100.0 + 3 * 3600) == "3h00m"
+    assert fmt_until(100.5) == "now"
+
+
+def test_human_count_rounds_up_into_millions() -> None:
+    assert human_count(999_500) == "1.0M"
+    assert human_count(999_499) == "999k"
+    assert human_count(999.9) == "999"
