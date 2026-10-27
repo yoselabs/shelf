@@ -1,7 +1,9 @@
-"""git-porcelain's own error type — no dependency on any host's error taxonomy.
+"""git-porcelain's own error types — no dependency on any host's error taxonomy.
 
 The host translates :class:`GitError` into its own error type at the seam (a2kay
-maps it to its typed ``GitError`` for the error dispatcher).
+maps it to its typed ``GitError`` for the error dispatcher). :class:`GitUnavailable` is what the
+``Repo``/``Worktree`` protocols raise: infrastructure only (git missing, a held ``index.lock``, no identity,
+not a repository, a timeout), never an expected outcome.
 """
 
 from __future__ import annotations
@@ -16,4 +18,12 @@ class GitError(Exception):
         self.hint = hint
 
 
-__all__ = ["GitError"]
+class GitUnavailable(GitError):  # noqa: N818 — the name the design gives the infrastructure failure
+    """Git could not answer: ``tail`` is the end of its output, ``retryable`` says a later try may succeed."""
+
+    @property
+    def tail(self) -> str:
+        return str(self)
+
+
+__all__ = ["GitError", "GitUnavailable"]

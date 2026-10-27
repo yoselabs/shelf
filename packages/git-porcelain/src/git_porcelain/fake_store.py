@@ -13,13 +13,13 @@ import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from git_porcelain.errors import GitError
+from git_porcelain.errors import GitUnavailable
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-__all__ = ["CommitObj", "Rebase", "Repo", "Store", "WorkTree", "ancestors", "blob_sha", "tree_sha"]
+__all__ = ["CheckoutState", "CommitObj", "Hooks", "Rebase", "RepoState", "Store", "ancestors", "blob_sha", "tree_sha"]
 
 _CLOCK = itertools.count(1)
 _STEP = re.compile(r"^(?P<base>.*?)(?P<steps>(?:~\d+|\^)*)$")
@@ -100,14 +100,18 @@ class Store:
 
 @dataclass
 class Rebase:
-    """A rebase stopped on a conflict: where to return to on abort."""
+    """A rebase stopped on a conflict: where to return to on abort, and what is left to replay."""
 
     orig_sha: str
     orig_ref: str | None
+    current: str
+    files: dict[str, str]
+    todo: list[CommitObj] = field(default_factory=list)
+    pending: CommitObj | None = None
 
 
 @dataclass
-class WorkTree:
+class CheckoutState:
     """One checkout: HEAD (a branch ref, or a bare sha when detached), index, and files."""
 
     path: Path
@@ -119,10 +123,21 @@ class WorkTree:
     rebase: Rebase | None = None
     main: bool = False
     missing: bool = False
+    toplevel: Path | None = None
+    index_locked: bool = False
 
 
 @dataclass
-class Repo:
+class Hooks:
+    """What the repository's hooks do, as knobs (no hook runs in memory)."""
+
+    refuse_commit: bool = False
+    refuse_push: bool = False
+    push_requires_env: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class RepoState:
     """A repository shared by its worktrees: objects, refs, config, remotes."""
 
     common: Path
@@ -130,27 +145,30 @@ class Repo:
     refs: dict[str, str] = field(default_factory=dict)
     config: dict[str, str] = field(default_factory=dict)
     remotes: dict[str, str] = field(default_factory=dict)
-    remote_repos: dict[str, Repo] = field(default_factory=dict)
-    worktrees: dict[Path, WorkTree] = field(default_factory=dict)
+    remote_repos: dict[str, RepoState] = field(default_factory=dict)
+    worktrees: dict[Path, CheckoutState] = field(default_factory=dict)
+    info_exclude: list[str] = field(default_factory=list)
+    hooks: Hooks = field(default_factory=Hooks)
+    offline: bool = False
 
     def tick(self) -> int:
         """A commit's place in time: one counter for every repository, so histories that meet by fetch stay ordered."""
         return next(_CLOCK)
 
-    def head_sha(self, wt: WorkTree) -> str | None:
+    def head_sha(self, wt: CheckoutState) -> str | None:
         return wt.detached if wt.head_ref is None else self.refs.get(wt.head_ref)
 
-    def head_files(self, wt: WorkTree) -> Mapping[str, str]:
+    def head_files(self, wt: CheckoutState) -> Mapping[str, str]:
         sha = self.head_sha(wt)
         return self.store.commits[sha].files if sha else {}
 
-    def move_head(self, wt: WorkTree, sha: str) -> None:
+    def move_head(self, wt: CheckoutState, sha: str) -> None:
         if wt.head_ref is None:
             wt.detached = sha
         else:
             self.refs[wt.head_ref] = sha
 
-    def commit_named(self, rev: str, wt: WorkTree) -> str | None:
+    def commit_named(self, rev: str, wt: CheckoutState) -> str | None:
         """The commit ``rev`` names: HEAD, a branch, ``origin/x``, a sha or prefix, with ``~N`` and ``^``."""
         match = _STEP.match(rev.removesuffix("^{commit}"))
         if match is None:  # pragma: no cover - the pattern matches every string
@@ -162,7 +180,7 @@ class Repo:
                 sha = parents[0] if parents else None
         return sha
 
-    def _base(self, name: str, wt: WorkTree) -> str | None:
+    def _base(self, name: str, wt: CheckoutState) -> str | None:
         if name in {"HEAD", "@"}:
             return self.head_sha(wt)
         for prefix in ("", "refs/", "refs/heads/", "refs/remotes/"):
@@ -173,7 +191,7 @@ class Repo:
             return found[0] if len(found) == 1 else None
         return None
 
-    def tree_named(self, rev: str, wt: WorkTree) -> Mapping[str, str]:
+    def tree_named(self, rev: str, wt: CheckoutState) -> Mapping[str, str]:
         """The flat tree of a commit-ish or a tree sha; unknown names raise like git."""
         sha = self.commit_named(rev, wt)
         if sha:
@@ -181,21 +199,21 @@ class Repo:
         if rev in self.store.trees:
             return self.store.trees[rev]
         msg = f"git: bad revision '{rev}'"
-        raise GitError(msg)
+        raise GitUnavailable(msg)
 
-    def range_commits(self, spec: str, wt: WorkTree) -> list[CommitObj]:
+    def range_commits(self, spec: str, wt: CheckoutState) -> list[CommitObj]:
         """Commits of ``A..B`` (or everything reachable from one revision), newest first."""
         left, dots, right = spec.partition("..")
         tip = self.commit_named(right if dots else left, wt)
         if tip is None:
             msg = f"git: bad revision '{spec}'"
-            raise GitError(msg)
+            raise GitUnavailable(msg)
         skip: set[str] = set()
         if dots:
             base = self.commit_named(left or "HEAD", wt)
             if base is None:
                 msg = f"git: bad revision '{spec}'"
-                raise GitError(msg)
+                raise GitUnavailable(msg)
             skip = ancestors(self.store, base)
         keep = ancestors(self.store, tip) - skip
         return sorted((self.store.commits[s] for s in keep), key=lambda c: -c.order)

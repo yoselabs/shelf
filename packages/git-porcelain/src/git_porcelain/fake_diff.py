@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import difflib
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
-from git_porcelain.api import FileStat
 from git_porcelain.fake_store import blob_sha
 from git_porcelain.porcelain import StatusEntry
 
@@ -19,16 +18,23 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from git_porcelain.fake_ignore import Ignore
-    from git_porcelain.fake_store import Store, WorkTree
+    from git_porcelain.fake_store import CheckoutState, Store
 
-__all__ = ["diff_stat", "diff_text", "grep_files", "status_entries"]
+__all__ = ["Stat", "diff_stat", "diff_text", "grep_files", "status_entries"]
+
+
+class Stat(NamedTuple):
+    path: str
+    added: int
+    deleted: int
+
 
 _ZERO = "0" * 7
 _FUNC = re.compile(r"^[A-Za-z_$]")
 _NO_EOL = "\n\\ No newline at end of file"
 
 
-def status_entries(head: Mapping[str, str], wt: WorkTree, ignore: Ignore) -> list[StatusEntry]:
+def status_entries(head: Mapping[str, str], wt: CheckoutState, ignore: Ignore) -> list[StatusEntry]:
     """``git status --porcelain=v1 -uall``: tracked changes by path, then untracked files by path."""
     staged = {p: _x(head.get(p), wt.index.get(p)) for p in sorted(set(head) | set(wt.index))}
     renames = _renames(head, wt.index, staged)
@@ -126,7 +132,7 @@ def _file_diff(path: str, old: str | None, new: str | None, store: Store) -> str
 
 
 def _kept(path: str, exclude: Sequence[str]) -> bool:
-    return path not in exclude
+    return not any(path == e or path.startswith(e.rstrip("/") + "/") for e in exclude)
 
 
 def diff_text(a: Mapping[str, str], b: Mapping[str, str], store: Store, exclude: Sequence[str] = ()) -> str:
@@ -134,17 +140,17 @@ def diff_text(a: Mapping[str, str], b: Mapping[str, str], store: Store, exclude:
     return "".join(_file_diff(p, a.get(p), b.get(p), store) for p in paths)
 
 
-def diff_stat(a: Mapping[str, str], b: Mapping[str, str], store: Store, exclude: Sequence[str] = ()) -> list[FileStat]:
-    stats: list[FileStat] = []
+def diff_stat(a: Mapping[str, str], b: Mapping[str, str], store: Store, exclude: Sequence[str] = ()) -> list[Stat]:
+    stats: list[Stat] = []
     for path in sorted(p for p in set(a) | set(b) if a.get(p) != b.get(p) and _kept(p, exclude)):
         before = store.blobs[a[path]] if path in a else b""
         after = store.blobs[b[path]] if path in b else b""
         if b"\0" in before + after:
-            stats.append(FileStat(path, 0, 0))
+            stats.append(Stat(path, 0, 0))
             continue
         ops = difflib.SequenceMatcher(None, _text_lines(before), _text_lines(after), autojunk=False).get_opcodes()
         stats.append(
-            FileStat(
+            Stat(
                 path,
                 sum(j2 - j1 for tag, _, _, j1, j2 in ops if tag != "equal"),
                 sum(i2 - i1 for tag, i1, i2, _, _ in ops if tag != "equal"),
@@ -153,7 +159,7 @@ def diff_stat(a: Mapping[str, str], b: Mapping[str, str], store: Store, exclude:
     return stats
 
 
-def grep_files(wt: WorkTree, term: str) -> list[str]:
+def grep_files(wt: CheckoutState, term: str) -> list[str]:
     """Tracked, non-binary files holding ``term`` as a whole word."""
     word = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(term)}(?![A-Za-z0-9_])")
     found: list[str] = []

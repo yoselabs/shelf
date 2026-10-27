@@ -265,7 +265,8 @@ testpaths = [
 # lane with SHELF_REQUIRE_BROWSER=1 where a non-launching engine is a hard fail.
 addopts = '-ra --strict-markers -m "not browser"'
 markers = [
-    "contract: a scenario of a package's contract suite that runs the same steps against the real implementation and its in-memory fake (git-porcelain's RealGit and FakeGit), so the fake cannot drift. Runs in the default gate and in `just check`; `-m contract` runs just this lane.",
+    "contract: a scenario of a package's contract suite that runs the same steps against the real implementation and its in-memory fake (git-porcelain's RealRepo and FakeRepo), so the fake cannot drift. Runs in the default gate and in `just check`; `-m contract` runs just this lane.",
+    "real_only: a contract scenario that only the real implementation can run: it names a fidelity gap of the in-memory fake (git-porcelain's FakeRepo), which the suite leaves out of the fake run.",
     "browser: real-browser test that launches a headless engine (any-browser); opt-in, excluded from the default run and `just check`; `just test-browser` runs it, and CI runs it with SHELF_REQUIRE_BROWSER=1 where a missing engine FAILS instead of skipping",
     "net: binds a real loopback TCP port and serves HTTP over it (async-scope's asgi lane). Names the slice, does NOT carve one out: it runs in the default gate and in `just check`, because the behaviours it covers are invisible without a real socket and a promotion that ships them unverified ships a blind spot to every consumer. `-m net` runs just this lane.",
 ]

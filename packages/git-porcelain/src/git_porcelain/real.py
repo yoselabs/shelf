@@ -1,279 +1,241 @@
-"""``RealGit``: the :class:`~git_porcelain.api.Git` protocol over the git binary.
+"""``RealRepo`` and ``RealWorktree``: the :class:`~git_porcelain.api.Repo` / ``Worktree`` protocols over the git binary.
 
-It reuses the package's runner (``run_git``: no prompts, no inherited ``GIT_DIR``, fail loud). The answers
-that cannot change while the process works on one checkout (``common_dir``, ``toplevel``, the remote URL,
-config values, the current branch) are memoized: a driver that asks for them dozens of times a run costs
-one git process each. Every write this object makes clears the memo; a change made behind its back (another
-process, a hand edit) needs :meth:`RealGit.invalidate`. ``memoize=False`` turns the memo off.
+This file holds the constructors, the one process runner (argv, env, timeout, ``GitUnavailable`` mapping) and the
+memo. The reads live in ``real_read``, the writes in ``real_write``; argv, exit codes and stderr text never leave
+them. Memoization is inside: immutable answers (identity, a diff between two shas, a tree) are kept for the
+process; ``worktrees`` and ``branches`` are kept until an own write or :meth:`RealRepo.invalidate`; answers that
+name refs are kept while the files they come from are unchanged (``real_cache``); ``health``, ``snapshot`` and
+``dirty`` are never remembered, because the working tree changes behind us.
 """
 
 from __future__ import annotations
 
-import re
-import tempfile
+import shutil
+import subprocess
 import time
-from pathlib import Path
-from typing import TYPE_CHECKING, Final, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar
 
-from git_porcelain.api import FileStat, Git, ResetMode, Worktree
-from git_porcelain.errors import GitError
-from git_porcelain.history import RemoteError, classify_remote_failure
-from git_porcelain.porcelain import StatusEntry, _run, git_dir, run_git, status, unmerged_paths
+from git_porcelain import real_env, real_read, real_write
+from git_porcelain.errors import GitUnavailable
+from git_porcelain.real_done import Done, unavailable
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
+    from pathlib import Path
+    from typing import Literal
 
-__all__ = ["RealGit"]
+    from git_porcelain.api import (
+        Diff,
+        Dirty,
+        FinishResult,
+        Health,
+        LogEntry,
+        PushResult,
+        RebaseResult,
+        RecordResult,
+        Relation,
+        Released,
+        RepoIdentity,
+        Sha,
+        Snapshot,
+        StillHeld,
+        SyncResult,
+        TakeResult,
+        Tree,
+        WorktreeInfo,
+    )
+    from git_porcelain.history import Identity
 
-# Another process fetching into the same repository at the same moment: the ref is then where it should be,
-# the fetch only lost the lock (task-loop measured 150 of 180 simultaneous fetches failing so).
-_REF_RACE: Final = re.compile(r"incorrect old value|cannot lock ref|unable to update local ref|Unable to create '[^']*\.lock'")
-_FETCH_TRIES: Final = 5
-_UNBORN: Final = "0" * 40
+__all__ = ["Done", "RealRepo", "RealWorktree", "unavailable"]
+
 _T = TypeVar("_T")
 
 
-def _lines(text: str, sep: str = "\n") -> list[str]:
-    return [line for line in text.split(sep) if line]
-
-
-class RealGit:
-    """The git binary behind the :class:`~git_porcelain.api.Git` protocol, bound to one checkout."""
+class RealRepo:
+    """The git binary behind :class:`~git_porcelain.api.Repo`. ``path`` is any checkout of the repository."""
 
     def __init__(
         self,
         path: Path,
         *,
+        identity: Identity | None = None,
         env: Mapping[str, str] | None = None,
         memoize: bool = True,
+        remote_timeout: float = 600.0,
         sleep: Callable[[float], None] = time.sleep,
-        _memo: dict[tuple[Path, str, str], object] | None = None,
+        observer: Callable[[tuple[str, ...]], None] | None = None,
     ) -> None:
-        self._path = path
-        self._env = dict(env or {})
-        self._memoize = memoize
-        self._sleep = sleep
-        self._memo: dict[tuple[Path, str, str], object] = {} if _memo is None else _memo
+        self.path = path
+        self.who = identity
+        self.extra_env = dict(env or {})
+        self.memoize = memoize
+        self.remote_timeout = remote_timeout
+        self.sleep = sleep
+        self.observer = observer
+        self._forever: dict[object, object] = {}
+        self._mutable: dict[object, object] = {}
+        self.refs_seen: dict[object, tuple[object, object]] = {}
+        self.snapshots: dict[str, tuple[object, object]] = {}
 
-    @property
-    def path(self) -> Path:
-        return self._path
-
-    def at(self, path: Path) -> Git:
-        return RealGit(path, env=self._env, memoize=self._memoize, sleep=self._sleep, _memo=self._memo)
-
-    def invalidate(self) -> None:
-        self._memo.clear()
-
-    # -- plumbing ------------------------------------------------------------------------------------
-    def _git(self, *args: str, check: bool = True, stdin: str | None = None) -> str:
-        return run_git(self._path, *args, check=check, env=self._env, stdin=stdin)
-
-    def _rc(self, *args: str) -> int:
-        return _run(self._path, args, self._env, None).returncode
-
-    def _write(self, *args: str, stdin: str | None = None) -> None:
+    # -- the one runner --------------------------------------------------------------------------------
+    def run(
+        self,
+        cwd: Path,
+        *args: str,
+        check: bool = True,
+        pin: bool = True,
+        stdin: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Done:
+        """``git -C cwd args``. A failure raises :class:`GitUnavailable` when ``check``; otherwise the caller reads ``rc``."""
+        if shutil.which("git") is None:
+            msg = "git not found on PATH"
+            raise GitUnavailable(msg, hint="install git")
+        pin_env = real_env.pinned(cwd) if pin else {}
+        child = real_env.base({**self.extra_env, **pin_env, **(env or {})})
+        if self.observer is not None:
+            self.observer(args)
         try:
-            self._git(*args, stdin=stdin)
-        finally:
-            self.invalidate()
+            done = subprocess.run(
+                [*real_env.argv_prefix(cwd, pin_env), *args],
+                check=False,
+                capture_output=True,
+                env=child,
+                timeout=timeout,
+                input=None if stdin is None else stdin.encode("utf-8", "surrogateescape"),
+            )
+        except subprocess.TimeoutExpired as exc:
+            msg = f"git {args[0] if args else ''} timed out after {timeout}s"
+            raise GitUnavailable(msg, retryable=True) from exc
+        result = Done(done.returncode, done.stdout, done.stderr.decode("utf-8", "replace"))
+        if check and result.rc != 0:
+            raise unavailable(args, result)
+        return result
 
-    def _cached(self, name: str, arg: str, compute: Callable[[], _T]) -> _T:
-        key = (self._path, name, arg)
-        if self._memoize and key in self._memo:
-            return cast("_T", self._memo[key])
+    # -- the memo --------------------------------------------------------------------------------------
+    def memo(self, key: object, compute: Callable[[], _T], *, forever: bool = True) -> _T:
+        store = self._forever if forever else self._mutable
+        if self.memoize and key in store:
+            return store[key]  # type: ignore[return-value]  # keys are tagged by the call site
         value = compute()
-        if self._memoize:
-            self._memo[key] = value
+        if self.memoize:
+            store[key] = value
         return value
 
-    # -- reads ---------------------------------------------------------------------------------------
-    def head(self) -> str | None:
-        return self.resolve("HEAD")
+    def invalidate(self) -> None:
+        """Forget the answers that can change: call it after something else (a worker, a hook, another process)
+        changed the repository. An own write calls it itself."""
+        self._mutable.clear()
+        self.refs_seen.clear()
 
-    def resolve(self, rev: str) -> str | None:
-        return self._git("rev-parse", "--verify", "-q", f"{rev}^{{commit}}", check=False).strip() or None
+    # -- Repo ------------------------------------------------------------------------------------------
+    def identity(self) -> RepoIdentity:
+        return real_read.identity(self)
 
-    def branch(self) -> str | None:
-        return self._cached("branch", "", lambda: self._git("symbolic-ref", "--short", "-q", "HEAD", check=False).strip() or None)
+    def sync(self, remote: str = "origin") -> SyncResult:
+        return real_write.sync(self, remote)
 
-    def common_dir(self) -> Path:
-        return self._cached("common_dir", "", lambda: Path(self._git("rev-parse", "--path-format=absolute", "--git-common-dir").strip()))
+    def relate(self, a: str, b: str) -> Relation:
+        return real_read.relate(self, a, b)
 
-    def toplevel(self) -> Path:
-        return self._cached("toplevel", "", lambda: Path(self._git("rev-parse", "--show-toplevel").strip()))
+    def history(
+        self,
+        revs: Sequence[str],
+        *,
+        not_on: Sequence[str] = (),
+        limit: int | None = None,
+        patch_equivalent_to: str | None = None,
+    ) -> tuple[LogEntry, ...]:
+        return real_read.history(self, revs, not_on, limit, patch_equivalent_to)
 
-    def is_inside_work_tree(self) -> bool:
-        return self._cached("inside", "", lambda: self._git("rev-parse", "--is-inside-work-tree", check=False).strip() == "true")
+    def branches(self, prefix: str = "") -> tuple[tuple[str, Sha], ...]:
+        return real_read.branches(self, prefix)
 
-    def remote_url(self, remote: str = "origin") -> str | None:
-        return self._cached("remote_url", remote, lambda: self._git("remote", "get-url", remote, check=False).strip() or None)
+    def tree(self, rev: str) -> Tree | None:
+        return real_read.tree(self, rev)
 
-    def config_get(self, key: str) -> str | None:
-        def read() -> str | None:
-            out = self._git("config", "--get", key, check=False)
-            return out.rstrip("\n") if out else None
+    def worktrees(self, *, with_dirty: bool = False) -> tuple[WorktreeInfo, ...]:
+        return real_read.worktrees(self, with_dirty=with_dirty)
 
-        return self._cached("config", key, read)
+    def add_worktree(self, path: Path, rev: str) -> RealWorktree:
+        return real_write.add_worktree(self, path, rev)
 
-    def tree_hash(self) -> str:
-        with tempfile.TemporaryDirectory() as folder:
-            env = {**self._env, "GIT_INDEX_FILE": str(Path(folder) / "index")}
-            if self.head() is not None:
-                run_git(self._path, "read-tree", "HEAD", env=env)
-            run_git(self._path, "add", "-A", env=env)
-            return run_git(self._path, "write-tree", env=env).strip()
+    def drop_worktree(self, path: Path, *, force: bool = False) -> None:
+        real_write.drop_worktree(self, path, force=force)
 
-    def status(self) -> list[StatusEntry]:
-        return status(self._path, env=self._env)
+    def exclude_locally(self, patterns: Sequence[str]) -> None:
+        real_write.exclude_locally(self, patterns)
 
-    def unmerged(self) -> list[str]:
-        return unmerged_paths(self._path, env=self._env)
+    def worktree(self, path: Path) -> RealWorktree:
+        return RealWorktree(self, path)
 
-    def rebase_in_progress(self) -> bool:
-        found = git_dir(self._path)
-        return found is not None and any((found / name).is_dir() for name in ("rebase-merge", "rebase-apply"))
 
-    def merge_base(self, a: str, b: str) -> str | None:
-        return self._git("merge-base", a, b, check=False).strip() or None
+class RealWorktree:
+    """One checkout of a :class:`RealRepo`. Cheap to make: it reads nothing until asked."""
 
-    def is_ancestor(self, ancestor: str, descendant: str) -> bool:
-        return self._rc("merge-base", "--is-ancestor", ancestor, descendant) == 0
+    def __init__(self, repo: RealRepo, path: Path) -> None:
+        self.repo = repo
+        self.path = path
 
-    def rev_list_count(self, rev_range: str) -> int:
-        return int(self._git("rev-list", "--count", rev_range).strip())
+    def run(self, *args: str, check: bool = True, pin: bool = True, stdin: str | None = None, env: Mapping[str, str] | None = None) -> Done:
+        return self.repo.run(self.path, *args, check=check, pin=pin, stdin=stdin, env=env)
 
-    def log_subjects(self, rev_range: str, *, limit: int | None = None) -> list[str]:
-        cap = [] if limit is None else ["-n", str(limit)]
-        return _lines(self._git("log", "--format=%s", *cap, rev_range))
+    def health(self) -> Health:
+        return real_read.health(self)
 
-    @staticmethod
-    def _scope(exclude: Sequence[str]) -> list[str]:
-        return ["--", ".", *(f":(exclude,literal){p}" for p in exclude)] if exclude else []
+    def snapshot(self, base: str) -> Snapshot:
+        return real_read.snapshot(self, base)
 
-    def diff(self, a: str, b: str, *, exclude: Sequence[str] = ()) -> str:
-        return self._git("diff", "--no-color", "--no-ext-diff", "--no-renames", a, b, *self._scope(exclude))
+    def diff(self, a: str, b: str, *, exclude: Sequence[str] = (), cap: int | None = None) -> Diff:
+        return real_read.diff(self, a, b, exclude=tuple(exclude), cap=cap)
 
-    def diff_names(self, a: str, b: str) -> list[str]:
-        return sorted(_lines(self._git("diff", "--name-only", "-z", "--no-renames", a, b), "\0"))
+    def dirty(self, base: str | None = None, *, ignored_under: Sequence[str] = ()) -> Dirty:
+        return real_read.dirty(self, base=base, ignored_under=tuple(ignored_under))
 
-    def diff_stat(self, a: str, b: str, *, exclude: Sequence[str] = ()) -> list[FileStat]:
-        out = self._git("diff", "--numstat", "--no-renames", "-z", a, b, *self._scope(exclude))
-        stats: list[FileStat] = []
-        for record in _lines(out, "\0"):
-            added, deleted, name = record.split("\t", 2)
-            stats.append(FileStat(name, 0 if added == "-" else int(added), 0 if deleted == "-" else int(deleted)))
-        return sorted(stats, key=lambda s: s.path)
+    def record(
+        self,
+        message: str,
+        *,
+        paths: Literal["own", "all"] = "own",
+        base: str | None = None,
+        mode: Literal["new", "amend", "squash_to"] = "new",
+        squash_to: Sha | None = None,
+        hooks: bool = False,
+        allow_empty: bool = False,
+    ) -> RecordResult:
+        return real_write.record(
+            self, message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=hooks, allow_empty=allow_empty
+        )
 
-    def show(self, rev: str, path: str) -> str | None:
-        done = _run(self._path, ("show", f"{rev}:{path}"), self._env, None)
-        return done.stdout if done.returncode == 0 else None
+    def take_branch(
+        self,
+        branch: str,
+        base: str,
+        *,
+        mode: Literal["resume", "fresh", "restart"],
+        keep_aside_as: str | None = None,
+        clean_keep: Sequence[str] | None = None,
+    ) -> TakeResult:
+        return real_write.take_branch(self, branch=branch, base=base, mode=mode, keep_aside_as=keep_aside_as, clean_keep=clean_keep)
 
-    def ls_tree(self, rev: str) -> list[str]:
-        return sorted(_lines(self._git("ls-tree", "-r", "--name-only", "-z", rev), "\0"))
+    def release_branch(self, holder: Path) -> Released | StillHeld:
+        return real_write.release_branch(self, holder)
 
-    def ls_files(self) -> list[str]:
-        return sorted(set(_lines(self._git("ls-files", "-z"), "\0")))
+    def park(self, base: str, *, clean_keep: Sequence[str] | None = None) -> Sha:
+        return real_write.park(self, base, clean_keep)
 
-    def grep_files(self, term: str) -> list[str]:
-        done = _run(self._path, ("grep", "-w", "-I", "-l", "-z", "-F", "-e", term), self._env, None)
-        if done.returncode not in (0, 1):
-            msg = f"git grep exited {done.returncode}: {done.stderr.strip()[:300]}"
-            raise GitError(msg)
-        return sorted(_lines(done.stdout, "\0"))
+    def rebase_onto(self, base: str, *, squash_message: str | None = None) -> RebaseResult:
+        return real_write.rebase_onto(self, base, squash_message)
 
-    def ignored(self, paths: Sequence[str], rules: Sequence[str]) -> set[str]:
-        if not paths:
-            return set()
-        with tempfile.TemporaryDirectory() as folder:
-            rules_file = Path(folder) / "rules"
-            rules_file.write_text("\n".join(rules) + "\n", encoding="utf-8")
-            args = ("-c", f"core.excludesFile={rules_file}", "check-ignore", "--no-index", "--stdin", "-z")
-            done = _run(self._path, args, self._env, None, "\0".join(paths) + "\0")
-        if done.returncode not in (0, 1):
-            msg = f"git check-ignore exited {done.returncode}: {done.stderr.strip()[:300]}"
-            raise GitError(msg)
-        return set(_lines(done.stdout, "\0"))
+    def finish_rebase(self, action: Literal["continue", "abort"], *, restore_to: Sha | None = None) -> FinishResult:
+        return real_write.finish_rebase(self, action, restore_to)
 
-    def worktree_list(self) -> list[Worktree]:
-        found: list[Worktree] = []
-        for block in self._git("worktree", "list", "--porcelain").split("\n\n"):
-            fields = dict(line.partition(" ")[::2] for line in block.splitlines() if line)
-            if "worktree" not in fields:
-                continue
-            sha = fields.get("HEAD", _UNBORN)
-            ref = fields.get("branch")
-            branch = ref.removeprefix("refs/heads/") if ref else None
-            found.append(Worktree(Path(fields["worktree"]), None if sha == _UNBORN else sha, branch))
-        return found
+    def push(self, dst: str, *, remote: str = "origin", hook_env: Mapping[str, str] | None = None) -> PushResult:
+        return real_write.push(self, dst, remote, hook_env)
 
-    # -- writes --------------------------------------------------------------------------------------
-    def add(self, paths: Sequence[str] | None = None) -> None:
-        if paths is None:
-            self._write("add", "-A")
-        elif paths:
-            self._write("--literal-pathspecs", "add", "-A", "--pathspec-from-file=-", "--pathspec-file-nul", stdin="\0".join(paths))
+    def landed(self, base: str, title_suffix: str) -> Sha | None:
+        return real_read.landed(self, base, title_suffix)
 
-    def commit(self, message: str, *, allow_empty: bool = False) -> str:
-        self._write("commit", "-q", "--no-verify", *(["--allow-empty"] if allow_empty else []), "-m", message)
-        return self.head() or ""
-
-    def checkout(self, branch: str) -> None:
-        self._write("checkout", "-q", branch, "--")
-
-    def checkout_new(self, branch: str, start: str | None = None, *, reset: bool = False) -> None:
-        self._write("checkout", "-q", "-B" if reset else "-b", branch, *([start] if start else []))
-
-    def detach(self, rev: str = "HEAD") -> None:
-        self._write("checkout", "-q", "--detach", rev)
-
-    def branch_rename(self, old: str, new: str) -> None:
-        self._write("branch", "-m", old, new)
-
-    def reset(self, rev: str, mode: ResetMode) -> None:
-        self._write("reset", "-q", f"--{mode}", rev)
-
-    def rebase(self, onto: str) -> bool:
-        try:
-            self._write("rebase", "-q", onto)
-        except GitError:
-            if self.rebase_in_progress():
-                return False
-            raise
-        return True
-
-    def rebase_abort(self) -> None:
-        self._write("rebase", "--abort")
-
-    def clean(self, keep: Sequence[str] = ()) -> None:
-        self._write("clean", "-fdq", *(arg for pattern in keep for arg in ("-e", pattern)))
-
-    def worktree_add(self, path: Path, rev: str) -> Git:
-        self._write("worktree", "add", "-q", "--detach", str(path), rev)
-        return self.at(path)
-
-    def worktree_remove(self, path: Path, *, force: bool = False) -> None:
-        self._write("worktree", "remove", *(["--force"] if force else []), str(path))
-
-    def worktree_prune(self) -> None:
-        self._write("worktree", "prune")
-
-    def fetch(self, remote: str = "origin") -> None:
-        for attempt in range(_FETCH_TRIES):
-            try:
-                self._run_remote("fetch", "--quiet", remote)
-            except RemoteError as exc:
-                if attempt == _FETCH_TRIES - 1 or not _REF_RACE.search(str(exc)):
-                    raise
-                self._sleep(0.1 * (attempt + 1))
-            else:
-                return
-
-    def push(self, src: str, dst: str, remote: str = "origin") -> None:
-        self._run_remote("push", "--porcelain", remote, f"{src}:refs/heads/{dst}")
-
-    def _run_remote(self, *args: str) -> None:
-        try:
-            self._write(*args)
-        except GitError as exc:
-            raise RemoteError(str(exc), reason="offline" if exc.retryable else classify_remote_failure(str(exc))) from exc
+    def grep_tracked(self, term: str) -> tuple[str, ...]:
+        return real_read.grep_tracked(self, term)

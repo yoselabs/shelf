@@ -14,7 +14,7 @@ from git_porcelain.fake_store import ancestors
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from git_porcelain.fake_store import CommitObj, Repo
+    from git_porcelain.fake_store import CommitObj, RepoState
 
 __all__ = ["merge_text", "merge_trees", "replay_list"]
 
@@ -69,7 +69,7 @@ def _split(data: bytes) -> list[str]:
 
 
 def merge_trees(
-    repo: Repo, base: Mapping[str, str], ours: Mapping[str, str], theirs: Mapping[str, str]
+    repo: RepoState, base: Mapping[str, str], ours: Mapping[str, str], theirs: Mapping[str, str]
 ) -> tuple[dict[str, str], dict[str, bytes]]:
     """Merge flat trees. Returns the merged blobs per path and the conflicted paths' text (markers in it)."""
     merged: dict[str, str] = {}
@@ -91,7 +91,7 @@ def merge_trees(
     return merged, conflicts
 
 
-def replay_list(repo: Repo, head: str, onto: str) -> list[CommitObj]:
+def replay_list(repo: RepoState, head: str, onto: str) -> list[CommitObj]:
     """The commits of ``onto..head`` oldest first, following first parents."""
     stop = ancestors(repo.store, onto)
     chain: list[CommitObj] = []
