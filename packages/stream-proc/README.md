@@ -2,7 +2,7 @@
 
 **Stop caring how a child is run, watched and killed.** One call runs a child in a session of its
 own, hands you its stdout and stderr lines as they come, and leaves nothing of it running. Stdlib
-only, POSIX.
+only (`ctypes` on macOS), POSIX.
 
 ```python
 import threading
@@ -29,14 +29,22 @@ res.survivors    # pids of its tree still alive after the stop (normally ())
   raises is ignored and reading goes on.
 - **The stop is the whole tree** (`stop_tree(p, grace=, prove=)`): SIGTERM to the group and to every
   descendant that left it (`setsid`), the grace, SIGKILL to what is left, then a proof loop that
-  re-reads `/proc` and kills again until nothing lives. Survivors come back in `Result.survivors`; they
+  re-reads the process table and kills again until nothing lives. Survivors come back in `Result.survivors`; they
   are never hidden. The caller's own group, parent and pids 0 and 1 are never signalled.
-- **Liveness survives pid reuse**: `alive(pid, start)` and `proc_start(pid)` use the start time from
-  `/proc/<pid>/stat`. Store `(pid, start)`, never the pid. Zombies count as dead.
+- **Liveness survives pid reuse**: `alive(pid, start)` and `proc_start(pid)` use the process start time
+  (`/proc/<pid>/stat` on Linux; `pbi_start_tvsec`/`tvusec` of libproc on macOS). Store `(pid, start)`, never
+  the pid. Zombies count as dead.
+- **A group's liveness needs no table**: `group_alive(pgid)` is `os.killpg(pgid, 0)` (a group we may not
+  signal still counts as alive; ids 0 and 1 and below are False). Use it with the `pgid` of a `Result`.
+- **One process table on both OSes**: `table() -> dict[int, Proc]` (`pid, ppid, pgid, sid, start, state,
+  cpu_s, cmd`) and `descendants(root, rows=None)`. Linux reads `/proc`; macOS calls `libproc` through
+  `ctypes` (`proc_listpids`, `proc_listchildpids`, `proc_pidinfo`), all inside `stream_proc.procmac`, loaded
+  lazily and only on macOS. On macOS `sid` is 0 and `cmd` is the short command name; `cpu_s` is 0.0 for
+  another user's process.
 - **A SIGTERM during the spawn still stops the child**: `run` swaps the main thread's SIGTERM handler
   while `Popen` runs (`TermHold`, `popen_held`), then replays it where the child is already known. If
   your handler raises, `run` stops the tree and the exception goes on.
-- **No `/proc` (macOS)**: no start token, `alive` is signal 0 on the pid, and the stop signals the group
-  only; a descendant that left the group is not swept there.
+- **macOS has the same stop**: start token, descendant sweep and proof work as on Linux. Only if libproc
+  cannot load does it degrade to signal 0 on the pid and the group alone.
 - `run` raises only for a spawn failure (`OSError`) or an exception that unwinds the wait; a child's
   failure is a `Result`.

@@ -12,14 +12,14 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import stream_proc
-from stream_proc import Result, procfs, run, stop_tree
+from stream_proc import Proc, Result, proctable, run, stop_tree
 from stream_proc.hold import TermHold, popen_held
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 PY = sys.executable
-needs_proc = pytest.mark.skipif(not procfs.has_proc(), reason="needs /proc")
+needs_proc = pytest.mark.skipif(not proctable.has_table(), reason="needs a process table")
 
 
 def py(code: str) -> list[str]:
@@ -47,7 +47,7 @@ def test_result_names_the_child_for_good() -> None:
     assert isinstance(res, Result)
     assert res.pid == res.pgid > 1
     assert res.secs >= 0
-    if procfs.has_proc():
+    if proctable.has_table():
         assert res.start
 
 
@@ -121,26 +121,26 @@ def test_grandchild_in_its_own_session_is_dead_after_stop() -> None:
     res = run(py(GRANDCHILD), on_stdout=on_line, stop=flag, grace=1)
     gpid = seen[0]
     assert res.survivors == ()
-    assert not procfs.alive(gpid)
+    assert not proctable.alive(gpid)
     assert os.getpgid(os.getpid()) != gpid
 
 
 @needs_proc
 def test_liveness_is_pid_reuse_safe() -> None:
     me = os.getpid()
-    start = procfs.proc_start(me)
+    start = proctable.proc_start(me)
     assert start
-    assert procfs.alive(me, start)
-    assert not procfs.alive(me, start + "0")
-    assert not procfs.alive(None)
+    assert proctable.alive(me, start)
+    assert not proctable.alive(me, start + "0")
+    assert not proctable.alive(None)
 
 
 def test_descendants_walks_a_table() -> None:
-    def row(pid: int, ppid: int) -> procfs.Proc:
-        return procfs.Proc(pid, ppid, pid, pid, "1", "S")
+    def row(pid: int, ppid: int) -> Proc:
+        return Proc(pid, ppid, pid, pid, "1", "S")
 
     rows = {r.pid: r for r in (row(2, 1), row(3, 2), row(4, 3), row(9, 8))}
-    assert [r.pid for r in procfs.descendants(2, rows)] == [3, 4]
+    assert [r.pid for r in proctable.descendants(2, rows)] == [3, 4]
 
 
 def test_stop_tree_never_signals_a_group_that_is_ours() -> None:
@@ -192,7 +192,7 @@ def test_sigterm_between_fork_and_assignment_still_stops_the_child(raising_term:
     monkeypatch.undo()
     child = spawned[0]
     assert child.returncode is not None  # stopped and reaped, not left running
-    assert not procfs.alive(child.pid) or not procfs.has_proc()
+    assert not proctable.alive(child.pid) or not proctable.has_table()
 
 
 def test_popen_held_returns_the_child_and_its_hold() -> None:
@@ -209,3 +209,12 @@ def test_a_deadline_is_met_roughly() -> None:
     t = time.monotonic()
     run(py("import time; time.sleep(60)"), timeout=0.3, grace=1)
     assert time.monotonic() - t < 5
+
+
+@needs_proc
+def test_table_rows_carry_cpu_and_command() -> None:
+    row = proctable.table()[os.getpid()]
+    assert (row.ppid, row.pgid) == (os.getppid(), os.getpgrp())
+    assert row.cpu_s >= 0
+    assert row.cmd
+    assert [r.pid for r in proctable.descendants(os.getppid())].count(os.getpid()) == 1

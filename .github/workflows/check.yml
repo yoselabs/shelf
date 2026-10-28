@@ -62,3 +62,18 @@ jobs:
           cache-to: type=gha,mode=max
       - name: the gate resolves inside the image
         run: docker run --rm shelf-gate:ci just --dry-run check-host
+
+  # stream-proc has a macOS path (libproc through ctypes) that nothing on Linux can run: its tests run here, and a
+  # stream-proc tag needs this job green. Only uv is installed (mise.toml, mise.lock: macos-arm64 is locked).
+  stream-proc-macos:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      UV_PYTHON_PREFERENCE: only-managed
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          install_args: --locked uv
+      - run: uv sync --locked
+      - run: uv run --locked pytest -q packages/stream-proc/tests
