@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from process_lock import LockHeldError, ProcessLock, held
+from process_lock import holder as read_holder
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -120,7 +121,9 @@ def test_held_names_what_this_process_holds(tmp_path: Path) -> None:
     with ProcessLock.acquire(path) as lock:
         assert lock.path in held()
         assert (path.stat().st_mode & 0o777) == 0o600
-        assert path.read_text(encoding="utf-8").strip() == str(os.getpid())
+        record = read_holder(path)
+        assert record is not None
+        assert record.pid == os.getpid()
     assert lock.path not in held()
     lock.release()  # a released handle stays released
 

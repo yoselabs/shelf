@@ -1,7 +1,7 @@
 [project]
 name = "process-lock"
-version = "0.1.0"
-description = "One process owns a path: an exclusive, non-blocking flock that the kernel drops when its holder dies, re-entrant within a process, never inherited by a child, naming the holder's pid when refused."
+version = "0.2.0"
+description = "One process owns a path: an exclusive flock the kernel drops when its holder dies, with blocking acquire (timeout, waiting callback), a JSON holder record readable without the lock, stale-holder break, optional non-reentrant mode, never inherited by a child."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
