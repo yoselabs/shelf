@@ -30,20 +30,27 @@ _RACER = textwrap.dedent(
     """
 )
 
-# Takes the lock, then hands the open descriptor to a long-lived child: the lock outlives the holder.
-_LEAKER = textwrap.dedent(
+# Takes the lock, optionally forks a child (no exec) that keeps the descriptor, prints the child's pid.
+_HOLDER = textwrap.dedent(
     """
-    import subprocess, sys
+    import os, sys, time
     from pathlib import Path
-    import process_lock
-    path = Path(sys.argv[1]).resolve()
-    process_lock.ProcessLock.acquire(path)
-    fd = process_lock._REGISTRY[path].fd
-    child = subprocess.Popen(["sleep", "60"], pass_fds=(fd,))
-    print(child.pid, flush=True)
-    sys.stdin.readline()
+    from process_lock import ProcessLock
+    ProcessLock.acquire(Path(sys.argv[1]))
+    child = os.fork() if sys.argv[2] == "fork" else 0
+    if child == 0 and sys.argv[2] == "fork":
+        time.sleep(60)
+        os._exit(0)
+    print(child, flush=True)
+    time.sleep(60)
     """
 )
+
+
+def _spawn_holder(path: Path, mode: str) -> tuple[subprocess.Popen[str], int]:
+    proc = subprocess.Popen([sys.executable, "-c", _HOLDER, str(path), mode], stdout=subprocess.PIPE, text=True)
+    assert proc.stdout is not None
+    return proc, int(proc.stdout.readline())
 
 
 def test_two_processes_racing_never_hold_the_lock_together(tmp_path: Path) -> None:
@@ -54,27 +61,30 @@ def test_two_processes_racing_never_hold_the_lock_together(tmp_path: Path) -> No
     assert lines in (["in", "a", "out", "a", "in", "b", "out", "b"], ["in", "b", "out", "b", "in", "a", "out", "a"])
 
 
-def test_a_sigkilled_holder_whose_descriptor_lives_on_is_broken_as_stale(tmp_path: Path) -> None:
+def test_a_sigkilled_holder_whose_forked_child_keeps_the_descriptor_stays_locked(tmp_path: Path) -> None:
     path = tmp_path / "crash.lock"
-    holder_proc = subprocess.Popen([sys.executable, "-c", _LEAKER, str(path)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-    assert holder_proc.stdout is not None
-    child_pid = int(holder_proc.stdout.readline())
+    proc, child = _spawn_holder(path, "fork")
     try:
-        with pytest.raises(LockHeldError):
-            ProcessLock.acquire(path, break_stale=False)  # still flock-held through the child
-        os.kill(holder_proc.pid, signal.SIGKILL)
-        holder_proc.wait(timeout=10)
-        dead = holder(path)
-        assert dead is not None
-        assert dead.pid == holder_proc.pid
-        assert dead.is_stale()
-
+        os.kill(proc.pid, signal.SIGKILL)
+        proc.wait(timeout=10)
         began = time.monotonic()
-        with ProcessLock.acquire(path, timeout=5) as lock:
-            assert time.monotonic() - began < 5
-            record = holder(lock.path)
-            assert record is not None
-            assert record.pid == os.getpid()
+        with pytest.raises(LockHeldError) as caught:
+            ProcessLock.acquire(path, timeout=0.5)
+        assert time.monotonic() - began >= 0.5
+        assert str(caught.value).endswith(f"held by an inherited descriptor; recorded holder pid {proc.pid} is gone")
+        assert caught.value.pid == proc.pid
+        assert caught.value.holder is not None
+        assert holder(path) == caught.value.holder  # nothing was broken or rewritten
     finally:
-        os.kill(child_pid, signal.SIGKILL)
-        holder_proc.wait(timeout=10)
+        os.kill(child, signal.SIGKILL)
+
+
+def test_a_sigkilled_holder_with_no_inheritor_is_released_by_the_kernel(tmp_path: Path) -> None:
+    path = tmp_path / "crash.lock"
+    proc, _ = _spawn_holder(path, "alone")
+    os.kill(proc.pid, signal.SIGKILL)
+    proc.wait(timeout=10)
+    with ProcessLock.acquire(path) as lock:
+        record = holder(lock.path)
+        assert record is not None
+        assert record.pid == os.getpid()

@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import process_lock
 import pytest
 from process_lock import Holder, LockHeldError, ProcessLock, Waiting, held, holder
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -78,19 +79,7 @@ def _held_by_thread(world: World, name: str, secs: float) -> None:
 
 @given(parsers.parse('a lock on "{name}" whose record names a dead process'))
 def _dead_record(world: World, name: str) -> None:
-    _foreign_lock(world, name, {"pid": _dead_pid(), "start": "1", "created": 1.0})
-
-
-@given(parsers.parse('a lock on "{name}" whose record names my pid with another start time'))
-def _reused_record(world: World, name: str) -> None:
-    _foreign_lock(world, name, {"pid": os.getppid(), "start": "not-the-start-time", "created": 1.0})
-
-
-@given("the record is read as stale")
-def _stale(world: World) -> None:
-    record = holder(world.root / "a.lock")
-    assert record is not None
-    assert record.is_stale()
+    _foreign_lock(world, name, {"pid": _dead_pid(), "created": 1.0})
 
 
 @given(parsers.parse('I hold "{name}" with label "{label}" and meta {meta}'))
@@ -111,11 +100,9 @@ def _release_later(world: World, secs: float) -> None:
     world.threads.append(thread)
 
 
-def _acquire(world: World, name: str, secs: float, *, reentrant: bool = True, break_stale: bool = True) -> None:
+def _acquire(world: World, name: str, secs: float, *, reentrant: bool = True) -> None:
     try:
-        world.locks.append(
-            ProcessLock.acquire(world.root / name, timeout=secs, on_wait=world.seen.append, reentrant=reentrant, break_stale=break_stale)
-        )
+        world.locks.append(ProcessLock.acquire(world.root / name, timeout=secs, on_wait=world.seen.append, reentrant=reentrant))
     except LockHeldError as exc:
         world.refusal = exc
 
@@ -123,11 +110,6 @@ def _acquire(world: World, name: str, secs: float, *, reentrant: bool = True, br
 @when(parsers.parse('I acquire "{name}" waiting up to {secs:g} seconds'))
 def _acquire_waiting(world: World, name: str, secs: float) -> None:
     _acquire(world, name, secs)
-
-
-@when(parsers.parse('I acquire "{name}" without breaking, waiting up to {secs:g} seconds'))
-def _acquire_no_break(world: World, name: str, secs: float) -> None:
-    _acquire(world, name, secs, break_stale=False)
 
 
 @when(parsers.parse('I acquire "{name}" non-reentrantly waiting up to {secs:g} seconds'))
@@ -155,6 +137,13 @@ def _refused(world: World) -> None:
     assert world.refusal.holder is not None
 
 
+@then("the acquire is refused saying the descriptor is inherited and the recorded pid is gone")
+def _refused_inherited(world: World) -> None:
+    assert world.refusal is not None
+    assert "held by an inherited descriptor; recorded holder pid" in str(world.refusal)
+    assert str(world.refusal).endswith("is gone")
+
+
 @then("the acquire is refused naming my pid")
 def _refused_me(world: World) -> None:
     assert world.refusal is not None
@@ -167,11 +156,12 @@ def _holder_shows(world: World, name: str, label: str, meta: str) -> None:
     assert record is not None
     assert (record.pid, record.label, record.meta) == (os.getpid(), label, json.loads(meta))
     assert record.created > 0
-    assert record.start is None or record.start
 
 
-@then(parsers.parse('holder "{name}" shows my pid'))
-def _holder_is_me(world: World, name: str) -> None:
-    record = holder(world.root / name)
-    assert record is not None
-    assert record.pid == os.getpid()
+def test_the_lock_descriptor_is_not_inheritable(tmp_path: Path) -> None:
+    lock = ProcessLock.acquire(tmp_path / "a.lock")
+    try:
+        fd = process_lock._REGISTRY[lock.path].fd
+        assert os.get_inheritable(fd) is False
+    finally:
+        lock.release()

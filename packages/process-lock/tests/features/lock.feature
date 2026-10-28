@@ -16,22 +16,10 @@ Feature: One holder owns a path, and waiters can wait, give up or break a dead h
     Given I hold "a.lock" with label "sync" and meta {"job": 7}
     Then holder "a.lock" shows my pid, label "sync" and meta {"job": 7}
 
-  Scenario: A lock file whose record names a dead process is broken
+  Scenario: A recorded holder that is gone does not unlock a held lock
     Given a lock on "a.lock" whose record names a dead process
-    When I acquire "a.lock" waiting up to 0 seconds
-    Then I hold "a.lock"
-    And holder "a.lock" shows my pid
-
-  Scenario: A lock file whose record names a reused pid is broken
-    Given a lock on "a.lock" whose record names my pid with another start time
-    And the record is read as stale
-    When I acquire "a.lock" waiting up to 0 seconds
-    Then I hold "a.lock"
-
-  Scenario: Breaking can be turned off
-    Given a lock on "a.lock" whose record names a dead process
-    When I acquire "a.lock" without breaking, waiting up to 0 seconds
-    Then the acquire is refused naming the holder's pid
+    When I acquire "a.lock" waiting up to 0.2 seconds
+    Then the acquire is refused saying the descriptor is inherited and the recorded pid is gone
 
   Scenario: Non-reentrant mode refuses a second acquire in the same process
     Given I hold "a.lock" non-reentrantly
