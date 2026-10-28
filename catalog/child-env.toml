@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
+name = "child-env"
+kind = "primitive"
+tier = "T0"
+release = "child-env-v0.1.0"
+capability = "Stop copying the env scrub — the environment for a child agent process: the caller's own minus CLAUDE_*, ANTHROPIC_*, DELEGATE_*, MCP_*, OTEL_*, CODEX_COMPANION*, the other Claude-app exports and credential-looking variables (tokens, secrets, passwords, API/access/private keys, AWS_*, GH_*/GITHUB_*, the ssh agent), with keep and drop overrides (exact names or PREFIX*); pure, os.environ read only by scrub_current."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from iorlas-task-loop (core/procs.py child_env) and iorlas-delegate (onboard.py app_free_env, route.py child_env); the default is the union of both, the differences are in the README. Zero-dependency stdlib, POSIX only. Born candidate."

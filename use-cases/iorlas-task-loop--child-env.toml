@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "iorlas-task-loop"
+software = "child-env"
+why = "task-loop (core/procs.py child_env) and delegate (onboard.py app_free_env, route.py child_env) each hand-roll the scrub of a launcher's CLAUDE_*/ANTHROPIC_*/DELEGATE_* and credential variables before starting a worker CLI. The rewrite (arch-study 88, S5) vendors one scrub into both plugins. Not yet adopted: the retention claim is the planned vendoring."
+needs = "child_env.scrub(env, keep=, drop=) -> dict and scrub_current(keep=, drop=), POSIX only; keep/drop take names or PREFIX*."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired
