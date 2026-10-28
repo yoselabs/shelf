@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "delegate"
+software = "stream-proc"
+why = "Runs worker processes that write for minutes: the output must stream live, a hung or silent worker must be stopped, and a stop must leave no worker (or its setsid'd helper) running or the next run edits the same tree. delegate carries this as its own procs module today."
+needs = "stream_proc.run(argv, cwd=, env=, on_stdout=, on_stderr=, timeout=, idle=, stop=) -> Result; stop_tree; alive/proc_start for a recorded (pid, start); popen_held for the SIGTERM-during-spawn race."
+sponsor = "yoselabs"
+requester = "delegate"
+status = "active"          # active | retired
