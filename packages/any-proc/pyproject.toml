@@ -1,7 +1,7 @@
 [project]
 name = "any-proc"
-version = "0.2.0"
-description = "Child processes you start and keep: run one to a single JSON result under OS limits and a timeout, or keep one alive with a probe, a start timeout, a graceful stop and a bounded restart budget."
+version = "0.3.0"
+description = "Child processes you start and keep: run one to a single JSON result under OS limits and a timeout, or keep one alive with a probe, a start timeout, a graceful stop and a bounded restart budget. Also the CPUs this process may really use (host affinity capped by a container quota)."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"

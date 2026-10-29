@@ -1,0 +1,10 @@
+seq = 155
+date = "2026-10-29"
+event = "delivery"
+software = "any-proc"
+release = "any-proc-v0.3.0"
+actor = "a2kay"
+consumer = "a2kay"
+verdict = "pass"
+cost = ""
+note = """FEATURE: `any_proc.cpus` — the CPUs a process may really use, promoted from a2kay's `services/search/embed.py` unchanged in behaviour: host CPUs (affinity, else core count) capped by the cgroup v2 `cpu.max` or v1 `cfs_quota_us`/`cfs_period_us` quota, rounded up. The affinity call is `getattr`-guarded, so it typechecks and runs on macOS. A host fact, not about child processes: it lives in any-proc until the owner renames the package to any-os. Additive: minor bump (0.x), no contract change."""

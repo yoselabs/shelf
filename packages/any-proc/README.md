@@ -67,3 +67,24 @@ sup.state, sup.reason, sup.version, sup.terminal
   healthy `up` forgives the past.
 - **`start` never raises** and never spawns over a live child.
 - `rotate_log(path, keep=2)` rolls `log` to `log.1`, `log.2` before a run opens it fresh.
+
+## cpus
+
+`os.cpu_count()` is the host's: under `cpus: 2` on a 16-core host a thread count taken from it
+starts eight threads spin-waiting for two CPUs of quota. `any_proc.cpus` is not about child
+processes; it is the host/OS helper that lives here until the package is renamed.
+
+```python
+from any_proc.cpus import available_cpus
+
+threads = max(1, available_cpus() // 2)
+```
+
+- `host_cpus()` — `len(os.sched_getaffinity(0))` where it exists (Linux); else `os.cpu_count()`
+  (macOS, Windows, or a refused call); never below 1.
+- `cgroup_quota(cgroup_dir=None)` — cgroup v2 `cpu.max` at the root, else v1
+  `cpu.cfs_quota_us` / `cpu.cfs_period_us` in the root, `cpu/` or `cpu,cpuacct/`; rounded up
+  (1.5 CPUs is 2). `max`, `-1`, a zero period, garbage or missing files give `None`.
+- `Cpus.read(cgroup_dir=None)` — frozen `Cpus(host, quota)`; `.available` is `min(host, quota)`.
+- `available_cpus(cgroup_dir=None)` — `Cpus.read(cgroup_dir).available`. The default tree is
+  `CGROUP_DIR` (`/sys/fs/cgroup`). Re-read on every call; no cache.
