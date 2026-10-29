@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "iorlas-task-loop"
+software = "static-page-check"
+why = "task-loop's dashboard is a no-build page (ES modules, CSS, HTML, one vendored runtime) whose asset rules live as a test class in the repo: imports resolve, relative urls, a pinned runtime, colours only in tokens.css, a gzip budget. Not yet adopted: the retention claim is the planned swap of that class for these functions."
+needs = "static_page_check.import_problems/page_problems/pin_problems/colour_problems/budget_problems(static_dir, ...) -> list[str]."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired

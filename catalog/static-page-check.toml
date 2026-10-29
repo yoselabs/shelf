@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
+name = "static-page-check"
+kind = "primitive"
+tier = "T0"
+release = "static-page-check-v0.1.0"
+capability = "Stop hand-checking a no-build static web page — plain functions, each returning a list of problems (empty means fine): every relative ES import resolves and exports the names it takes, HTML references only relative files that exist, vendored files match their sha256 pins, colour literals live only in the tokens file, JS+CSS stay within a gzip budget."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from iorlas-task-loop's dashboard asset tests (tests/test_dash_static.py, StaticAssets). Stdlib only, no test-framework coupling: a consumer's test is assertEqual(check(...), []). Born candidate."
