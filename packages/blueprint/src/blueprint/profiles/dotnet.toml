@@ -95,19 +95,24 @@ role = "coverage"
 tool = """coverlet.MTP 10.1.0 (MIT) collects cobertura under Microsoft.Testing.Platform; ReportGenerator 5.5.11 (local dotnet tool) merges every test project's report into one Summary.json; \
 a 15-line script fails the gate when merged line or branch coverage is under the committed floor (coverage-floor.json). First-party assemblies only (`--coverlet-include '[Prefix.*]*'`). \
 A repo with ONE test project may use coverlet's own `--coverlet-threshold N --coverlet-threshold-type line,branch --coverlet-threshold-stat total` instead (exit code 14 under the floor). \
-Refused: Microsoft.Testing.Extensions.CodeCoverage as the default (no threshold option, so it needs the same script, and its engine is closed source; it does run on macOS arm64 and gave the same numbers, so it is the fallback if coverlet.MTP is ever abandoned)"""
+Accepted alternative: Microsoft.Testing.Extensions.CodeCoverage 18.12.0 (closed-source engine, no threshold option, so it needs the same coverage-floor script; \
+measured on lifesim 2026-10-29, same commit, build included: `just coverage` 5m42s with coverlet.MTP vs 4m36s with it, tests 5m15s vs 3m57s, line coverage 94.1% both, branch 85.2% vs 86.8%, no covered source file missing). \
+coverlet stays the default for a new repo (open source, own threshold option for a one-project repo)"""
 install = """Directory.Packages.props: <PackageVersion Include="coverlet.MTP" Version="10.1.0" />; tests/Directory.Build.props: <PackageReference Include="coverlet.MTP" PrivateAssets="all" /> \
 (builds clean under latest-all + warnings as errors; regenerate the packages.lock.json files). dotnet new tool-manifest (if none) && dotnet tool install dotnet-reportgenerator-globaltool --version 5.5.11. \
 Commit coverage-floor.json = {"line": <floor>, "branch": <floor>} (start at the current value rounded down) and tools/check_coverage.py (`blueprint recipe dotnet-coverage > tools/check_coverage.py`). \
 justfile: `coverage: build` / `rm -rf TestResults cov` / `dotnet test --solution X.slnx --no-build -- --coverlet --coverlet-output-format cobertura --coverlet-include '[Sim.*]*'` / \
 `dotnet reportgenerator "-reports:TestResults/coverage.cobertura*.xml" -targetdir:cov -reporttypes:JsonSummary` / `python3 tools/check_coverage.py cov/Summary.json coverage-floor.json`; \
 let `check` run `coverage` INSTEAD of the plain test run so the suite runs once. Add TestResults/ and cov/ to .gitignore. \
+Microsoft alternative instead of coverlet: Directory.Packages.props <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />; tests/Directory.Build.props <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />; \
+the dotnet test line becomes `-- --coverage --coverage-output-format cobertura --coverage-settings coverage.settings.xml` (coverage.settings.xml includes the first-party modules and excludes test assemblies and generated code); \
+it writes `<guid>.cobertura.xml`, so the ReportGenerator glob is `-reports:TestResults/**/*.cobertura.xml`. The tool, floor file and script stay as above. \
 The floor only rises: a PR that raises coverage raises coverage-floor.json in the same commit. Gotchas (all seen): without --coverlet-include the total is dominated by NuGet assemblies (Humanizer: 23.5% instead of 89.9%); \
 the default --coverlet-threshold-stat is Minimum, so one assembly at 0% fails a per-project threshold; an architecture-test project covers ~0% of the code it inspects, so a per-project threshold cannot be the floor of a multi-project solution; \
 `dotnet test` prints no reason for exit 14 (run the test exe directly to read the 'Coverage Threshold Results' block); `--results-directory` after `--` crashed `dotnet test` (use the default TestResults/); \
 the coverlet.MTP package's own Known Limitations section still says 'Threshold validation is not yet supported': it is out of date, the option works (tested red and green)"""
 config = [
-    { path = "Directory.Packages.props", contains = "coverlet.MTP" },
+    { any = [{ path = "Directory.Packages.props", contains = "coverlet.MTP" }, { path = "Directory.Packages.props", contains = "Microsoft.Testing.Extensions.CodeCoverage" }] },
     { path = ".config/dotnet-tools.json", contains = "dotnet-reportgenerator-globaltool" },
     { path = "coverage-floor.json" },
     { path = "tools/check_coverage.py" },

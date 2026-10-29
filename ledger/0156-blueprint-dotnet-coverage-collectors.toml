@@ -1,0 +1,10 @@
+seq = 156
+date = "2026-10-29"
+event = "delivery"
+software = "blueprint"
+release = ""
+actor = "lifesim"
+consumer = "lifesim"
+verdict = "pass"
+cost = ""
+note = """EVOLVE: the dotnet coverage role accepts Microsoft.Testing.Extensions.CodeCoverage as well as coverlet.MTP (owner ruling 2026-10-29). Evidence from lifesim, same commit: `just coverage` 5m42s (coverlet) vs 4m36s (Microsoft), line 94.1% both, branch 85.2% vs 86.8%. coverlet stays the default; the floor script is needed either way. Profile data only, no contract shape change, no version bump (blueprint has no tags)."""

@@ -263,9 +263,13 @@ def test_a_nix_host_eval_outside_the_gate_fails_the_types_row(repo: Repo) -> Non
     assert _rows(repo)["stack.nix.types"][0] is Verdict.FAILING
 
 
-def _coverage_files(repo: Repo) -> None:
+_COVERLET = '<PackageVersion Include="coverlet.MTP" Version="10.1.0" />'
+_MS_COVERAGE = '<PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />'
+
+
+def _coverage_files(repo: Repo, collector: str = _COVERLET) -> None:
     repo.write("App.sln", "")
-    repo.write("Directory.Packages.props", '<PackageVersion Include="coverlet.MTP" Version="10.1.0" />')
+    repo.write("Directory.Packages.props", collector)
     repo.write(".config/dotnet-tools.json", '{"tools": {"dotnet-reportgenerator-globaltool": {"version": "5.5.11"}}}')
     repo.write("coverage-floor.json", '{"line": 89.0, "branch": 75.0}')
     repo.write("tools/check_coverage.py", "")
@@ -275,6 +279,16 @@ def test_dotnet_coverage_floor_run_by_the_gate_passes(repo: Repo) -> None:
     _coverage_files(repo)
     repo.write("justfile", "check: coverage\ncoverage:\n    python3 tools/check_coverage.py cov/Summary.json coverage-floor.json\n")
     assert _rows(repo)["stack.dotnet.coverage"][0] is Verdict.PASSING
+
+
+@pytest.mark.parametrize(
+    ("collector", "verdict"), [(_COVERLET, Verdict.PASSING), (_MS_COVERAGE, Verdict.PASSING), ("", Verdict.NOT_SET_UP)]
+)
+def test_dotnet_coverage_accepts_either_collector(repo: Repo, collector: str, verdict: Verdict) -> None:
+    # lifesim measured Microsoft.Testing.Extensions.CodeCoverage against coverlet.MTP: same coverage, faster (owner ruling 2026-10-29).
+    _coverage_files(repo, collector)
+    repo.write("justfile", "check: coverage\ncoverage:\n    python3 tools/check_coverage.py cov/Summary.json coverage-floor.json\n")
+    assert _rows(repo)["stack.dotnet.coverage"][0] is verdict
 
 
 def test_dotnet_coverage_floor_outside_the_gate_fails(repo: Repo) -> None:

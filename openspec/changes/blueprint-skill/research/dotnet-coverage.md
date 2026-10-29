@@ -16,3 +16,5 @@ Evidence:
 Refused: coverlet.collector/msbuild (VSTest/MSBuild paths, wrong under MTP-only); a per-project threshold as the repo floor (above); NetArchTest-like duplicates not relevant.
 
 Open: lifesim's own `stack.dotnet.coverage` row stays unjudged until a `coverage` recipe + files are committed in lifesim (I did not edit it). Gate string is `check_coverage`; engine tests added for pass and outside-the-gate fail.
+
+Update 2026-10-29 (owner ruling: accept both). Microsoft.Testing.Extensions.CodeCoverage 18.12.0 is now an accepted collector beside coverlet.MTP (the coverage role's config takes either); coverlet stays the default for a new repo. Evidence, measured on lifesim's devbox at one commit (8eba69464), build included: `just coverage` 5m42s with coverlet.MTP vs 4m36s with the Microsoft extension (tests alone 5m15s vs 3m57s); line coverage 94.1% both; branch 85.2% vs 86.8%; no source file covered under coverlet is missing from the new report. Sim.Properties alone: no coverage 125 s, coverlet 209 s, Microsoft 133 s. Trade-off unchanged: closed-source engine, no threshold option, so the same check_coverage.py floor script is needed.
