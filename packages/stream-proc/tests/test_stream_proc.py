@@ -195,6 +195,40 @@ def test_sigterm_between_fork_and_assignment_still_stops_the_child(raising_term:
     assert not proctable.alive(child.pid) or not proctable.has_table()
 
 
+def test_ctrl_c_during_the_spawn_still_stops_the_whole_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    spawned: list[subprocess.Popen[Any]] = []
+    real = subprocess.Popen
+
+    def popen_then_int(*args: Any, **kwargs: Any) -> subprocess.Popen[Any]:
+        child = real(*args, **kwargs)
+        spawned.append(child)
+        os.kill(os.getpid(), signal.SIGINT)  # a Ctrl-C before the caller holds the Popen
+        return child
+
+    monkeypatch.setattr(subprocess, "Popen", popen_then_int)
+    tree = "import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(300)']); time.sleep(300)"
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            run(py(tree), grace=1)
+        monkeypatch.undo()
+        assert not stream_proc.group_alive(spawned[0].pid)
+    finally:
+        if stream_proc.group_alive(spawned[0].pid):  # the orphaned tree of the bug: stop it, it is ours
+            os.killpg(spawned[0].pid, signal.SIGKILL)
+            spawned[0].wait()
+
+
+def test_a_signal_held_during_a_failed_spawn_is_not_lost(monkeypatch: pytest.MonkeyPatch) -> None:
+    def int_then_fail(*_args: Any, **_kwargs: Any) -> subprocess.Popen[Any]:
+        os.kill(os.getpid(), signal.SIGINT)
+        raise FileNotFoundError
+
+    monkeypatch.setattr(subprocess, "Popen", int_then_fail)
+    with pytest.raises(KeyboardInterrupt):
+        popen_held(["no-such-program"])
+    assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
+
+
 def test_popen_held_returns_the_child_and_its_hold() -> None:
     p, hold = popen_held(py("pass"))
     hold.replay()

@@ -4068,7 +4068,7 @@ source = { editable = "packages/static-page-check" }
 
 [[package]]
 name = "stream-proc"
-version = "0.2.1"
+version = "0.2.2"
 source = { editable = "packages/stream-proc" }
 
 [[package]]

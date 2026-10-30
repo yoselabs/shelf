@@ -2,7 +2,7 @@
 name = "stream-proc"
 kind = "primitive"
 tier = "T0"
-release = "stream-proc-v0.2.1"
+release = "stream-proc-v0.2.2"
 capability = "Stop caring how a child is run, watched and killed — one call runs it in a session of its own, streams its stdout and stderr lines to callbacks (no deadlock on large output, torn last line flushed) under a wall timeout, an idle timeout and a stop flag, and stops its whole tree (SIGTERM, grace, SIGKILL, a sweep of descendants that left the group, a proof it is dead), with pid-reuse-safe liveness from /proc or libproc and a SIGTERM landing during the spawn still stopping the child."
 implementation = "ours"
 status = "candidate"

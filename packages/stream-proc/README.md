@@ -41,9 +41,10 @@ res.survivors    # pids of its tree still alive after the stop (normally ())
   `ctypes` (`proc_listpids`, `proc_listchildpids`, `proc_pidinfo`), all inside `stream_proc.procmac`, loaded
   lazily and only on macOS. On macOS `sid` is 0 and `cmd` is the short command name; `cpu_s` is 0.0 for
   another user's process.
-- **A SIGTERM during the spawn still stops the child**: `run` swaps the main thread's SIGTERM handler
-  while `Popen` runs (`TermHold`, `popen_held`), then replays it where the child is already known. If
-  your handler raises, `run` stops the tree and the exception goes on.
+- **A SIGTERM or Ctrl-C during the spawn still stops the child**: `run` swaps the main thread's SIGTERM
+  and SIGINT handlers while `Popen` runs (`TermHold`, `popen_held`), then replays them where the child is
+  already known. If a handler raises (SIGINT's default raises KeyboardInterrupt), `run` stops the tree and
+  the exception goes on.
 - **macOS has the same stop**: start token, descendant sweep and proof work as on Linux. Only if libproc
   cannot load does it degrade to signal 0 on the pid and the group alone.
 - `run` raises only for a spawn failure (`OSError`) or an exception that unwinds the wait; a child's
