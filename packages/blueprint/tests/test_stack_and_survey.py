@@ -291,10 +291,12 @@ def test_dotnet_coverage_accepts_either_collector(repo: Repo, collector: str, ve
     assert _rows(repo)["stack.dotnet.coverage"][0] is verdict
 
 
-def test_dotnet_coverage_floor_outside_the_gate_fails(repo: Repo) -> None:
-    _coverage_files(repo)
-    repo.write("justfile", "check:\n    true\ncoverage:\n    python3 tools/check_coverage.py cov/Summary.json coverage-floor.json\n")
-    assert _rows(repo)["stack.dotnet.coverage"][0] is Verdict.FAILING
+def test_dotnet_coverage_collector_alone_passes_without_a_floor(repo: Repo) -> None:
+    # Owner 2026-10-30: coverage is not a prerequisite; the collector stays for a project that selects tests by coverage.
+    repo.write("App.sln", "")
+    repo.write("Directory.Packages.props", _MS_COVERAGE)
+    repo.write("justfile", "check:\n    true\n")
+    assert _rows(repo)["stack.dotnet.coverage"][0] is Verdict.PASSING
 
 
 def test_a_role_nothing_configures_and_the_gate_never_runs_is_not_set_up(repo: Repo) -> None:

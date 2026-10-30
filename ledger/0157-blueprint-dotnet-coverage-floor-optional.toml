@@ -1,0 +1,10 @@
+seq = 157
+date = "2026-10-30"
+event = "delivery"
+software = "blueprint"
+release = ""
+actor = "lifesim"
+consumer = "lifesim"
+verdict = "pass"
+cost = ""
+note = """EVOLVE: the dotnet coverage role is satisfied by a collector package alone; the floor (ReportGenerator, coverage-floor.json, tools/check_coverage.py, gate check_coverage) is optional (owner ruling 2026-10-30: coverage is not a prerequisite; a coverage collector is still needed by a project that selects tests by coverage). Profile data only, no gate on the role, no engine change, no version bump."""

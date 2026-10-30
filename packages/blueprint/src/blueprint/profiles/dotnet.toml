@@ -90,15 +90,20 @@ just test runs `dotnet test --solution <sln> --no-build` (no --nologo: MTP rejec
 config = [{ path = "global.json", contains = "Microsoft.Testing.Platform" }]
 gate = "dotnet test"
 
+# Owner, 2026-10-30: coverage is not a prerequisite; a coverage collector is still needed by a project that selects tests by coverage.
+# So the role asks for a collector package only. The floor (ReportGenerator, coverage-floor.json, check_coverage.py) is OPTIONAL:
+# a repo that has none passes; no `gate`, so nothing forces check_coverage into the gate.
 [[role]]
 role = "coverage"
-tool = """coverlet.MTP 10.1.0 (MIT) collects cobertura under Microsoft.Testing.Platform; ReportGenerator 5.5.11 (local dotnet tool) merges every test project's report into one Summary.json; \
+tool = """a coverage COLLECTOR is required (coverlet.MTP or Microsoft.Testing.Extensions.CodeCoverage); a coverage FLOOR is optional (owner: coverage is not a prerequisite; a coverage collector is still needed by a project that selects tests by coverage). \
+coverlet.MTP 10.1.0 (MIT) collects cobertura under Microsoft.Testing.Platform; ReportGenerator 5.5.11 (local dotnet tool) merges every test project's report into one Summary.json; \
 a 15-line script fails the gate when merged line or branch coverage is under the committed floor (coverage-floor.json). First-party assemblies only (`--coverlet-include '[Prefix.*]*'`). \
 A repo with ONE test project may use coverlet's own `--coverlet-threshold N --coverlet-threshold-type line,branch --coverlet-threshold-stat total` instead (exit code 14 under the floor). \
 Accepted alternative: Microsoft.Testing.Extensions.CodeCoverage 18.12.0 (closed-source engine, no threshold option, so it needs the same coverage-floor script; \
 measured on lifesim 2026-10-29, same commit, build included: `just coverage` 5m42s with coverlet.MTP vs 4m36s with it, tests 5m15s vs 3m57s, line coverage 94.1% both, branch 85.2% vs 86.8%, no covered source file missing). \
 coverlet stays the default for a new repo (open source, own threshold option for a one-project repo)"""
-install = """Directory.Packages.props: <PackageVersion Include="coverlet.MTP" Version="10.1.0" />; tests/Directory.Build.props: <PackageReference Include="coverlet.MTP" PrivateAssets="all" /> \
+install = """The collector is the whole requirement. Everything from "ReportGenerator" below on is the OPTIONAL floor: adopt it only when the repo wants a coverage floor. \
+Directory.Packages.props: <PackageVersion Include="coverlet.MTP" Version="10.1.0" />; tests/Directory.Build.props: <PackageReference Include="coverlet.MTP" PrivateAssets="all" /> \
 (builds clean under latest-all + warnings as errors; regenerate the packages.lock.json files). dotnet new tool-manifest (if none) && dotnet tool install dotnet-reportgenerator-globaltool --version 5.5.11. \
 Commit coverage-floor.json = {"line": <floor>, "branch": <floor>} (start at the current value rounded down) and tools/check_coverage.py (`blueprint recipe dotnet-coverage > tools/check_coverage.py`). \
 justfile: `coverage: build` / `rm -rf TestResults cov` / `dotnet test --solution X.slnx --no-build -- --coverlet --coverlet-output-format cobertura --coverlet-include '[Sim.*]*'` / \
@@ -113,11 +118,7 @@ the default --coverlet-threshold-stat is Minimum, so one assembly at 0% fails a 
 the coverlet.MTP package's own Known Limitations section still says 'Threshold validation is not yet supported': it is out of date, the option works (tested red and green)"""
 config = [
     { any = [{ path = "Directory.Packages.props", contains = "coverlet.MTP" }, { path = "Directory.Packages.props", contains = "Microsoft.Testing.Extensions.CodeCoverage" }] },
-    { path = ".config/dotnet-tools.json", contains = "dotnet-reportgenerator-globaltool" },
-    { path = "coverage-floor.json" },
-    { path = "tools/check_coverage.py" },
 ]
-gate = "check_coverage"
 
 [[role]]
 role = "spelling"
