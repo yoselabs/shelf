@@ -1,0 +1,10 @@
+seq = 158
+date = "2026-11-02"
+event = "delivery"
+software = "any-path-glob"
+release = "any-path-glob-v0.1.0"
+actor = "lifesim"
+consumer = "lifesim"
+verdict = "pass"
+cost = ""
+note = """Promoted from lifesim's `tools/gate_inputs.py` `glob_re`: three copies of one glob dialect in lifesim, the task-loop engine and a test oracle. Immutable cached `Glob` patterns and ordered `GlobSet` selection share repo-relative matching with segment wildcards, folder-spanning double stars and nested brace alternatives. Stdlib only; differential acceptance preserves the original compiler's valid inputs. Candidate contract; the consumer repoint is not done yet, so no adoption verdict."""

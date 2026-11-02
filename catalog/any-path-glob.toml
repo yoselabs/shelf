@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-path-glob"
+kind = "any-lib"
+tier = "T1"
+release = "any-path-glob-v0.1.0"
+capability = "Stop copying the repo-relative glob dialect: immutable cached Glob patterns and ordered GlobSet selection, with segment wildcards, folder-spanning double stars and nested brace alternatives."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from lifesim tools/gate_inputs.py and the task-loop matcher. Stdlib only. Candidate contract: packages/any-path-glob/CONTRACT.md; differential acceptance preserves the original compiler's valid inputs. Consumers adopt separately; no release tag created by this change."

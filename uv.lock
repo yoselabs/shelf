@@ -17,6 +17,7 @@ members = [
     "any-file",
     "any-frontmatter",
     "any-markdown",
+    "any-path-glob",
     "any-proc",
     "anyembed",
     "anyllm",
@@ -241,6 +242,11 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "markdown-it-py", specifier = ">=3,<5" }]
+
+[[package]]
+name = "any-path-glob"
+version = "0.1.0"
+source = { editable = "packages/any-path-glob" }
 
 [[package]]
 name = "any-proc"

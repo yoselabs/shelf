@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "lifesim"
+software = "any-path-glob"
+why = "Three copies of one glob dialect exist in lifesim (github.com/yoselabs/lifesim), the task-loop engine and a test oracle; the gate planner tools/gate_inputs.py and the test-map oracle copy the dialect."
+needs = "Glob and GlobSet with one shared glob dialect for repo-relative paths, used by the gate planner tools/gate_inputs.py and the test-map oracle."
+sponsor = "yoselabs"
+requester = "lifesim"
+status = "active"          # active | retired
