@@ -7,4 +7,4 @@ capability = "Stop finding shelf candidates by hunch — one command scans a rep
 implementation = "ours"
 status = "candidate"
 owner = "yoselabs"
-notes = "User-invoked (/shelf-scan, disable-model-invocation: zero standing cost). Distilled from the 2026-11-03 task-loop and delegate seam reviews; supersedes the manual use of k-my:micro-software for shelf extraction. One eval case, written from a predicted invariant, not an observed failure; evals not yet run, so not active."
+notes = "User-invoked (/shelf-scan, disable-model-invocation; measured 2026-11-03 with claude plugin details: ~70 tok always-on, ~830 tok on invoke). Distilled from the 2026-11-03 task-loop and delegate seam reviews; supersedes the manual use of k-my:micro-software for shelf extraction. One eval case, written from a predicted invariant, not an observed failure; evals not yet run, so not active."
