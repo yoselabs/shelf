@@ -1,23 +1,11 @@
-"""Quote-aware shell command parsing and a first-block-wins rule runner, for guards over tool calls."""
+"""Quote-aware shell command parsing and a first-block-wins rule runner, for guards over tool calls.
 
-from any_shell_policy.command import SHELLS, WRAPPERS, Command, is_assign, name_of, strip_wrappers
+Not a security boundary: see CONTRACT.md for what `parse` does not see.
+"""
+
+from any_shell_policy.command import Command
 from any_shell_policy.excluded import strip_excluded
 from any_shell_policy.judge import Rule, Verdict, judge
-from any_shell_policy.parse import MAX_DEPTH, has_write_syntax, parse, strip_heredocs
+from any_shell_policy.parse import has_write_syntax, parse
 
-__all__ = [
-    "MAX_DEPTH",
-    "SHELLS",
-    "WRAPPERS",
-    "Command",
-    "Rule",
-    "Verdict",
-    "has_write_syntax",
-    "is_assign",
-    "judge",
-    "name_of",
-    "parse",
-    "strip_excluded",
-    "strip_heredocs",
-    "strip_wrappers",
-]
+__all__ = ["Command", "Rule", "Verdict", "has_write_syntax", "judge", "parse", "strip_excluded"]

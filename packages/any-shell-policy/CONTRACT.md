@@ -18,9 +18,15 @@ redirects and substitutions. `strip_heredocs`, `strip_excluded(argv)` and `strip
 `judge(rules, tool, tool_input) -> Verdict(blocked, reason)` runs rules in order; a rule answers a
 `Verdict`, a non-empty reason string (blocks) or `None`/`""` (allows). The first block wins.
 
-Not covered (use `has_write_syntax` or a rule on the text): variable expansion, `$'...'` decoding,
-substitutions inside double quotes, a shell fed by a pipe, long wrapper options with a separate value
-that are not in `WRAPPERS`. No consumer app is imported; stdlib only.
+**Not a security boundary.** A rule over `parse` is a tripwire, not a sandbox. Not covered: a shell fed
+by a pipe (`echo 'git push' | sh`, here-document into `| sh`), a substitution inside double quotes
+(`echo "$(git push)"`), variable expansion, `$'...'` decoding, launchers such as `busybox`, `coproc`,
+`find -exec`, `ssh host`, and wrapper options outside `WRAPPERS`. A `None` from `parse` must be treated
+as a block. No consumer app is imported; stdlib only.
+
+Public surface: `parse`, `Command`, `judge`, `Rule`, `Verdict`, `has_write_syntax`, `strip_excluded`.
+Unstable (submodule helpers, may change): `strip_wrappers`, `name_of`, `is_assign`, `strip_heredocs`,
+`WRAPPERS`, `SHELLS`, `MAX_DEPTH`.
 
 Executable acceptance: `tests/test_parse.py` (bypass corpus), `tests/test_command.py`,
 `tests/test_judge.py`, `tests/test_property_parse.py` and `tests/test_boundary_any_shell_policy.py`.

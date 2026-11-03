@@ -155,3 +155,9 @@ def test_shell_c_keeps_its_own_redirect() -> None:
 @pytest.mark.parametrize("text", ["echo 'open", 'echo "open', "echo $'\\x70kill'", "sh -c 'echo \"open'"])
 def test_unparseable_returns_none(text: str) -> None:
     assert parse(text) is None
+
+
+def test_line_continuation_after_a_separator_is_no_word() -> None:
+    assert argvs("echo x &&\\\n git push") == [("echo", "x"), ("git", "push")]
+    assert argvs("echo x \\\n  y") == [("echo", "x", "y")]
+    assert argvs("echo x | \\\n git push") == [("echo", "x"), ("git", "push")]

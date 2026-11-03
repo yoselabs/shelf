@@ -7,7 +7,8 @@ import shlex
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from any_shell_policy import has_write_syntax, parse, strip_heredocs
+from any_shell_policy import has_write_syntax, parse
+from any_shell_policy.parse import strip_heredocs
 
 # Any printable word, newlines included; NUL cannot appear in a shell word.
 _WORD = st.text(st.characters(blacklist_characters="\x00", blacklist_categories=("Cs",)), min_size=1, max_size=12)

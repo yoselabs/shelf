@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from any_shell_policy import Command, has_write_syntax, is_assign, name_of, strip_excluded, strip_heredocs, strip_wrappers
+from any_shell_policy import Command, has_write_syntax, strip_excluded
+from any_shell_policy.command import is_assign, name_of, strip_wrappers
+from any_shell_policy.parse import strip_heredocs
 
 
 @pytest.mark.parametrize(
@@ -19,6 +21,13 @@ from any_shell_policy import Command, has_write_syntax, is_assign, name_of, stri
         (["nohup", "time", "nice", "-n", "5", "pkill", "x"], ["pkill", "x"]),
         (["timeout", "-s", "KILL", "5", "pkill", "x"], ["pkill", "x"]),
         (["/usr/bin/env", "xargs", "-n", "1", "-P", "4", "kill"], ["kill"]),
+        (["env", "-S", "git push"], ["git", "push"]),
+        (["env", "-Sgit push -f"], ["git", "push", "-f"]),
+        (["env", "--split-string=sudo git push"], ["git", "push"]),
+        (["env", "-S", "A=1 git push", "extra"], ["git", "push", "extra"]),
+        (["env", "-S", "'unclosed"], ["'unclosed"]),
+        (["sudo", "FOO=1", "git", "push"], ["git", "push"]),
+        (["doas", "FOO=1", "git"], ["git"]),
         (["sudo", "--", "-weird"], ["-weird"]),
         (["sudo"], []),
         ([], []),

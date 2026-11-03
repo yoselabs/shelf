@@ -134,6 +134,8 @@ def lex(text: str) -> Lexed | None:
                 bodies.append((start, i))
                 owner.stdin = text[start:end]
             pending.clear()
+        elif c == "\\" and text[i + 1 : i + 2] == "\n":
+            i += 2  # a line continuation between words joins nothing
         elif c == "#":
             end = text.find("\n", i)
             i = n if end < 0 else end

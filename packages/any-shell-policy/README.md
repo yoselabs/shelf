@@ -30,13 +30,22 @@ assert not judge([no_kill_by_name], "Bash", {"command": "echo 'a;pkill'"}).block
 | `cmd > out 2>>log`, `> /dev/null`, `2>&1` | `redirects` keeps the first two, drops the quiet ones |
 | `cat <<EOF ... EOF` | body is `Command.stdin`, never parsed as commands |
 
-`parse` returns `None` for an unclosed quote, `$'...'`, or `sh -c` nested deeper than 3. Treat `None` as
-"cannot tell" and choose: a block-list guard may allow (the shell will refuse it), an allow-list guard
-must block. It never raises.
+## Not a security boundary
+
+A rule over `parse` is a tripwire for accidents and lazy injections, not a sandbox. It does not see:
+
+- a shell fed by a pipe: `echo 'git push' | sh`, `cat <<EOF | sh`
+- a substitution inside double quotes: `echo "$(git push)"` (`has_write_syntax` flags it as text, nothing more)
+- variable expansion, `$'..'` decoding, aliases, functions defined elsewhere
+- launchers that run a command string: `busybox`, `coproc`, `find -exec`, `ssh host`, `xargs sh`-style tools outside `WRAPPERS`
+
+**`parse` returns `None` for an unclosed quote, `$'...'`, or `sh -c` nested deeper than 3: treat `None` as
+a block.** A guard that allows on `None` lets the one input it could not read through. It never raises.
 
 `has_write_syntax(text)` is the quote-blind check for output redirects and substitutions (a `>` inside
-quotes counts). `strip_heredocs(text)` and `strip_excluded(argv)` (drop `rg --glob '!x'`, `grep --exclude`,
-`find -not -path`, git `':!x'`) serve guards that scan the remaining text for secret paths.
+quotes counts). `strip_excluded(argv)` drops `rg --glob '!x'`, `grep --exclude`, `find -not -path`, git
+`':!x'` so a guard scanning for secret paths does not trip on a path the call only excludes.
 
-Not modelled: variable expansion, a shell fed by a pipe (`echo x | sh`), `$(...)` inside double quotes
-(see `has_write_syntax`), long wrapper options with a separate value outside `WRAPPERS`.
+Public: `parse`, `Command`, `judge`, `Rule`, `Verdict`, `has_write_syntax`, `strip_excluded`. Helpers in
+the submodules (`strip_wrappers`, `name_of`, `is_assign`, `strip_heredocs`, `WRAPPERS`, `SHELLS`,
+`MAX_DEPTH`) are unstable and may change without notice.
