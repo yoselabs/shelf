@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-breaker"
+kind = "any-lib"
+tier = "T1"
+release = "any-breaker-v0.1.0"
+capability = "Stop re-writing the circuit breaker: a pure fold of facts into a state with a bench ladder (15/30/60 min by default), a canary after each bench, whole-key outs with a vendor unlock time, and an append-only JSON-lines ledger that replays it; plus an async guard that counts a bad result, not only an exception, so a breaker around code that never raises is not inert."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from delegate src/delegate/domain/health/ledger.py (the golden health_replay.json is the acceptance scenario). a2web uses third-party purgatory at 4 call sites (get_breaker in tiers/raw.py, tiers/jina.py, tiers/_paid.py, sites/twitter.py; counted 2026-11-03) and is not migrated by this change. task-loop has no breaker of its own (storm.py only stamps fingerprints). Stdlib only, so delegate can vendor it byte-for-byte. Candidate contract: packages/any-breaker/CONTRACT.md. Consumers adopt separately; no release tag created by this change."

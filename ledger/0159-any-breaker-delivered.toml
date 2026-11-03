@@ -1,0 +1,10 @@
+seq = 159
+date = "2026-11-03"
+event = "delivery"
+software = "any-breaker"
+release = "any-breaker-v0.1.0"
+actor = "delegate"
+consumer = "delegate"
+verdict = "pass"
+cost = ""
+note = """Promoted from delegate's `domain/health/ledger.py` (bead tl-w7lt.9): the pure fold of finished runs into a breaker state, the 15/30/60 min bench ladder, the canary, whole-key outs with a vendor unlock time. Delegate's golden `health_replay.json` (four incident replays, 439 rows) is the acceptance scenario and passes row by row through a test-local `fact_of`. Added the ledger file and an async guard that counts a bad result as well as a raise, after a2web's inert-breaker trap. a2web (purgatory, 4 call sites) is not migrated. Stdlib only. Candidate contract; the delegate repoint is not done yet, so no adoption verdict."""
