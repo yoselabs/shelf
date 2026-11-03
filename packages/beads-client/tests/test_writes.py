@@ -213,7 +213,9 @@ def test_sync_rejection_under_exit_zero_is_a_failure(bd: Bd, script: Script) -> 
 def test_dolt_lock_is_retried_then_succeeds(script: Script) -> None:
     slept: list[float] = []
     bd = Bd("t", exe="bd", run=script, sleep=slept.append)
-    script.say(err="database is locked", code=1).say(err="database is locked", code=1).say(fixture("create.json"))
+    script.say(err="embeddeddolt: acquiring lock: busy", code=1).say(err="embeddeddolt: acquiring lock: busy", code=1).say(
+        fixture("create.json")
+    )
     assert bd.create(NewBead("T")) == "zz-6q8"
     assert len(script.calls) == 3
     assert slept == [0.2, 0.4]
@@ -221,7 +223,43 @@ def test_dolt_lock_is_retried_then_succeeds(script: Script) -> None:
 
 def test_dolt_lock_gives_up(script: Script) -> None:
     bd = Bd("t", exe="bd", run=script, sleep=lambda _s: None, lock_retries=1)
-    script.say(err="database is locked", code=1).say(err="database is locked", code=1)
+    script.say(err="embeddeddolt: acquiring lock: busy", code=1).say(err="embeddeddolt: acquiring lock: busy", code=1)
     with pytest.raises(BdError):
         bd.create(NewBead("T"))
+    assert len(script.calls) == 2
+
+
+def test_dependencies(bd: Bd, script: Script) -> None:
+    script.say(fixture("dep_added.json")).say(fixture("dep_added.json")).say(fixture("dep_removed.json"))
+    bd.add_dep("a-1", "a-2")
+    bd.add_dep("a-1", "a-2", "related")
+    bd.remove_dep("a-1", "a-2")
+    assert [argv(script, i) for i in range(3)] == [
+        ["dep", "add", "a-1", "a-2"],
+        ["dep", "add", "a-1", "a-2", "--type", "related"],
+        ["dep", "remove", "a-1", "a-2"],
+    ]
+
+
+def test_dependency_conflict_and_odd_reply(bd: Bd, script: Script) -> None:
+    script.say(fixture("dep_exists.json"), code=1).say("{}")
+    with pytest.raises(BdError):
+        bd.add_dep("a-1", "a-2", "related")
+    with pytest.raises(BdError) as e:
+        bd.remove_dep("a-1", "a-2")
+    assert e.value.kind == "malformed"
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        "embeddeddolt: acquiring lock: resource temporarily unavailable",
+        "failed to acquire exclusive lock: timeout",
+        "Processes 123 (bd/dolt) may be holding the lock.",
+    ],
+)
+def test_real_lock_strings_are_retried(script: Script, words: str) -> None:
+    bd = Bd("t", exe="bd", run=script, sleep=lambda _s: None)
+    script.say(err=words, code=1).say(fixture("create.json"))
+    assert bd.create(NewBead("T")) == "zz-6q8"
     assert len(script.calls) == 2

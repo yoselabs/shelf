@@ -1,0 +1,1 @@
+{"error": "dependency zz-0se -> zz-qot already exists with type \"blocks\" (requested \"related\"); remove it first with 'bd dep remove' then re-add", "schema_version": 1}

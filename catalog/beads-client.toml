@@ -7,4 +7,4 @@ capability = "Stop hand-rolling bd subprocess calls: typed Bd verbs (show, find,
 implementation = "ours"
 status = "candidate"
 owner = "yoselabs"
-notes = "Extracted from task-loop's src/taskloop/adapters/bd.py (bd 1.3.1). Named for the one tool it wraps (precedent git-porcelain). Stdlib only. Candidate contract: packages/beads-client/CONTRACT.md. Task-loop's held_* marks, slot policy and filler wording stay in task-loop. Dolt lock-retry words are unconfirmed. Consumers adopt separately; no release tag created by this change."
+notes = "Extracted from task-loop's src/taskloop/adapters/bd.py (bd 1.3.1). Named for the one tool it wraps (precedent git-porcelain). Stdlib only. Candidate contract: packages/beads-client/CONTRACT.md. Task-loop's held_* marks, slot policy and filler wording stay in task-loop. Dolt lock-retry words come from strings in the bd 1.3.1 binary, not a live capture. Consumers adopt separately; no release tag created by this change."

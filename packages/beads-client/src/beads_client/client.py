@@ -241,6 +241,20 @@ class Bd:
             self.update(bead, assignee=if_assignee, if_assignee=if_assignee)
         self._must("close", bead, "--reason", reason)
 
+    def add_dep(self, bead: str, depends_on: str, dep_type: str = "") -> None:
+        """``bead`` depends on ``depends_on`` (bd's default type is blocks). An existing edge of another type raises."""
+        self._dep("add", bead, depends_on, "added", *(["--type", dep_type] if dep_type else []))
+
+    def remove_dep(self, bead: str, depends_on: str) -> None:
+        """Remove the edge; removing an absent edge is not an error in bd."""
+        self._dep("remove", bead, depends_on, "removed")
+
+    def _dep(self, verb: str, bead: str, depends_on: str, done: str, *extra: str) -> None:
+        said = loads(self._must("dep", verb, bead, depends_on, *extra).out)
+        if not isinstance(said, dict) or said.get("status") != done:
+            msg = f"bd dep {verb} did not answer {done!r}"
+            raise malformed(msg)
+
     def comment(self, bead: str, text: str) -> None:
         self._must("comments", "add", bead, text)
 

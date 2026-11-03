@@ -12,9 +12,9 @@ from beads_client.runner import EXIT_MISSING, EXIT_PRECONDITION, EXIT_TIMEOUT, B
 LINT_MISSING = re.compile(r"missing required sections?[^:\n]*:\s*(.+)", re.IGNORECASE)
 # bd 1.3.1 exits 0 on a push the remote rejected; its words are git's
 PUSH_REJECTED = re.compile(r"Updates were rejected|failed to push some refs|tip of your current branch is behind", re.IGNORECASE)
-# Embedded Dolt serialises writers. UNCONFIRMED words (no contention reproduced against 1.3.1 yet): kept as one pattern so
-# the first real capture changes one line.
-LOCKED = re.compile(r"database is locked|locked by another process|lock contention|could not acquire .*lock", re.IGNORECASE)
+# Lock refusals, from the strings compiled into bd 1.3.1 ("embeddeddolt: acquiring lock: %w", "failed to acquire %s lock: %v",
+# "Processes %s (bd/dolt) may be holding the lock."). Not yet captured from a live contention: pinned by tests as strings.
+LOCKED = re.compile(r"acquiring lock|failed to acquire .*lock|may be holding the lock", re.IGNORECASE)
 
 
 def loads(text: str) -> object:

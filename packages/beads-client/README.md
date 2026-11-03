@@ -22,7 +22,7 @@ if bd.claim(bead_id):                    # False: someone else holds it
 ## Verbs
 
 `show`, `comments`, `find`, `ready`, `create`, `create_with_sections`, `update` (with `if_assignee`/`if_status` fences),
-`claim`, `unclaim`, `reclaim`, `heartbeat`, `close`, `comment`, `add_label`, `remove_label`, `provenance`, `sync`, `version`,
+`claim`, `unclaim`, `reclaim`, `heartbeat`, `close`, `comment`, `add_label`, `remove_label`, `add_dep`, `remove_dep`, `provenance`, `sync`, `version`,
 `check_version`, `at(cwd)`.
 
 ## Fails loud
@@ -36,7 +36,9 @@ if bd.claim(bead_id):                    # False: someone else holds it
 | `show` of an unknown bead | `None` (the only absence) |
 | `claim`/`unclaim` refused by the holder | `False`; any other failure raises |
 | `sync` rejected by the remote under exit 0 (bd 1.3.1) | `SyncResult.code == 1` |
-| Dolt lock contention | retried with backoff (`lock_retries`); words are unconfirmed, see `classify.LOCKED` |
+| Dolt lock contention | retried with backoff (`lock_retries`); matched on the lock strings compiled into bd 1.3.1 (`classify.LOCKED`), not yet seen from a live contention |
+
+`close(..., if_assignee=)` and `add_label(..., if_assignee=)` are not atomic: bd has no fence on those verbs, so a same-value `update` fences first and the second call follows it.
 
 Tested against bd 1.3.1 (`TESTED_FROM`..`TESTED_BELOW`); recorded replies live in `tests/fixtures/`. Marks that a driver keeps
 on top of bd (task-loop's `held_*`, slot policy, filler wording) are not here.
