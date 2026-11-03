@@ -1,0 +1,9 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it.
+consumer = "task-loop"
+software = "shelf-scan"
+why = "task-loop and delegate were scanned against the shelf by hand on 2026-11-03 (12 seam reviews, epic tl-w7lt); the skill repeats that scan on demand so new duplication is found when it appears."
+needs = "/shelf-scan run in a host repo: verdicts per module and one epic of beads."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active"          # active | retired

@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
+name = "shelf-scan"
+kind = "skill"
+tier = "T1"
+release = "shelf-scan-v0.1.0"
+capability = "Stop finding shelf candidates by hunch — one command scans a repository seam by seam with read-only reviewers, judges every module adopt, evolve, promote or skip against the shelf's catalog with the reason it fails the other three, and files the findings as one epic of beads."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "User-invoked (/shelf-scan, disable-model-invocation; measured 2026-11-03 with claude plugin details: ~70 tok always-on, ~830 tok on invoke). Distilled from the 2026-11-03 task-loop and delegate seam reviews; supersedes the manual use of k-my:micro-software for shelf extraction. One eval case, written from a predicted invariant, not an observed failure; evals not yet run, so not active."
