@@ -1,0 +1,18 @@
+[project]
+name = "any-failure-fp"
+version = "0.1.0"
+description = "Group failures by a stable fingerprint: normalise volatile ids, paths and numbers out of a reason, detect one cause hitting many keys (a storm), count repeats (a streak) and space retries with capped jittered backoff."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/any_failure_fp"]
+
+[tool.ruff]
+extend = "../../pyproject.toml"

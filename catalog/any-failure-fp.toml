@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-failure-fp"
+kind = "any-lib"
+tier = "T1"
+release = "any-failure-fp-v0.1.0"
+capability = "Stop re-writing failure grouping: stable fingerprints of a failure reason, storm trip across distinct keys, same-cause streaks, repeat-report dedupe and capped jittered backoff."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from task-loop domain/report/matchers.py (fingerprint), domain/storm.py (storm_trip), domain/outcome.py apply() (streak, comment dedupe) and domain/lanes/pauses.py delay(). Stdlib only. Host id patterns are injected via ids; the storm file, the policy table and the retry caps stay in the host. Candidate contract: packages/any-failure-fp/CONTRACT.md. Consumers adopt separately; no release tag created by this change."
