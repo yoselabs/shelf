@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "task-loop"
+software = "any-failure-fp"
+why = "task-loop groups failed runs by a normalised fingerprint, trips a storm when one cause hits several beads, escalates a same-cause streak and spaces retries with jittered backoff; the code is generic and lives in its domain layer (tl-w7lt.10)."
+needs = "fingerprint with injected bead-id patterns, a storm trip across distinct keys in a window, a same-fingerprint streak count, a per-key repeat check and capped jittered backoff."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active"          # active | retired

@@ -14,6 +14,7 @@ resolution-markers = [
 members = [
     "a2effect",
     "any-browser",
+    "any-failure-fp",
     "any-file",
     "any-frontmatter",
     "any-markdown",
@@ -200,6 +201,11 @@ requires-dist = [
     { name = "zendriver", marker = "extra == 'zendriver'", specifier = ">=0.15,<1" },
 ]
 provides-extras = ["patchright", "zendriver"]
+
+[[package]]
+name = "any-failure-fp"
+version = "0.1.0"
+source = { editable = "packages/any-failure-fp" }
 
 [[package]]
 name = "any-file"
