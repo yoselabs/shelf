@@ -1,0 +1,10 @@
+seq = 160
+date = "2026-11-03"
+event = "delivery"
+software = "any-shell-policy"
+release = "any-shell-policy-v0.1.0"
+actor = "task-loop"
+consumer = "task-loop"
+verdict = "pass"
+cost = ""
+note = """Promoted from delegate's `domain/policy` (shell.py, matchers.py) and task-loop's `hook/rules.py` (bead tl-w7lt.8): two independent tokenizers with about 10% duplicated rules. Quote-aware `parse` into `Command`s (separators, `sh -c`/`eval`/shell-fed here-documents to depth 3 then fail closed, wrappers, redirects, assignments), `has_write_syntax`, `strip_heredocs`, `strip_excluded` and a first-block-wins `judge`. Stdlib only so delegate can vendor it. Candidate contract; the consumer repoints are not done yet, so no adoption verdict."""

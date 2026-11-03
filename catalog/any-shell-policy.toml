@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-shell-policy"
+kind = "any-lib"
+tier = "T1"
+release = "any-shell-policy-v0.1.0"
+capability = "Stop hand-rolling shell-text guards: quote-aware parsing of a command line into simple commands (separators, sh -c, wrappers, here-documents, redirects) and a first-block-wins rule runner for tool-call policies."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from delegate's domain/policy tokenizer and task-loop's hook/rules.py, two independent tokenizers. Stdlib only so delegate can vendor it. Candidate contract: packages/any-shell-policy/CONTRACT.md. Consumers adopt separately; no release tag created by this change."
