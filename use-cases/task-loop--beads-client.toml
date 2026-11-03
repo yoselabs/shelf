@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "task-loop"
+software = "beads-client"
+why = "task-loop's src/taskloop/adapters/bd.py is the one place that starts bd; it is generic bd plumbing (JSON normalisation, error words, fences, claim and lease verbs) with no task-loop policy in it."
+needs = "Typed Bd verbs over the bd CLI with --if-assignee/--if-status fences and classified, fail-loud errors, replacing the local adapter."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active"          # active | retired

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "zz-6q8",
+    "title": "T one",
+    "description": "d",
+    "status": "open",
+    "priority": 2,
+    "issue_type": "task",
+    "owner": "dt0xff@gmail.com",
+    "created_at": "2026-11-03T20:48:53Z",
+    "created_by": "tester",
+    "updated_at": "2026-11-03T20:48:53Z",
+    "dependent_count": 0,
+    "dependency_count": 0,
+    "comment_count": 0,
+    "revision": "2187433810093087345"
+  }
+]

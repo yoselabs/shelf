@@ -27,6 +27,7 @@ members = [
     "async-scope",
     "atomic-io",
     "bdd-tags",
+    "beads-client",
     "blueprint",
     "browser-cookies",
     "child-env",
@@ -416,6 +417,11 @@ requires-dist = [
     { name = "pytest", specifier = ">=8,<9" },
     { name = "pytest-bdd", specifier = ">=8,<9" },
 ]
+
+[[package]]
+name = "beads-client"
+version = "0.1.0"
+source = { editable = "packages/beads-client" }
 
 [[package]]
 name = "beartype"
