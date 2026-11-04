@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from git_porcelain import fake_flow
 from git_porcelain.api import Conflict, Offline
-from git_porcelain.errors import GitUnavailable, MissingRevision, NotARepo, RefRace
+from git_porcelain.errors import GitUnavailable, MissingRevision, NotARepo, NotFastForward, RefRace
 from git_porcelain.fake_ops import ignore_of, require_index, switch_tree, tracked_dirty
 from git_porcelain.fake_store import ancestors
 from git_porcelain.plumbing import Ref
@@ -103,7 +103,7 @@ class FakePlumbing:
             return
         if head is not None and head not in ancestors(self.state.store, target):
             msg = "not possible to fast-forward"
-            raise GitUnavailable(msg)
+            raise NotFastForward(msg)
         require_index(wt)
         switch_tree(self.state, wt, self.state.store.commits[target].files, self.state.head_files(wt))
         self.state.move_head(wt, target)

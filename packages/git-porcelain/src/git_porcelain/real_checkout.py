@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def branch(wt: RealWorktree) -> str | None:
     """Read symbolic HEAD, including an unborn branch."""
-    done = wt.run("symbolic-ref", "--quiet", "--short", "HEAD", check=False)
+    done = wt.run("symbolic-ref", "--short", "-q", "HEAD", check=False)
     if done.rc == 1 and not done.out and not done.err:
         return None
     if done.rc:

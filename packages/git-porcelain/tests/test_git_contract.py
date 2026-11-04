@@ -22,7 +22,6 @@ import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from git_porcelain import Change, CommandResult, GitTimeout, GitUnavailable, Identity, RealRepo, Rebased, Worktree, WorktreeRemoveRefused
-from git_porcelain.fake_ops import stage
 from git_porcelain.real_done import Done
 from git_porcelain.real_parse import parse_status
 from git_porcelain.testing import QUIET, FakeRemote, FakeRepo, FakeWorktree, apply_hermetic_env
@@ -37,6 +36,18 @@ _ME = Identity("Contract Author", "author@example.invalid")
 _PLACEHOLDER = re.compile(r"<(\w+)(?::([^>]*))?>")
 _FILE = re.compile(r'("[^"]+"|\S+?)="((?:[^"\\]|\\.)*)"')
 _PATH_ARGS = {"add_worktree", "drop_worktree", "release_branch", "worktree_state"}
+_COMMIT_STDOUT = "stdout-start\n" + "x" * 1024 + "\nstdout-end\n"
+_COMMIT_STDERR = "stderr-start\n" + "y" * 1024 + "\nstderr-end\n"
+_COMMIT_FAILURE_STDERR = "error: gpg failed to sign the data\n" + _COMMIT_STDERR
+
+
+def _hook_script(kind: str, mode: str) -> str:
+    if mode.startswith("verbose"):
+        code = 1 if mode.endswith("refuses") else 0
+        return f"printf '%s' '{_COMMIT_STDOUT}'\nprintf '%s' '{_COMMIT_STDERR}' >&2\nexit {code}\n"
+    if mode == "refuses":
+        return f"echo '{kind} hook declined' >&2\nexit 1\n"
+    return '[ "$X" = "1" ] || { echo "X is not set" >&2; exit 1; }\n'
 
 
 # -- the two ways to arrange a repository -----------------------------------------------------------------
@@ -155,11 +166,7 @@ class RealRig:
         # the hermetic env runs with core.hooksPath=/dev/null at command-line scope: hooks only run without it
         config = {k: v for k, v in QUIET.items() if k != "core.hooksPath"}
         apply_hermetic_env(self.monkeypatch, identity=_ME, config=config, home=self.root / "home")
-        script = (
-            f"echo '{kind} hook declined' >&2\nexit 1\n"
-            if mode == "refuses"
-            else '[ "$X" = "1" ] || { echo "X is not set" >&2; exit 1; }\n'
-        )
+        script = _hook_script(kind, mode)
         hook = wt.path / ".git" / "hooks" / kind
         hook.parent.mkdir(parents=True, exist_ok=True)
         hook.write_text("#!/bin/sh\n" + script, encoding="utf-8")
@@ -242,7 +249,9 @@ class FakeRig:
     def hook(self, wt: Worktree, kind: str, mode: str) -> None:
         hooks = self._repo(wt).hooks
         if kind == "pre-commit":
-            hooks.refuse_commit = True
+            hooks.refuse_commit = mode.endswith("refuses")
+            if mode.startswith("verbose"):
+                hooks.commit_output = (_COMMIT_STDOUT + _COMMIT_STDERR).strip()
         elif mode == "refuses":
             hooks.refuse_push = True
         else:
@@ -403,6 +412,122 @@ def _hook(world: World, name: str, kind: str, mode: str) -> None:
     world.rig.hook(world.wts[name], kind, mode)
 
 
+@given(parsers.parse('the verbose commit hook of "{name}" {outcome}'))
+def _verbose_commit_hook(world: World, name: str, outcome: str) -> None:
+    world.rig.hook(world.wts[name], "pre-commit", f"verbose {outcome}")
+
+
+@then("the complete hook output is preserved")
+def _complete_hook_output(world: World) -> None:
+    output = _dig(world.result, "output")
+    assert output == (_COMMIT_STDOUT + _COMMIT_STDERR).strip()
+    if type(world.result).__name__ == "HookRejected":
+        assert _dig(world.result, "tail") == output
+
+
+def _literal_paths() -> tuple[str, ...]:
+    return ("-leading", "tab\tname", "line\nname", *(f"bulk/[{index}]" for index in range(512)))
+
+
+@given(parsers.parse('"{name}" has many literal paths waiting to stage'))
+def _many_paths(world: World, name: str) -> None:
+    for path in _literal_paths():
+        world.rig.write(world.wts[name], path, path)
+
+
+@when(parsers.parse('"{name}" stages all the many literal paths'))
+def _stage_many_paths(world: World, name: str) -> None:
+    world.wts[name].stage(_literal_paths())
+
+
+@then("all the many literal paths were committed")
+def _many_paths_committed(world: World) -> None:
+    tree = world.wts["r"].repo.tree("HEAD")
+    assert tree is not None
+    assert set(tree.files) == set(_literal_paths())
+
+
+@given(parsers.parse('"{name}" reaches origin "{origin}" only through its injected environment'))
+def _injected_remote(world: World, name: str, origin: str) -> None:
+    wt = world.wts[name]
+    url = str(world.memory[f"origin:{origin}"])
+    if isinstance(wt.repo, FakeRepo):
+        world.rig.add_remote(wt, "injected", url)
+        return
+    assert isinstance(wt.repo, RealRepo)
+    wt.repo.extra_env.update({"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "remote.injected.url", "GIT_CONFIG_VALUE_0": url})
+
+
+@given(parsers.parse('the commit command of "{name}" fails with a long diagnostic'))
+def _long_commit_failure(world: World, name: str) -> None:
+    repo = world.wts[name].repo
+    if isinstance(repo, FakeRepo):
+        repo.hooks.commit_failure = (_COMMIT_STDOUT + _COMMIT_FAILURE_STDERR).strip()
+        return
+    assert isinstance(repo, RealRepo)
+    original = repo.run
+
+    def failed_commit(
+        cwd: Path,
+        *args: str,
+        check: bool = True,
+        pin: bool = True,
+        stdin: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Done:
+        if "commit" in args:
+            return Done(1, _COMMIT_STDOUT.encode(), _COMMIT_FAILURE_STDERR)
+        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+
+    world.monkeypatch.setattr(repo, "run", failed_commit)
+
+
+@then("the complete commit failure output is preserved")
+def _complete_commit_failure(world: World) -> None:
+    assert isinstance(world.error, GitUnavailable)
+    assert world.error.output == (_COMMIT_STDOUT + _COMMIT_FAILURE_STDERR).strip()
+
+
+@given(parsers.parse('the rebase command of "{name}" will {outcome}'))
+def _rebase_command_outcome(world: World, name: str, outcome: str) -> None:
+    repo = world.wts[name].repo
+    output = (_COMMIT_STDOUT + _COMMIT_STDERR).strip()
+    if isinstance(repo, FakeRepo):
+        repo.hooks.rebase_spawn_failure = "failed to invoke git" if outcome == "fail spawn" else None
+        repo.hooks.rebase_result = CommandResult(ok=False, output=output)
+        return
+    assert isinstance(repo, RealRepo)
+    original = repo.run
+
+    def rebase_process(
+        cwd: Path,
+        *args: str,
+        check: bool = True,
+        pin: bool = True,
+        stdin: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Done:
+        if "rebase" in args:
+            if outcome == "fail spawn":
+                msg = "failed to invoke git"
+                raise GitUnavailable(msg)
+            return Done(1, _COMMIT_STDOUT.encode(), _COMMIT_STDERR)
+        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+
+    world.monkeypatch.setattr(repo, "run", rebase_process)
+
+
+@then(parsers.parse('the rebase command outcome is "{outcome}"'))
+def _rebase_outcome(world: World, outcome: str) -> None:
+    if outcome == "fail spawn":
+        assert isinstance(world.error, GitUnavailable)
+    else:
+        assert world.error is None
+        assert world.result == CommandResult(ok=False, output=(_COMMIT_STDOUT + _COMMIT_STDERR).strip())
+
+
 @given(parsers.parse('"{name}" holds an index lock'))
 def _index_lock(world: World, name: str) -> None:
     world.rig.lock_index(world.wts[name])
@@ -461,10 +586,7 @@ def _writes(world: World, name: str, files: str) -> None:
 def _stages(world: World, name: str, paths: str) -> None:
     wt = world.wts[name]
     picks = ast.literal_eval(paths)
-    if isinstance(wt, FakeWorktree):
-        stage(wt.repo._state, wt.state(), picks)
-    else:
-        run(wt.path, "--literal-pathspecs", "add", "-A", "--", *picks)
+    wt.stage(picks)
 
 
 @then(parsers.parse('the index of "{name}" reads "{rel}" as "{text}"'))

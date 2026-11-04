@@ -29,6 +29,7 @@ __all__ = [
     "health",
     "history",
     "identity",
+    "is_ancestor",
     "relate",
     "resolve_commit",
     "snapshot",
@@ -142,6 +143,11 @@ def dirty(repo: RepoState, wt: CheckoutState, *, base: str | None, ignored_under
 def _ignore_files(repo: RepoState, commit: str) -> dict[str, str]:
     files = repo.store.commits[commit].files
     return {p: repo.store.blobs[s].decode("utf-8", "replace") for p, s in files.items() if ignore_rules.is_ignore_file(p)}
+
+
+def is_ancestor(repo: RepoState, wt: CheckoutState, a: str, b: str) -> bool:
+    left, right = resolve_commit(repo, wt, a), resolve_commit(repo, wt, b)
+    return left in ancestors(repo.store, right)
 
 
 def relate(repo: RepoState, wt: CheckoutState, a: str, b: str) -> Relation:

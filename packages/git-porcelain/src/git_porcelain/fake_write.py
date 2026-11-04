@@ -60,10 +60,45 @@ def record(
         msg = "mode='squash_to' needs squash_to"
         raise ValueError(msg)
     old = repo.head_sha(wt)
-    if mode == "amend" and old is None:
-        msg = "nothing to amend: HEAD is unborn"
-        raise ValueError(msg)
     require_index(wt)
+    record_stage(repo, wt, paths, base)
+    if not record_needed(repo, wt, mode, old, squash_to, allow_empty=allow_empty):
+        return NothingToRecord()
+    if mode == "amend" and old is None:
+        return unborn_amend(hooks=hooks)
+    if hooks and repo.hooks.refuse_commit:
+        output = repo.hooks.commit_output or "pre-commit hook declined the commit"
+        return HookRejected(output, output=output)
+    if repo.hooks.commit_failure is not None:
+        raise GitUnavailable(repo.hooks.commit_failure)
+    return record_commit(repo, wt, message, mode, old, squash_to=squash_to, hooks=hooks)
+
+
+def unborn_amend(*, hooks: bool) -> HookRejected:
+    """Model git's command refusal after staging, without a caller precondition."""
+    msg = "fatal: You have nothing to amend."
+    if hooks:
+        return HookRejected(msg, output=msg)
+    raise GitUnavailable(msg)
+
+
+def record_needed(
+    repo: RepoState,
+    wt: CheckoutState,
+    mode: Literal["new", "amend", "squash_to"],
+    old: str | None,
+    squash_to: Sha | None,
+    *,
+    allow_empty: bool,
+) -> bool:
+    """An amendment still invokes commit when the index has not changed."""
+    target = squash_to if mode == "squash_to" else old
+    changed = dict(wt.index) != (dict(repo.store.commits[target].files) if target else {})
+    return changed or allow_empty or mode == "amend"
+
+
+def record_stage(repo: RepoState, wt: CheckoutState, paths: Literal["own", "all", "tracked", "staged"], base: str | None) -> None:
+    """Apply the selected staging scope without committing."""
     if paths == "all":
         stage(repo, wt, None)
     elif paths == "tracked":
@@ -73,13 +108,19 @@ def record(
         picks = [*state.tracked, *(p for p in state.untracked if p not in state.base_ignored)]
         if picks:
             stage(repo, wt, picks)
-    target = squash_to if mode == "squash_to" else old
-    if dict(wt.index) == (dict(repo.store.commits[target].files) if target else {}) and not allow_empty and mode != "amend":
-        return NothingToRecord()
-    if hooks and repo.hooks.refuse_commit:
-        return HookRejected("pre-commit hook declined the commit")
-    if repo.hooks.commit_failure is not None:
-        raise GitUnavailable(repo.hooks.commit_failure)
+
+
+def record_commit(
+    repo: RepoState,
+    wt: CheckoutState,
+    message: str,
+    mode: Literal["new", "amend", "squash_to"],
+    old: str | None,
+    *,
+    squash_to: Sha | None,
+    hooks: bool,
+) -> Recorded:
+    """Commit the prepared index with the requested parent and message semantics."""
     if mode == "squash_to":
         repo.move_head(wt, str(squash_to))
     if mode == "amend":
@@ -88,7 +129,7 @@ def record(
     else:
         parent = repo.head_sha(wt)
         sha = make_commit(repo, wt, message, (parent,) if parent else ())
-    return Recorded(Sha(sha))
+    return Recorded(Sha(sha), output=repo.hooks.commit_output if hooks else "")
 
 
 def _land(repo: RepoState, wt: CheckoutState, sha: str, ref: str | None) -> None:

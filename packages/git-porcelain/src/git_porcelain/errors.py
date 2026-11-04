@@ -22,7 +22,14 @@ class GitError(Exception):
 
 
 class GitUnavailable(GitError):
-    """Git could not answer: ``tail`` is the end of its output, ``retryable`` says a later try may succeed."""
+    """Git could not answer: ``output`` retains command diagnostics, ``retryable`` permits a later try.
+
+    ``tail`` remains the exception's display text; invocation failures have only their failure message.
+    """
+
+    def __init__(self, message: str, *, retryable: bool = False, hint: str | None = None) -> None:
+        super().__init__(message, retryable=retryable, hint=hint)
+        self.output = message
 
     @property
     def tail(self) -> str:
@@ -51,6 +58,14 @@ class DirtyTree(GitUnavailable):
 
 class BranchExists(GitUnavailable):
     """Exclusive branch creation or rename found an existing destination."""
+
+
+class TagExists(GitUnavailable):
+    """Exclusive lightweight tag creation found an existing tag."""
+
+
+class NotFastForward(GitUnavailable):
+    """The requested merge would require a merge commit."""
 
 
 class NotARepo(GitUnavailable):
@@ -93,11 +108,20 @@ _MISSING_REVISION = re.compile(r"fatal: (?:bad revision '.+'|Not a valid object 
 _AMBIGUOUS_REVISION = re.compile(r"fatal: ambiguous argument '.+': unknown revision or path not in the working tree\.")
 
 
+def operation_failure(stderr: str) -> type[GitUnavailable]:
+    """Operation-specific refusals before the shared infrastructure classification."""
+    if re.search(r"tag '.+' already exists", stderr):
+        return TagExists
+    if "Not possible to fast-forward" in stderr:
+        return NotFastForward
+    return GitUnavailable
+
+
 def failure(message: str, stderr: str, code: int, *, retryable: bool = False, hint: str | None = None) -> GitUnavailable:
     """Translate git's specific diagnostics; an unknown failure remains ``GitUnavailable``."""
     lines = [line.strip() for line in stderr.splitlines() if line.strip()]
     tail = next((line for line in lines if line.startswith(("fatal:", "error:"))), lines[-1] if lines else "")
-    kind: type[GitUnavailable] = GitUnavailable
+    kind = operation_failure(stderr)
     if _INDEX_LOCK.search(stderr):
         kind, retryable = IndexLocked, True
     elif match := _PINNED.search(stderr):
@@ -138,7 +162,9 @@ __all__ = [
     "MissingRemote",
     "MissingRevision",
     "NotARepo",
+    "NotFastForward",
     "RefRace",
+    "TagExists",
     "WorktreeRemoveRefused",
     "failure",
     "some",

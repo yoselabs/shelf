@@ -35,8 +35,8 @@ def command(
 
 
 def rebase(wt: RealWorktree, base: str, *, update_refs: bool | None) -> CommandResult:
-    flags = [] if update_refs is None else ["--update-refs" if update_refs else "--no-update-refs"]
-    return command(wt, ["-c", "core.editor=true", "rebase", *flags, "--", base])
+    config = [] if update_refs is None else ["-c", f"rebase.updateRefs={str(update_refs).lower()}"]
+    return command(wt, [*config, "rebase", "-q", base])
 
 
 def continue_rebase(wt: RealWorktree, *, stage_conflicts: bool, check_markers: bool, missing_ok: bool) -> CommandResult:

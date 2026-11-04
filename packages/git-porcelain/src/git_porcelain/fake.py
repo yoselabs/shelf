@@ -25,7 +25,7 @@ from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Literal, Self
 
 from git_porcelain import fake_checkout as checkout_ops
-from git_porcelain import fake_commands, fake_remote
+from git_porcelain import fake_commands, fake_operations, fake_remote
 from git_porcelain import fake_flow as flow
 from git_porcelain import fake_read as read
 from git_porcelain import fake_write as write
@@ -50,8 +50,10 @@ if TYPE_CHECKING:
         PushResult,
         RebaseResult,
         RecordResult,
+        RefEntry,
         Relation,
         Released,
+        RemoteRef,
         RepoIdentity,
         Snapshot,
         StillHeld,
@@ -156,6 +158,23 @@ class FakeRepo:
         self._state.worktrees[path].missing = True
 
     # -- Repo ------------------------------------------------------------------------------------------
+    def tag(self, name: str, rev: str) -> None:
+        fake_operations.tag(self._state, self._anchor(), name, rev)
+
+    def count(self, include: Sequence[str], exclude: Sequence[str] = ()) -> int:
+        return fake_operations.count(self._state, self._anchor(), include, exclude)
+
+    def refs(self, prefixes: Sequence[str]) -> tuple[RefEntry, ...]:
+        self._anchor()
+        return fake_operations.refs(self._state, prefixes)
+
+    def ls_remote(self, remote: str, patterns: Sequence[str] = ()) -> tuple[RemoteRef, ...]:
+        self._anchor()
+        return fake_operations.ls_remote(self._state, remote, patterns)
+
+    def is_ancestor(self, a: str, b: str) -> bool:
+        return read.is_ancestor(self._state, self._read_anchor(), a, b)
+
     def merge_base(self, a: str, b: str) -> Sha | None:
         wt = self._read_anchor()
         try:
@@ -309,6 +328,16 @@ class FakeWorktree:
     # -- Worktree --------------------------------------------------------------------------------------
     def health(self) -> Health:
         return read.health(self._repo, self._find(), self.path)
+
+    def stage(self, paths: Sequence[str], *, literal: bool = True) -> None:
+        fake_operations.stage(self._repo, self.state(), paths, literal=literal)
+
+    def stage_tracked(self) -> None:
+        wt = self.state()
+        fake_operations.stage(self._repo, wt, list(wt.index), literal=True)
+
+    def merge_ff(self, rev: str) -> None:
+        self.repo.plumbing().merge_ff(self.path, rev)
 
     def branch(self) -> str | None:
         return checkout_ops.branch(self.state())

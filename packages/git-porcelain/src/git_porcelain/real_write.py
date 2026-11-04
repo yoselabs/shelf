@@ -143,34 +143,63 @@ def record(
         raise ValueError(msg)
     wt.run("rev-parse", "--git-dir")
     old = real_read.head_of(wt)
-    if mode == "amend" and old is None:
-        msg = "nothing to amend: HEAD is unborn"
-        raise ValueError(msg)
     try:
-        _stage(wt, paths, base)
-        target = squash_to if mode == "squash_to" else old
-        against = str(target) if target is not None else "4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # the empty tree
-        delta = wt.run("diff", "--cached", "--quiet", against, check=False)
-        if delta.rc not in {0, 1}:
-            raise unavailable(("diff",), delta)
-        if delta.rc == 0 and not allow_empty and mode != "amend":
+        if not record_prepare(wt, paths, base, mode, old, squash_to=squash_to, allow_empty=allow_empty):
             return NothingToRecord()
         if mode == "squash_to":
             wt.run("reset", "-q", "--soft", str(squash_to))
-        args = ["commit", "-q", *([] if hooks else ["--no-verify"]), *(["--allow-empty"] if allow_empty else [])]
-        args += ["--amend", *(["-m", message] if message else ["--no-edit"])] if mode == "amend" else ["-m", message]
+        args = record_args(message, mode, hooks=hooks, allow_empty=allow_empty)
         done = wt.repo.run(wt.path, *_identity_args(wt.repo), *args, check=False)
         if done.rc != 0:
             if mode == "squash_to" and old is not None:
                 wt.run("reset", "-q", "--soft", str(old))
-            if hooks and "hook" in done.tail.lower():
-                return HookRejected(done.tail)
-            raise unavailable(args, done)
+            return record_failure(args, done, hooks=hooks)
         head = real_read.head_of(wt)
         head = some(head)
-        return Recorded(head)
+        return Recorded(head, output=(done.out + done.err).strip())
     finally:
         wt.repo.invalidate()
+
+
+def record_prepare(
+    wt: RealWorktree,
+    paths: Literal["own", "all", "tracked", "staged"],
+    base: str | None,
+    mode: Literal["new", "amend", "squash_to"],
+    old: Sha | None,
+    *,
+    squash_to: Sha | None,
+    allow_empty: bool,
+) -> bool:
+    """Stage the selected scope and decide whether a commit command is needed."""
+    _stage(wt, paths, base)
+    target = squash_to if mode == "squash_to" else old
+    against = str(target) if target is not None else "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    delta = wt.run("diff", "--cached", "--quiet", against, check=False)
+    if delta.rc not in {0, 1}:
+        raise unavailable(("diff",), delta)
+    return delta.rc != 0 or allow_empty or mode == "amend"
+
+
+def record_args(message: str, mode: Literal["new", "amend", "squash_to"], *, hooks: bool, allow_empty: bool) -> list[str]:
+    """Build commit arguments without changing the selected index."""
+    args = ["commit", "-q", *([] if hooks else ["--no-verify"]), *(["--allow-empty"] if allow_empty else [])]
+    args += ["--amend", *(["-m", message] if message else ["--no-edit"])] if mode == "amend" else ["-m", message]
+    return args
+
+
+def record_failure(args: Sequence[str], done: Done, *, hooks: bool) -> RecordResult:
+    """Keep complete command diagnostics, including hooks that never name themselves."""
+    output = (done.out + done.err).strip()
+    infrastructure = re.search(
+        r"gpg failed|unable to sign|identity unknown|tell me who you are|empty ident|index\.lock|cannot lock ref", output, re.IGNORECASE
+    )
+    if hooks and not infrastructure:
+        return HookRejected(output, output=output)
+    error = unavailable(args, done)
+    error.output = output
+    error.args = (f"git commit exited {done.rc}: {output}",)
+    raise error
 
 
 def _clean(wt: RealWorktree, clean_keep: Sequence[str] | None) -> None:

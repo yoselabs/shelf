@@ -15,6 +15,10 @@ if TYPE_CHECKING:
 
 
 def rebase(repo: RepoState, state: CheckoutState, base: str, *, update_refs: bool | None) -> CommandResult:
+    if repo.hooks.rebase_spawn_failure is not None:
+        raise GitUnavailable(repo.hooks.rebase_spawn_failure)
+    if repo.hooks.rebase_result is not None:
+        return repo.hooks.rebase_result
     if state.rebase is not None:
         return CommandResult(ok=False, output="fatal: there is already a rebase-merge directory")
     if tracked_dirty(state, repo.head_files(state)):
