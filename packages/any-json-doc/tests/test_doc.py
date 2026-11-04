@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import os
+import signal
+import subprocess
+import sys
+import textwrap
 import threading
+import time
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from any_json_doc import Absent, Doc, DocSet, ForeignVersion, ForeignVersionError, Present, Refused, Torn
+from any_json_doc import Absent, Doc, DocSet, ForeignVersion, ForeignVersionError, Present, RefusedError, Torn
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -56,7 +62,7 @@ def test_foreign_version_is_never_read_as_empty(tmp_path: Path) -> None:
     doc.path.write_text('{"v": 1, "n": 1}', encoding="utf-8")
     assert doc.read() == ForeignVersion(doc.path, 1, WANT)
     assert doc.get() is None
-    with pytest.raises(Refused, match=r"is v1, this install reads v2"):
+    with pytest.raises(RefusedError, match=r"is v1, this install reads v2"):
         doc.need()
 
 
@@ -70,7 +76,7 @@ def test_torn_file_is_named_and_refused(tmp_path: Path, bytes_: bytes) -> None:
     doc.path.write_bytes(bytes_)
     assert isinstance(doc.read(), Torn)
     assert doc.get() is None
-    with pytest.raises(Refused, match=r"d\.json is torn"):
+    with pytest.raises(RefusedError, match=r"d\.json is torn"):
         doc.need()
 
 
@@ -112,7 +118,7 @@ def test_a_concurrent_reader_never_sees_a_half_written_document(tmp_path: Path) 
 
 
 def test_docset_keeps_one_document_per_key(tmp_path: Path) -> None:
-    docs = DocSet(lambda key: tmp_path / "pins" / f"{key}.json", _load)
+    docs = DocSet(tmp_path / "pins", ".json", _load)
     assert docs.keys() == []
     docs.of("b").write({"v": WANT, "n": 2})
     docs.of("a").write({"v": WANT, "n": 1})
@@ -123,3 +129,55 @@ def test_docset_keeps_one_document_per_key(tmp_path: Path) -> None:
     assert docs.of("a").get() == {"v": WANT, "n": 1}
     docs.of("a").delete()
     assert docs.keys() == ["b"]
+
+
+@pytest.mark.parametrize("key", ["", ".hidden", "a/b"])
+def test_docset_refuses_a_key_that_is_not_a_plain_stem(tmp_path: Path, key: str) -> None:
+    with pytest.raises(ValueError, match="plain file stem"):
+        DocSet(tmp_path).of(key)
+
+
+def test_docset_refuses_a_suffix_that_is_not_an_extension(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="dot extension"):
+        DocSet(tmp_path, "json")
+
+
+_KILLED_WRITER = textwrap.dedent(
+    """
+    import os, sys, time
+    from pathlib import Path
+    from any_json_doc import Doc
+
+    target, marker = Path(sys.argv[1]), Path(sys.argv[2])
+
+    def stall(fd):  # the temp file is written and flushed; the replace has not happened yet
+        marker.write_text("ready")
+        time.sleep(60)
+
+    os.fsync = stall
+    Doc(target, fsync=True).write({"new": "x" * 100_000})
+    """
+)
+
+
+def test_a_writer_killed_before_the_replace_leaves_the_old_document(tmp_path: Path) -> None:
+    target, marker = tmp_path / "d.json", tmp_path / "ready"
+    old = Doc(target)
+    old.write({"old": True})
+    child = subprocess.Popen([sys.executable, "-c", _KILLED_WRITER, str(target), str(marker)])
+    try:
+        deadline = time.monotonic() + 30
+        while not marker.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert marker.exists(), "child never reached the fsync"
+        assert list(tmp_path.glob(".d.json.*.tmp")), "the child should be mid-write"
+        os.kill(child.pid, signal.SIGKILL)
+        child.wait(timeout=30)
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait()
+    assert old.read() == Present({"old": True})
+    assert DocSet(tmp_path).keys() == ["d"]  # the leftover temp is no key
+    old.write({"old": False})
+    assert old.get() == {"old": False}

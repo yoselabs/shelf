@@ -23,11 +23,12 @@ assert doc.read() == Present({"v": 2, "sha": "abc"})
 | `Doc(path, load=, dump=, *, fsync=False)` | one document; `load`/`dump` default to raw JSON |
 | `read()` | `Present(rec)`, `Absent()`, `Torn(path, why)` or `ForeignVersion(path, found, want)` |
 | `get()` | the record, else `None`: for caches and derivable files |
-| `need()` | the record, `None` when absent, `Refused` (names the file) for Torn or ForeignVersion |
+| `need()` | the record, `None` when absent, `RefusedError` (names the file) for Torn or ForeignVersion |
 | `write(rec)` / `delete()` | atomic replace (indent 1) / remove, idempotent |
-| `DocSet(path_of, load=, dump=)` | `of(key) -> Doc`, `keys()` lists the folder (dot-files skipped) |
+| `DocSet(folder, suffix=".json", load=, dump=)` | `of(key) -> Doc` for `folder/key+suffix`, `keys()` lists that flat folder (dot-files skipped) |
 
 `load` raises `ValueError` for a bad shape (read as Torn) and `ForeignVersionError(found, want)` for another version.
-No msgspec, no version envelope: those stay in the host. Depends on `atomic-io` only.
+No msgspec, no version envelope: those stay in the host. Depends on `atomic-io` only (stdlib otherwise). Vendoring into a repo that copies shelf packages byte-for-byte takes
+`atomic-io` along with it; this package is not stdlib-only on its own.
 
 Not here: task-loop's `FileTickets` (hard-link ticket line) is a lock protocol, not a document.
