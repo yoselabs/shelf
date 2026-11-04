@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
+name = "sqlite-store"
+kind = "primitive"
+tier = "T0"
+release = "sqlite-store-v0.1.0"
+capability = "Stop copying SQLite-on-disk lifecycle glue: conservative WAL opens, per-thread/process/file shared writers, immediate transactions, atomic ordered schema upgrades, filesystem refusal, integrity-check caching, explicit quarantine and revision-guarded updates. Applications own all schema and domain SQL."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from iorlas-task-loop factorydb, factoryconnections and factorymigrate. Stdlib only, POSIX only; no ORM or query builder. Born candidate; consumer adoption remains with task-loop."
