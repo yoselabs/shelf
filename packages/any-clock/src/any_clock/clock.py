@@ -14,7 +14,7 @@ class PhaseClock:
     """Time attributed to named phases; the innermost open phase owns the current instant.
 
     Entering a phase pauses the one around it; leaving resumes it. Time outside every `phase()` block belongs to
-    `root`, so no instant is unowned and `sum(totals().values()) == wall()`. The clock cannot stop a caller
+    `root`, so no instant is unowned and `sum(totals().values()) == wall()` (both share one clock read). The clock cannot stop a caller
     entering the wrong phase. Not thread-safe: `phase()` from a thread other than the creating one raises.
     """
 
@@ -25,19 +25,26 @@ class PhaseClock:
         *,
         root: str = "run",
         exempt: Iterable[str] = (),
+        budget: float | None = None,
     ) -> None:
         self._now = now
         self._limits = dict(limits or {})
         self._exempt = frozenset(exempt)
+        self._budget = budget
         self._owner = threading.get_ident()
         self._t0 = self._last = now()
         self._stack = [root]
         self._totals = {root: 0.0}
 
-    def _book(self) -> None:
-        t = self._now()
-        self._totals[self._stack[-1]] += max(t - self._last, 0.0)  # a clock stepping back books nothing
+    def _book(self) -> float:
+        """Book the time since the last read to the owning phase; returns the high-water clock reading.
+
+        A clock stepping back is ignored until it passes its old high-water mark, so nothing is booked twice.
+        """
+        t = max(self._now(), self._last)
+        self._totals[self._stack[-1]] += t - self._last
         self._last = t
+        return t
 
     @contextmanager
     def phase(self, name: str) -> Iterator[None]:
@@ -51,14 +58,16 @@ class PhaseClock:
         try:
             yield
         finally:
-            self._book()
-            self._stack.pop()
+            try:
+                self._book()
+            finally:
+                self._stack.pop()
 
     def current(self) -> str:
         return self._stack[-1]
 
     def wall(self) -> float:
-        return self._now() - self._t0
+        return self._book() - self._t0
 
     def total(self, name: str) -> float:
         """Seconds owned by `name` so far, live while it is open; 0 for a phase never entered."""
@@ -74,6 +83,11 @@ class PhaseClock:
         return sum(s for name, s in self.totals().items() if name not in self._exempt)
 
     def over(self) -> list[tuple[str, float, float]]:
-        """`(phase, spent, limit)` for each limited phase past its limit; empty while inside."""
+        """`(phase, spent, limit)` for each limited phase past its limit, then `("charged", spent, budget)` when
+        `charged()` is past `budget`; empty while inside."""
         totals = self.totals()
-        return [(name, totals.get(name, 0.0), cap) for name, cap in self._limits.items() if totals.get(name, 0.0) > cap]
+        found = [(name, totals.get(name, 0.0), cap) for name, cap in self._limits.items() if totals.get(name, 0.0) > cap]
+        spent = sum(s for name, s in totals.items() if name not in self._exempt)
+        if self._budget is not None and spent > self._budget:
+            found.append(("charged", spent, self._budget))
+        return found

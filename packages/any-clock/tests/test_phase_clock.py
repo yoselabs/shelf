@@ -92,7 +92,6 @@ def test_over_reports_only_limited_phases_past_their_limit() -> None:
     with clock.phase("review"):
         tick.advance(5)
     assert clock.over() == []
-    tick.advance(0)
     with clock.phase("review"):
         tick.advance(1)
     with clock.phase("other"):
@@ -105,6 +104,58 @@ def test_clock_stepping_back_never_books_negative_time() -> None:
     clock = PhaseClock(tick)
     tick.advance(-50)
     assert clock.total("run") == 0
+
+
+def test_clock_stepping_back_then_forward_books_each_second_once() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick)
+    tick.advance(10)
+    assert clock.total("run") == 10
+    tick.advance(-10)
+    assert clock.total("run") == 10
+    tick.advance(15)
+    assert clock.totals() == {"run": 15}
+    assert sum(clock.totals().values()) == clock.wall() == 15
+
+
+def test_budget_limits_charged_time_only() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick, exempt={"lane"}, budget=10)
+    with clock.phase("lane"):
+        tick.advance(100)
+    tick.advance(10)
+    assert clock.over() == []
+    tick.advance(1)
+    assert clock.over() == [("charged", 11, 10)]
+
+
+def test_phase_named_like_the_root_and_same_name_nesting() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick)
+    with clock.phase("run"):
+        tick.advance(1)
+        with clock.phase("run"):
+            tick.advance(2)
+    with clock.phase("a"), clock.phase("a"):
+        tick.advance(4)
+    assert clock.totals() == {"run": 3, "a": 4}
+    assert clock.current() == "run"
+
+
+def test_clock_raising_inside_the_exit_still_pops_the_phase() -> None:
+    tick = Tick()
+    broken = False
+
+    def now() -> float:
+        if broken:
+            raise OSError
+        return tick()
+
+    clock = PhaseClock(now)
+    with pytest.raises(OSError), clock.phase("x"):
+        broken = True
+    broken = False
+    assert clock.current() == "run"
 
 
 def test_other_thread_is_refused() -> None:
