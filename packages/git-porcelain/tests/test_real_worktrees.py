@@ -8,6 +8,7 @@ import pytest
 
 from git_porcelain import GitUnavailable, IndexLocked, NotARepo, RealRepo, WorktreeRemoveRefused
 from git_porcelain.real_done import Done
+from git_porcelain.testing import git
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -56,20 +57,40 @@ def test_worktree_state_distinguishes_absence_from_read_failure(
             repo.worktree_state(tmp_path)
 
 
-def test_remove_refusal_keeps_the_complete_final_stderr_line(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("intro", ["introductory diagnostic", "error: introductory diagnostic"])
+def test_remove_refusal_keeps_the_first_diagnostic_and_final_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, intro: str) -> None:
     repo = RealRepo(tmp_path)
     reason = "fatal: " + "long path " * 100 + "contains modified or untracked files"
     calls: list[tuple[str, ...]] = []
 
     def run(cwd: Path, *args: str, check: bool = True) -> Done:
         calls.append(args)
-        return Done(128, b"", f"error: introductory diagnostic\n{reason}\n\n")
+        return Done(128, b"", f"{intro}\n{reason}\n\n")
 
     monkeypatch.setattr(repo, "run", run)
     with pytest.raises(WorktreeRemoveRefused) as caught:
         repo.drop_worktree(tmp_path / "w", missing_ok=False)
-    assert caught.value.reason == reason
+    expected = intro if intro.startswith("error:") else reason
+    assert caught.value.reason == expected
+    message = f"git worktree remove exited 128: {expected}"
+    assert str(caught.value) == message + (f" | {reason}" if expected != reason else "")
     assert calls == [("worktree", "remove", str(tmp_path / "w"))]
+
+
+def test_locked_worktree_removal_keeps_fatal_reason_and_hint(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q", "-b", "main")
+    git(tmp_path, "commit", "--allow-empty", "-qm", "seed")
+    repo = RealRepo(tmp_path)
+    path = tmp_path / "locked"
+    repo.add_worktree(path, "HEAD")
+    git(tmp_path, "worktree", "lock", "--reason", "contract lock", str(path))
+
+    with pytest.raises(WorktreeRemoveRefused) as caught:
+        repo.drop_worktree(path, missing_ok=False)
+
+    assert caught.value.reason == "fatal: cannot remove a locked working tree, lock reason: contract lock"
+    assert str(caught.value).startswith(f"git worktree remove exited 128: {caught.value.reason}")
+    assert " | use 'remove -f -f' to override or unlock first" in str(caught.value)
 
 
 @pytest.mark.parametrize(

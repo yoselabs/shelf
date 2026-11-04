@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "task-loop"
+software = "any-plugin-cache"
+why = "task-loop's release/catalog.py, the pin check in pins.py and adapters/versionfile.py read the plugin cache and bump plugin.json versions; that is generic Claude Code plugin plumbing. Delegate's hand version bump is the same need."
+needs = "Installed versions of a plugin, the user-scope installed version, pin validity, the rollback target, and a version bump that keeps the file's formatting, replacing the local copies."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active"          # active | retired

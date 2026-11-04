@@ -1206,6 +1206,27 @@ Feature: One Repo and Worktree, real or fake
     When "r" calls worktree_state("<root>/absent")
     Then the result is None
 
+  Scenario: Status state preserves staged rename records and their NUL separated original path
+    Given a repository "r"
+    And "r" commits "one" with "old name.txt"="1\n"
+    And "r" stages a rename from "old name.txt" to "new name.txt"
+    When "r" calls worktree_state("<root>/r")
+    Then the status records with object ids normalized are b"2 R. N... 100644 100644 100644 <oid> <oid> R100 new name.txt\x00old name.txt\x00"
+
+  # The fake keeps an unmerged path set, not the three index stages. Object ids may
+  # differ; both implementations must emit the same fields, modes and record framing.
+  Scenario: Status state preserves unmerged records during a conflicted rebase
+    Given an origin "o"
+    And the origin "o" holds a.txt="1\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a.txt="mine\n"
+    And the origin "o" advances "main" with a.txt="theirs\n"
+    And "r" calls sync()
+    When "r" calls rebase_onto("origin/main")
+    Then the result is a Conflict
+    When "r" calls worktree_state("<root>/r")
+    Then the status records with object ids normalized are b"u UU N... 100644 100644 100644 100644 <oid> <oid> <oid> a.txt\x00"
+
   Scenario: Status state handles unborn detached ignored and missing checkouts
     Given a repository "r"
     When "r" calls worktree_state("<root>/r")
