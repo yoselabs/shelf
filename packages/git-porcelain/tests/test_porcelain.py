@@ -9,8 +9,9 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import git_porcelain as git
 import pytest
+
+import git_porcelain as git
 from git_porcelain import GitError
 from git_porcelain.testing import git as _git
 

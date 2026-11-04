@@ -144,6 +144,25 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
 
 ## Surface
 
+The path-based plumbing also exports `Ref(name, oid)`, `ls_remote(repo, remote, *patterns)`,
+`branches(repo, remote=None)` (short names, local or that remote's tracking branches),
+`delete_ref_at(repo, ref, oid)` (atomic compare-and-delete), `config_get(repo, key, default=None)`,
+`config_entries(repo, pattern)`, `symbolic_ref(repo, name)`, `merge_ff(repo, ref)`,
+`pull_rebase(repo, remote, branch)`, `check_ignore(repo, paths)` (`--no-index`), and
+`ls_files(repo, scope="tracked" | "untracked" | "ignored" | "all")` (sorted paths).
+Git diagnostics raise `MissingRevision`, `NotARepo`, `IndexLocked`, `RefRace`, or `BranchPinned`
+(`holder` is the other worktree); all extend `GitUnavailable` and `GitError`.
+`FakeRepo.plumbing()` supplies the same path-taking calls (`FakePlumbing` in `testing`).
+It inherits the fake's ignore/merge limitations; config has one value per normalized key and Python
+regex matching rather than git's POSIX regex dialect, no global/include config, no annotated tag
+peeling, no filesystem ref-lock races, no arbitrary remote transport, and no hook execution.
+Pull uses the modeled named remote, without custom refspecs or config-driven autostash.
+`Worktree.snapshot(base, inputs=[...])` force-includes literal input files/directories even when
+ignored, without changing the real index; declared inputs bypass the snapshot cache.
+Task-loop's `treehash.state_of` is a status/stat signature, while `tree_of` is the matching tree-id
+operation: both omit ignored files by default. Explicit `inputs` extends that default for declared
+ignored inputs; ordinary snapshots retain `tree_of` semantics.
+
 `run_git`, `git_returncode`, `is_repo`, `git_dir`, `has_upstream`, `upstream`, `head`,
 `merge_in_progress`, `sync_status`, `readiness`, `status`, `dirty_rels`, `unmerged_paths`,
 `has_conflict_markers`, `show_stage`, `show_at`, `commit_paths`, `log_grep`, `push`,

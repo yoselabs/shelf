@@ -12,6 +12,7 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
+
 from git_porcelain import Identity, RealRepo, RealWorktree
 from git_porcelain.testing import apply_hermetic_env
 from git_porcelain.testing import git as run

@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import git_porcelain as git
 import pytest
+
+import git_porcelain as git
 from git_porcelain import GitError, Identity, RemoteError
 from git_porcelain.testing import git as _git
 
