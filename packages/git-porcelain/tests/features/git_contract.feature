@@ -3,6 +3,835 @@ Feature: One Repo and Worktree, real or fake
   Every intent operation a driver such as task-loop takes on a checkout behaves the same on the git binary
   (RealRepo) and in memory (FakeRepo). These scenarios run against both; @real_only names a gap of the fake.
 
+  Scenario: Guarded remote deletion requires a full ref and preserves a stale lease
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And the origin "o" advances "main" with b="remote"
+    When "r" tries delete_remote_at("origin", "main", "<mem:root>")
+    Then the call raises ValueError
+    When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:root>")
+    Then the call raises GitUnavailable
+    When "r" calls fetch("origin")
+    And "r" calls history(["origin/main"], limit=1)
+    Then the result's 0.sha is not "<mem:root>"
+
+  Scenario: Checked out branches cannot be deleted even at the expected tip
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "root"
+    When "r" tries delete_branch("main", expected="<mem:root>")
+    Then the call raises BranchPinned
+    When "r" calls branches()
+    Then the result is [["main", "<mem:root>"]]
+    When "r" calls checkout_new("other")
+    And "r" calls delete_branch("main", expected="<mem:root>")
+    And "r" calls branches()
+    Then the result is [["other", "<mem:root>"]]
+
+  Scenario: Another worktree also prevents branch deletion
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "root"
+    And "r" calls checkout_new("topic")
+    And "r" calls checkout("main")
+    And "r" adds a worktree "linked" at "topic" as "linked"
+    And "linked" calls checkout("topic")
+    When "r" tries delete_branch("topic", expected="<mem:root>")
+    Then the call raises BranchPinned
+    When "r" calls branches("topic")
+    Then the result is [["topic", "<mem:root>"]]
+    When "linked" calls branch()
+    Then the result is "topic"
+
+  Scenario Outline: Push safety requires explicit consent before invoking git
+    Given a repository "r"
+    When "r" tries <operation>
+    Then the call raises ValueError
+
+    Examples:
+      | operation                                                         |
+      | push_refspecs("origin", ["+HEAD:main"])                             |
+      | push_request("origin", ["+HEAD:main"])                              |
+      | push_refspecs("origin", [":main"])                                  |
+      | push_refspecs("origin", ["+:main"], force=True)                      |
+      | push_request("origin", ["+:main"], force=True)                       |
+      | push_refspecs("origin", ["+:main"], allow_delete=True)               |
+      | push_request("origin", ["+:main"], allow_delete=True)                |
+      | push_request("origin", [":main"])                                   |
+      | push_request("origin", ["main"], options=["--force"])                |
+      | push_request("origin", ["main"], options=["-f"])                     |
+      | push_request("origin", ["main"], options=["--delete"])               |
+      | push_request("origin", ["main"], options=["-d"])                     |
+      | push_request("origin", [], options=["--mirror"])                    |
+      | push_request("origin", [], options=["--mirror"], force=True)         |
+      | push_request("origin", [], options=["--mirror"], allow_delete=True)  |
+      | push_request("origin", [], options=["--prune"])                     |
+
+  Scenario Outline: Push opt ins permit their corresponding forms
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" calls <operation>
+    Then the push succeeded
+
+    Examples:
+      | operation                                                                                  |
+      | push_refspecs("origin", ["+HEAD:refs/heads/main"], force=True)                                |
+      | push_request("origin", ["+HEAD:refs/heads/main"], force=True)                                 |
+      | push_refspecs("origin", [":refs/heads/main"], allow_delete=True)                              |
+      | push_request("origin", [":refs/heads/main"], allow_delete=True)                               |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force"], force=True)              |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["-f"], force=True)                   |
+      | push_request("origin", ["main"], options=["--delete"], allow_delete=True)                     |
+      | push_request("origin", ["main"], options=["-d"], allow_delete=True)                           |
+      | push_request("origin", [], options=["--mirror"], force=True, allow_delete=True)               |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--prune"], allow_delete=True)       |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease"])               |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease=refs/heads/main:<head:r>"]) |
+
+  Scenario: An explicit lease remains allowed and refuses a stale expected tip
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And "r" commits "local" with b="local"
+    And the origin "o" advances "main" with c="remote"
+    When "r" calls push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease=refs/heads/main:<mem:root>"])
+    Then the result's ok is False
+    And the command output contains "stale info"
+
+  Scenario: A deletion only push returns an empty sha
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" calls push_refspecs("origin", [":refs/heads/main"], allow_delete=True)
+    Then the result is a Pushed
+    And the result's sha is ""
+    When "r" tries fetch("origin", refspecs=["refs/heads/main"])
+    Then the call raises GitUnavailable
+
+  Scenario Outline: Force options authorize replacing a remote tip
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And the origin "o" advances "main" with b="remote"
+    When "r" calls push_request("origin", ["HEAD:refs/heads/main"], options=["<option>"], force=True)
+    Then the result's ok is True
+    When "r" calls fetch("origin")
+    And "r" calls history(["origin/main"], limit=1)
+    Then the result's 0.sha is "<mem:root>"
+
+    Examples:
+      | option  |
+      | --force |
+      | -f      |
+
+  Scenario Outline: Deletion options remove the advertised ref
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" calls push_request("origin", ["main"], options=["<option>"], allow_delete=True)
+    Then the result's ok is True
+    When "r" tries fetch("origin", refspecs=["refs/heads/main"])
+    Then the call raises GitUnavailable
+
+    Examples:
+      | option   |
+      | --delete |
+      | -d       |
+
+  Scenario Outline: Mirror and prune delete refs absent from their local scope
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" calls push_refspecs("origin", ["HEAD:refs/heads/stale"])
+    When "r" calls push_request("origin", <refspecs>, options=["<option>"], force=<force>, allow_delete=True)
+    Then the result's ok is True
+    When "r" tries fetch("origin", refspecs=["refs/heads/stale"])
+    Then the call raises GitUnavailable
+    When "r" calls fetch("origin", refspecs=["refs/heads/main"])
+    Then the result is None
+
+    Examples:
+      | option   | refspecs                      | force |
+      | --mirror | []                            | True  |
+      | --prune  | ["refs/heads/*:refs/heads/*"]   | False |
+
+  Scenario Outline: Remote option injection is rejected
+    Given a repository "r"
+    When "r" tries <operation>
+    Then the call raises ValueError
+
+    Examples:
+      | operation                                                        |
+      | sync("--receive-pack=false")                                     |
+      | fetch("--receive-pack=false")                                    |
+      | push("main", remote="--receive-pack=false")                       |
+      | push_refspecs("--receive-pack=false", ["HEAD:main"])               |
+      | push_request("--receive-pack=false", ["HEAD:main"])                |
+      | delete_remote_at("--receive-pack=false", "refs/heads/main", "abc") |
+
+  Scenario Outline: Invalid bases fail before branch or history mutation
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "before"
+    When "r" tries <operation>
+    Then the call raises MissingRevision
+    When "r" calls branch()
+    Then the result is "main"
+    When "r" calls snapshot("HEAD")
+    Then the result's head is "<mem:before>"
+
+    Examples:
+      | operation                                                  |
+      | take_branch(branch="topic", base="--orphan", mode="restart") |
+      | take_branch(branch="main", base="missing", mode="resume")    |
+      | rebase_onto("--exec=false", squash_message="squash")          |
+
+  Scenario: A signer failure is infrastructure failure rather than hook rejection
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "before"
+    And "r" writes b="pending"
+    And the signer of "r" fails
+    When "r" tries record("signed", paths="all", hooks=True)
+    Then the call raises GitUnavailable
+    When "r" calls snapshot("HEAD")
+    Then the result's head is "<mem:before>"
+    And the index of "r" reads "b" as "pending"
+
+  Scenario: Fresh rebase observations and command refusals are explicit
+    Given a repository "r"
+    When "r" calls rebasing()
+    Then the result is False
+    When "r" calls unmerged()
+    Then the result is []
+    When "r" calls abort_rebase()
+    Then the result's ok is True
+    When "r" calls continue_rebase()
+    Then the result's ok is False
+    When "r" calls rebase("missing")
+    Then the result's ok is False
+
+  Scenario: Merge base permits missing revisions and cherry preserves oldest first picks
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "root"
+    And "r" commits "first" with b="first"
+    And "r" remembers its head as "first"
+    And "r" commits "second" with c="second"
+    When "r" calls merge_base("missing", "HEAD")
+    Then the result is None
+    When "r" calls merge_base("<mem:root>", "HEAD")
+    Then the result is "<mem:root>"
+    When "r" calls cherry("<mem:root>", "HEAD")
+    Then the oid of each result entry is ["<mem:first>", "<head:r>"]
+    And the upstream of each result entry is [False, False]
+
+  Scenario: Named remote URL absence is typed
+    Given a repository "r"
+    When "r" tries remote_url("missing")
+    Then the call raises MissingRemote
+
+  Scenario Outline: Observation faults stay failures instead of becoming absence
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And the observations of "r" will fail
+    When "r" tries <operation>
+    Then the call raises GitReadFailure
+
+    Examples:
+      | operation                 |
+      | merge_base("HEAD", "HEAD") |
+      | remote_url("origin")       |
+      | rebasing()                 |
+      | unmerged()                 |
+
+  Scenario: Explicit refspecs keep source commits and guarded deletion keeps moved refs
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And "r" commits "local" with b="local"
+    When "r" calls remote_url("origin")
+    Then the result is "<mem:origin:o>"
+    When "r" calls push_refspecs("origin", ["<mem:root>:refs/heads/pinned"])
+    Then the result is a Pushed
+    When "r" calls fetch("origin", refspecs=["refs/heads/pinned"])
+    Then the result is None
+    When "r" calls delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
+    Then the result is None
+    When "r" calls delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
+    Then the result is None
+
+  Scenario: Push requests preserve namespaces multiple refs and deletion
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" calls push_request("origin", ["HEAD:refs/heads/one", "+HEAD:refs/tags/two"], force=True)
+    Then the result's ok is True
+    When "r" calls push_request("origin", [":refs/heads/one", ":refs/tags/two"], allow_delete=True)
+    Then the result's ok is True
+
+  Scenario: A lease refuses a branch changed since fetching
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "local" with b="local"
+    And the origin "o" advances "main" with c="elsewhere"
+    When "r" calls push_lease("origin", "HEAD:refs/heads/main")
+    Then the result's ok is False
+    And the command output contains "stale info"
+
+  Scenario Outline: Configured landing push forms retain HEAD destinations and options
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "local" with b="local"
+    When "r" calls push_request(<remote>, <refspecs>, options=<options>, force=<force>)
+    Then the result's ok is True
+
+    Examples:
+      | remote   | refspecs          | options        | force |
+      | "origin" | ["HEAD"]          | []             | False |
+      | "origin" | ["HEAD:main"]     | []             | False |
+      | "origin" | ["+HEAD:main"]    | []             | True  |
+      | "origin" | []                | []             | False |
+      | None     | []                | []             | False |
+      | None     | ["HEAD:main"]     | ["--dry-run"]  | False |
+
+  Scenario: Remote policy refusal is distinct from a ref race
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "before"
+    And "r" commits "local" with b="local"
+    And "r" calls push_request("origin", ["HEAD:refs/heads/main"])
+    And the origin "o" refuses non fast forward pushes
+    When "r" calls push_refspecs("origin", ["+<mem:before>:refs/heads/main"], force=True)
+    Then the result is a RemoteRejected
+
+  Scenario: An explicit push reports a ref race separately
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "local" with b="local"
+    And the origin "o" advances "main" with c="remote"
+    When "r" calls push_refspecs("origin", ["HEAD:refs/heads/main"])
+    Then the result is a RefRejected
+
+  Scenario: Cherry recognizes equivalent patches on separate branches
+    Given a repository "r"
+    And "r" commits "root" with a="root\n"
+    And "r" calls checkout_new("topic")
+    And "r" commits "mine" with b="shared\n"
+    And "r" remembers its head as "mine"
+    And "r" calls checkout("main")
+    And "r" commits "equivalent" with b="shared\n"
+    When "r" calls cherry("main", "topic")
+    Then the oid of each result entry is ["<mem:mine>"]
+    And the upstream of each result entry is [True]
+
+  Scenario: No common ancestor is a known absence
+    Given an origin "o"
+    And the origin "o" holds a="remote"
+    And a repository "r"
+    And "r" commits "unrelated" with b="local"
+    And "r" has the origin "o" as remote "origin"
+    And "r" calls fetch()
+    When "r" calls merge_base("HEAD", "origin/main")
+    Then the result is None
+
+  Scenario: Named remote URLs honor rewrite rules
+    Given an origin "o"
+    And "r" is a clone of the origin "o"
+    And "r" config "url.expanded/.insteadOf" is "<root>/"
+    When "r" calls remote_url("origin")
+    Then the result is "expanded/o.git"
+
+  Scenario: Scoped fetch writes FETCH_HEAD without moving the checkout
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And the origin "o" advances "main" with b="remote"
+    When "r" calls fetch("<mem:origin:o>", refspecs=["main"])
+    Then the result is None
+    When "r" calls history(["FETCH_HEAD"], limit=1)
+    Then the result's 0.subject is "advance"
+    When "r" calls branch()
+    Then the result is "main"
+
+  Scenario: LFS failure remains an outcome
+    Given a repository "r"
+    When "r" calls lfs_push("absent", ["HEAD", "refs/heads/main"])
+    Then the result's ok is False
+
+  Scenario: LFS timeout is an outcome and invocation failure still raises
+    Given a repository "r"
+    And the LFS command of "r" will time out
+    When "r" calls lfs_push("origin", ["HEAD", "refs/heads/main"])
+    Then the result's ok is False
+    And the result's output is "git lfs timed out after 60 min"
+    Given the LFS command of "r" cannot start
+    When "r" tries lfs_push("origin", ["HEAD"])
+    Then the call raises GitUnavailable
+
+  Scenario: LFS uploads can succeed without installing hooks
+    Given a repository "r"
+    And the LFS command of "r" will succeed
+    When "r" calls lfs_push("origin", ["HEAD", "refs/heads/main"])
+    Then the result's ok is True
+
+  Scenario Outline: Rebase update-refs inherits configuration and permits explicit overrides
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" calls checkout_new("topic")
+    And "r" commits "first" with b="first"
+    And "r" calls checkout_new("middle")
+    And "r" remembers its head as "middle"
+    And "r" calls checkout("topic")
+    And "r" commits "second" with c="second"
+    And "r" calls checkout("main")
+    And "r" commits "base" with d="base"
+    And "r" calls checkout("topic")
+    And "r" config "rebase.updateRefs" is "true"
+    When "r" calls rebase_onto("main", update_refs=<option>)
+    Then the result is a Rebased
+    And the branch "middle" of "r" rewritten is <rewritten>
+
+    Examples:
+      | option | rewritten |
+      | None   | True      |
+      | False  | False     |
+      | True   | True      |
+
+  Scenario Outline: A failed squash restores the original work before applying its failure policy
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "first" with b="first"
+    And "r" commits "second" with c="second"
+    And "r" remembers its head as "before"
+    And the origin "o" advances "main" with d="base"
+    And "r" calls fetch()
+    And the squash commit of "r" will fail
+    When "r" tries rebase_onto("origin/main", squash_message="combined", squash_failure="<policy>")
+    Then the squash policy outcome is "<outcome>"
+    And the file "b" of "r" holds "first"
+    And the file "c" of "r" holds "second"
+
+    Examples:
+      | policy             | outcome |
+      | raise              | raised  |
+      | continue_unsquashed | rebased |
+
+  Scenario: Raw rebase continuation uses only the caller's staged resolution
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And "r" remembers its head as "before"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    When "r" calls rebase("origin/main")
+    Then the result's ok is False
+    When "r" calls rebasing()
+    Then the result is True
+    When "r" calls unmerged()
+    Then the result is ["a"]
+    When "r" calls continue_rebase(check_markers=True, stage_conflicts=True)
+    Then the result's ok is False
+    When "r" writes a="resolved\n"
+    And "r" calls continue_rebase()
+    Then the result's ok is False
+    When "r" stages ["a"]
+    And "r" writes a="unstaged\n"
+    And "r" calls continue_rebase()
+    Then the result's ok is False
+    When "r" writes a="resolved\n"
+    And "r" calls continue_rebase()
+    Then the result's ok is True
+    When "r" calls rebasing()
+    Then the result is False
+    When "r" calls abort_rebase(restore_to="<mem:before>")
+    Then the result's ok is True
+    And the file "a" of "r" holds "mine\n"
+
+  Scenario: Rebase abort restores HEAD and clears conflict observations
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And "r" remembers its head as "before"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    And "r" calls rebase_onto("origin/main")
+    When "r" calls abort_rebase(restore_to="<mem:before>")
+    Then the result's ok is True
+    When "r" calls unmerged()
+    Then the result is []
+    When "r" calls rebasing()
+    Then the result is False
+
+  Scenario: Continuation explicitly stages an edited resolution
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    And "r" calls rebase_onto("origin/main")
+    When "r" writes a="resolved\n"
+    And "r" calls continue_rebase(stage_conflicts=True, check_markers=True)
+    Then the result's ok is True
+    When "r" calls continue_rebase(missing_ok=True)
+    Then the result's ok is True
+    When "r" calls abort_rebase(missing_ok=False)
+    Then the result's ok is False
+
+  Scenario: A guarded remote deletion refuses an advanced destination
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "before"
+    And the origin "o" advances "main" with b="other"
+    When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:before>")
+    Then the call raises GitUnavailable
+
+  Scenario: Failed deletion verification cannot report authoritative absence
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "before"
+    And the origin "o" is offline
+    When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:before>")
+    Then the call raises GitReadFailure
+
+  Scenario: Scoped fetch refuses a missing remote ref
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" tries fetch("origin", refspecs=["missing"])
+    Then the call raises GitUnavailable
+
+  Scenario: Explicit pushes preserve hook environment and distinguish policy from races
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with b="local"
+    And "r" has a pre-push hook that wants env
+    When "r" calls push_refspecs("origin", ["HEAD:refs/heads/main"])
+    Then the result is a HookRejected
+    When "r" calls push_refspecs("origin", ["HEAD:refs/heads/main"], hook_env={"X": "1"})
+    Then the result is a Pushed
+
+  Scenario: A lease can replace a fetched destination without setting an upstream
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "before"
+    And "r" commits "mine" with b="local"
+    And "r" calls push_lease("origin", "HEAD:refs/heads/main")
+    And "r" calls reset("<mem:before>", mode="hard")
+    When "r" calls push_lease("origin", "HEAD:refs/heads/main")
+    Then the result's ok is True
+
+  Scenario Outline: Checkout observations never manufacture absence outside a repository
+    Given "plain" is the plain folder
+    When "plain" tries <operation>()
+    Then the call raises GitReadFailure
+
+    Examples:
+      | operation |
+      | unmerged  |
+      | rebasing  |
+
+  Scenario: Branch names survive unborn HEAD and become absent when detached
+    Given a repository "r"
+    When "r" calls branch()
+    Then the result is "main"
+    When "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" calls checkout("<mem:root>")
+    And "r" calls branch()
+    Then the result is None
+    When "r" calls checkout("main")
+    And "r" calls branch()
+    Then the result is "main"
+
+  Scenario: New branches are exclusive and ordinary checkout never creates one
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    When "r" calls checkout_new("topic")
+    And "r" calls branch()
+    Then the result is "topic"
+    When "r" tries checkout_new("topic")
+    Then the call raises BranchExists
+    When "r" tries checkout("absent")
+    Then the call raises MissingRevision
+    When "r" calls branch()
+    Then the result is "topic"
+
+  Scenario: Checkout refuses to overwrite local changes
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" calls checkout_new("topic")
+    And "r" commits "topic" with a="two"
+    And "r" calls checkout("main")
+    And "r" writes a="local"
+    When "r" tries checkout("topic")
+    Then the call raises DirtyTree
+    And the file "a" of "r" holds "local"
+
+  Scenario: Checkout refuses another worktree's branch
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" adds a worktree "w" at "HEAD" as "w"
+    And "w" calls checkout_new("topic")
+    When "r" tries checkout("topic")
+    Then the call raises BranchPinned
+    When "r" tries checkout_force("topic", "main")
+    Then the call raises BranchPinned
+    When "w" calls branch()
+    Then the result is "topic"
+
+  Scenario: Creating from an explicit start switches files while compatible local edits survive checkout
+    Given a repository "r"
+    And "r" commits "root" with a="one", unchanged="base"
+    And "r" remembers its head as "root"
+    And "r" commits "next" with a="two"
+    And "r" writes unchanged="local", untracked="keep"
+    When "r" calls checkout_new("topic", "<mem:root>")
+    Then the file "a" of "r" holds "one"
+    And the file "unchanged" of "r" holds "local"
+    And the file "untracked" of "r" holds "keep"
+    When "r" calls checkout("HEAD")
+    And "r" calls branch()
+    Then the result is "topic"
+    When "r" calls checkout("main")
+    Then the file "a" of "r" holds "two"
+    And the file "unchanged" of "r" holds "local"
+
+  Scenario: Clean respects keep patterns and optionally removes ignored files without moving HEAD
+    Given a repository "r"
+    And "r" commits "root" with .gitignore="*.cache\n" tracked="one"
+    And "r" remembers its head as "root"
+    And "r" writes drop/file="trash", keep/file="keep", ignored.cache="cache", saved.cache="saved"
+    When "r" calls clean(["keep/", "saved.cache"])
+    Then the file "drop/file" of "r" is absent
+    And the file "keep/file" of "r" holds "keep"
+    And the file "ignored.cache" of "r" holds "cache"
+    When "r" calls clean(["keep/", "saved.cache"], ignored=True)
+    Then the file "ignored.cache" of "r" is absent
+    And the file "saved.cache" of "r" holds "saved"
+    And the file "tracked" of "r" holds "one"
+    When "r" calls history(["HEAD"], limit=1)
+    Then the result's 0.sha is "<mem:root>"
+    When "r" calls branch()
+    Then the result is "main"
+
+  Scenario Outline: Reset modes separately control HEAD index and files
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" commits "next" with a="two"
+    And "r" writes a="local", untracked="keep"
+    When "r" calls reset("<mem:root>", mode="<mode>")
+    Then the file "a" of "r" holds "<files>"
+    And the file "untracked" of "r" holds "keep"
+    And the index of "r" reads "a" as "<index>"
+    When "r" calls history(["HEAD"], limit=1)
+    Then the result's 0.sha is "<mem:root>"
+
+    Examples:
+      | mode  | files | index |
+      | soft  | local | two   |
+      | mixed | local | one   |
+      | hard  | one   | one   |
+
+  Scenario: Forced checkout resets an existing branch and discards tracked edits
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" calls checkout_new("topic")
+    And "r" commits "next" with a="two"
+    And "r" writes a="local", untracked="keep"
+    When "r" calls checkout_force("topic", "<mem:root>")
+    Then the file "a" of "r" holds "one"
+    And the file "untracked" of "r" holds "keep"
+    When "r" calls branch()
+    Then the result is "topic"
+    When "r" calls checkout_force("new", "main")
+    And "r" calls branch()
+    Then the result is "new"
+
+  Scenario: Renaming updates a checked out branch and refuses a taken name
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    When "r" calls rename_branch("main", "renamed")
+    And "r" calls branch()
+    Then the result is "renamed"
+    When "r" calls checkout_new("topic")
+    And "r" tries rename_branch("renamed", "topic")
+    Then the call raises BranchExists
+    When "r" tries rename_branch("absent", "other")
+    Then the call raises MissingRevision
+
+  Scenario: Branch deletion compares its tip and never retries a stale expectation
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" calls checkout_new("topic")
+    And "r" commits "next" with a="two"
+    And "r" remembers its head as "next"
+    And "r" calls checkout("main")
+    When "r" tries delete_branch("topic", expected="<mem:root>")
+    Then the call raises RefRace
+    And the failure cannot be retried
+    When "r" calls branches("topic")
+    Then the result is [["topic", "<mem:next>"]]
+    When "r" calls delete_branch("topic", expected="<mem:next>")
+    And "r" calls branches("topic")
+    Then the result is []
+    When "r" tries delete_branch("topic", expected="<mem:next>")
+    Then the call raises RefRace
+    And the failure cannot be retried
+
+  Scenario: Reset defaults to mixed and can run while detached
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" commits "next" with a="two"
+    And "r" remembers its head as "next"
+    And "r" calls checkout("<mem:next>")
+    When "r" calls reset("<mem:root>")
+    Then the file "a" of "r" holds "two"
+    And the index of "r" reads "a" as "one"
+    When "r" calls branch()
+    Then the result is None
+
+  Scenario: Staged recording works on an unborn branch and can explicitly create an empty commit
+    Given a repository "r"
+    And "r" writes a="staged", untracked="keep"
+    And "r" stages ["a"]
+    When "r" calls record("root", paths="staged")
+    Then the result is a Recorded
+    When "r" calls tree("HEAD")
+    Then the tree lists ["a"]
+    When "r" calls record("empty", paths="staged", allow_empty=True)
+    Then the result is a Recorded
+    When "r" calls history(["HEAD"])
+    Then the subject of each result entry is ["empty", "root"]
+
+  Scenario: Staged recording preserves the staged contents and leaves unstaged work alone
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" writes a="staged", added="new"
+    And "r" stages ["a", "added"]
+    And "r" writes a="unstaged", untracked="keep"
+    When "r" calls record("staged only", paths="staged")
+    Then the result is a Recorded
+    And the index of "r" reads "a" as "staged"
+    And the file "a" of "r" holds "unstaged"
+    When "r" calls tree("HEAD")
+    Then the tree reads "a" as "staged"
+    And the tree reads "added" as "new"
+    And the tree reads "untracked" as nothing
+    When "r" calls record("no staged changes", paths="staged")
+    Then the result is a NothingToRecord
+
+  Scenario: Tracked recording includes deletions and staged additions but excludes untracked files
+    Given a repository "r"
+    And "r" commits "root" with a="one", deleted="old"
+    And "r" writes added="new"
+    And "r" stages ["added"]
+    And "r" writes a="changed", untracked="keep"
+    And "r" removes "deleted"
+    When "r" calls record("tracked only", paths="tracked")
+    Then the result is a Recorded
+    When "r" calls tree("HEAD")
+    Then the tree lists ["a", "added"]
+    And the tree reads "a" as "changed"
+    And the file "untracked" of "r" holds "keep"
+
+  Scenario: Amend can change only the message or keep the message while folding staged work
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" commits "original" with a="two"
+    When "r" calls record("renamed", paths="staged", mode="amend")
+    Then the result is a Recorded
+    When "r" calls history(["HEAD"])
+    Then the subject of each result entry is ["renamed", "root"]
+    When "r" writes a="staged"
+    And "r" stages ["a"]
+    And "r" writes a="unstaged"
+    And "r" calls record("", paths="staged", mode="amend")
+    Then the result is a Recorded
+    And the file "a" of "r" holds "unstaged"
+    When "r" calls history(["HEAD"])
+    Then the subject of each result entry is ["renamed", "root"]
+    When "r" calls tree("HEAD")
+    Then the tree reads "a" as "staged"
+
+  Scenario: A refusing hook leaves the staged index and unstaged work intact
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" writes a="staged"
+    And "r" stages ["a"]
+    And "r" writes a="unstaged"
+    And "r" has a pre-commit hook that refuses
+    When "r" calls record("blocked", paths="staged", hooks=True)
+    Then the result is a HookRejected
+    And the index of "r" reads "a" as "staged"
+    And the file "a" of "r" holds "unstaged"
+    When "r" calls history(["HEAD"], limit=1)
+    Then the result's 0.sha is "<mem:root>"
+    When "r" calls record("accepted", paths="staged")
+    Then the result is a Recorded
+
+  Scenario: New checkout and reset report a missing start without changing branches
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    When "r" tries checkout_new("topic", "absent")
+    Then the call raises MissingRevision
+    When "r" tries reset("absent")
+    Then the call raises MissingRevision
+    When "r" tries checkout_force("topic", "absent")
+    Then the call raises MissingRevision
+    When "r" calls branch()
+    Then the result is "main"
+
+  Scenario: Index locks stop checkout and reset with a typed retryable failure
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" holds an index lock
+    When "r" tries checkout_new("topic")
+    Then the call raises IndexLocked
+    And the failure may be retried
+    When "r" tries reset("HEAD", mode="hard")
+    Then the call raises IndexLocked
+    And the failure may be retried
+
+  Scenario Outline: Checkout primitives fail loudly outside a repository
+    Given "plain" is the plain folder
+    When "plain" tries <call>
+    Then the call raises NotARepo
+
+    Examples:
+      | call                                 |
+      | branch()                             |
+      | checkout("main")                     |
+      | checkout_new("topic")                |
+      | clean()                              |
+      | reset("HEAD")                        |
+      | checkout_force("topic", "HEAD")      |
+      | record("work", paths="staged")       |
+
   # -- identity ----------------------------------------------------------------------------------------
   Scenario: A repository says where it is, and names itself the same from every worktree
     Given a repository "r"

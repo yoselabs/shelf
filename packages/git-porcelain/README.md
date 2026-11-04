@@ -107,16 +107,46 @@ land(RealRepo(path).worktree(path))             # the binary, memoized
 land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no subprocess
 ```
 
-- **`Repo`**: `identity sync relate history branches tree worktrees add_worktree drop_worktree
+- **`Repo`**: `identity sync fetch remote_url delete_remote_at merge_base cherry relate history branches rename_branch delete_branch tree worktrees add_worktree drop_worktree
   prune_worktrees worktree_state exclude_locally worktree`.
-- **`Worktree`**: `health snapshot diff dirty record take_branch release_branch park rebase_onto
-  finish_rebase push landed grep_tracked`.
+- **`Worktree`**: `health branch checkout checkout_new clean reset checkout_force snapshot diff dirty record take_branch release_branch park rebase_onto
+  finish_rebase rebase continue_rebase abort_rebase rebasing unmerged push push_refspecs push_request push_lease lfs_push landed grep_tracked`.
 - **Results are frozen unions** (`Recorded | NothingToRecord | HookRejected`, `BranchTaken |
   BranchHeld`, `UpToDate | Rebased | Conflict`, `Pushed | Rejected | Transient`, `Synced | Offline`,
   ...), shared records live in `git_porcelain.api`. An expected condition is a variant, except
   worktree removal's `WorktreeRemoveRefused` diagnostic. An
   infrastructure failure raises `GitUnavailable` (`.tail`, `.retryable`, `.hint`). A caller
   precondition raises `ValueError`.
+- **Checkout primitives**: `branch()` returns symbolic HEAD's short name, even for an unborn
+  branch, or `None` when detached. `checkout(ref)` switches to an existing local branch or
+  detaches at a commit-ish; it never creates a tracking branch implicitly. `checkout_new(branch,
+  start="HEAD")` creates exclusively, raising `BranchExists` for an existing branch.
+  Compatible local edits survive ordinary checkout; edits that would be overwritten raise
+  `DirtyTree`. A branch held by another worktree raises `BranchPinned` with its `holder`.
+  `checkout_force(branch, start)` runs checkout with `-B -f`: create or reset the branch and
+  discard local changes, while still respecting another worktree's branch pin.
+- **Cleanup and reset**: `clean(keep=(), ignored=False)` removes untracked files and directories
+  except gitignore-style `keep` patterns, without moving HEAD or changing tracked files.
+  `ignored=True` also removes ignored files. `reset(rev, mode="mixed")` moves HEAD; `soft`
+  preserves the index and working files, `mixed` resets the index, and `hard` also resets tracked
+  files, discarding edits. Unrelated untracked files survive a hard reset or forced checkout;
+  untracked files obstructing the target's tracked files may be removed by git.
+- **Branch maintenance**: `rename_branch(old, new)` renames without replacing an existing
+  destination (`BranchExists`). `delete_branch(branch, expected=sha)` uses atomic
+  compare-and-delete (`update-ref -d`); a moved or missing tip raises non-retryable `RefRace`.
+  A branch checked out in any worktree raises `BranchPinned`, preserving its tip and HEAD.
+  There is no merged check. No retry can delete a newly advanced tip.
+- **Recording scopes**: `record(message, paths="own", base=None, mode="new", squash_to=None,
+  hooks=False, allow_empty=False)` keeps the original `own` and `all` behavior. `tracked` stages
+  modifications/deletions of index-tracked paths and commits them with already staged additions;
+  untracked files stay out. `staged` commits the existing index contents, preserving staged blob
+  contents and leaving unstaged edits and untracked files alone. `mode="amend"` replaces HEAD
+  rather than adding a child, including message-only amendments; an empty message keeps HEAD's
+  message. An unborn HEAD cannot be amended. `squash_to` retains its existing soft-reset behavior.
+  Hooks run only with `hooks=True`; their refusal returns `HookRejected`. An unchanged index
+  returns `NothingToRecord` for a new commit unless `allow_empty=True`.
+  A failed commit is classified as `HookRejected` only when its diagnostic names a hook;
+  signing, identity and other command failures raise `GitUnavailable` (or its typed subclass).
 - **`RealRepo` owns the environment**: it strips the variables that make `-C` lie, forbids prompts,
   pins `GIT_DIR`/`GIT_WORK_TREE` from the checkout's `.git`, sets `LC_ALL=C`, and runs hooks:
   `record(hooks=False)` skips them, `push` always runs `pre-push`. Under `user.useConfigOnly` a
@@ -128,8 +158,7 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   text and each listed file's (size, mtime_ns, mode, inode, sha1) are unchanged, so a same-size
   edit in the same clock tick is still seen. A change made by another process to something the
   signatures do not cover needs `invalidate()`.
-- **`push(dst)` only.** The old `cfg['land']` configurability is gone (decision 13.1): a repo that
-  needs more (a different remote ref, extra checks) does it in its `pre-push` hook.
+- **Explicit landing operations** supplement `push(dst)`; their contracts are described below.
 - **Worktree pools** stay pinned to the checkout's `.git`, including add, remove and prune.
   `add_worktree(path, rev, force=True)` passes `--force`: it recreates a registered checkout
   whose folder disappeared, still detached at `rev`; it cannot replace a live checkout.
@@ -166,11 +195,106 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   virtual checkouts; git can retain registrations according to lock and expiration rules.
   The fake assumes descendant directories exist; it cannot distinguish an absent subdirectory
   inside a live checkout from an existing one when answering `worktree_state`.
+  Checkout/reset/clean operate on virtual regular files: no nested-repository protection,
+  filesystem permission failures, file/directory obstructions, reflogs or branch config migration.
+  Ordinary checkout conservatively refuses changed paths with local edits rather than modeling
+  every index merge exception git accepts. Branch-name validation, previous-checkout shorthand,
+  and tracking configuration are not modeled. Clean uses the fake's root-only ignore matcher.
+  Hooks remain refusal knobs; staged contents and amend parents/messages are modeled, while
+  author/committer metadata and commit ids differ from real git. Index locks are simulated by
+  `lock_index`; actual ref-lock contention runs only on real git.
 - **It cannot drift:** `tests/features/git_contract.feature` (`@contract`) holds one scenario per
   behaviour and runs against `RealRepo` on temp repos and against `FakeRepo`. Add a scenario before
   teaching the fake a new behaviour. `tests/test_real_git_cache.py` covers the memo rules on real git.
 
 ## Surface
+
+### Rebase and landing operations
+
+`Worktree.rebase_onto(base, squash_message=None, squash_failure="raise", update_refs=None)`
+inherits `rebase.updateRefs` when `update_refs` is `None`; `True` enables it and `False`
+overrides configuration. Failed squash commits restore the original HEAD and work before
+raising. `squash_failure="continue_unsquashed"` instead replays the original commits and
+returns the complete squash diagnostic in `Rebased.squash_failure` or
+`Conflict.squash_failure`. Conflicts remain paused; `abort_rebase(restore_to=original)`
+can restore the pre-squash HEAD.
+
+`rebase(base, update_refs=None)`, `continue_rebase(stage_conflicts=False,
+check_markers=False, missing_ok=False)` and `abort_rebase(missing_ok=True, restore_to=None)`
+return `CommandResult(ok, output)`. These preserve complete stripped stdout plus stderr;
+git refusals are `ok=False`, while invocation failures raise. Raw rebase always invokes
+git, including for dirty trees and already paused rebases. Continuation uses the caller's
+index by default; staging conflicted paths and checking markers are explicit choices.
+`rebasing()` checks both backends in the checkout's actual git directory; `unmerged()`
+freshly reads NUL-delimited paths in git order, including merge conflicts. Observation
+faults raise `GitReadFailure`, rather than manufacturing an empty answer.
+
+`Repo.merge_base(a, b)` returns a SHA or `None` for verified missing revisions or unrelated
+histories. Other observation failures raise `GitReadFailure`. `Repo.cherry(upstream, head)`
+returns oldest-first `Pick(oid, upstream)` rows matching git cherry's non-merge selection;
+`upstream=True` denotes patch equivalence. `Repo.remote_url(remote)` uses remote get-url,
+including URL rewrites; missing named remotes raise `MissingRemote`, distinct from failed
+observations. Both errors extend `GitUnavailable`.
+
+`Repo.fetch(remote="origin", refspecs=(), timeout=None)` accepts a named remote or a source
+URL/path, writes `FETCH_HEAD`, and retries ref-lock failures five times with the same
+increasing delays as `sync`. `fetch(source, refspecs=[ref])` is the scoped fetch operation;
+there is no redundant `fetch_ref` method. Missing remote refs raise. `timeout=None` means
+no timeout. `Repo.delete_remote_at(remote, ref, expected)` sends an explicit expected-SHA
+lease with a deletion refspec. `ref` must start with `refs/`; short names raise `ValueError`
+before invoking git. After refusal it verifies advertisement: absence succeeds,
+presence preserves the original push error, and failed verification raises `GitReadFailure`.
+
+`Worktree.push_refspecs(remote, refspecs, *, force=False, allow_delete=False, hook_env=None, timeout=None)` supports explicit
+OIDs, full namespaces, multiple updates and deletion. It returns `Pushed`, `RefRejected`
+(a `Rejected` subclass for non-fast-forward/stale races), `HookRejected`, `RemoteRejected`
+(policy/other per-ref refusal), or `Transient`. Diagnostics are complete combined output.
+For multiple updates, `Pushed.sha` identifies the first supplied source; a deletion-only
+request returns `Pushed(Sha(""))`: the empty sha means nothing was pushed, only deleted.
+Existing `push(dst)` retains its original result
+classification; callers needing policy-versus-race distinction use `push_refspecs`.
+
+`push_request(remote, refspecs, *, options=(), force=False, allow_delete=False, hook_env=None, timeout=None)` returns
+`CommandResult` for configured landing forms, including omitted remote/refspec defaults,
+`HEAD`, `HEAD:main`, `+HEAD:main`, OIDs, tags, deletion and multiple refs. Exact HEAD
+sources are captured once before hooks; force prefixes and explicit destinations survive.
+A bare HEAD retains its symbolic branch destination. For an explicit refspec with omitted
+remote, selection follows branch pushRemote, remote.pushDefault, branch remote, then origin.
+Normal pre-push hooks, checkout pinning and the repository's injected environment remain
+in force. Both push methods reject leading `+` without `force=True`, and empty-source
+deletion refspecs (`:destination`) without `allow_delete=True`, before invoking git.
+In `push_request`, `--force`/`-f` require `force=True`; `--delete`/`-d` and `--prune`
+require `allow_delete=True`; `--mirror` requires both. `--force-with-lease[=...]`
+remains allowed. Opt ins authorize the supplied forms; they do not add push options.
+Remote arguments starting with `-` raise `ValueError` in push, fetch, sync and guarded
+remote deletion. Other options pass to git without changing configuration or upstream settings.
+`push_lease(remote, refspec, timeout=3600)` uses plain `--force-with-lease`, preserving
+stale-info refusals. `lfs_push(remote, refs, timeout=3600)` invokes LFS once with all refs,
+without setup or hook installation. Its default timeout outcome is
+`CommandResult(False, "git lfs timed out after 60 min")`. Command-style push timeouts also
+return failure outcomes; spawn failures raise.
+
+The fake models branch rewrites (excluding branches held by worktrees), leases against
+fetched tracking refs, explicit push refspecs, guarded deletion, FETCH_HEAD, named URL
+rewrites and staged continuation. Mirror and wildcard pruning model remote ref deletion.
+`FakeRepo.hooks.commit_failure` injects a non-hook commit failure; no signing runs in memory.
+Its diagnostics are representative, while real git owns
+exact success and refusal wording. Scoped fetch sources must identify a registered
+`FakeRemote`; arbitrary transports, wildcard fetch refspecs, shallow histories, annotated
+tags, complex cherry patch/context equivalence and Git's ordering tie-breaks for complex
+graphs remain outside the fake. URL rewrite config keeps the fake's normalized-key limitation.
+The fake supports force, lease, dry-run and delete push options and basic clone upstream
+defaults; arbitrary configured push modes/options (including atomic transactions and server
+push options) are deliberately refused rather than simulated as successful. Real git accepts
+those options. Full emulation is entangled with Git's configuration and transport protocols.
+LFS transfer/storage is not simulated: `hooks.lfs_available` and `hooks.lfs_push_failure`
+control outcomes; `hooks.lfs_spawn_failure` raises an invocation error. LFS is unavailable
+by default. The real operation uses installed git-lfs. Successful transfer and deadline
+contract scenarios inject the process result in the real lane; the unavailable/failing
+command scenario invokes the real binary.
+Fake timeouts, filesystem failures, real hook execution and rebase backend differences are
+not simulated. Contract scenarios exercise the shared public methods against both lanes;
+the squash-failure scenario injects a process refusal in the real lane.
 
 The path-based plumbing also exports `Ref(name, oid)`, `ls_remote(repo, remote, *patterns)`,
 `branches(repo, remote=None)` (short names, local or that remote's tracking branches),
@@ -178,7 +302,7 @@ The path-based plumbing also exports `Ref(name, oid)`, `ls_remote(repo, remote, 
 `config_entries(repo, pattern)`, `symbolic_ref(repo, name)`, `merge_ff(repo, ref)`,
 `pull_rebase(repo, remote, branch)`, `check_ignore(repo, paths)` (`--no-index`), and
 `ls_files(repo, scope="tracked" | "untracked" | "ignored" | "all")` (sorted paths).
-Git diagnostics raise `MissingRevision`, `NotARepo`, `IndexLocked`, `RefRace`, or `BranchPinned`
+Git diagnostics raise `MissingRevision`, `NotARepo`, `IndexLocked`, `RefRace`, `DirtyTree`, `BranchExists`, or `BranchPinned`
 (`holder` is the other worktree); all extend `GitUnavailable` and `GitError`.
 `FakeRepo.plumbing()` supplies the same path-taking calls (`FakePlumbing` in `testing`).
 It inherits the fake's ignore/merge limitations; config has one value per normalized key and Python
