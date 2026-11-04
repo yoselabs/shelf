@@ -19,10 +19,11 @@ from pathlib import Path
 from typing import Protocol
 
 import pytest
+from pytest_bdd import given, parsers, scenarios, then, when
+
 from git_porcelain import Change, GitUnavailable, Identity, RealRepo, Worktree
 from git_porcelain.testing import QUIET, FakeRemote, FakeRepo, FakeWorktree, apply_hermetic_env
 from git_porcelain.testing import git as run
-from pytest_bdd import given, parsers, scenarios, then, when
 
 scenarios("features/git_contract.feature")
 

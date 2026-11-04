@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
+from pytest_bdd import given, parsers, scenarios, then, when
+
 from git_porcelain import Identity
 from git_porcelain.testing import apply_hermetic_env, git
-from pytest_bdd import given, parsers, scenarios, then, when
 
 if TYPE_CHECKING:
     from pathlib import Path

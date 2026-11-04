@@ -139,7 +139,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "base" with a.txt="a\n"
     When "r" tries snapshot("origin/nowhere")
-    Then the call raises GitUnavailable
+    Then the call raises MissingRevision
 
   # -- diff --------------------------------------------------------------------------------------------
   Scenario: A diff between two commits lists the changes and carries the patch
@@ -298,7 +298,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" holds an index lock
     When "r" writes a.txt="2\n"
     And "r" tries record("blocked")
-    Then the call raises GitUnavailable
+    Then the call raises IndexLocked
     And the failure may be retried
 
   @real_only
@@ -689,7 +689,7 @@ Feature: One Repo and Worktree, real or fake
     Then the result's ahead is 1
     And the result's behind is 2
     When "r" tries relate("HEAD", "nonsense")
-    Then the call raises GitUnavailable
+    Then the call raises MissingRevision
 
   Scenario: History lists commits newest first, from some revisions and not on others
     Given an origin "o"
@@ -807,9 +807,9 @@ Feature: One Repo and Worktree, real or fake
   Scenario: A folder that is no repository is an infrastructure failure
     Given "plain" is the plain folder
     When "plain" tries dirty()
-    Then the call raises GitUnavailable
+    Then the call raises NotARepo
     When "plain" tries snapshot("HEAD")
-    Then the call raises GitUnavailable
+    Then the call raises NotARepo
 
   @real_only
   Scenario: A missing git binary is an infrastructure failure (the fake runs no binary)

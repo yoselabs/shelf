@@ -11,8 +11,9 @@ import os
 import subprocess
 from typing import TYPE_CHECKING
 
-import git_porcelain as git
 import pytest
+
+import git_porcelain as git
 from git_porcelain import Identity, porcelain
 from git_porcelain.testing import git as _git
 

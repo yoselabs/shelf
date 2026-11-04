@@ -1,6 +1,6 @@
 [project]
 name = "git-porcelain"
-version = "0.7.0"
+version = "0.8.0"
 description = "A pure, fail-loud git surface over the git binary — preserving the user's credential/config fidelity."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
@@ -14,3 +14,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/git_porcelain"]
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+
+[tool.ruff.lint.extend-per-file-ignores]
+# These public failure names follow git's conditions and the consumer's existing taxonomy.
+"src/git_porcelain/errors.py" = ["N818"]
