@@ -13,11 +13,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from git_porcelain import Identity, RealRepo, RealWorktree
+from git_porcelain import GitReadFailure, Identity, MissingRevision, NotFastForward, RealRepo, RealWorktree
+from git_porcelain.real_done import Done
 from git_porcelain.testing import apply_hermetic_env
 from git_porcelain.testing import git as run
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
 _ME = Identity("Cache Author", "author@example.invalid")
@@ -58,6 +60,105 @@ def test_identity_is_asked_of_git_once(rig: Rig) -> None:
     for _ in range(3):
         rig.repo.identity()
     assert rig.count("--git-common-dir") == 1
+
+
+@pytest.mark.parametrize(
+    ("operation", "a", "b", "expected"),
+    [
+        ("is_ancestor", "HEAD", "HEAD", True),
+        ("is_ancestor", "HEAD~1", "HEAD", True),
+        ("is_ancestor", "HEAD", "HEAD~1", False),
+        ("merge_base", "HEAD~1", "HEAD", None),
+    ],
+)
+def test_revision_reads_start_one_process_per_ask(rig: Rig, operation: str, a: str, b: str, expected: bool | None) -> None:
+    root = run(rig.path, "rev-parse", "HEAD").strip()
+    rig.wt.record("second", allow_empty=True)
+    for _ in range(2):
+        rig.calls.clear()
+        if operation == "is_ancestor":
+            assert rig.repo.is_ancestor(a, b) is expected
+            assert rig.calls == [("merge-base", "--is-ancestor", "--end-of-options", a, b)]
+        else:
+            assert rig.repo.merge_base(a, b) == root
+            assert rig.calls == [("merge-base", "--end-of-options", a, b)]
+
+
+@pytest.mark.parametrize("detached", [False, True])
+def test_branch_starts_one_process_per_ask(rig: Rig, *, detached: bool) -> None:
+    if detached:
+        run(rig.path, "checkout", "-q", "--detach")
+    for _ in range(2):
+        rig.calls.clear()
+        assert rig.wt.branch() == (None if detached else "main")
+        assert rig.calls == [("symbolic-ref", "--short", "-q", "HEAD")]
+
+
+@pytest.mark.parametrize(("a", "b"), [("missing", "HEAD"), ("HEAD", "missing")])
+def test_missing_ancestry_still_starts_only_one_process(rig: Rig, a: str, b: str) -> None:
+    rig.calls.clear()
+    with pytest.raises(MissingRevision):
+        rig.repo.is_ancestor(a, b)
+    assert rig.calls == [("merge-base", "--is-ancestor", "--end-of-options", a, b)]
+
+
+def test_unrelated_revision_reads_each_start_one_process(rig: Rig) -> None:
+    unrelated = run(rig.path, "commit-tree", "HEAD^{tree}", "-m", "another root").strip()
+    rig.calls.clear()
+    assert rig.repo.merge_base("HEAD", unrelated) is None
+    assert rig.calls == [("merge-base", "--end-of-options", "HEAD", unrelated)]
+    rig.calls.clear()
+    assert rig.repo.is_ancestor("HEAD", unrelated) is False
+    assert rig.calls == [("merge-base", "--is-ancestor", "--end-of-options", "HEAD", unrelated)]
+
+
+@pytest.mark.parametrize("revision", ["--root", "--abort", "--all", "--independent", "-x"])
+def test_option_like_revisions_start_no_process(rig: Rig, revision: str) -> None:
+    rig.calls.clear()
+    for operation in (rig.repo.is_ancestor, rig.repo.merge_base):
+        for a, b in ((revision, "HEAD"), ("HEAD", revision)):
+            with pytest.raises(ValueError, match="revision must not start"):
+                operation(a, b)
+    with pytest.raises(ValueError, match="revision must not start"):
+        rig.wt.rebase(revision)
+    assert rig.calls == []
+
+
+def test_fast_forward_failure_is_typed_with_an_injected_non_english_locale(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LANG", "fr_FR.UTF-8")
+    run(rig.path, "checkout", "-qb", "other")
+    run(rig.path, "commit", "--allow-empty", "-qm", "other")
+    run(rig.path, "checkout", "-q", "main")
+    run(rig.path, "commit", "--allow-empty", "-qm", "local")
+    repo = RealRepo(rig.path, env={"LC_ALL": "fr_FR.UTF-8", "LANG": "fr_FR.UTF-8"})
+    wt = repo.worktree(rig.path)
+    before = repo.history(["HEAD"])
+    with pytest.raises(NotFastForward):
+        wt.merge_ff("other")
+    assert repo.history(["HEAD"]) == before
+
+
+@pytest.mark.parametrize("operation", ["is_ancestor", "merge_base"])
+@pytest.mark.parametrize("outcome", [Done(128, b"", "unknown read failure"), Done(0, b"malformed", "")])
+def test_revision_read_failures_are_never_absence(rig: Rig, monkeypatch: pytest.MonkeyPatch, operation: str, outcome: Done) -> None:
+    original = rig.repo.run
+
+    def failed_read(
+        cwd: Path,
+        *args: str,
+        check: bool = True,
+        pin: bool = True,
+        stdin: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Done:
+        if args[0] == "merge-base":
+            return outcome
+        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+
+    monkeypatch.setattr(rig.repo, "run", failed_read)
+    with pytest.raises(GitReadFailure):
+        getattr(rig.repo, operation)("HEAD", "HEAD")
 
 
 def test_memo_can_be_switched_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -3,6 +3,254 @@ Feature: One Repo and Worktree, real or fake
   Every intent operation a driver such as task-loop takes on a checkout behaves the same on the git binary
   (RealRepo) and in memory (FakeRepo). These scenarios run against both; @real_only names a gap of the fake.
 
+  Scenario: Literal staging includes deletions and leaves other working files alone
+    Given a repository "r"
+    And "r" commits "root" with gone="old", keep="old"
+    And "r" removes "gone"
+    And "r" writes keep="edited", "[literal]"="new", other="untracked"
+    When "r" calls stage(["gone", "[literal]"])
+    And "r" calls record("selected", paths="staged")
+    Then the result is a Recorded
+    When "r" calls tree("HEAD")
+    Then the tree lists ["[literal]", "keep"]
+    And the tree reads "keep" as "old"
+    When "r" calls stage([])
+    And "r" calls stage_tracked()
+    And "r" calls record("tracked", paths="staged")
+    Then the result is a Recorded
+    When "r" calls tree("HEAD")
+    Then the tree lists ["[literal]", "keep"]
+    And the tree reads "keep" as "edited"
+
+  Scenario: Staging a missing path reports failure
+    Given a repository "r"
+    When "r" tries stage(["missing"])
+    Then the call raises GitUnavailable
+
+  Scenario: Staging supports NUL delimited names and optional wildcard matching
+    Given a repository "r"
+    And "r" has many literal paths waiting to stage
+    When "r" stages all the many literal paths
+    And "r" calls record("many", paths="staged")
+    Then the result is a Recorded
+    And all the many literal paths were committed
+    When "r" writes first.txt="one", second.txt="two", other="keep"
+    And "r" calls stage(["*.txt"], literal=False)
+    And "r" calls record("glob", paths="staged")
+    Then the result is a Recorded
+    When "r" calls dirty()
+    Then the result's untracked is ["other"]
+
+  Scenario: Tags are exclusive and missing revisions cannot create tags
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    When "r" calls tag("release", "HEAD")
+    And "r" calls refs(["refs/tags/"])
+    Then the result is [{"name": "refs/tags/release", "sha": "<mem:root>"}]
+    When "r" tries tag("release", "HEAD")
+    Then the call raises TagExists
+    When "r" tries tag("absent", "missing")
+    Then the call raises MissingRevision
+    When "r" calls refs([])
+    Then the name of each result entry is ["refs/heads/main", "refs/tags/release"]
+    When "r" calls refs(["refs/absent/"])
+    Then the result is []
+
+  Scenario: Ref listings accept arbitrary namespaces and multiple prefixes
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" calls fetch("origin", refspecs=["main:refs/custom/task"])
+    And "r" calls tag("release", "HEAD")
+    When "r" calls refs(["refs/custom/", "refs/tags/"])
+    Then the name of each result entry is ["refs/custom/task", "refs/tags/release"]
+    And the sha of each result entry is ["<head:r>", "<head:r>"]
+
+  Scenario: Counts use explicit include and exclude sets without implicit HEAD
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" commits "child" with b="two"
+    When "r" calls count(["HEAD", "main"], ["HEAD~1"])
+    Then the result is 1
+    When "r" calls count([])
+    Then the result is 0
+    When "r" calls count(["HEAD~1..HEAD", "HEAD~1"])
+    Then the result is 1
+    When "r" calls count(["HEAD", "^HEAD~1"])
+    Then the result is 1
+    When "r" tries count(["missing"])
+    Then the call raises MissingRevision
+    When "r" tries count(["HEAD"], ["missing"])
+    Then the call raises MissingRevision
+
+  Scenario: Fast forward merging preserves divergence as a typed error
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" commits "child" with b="two"
+    And "r" remembers its head as "child"
+    And "r" calls reset("<mem:root>", mode="hard")
+    When "r" calls merge_ff("<mem:child>")
+    And "r" calls count(["HEAD"])
+    Then the result is 2
+    When "r" calls reset("<mem:root>", mode="hard")
+    And "r" commits "different" with c="three"
+    And "r" tries merge_ff("<mem:child>")
+    Then the call raises NotFastForward
+    When "r" tries merge_ff("missing")
+    Then the call raises MissingRevision
+
+  Scenario: Remote advertisements accept patterns and report unreachable repositories
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" calls ls_remote("origin", ["main"])
+    Then the name of each result entry is ["refs/heads/main"]
+    And the oid of each result entry is ["<head:r>"]
+    When "r" calls ls_remote("origin", ["absent"])
+    Then the result is []
+    When "r" calls ls_remote("origin")
+    Then the name of each result entry is ["HEAD", "refs/heads/main"]
+    When the origin "o" goes offline
+    And "r" tries ls_remote("origin")
+    Then the call raises GitUnavailable
+
+  Scenario: Remote advertisements use the repository's injected environment
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" reaches origin "o" only through its injected environment
+    When "r" calls ls_remote("injected", ["main"])
+    Then the name of each result entry is ["refs/heads/main"]
+    And the oid of each result entry is ["<head:r>"]
+
+  Scenario: Staging and fast forward merging stay pinned under stray configuration
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "root"
+    And "r" commits "child" with b="new"
+    And "r" remembers its head as "child"
+    And "r" calls reset("<mem:root>", mode="hard")
+    And a folder "elsewhere"
+    And "r" config "core.worktree" is "<root>/elsewhere"
+    When "r" calls merge_ff("<mem:child>")
+    Then the file "b" of "r" holds "new"
+    When "r" writes a="edited"
+    And "r" calls stage_tracked()
+    Then the index of "r" reads "a" as "edited"
+    When "r" writes literal="added"
+    And "r" calls stage(["literal"])
+    Then the index of "r" reads "literal" as "added"
+
+  Scenario Outline: Recording preserves all hook output on success and refusal
+    Given a repository "r"
+    And "r" commits "root" with a="old"
+    And "r" writes a="new"
+    And "r" stages ["a"]
+    And the verbose commit hook of "r" <outcome>
+    When "r" calls record("work", paths="<scope>", mode="<mode>", hooks=True)
+    Then the result is a <kind>
+    And the complete hook output is preserved
+
+    Examples:
+      | outcome  | scope   | mode  | kind         |
+      | accepts  | staged  | new   | Recorded     |
+      | refuses  | staged  | new   | HookRejected |
+      | accepts  | tracked | amend | Recorded     |
+      | refuses  | tracked | amend | HookRejected |
+
+  Scenario: Non hook commit failures also preserve complete combined output
+    Given a repository "r"
+    And "r" commits "root" with a="old"
+    And "r" writes a="new"
+    And the commit command of "r" fails with a long diagnostic
+    When "r" tries record("work", paths="tracked", hooks=True)
+    Then the call raises GitUnavailable
+    And the complete commit failure output is preserved
+
+  Scenario Outline: Recording marker text leaves the commit decision to git
+    Given a repository "r"
+    And "r" commits "root" with a="old"
+    And "r" writes a="<<<<<<< ours\nmine\n=======\ntheirs\n>>>>>>> theirs\n"
+    And "r" stages ["a"]
+    When "r" calls record("markers", paths="<scope>", mode="<mode>")
+    Then the result is a Recorded
+    When "r" calls tree("HEAD")
+    Then the tree reads "a" as "<<<<<<< ours\nmine\n=======\ntheirs\n>>>>>>> theirs\n"
+
+    Examples:
+      | scope   | mode  |
+      | staged  | new   |
+      | tracked | amend |
+
+  Scenario: Amending an unborn branch exposes git's refusal after staging
+    Given a repository "r"
+    And "r" writes a="pending"
+    When "r" tries record("amend", paths="tracked", mode="amend", hooks=True)
+    Then the call raises GitUnavailable
+    When "r" tries record("amend", paths="staged", mode="amend")
+    Then the call raises GitUnavailable
+
+  Scenario: Rebase still runs against an ancestor and lets git refuse dirty work
+    Given a repository "r"
+    And "r" commits "root" with a="old"
+    And "r" commits "child" with b="new"
+    When "r" calls rebase("HEAD~1")
+    Then the result's ok is True
+    When "r" writes a="dirty"
+    And "r" calls rebase("HEAD~1", update_refs=False)
+    Then the result's ok is False
+    And the command output contains "cannot rebase"
+
+  Scenario Outline: Rebase preserves complete command refusals and propagates spawn failures
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And the rebase command of "r" will <outcome>
+    When "r" tries rebase("HEAD")
+    Then the rebase command outcome is "<outcome>"
+
+    Examples:
+      | outcome     |
+      | refuse      |
+      | fail spawn  |
+
+  Scenario Outline: Command rebase inherits update refs configuration and permits overrides
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" calls checkout_new("topic")
+    And "r" commits "first" with b="first"
+    And "r" calls checkout_new("middle")
+    And "r" remembers its head as "middle"
+    And "r" calls checkout("topic")
+    And "r" commits "second" with c="second"
+    And "r" calls checkout("main")
+    And "r" commits "base" with d="base"
+    And "r" calls checkout("topic")
+    And "r" config "rebase.updateRefs" is "true"
+    When "r" calls rebase("main", update_refs=<option>)
+    Then the result's ok is True
+    And the branch "middle" of "r" rewritten is <rewritten>
+
+    Examples:
+      | option | rewritten |
+      | None   | True      |
+      | True   | True      |
+      | False  | False     |
+
+  Scenario: Command rebase reports an already paused rebase without raising
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    When "r" calls rebase("origin/main")
+    Then the result's ok is False
+    When "r" calls rebase("origin/main")
+    Then the result's ok is False
+    And the command output contains "rebase-merge"
+
   Scenario: Guarded remote deletion requires a full ref and preserves a stale lease
     Given an origin "o"
     And the origin "o" holds a="root"
@@ -179,17 +427,59 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "root" with a="root"
     And "r" remembers its head as "before"
     When "r" tries <operation>
-    Then the call raises MissingRevision
+    Then the call raises <error>
     When "r" calls branch()
     Then the result is "main"
     When "r" calls snapshot("HEAD")
     Then the result's head is "<mem:before>"
 
     Examples:
-      | operation                                                  |
-      | take_branch(branch="topic", base="--orphan", mode="restart") |
-      | take_branch(branch="main", base="missing", mode="resume")    |
-      | rebase_onto("--exec=false", squash_message="squash")          |
+      | operation                                                  | error           |
+      | take_branch(branch="topic", base="--orphan", mode="restart") | ValueError      |
+      | take_branch(branch="main", base="missing", mode="resume")    | MissingRevision |
+      | rebase_onto("--exec=false", squash_message="squash")          | ValueError      |
+
+  Scenario Outline: Other revision consumers reject options before changing the checkout
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "before"
+    When "r" tries <operation>
+    Then the call raises ValueError
+    When "r" calls branch()
+    Then the result is "main"
+    When "r" calls history(["HEAD"])
+    Then the sha of each result entry is ["<mem:before>"]
+    When "r" calls refs(["refs/tags/"])
+    Then the result is []
+
+    Examples:
+      | operation                                                            |
+      | checkout("--orphan")                                                 |
+      | checkout_new("topic", "-x")                                          |
+      | checkout_force("topic", "-x")                                        |
+      | reset("--hard")                                                      |
+      | merge_ff("--abort")                                                  |
+      | cherry("--abbrev=1", "HEAD")                                         |
+      | cherry("HEAD", "--abbrev=1")                                         |
+      | relate("--all", "HEAD")                                              |
+      | relate("HEAD", "--all")                                              |
+      | history(["--all"])                                                   |
+      | history(["HEAD"], not_on=["--all"])                                   |
+      | history(["HEAD"], patch_equivalent_to="--all")                         |
+      | tree("--all")                                                        |
+      | snapshot("--all")                                                    |
+      | dirty("--all")                                                       |
+      | landed("--all", "unmatched")                                         |
+      | diff("--output=injected", "HEAD")                                     |
+      | diff("HEAD", "--output=injected")                                     |
+      | tag("probe", "--all")                                                |
+      | count(["--all"])                                                     |
+      | count(["HEAD"], exclude=["--all"])                                    |
+      | add_worktree("<root>/injected", "--orphan")                            |
+      | take_branch(branch="--orphan", base="HEAD", mode="resume")            |
+      | abort_rebase(restore_to="--hard")                                     |
+      | finish_rebase("abort", restore_to="--hard")                           |
+      | record("squash", paths="all", mode="squash_to", squash_to="--hard")    |
 
   Scenario: A signer failure is infrastructure failure rather than hook rejection
     Given a repository "r"
@@ -203,6 +493,21 @@ Feature: One Repo and Worktree, real or fake
     Then the result's head is "<mem:before>"
     And the index of "r" reads "b" as "pending"
 
+  Scenario: Recording an unresolved conflict is a git failure with hooks enabled
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    And "r" calls rebase("origin/main")
+    When "r" tries record("unresolved", paths="staged", hooks=True, allow_empty=True)
+    Then the call raises GitUnavailable
+    When "r" calls rebasing()
+    Then the result is True
+    When "r" calls unmerged()
+    Then the result is ["a"]
+
   Scenario: Fresh rebase observations and command refusals are explicit
     Given a repository "r"
     When "r" calls rebasing()
@@ -213,8 +518,52 @@ Feature: One Repo and Worktree, real or fake
     Then the result's ok is True
     When "r" calls continue_rebase()
     Then the result's ok is False
-    When "r" calls rebase("missing")
+    When "r" tries rebase("missing")
+    Then the call raises MissingRevision
+
+  Scenario Outline: Option-like revisions cannot alter history
+    Given a repository "r"
+    And "r" commits "root" with a="root\n"
+    And "r" commits "next" with b="next\n"
+    Then "r" rejects option-like revision "<revision>" without changing history
+
+    Examples:
+      | revision      |
+      | --root        |
+      | --abort       |
+      | --quit        |
+      | --all         |
+      | --octopus     |
+      | --fork-point  |
+      | --independent |
+      | -x            |
+
+  Scenario Outline: Option-like revisions leave a paused rebase intact
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    And "r" calls rebase("origin/main")
     Then the result's ok is False
+    And "r" rejects option-like revision "<revision>" without changing history
+    When "r" calls rebasing()
+    Then the result is True
+    When "r" writes a="resolved\n"
+    And "r" calls continue_rebase(stage_conflicts=True, check_markers=True)
+    Then the result's ok is True
+    When "r" calls rebasing()
+    Then the result is False
+
+    Examples:
+      | revision      |
+      | --root        |
+      | --abort       |
+      | --quit        |
+      | --all         |
+      | --independent |
+      | -x            |
 
   Scenario: Merge base permits missing revisions and cherry preserves oldest first picks
     Given a repository "r"
@@ -225,11 +574,46 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "second" with c="second"
     When "r" calls merge_base("missing", "HEAD")
     Then the result is None
+    When "r" calls merge_base("HEAD", "missing")
+    Then the result is None
     When "r" calls merge_base("<mem:root>", "HEAD")
     Then the result is "<mem:root>"
     When "r" calls cherry("<mem:root>", "HEAD")
     Then the oid of each result entry is ["<mem:first>", "<head:r>"]
     And the upstream of each result entry is [False, False]
+
+  Scenario: Ancestry distinguishes equality ancestors descendants and diverged commits
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "root"
+    And "r" commits "left" with b="left"
+    And "r" remembers its head as "left"
+    When "r" calls is_ancestor("HEAD", "HEAD")
+    Then the result is True
+    When "r" calls is_ancestor("<mem:root>", "HEAD")
+    Then the result is True
+    When "r" calls is_ancestor("HEAD", "<mem:root>")
+    Then the result is False
+    When "r" calls checkout_new("right", "<mem:root>")
+    And "r" commits "right" with c="right"
+    And "r" calls is_ancestor("<mem:left>", "HEAD")
+    Then the result is False
+
+  Scenario Outline: Ancestry reports missing revisions instead of false
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    When "r" tries is_ancestor(<a>, <b>)
+    Then the call raises MissingRevision
+
+    Examples:
+      | a         | b         |
+      | "missing" | "HEAD"    |
+      | "HEAD"    | "missing" |
+
+  Scenario: Ancestry reports an unborn HEAD as a missing revision
+    Given a repository "r"
+    When "r" tries is_ancestor("HEAD", "HEAD")
+    Then the call raises MissingRevision
 
   Scenario: Named remote URL absence is typed
     Given a repository "r"
@@ -246,6 +630,7 @@ Feature: One Repo and Worktree, real or fake
     Examples:
       | operation                 |
       | merge_base("HEAD", "HEAD") |
+      | is_ancestor("HEAD", "HEAD") |
       | remote_url("origin")       |
       | rebasing()                 |
       | unmerged()                 |
@@ -344,6 +729,26 @@ Feature: One Repo and Worktree, real or fake
     And "r" calls fetch()
     When "r" calls merge_base("HEAD", "origin/main")
     Then the result is None
+    When "r" calls is_ancestor("HEAD", "origin/main")
+    Then the result is False
+
+  Scenario: Branch observation faults remain failures
+    Given a repository "r"
+    And the observations of "r" will fail
+    When "r" tries branch()
+    Then the call raises GitUnavailable
+
+  Scenario Outline: Revision reads fail when the repository becomes unreadable
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And the folder of "r" is deleted behind git's back
+    When "r" tries <operation>
+    Then the call raises GitReadFailure
+
+    Examples:
+      | operation                   |
+      | merge_base("HEAD", "HEAD")  |
+      | is_ancestor("HEAD", "HEAD") |
 
   Scenario: Named remote URLs honor rewrite rules
     Given an origin "o"
