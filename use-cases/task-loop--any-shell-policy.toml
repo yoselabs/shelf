@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "task-loop"
+software = "any-shell-policy"
+why = "task-loop's PreToolUse hook (src/taskloop/hook/rules.py) refuses pkill and killall with its own shlex tokenizer, and delegate's worker policy carries a second, independent tokenizer with about 10% duplicated rules; every further guard rule would grow a third."
+needs = "parse(text) into simple commands that looks through separators, sh -c, wrappers and quoting; Command.name for wrapper-stripped program names; judge(rules, tool, tool_input) as the first-block-wins runner for the hook's rule list."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active"          # active | retired

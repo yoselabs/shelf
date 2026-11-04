@@ -21,6 +21,7 @@ members = [
     "any-markdown",
     "any-path-glob",
     "any-proc",
+    "any-shell-policy",
     "anyembed",
     "anyllm",
     "app-dirs",
@@ -265,6 +266,11 @@ source = { editable = "packages/any-path-glob" }
 name = "any-proc"
 version = "0.3.0"
 source = { editable = "packages/any-proc" }
+
+[[package]]
+name = "any-shell-policy"
+version = "0.1.0"
+source = { editable = "packages/any-shell-policy" }
 
 [[package]]
 name = "anyascii"
