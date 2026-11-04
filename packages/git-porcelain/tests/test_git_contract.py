@@ -110,6 +110,7 @@ class RealRig:
     def make_origin(self, name: str) -> str:
         path = self.root / f"{name}.git"
         run(self.root, "init", "-q", "--bare", "-b", "main", str(path))
+        run(path, "config", "receive.denyDeleteCurrent", "ignore")  # the contract deletes main on a bare origin; the fake allows it
         return str(path)
 
     def add_remote(self, wt: Worktree, name: str, url: str) -> None:
@@ -154,7 +155,11 @@ class RealRig:
         # the hermetic env runs with core.hooksPath=/dev/null at command-line scope: hooks only run without it
         config = {k: v for k, v in QUIET.items() if k != "core.hooksPath"}
         apply_hermetic_env(self.monkeypatch, identity=_ME, config=config, home=self.root / "home")
-        script = "echo declined >&2\nexit 1\n" if mode == "refuses" else '[ "$X" = "1" ] || { echo "X is not set" >&2; exit 1; }\n'
+        script = (
+            f"echo '{kind} hook declined' >&2\nexit 1\n"
+            if mode == "refuses"
+            else '[ "$X" = "1" ] || { echo "X is not set" >&2; exit 1; }\n'
+        )
         hook = wt.path / ".git" / "hooks" / kind
         hook.parent.mkdir(parents=True, exist_ok=True)
         hook.write_text("#!/bin/sh\n" + script, encoding="utf-8")
@@ -401,6 +406,38 @@ def _hook(world: World, name: str, kind: str, mode: str) -> None:
 @given(parsers.parse('"{name}" holds an index lock'))
 def _index_lock(world: World, name: str) -> None:
     world.rig.lock_index(world.wts[name])
+
+
+@given(parsers.parse('the signer of "{name}" fails'))
+def _signer_fails(world: World, name: str) -> None:
+    repo = world.wts[name].repo
+    if isinstance(repo, FakeRepo):
+        repo.hooks.commit_failure = "error: gpg failed to sign the data"
+        return
+    assert isinstance(repo, RealRepo)
+    original = repo.run
+
+    def signing_process(
+        cwd: Path,
+        *args: str,
+        check: bool = True,
+        pin: bool = True,
+        stdin: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Done:
+        config = ("-c", "commit.gpgsign=true", "-c", "gpg.program=false") if "commit" in args else ()
+        return original(cwd, *config, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+
+    world.monkeypatch.setattr(repo, "run", signing_process)
+
+
+@then("the push succeeded")
+def _push_succeeded(world: World) -> None:
+    if isinstance(world.result, CommandResult):
+        assert world.result.ok, world.result.output
+    else:
+        assert type(world.result).__name__ == "Pushed", world.result
 
 
 @given(parsers.parse('"{name}" commits "{message}" with {files}'))

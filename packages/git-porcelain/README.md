@@ -134,8 +134,8 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
 - **Branch maintenance**: `rename_branch(old, new)` renames without replacing an existing
   destination (`BranchExists`). `delete_branch(branch, expected=sha)` uses atomic
   compare-and-delete (`update-ref -d`); a moved or missing tip raises non-retryable `RefRace`.
-  This is a ref operation, without branch porcelain's merged/pinned checks: deleting a checked
-  out branch leaves its symbolic HEAD unborn. No retry can delete a newly advanced tip.
+  A branch checked out in any worktree raises `BranchPinned`, preserving its tip and HEAD.
+  There is no merged check. No retry can delete a newly advanced tip.
 - **Recording scopes**: `record(message, paths="own", base=None, mode="new", squash_to=None,
   hooks=False, allow_empty=False)` keeps the original `own` and `all` behavior. `tracked` stages
   modifications/deletions of index-tracked paths and commits them with already staged additions;
@@ -145,6 +145,8 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   message. An unborn HEAD cannot be amended. `squash_to` retains its existing soft-reset behavior.
   Hooks run only with `hooks=True`; their refusal returns `HookRejected`. An unchanged index
   returns `NothingToRecord` for a new commit unless `allow_empty=True`.
+  A failed commit is classified as `HookRejected` only when its diagnostic names a hook;
+  signing, identity and other command failures raise `GitUnavailable` (or its typed subclass).
 - **`RealRepo` owns the environment**: it strips the variables that make `-C` lie, forbids prompts,
   pins `GIT_DIR`/`GIT_WORK_TREE` from the checkout's `.git`, sets `LC_ALL=C`, and runs hooks:
   `record(hooks=False)` skips them, `push` always runs `pre-push`. Under `user.useConfigOnly` a
@@ -239,25 +241,33 @@ URL/path, writes `FETCH_HEAD`, and retries ref-lock failures five times with the
 increasing delays as `sync`. `fetch(source, refspecs=[ref])` is the scoped fetch operation;
 there is no redundant `fetch_ref` method. Missing remote refs raise. `timeout=None` means
 no timeout. `Repo.delete_remote_at(remote, ref, expected)` sends an explicit expected-SHA
-lease with a deletion refspec. After refusal it verifies advertisement: absence succeeds,
+lease with a deletion refspec. `ref` must start with `refs/`; short names raise `ValueError`
+before invoking git. After refusal it verifies advertisement: absence succeeds,
 presence preserves the original push error, and failed verification raises `GitReadFailure`.
 
-`Worktree.push_refspecs(remote, refspecs, hook_env=None, timeout=None)` supports explicit
+`Worktree.push_refspecs(remote, refspecs, *, force=False, allow_delete=False, hook_env=None, timeout=None)` supports explicit
 OIDs, full namespaces, multiple updates and deletion. It returns `Pushed`, `RefRejected`
 (a `Rejected` subclass for non-fast-forward/stale races), `HookRejected`, `RemoteRejected`
 (policy/other per-ref refusal), or `Transient`. Diagnostics are complete combined output.
 For multiple updates, `Pushed.sha` identifies the first supplied source; a deletion-only
-request uses the empty SHA sentinel. Existing `push(dst)` retains its original result
+request returns `Pushed(Sha(""))`: the empty sha means nothing was pushed, only deleted.
+Existing `push(dst)` retains its original result
 classification; callers needing policy-versus-race distinction use `push_refspecs`.
 
-`push_request(remote, refspecs, options=(), hook_env=None, timeout=None)` returns
+`push_request(remote, refspecs, *, options=(), force=False, allow_delete=False, hook_env=None, timeout=None)` returns
 `CommandResult` for configured landing forms, including omitted remote/refspec defaults,
 `HEAD`, `HEAD:main`, `+HEAD:main`, OIDs, tags, deletion and multiple refs. Exact HEAD
 sources are captured once before hooks; force prefixes and explicit destinations survive.
 A bare HEAD retains its symbolic branch destination. For an explicit refspec with omitted
 remote, selection follows branch pushRemote, remote.pushDefault, branch remote, then origin.
 Normal pre-push hooks, checkout pinning and the repository's injected environment remain
-in force. Options pass to git without changing configuration or upstream settings.
+in force. Both push methods reject leading `+` without `force=True`, and empty-source
+deletion refspecs (`:destination`) without `allow_delete=True`, before invoking git.
+In `push_request`, `--force`/`-f` require `force=True`; `--delete`/`-d` and `--prune`
+require `allow_delete=True`; `--mirror` requires both. `--force-with-lease[=...]`
+remains allowed. Opt ins authorize the supplied forms; they do not add push options.
+Remote arguments starting with `-` raise `ValueError` in push, fetch, sync and guarded
+remote deletion. Other options pass to git without changing configuration or upstream settings.
 `push_lease(remote, refspec, timeout=3600)` uses plain `--force-with-lease`, preserving
 stale-info refusals. `lfs_push(remote, refs, timeout=3600)` invokes LFS once with all refs,
 without setup or hook installation. Its default timeout outcome is
@@ -266,7 +276,9 @@ return failure outcomes; spawn failures raise.
 
 The fake models branch rewrites (excluding branches held by worktrees), leases against
 fetched tracking refs, explicit push refspecs, guarded deletion, FETCH_HEAD, named URL
-rewrites and staged continuation. Its diagnostics are representative, while real git owns
+rewrites and staged continuation. Mirror and wildcard pruning model remote ref deletion.
+`FakeRepo.hooks.commit_failure` injects a non-hook commit failure; no signing runs in memory.
+Its diagnostics are representative, while real git owns
 exact success and refusal wording. Scoped fetch sources must identify a registered
 `FakeRemote`; arbitrary transports, wildcard fetch refspecs, shallow histories, annotated
 tags, complex cherry patch/context equivalence and Git's ordering tie-breaks for complex

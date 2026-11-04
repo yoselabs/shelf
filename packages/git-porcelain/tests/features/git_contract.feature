@@ -3,6 +3,206 @@ Feature: One Repo and Worktree, real or fake
   Every intent operation a driver such as task-loop takes on a checkout behaves the same on the git binary
   (RealRepo) and in memory (FakeRepo). These scenarios run against both; @real_only names a gap of the fake.
 
+  Scenario: Guarded remote deletion requires a full ref and preserves a stale lease
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And the origin "o" advances "main" with b="remote"
+    When "r" tries delete_remote_at("origin", "main", "<mem:root>")
+    Then the call raises ValueError
+    When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:root>")
+    Then the call raises GitUnavailable
+    When "r" calls fetch("origin")
+    And "r" calls history(["origin/main"], limit=1)
+    Then the result's 0.sha is not "<mem:root>"
+
+  Scenario: Checked out branches cannot be deleted even at the expected tip
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "root"
+    When "r" tries delete_branch("main", expected="<mem:root>")
+    Then the call raises BranchPinned
+    When "r" calls branches()
+    Then the result is [["main", "<mem:root>"]]
+    When "r" calls checkout_new("other")
+    And "r" calls delete_branch("main", expected="<mem:root>")
+    And "r" calls branches()
+    Then the result is [["other", "<mem:root>"]]
+
+  Scenario: Another worktree also prevents branch deletion
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "root"
+    And "r" calls checkout_new("topic")
+    And "r" calls checkout("main")
+    And "r" adds a worktree "linked" at "topic" as "linked"
+    And "linked" calls checkout("topic")
+    When "r" tries delete_branch("topic", expected="<mem:root>")
+    Then the call raises BranchPinned
+    When "r" calls branches("topic")
+    Then the result is [["topic", "<mem:root>"]]
+    When "linked" calls branch()
+    Then the result is "topic"
+
+  Scenario Outline: Push safety requires explicit consent before invoking git
+    Given a repository "r"
+    When "r" tries <operation>
+    Then the call raises ValueError
+
+    Examples:
+      | operation                                                         |
+      | push_refspecs("origin", ["+HEAD:main"])                             |
+      | push_request("origin", ["+HEAD:main"])                              |
+      | push_refspecs("origin", [":main"])                                  |
+      | push_refspecs("origin", ["+:main"], force=True)                      |
+      | push_request("origin", ["+:main"], force=True)                       |
+      | push_refspecs("origin", ["+:main"], allow_delete=True)               |
+      | push_request("origin", ["+:main"], allow_delete=True)                |
+      | push_request("origin", [":main"])                                   |
+      | push_request("origin", ["main"], options=["--force"])                |
+      | push_request("origin", ["main"], options=["-f"])                     |
+      | push_request("origin", ["main"], options=["--delete"])               |
+      | push_request("origin", ["main"], options=["-d"])                     |
+      | push_request("origin", [], options=["--mirror"])                    |
+      | push_request("origin", [], options=["--mirror"], force=True)         |
+      | push_request("origin", [], options=["--mirror"], allow_delete=True)  |
+      | push_request("origin", [], options=["--prune"])                     |
+
+  Scenario Outline: Push opt ins permit their corresponding forms
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" calls <operation>
+    Then the push succeeded
+
+    Examples:
+      | operation                                                                                  |
+      | push_refspecs("origin", ["+HEAD:refs/heads/main"], force=True)                                |
+      | push_request("origin", ["+HEAD:refs/heads/main"], force=True)                                 |
+      | push_refspecs("origin", [":refs/heads/main"], allow_delete=True)                              |
+      | push_request("origin", [":refs/heads/main"], allow_delete=True)                               |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force"], force=True)              |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["-f"], force=True)                   |
+      | push_request("origin", ["main"], options=["--delete"], allow_delete=True)                     |
+      | push_request("origin", ["main"], options=["-d"], allow_delete=True)                           |
+      | push_request("origin", [], options=["--mirror"], force=True, allow_delete=True)               |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--prune"], allow_delete=True)       |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease"])               |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease=refs/heads/main:<head:r>"]) |
+
+  Scenario: An explicit lease remains allowed and refuses a stale expected tip
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And "r" commits "local" with b="local"
+    And the origin "o" advances "main" with c="remote"
+    When "r" calls push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease=refs/heads/main:<mem:root>"])
+    Then the result's ok is False
+    And the command output contains "stale info"
+
+  Scenario: A deletion only push returns an empty sha
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" calls push_refspecs("origin", [":refs/heads/main"], allow_delete=True)
+    Then the result is a Pushed
+    And the result's sha is ""
+    When "r" tries fetch("origin", refspecs=["refs/heads/main"])
+    Then the call raises GitUnavailable
+
+  Scenario Outline: Force options authorize replacing a remote tip
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And the origin "o" advances "main" with b="remote"
+    When "r" calls push_request("origin", ["HEAD:refs/heads/main"], options=["<option>"], force=True)
+    Then the result's ok is True
+    When "r" calls fetch("origin")
+    And "r" calls history(["origin/main"], limit=1)
+    Then the result's 0.sha is "<mem:root>"
+
+    Examples:
+      | option  |
+      | --force |
+      | -f      |
+
+  Scenario Outline: Deletion options remove the advertised ref
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" calls push_request("origin", ["main"], options=["<option>"], allow_delete=True)
+    Then the result's ok is True
+    When "r" tries fetch("origin", refspecs=["refs/heads/main"])
+    Then the call raises GitUnavailable
+
+    Examples:
+      | option   |
+      | --delete |
+      | -d       |
+
+  Scenario Outline: Mirror and prune delete refs absent from their local scope
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" calls push_refspecs("origin", ["HEAD:refs/heads/stale"])
+    When "r" calls push_request("origin", <refspecs>, options=["<option>"], force=<force>, allow_delete=True)
+    Then the result's ok is True
+    When "r" tries fetch("origin", refspecs=["refs/heads/stale"])
+    Then the call raises GitUnavailable
+    When "r" calls fetch("origin", refspecs=["refs/heads/main"])
+    Then the result is None
+
+    Examples:
+      | option   | refspecs                      | force |
+      | --mirror | []                            | True  |
+      | --prune  | ["refs/heads/*:refs/heads/*"]   | False |
+
+  Scenario Outline: Remote option injection is rejected
+    Given a repository "r"
+    When "r" tries <operation>
+    Then the call raises ValueError
+
+    Examples:
+      | operation                                                        |
+      | sync("--receive-pack=false")                                     |
+      | fetch("--receive-pack=false")                                    |
+      | push("main", remote="--receive-pack=false")                       |
+      | push_refspecs("--receive-pack=false", ["HEAD:main"])               |
+      | push_request("--receive-pack=false", ["HEAD:main"])                |
+      | delete_remote_at("--receive-pack=false", "refs/heads/main", "abc") |
+
+  Scenario Outline: Invalid bases fail before branch or history mutation
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "before"
+    When "r" tries <operation>
+    Then the call raises MissingRevision
+    When "r" calls branch()
+    Then the result is "main"
+    When "r" calls snapshot("HEAD")
+    Then the result's head is "<mem:before>"
+
+    Examples:
+      | operation                                                  |
+      | take_branch(branch="topic", base="--orphan", mode="restart") |
+      | take_branch(branch="main", base="missing", mode="resume")    |
+      | rebase_onto("--exec=false", squash_message="squash")          |
+
+  Scenario: A signer failure is infrastructure failure rather than hook rejection
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "before"
+    And "r" writes b="pending"
+    And the signer of "r" fails
+    When "r" tries record("signed", paths="all", hooks=True)
+    Then the call raises GitUnavailable
+    When "r" calls snapshot("HEAD")
+    Then the result's head is "<mem:before>"
+    And the index of "r" reads "b" as "pending"
+
   Scenario: Fresh rebase observations and command refusals are explicit
     Given a repository "r"
     When "r" calls rebasing()
@@ -71,9 +271,9 @@ Feature: One Repo and Worktree, real or fake
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
-    When "r" calls push_request("origin", ["HEAD:refs/heads/one", "+HEAD:refs/tags/two"])
+    When "r" calls push_request("origin", ["HEAD:refs/heads/one", "+HEAD:refs/tags/two"], force=True)
     Then the result's ok is True
-    When "r" calls push_request("origin", [":refs/heads/one", ":refs/tags/two"])
+    When "r" calls push_request("origin", [":refs/heads/one", ":refs/tags/two"], allow_delete=True)
     Then the result's ok is True
 
   Scenario: A lease refuses a branch changed since fetching
@@ -91,17 +291,17 @@ Feature: One Repo and Worktree, real or fake
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
     And "r" commits "local" with b="local"
-    When "r" calls push_request(<remote>, <refspecs>, options=<options>)
+    When "r" calls push_request(<remote>, <refspecs>, options=<options>, force=<force>)
     Then the result's ok is True
 
     Examples:
-      | remote   | refspecs          | options        |
-      | "origin" | ["HEAD"]          | []             |
-      | "origin" | ["HEAD:main"]     | []             |
-      | "origin" | ["+HEAD:main"]    | []             |
-      | "origin" | []                | []             |
-      | None     | []                | []             |
-      | None     | ["HEAD:main"]     | ["--dry-run"]  |
+      | remote   | refspecs          | options        | force |
+      | "origin" | ["HEAD"]          | []             | False |
+      | "origin" | ["HEAD:main"]     | []             | False |
+      | "origin" | ["+HEAD:main"]    | []             | True  |
+      | "origin" | []                | []             | False |
+      | None     | []                | []             | False |
+      | None     | ["HEAD:main"]     | ["--dry-run"]  | False |
 
   Scenario: Remote policy refusal is distinct from a ref race
     Given an origin "o"
@@ -111,7 +311,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "local" with b="local"
     And "r" calls push_request("origin", ["HEAD:refs/heads/main"])
     And the origin "o" refuses non fast forward pushes
-    When "r" calls push_refspecs("origin", ["+<mem:before>:refs/heads/main"])
+    When "r" calls push_refspecs("origin", ["+<mem:before>:refs/heads/main"], force=True)
     Then the result is a RemoteRejected
 
   Scenario: An explicit push reports a ref race separately

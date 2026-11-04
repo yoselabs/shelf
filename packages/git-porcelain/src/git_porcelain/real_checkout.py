@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from git_porcelain.errors import MissingRevision
+from git_porcelain.errors import BranchPinned, MissingRevision
 from git_porcelain.real_done import unavailable
 
 if TYPE_CHECKING:
@@ -25,7 +25,8 @@ def branch(wt: RealWorktree) -> str | None:
     return done.out.removesuffix("\n")
 
 
-def _resolve(wt: RealWorktree, ref: str) -> str:
+def resolve_commit(wt: RealWorktree, ref: str) -> str:
+    """Validate a revision without option parsing and return its commit OID."""
     done = wt.run("rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}", check=False)
     if done.rc:
         error = unavailable(("rev-parse",), done)
@@ -38,7 +39,7 @@ def _resolve(wt: RealWorktree, ref: str) -> str:
 def checkout(wt: RealWorktree, ref: str) -> None:
     """Switch to an existing branch or detach at a commit, without DWIM branch creation."""
     try:
-        _resolve(wt, ref)
+        resolve_commit(wt, ref)
         wt.run("checkout", "-q", "--no-guess", ref, "--")
     finally:
         wt.repo.invalidate()
@@ -47,7 +48,7 @@ def checkout(wt: RealWorktree, ref: str) -> None:
 def checkout_new(wt: RealWorktree, branch: str, start: str) -> None:
     """Create and check out a branch exclusively."""
     try:
-        target = _resolve(wt, start)
+        target = resolve_commit(wt, start)
         wt.run("checkout", "-q", "-b", branch, target, "--")
     finally:
         wt.repo.invalidate()
@@ -67,7 +68,7 @@ def reset(wt: RealWorktree, rev: str, *, mode: Literal["soft", "mixed", "hard"])
         msg = f"unknown reset mode: {mode!r}"
         raise ValueError(msg)
     try:
-        target = _resolve(wt, rev)
+        target = resolve_commit(wt, rev)
         wt.run("reset", "-q", f"--{mode}", target)
     finally:
         wt.repo.invalidate()
@@ -76,7 +77,7 @@ def reset(wt: RealWorktree, rev: str, *, mode: Literal["soft", "mixed", "hard"])
 def checkout_force(wt: RealWorktree, branch: str, start: str) -> None:
     """Discard local changes and create or reset the checked out branch."""
     try:
-        target = _resolve(wt, start)
+        target = resolve_commit(wt, start)
         wt.run("checkout", "-q", "-f", "-B", branch, target, "--")
     finally:
         wt.repo.invalidate()
@@ -98,6 +99,10 @@ def delete_branch(repo: RealRepo, branch: str, *, expected: Sha) -> None:
         raise ValueError(msg)
     try:
         repo.run(repo.path, "rev-parse", "--git-dir")
+        for worktree in repo.worktrees():
+            if worktree.branch == branch:
+                msg = f"branch {branch!r} is checked out at {worktree.path}"
+                raise BranchPinned(msg, str(worktree.path))
         repo.run(repo.path, "update-ref", "-d", f"refs/heads/{branch}", str(expected))
     finally:
         repo.invalidate()

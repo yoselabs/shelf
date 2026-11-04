@@ -10,6 +10,7 @@ from git_porcelain.errors import GitUnavailable, WorktreeRemoveRefused, some
 from git_porcelain.fake_merge import merge_trees, replay_list
 from git_porcelain.fake_ops import hard_to, is_clean, make_commit, require_index, switch_tree
 from git_porcelain.fake_store import CheckoutState, Rebase, ancestors
+from git_porcelain.remote_validation import validate_remote
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -150,6 +151,7 @@ def remote_state(repo: RepoState, name: str) -> RepoState | str:
 
 def fetch(repo: RepoState, name: str) -> SyncResult:
     """Copy the remote's objects and set ``refs/remotes/<name>/<branch>`` for each of its branches."""
+    validate_remote(name)
     there = remote_state(repo, name)
     if isinstance(there, str):
         return Offline(there)
@@ -162,6 +164,7 @@ def fetch(repo: RepoState, name: str) -> SyncResult:
 
 def push(repo: RepoState, wt: CheckoutState, dst: str, name: str, env: Mapping[str, str]) -> PushResult:
     """Fast-forward (or create) branch ``dst`` on the remote; the pre-push knobs first, then the network."""
+    validate_remote(name)
     sha = repo.head_sha(wt)
     if sha is None:
         msg = "nothing to push: HEAD is unborn"

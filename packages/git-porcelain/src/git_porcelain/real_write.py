@@ -29,6 +29,7 @@ from git_porcelain.api import (
 )
 from git_porcelain.errors import GitUnavailable, some
 from git_porcelain.real_done import unavailable
+from git_porcelain.remote_validation import validate_remote
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -69,7 +70,6 @@ TRANSIENT: Final = re.compile(
     r"Could not read from remote repository|does not appear to be a git repository|unable to access",
     re.IGNORECASE,
 )
-_NOT_A_HOOK: Final = ("index.lock", "tell me who you are", "empty ident", "unable to auto-detect", "not a git repository", "unmerged files")
 _MARKERS: Final = re.compile(r"^(?:<<<<<<<|>>>>>>>)(?: |$)", re.MULTILINE)
 
 
@@ -85,9 +85,10 @@ def _done[T](repo: RealRepo, result: T) -> T:
 
 # -- Repo -------------------------------------------------------------------------------------------------
 def sync(repo: RealRepo, remote: str) -> SyncResult:
+    validate_remote(remote)
     try:
         for attempt in range(_FETCH_TRIES):
-            done = repo.run(repo.path, "fetch", "--quiet", remote, check=False, timeout=repo.remote_timeout)
+            done = repo.run(repo.path, "fetch", "--quiet", "--", remote, check=False, timeout=repo.remote_timeout)
             if done.rc == 0:
                 return Synced()
             if attempt == _FETCH_TRIES - 1 or not REF_RACE.search(done.tail):
@@ -162,7 +163,7 @@ def record(
         if done.rc != 0:
             if mode == "squash_to" and old is not None:
                 wt.run("reset", "-q", "--soft", str(old))
-            if hooks and not any(mark in done.tail.lower() for mark in _NOT_A_HOOK):
+            if hooks and "hook" in done.tail.lower():
                 return HookRejected(done.tail)
             raise unavailable(args, done)
         head = real_read.head_of(wt)
@@ -193,12 +194,13 @@ def take_branch(
     holders = tuple(w for w in wt.repo.worktrees() if w.branch == branch and not _same(w.path, wt.path))
     if holders:
         return BranchHeld(holders)
+    base = real_checkout.resolve_commit(wt, base)
     ref = f"refs/heads/{branch}"
     exists = wt.run("rev-parse", "--verify", "-q", ref, check=False).rc == 0
     kept: str | None = None
     try:
         if mode == "resume":
-            wt.run("checkout", "-q", branch, "--") if exists else wt.run("checkout", "-q", "-b", branch, base)
+            wt.run("checkout", "-q", branch, "--") if exists else wt.run("checkout", "-q", "-b", branch, "--end-of-options", base, "--")
         else:
             if mode == "fresh" and exists and keep_aside_as is not None and int(wt.run("rev-list", "--count", f"{base}..{branch}").out) > 0:
                 if wt.run("rev-parse", "--verify", "-q", f"refs/heads/{keep_aside_as}", check=False).rc == 0:
@@ -206,7 +208,7 @@ def take_branch(
                     raise ValueError(msg)
                 wt.run("branch", "-m", branch, keep_aside_as)
                 kept = keep_aside_as
-            wt.run("checkout", "-q", "-B", branch, base)
+            wt.run("checkout", "-q", "-B", branch, "--end-of-options", base, "--")
         _clean(wt, clean_keep)
         head = real_read.head_of(wt)
         head = some(head)
@@ -253,7 +255,8 @@ def _count(wt: RealWorktree, spec: str) -> int:
 def _squash_before_rebase(
     wt: RealWorktree, base: str, message: str, old: Sha, *, squash_failure: Literal["raise", "continue_unsquashed"]
 ) -> tuple[bool, str | None]:
-    fork = wt.run("merge-base", "HEAD", base, check=False).out.strip()
+    base = real_checkout.resolve_commit(wt, base)
+    fork = wt.run("merge-base", "--end-of-options", "HEAD", base, check=False).out.strip()
     if not fork or _count(wt, f"{fork}..HEAD") <= 1:
         return False, None
     wt.run("reset", "-q", "--soft", fork)
@@ -286,6 +289,7 @@ def rebase_onto(
     if old is None:
         msg = "nothing to rebase: HEAD is unborn"
         raise ValueError(msg)
+    base = real_checkout.resolve_commit(wt, base)
     if _count(wt, f"HEAD..{base}") == 0:
         return UpToDate()
     squashed = False
@@ -294,7 +298,7 @@ def rebase_onto(
         if squash_message is not None:
             squashed, squash_diagnostic = _squash_before_rebase(wt, base, squash_message, old, squash_failure=squash_failure)
         flags = [] if update_refs is None else ["--update-refs" if update_refs else "--no-update-refs"]
-        done = wt.run("-c", "core.editor=true", "rebase", "-q", *flags, "--", base, check=False)
+        done = wt.run("-c", "core.editor=true", "rebase", "-q", *flags, "--end-of-options", base, check=False)
         if done.rc == 0:
             new = real_read.head_of(wt)
             new = some(new)
@@ -360,13 +364,22 @@ def has_markers(path: Path) -> bool:
 
 
 def push(wt: RealWorktree, dst: str, remote: str, hook_env: Mapping[str, str] | None) -> PushResult:
+    validate_remote(remote)
     head = real_read.head_of(wt)
     if head is None:
         msg = "nothing to push: HEAD is unborn"
         raise ValueError(msg)
     try:
         done = wt.repo.run(
-            wt.path, "push", "--porcelain", remote, f"HEAD:refs/heads/{dst}", check=False, env=hook_env, timeout=wt.repo.remote_timeout
+            wt.path,
+            "push",
+            "--porcelain",
+            "--",
+            remote,
+            f"HEAD:refs/heads/{dst}",
+            check=False,
+            env=hook_env,
+            timeout=wt.repo.remote_timeout,
         )
     finally:
         wt.repo.invalidate()

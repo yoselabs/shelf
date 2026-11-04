@@ -358,7 +358,7 @@ class Repo(Protocol):
         ...
 
     def delete_remote_at(self, remote: str, ref: str, expected: Sha) -> None:
-        """Lease-guarded deletion; authoritative absence also succeeds after refusal."""
+        """Lease-guarded deletion of a full refs/ name; authoritative absence also succeeds after refusal."""
         ...
 
     def identity(self) -> RepoIdentity:
@@ -394,7 +394,7 @@ class Repo(Protocol):
         ...
 
     def delete_branch(self, branch: str, *, expected: Sha) -> None:
-        """Atomically delete only at ``expected``; a stale tip raises non-retryable ``RefRace``."""
+        """Delete only at ``expected``; checked out raises ``BranchPinned``, stale tip non-retryable ``RefRace``."""
         ...
 
     def tree(self, rev: str) -> Tree | None:
@@ -565,10 +565,12 @@ class Worktree(Protocol):
         refspecs: Sequence[str],
         *,
         options: Sequence[str] = (),
+        force: bool = False,
+        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> CommandResult:
-        """Push supplied forms and options; pin exact HEAD sources once before hooks run."""
+        """Push supplied forms and options; force/deletion need explicit opt ins. Pin HEAD before hooks."""
         ...
 
     def push_refspecs(
@@ -576,10 +578,12 @@ class Worktree(Protocol):
         remote: str,
         refspecs: Sequence[str],
         *,
+        force: bool = False,
+        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> PushResult:
-        """Push explicit refspecs with race, hook, remote-policy and transient outcomes."""
+        """Push explicit refs with opt ins for force/deletion; deletion-only success has an empty sha."""
         ...
 
     def push_lease(self, remote: str, refspec: str, *, timeout: float = 3600) -> CommandResult:

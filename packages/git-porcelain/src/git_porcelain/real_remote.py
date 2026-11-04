@@ -9,6 +9,7 @@ from git_porcelain import real_commands, real_parse, real_write
 from git_porcelain.api import HookRejected, Pushed, RefRejected, RemoteRejected, Sha, Transient
 from git_porcelain.errors import GitReadFailure, GitUnavailable
 from git_porcelain.real_done import unavailable
+from git_porcelain.remote_validation import validate_delete_ref, validate_push, validate_remote
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 
 
 def fetch(repo: RealRepo, remote: str, refspecs: Sequence[str], timeout: float | None) -> None:
+    validate_remote(remote)
     try:
         for attempt in range(5):
             done = repo.run(repo.path, "fetch", "--quiet", "--", remote, *refspecs, check=False, timeout=timeout)
@@ -31,6 +33,8 @@ def fetch(repo: RealRepo, remote: str, refspecs: Sequence[str], timeout: float |
 
 
 def delete_remote_at(repo: RealRepo, remote: str, ref: str, expected: Sha) -> None:
+    validate_remote(remote)
+    validate_delete_ref(ref)
     try:
         done = repo.run(repo.path, "push", f"--force-with-lease={ref}:{expected}", "--", remote, f":{ref}", check=False)
         if done.rc == 0:
@@ -80,7 +84,10 @@ def push_request(
     options: Sequence[str],
     hook_env: Mapping[str, str] | None,
     timeout: float | None,
+    force: bool = False,
+    allow_delete: bool = False,
 ) -> CommandResult:
+    validate_push(remote, refspecs, options=options, force=force, allow_delete=allow_delete)
     specs = _pin(wt, refspecs)
     if remote is None and specs:
         branch = wt.branch()
@@ -94,6 +101,7 @@ def push_request(
             if configured.rc != 1:
                 raise unavailable(("config",), configured)
         remote = remote or "origin"
+    validate_remote(remote)
     return real_commands.command(
         wt, ["push", *options, "--", *([remote] if remote is not None else []), *specs], env=hook_env, timeout=timeout
     )
@@ -106,7 +114,11 @@ def push_refspecs(
     *,
     hook_env: Mapping[str, str] | None,
     timeout: float | None,
+    force: bool = False,
+    allow_delete: bool = False,
 ) -> PushResult:
+    """Push explicit refs; deletion-only success is Pushed(Sha("")), with nothing pushed."""
+    validate_push(remote, refspecs, force=force, allow_delete=allow_delete)
     specs = _pin(wt, refspecs)
     try:
         done = wt.repo.run(wt.path, "push", "--porcelain", "--", remote, *specs, check=False, env=hook_env, timeout=timeout)
@@ -114,7 +126,7 @@ def push_refspecs(
         wt.repo.invalidate()
     output = (done.out + done.err).strip()
     if not done.rc:
-        source = next((spec.removeprefix("+").partition(":")[0] for spec in specs if not spec.startswith(":")), None)
+        source = next((src for spec in specs if (src := spec.removeprefix("+").partition(":")[0])), None)
         if not specs:
             source = "HEAD"
         sha = wt.run("rev-parse", "--verify", source).out.strip() if source is not None else ""

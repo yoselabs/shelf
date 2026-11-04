@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from git_porcelain.errors import BranchExists, GitUnavailable, MissingRevision, RefRace
+from git_porcelain.errors import BranchExists, BranchPinned, GitUnavailable, MissingRevision, RefRace
 from git_porcelain.fake_ops import branch_ref, check_branch_free, hard_to, require_index, switch_tree
 from git_porcelain.fake_read import resolve_commit
 
@@ -101,6 +101,10 @@ def delete_branch(repo: RepoState, branch: str, *, expected: Sha) -> None:
         msg = "expected must be a nonempty commit sha"
         raise ValueError(msg)
     ref = branch_ref(branch)
+    for worktree in repo.worktrees.values():
+        if worktree.head_ref == ref:
+            msg = f"branch {branch!r} is checked out at {worktree.path}"
+            raise BranchPinned(msg, str(worktree.path))
     if repo.refs.get(ref) != expected:
         msg = f"cannot lock ref '{ref}': expected {expected}, found {repo.refs.get(ref)}"
         raise RefRace(msg)

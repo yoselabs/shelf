@@ -410,22 +410,30 @@ class FakeWorktree:
         refspecs: Sequence[str],
         *,
         options: Sequence[str] = (),
+        force: bool = False,
+        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> CommandResult:
         _ = timeout  # In-memory operations have no elapsed process time.
-        return fake_remote.push_request(self._repo, self.state(), remote, refspecs, options=options, hook_env=hook_env)
+        return fake_remote.push_request(
+            self._repo, self.state(), remote, refspecs, options=options, force=force, allow_delete=allow_delete, hook_env=hook_env
+        )
 
     def push_refspecs(
         self,
         remote: str,
         refspecs: Sequence[str],
         *,
+        force: bool = False,
+        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> PushResult:
         _ = timeout  # In-memory operations have no elapsed process time.
-        return fake_remote.push_refspecs(self._repo, self.state(), remote, refspecs, hook_env=hook_env)
+        return fake_remote.push_refspecs(
+            self._repo, self.state(), remote, refspecs, force=force, allow_delete=allow_delete, hook_env=hook_env
+        )
 
     def push_lease(self, remote: str, refspec: str, *, timeout: float = 3600) -> CommandResult:
         return self.push_request(remote, [refspec], options=["--force-with-lease"], timeout=timeout)

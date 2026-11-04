@@ -77,7 +77,7 @@ class RefRace(GitUnavailable):
 
 
 class BranchPinned(GitUnavailable):
-    """Another worktree has the branch checked out; ``holder`` names it."""
+    """A worktree has the branch checked out; ``holder`` names it."""
 
     def __init__(self, message: str, holder: str, *, retryable: bool = False, hint: str | None = None) -> None:
         super().__init__(message, retryable=retryable, hint=hint)

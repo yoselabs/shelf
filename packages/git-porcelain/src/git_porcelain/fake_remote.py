@@ -8,6 +8,7 @@ from git_porcelain import fake_flow
 from git_porcelain.api import CommandResult, Pushed, RefRejected, RemoteRejected, Sha, Transient
 from git_porcelain.errors import GitReadFailure, GitUnavailable, MissingRemote
 from git_porcelain.fake_store import ancestors
+from git_porcelain.remote_validation import validate_delete_ref, validate_push, validate_remote
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -41,6 +42,7 @@ def remote_url(state: RepoState, remote: str) -> str:
 
 
 def fetch(state: RepoState, remote: str, refspecs: Sequence[str]) -> None:
+    validate_remote(remote)
     name, there = _source(state, remote)
     state.store.absorb(there.store)
     if not refspecs:
@@ -65,6 +67,8 @@ def fetch(state: RepoState, remote: str, refspecs: Sequence[str]) -> None:
 
 
 def delete_remote_at(state: RepoState, remote: str, ref: str, expected: Sha) -> None:
+    validate_remote(remote)
+    validate_delete_ref(ref)
     try:
         name, there = _source(state, remote)
     except GitUnavailable as exc:
@@ -131,11 +135,14 @@ def _check_push(
     options: Sequence[str],
 ) -> RefRejected | RemoteRejected | None:
     old = there.refs.get(dst)
-    if "--force-with-lease" in options:
-        expected = state.refs.get(f"refs/remotes/{name}/{dst.removeprefix('refs/heads/')}")
-        if old != expected:
+    lease = next((opt for opt in options if opt == "--force-with-lease" or opt.startswith("--force-with-lease=")), None)
+    if lease is not None:
+        ref, colon, value = lease.partition("=")[2].partition(":")
+        applies = not ref or ref == dst
+        expected = value if colon else state.refs.get(f"refs/remotes/{name}/{dst.removeprefix('refs/heads/')}")
+        if applies and old != (expected or None):
             return RefRejected("[rejected] (stale info)")
-        force = True
+        force = force or applies
     if old is not None and sha is not None:
         if not force and old not in ancestors(state.store, sha):
             return RefRejected("[rejected] (non-fast-forward)")
@@ -162,6 +169,68 @@ def _apply_push(state: RepoState, there: RepoState, name: str, dst: str, sha: st
             state.refs[tracking] = sha
 
 
+def _expand_spec(state: RepoState, there: RepoState, spec: str, *, prune: bool) -> list[str]:
+    src, colon, dst = spec.removeprefix("+").partition(":")
+    if "*" not in src or not colon or "*" not in dst:
+        return [spec]
+    prefix, _, suffix = src.partition("*")
+    mapped = {
+        dst.replace("*", ref[len(prefix) : len(ref) - len(suffix) if suffix else None]): ref
+        for ref in state.refs
+        if ref.startswith(prefix) and ref.endswith(suffix)
+    }
+    expanded = [("+" if spec.startswith("+") else "") + ref + ":" + target for target, ref in mapped.items()]
+    if prune:
+        start, _, end = dst.partition("*")
+        expanded += [f":{ref}" for ref in there.refs if ref.startswith(start) and ref.endswith(end) and ref not in mapped]
+    return expanded
+
+
+def _requested_specs(
+    state: RepoState, checkout: CheckoutState, name: str, there: RepoState, refspecs: Sequence[str], *, options: Sequence[str]
+) -> list[str]:
+    if "--mirror" in options:
+        if refspecs:
+            msg = "--mirror cannot be combined with refspecs"
+            raise GitUnavailable(msg)
+        return [f"+{ref}:{ref}" for ref in state.refs if ref.startswith("refs/")] + [
+            f":{ref}" for ref in there.refs if ref.startswith("refs/") and ref not in state.refs
+        ]
+    return [
+        expanded
+        for spec in _push_specs(state, checkout, name, refspecs)
+        for expanded in _expand_spec(state, there, spec, prune="--prune" in options)
+    ]
+
+
+def _validate_options(options: Sequence[str]) -> None:
+    if any(
+        opt not in {"--force-with-lease", "--force", "-f", "--dry-run", "--delete", "-d", "--mirror", "--prune"}
+        and not opt.startswith("--force-with-lease=")
+        for opt in options
+    ):
+        msg = "fake push does not model these push options"
+        raise GitUnavailable(msg)
+
+
+def _send_specs(
+    state: RepoState, checkout: CheckoutState, name: str, there: RepoState, specs: Sequence[str], *, options: Sequence[str]
+) -> PushResult:
+    captured = state.head_sha(checkout)
+    result_sha: str | None = None
+    for spec in specs:
+        forced = spec.startswith("+") or "--force" in options or "-f" in options or "--mirror" in options
+        dst, sha = _resolve_push(state, checkout, spec, captured, options=options)
+        rejected = _check_push(state, there, name, dst, sha, force=forced, options=options)
+        if rejected is not None:
+            return rejected
+        if "--dry-run" not in options:
+            _apply_push(state, there, name, dst, sha)
+            if sha is not None and result_sha is None:
+                result_sha = sha
+    return Pushed(Sha(result_sha or ""))
+
+
 def push_refspecs(
     state: RepoState,
     checkout: CheckoutState,
@@ -170,7 +239,11 @@ def push_refspecs(
     *,
     hook_env: Mapping[str, str] | None,
     options: Sequence[str] = (),
+    force: bool = False,
+    allow_delete: bool = False,
 ) -> PushResult:
+    """Push explicit refs; deletion-only success carries an empty sha."""
+    validate_push(remote, refspecs, options=options, force=force, allow_delete=allow_delete)
     refusal = fake_flow.hook_refusal(state, hook_env or {})
     if refusal:
         return refusal
@@ -178,23 +251,9 @@ def push_refspecs(
         name, there = _source(state, remote)
     except GitUnavailable as exc:
         return Transient(str(exc))
-    if any(opt not in {"--force-with-lease", "--force", "-f", "--dry-run", "--delete", "-d"} for opt in options):
-        msg = "fake push does not model these push options"
-        raise GitUnavailable(msg)
-    specs = _push_specs(state, checkout, name, refspecs)
-    captured = state.head_sha(checkout)
-    result_sha: str | None = None
-    for spec in specs:
-        force = spec.startswith("+") or "--force" in options or "-f" in options
-        dst, sha = _resolve_push(state, checkout, spec, captured, options=options)
-        rejected = _check_push(state, there, name, dst, sha, force=force, options=options)
-        if rejected is not None:
-            return rejected
-        if "--dry-run" not in options:
-            _apply_push(state, there, name, dst, sha)
-            if sha is not None and result_sha is None:
-                result_sha = sha
-    return Pushed(Sha(result_sha or ""))
+    _validate_options(options)
+    specs = _requested_specs(state, checkout, name, there, refspecs, options=options)
+    return _send_specs(state, checkout, name, there, specs, options=options)
 
 
 def push_request(
@@ -205,7 +264,10 @@ def push_request(
     *,
     options: Sequence[str],
     hook_env: Mapping[str, str] | None,
+    force: bool = False,
+    allow_delete: bool = False,
 ) -> CommandResult:
+    validate_push(remote, refspecs, options=options, force=force, allow_delete=allow_delete)
     branch = (checkout.head_ref or "").removeprefix("refs/heads/")
     name = (
         remote
@@ -214,7 +276,7 @@ def push_request(
         or state.config.get(f"branch.{branch}.remote", "origin")
     )
     try:
-        result = push_refspecs(state, checkout, name, refspecs, hook_env=hook_env, options=options)
+        result = push_refspecs(state, checkout, name, refspecs, hook_env=hook_env, options=options, force=force, allow_delete=allow_delete)
     except GitUnavailable as exc:
         return CommandResult(ok=False, output=str(exc))
     return CommandResult(ok=isinstance(result, Pushed), output="" if isinstance(result, Pushed) else result.tail)

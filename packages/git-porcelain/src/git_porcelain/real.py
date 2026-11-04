@@ -304,20 +304,26 @@ class RealWorktree:
         refspecs: Sequence[str],
         *,
         options: Sequence[str] = (),
+        force: bool = False,
+        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> CommandResult:
-        return real_remote.push_request(self, remote, refspecs, options=options, hook_env=hook_env, timeout=timeout)
+        return real_remote.push_request(
+            self, remote, refspecs, options=options, force=force, allow_delete=allow_delete, hook_env=hook_env, timeout=timeout
+        )
 
     def push_refspecs(
         self,
         remote: str,
         refspecs: Sequence[str],
         *,
+        force: bool = False,
+        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> PushResult:
-        return real_remote.push_refspecs(self, remote, refspecs, hook_env=hook_env, timeout=timeout)
+        return real_remote.push_refspecs(self, remote, refspecs, force=force, allow_delete=allow_delete, hook_env=hook_env, timeout=timeout)
 
     def push_lease(self, remote: str, refspec: str, *, timeout: float = 3600) -> CommandResult:
         return self.push_request(remote, [refspec], options=["--force-with-lease"], timeout=timeout)

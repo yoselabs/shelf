@@ -78,6 +78,8 @@ def record(
         return NothingToRecord()
     if hooks and repo.hooks.refuse_commit:
         return HookRejected("pre-commit hook declined the commit")
+    if repo.hooks.commit_failure is not None:
+        raise GitUnavailable(repo.hooks.commit_failure)
     if mode == "squash_to":
         repo.move_head(wt, str(squash_to))
     if mode == "amend":
@@ -126,13 +128,13 @@ def take_branch(
     held = _holders(repo, wt, ref)
     if held:
         return BranchHeld(held)
+    target = resolve_commit(repo, wt, base)
     require_index(wt)
     exists = ref in repo.refs
     kept: str | None = None
     if mode == "resume" and exists:
         _land(repo, wt, repo.refs[ref], ref)
     else:
-        target = resolve_commit(repo, wt, base)
         if mode == "fresh" and exists and keep_aside_as is not None:
             ahead = ancestors(repo.store, repo.refs[ref]) - ancestors(repo.store, target)
             if ahead:
