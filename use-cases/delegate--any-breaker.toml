@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "delegate"
+software = "any-breaker"
+why = "Delegate keeps a pure fold of finished runs that benches a (lane, model) pair after repeated identical failures and takes a whole lane out on a rate limit; the fold, ladder and canary are generic and sit inside its lane naming (domain/health/ledger.py)."
+needs = "Policy with per-kind Rule and Out, Breaker.fold/step/view with fold(tail, fold(head)) == fold(all), State to_dict/from_dict for the checkpoint, and Fact(key=lane or lane|model); delegate keeps fact_of, the lane/model names, fingerprinting and usage windows. Must stay stdlib-only so delegate vendors it byte-for-byte."
+sponsor = "yoselabs"
+requester = "delegate"
+status = "active"          # active | retired

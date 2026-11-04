@@ -13,6 +13,7 @@ resolution-markers = [
 [manifest]
 members = [
     "a2effect",
+    "any-breaker",
     "any-browser",
     "any-failure-fp",
     "any-file",
@@ -182,6 +183,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/66/a2/d31f14e28d49bae98
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/dd/2a1e81cf1b163acc340afc4ec74ed1d86f5eed1a809fabdeed3e0997b346/anthropic-0.116.0-py3-none-any.whl", hash = "sha256:6c0a7698e8d652455da3499978279bb2588c7264d0a35be3666009a4258c8256", size = 956896, upload-time = "2026-07-02T19:08:08.756Z" },
 ]
+
+[[package]]
+name = "any-breaker"
+version = "0.1.0"
+source = { editable = "packages/any-breaker" }
 
 [[package]]
 name = "any-browser"
