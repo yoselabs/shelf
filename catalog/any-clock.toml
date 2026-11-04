@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-clock"
+kind = "any-lib"
+tier = "T1"
+release = "any-clock-v0.1.0"
+capability = "Stop attributing time by hand: a nested phase stopwatch where exactly one phase owns each instant, with per-phase totals, limits and exempt phases."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from task-loop app/run/budget.py (flat 'waited' bucket booked by hand). Stdlib only, single-threaded. Candidate contract: packages/any-clock/CONTRACT.md. Consumers adopt separately; no release tag created by this change."

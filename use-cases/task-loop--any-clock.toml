@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "task-loop"
+software = "any-clock"
+why = "task-loop's run budget is wall time minus a flat waited bucket booked by hand, so unbooked time counts as run time (the push-time-as-review bug class); a phase stack makes unowned time impossible (tl-w7lt.12)."
+needs = "nested phases with per-phase live totals, per-phase limits, and a charged() total that skips exempt phases (resource, lane, push, network)."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active"          # active | retired
