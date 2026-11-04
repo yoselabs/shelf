@@ -24,6 +24,7 @@ members = [
     "any-markdown",
     "any-net",
     "any-path-glob",
+    "any-plugin-cache",
     "any-proc",
     "any-shell-policy",
     "anyembed",
@@ -297,6 +298,11 @@ source = { editable = "packages/any-net" }
 name = "any-path-glob"
 version = "0.1.0"
 source = { editable = "packages/any-path-glob" }
+
+[[package]]
+name = "any-plugin-cache"
+version = "0.1.0"
+source = { editable = "packages/any-plugin-cache" }
 
 [[package]]
 name = "any-proc"
