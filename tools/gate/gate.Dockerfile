@@ -26,6 +26,15 @@ RUN git config --global --add safe.directory '*' \
     && git config --global user.name "shelf gate" && git config --global user.email "gate@example.invalid" \
     && git config --global init.defaultBranch main
 
+# The repo tools the in-container tests call come from mise.toml and mise.lock (ADR 0024), the one pin list, never a second
+# version here. Only conftest so far: blueprint's recipe tests fail without it; the other pinned tools run on the host.
+FROM base AS tools
+COPY --from=ghcr.io/jdx/mise:2026.10.8@sha256:b720f506c21a6bf5f733a3b1cd04361617ac461a597e44f513aa3976dcd71e57 /usr/local/bin/mise /usr/local/bin/mise
+WORKDIR /app
+COPY mise.toml mise.lock ./
+RUN MISE_IGNORED_CONFIG_PATHS=/root/.config/mise mise trust --yes . && mise install --locked conftest \
+    && cp "$(mise which conftest)" /usr/local/bin/conftest
+
 FROM base AS manifests
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 WORKDIR /src
@@ -33,6 +42,7 @@ COPY . .
 RUN mkdir /m && { find . -name pyproject.toml -not -path './.git/*'; echo uv.lock; } | tar -cf - -T - | tar -xf - -C /m
 
 FROM base
+COPY --from=tools /usr/local/bin/conftest /usr/local/bin/conftest
 WORKDIR /app
 COPY --from=manifests /m/ ./
 RUN --mount=type=cache,target=/root/.cache/uv \
