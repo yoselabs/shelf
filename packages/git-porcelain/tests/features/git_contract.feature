@@ -108,6 +108,7 @@ Feature: One Repo and Worktree, real or fake
     When "r" calls ls_remote("origin", ["main"])
     Then the name of each result entry is ["refs/heads/main"]
     And the oid of each result entry is ["<head:r>"]
+    And the result's output is "<head:r>\trefs/heads/main"
     When "r" calls ls_remote("origin", ["absent"])
     Then the result is []
     When "r" calls ls_remote("origin")
@@ -401,7 +402,7 @@ Feature: One Repo and Worktree, real or fake
     When "r" tries fetch("origin", refspecs=["refs/heads/stale"])
     Then the call raises GitUnavailable
     When "r" calls fetch("origin", refspecs=["refs/heads/main"])
-    Then the result is None
+    Then the result's ok is True
 
     Examples:
       | option   | refspecs                      | force |
@@ -646,11 +647,15 @@ Feature: One Repo and Worktree, real or fake
     When "r" calls push_refspecs("origin", ["<mem:root>:refs/heads/pinned"])
     Then the result is a Pushed
     When "r" calls fetch("origin", refspecs=["refs/heads/pinned"])
-    Then the result is None
+    Then the result's ok is True
+    And the remote result carries command output
     When "r" calls delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
-    Then the result is None
+    Then the result's ok is True
+    And the remote result carries command output
     When "r" calls delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
-    Then the result is None
+    Then the result's ok is True
+    When "r" tries delete_remote_at("origin", "refs/heads/pinned", "<mem:root>", missing_ok=False)
+    Then the call raises GitUnavailable
 
   Scenario: Push requests preserve namespaces multiple refs and deletion
     Given an origin "o"
@@ -764,7 +769,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" remembers its head as "root"
     And the origin "o" advances "main" with b="remote"
     When "r" calls fetch("<mem:origin:o>", refspecs=["main"])
-    Then the result is None
+    Then the result's ok is True
     When "r" calls history(["FETCH_HEAD"], limit=1)
     Then the result's 0.subject is "advance"
     When "r" calls branch()
@@ -915,6 +920,9 @@ Feature: One Repo and Worktree, real or fake
     And the origin "o" is offline
     When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:before>")
     Then the call raises GitReadFailure
+    And the failure retains push and verification diagnostics
+    When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:before>", missing_ok=False)
+    Then the call raises GitUnavailable
 
   Scenario: Scoped fetch refuses a missing remote ref
     Given an origin "o"
@@ -933,6 +941,84 @@ Feature: One Repo and Worktree, real or fake
     Then the result is a HookRejected
     When "r" calls push_refspecs("origin", ["HEAD:refs/heads/main"], hook_env={"X": "1"})
     Then the result is a Pushed
+
+  Scenario: A caller supplies the exact object for a push
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And "r" commits "mine" with b="local"
+    When "r" calls push("pinned", head="<mem:root>")
+    Then the result is a Pushed
+    And the result's sha is "<mem:root>"
+    And the remote result carries command output
+    When "r" calls fetch("origin", refspecs=["refs/heads/pinned"])
+    And "r" calls history(["FETCH_HEAD"], limit=1)
+    Then the result's 0.sha is "<mem:root>"
+
+  Scenario Outline: Partial push success is distinct from every ref losing a race
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with b="local"
+    And the origin "o" advances "main" with c="remote"
+    When "r" calls push_refspecs("origin", <refspecs>)
+    Then the result is a RemoteRejected
+    And the remote result carries command output
+    When "r" calls ls_remote("origin", ["new"])
+    Then the oid of each result entry is ["<head:r>"]
+
+    Examples:
+      | refspecs                                          |
+      | ["HEAD:refs/heads/main", "HEAD:refs/heads/new"]       |
+      | ["HEAD:refs/heads/new", "HEAD:refs/heads/main"]       |
+
+  Scenario Outline: A pre push hook can refuse without naming itself
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with b="local"
+    And "r" has a pre-push hook that <mode>
+    When "r" calls <call>
+    Then the result is a HookRejected
+    And the remote result carries command output
+
+    Examples:
+      | mode       | call                                                |
+      | error only | push("main")                                        |
+      | silent     | push("main")                                        |
+      | error only | push_refspecs("origin", ["HEAD:refs/heads/main"])     |
+      | silent     | push_refspecs("origin", ["HEAD:refs/heads/main"])     |
+
+  Scenario Outline: A passing pre-push hook followed by a connection drop remains transient
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" has a passing pre-push hook followed by a dropped connection
+    When "r" calls <call>
+    Then the result is a Transient
+    And the remote result carries command output
+
+    Examples:
+      | call                                                   |
+      | push("main")                                           |
+      | push_refspecs("origin", ["HEAD:refs/heads/main"])        |
+
+  Scenario Outline: Push outcomes retain a long hook transcript
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with b="local"
+    And "r" has a pre-push hook that verbose refuses
+    When "r" calls <call>
+    Then the remote result retains both complete output streams
+
+    Examples:
+      | call                                                    |
+      | push("main")                                            |
+      | push_refspecs("origin", ["HEAD:refs/heads/main"])         |
+      | push_request("origin", ["HEAD:refs/heads/main"])          |
+      | push_lease("origin", "HEAD:refs/heads/main")               |
 
   Scenario: A lease can replace a fetched destination without setting an upstream
     Given an origin "o"
@@ -1854,7 +1940,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "work" with f.txt="f\n"
     And the origin "o" advances "main" with g.txt="g\n"
     When "r" calls push("main")
-    Then the result is a Rejected
+    Then the result is a RefRejected
 
   Scenario: A push to an origin that cannot be reached is transient
     Given an origin "o"
@@ -1918,16 +2004,53 @@ Feature: One Repo and Worktree, real or fake
     When "r" calls sync()
     Then the result is a Offline
 
+  Scenario Outline: Fetch retries up to four ref races before succeeding
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" encounters 4 ref races before fetching
+    When "r" calls <call>
+    Then the result is a <result>
+
+    Examples:
+      | call                                       | result        |
+      | sync()                                     | Synced        |
+      | fetch("origin")                            | CommandResult |
+      | fetch("origin", refspecs=["main"])          | CommandResult |
+
+  Scenario: Sync reports offline after five ref races
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" encounters 5 ref races before fetching
+    When "r" calls sync()
+    Then the result is a Offline
+    And the remote result carries command output
+
+  Scenario: Explicit fetch reports the final ref race after five attempts
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" encounters 5 ref races before fetching
+    When "r" tries fetch("origin")
+    Then the call raises RefRace
+
   @real_only
-  Scenario: A fetch that loses a ref lock to a competing fetch tries again (the fake has no locks)
+  Scenario Outline: A fetch that loses a ref lock succeeds after retrying (the fake has no locks)
     Given an origin "o"
     And the origin "o" holds a.txt="1\n"
     And "r" is a clone of the origin "o"
     And the origin "o" advances "main" with b.txt="b\n"
     And a competing fetch holds the lock on "origin/main" until the first retry
-    When "r" calls sync()
-    Then the result is a Synced
+    When "r" calls <call>
+    Then the result is a <result>
+    And the remote result carries command output
     And the fetch rested 1 time
+
+    Examples:
+      | call            | result        |
+      | sync()          | Synced        |
+      | fetch("origin") | CommandResult |
 
   # -- relate, history, branches, tree -----------------------------------------------------------------
   Scenario: Relate gives the merge base and both counts in one look

@@ -4,9 +4,43 @@ from __future__ import annotations
 
 import pytest
 
-from git_porcelain import GitUnavailable, HookRejected
+from git_porcelain import GitUnavailable, HookRejected, Pushed, Sha
 from git_porcelain.real_done import Done
+from git_porcelain.real_remote import classify_push
 from git_porcelain.real_write import record_failure
+
+
+@pytest.mark.parametrize(
+    ("rows", "hook", "kind"),
+    [
+        (b"", True, "HookRejected"),
+        (b"!\tHEAD:refs/heads/main\t[remote rejected] (hook declined)\n", True, "RemoteRejected"),
+        (b"!\tHEAD:refs/heads/main\t[rejected] (non-fast-forward)\n", False, "RefRejected"),
+        (b"!\tHEAD:refs/heads/main\t[rejected] (fetch first)\n", False, "RefRejected"),
+        (b"!\tHEAD:refs/heads/main\t[rejected] (stale info)\n", False, "RefRejected"),
+        (b"!\tHEAD:refs/heads/main\t[rejected] (policy)\n", False, "RemoteRejected"),
+        (
+            b"=\tHEAD:refs/heads/one\t[up to date]\n!\tHEAD:refs/heads/main\t[rejected] (stale info)\n",
+            False,
+            "RemoteRejected",
+        ),
+    ],
+)
+@pytest.mark.parametrize("diagnostic", ["", "error: nope", "remote: rejected by a hook\n" + "detail\n" * 200])
+def test_push_classification_uses_ref_rows_and_hook_evidence(rows: bytes, *, hook: bool, kind: str, diagnostic: str) -> None:
+    done = Done(1, rows, diagnostic, hooks=("pre-push",) if hook else (), hook_exits=(("pre-push", 1),) if hook else ())
+    result = classify_push(done, Sha("a" * 40))
+    assert type(result).__name__ == kind
+    assert result.output == (rows.decode() + diagnostic).strip()
+    assert not isinstance(result, Pushed)
+    assert len(result.tail) <= 600
+
+
+def test_failed_push_summary_alone_is_not_hook_evidence() -> None:
+    done = Done(1, b"", "error: failed to push some refs\n" + "detail\n" * 200)
+    with pytest.raises(GitUnavailable) as caught:
+        classify_push(done, Sha("a" * 40))
+    assert caught.value.output == done.err.strip()
 
 
 @pytest.mark.parametrize(

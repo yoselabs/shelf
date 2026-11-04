@@ -51,7 +51,9 @@ def test_refs_are_named_and_delete_is_compare_and_swap(plumbing: tuple[Plumbing,
     local = api.branches(path)
     assert [r.name for r in local] == ["main"]
     assert api.branches(path, "origin") == local
-    assert api.ls_remote(path, "origin", "refs/heads/main") == [porcelain.Ref("refs/heads/main", local[0].oid)]
+    advertised = api.ls_remote(path, "origin", "refs/heads/main")
+    assert advertised == [porcelain.Ref("refs/heads/main", local[0].oid)]
+    assert advertised.output == f"{local[0].oid}\trefs/heads/main"
     assert api.ls_remote(path, "origin", "missing*") == []
     with pytest.raises(RefRace) as caught:
         api.delete_ref_at(path, "refs/remotes/origin/main", "1" * 40)

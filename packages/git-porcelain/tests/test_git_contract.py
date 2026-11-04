@@ -11,9 +11,11 @@ from __future__ import annotations
 import ast
 import dataclasses
 import hashlib
+import json
 import os
 import re
 import shutil
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -42,6 +44,10 @@ _COMMIT_FAILURE_STDERR = "error: gpg failed to sign the data\n" + _COMMIT_STDERR
 
 
 def _hook_script(kind: str, mode: str) -> str:
+    if mode == "error only":
+        return "echo 'error: nope' >&2\nexit 1\n"
+    if mode == "silent":
+        return "exit 1\n"
     if mode.startswith("verbose"):
         code = 1 if mode.endswith("refuses") else 0
         return f"printf '%s' '{_COMMIT_STDOUT}'\nprintf '%s' '{_COMMIT_STDERR}' >&2\nexit {code}\n"
@@ -254,6 +260,8 @@ class FakeRig:
                 hooks.commit_output = (_COMMIT_STDOUT + _COMMIT_STDERR).strip()
         elif mode == "refuses":
             hooks.refuse_push = True
+        elif mode in {"error only", "silent", "verbose refuses"}:
+            hooks.push_output = {"error only": "error: nope\n", "silent": "", "verbose refuses": _COMMIT_STDOUT + _COMMIT_STDERR}[mode]
         else:
             hooks.push_requires_env = {"X": "1"}
 
@@ -420,9 +428,10 @@ def _verbose_commit_hook(world: World, name: str, outcome: str) -> None:
 @then("the complete hook output is preserved")
 def _complete_hook_output(world: World) -> None:
     output = _dig(world.result, "output")
+    assert isinstance(output, str)
     assert output == (_COMMIT_STDOUT + _COMMIT_STDERR).strip()
     if type(world.result).__name__ == "HookRejected":
-        assert _dig(world.result, "tail") == output
+        assert _dig(world.result, "tail") == output[-600:]
 
 
 def _literal_paths() -> tuple[str, ...]:
@@ -690,6 +699,44 @@ def _ref_lock(world: World, ref: str) -> None:
     rig.locks.append(lock)
 
 
+@given(parsers.parse('"{name}" has a passing pre-push hook followed by a dropped connection'))
+def _passing_hook_transport_failure(world: World, name: str) -> None:
+    wt = world.wts[name]
+    output = "fatal: the remote end hung up unexpectedly\n"
+    if isinstance(wt, FakeWorktree):
+        wt.repo.hooks.push_transport_failure = output
+        return
+    head = world.rig.head(wt)
+
+    def process(args: list[str], *, env: dict[str, str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        if "rev-parse" in args:
+            return subprocess.CompletedProcess(args, 0, (head + "\n").encode(), b"")
+        events = [
+            {"event": "child_start", "child_class": "hook", "hook_name": "pre-push", "child_id": 0},
+            {"event": "child_exit", "child_id": 0, "code": 0},
+        ]
+        Path(env["GIT_TRACE2_EVENT"]).write_text("\n".join(json.dumps(event) for event in events), encoding="utf-8")
+        return subprocess.CompletedProcess(args, 128, b"", output.encode())
+
+    world.monkeypatch.setattr(subprocess, "run", process)
+
+
+@given(parsers.parse('"{name}" encounters {count:d} ref races before fetching'))
+def _fetch_races(world: World, name: str, count: int) -> None:
+    wt = world.wts[name]
+    if isinstance(wt, FakeWorktree):
+        wt.repo.hooks.fetch_ref_races = count
+        return
+
+    def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        nonlocal count
+        error = b"error: cannot lock ref 'refs/remotes/origin/main': is at abc but expected def\n" if count else b""
+        count = max(0, count - 1)
+        return subprocess.CompletedProcess(args, int(bool(error)), b"", error)
+
+    world.monkeypatch.setattr(subprocess, "run", process)
+
+
 # -- checking ------------------------------------------------------------------------------------------
 @given(parsers.parse('the observations of "{name}" will fail'))
 def _observations_fail(world: World, name: str) -> None:
@@ -814,6 +861,26 @@ def _branch_rewritten(world: World, branch: str, name: str, expected: str) -> No
 def _command_output(world: World, text: str) -> None:
     assert isinstance(world.result, CommandResult)
     assert text in world.result.output
+
+
+@then("the remote result retains both complete output streams")
+def _remote_output(world: World) -> None:
+    output = getattr(world.result, "output", None)
+    assert isinstance(output, str)
+    assert _COMMIT_STDOUT.strip() in output
+    assert _COMMIT_STDERR.strip() in output
+
+
+@then("the remote result carries command output")
+def _has_remote_output(world: World) -> None:
+    assert isinstance(getattr(world.result, "output", None), str)
+
+
+@then("the failure retains push and verification diagnostics")
+def _deletion_diagnostics(world: World) -> None:
+    assert isinstance(world.error, GitUnavailable)
+    assert world.error.output
+    assert getattr(world.error, "push_output", "")
 
 
 @then(parsers.parse('"{name}" rejects option-like revision "{revision}" without changing history'))
