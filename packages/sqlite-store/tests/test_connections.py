@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import atexit
 import os
 import sqlite3
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event, Thread
 from typing import TYPE_CHECKING, override
+from unittest.mock import Mock
 
 import pytest
-from sqlite_store import SharedConnections
+from sqlite_store import SharedConnections, Store
 
 if TYPE_CHECKING:
-    from sqlite_store import Store
+    from sqlite_store import Schema
 
 
 def test_shared_reuse_aliases_threads_and_close(tmp_path: Path, store: Store) -> None:
@@ -134,3 +139,101 @@ def test_pid_ownership_and_after_fork(tmp_path: Path, monkeypatch: pytest.Monkey
     cache.discard(parent)
     assert cache.get(path, opener) is not parent
     cache.close()
+
+
+def test_short_lived_threads_release_writers(tmp_path: Path, store: Store) -> None:
+    fd_directory = Path("/proc/self/fd")
+    if not fd_directory.is_dir():
+        pytest.skip("Linux fd accounting required")
+    baseline = sum(1 for _ in fd_directory.iterdir())
+    path = tmp_path / "journal.db"
+    errors: list[BaseException] = []
+
+    def write(start: Event) -> None:
+        try:
+            assert start.wait(timeout=300)
+            con = store.shared_rw(path)
+            assert con is not None
+            con.execute("INSERT INTO item VALUES (lower(hex(randomblob(16))), 'kept', 0)")
+        except (AssertionError, sqlite3.Error, OSError, RuntimeError) as error:
+            errors.append(error)
+
+    # Keep all identities alive initially so OS thread-id reuse cannot mask leaks.
+    starts = [Event() for _ in range(200)]
+    workers = [(start, Thread(target=write, args=(start,))) for start in starts]
+    for _, thread in workers:
+        thread.start()
+    try:
+        for start, thread in workers:
+            start.set()
+            thread.join(timeout=30)
+            assert not thread.is_alive()
+    finally:
+        for start, _ in workers:
+            start.set()
+        for _, thread in workers:
+            thread.join(timeout=30)
+    assert not errors
+    con = store.shared_rw(path)
+    assert con is not None
+    assert con.execute("SELECT count(*) FROM item").fetchone() == (200,)
+    assert len(store._shared.connections) <= 2
+    assert sum(1 for _ in fd_directory.iterdir()) <= baseline + 5
+    store.close_shared()
+    assert sum(1 for _ in fd_directory.iterdir()) <= baseline + 2
+
+
+def test_store_creation_does_not_register_exit_or_fork_callbacks(schema: Schema, monkeypatch: pytest.MonkeyPatch) -> None:
+    exit_registration, fork_registration = Mock(), Mock()
+    monkeypatch.setattr(atexit, "register", exit_registration)
+    monkeypatch.setattr(os, "register_at_fork", fork_registration)
+    stores = [Store(schema) for _ in range(50)]
+    assert len(stores) == 50
+    exit_registration.assert_not_called()
+    fork_registration.assert_not_called()
+
+
+def test_last_shared_close_cleans_wal(tmp_path: Path, store: Store) -> None:
+    path = tmp_path / "journal.db"
+    con = store.shared_rw(path)
+    assert con is not None
+    con.execute("INSERT INTO item VALUES ('a', 'kept', 0)")
+    assert Path(str(path) + "-wal").stat().st_size > 0
+    store.close_shared()
+    for suffix in ("-wal", "-shm"):
+        sidecar = Path(str(path) + suffix)
+        assert not sidecar.exists() or sidecar.stat().st_size == 0
+    reader = store.open_ro(path)
+    assert reader is not None
+    try:
+        assert reader.execute("SELECT value FROM item").fetchall() == [("kept",)]
+    finally:
+        reader.close()
+
+
+def test_process_exit_closes_shared_writer(tmp_path: Path) -> None:
+    path = tmp_path / "journal.db"
+    script = """
+import sys
+from pathlib import Path
+
+sys.path.insert(0, sys.argv[2])
+from sqlite_store import Schema, Store
+
+store = Store(Schema(version=1, ddl="CREATE TABLE item (value TEXT)", steps={}))
+path = Path(sys.argv[1])
+con = store.shared_rw(path)
+assert con is not None
+con.execute("INSERT INTO item VALUES ('kept')")
+assert Path(str(path) + "-wal").stat().st_size > 0
+"""
+    source = Path(__file__).resolve().parents[1] / "src"
+    result = subprocess.run([sys.executable, "-c", script, str(path), str(source)], capture_output=True, text=True, timeout=60, check=False)
+    assert result.returncode == 0, result.stderr
+    for suffix in ("-wal", "-shm"):
+        assert not Path(str(path) + suffix).exists()
+    reader = sqlite3.connect(path)
+    try:
+        assert reader.execute("SELECT value FROM item").fetchall() == [("kept",)]
+    finally:
+        reader.close()

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import atexit
 import os
 import sqlite3
 import time
@@ -179,8 +178,6 @@ class Store:
         self.schema = schema
         self._shared = SharedConnections()
         self._checked: set[Identity] = set()
-        os.register_at_fork(after_in_child=self._shared.after_fork)
-        atexit.register(self._shared.close)
 
     def _open(self, path: str | os.PathLike[str], *, readonly: bool, shared: bool = False) -> sqlite3.Connection | None:
         return _open(path, self.schema, self._checked, readonly=readonly, shared=shared)

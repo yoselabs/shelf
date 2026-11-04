@@ -24,8 +24,11 @@ triggers and embedded semicolons. Migration steps must not end transactions.
 - Store owns its own shared writers and check cache. Standalone opens share a
   module-level integrity cache. Cache identities include PID, path, device and
   inode. Filesystem cache resets on fork; shared writer locks are replaced on fork.
-- Use thread barriers for concurrent creation, upgrades and quarantine. Simulate
-  PID changes for fork ownership contracts; never spawn a process in these tests.
+- Use thread barriers for concurrent creation and upgrades, plus spawn-context
+  process barriers for quarantine/recreation. Simulate PID changes for fork
+  ownership contracts; verify exit cleanup in a subprocess.
+- Shared caches evict dead threads on each request. One module-level weak registry
+  registers exit cleanup and fork lock replacement without retaining Store objects.
 
 ## Validation boundary
 

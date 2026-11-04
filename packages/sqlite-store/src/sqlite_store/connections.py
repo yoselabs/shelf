@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import atexit
 import os
 import sqlite3
-from _thread import RLock, _local, get_ident
+import threading
 from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeAlias
+from weakref import WeakSet
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
 Key: TypeAlias = tuple[int, int, Path, int, int]
 
 
-class ThreadOwner(_local):
+class ThreadOwner(threading.local):
     def __init__(self) -> None:
         super().__init__()
         self.owner = object()
@@ -26,17 +28,18 @@ class SharedConnections:
 
     def __init__(self) -> None:
         self.connections: dict[Key, tuple[sqlite3.Connection, object]] = {}
-        self.lock = RLock()
+        self.lock = threading.RLock()
         self.local = ThreadOwner()
+        _INSTANCES.add(self)
 
     def after_fork(self) -> None:
         """Replace a lock that may belong to a vanished thread in the parent."""
-        self.lock = RLock()
+        self.lock = threading.RLock()
 
     @staticmethod
     def key_of(path: Path) -> Key:
         stat = path.stat()
-        return os.getpid(), get_ident(), path, stat.st_dev, stat.st_ino
+        return os.getpid(), threading.get_ident(), path, stat.st_dev, stat.st_ino
 
     @staticmethod
     def usable(con: sqlite3.Connection) -> bool:
@@ -54,6 +57,10 @@ class SharedConnections:
 
     def get(self, path: str | os.PathLike[str], opener: Callable[[Path], sqlite3.Connection | None]) -> sqlite3.Connection | None:
         with self.lock:
+            alive = {thread.ident for thread in threading.enumerate()}
+            for key in tuple(self.connections):
+                if key[0] == os.getpid() and key[1] not in alive:
+                    self.drop(key)
             try:
                 con = self._get(Path(path).resolve(), opener)
             except (OSError, ValueError, RuntimeError):
@@ -62,7 +69,7 @@ class SharedConnections:
                 return con
 
     def _get(self, target: Path, opener: Callable[[Path], sqlite3.Connection | None]) -> sqlite3.Connection | None:
-        prefix = os.getpid(), get_ident(), target
+        prefix = os.getpid(), threading.get_ident(), target
         try:
             key = self.key_of(target)
         except FileNotFoundError:
@@ -94,3 +101,20 @@ class SharedConnections:
             for key in tuple(self.connections):
                 if key[0] == os.getpid():
                     self.drop(key)
+
+
+_INSTANCES: WeakSet[SharedConnections] = WeakSet()
+
+
+def _close_all() -> None:
+    for instance in tuple(_INSTANCES):
+        instance.close()
+
+
+def _after_fork() -> None:
+    for instance in tuple(_INSTANCES):
+        instance.after_fork()
+
+
+atexit.register(_close_all)
+os.register_at_fork(after_in_child=_after_fork)

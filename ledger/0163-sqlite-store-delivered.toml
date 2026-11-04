@@ -1,0 +1,10 @@
+seq = 163
+date = "2026-11-05"
+event = "delivery"
+software = "sqlite-store"
+release = "sqlite-store-v0.1.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = """Promoted from task-loop's factory.db substrate (factorydb/factoryconnections/factorymigrate): shared per-thread writers, begin_immediate, rev-guarded update, user_version migrations, quarantine-and-recreate and cached filesystem check. Stdlib only, POSIX. Candidate; the task-loop repoint is not done yet, so no adoption verdict."""

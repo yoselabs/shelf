@@ -4,6 +4,9 @@ SQLite-on-disk lifecycle glue extracted from task-loop's factory database. Stdli
 POSIX only, Python 3.12+. Applications supply their schema and SQL. This is not an ORM
 or a query builder: it owns connection safety and transactions, never domain tables.
 
+`quarantine.py` imports `fcntl` at module level, so the package does not import on
+Windows. A Windows port would need a different lock.
+
 ```python
 from pathlib import Path
 from sqlite_store import Schema, Store, change_counter
@@ -50,6 +53,9 @@ Guarantees:
   writers across threads after their operations stop. Forked children replace the
   cache lock and cannot reuse parent connections; thread identifier reuse also cannot
   transfer ownership to a new thread.
+  Each shared-writer request closes cached connections belonging to dead threads.
+  Process exit closes remaining writers through one module-level atexit callback;
+  closing the last connection lets SQLite checkpoint and remove WAL/SHM sidecars.
 - `begin_immediate(con)` commits on success and rolls back on any `BaseException`.
   `Store.begin_immediate` also discards shared writers after `sqlite3.DatabaseError`,
   including failures to begin or commit. Transactions do not nest.
