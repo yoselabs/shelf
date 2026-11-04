@@ -15,6 +15,7 @@ members = [
     "a2effect",
     "any-breaker",
     "any-browser",
+    "any-clock",
     "any-failure-fp",
     "any-file",
     "any-frontmatter",
@@ -212,6 +213,11 @@ requires-dist = [
     { name = "zendriver", marker = "extra == 'zendriver'", specifier = ">=0.15,<1" },
 ]
 provides-extras = ["patchright", "zendriver"]
+
+[[package]]
+name = "any-clock"
+version = "0.1.0"
+source = { editable = "packages/any-clock" }
 
 [[package]]
 name = "any-failure-fp"
