@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "iorlas-task-loop"
+software = "sqlite-store"
+why = "The factory journal owns its tables and domain queries but hand-rolls generic WAL connection lifecycle, shared writer ownership, filesystem refusal, schema upgrades, integrity checks, obsolete derived-schema quarantine and CAS. Extract that substrate while retaining application SQL in task-loop. Not yet adopted: the retention claim is the planned extraction."
+needs = "Schema and Store; open_rw/open_ro/shared_rw/close_shared, begin_immediate, change_counter, CAS with caller-declared revisioned tables, named SchemaError, ordered atomic upgrades and serialized explicit-version quarantine; stdlib only, POSIX only."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"

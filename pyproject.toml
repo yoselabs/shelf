@@ -197,6 +197,8 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 # such thing.
 "packages/any-browser/src/any_browser/playwright.py" = ["BLE001"]
 "packages/any-browser/src/any_browser/zendriver.py" = ["BLE001"]
+# CAS interpolates only quoted identifiers; all data values remain bound parameters.
+"packages/sqlite-store/src/sqlite_store/cas.py" = ["S608"]
 
 [tool.pytest.ini_options]
 # testpaths lists the shelf's own fitness tests + every package's tests.
@@ -271,6 +273,7 @@ testpaths = [
     "packages/stream-proc/tests",
     "packages/sqlite-resource/tests",
     "packages/sqlite-sidecar/tests",
+    "packages/sqlite-store/tests",
     "packages/timefmt/tests",
     "packages/verb-cli/tests",
     "packages/yaml-merge/tests",
@@ -357,6 +360,7 @@ root_packages = [
     "settings_base",
     "sqlite_resource",
     "sqlite_sidecar",
+    "sqlite_store",
     "static_page_check",
     "stream_proc",
     "timefmt",
@@ -434,6 +438,7 @@ source_modules = [
     "settings_base",
     "sqlite_resource",
     "sqlite_sidecar",
+    "sqlite_store",
     "static_page_check",
     "stream_proc",
     "timefmt",
@@ -513,6 +518,7 @@ modules = [
     "settings_base",
     "sqlite_resource",
     "sqlite_sidecar",
+    "sqlite_store",
     "static_page_check",
     "stream_proc",
     "timefmt",

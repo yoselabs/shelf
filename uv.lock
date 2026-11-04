@@ -74,6 +74,7 @@ members = [
     "settings-base",
     "sqlite-resource",
     "sqlite-sidecar",
+    "sqlite-store",
     "static-page-check",
     "stream-proc",
     "timefmt",
@@ -4106,6 +4107,11 @@ requires-dist = [{ name = "aiosqlite", specifier = ">=0.20,<1" }]
 name = "sqlite-sidecar"
 version = "0.2.0"
 source = { editable = "packages/sqlite-sidecar" }
+
+[[package]]
+name = "sqlite-store"
+version = "0.1.0"
+source = { editable = "packages/sqlite-store" }
 
 [[package]]
 name = "sse-starlette"
