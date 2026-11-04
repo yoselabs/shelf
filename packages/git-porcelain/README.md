@@ -146,8 +146,8 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   Hooks run only with `hooks=True`; their refusal returns `HookRejected`. An unchanged index
   returns `NothingToRecord` for a new commit unless `allow_empty=True`.
   `Recorded.output` contains complete stripped stdout plus stderr, including successful hook output.
-  `HookRejected.output` and its existing `tail` retain the entire diagnostic, even when the hook
-  prints no hook name. Rejection requires positive hook evidence: a hook name, a hook failure
+  `HookRejected.output` retains the entire diagnostic; `tail` is a short display excerpt, even when the hook
+  prints no hook name. Commit rejection requires positive hook evidence: a hook name, a hook failure
   marker, or the hook's own output with hooks enabled. Git failures, including unresolved
   conflicts, unborn amendments, signing, identity and lock failures, raise `GitUnavailable`
   (or its typed subclass).
@@ -292,13 +292,16 @@ including URL rewrites; missing named remotes raise `MissingRemote`, distinct fr
 observations. Both errors extend `GitUnavailable`.
 
 `Repo.fetch(remote="origin", refspecs=(), timeout=None)` accepts a named remote or a source
-URL/path, writes `FETCH_HEAD`, and retries ref-lock failures five times with the same
-increasing delays as `sync`. `fetch(source, refspecs=[ref])` is the scoped fetch operation;
+URL/path, writes `FETCH_HEAD`, and returns `CommandResult(ok=True, output=...)`.
+It and `sync` attempt the fetch once; callers own retries. `fetch(source, refspecs=[ref])` is the scoped fetch operation;
 there is no redundant `fetch_ref` method. Missing remote refs raise. `timeout=None` means
 no timeout. `Repo.delete_remote_at(remote, ref, expected)` sends an explicit expected-SHA
 lease with a deletion refspec. `ref` must start with `refs/`; short names raise `ValueError`
-before invoking git. After refusal it verifies advertisement: absence succeeds,
-presence preserves the original push error, and failed verification raises `GitReadFailure`.
+before invoking git. Success returns `CommandResult`. The default `missing_ok=True`
+preserves idempotency: after refusal, one advertisement verifies absence. A failed probe
+raises `GitReadFailure`, carrying its complete `output` and the original `push_output`.
+Pass `missing_ok=False` for exactly one process: every refusal then raises the original
+push error with complete output, including a stale lease on an already absent destination.
 
 `Worktree.push_refspecs(remote, refspecs, *, force=False, allow_delete=False, hook_env=None, timeout=None)` supports explicit
 OIDs, full namespaces, multiple updates and deletion. It returns `Pushed`, `RefRejected`
@@ -306,14 +309,17 @@ OIDs, full namespaces, multiple updates and deletion. It returns `Pushed`, `RefR
 (policy/other per-ref refusal), or `Transient`. Diagnostics are complete combined output.
 For multiple updates, `Pushed.sha` identifies the first supplied source; a deletion-only
 request returns `Pushed(Sha(""))`: the empty sha means nothing was pushed, only deleted.
-Existing `push(dst)` retains its original result
-classification; callers needing policy-versus-race distinction use `push_refspecs`.
+`push(dst)` uses the same classification. `RefRejected` requires every porcelain ref row
+to be `! [rejected]` with non-fast-forward, fetch first or stale info; remote policy
+refusals remain `RemoteRejected` even when hook text contains "rejected".
+`HookRejected` requires no ref status rows and Git's trace evidence that pre-push actually
+ran. Silent hooks and hooks printing only `error:` are supported, including configured hook paths.
 
 `push_request(remote, refspecs, *, options=(), force=False, allow_delete=False, hook_env=None, timeout=None)` returns
 `CommandResult` for configured landing forms, including omitted remote/refspec defaults,
 `HEAD`, `HEAD:main`, `+HEAD:main`, OIDs, tags, deletion and multiple refs. Exact HEAD
-sources are captured once before hooks; force prefixes and explicit destinations survive.
-A bare HEAD retains its symbolic branch destination. For an explicit refspec with omitted
+sources are resolved by the push process itself; force prefixes and explicit destinations survive.
+A bare HEAD retains Git's symbolic branch destination. For an explicit refspec with omitted
 remote, selection follows branch pushRemote, remote.pushDefault, branch remote, then origin.
 Normal pre-push hooks, checkout pinning and the repository's injected environment remain
 in force. Both push methods reject leading `+` without `force=True`, and empty-source
@@ -329,12 +335,49 @@ without setup or hook installation. Its default timeout outcome is
 `CommandResult(False, "git lfs timed out after 60 min")`. Command-style push timeouts also
 return failure outcomes; spawn failures raise.
 
+Version **0.12.0** retains complete, stripped stdout followed by stderr in `output` on every
+remote result and failure. `tail` is only a short display diagnostic. `Repo.ls_remote`
+returns `RemoteRefs`, a tuple with `output`; the path-based function returns `Refs`, a list
+with `output`. Path-based push, fetch, LFS push/fetch and pull/rebase now return
+`CommandResult` instead of `None`; their exceptions retain full `output`, too. Timeouts
+retain whatever output Git produced before the deadline.
+`readiness` includes the remote probe's complete diagnostics in its `output` dictionary entry.
+Typed rebase results also expose `output`; merge results retain complete `output` and
+untruncated blocked-merge `error`. `HookRejected.tail`, including commit-hook refusals,
+and exception `tail` values are display excerpts of at most 600 characters.
+
+Process budgets (top-level git invocations, excluding processes Git itself launches):
+
+| Operation | Processes |
+|---|---|
+| `push(dst, head=known_sha)` | 1 |
+| `push(dst)` | 2: resolve a full SHA, then push that pinned object |
+| `push_refspecs` with full OIDs or deletions | 1 |
+| `push_refspecs` with a symbolic source | 2; bare `HEAD` needs a third to preserve its branch destination |
+| `push_request` with a remote, `push_lease`, `lfs_push` | 1 |
+| `push_request(None, explicit_refspecs)` | 3: symbolic branch, one config query, push |
+| `push_request(None, [])` | 1 |
+| `fetch`, `sync`, `ls_remote` | 1 |
+| `delete_remote_at(..., missing_ok=False)` | 1 |
+| `delete_remote_at` with default idempotency | 1 on success, 2 after refusal to distinguish absence from a moved ref |
+| Path-based push, fetch, LFS push/fetch, pull/rebase, ls-remote | 1 |
+| `readiness` with a remote probe | 3: identity, configured remotes, ls-remote |
+
+Push porcelain omits full object IDs on new and up-to-date refs. Typed pushes therefore
+need resolution unless the caller supplies the object ID: use `push(dst, head=known_sha)`
+or a full-OID refspec to keep the one-process budget. Command-style pushes have no SHA to
+return. Hook detection reads Git trace events from the same invocation and adds no process.
+Push calls reserve `GIT_TRACE2_EVENT` for that temporary capture.
+
 The fake models branch rewrites (excluding branches held by worktrees), leases against
 fetched tracking refs, explicit push refspecs, guarded deletion, FETCH_HEAD, named URL
 rewrites and staged continuation. Mirror and wildcard pruning model remote ref deletion.
 `FakeRepo.hooks.commit_failure` injects a non-hook commit failure; no signing runs in memory.
 `hooks.commit_output` supplies complete hook output, and `hooks.rebase_result` and
 `hooks.rebase_spawn_failure` model a command refusal or invocation failure even on an up-to-date base.
+`hooks.push_output` supplies the complete output of a refusing pre-push hook, including an
+empty string for a silent refusal. The fake applies successful refs in a partial push and
+classifies the combined outcome using all ref rows.
 Its diagnostics are representative, while real git owns
 exact success and refusal wording. Scoped fetch sources must identify a registered
 `FakeRemote`; arbitrary transports, wildcard fetch refspecs, shallow histories, annotated

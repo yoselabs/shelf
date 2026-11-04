@@ -27,6 +27,8 @@ def command(
         done = wt.repo.run(wt.path, *args, check=False, env=env, timeout=timeout)
         return CommandResult(ok=done.rc == 0, output=(done.out + done.err).strip())
     except GitTimeout as exc:
+        if exc.output:
+            return CommandResult(ok=False, output=exc.output)
         if lfs and timeout == 3600:
             return CommandResult(ok=False, output="git lfs timed out after 60 min")
         return CommandResult(ok=False, output=str(exc))

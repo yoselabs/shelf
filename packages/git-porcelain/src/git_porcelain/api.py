@@ -20,12 +20,12 @@ layout stay inside the implementations. ``worktree_state`` deliberately exposes 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, NewType, Protocol
+from typing import TYPE_CHECKING, Literal, NewType, Protocol, Self
 
 from git_porcelain.errors import GitUnavailable
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable, Iterable, Mapping, Sequence
     from pathlib import Path
 
 __all__ = [
@@ -57,6 +57,7 @@ __all__ = [
     "Relation",
     "Released",
     "RemoteRef",
+    "RemoteRefs",
     "RemoteRejected",
     "Repo",
     "RepoIdentity",
@@ -261,6 +262,7 @@ class HookRejected:
     def __post_init__(self) -> None:
         if not self.output:
             object.__setattr__(self, "output", self.tail)
+        object.__setattr__(self, "tail", self.tail[-600:])
 
 
 @dataclass(frozen=True)
@@ -290,7 +292,7 @@ class StillHeld:
 
 @dataclass(frozen=True)
 class UpToDate:
-    pass
+    output: str = ""
 
 
 @dataclass(frozen=True)
@@ -299,6 +301,7 @@ class Rebased:
     new_head: Sha
     squashed: bool
     squash_failure: str | None = None
+    output: str = ""
 
 
 @dataclass(frozen=True)
@@ -309,21 +312,35 @@ class Conflict:
     tail: str
     old_head: Sha
     squash_failure: str | None = None
+    output: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.output:
+            object.__setattr__(self, "output", self.tail)
+        object.__setattr__(self, "tail", self.tail[-600:])
 
 
 @dataclass(frozen=True)
 class Aborted:
     head: Sha
+    output: str = ""
 
 
 @dataclass(frozen=True)
 class Pushed:
     sha: Sha
+    output: str = ""
 
 
 @dataclass(frozen=True)
 class Rejected:
     tail: str
+    output: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.output:
+            object.__setattr__(self, "output", self.tail)
+        object.__setattr__(self, "tail", self.tail[-600:])
 
 
 @dataclass(frozen=True)
@@ -336,21 +353,50 @@ class RemoteRejected:
     """The remote refused an update for policy or another non-race reason."""
 
     tail: str
+    output: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.output:
+            object.__setattr__(self, "output", self.tail)
+        object.__setattr__(self, "tail", self.tail[-600:])
 
 
 @dataclass(frozen=True)
 class Transient:
     tail: str
+    output: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.output:
+            object.__setattr__(self, "output", self.tail)
+        object.__setattr__(self, "tail", self.tail[-600:])
 
 
 @dataclass(frozen=True)
 class Synced:
-    pass
+    output: str = ""
 
 
 @dataclass(frozen=True)
 class Offline:
     tail: str
+    output: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.output:
+            object.__setattr__(self, "output", self.tail)
+        object.__setattr__(self, "tail", self.tail[-600:])
+
+
+class RemoteRefs(tuple[RemoteRef, ...]):
+    """Advertised refs, retaining tuple behavior and complete command diagnostics."""
+
+    output: str
+
+    def __new__(cls, refs: Iterable[RemoteRef] = (), *, output: str = "") -> Self:
+        result = super().__new__(cls, refs)
+        result.output = output
+        return result
 
 
 RecordResult = Recorded | NothingToRecord | HookRejected
@@ -377,7 +423,7 @@ class Repo(Protocol):
         """Sorted for-each-ref rows for arbitrary prefixes; empty prefixes select all. Failures raise GitUnavailable."""
         ...
 
-    def ls_remote(self, remote: str, patterns: Sequence[str] = ()) -> tuple[RemoteRef, ...]:
+    def ls_remote(self, remote: str, patterns: Sequence[str] = ()) -> RemoteRefs:
         """Advertise remote refs with tail globs and injected environment; transport failures raise GitUnavailable."""
         ...
 
@@ -403,12 +449,12 @@ class Repo(Protocol):
         """Expanded fetch URL; MissingRemote only for a missing named remote."""
         ...
 
-    def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> None:
-        """Fetch named remote or source URL/path, writing FETCH_HEAD; retry ref-lock races five times."""
+    def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> CommandResult:
+        """Fetch once, writing FETCH_HEAD; return complete output, raise on any refusal."""
         ...
 
-    def delete_remote_at(self, remote: str, ref: str, expected: Sha) -> None:
-        """Lease-guarded deletion of a full refs/ name; authoritative absence also succeeds after refusal."""
+    def delete_remote_at(self, remote: str, ref: str, expected: Sha, *, missing_ok: bool = True) -> CommandResult:
+        """Lease-guarded deletion; missing_ok=False avoids the verification call after refusal."""
         ...
 
     def identity(self) -> RepoIdentity:
@@ -638,7 +684,7 @@ class Worktree(Protocol):
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> CommandResult:
-        """Push supplied forms and options; force/deletion need explicit opt ins. Pin HEAD before hooks."""
+        """Push supplied forms and options once; force/deletion need explicit opt ins. Git resolves HEAD."""
         ...
 
     def push_refspecs(
@@ -667,8 +713,8 @@ class Worktree(Protocol):
         ``abort``: abandon, then ``reset --hard`` to ``restore_to`` when given. A no-op when nothing is paused."""
         ...
 
-    def push(self, dst: str, *, remote: str = "origin", hook_env: Mapping[str, str] | None = None) -> PushResult:
-        """Push HEAD to branch ``dst`` (never forced). The repository's pre-push hook runs, with ``hook_env`` added."""
+    def push(self, dst: str, *, remote: str = "origin", hook_env: Mapping[str, str] | None = None, head: Sha | None = None) -> PushResult:
+        """Push HEAD or caller-supplied full ``head`` to ``dst``; supplying it avoids a resolution process."""
         ...
 
     def landed(self, base: str, title_suffix: str) -> Sha | None:

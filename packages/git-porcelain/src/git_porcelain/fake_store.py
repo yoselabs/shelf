@@ -141,6 +141,7 @@ class Hooks:
     rebase_result: CommandResult | None = None
     rebase_spawn_failure: str | None = None
     refuse_push: bool = False
+    push_output: str | None = None
     push_requires_env: dict[str, str] = field(default_factory=dict)
     squash_failure: str | None = None
     lfs_push_failure: str | None = None

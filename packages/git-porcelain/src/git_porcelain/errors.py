@@ -15,10 +15,11 @@ import re
 class GitError(Exception):
     """A git invocation failed. ``retryable`` marks transient failures; ``hint`` is optional."""
 
-    def __init__(self, message: str, *, retryable: bool = False, hint: str | None = None) -> None:
+    def __init__(self, message: str, *, retryable: bool = False, hint: str | None = None, output: str = "") -> None:
         super().__init__(message)
         self.retryable = retryable
         self.hint = hint
+        self.output = output
 
 
 class GitUnavailable(GitError):
@@ -33,7 +34,7 @@ class GitUnavailable(GitError):
 
     @property
     def tail(self) -> str:
-        return str(self)
+        return str(self)[-600:]
 
 
 class MissingRevision(GitUnavailable):
@@ -47,9 +48,18 @@ class MissingRemote(GitUnavailable):
 class GitReadFailure(GitUnavailable):
     """An observation failed; absence cannot be inferred."""
 
+    def __init__(
+        self, message: str, *, retryable: bool = False, hint: str | None = None, output: str | None = None, push_output: str = ""
+    ) -> None:
+        super().__init__(message, retryable=retryable, hint=hint, output=output)
+        self.push_output = push_output
+
 
 class GitTimeout(GitUnavailable):
     """The child exceeded its deadline; distinct from a failure to invoke it."""
+
+    def __init__(self, message: str, *, retryable: bool = False, hint: str | None = None, output: str = "") -> None:
+        super().__init__(message, retryable=retryable, hint=hint, output=output)
 
 
 class DirtyTree(GitUnavailable):

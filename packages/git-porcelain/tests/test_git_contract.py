@@ -42,6 +42,10 @@ _COMMIT_FAILURE_STDERR = "error: gpg failed to sign the data\n" + _COMMIT_STDERR
 
 
 def _hook_script(kind: str, mode: str) -> str:
+    if mode == "error only":
+        return "echo 'error: nope' >&2\nexit 1\n"
+    if mode == "silent":
+        return "exit 1\n"
     if mode.startswith("verbose"):
         code = 1 if mode.endswith("refuses") else 0
         return f"printf '%s' '{_COMMIT_STDOUT}'\nprintf '%s' '{_COMMIT_STDERR}' >&2\nexit {code}\n"
@@ -254,6 +258,8 @@ class FakeRig:
                 hooks.commit_output = (_COMMIT_STDOUT + _COMMIT_STDERR).strip()
         elif mode == "refuses":
             hooks.refuse_push = True
+        elif mode in {"error only", "silent", "verbose refuses"}:
+            hooks.push_output = {"error only": "error: nope\n", "silent": "", "verbose refuses": _COMMIT_STDOUT + _COMMIT_STDERR}[mode]
         else:
             hooks.push_requires_env = {"X": "1"}
 
@@ -420,9 +426,10 @@ def _verbose_commit_hook(world: World, name: str, outcome: str) -> None:
 @then("the complete hook output is preserved")
 def _complete_hook_output(world: World) -> None:
     output = _dig(world.result, "output")
+    assert isinstance(output, str)
     assert output == (_COMMIT_STDOUT + _COMMIT_STDERR).strip()
     if type(world.result).__name__ == "HookRejected":
-        assert _dig(world.result, "tail") == output
+        assert _dig(world.result, "tail") == output[-600:]
 
 
 def _literal_paths() -> tuple[str, ...]:
@@ -814,6 +821,26 @@ def _branch_rewritten(world: World, branch: str, name: str, expected: str) -> No
 def _command_output(world: World, text: str) -> None:
     assert isinstance(world.result, CommandResult)
     assert text in world.result.output
+
+
+@then("the remote result retains both complete output streams")
+def _remote_output(world: World) -> None:
+    output = getattr(world.result, "output", None)
+    assert isinstance(output, str)
+    assert _COMMIT_STDOUT.strip() in output
+    assert _COMMIT_STDERR.strip() in output
+
+
+@then("the remote result carries command output")
+def _has_remote_output(world: World) -> None:
+    assert isinstance(getattr(world.result, "output", None), str)
+
+
+@then("the failure retains push and verification diagnostics")
+def _deletion_diagnostics(world: World) -> None:
+    assert isinstance(world.error, GitUnavailable)
+    assert world.error.output
+    assert getattr(world.error, "push_output", "")
 
 
 @then(parsers.parse('"{name}" rejects option-like revision "{revision}" without changing history'))

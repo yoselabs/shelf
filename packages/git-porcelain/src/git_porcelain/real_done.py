@@ -23,6 +23,7 @@ class Done:
     rc: int
     raw: bytes
     err: str
+    hooks: tuple[str, ...] = ()
 
     @property
     def out(self) -> str:
@@ -32,10 +33,14 @@ class Done:
     def tail(self) -> str:
         return (self.err.strip() or self.out.strip())[-_TAIL:]
 
+    @property
+    def output(self) -> str:
+        return (self.out + self.err).strip()
+
 
 def unavailable(args: Sequence[str], done: Done, *, full_output: bool = False) -> GitUnavailable:
     """The infrastructure failure of a git child that exited non-zero."""
-    low = done.tail.lower()
+    low = done.output.lower()
     hint = "set user.name and user.email" if "tell me who you are" in low or "empty ident" in low else None
     output = (done.out + done.err).strip()
     return failure(

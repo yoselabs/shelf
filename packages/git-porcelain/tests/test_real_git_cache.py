@@ -8,21 +8,36 @@ that must make it ask git again.
 from __future__ import annotations
 
 import os
+import subprocess
 import time
 from typing import TYPE_CHECKING
 
 import pytest
 
-from git_porcelain import GitReadFailure, Identity, MissingRevision, NotFastForward, RealRepo, RealWorktree
+import git_porcelain as porcelain
+from git_porcelain import GitReadFailure, GitUnavailable, Identity, MissingRevision, NotFastForward, RealRepo, RealWorktree, Sha
 from git_porcelain.real_done import Done
 from git_porcelain.testing import apply_hermetic_env
 from git_porcelain.testing import git as run
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
     from pathlib import Path
 
 _ME = Identity("Cache Author", "author@example.invalid")
+_REMOTE_OPERATIONS = [
+    "push",
+    "push_known",
+    "push_refspecs",
+    "push_request",
+    "push_default",
+    "push_lease",
+    "lfs_push",
+    "fetch",
+    "sync",
+    "delete_remote_at",
+    "ls_remote",
+]
 
 
 class Rig:
@@ -60,6 +75,205 @@ def test_identity_is_asked_of_git_once(rig: Rig) -> None:
     for _ in range(3):
         rig.repo.identity()
     assert rig.count("--git-common-dir") == 1
+
+
+def _remote_call(rig: Rig, operation: str, sha: Sha) -> object:
+    operations: dict[str, Callable[[], object]] = {
+        "push": lambda: rig.wt.push("main"),
+        "push_known": lambda: rig.wt.push("main", head=sha),
+        "push_refspecs": lambda: rig.wt.push_refspecs("origin", [f"{sha}:refs/heads/main"]),
+        "push_request": lambda: rig.wt.push_request("origin", ["HEAD:refs/heads/main"]),
+        "push_default": lambda: rig.wt.push_request(None, []),
+        "push_lease": lambda: rig.wt.push_lease("origin", "HEAD:refs/heads/main"),
+        "lfs_push": lambda: rig.wt.lfs_push("origin", ["HEAD"]),
+        "fetch": rig.repo.fetch,
+        "sync": rig.repo.sync,
+        "delete_remote_at": lambda: rig.repo.delete_remote_at("origin", "refs/heads/main", sha, missing_ok=False),
+        "ls_remote": lambda: rig.repo.ls_remote("origin"),
+    }
+    return operations[operation]()
+
+
+@pytest.mark.parametrize("operation", _REMOTE_OPERATIONS)
+def test_remote_operations_have_a_fixed_process_budget(rig: Rig, operation: str) -> None:
+    sha = Sha(run(rig.path, "rev-parse", "HEAD").strip())
+    run(rig.root / "o.git", "config", "receive.denyDeleteCurrent", "ignore")
+    rig.calls.clear()
+    _remote_call(rig, operation, sha)
+    assert len(rig.calls) == (2 if operation == "push" else 1), rig.calls
+
+
+@pytest.mark.parametrize("operation", _REMOTE_OPERATIONS)
+@pytest.mark.parametrize("code", [0, 1])
+def test_remote_results_preserve_complete_process_output(rig: Rig, monkeypatch: pytest.MonkeyPatch, operation: str, code: int) -> None:
+    sha = Sha("a" * 40)
+    stdout = f"{sha}\trefs/heads/main\n" if operation == "ls_remote" else "stdout-start\n" + "x\n" * 1000 + "stdout-end\n"
+    if code and operation in {"push", "push_known", "push_refspecs", "delete_remote_at"}:
+        stdout += "!\tHEAD:refs/heads/main\t[rejected] (stale info)\n"
+    stderr = "stderr-start\n" + "detail\n" * 1000 + "stderr-end\n"
+
+    def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        if "rev-parse" in args:
+            return subprocess.CompletedProcess(args, 0, (sha + "\n").encode(), b"")
+        return subprocess.CompletedProcess(args, code, stdout.encode(), stderr.encode())
+
+    monkeypatch.setattr(subprocess, "run", process)
+    rig.calls.clear()
+    try:
+        result = _remote_call(rig, operation, sha)
+    except GitUnavailable as exc:
+        assert code and operation in {"fetch", "delete_remote_at", "ls_remote"}
+        result = exc
+    assert getattr(result, "output", None) == (stdout + stderr).strip()
+    assert len(rig.calls) == (2 if operation == "push" else 1), rig.calls
+
+
+@pytest.mark.parametrize("diagnostic", ["error: nope", ""])
+def test_configured_pre_push_hook_is_observed_in_the_push_process(rig: Rig, monkeypatch: pytest.MonkeyPatch, diagnostic: str) -> None:
+    hooks = rig.root / "custom-hooks"
+    hooks.mkdir()
+    hook = hooks / "pre-push"
+    hook.write_text(f"#!/bin/sh\nprintf '%s' '{diagnostic}' >&2\nexit 1\n", encoding="utf-8")
+    hook.chmod(0o755)
+    apply_hermetic_env(monkeypatch, identity=_ME, home=rig.root / "home", config={"core.hooksPath": str(hooks)})
+    sha = Sha(run(rig.path, "rev-parse", "HEAD").strip())
+    rig.calls.clear()
+    result = rig.wt.push_refspecs("origin", [f"{sha}:refs/heads/main"])
+    assert type(result).__name__ == "HookRejected"
+    assert diagnostic in result.output
+    assert len(rig.calls) == 1
+
+
+@pytest.mark.parametrize(("source", "count"), [("HEAD:refs/heads/main", 2), ("HEAD", 3), ("main:refs/heads/main", 2)])
+def test_symbolic_typed_pushes_document_the_resolution_budget(rig: Rig, source: str, count: int) -> None:
+    rig.calls.clear()
+    result = rig.wt.push_refspecs("origin", [source])
+    assert type(result).__name__ == "Pushed"
+    assert len(rig.calls) == count
+
+
+def test_configured_remote_discovery_uses_one_config_query(rig: Rig) -> None:
+    rig.calls.clear()
+    result = rig.wt.push_request(None, ["HEAD:refs/heads/main"])
+    assert result.ok
+    assert len(rig.calls) == 3
+    assert rig.count("config") == 1
+
+
+@pytest.mark.parametrize("missing_ok", [False, True])
+def test_absent_remote_deletion_only_probes_when_idempotency_is_requested(rig: Rig, *, missing_ok: bool) -> None:
+    sha = Sha(run(rig.path, "rev-parse", "HEAD").strip())
+    rig.calls.clear()
+    if missing_ok:
+        result = rig.repo.delete_remote_at("origin", "refs/heads/absent", sha)
+        assert result.ok
+        assert "stale info" in result.output
+    else:
+        with pytest.raises(GitUnavailable) as caught:
+            rig.repo.delete_remote_at("origin", "refs/heads/absent", sha, missing_ok=False)
+        assert "stale info" in caught.value.output
+    assert len(rig.calls) == (2 if missing_ok else 1)
+
+
+def test_deletion_verification_failure_retains_both_invocations(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
+    pushed = "push stdout\n" + "push detail\n" * 1000
+    probed = "probe stdout\n" + "probe detail\n" * 1000
+
+    def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        output = probed if "ls-remote" in args else pushed
+        return subprocess.CompletedProcess(args, 1, output.encode(), b"error: refused\n")
+
+    monkeypatch.setattr(subprocess, "run", process)
+    rig.calls.clear()
+    with pytest.raises(GitReadFailure) as caught:
+        rig.repo.delete_remote_at("origin", "refs/heads/main", Sha("a" * 40))
+    assert caught.value.output == (probed + "error: refused\n").strip()
+    assert caught.value.push_output == (pushed + "error: refused\n").strip()
+    assert len(rig.calls) == 2
+
+
+def test_remote_hook_text_cannot_be_classified_as_a_ref_race(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
+    apply_hermetic_env(monkeypatch, identity=_ME, home=rig.root / "home", config={"maintenance.auto": "false"})
+    hook = rig.root / "o.git" / "hooks" / "pre-receive"
+    hook.parent.mkdir(exist_ok=True)
+    hook.write_text("#!/bin/sh\necho 'rejected by policy hook' >&2\nexit 1\n", encoding="utf-8")
+    hook.chmod(0o755)
+    sha = Sha(run(rig.path, "rev-parse", "HEAD").strip())
+    rig.calls.clear()
+    result = rig.wt.push_refspecs("origin", [f"{sha}:refs/heads/new"])
+    assert type(result).__name__ == "RemoteRejected"
+    assert "rejected by policy hook" in result.output
+    assert len(rig.calls) == 1
+
+
+@pytest.mark.parametrize("operation", ["push_lease", "lfs_push", "fetch", "sync", "ls_remote"])
+def test_remote_timeouts_preserve_partial_output(rig: Rig, monkeypatch: pytest.MonkeyPatch, operation: str) -> None:
+    output = b"stdout-start\n" + b"x\n" * 1000
+    stderr = b"stderr-start\n" + b"detail\n" * 1000
+
+    def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        raise subprocess.TimeoutExpired(args, 1, output=output, stderr=stderr)
+
+    monkeypatch.setattr(subprocess, "run", process)
+    rig.calls.clear()
+    try:
+        result = _remote_call(rig, operation, Sha("a" * 40))
+    except GitUnavailable as exc:
+        result = exc
+    assert getattr(result, "output", None) == (output + stderr).decode().strip()
+    assert len(rig.calls) == 1
+
+
+@pytest.mark.parametrize("path_api", [False, True])
+def test_malformed_advertisements_keep_complete_diagnostics(rig: Rig, monkeypatch: pytest.MonkeyPatch, *, path_api: bool) -> None:
+    stdout = "not a ref row\n"
+    stderr = "detail\n" * 1000
+
+    def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str] | subprocess.CompletedProcess[bytes]:
+        if path_api:
+            return subprocess.CompletedProcess(args, 0, stdout, stderr)
+        return subprocess.CompletedProcess(args, 0, stdout.encode(), stderr.encode())
+
+    monkeypatch.setattr(subprocess, "run", process)
+    with pytest.raises(GitReadFailure) as caught:
+        if path_api:
+            porcelain.ls_remote(rig.path, "origin")
+        else:
+            rig.repo.ls_remote("origin")
+    assert caught.value.output == (stdout + stderr).strip()
+
+
+@pytest.mark.parametrize("operation", ["push", "fetch", "lfs_push", "lfs_fetch", "pull_rebase", "ls_remote", "readiness"])
+@pytest.mark.parametrize("code", [0, 1])
+def test_path_remote_operations_keep_complete_output_with_a_fixed_budget(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch, operation: str, code: int
+) -> None:
+    stdout = "a" * 40 + "\trefs/heads/main\n"
+    stderr = "detail\n" * 1000
+    calls: list[list[str]] = []
+
+    def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return subprocess.CompletedProcess(args, code, stdout, stderr)
+
+    monkeypatch.setattr(subprocess, "run", process)
+    operations: dict[str, Callable[[], object]] = {
+        "push": lambda: porcelain.push(rig.path, "origin"),
+        "fetch": lambda: porcelain.fetch(rig.path, "origin"),
+        "lfs_push": lambda: porcelain.lfs_push(rig.path, "origin", "HEAD"),
+        "lfs_fetch": lambda: porcelain.lfs_fetch(rig.path, "origin", "HEAD"),
+        "pull_rebase": lambda: porcelain.pull_rebase(rig.path, "origin", "main"),
+        "ls_remote": lambda: porcelain.ls_remote(rig.path, "origin"),
+        "readiness": lambda: porcelain.readiness(rig.path),
+    }
+    try:
+        result = operations[operation]()
+    except porcelain.GitError as exc:
+        assert code
+        result = exc
+    output = result["output"] if isinstance(result, dict) else getattr(result, "output", None)
+    assert output == (stdout + stderr).strip()
+    assert len(calls) == (3 if operation == "readiness" else 1)
 
 
 @pytest.mark.parametrize(
