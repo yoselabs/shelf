@@ -990,6 +990,20 @@ Feature: One Repo and Worktree, real or fake
       | error only | push_refspecs("origin", ["HEAD:refs/heads/main"])     |
       | silent     | push_refspecs("origin", ["HEAD:refs/heads/main"])     |
 
+  Scenario Outline: A passing pre-push hook followed by a connection drop remains transient
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" has a passing pre-push hook followed by a dropped connection
+    When "r" calls <call>
+    Then the result is a Transient
+    And the remote result carries command output
+
+    Examples:
+      | call                                                   |
+      | push("main")                                           |
+      | push_refspecs("origin", ["HEAD:refs/heads/main"])        |
+
   Scenario Outline: Push outcomes retain a long hook transcript
     Given an origin "o"
     And the origin "o" holds a="root"
@@ -1990,17 +2004,53 @@ Feature: One Repo and Worktree, real or fake
     When "r" calls sync()
     Then the result is a Offline
 
+  Scenario Outline: Fetch retries up to four ref races before succeeding
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" encounters 4 ref races before fetching
+    When "r" calls <call>
+    Then the result is a <result>
+
+    Examples:
+      | call                                       | result        |
+      | sync()                                     | Synced        |
+      | fetch("origin")                            | CommandResult |
+      | fetch("origin", refspecs=["main"])          | CommandResult |
+
+  Scenario: Sync reports offline after five ref races
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" encounters 5 ref races before fetching
+    When "r" calls sync()
+    Then the result is a Offline
+    And the remote result carries command output
+
+  Scenario: Explicit fetch reports the final ref race after five attempts
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" encounters 5 ref races before fetching
+    When "r" tries fetch("origin")
+    Then the call raises RefRace
+
   @real_only
-  Scenario: A fetch that loses a ref lock returns after one attempt (the fake has no locks)
+  Scenario Outline: A fetch that loses a ref lock succeeds after retrying (the fake has no locks)
     Given an origin "o"
     And the origin "o" holds a.txt="1\n"
     And "r" is a clone of the origin "o"
     And the origin "o" advances "main" with b.txt="b\n"
     And a competing fetch holds the lock on "origin/main" until the first retry
-    When "r" calls sync()
-    Then the result is a Offline
+    When "r" calls <call>
+    Then the result is a <result>
     And the remote result carries command output
-    And the fetch rested 0 time
+    And the fetch rested 1 time
+
+    Examples:
+      | call            | result        |
+      | sync()          | Synced        |
+      | fetch("origin") | CommandResult |
 
   # -- relate, history, branches, tree -----------------------------------------------------------------
   Scenario: Relate gives the merge base and both counts in one look

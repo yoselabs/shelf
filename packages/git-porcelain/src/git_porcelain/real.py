@@ -66,20 +66,33 @@ if TYPE_CHECKING:
 __all__ = ["Done", "RealRepo", "RealWorktree", "unavailable"]
 
 
-def _trace_hooks(trace: Path) -> tuple[str, ...]:
+def _trace_hooks(trace: Path) -> tuple[tuple[str, ...], tuple[tuple[str, int], ...]]:
     if not trace.exists():
-        return ()
+        return (), ()
     hooks: list[str] = []
+    children: dict[tuple[str, int], str] = {}
+    exits: list[tuple[str, int]] = []
     for line in trace.read_text(encoding="utf-8", errors="replace").splitlines():
         try:
             event = json.loads(line)
         except ValueError:
             continue
-        if isinstance(event, dict) and event.get("event") == "child_start" and event.get("child_class") == "hook":
+        if not isinstance(event, dict):
+            continue
+        child_id, sid = event.get("child_id"), event.get("sid", "")
+        if not isinstance(child_id, int) or not isinstance(sid, str):
+            continue
+        key = (sid, child_id)
+        if event.get("event") == "child_start" and event.get("child_class") == "hook":
             name = event.get("hook_name")
             if isinstance(name, str):
                 hooks.append(name)
-    return tuple(hooks)
+                children[key] = name
+        elif event.get("event") == "child_exit" and key in children:
+            code = event.get("code")
+            if isinstance(code, int):
+                exits.append((children.pop(key), code))
+    return tuple(hooks), tuple(exits)
 
 
 class RealRepo:
@@ -144,17 +157,17 @@ class RealRepo:
                     timeout=timeout,
                     input=None if stdin is None else stdin.encode("utf-8", "surrogateescape"),
                 )
-                hooks = _trace_hooks(trace) if trace is not None else ()
+                hooks, hook_exits = _trace_hooks(trace) if trace is not None else ((), ())
         except subprocess.TimeoutExpired as exc:
             msg = f"git {args[0] if args else ''} timed out after {timeout}s"
             stdout = exc.stdout or b""
             stderr = exc.stderr or b""
-            output = (stdout + stderr).decode("utf-8", "surrogateescape").strip()
+            output = (stdout + stderr).decode("utf-8", "replace").strip()
             raise GitTimeout(msg, retryable=True, output=output) from exc
         except OSError as exc:
             msg = f"failed to invoke git: {exc}"
             raise GitUnavailable(msg) from exc
-        result = Done(done.returncode, done.stdout, done.stderr.decode("utf-8", "surrogateescape"), hooks=hooks)
+        result = Done(done.returncode, done.stdout, done.stderr.decode("utf-8", "replace"), hooks=hooks, hook_exits=hook_exits)
         if check and result.rc != 0:
             raise unavailable(args, result)
         return result

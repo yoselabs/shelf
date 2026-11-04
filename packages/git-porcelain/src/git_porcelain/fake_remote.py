@@ -43,10 +43,11 @@ def remote_url(state: RepoState, remote: str) -> str:
 
 def fetch(state: RepoState, remote: str, refspecs: Sequence[str]) -> CommandResult:
     validate_remote(remote)
+    fake_flow.fetch_races(state)
     name, there = _source(state, remote)
     state.store.absorb(there.store)
     if not refspecs:
-        fake_flow.fetch(state, name)
+        fake_flow.fetch(state, name, retry=False)
         tip = there.refs.get(f"refs/heads/{there.default_branch}")
         if tip:
             state.refs["FETCH_HEAD"] = tip
@@ -271,6 +272,8 @@ def push_refspecs(
     refusal = fake_flow.hook_refusal(state, hook_env or {})
     if refusal:
         return refusal
+    if state.hooks.push_transport_failure is not None:
+        return Transient(state.hooks.push_transport_failure)
     try:
         name, there = _source(state, remote)
     except GitUnavailable as exc:

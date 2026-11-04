@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from git_porcelain import real_commands, real_parse, real_write
 from git_porcelain.api import CommandResult, HookRejected, Pushed, RefRejected, RemoteRejected, Sha, Transient
-from git_porcelain.errors import GitReadFailure, GitUnavailable
+from git_porcelain.errors import GitReadFailure, GitUnavailable, RefRace
 from git_porcelain.real_done import unavailable
 from git_porcelain.remote_validation import validate_delete_ref, validate_push, validate_remote
 
@@ -19,10 +19,21 @@ if TYPE_CHECKING:
     from git_porcelain.real_done import Done
 
 
+def fetch_done(repo: RealRepo, remote: str, refspecs: Sequence[str], timeout: float | None) -> Done:
+    """Retry only ref races, with at most five single-process attempts."""
+    attempt = 0
+    while True:
+        done = repo.run(repo.path, "fetch", "--quiet", "--", remote, *refspecs, check=False, timeout=timeout)
+        if not done.rc or attempt == 4 or not isinstance(unavailable(("fetch",), done), RefRace):
+            return done
+        repo.sleep(0.1 * (attempt + 1))
+        attempt += 1
+
+
 def fetch(repo: RealRepo, remote: str, refspecs: Sequence[str], timeout: float | None) -> CommandResult:
     validate_remote(remote)
     try:
-        done = repo.run(repo.path, "fetch", "--quiet", "--", remote, *refspecs, check=False, timeout=timeout)
+        done = fetch_done(repo, remote, refspecs, timeout)
         if done.rc:
             raise unavailable(("fetch",), done)
         return CommandResult(ok=True, output=done.output)
@@ -163,7 +174,7 @@ def classify_push(done: Done, sha: Sha) -> PushResult:
         ):
             return RefRejected(done.tail, output=output)
         return RemoteRejected(done.tail, output=output)
-    if not rows and "pre-push" in done.hooks:
+    if not rows and any(name == "pre-push" and code != 0 for name, code in done.hook_exits):
         return HookRejected(done.tail, output=output)
     if real_write.TRANSIENT.search(output):
         return Transient(done.tail, output=output)

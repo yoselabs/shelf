@@ -28,7 +28,7 @@ from git_porcelain.real_write import record_failure
 )
 @pytest.mark.parametrize("diagnostic", ["", "error: nope", "remote: rejected by a hook\n" + "detail\n" * 200])
 def test_push_classification_uses_ref_rows_and_hook_evidence(rows: bytes, *, hook: bool, kind: str, diagnostic: str) -> None:
-    done = Done(1, rows, diagnostic, hooks=("pre-push",) if hook else ())
+    done = Done(1, rows, diagnostic, hooks=("pre-push",) if hook else (), hook_exits=(("pre-push", 1),) if hook else ())
     result = classify_push(done, Sha("a" * 40))
     assert type(result).__name__ == kind
     assert result.output == (rows.decode() + diagnostic).strip()

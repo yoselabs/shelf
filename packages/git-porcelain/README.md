@@ -191,7 +191,7 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   `write_markers`, `redirect_toplevel`, `lock_index`. Paths are virtual.
 - **Fidelity gaps of the fake** (documented, not hidden): no signing, no rename detection in a
   diff (`Change.kind` is never `R`), a `.gitignore` below the root is not read, only rebases merge,
-  the commit's author is not kept, and the five `real_only` scenarios (ref-lock races, a broken
+  the commit's author is not kept, and the `real_only` scenarios (ref-lock races, a broken
   `core.worktree`, git missing) run on real git only.
   Its `worktree_state` emits deterministic porcelain v2 bytes from virtual HEAD/index/files,
   with regular-file modes, exact-content staged renames, and placeholder stages for unmerged paths.
@@ -293,7 +293,9 @@ observations. Both errors extend `GitUnavailable`.
 
 `Repo.fetch(remote="origin", refspecs=(), timeout=None)` accepts a named remote or a source
 URL/path, writes `FETCH_HEAD`, and returns `CommandResult(ok=True, output=...)`.
-It and `sync` attempt the fetch once; callers own retries. `fetch(source, refspecs=[ref])` is the scoped fetch operation;
+It and `sync` retry only ref-race failures, with at most five attempts and one process per
+attempt. Other failures return immediately. Exhaustion raises the final error from `fetch`
+and returns `Offline` from `sync`. `fetch(source, refspecs=[ref])` is the scoped fetch operation;
 there is no redundant `fetch_ref` method. Missing remote refs raise. `timeout=None` means
 no timeout. `Repo.delete_remote_at(remote, ref, expected)` sends an explicit expected-SHA
 lease with a deletion refspec. `ref` must start with `refs/`; short names raise `ValueError`
@@ -312,8 +314,9 @@ request returns `Pushed(Sha(""))`: the empty sha means nothing was pushed, only 
 `push(dst)` uses the same classification. `RefRejected` requires every porcelain ref row
 to be `! [rejected]` with non-fast-forward, fetch first or stale info; remote policy
 refusals remain `RemoteRejected` even when hook text contains "rejected".
-`HookRejected` requires no ref status rows and Git's trace evidence that pre-push actually
-ran. Silent hooks and hooks printing only `error:` are supported, including configured hook paths.
+`HookRejected` requires no ref status rows and Git's trace evidence that pre-push exited
+with a nonzero status. A hook that passed before a connection drop remains `Transient`.
+Silent hooks and hooks printing only `error:` are supported, including configured hook paths.
 
 `push_request(remote, refspecs, *, options=(), force=False, allow_delete=False, hook_env=None, timeout=None)` returns
 `CommandResult` for configured landing forms, including omitted remote/refspec defaults,
@@ -335,6 +338,8 @@ without setup or hook installation. Its default timeout outcome is
 `CommandResult(False, "git lfs timed out after 60 min")`. Command-style push timeouts also
 return failure outcomes; spawn failures raise.
 
+### Behavior notes 0.12
+
 Version **0.12.0** retains complete, stripped stdout followed by stderr in `output` on every
 remote result and failure. `tail` is only a short display diagnostic. `Repo.ls_remote`
 returns `RemoteRefs`, a tuple with `output`; the path-based function returns `Refs`, a list
@@ -345,6 +350,23 @@ retain whatever output Git produced before the deadline.
 Typed rebase results also expose `output`; merge results retain complete `output` and
 untruncated blocked-merge `error`. `HookRejected.tail`, including commit-hook refusals,
 and exception `tail` values are display excerpts of at most 600 characters.
+
+Diagnostic `output`, `tail` and exception text redact URL userinfo:
+`https://user:pass@host/repo` becomes `https://***@host/repo`, and
+`http://user@host/repo` / `ssh://user@host/repo` hide the username too. This covers both
+output streams and partial timeout output. Invalid UTF-8 bytes become replacement
+characters in diagnostic text. Raw byte reads and parsed values such as configured remote
+URLs retain their data. This is URL userinfo redaction, not a general secret scanner.
+
+`push(dst)` sends `<sha>:refs/heads/dst`, pinning HEAD before the push. The pre-push hook's
+stdin local-ref field is therefore that full SHA, rather than `HEAD`; its local-object-id
+field is the same SHA. `push_request` still lets Git resolve its supplied HEAD refspec.
+
+Hook classification requires Git **2.37+ (verify)** for the `hook_name` field in trace2
+`child_start`, matched to the same child's `child_exit` status. Without that evidence, an
+otherwise unclassified refusal raises `GitUnavailable` with complete redacted output;
+hook wording alone never produces `HookRejected`. Recognized transport failures remain
+`Transient` even without trace evidence.
 
 Process budgets (top-level git invocations, excluding processes Git itself launches):
 
@@ -357,7 +379,8 @@ Process budgets (top-level git invocations, excluding processes Git itself launc
 | `push_request` with a remote, `push_lease`, `lfs_push` | 1 |
 | `push_request(None, explicit_refspecs)` | 3: symbolic branch, one config query, push |
 | `push_request(None, [])` | 1 |
-| `fetch`, `sync`, `ls_remote` | 1 |
+| `fetch`, `sync` | 1 per attempt; at most 5, retrying only ref races |
+| `ls_remote` | 1 |
 | `delete_remote_at(..., missing_ok=False)` | 1 |
 | `delete_remote_at` with default idempotency | 1 on success, 2 after refusal to distinguish absence from a moved ref |
 | Path-based push, fetch, LFS push/fetch, pull/rebase, ls-remote | 1 |
@@ -378,6 +401,8 @@ rewrites and staged continuation. Mirror and wildcard pruning model remote ref d
 `hooks.push_output` supplies the complete output of a refusing pre-push hook, including an
 empty string for a silent refusal. The fake applies successful refs in a partial push and
 classifies the combined outcome using all ref rows.
+`hooks.push_transport_failure` models a transport failure after a passing hook;
+`hooks.fetch_ref_races` injects ref races consumed within the same five-attempt fetch budget.
 Its diagnostics are representative, while real git owns
 exact success and refusal wording. Scoped fetch sources must identify a registered
 `FakeRemote`; arbitrary transports, wildcard fetch refspecs, shallow histories, annotated

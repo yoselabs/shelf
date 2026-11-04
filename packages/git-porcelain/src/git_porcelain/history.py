@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
+from git_porcelain.diagnostic_output import redact_output
 from git_porcelain.errors import GitError
 from git_porcelain.porcelain import (
     _head_from_files,
@@ -324,7 +325,7 @@ def merge(
     if message is not None:
         args += ["-m", _message(message, trailers)]
     proc = _run(repo, (*args, "--", ref), _identity_env(author, committer), None)
-    output = (proc.stdout + proc.stderr).strip()
+    output = redact_output((proc.stdout + proc.stderr).strip())
     if proc.returncode != 0:
         if merge_in_progress(repo):
             return MergeResult("conflict", changed=_changed_since(repo, before), conflicted=tuple(unmerged_paths(repo)), output=output)

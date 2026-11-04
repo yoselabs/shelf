@@ -7,9 +7,11 @@ that must make it ask git again.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -22,7 +24,6 @@ from git_porcelain.testing import git as run
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
-    from pathlib import Path
 
 _ME = Identity("Cache Author", "author@example.invalid")
 _REMOTE_OPERATIONS = [
@@ -142,6 +143,59 @@ def test_configured_pre_push_hook_is_observed_in_the_push_process(rig: Rig, monk
     assert type(result).__name__ == "HookRejected"
     assert diagnostic in result.output
     assert len(rig.calls) == 1
+
+
+@pytest.mark.parametrize("hook_code", [0, 1, None])
+def test_push_needs_a_failed_hook_exit_to_report_hook_rejection(rig: Rig, monkeypatch: pytest.MonkeyPatch, hook_code: int | None) -> None:
+    output = "transport-start\n" + "detail\n" * 200 + "fatal: the remote end hung up unexpectedly\n"
+
+    def process(args: list[str], *, env: dict[str, str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        if hook_code is not None:
+            events = [
+                {"event": "child_start", "child_class": "hook", "hook_name": "pre-push", "child_id": 0},
+                {"event": "child_exit", "child_id": 0, "code": hook_code},
+            ]
+            Path(env["GIT_TRACE2_EVENT"]).write_text("\n".join(json.dumps(event) for event in events), encoding="utf-8")
+        return subprocess.CompletedProcess(args, 128, b"", output.encode())
+
+    monkeypatch.setattr(subprocess, "run", process)
+    rig.calls.clear()
+    result = rig.wt.push_refspecs("origin", [f"{'a' * 40}:refs/heads/main"])
+    assert type(result).__name__ == ("HookRejected" if hook_code == 1 else "Transient")
+    assert result.output == output.strip()
+    assert len(rig.calls) == 1
+
+
+@pytest.mark.parametrize("old_trace", [False, True])
+def test_hook_failure_without_trace_evidence_is_unavailable(rig: Rig, monkeypatch: pytest.MonkeyPatch, *, old_trace: bool) -> None:
+    output = "error: pre-push declined\n" + "detail\n" * 200
+
+    def process(args: list[str], *, env: dict[str, str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        if old_trace:
+            events = [
+                {"event": "child_start", "child_class": "hook", "child_id": 0},
+                {"event": "child_exit", "child_id": 0, "code": 1},
+            ]
+            Path(env["GIT_TRACE2_EVENT"]).write_text("\n".join(json.dumps(event) for event in events), encoding="utf-8")
+        return subprocess.CompletedProcess(args, 1, b"", output.encode())
+
+    monkeypatch.setattr(subprocess, "run", process)
+    with pytest.raises(GitUnavailable) as caught:
+        rig.wt.push_refspecs("origin", [f"{'a' * 40}:refs/heads/main"])
+    assert caught.value.output == output.strip()
+
+
+def test_push_hook_receives_the_pinned_object_as_its_local_ref(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
+    hook = rig.path / ".git" / "hooks" / "pre-push"
+    hook.parent.mkdir(exist_ok=True)
+    captured = rig.root / "push-stdin"
+    hook.write_text(f"#!/bin/sh\ncat > '{captured}'\n", encoding="utf-8")
+    hook.chmod(0o755)
+    apply_hermetic_env(monkeypatch, identity=_ME, home=rig.root / "home", config={})
+    sha = run(rig.path, "rev-parse", "HEAD").strip()
+    result = rig.wt.push("new")
+    assert type(result).__name__ == "Pushed"
+    assert captured.read_text(encoding="utf-8").split() == [sha, sha, "refs/heads/new", "0" * 40]
 
 
 @pytest.mark.parametrize(("source", "count"), [("HEAD:refs/heads/main", 2), ("HEAD", 3), ("main:refs/heads/main", 2)])

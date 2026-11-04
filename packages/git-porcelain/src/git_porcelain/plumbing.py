@@ -2,30 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from git_porcelain.api_results import Ref, Refs
+
+__all__ = ["Plumbing", "Ref", "Refs"]
+
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Sequence
     from pathlib import Path
 
     from git_porcelain.api import CommandResult
-
-
-@dataclass(frozen=True)
-class Ref:
-    """A ref's name and object id; branch listings use names relative to their namespace."""
-
-    name: str
-    oid: str
-
-
-class Refs(list[Ref]):
-    """Path-based remote refs with list behavior and complete command output."""
-
-    def __init__(self, refs: Iterable[Ref] = (), *, output: str = "") -> None:
-        super().__init__(refs)
-        self.output = output
 
 
 class Plumbing(Protocol):

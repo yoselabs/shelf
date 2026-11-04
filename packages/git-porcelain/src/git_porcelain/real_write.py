@@ -79,7 +79,7 @@ def _done[T](repo: RealRepo, result: T) -> T:
 def sync(repo: RealRepo, remote: str) -> SyncResult:
     validate_remote(remote)
     try:
-        done = repo.run(repo.path, "fetch", "--quiet", "--", remote, check=False, timeout=repo.remote_timeout)
+        done = real_remote.fetch_done(repo, remote, (), repo.remote_timeout)
         return Offline(done.tail, output=done.output) if done.rc else Synced(output=done.output)
     finally:
         repo.invalidate()
@@ -143,7 +143,7 @@ def record(
             return record_failure(args, done, hooks=hooks)
         head = real_read.head_of(wt)
         head = some(head)
-        return Recorded(head, output=(done.out + done.err).strip())
+        return Recorded(head, output=done.output)
     finally:
         wt.repo.invalidate()
 
@@ -177,7 +177,7 @@ def record_args(message: str, mode: Literal["new", "amend", "squash_to"], *, hoo
 
 def record_failure(args: Sequence[str], done: Done, *, hooks: bool) -> RecordResult:
     """Keep complete command diagnostics, including hooks that never name themselves."""
-    output = (done.out + done.err).strip()
+    output = done.output
     if hooks and _hook_rejection(output):
         return HookRejected(output, output=output)
     raise unavailable(args, done, full_output=True)
@@ -300,7 +300,7 @@ def _squash_before_rebase(
     wt.run("reset", "-q", "--hard", str(old))
     if squash_failure == "raise":
         raise unavailable(("commit",), made)
-    return False, (made.out + made.err).strip()
+    return False, made.output
 
 
 def rebase_onto(

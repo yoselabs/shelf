@@ -11,9 +11,11 @@ from __future__ import annotations
 import ast
 import dataclasses
 import hashlib
+import json
 import os
 import re
 import shutil
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -695,6 +697,44 @@ def _ref_lock(world: World, ref: str) -> None:
     lock.parent.mkdir(parents=True, exist_ok=True)
     lock.write_text("", encoding="utf-8")
     rig.locks.append(lock)
+
+
+@given(parsers.parse('"{name}" has a passing pre-push hook followed by a dropped connection'))
+def _passing_hook_transport_failure(world: World, name: str) -> None:
+    wt = world.wts[name]
+    output = "fatal: the remote end hung up unexpectedly\n"
+    if isinstance(wt, FakeWorktree):
+        wt.repo.hooks.push_transport_failure = output
+        return
+    head = world.rig.head(wt)
+
+    def process(args: list[str], *, env: dict[str, str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        if "rev-parse" in args:
+            return subprocess.CompletedProcess(args, 0, (head + "\n").encode(), b"")
+        events = [
+            {"event": "child_start", "child_class": "hook", "hook_name": "pre-push", "child_id": 0},
+            {"event": "child_exit", "child_id": 0, "code": 0},
+        ]
+        Path(env["GIT_TRACE2_EVENT"]).write_text("\n".join(json.dumps(event) for event in events), encoding="utf-8")
+        return subprocess.CompletedProcess(args, 128, b"", output.encode())
+
+    world.monkeypatch.setattr(subprocess, "run", process)
+
+
+@given(parsers.parse('"{name}" encounters {count:d} ref races before fetching'))
+def _fetch_races(world: World, name: str, count: int) -> None:
+    wt = world.wts[name]
+    if isinstance(wt, FakeWorktree):
+        wt.repo.hooks.fetch_ref_races = count
+        return
+
+    def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        nonlocal count
+        error = b"error: cannot lock ref 'refs/remotes/origin/main': is at abc but expected def\n" if count else b""
+        count = max(0, count - 1)
+        return subprocess.CompletedProcess(args, int(bool(error)), b"", error)
+
+    world.monkeypatch.setattr(subprocess, "run", process)
 
 
 # -- checking ------------------------------------------------------------------------------------------

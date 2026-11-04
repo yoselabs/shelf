@@ -55,14 +55,14 @@ def _run(
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="surrogateescape",
+            errors="replace",
             env={**_git_env(), **(env or {})},
             timeout=timeout,
             input=stdin,
         )
     except subprocess.TimeoutExpired as exc:
         msg = f"git {args[0] if args else ''} timed out after {timeout}s"
-        output = ((exc.stdout or b"") + (exc.stderr or b"")).decode("utf-8", "surrogateescape").strip()
+        output = ((exc.stdout or b"") + (exc.stderr or b"")).decode("utf-8", "replace").strip()
         raise GitError(msg, retryable=True, output=output) from exc
     except OSError as exc:  # pragma: no cover - exec failure
         msg = f"failed to invoke git: {exc}"

@@ -6,7 +6,7 @@ import re
 from typing import TYPE_CHECKING, Final
 
 from git_porcelain.api import Conflict, HookRejected, Offline, Pushed, Rebased, RefRejected, Sha, Synced, Transient
-from git_porcelain.errors import GitUnavailable, WorktreeRemoveRefused, some
+from git_porcelain.errors import GitUnavailable, RefRace, WorktreeRemoveRefused, some
 from git_porcelain.fake_merge import merge_trees, replay_list
 from git_porcelain.fake_ops import hard_to, is_clean, make_commit, require_index, switch_tree
 from git_porcelain.fake_store import CheckoutState, Rebase, ancestors
@@ -149,9 +149,23 @@ def remote_state(repo: RepoState, name: str) -> RepoState | str:
     return found
 
 
-def fetch(repo: RepoState, name: str) -> SyncResult:
+def fetch_races(repo: RepoState) -> None:
+    """Consume at most five simulated ref races, matching the real fetch attempt budget."""
+    races = repo.hooks.fetch_ref_races
+    repo.hooks.fetch_ref_races = max(0, races - 5)
+    if races >= 5:
+        msg = "error: cannot lock ref 'refs/remotes/origin/main': is at abc but expected def"
+        raise RefRace(msg)
+
+
+def fetch(repo: RepoState, name: str, *, retry: bool = True) -> SyncResult:
     """Copy the remote's objects and set ``refs/remotes/<name>/<branch>`` for each of its branches."""
     validate_remote(name)
+    if retry:
+        try:
+            fetch_races(repo)
+        except RefRace as exc:
+            return Offline(exc.tail, output=exc.output)
     there = remote_state(repo, name)
     if isinstance(there, str):
         return Offline(there)
@@ -175,6 +189,8 @@ def push(repo: RepoState, wt: CheckoutState, dst: str, name: str, env: Mapping[s
     refusal = hook_refusal(repo, env)
     if refusal is not None:
         return refusal
+    if repo.hooks.push_transport_failure is not None:
+        return Transient(repo.hooks.push_transport_failure)
     there = remote_state(repo, name)
     if isinstance(there, str):
         return Transient(there)
