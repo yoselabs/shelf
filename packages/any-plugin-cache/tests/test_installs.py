@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from any_plugin_cache import behind, installed_version, installs, pin_ok, previous, version_key
+from any_plugin_cache import behind, installed_version, installs, previous, rollback_target, version_key
 
 MARK = "skills/x/x.py"
 Install = Callable[..., Path]
@@ -55,11 +55,51 @@ def test_installed_version_is_blank_without_or_with_broken_record(claude: Path, 
     assert installed_version(claude, "p") == ""
 
 
-def test_pin_must_name_an_installed_dir(claude: Path, install: Install) -> None:
+def test_pin_check_is_membership(claude: Path, install: Install) -> None:
     install("0.2.0")
     found = installs(claude, "p", MARK)
-    assert pin_ok(found, "0.2.0")
-    assert not pin_ok(found, "0.3.0")
+    assert "0.2.0" in found
+    assert "0.3.0" not in found
+
+
+def test_dir_with_main_file_but_no_manifest_is_not_installed(claude: Path, install: Install) -> None:
+    install("0.1.0")
+    half = install("0.2.0")
+    (half / ".claude-plugin").mkdir()  # no plugin.json inside
+    both = (MARK, ".claude-plugin/plugin.json")
+    assert installs(claude, "p", both) == {}
+    (install("0.3.0") / ".claude-plugin").mkdir()
+    done = claude / "plugins" / "cache" / "m" / "p" / "0.3.0" / ".claude-plugin" / "plugin.json"
+    done.write_text("{}", encoding="utf-8")
+    assert installs(claude, "p", both).keys() == {"0.3.0"}
+    assert installs(claude, "p", MARK).keys() == {"0.1.0", "0.2.0", "0.3.0"}
+
+
+def test_plugin_name_is_not_a_glob(claude: Path, install: Install) -> None:
+    install("0.1.0", plugin="a")
+    install("0.1.0", plugin="b")
+    assert installs(claude, "*", MARK) == {}
+    assert installs(claude, "[ab]", MARK) == {}
+
+
+def test_previous_of_an_unparseable_current_is_blank(claude: Path, install: Install) -> None:
+    install("0.1.0")
+    assert previous(installs(claude, "p", MARK), "junk") == ""
+
+
+def test_rollback_target_picks_current_from_pin_then_record_then_newest(claude: Path, install: Install) -> None:
+    for v in ("0.1.0", "0.2.0", "0.3.0"):
+        install(v)
+    found = installs(claude, "p", MARK)
+    assert rollback_target(found, pinned="0.2.0", installed="0.3.0") == ("0.1.0", "")
+    assert rollback_target(found, installed="0.3.0") == ("0.2.0", "")
+    assert rollback_target(found) == ("0.2.0", "")
+
+
+def test_rollback_target_says_why_not(claude: Path, install: Install) -> None:
+    assert rollback_target({}) == ("", "no install to roll back from")
+    install("0.1.0")
+    assert rollback_target(installs(claude, "p", MARK)) == ("", "no version older than 0.1.0 is installed")
 
 
 def test_previous_is_newest_below_current(claude: Path, install: Install) -> None:

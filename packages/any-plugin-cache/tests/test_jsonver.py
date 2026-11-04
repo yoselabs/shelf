@@ -28,3 +28,8 @@ def test_no_version_raises() -> None:
         set_json_version('{"name": "p"}', "1.0.0")
     with pytest.raises(NoVersionError):
         set_json_version(MARKET, "1.0.0", after=len(MARKET))
+
+
+def test_replaces_a_value_holding_an_escaped_quote() -> None:
+    text = '{"name": "p", "version": "1.0\\"x"}'
+    assert set_json_version(text, "2.0.0") == '{"name": "p", "version": "2.0.0"}'

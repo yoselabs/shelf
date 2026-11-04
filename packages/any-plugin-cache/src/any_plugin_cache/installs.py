@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import glob
 import json
 from pathlib import Path
 
@@ -14,12 +15,14 @@ def version_key(name: str) -> tuple[int, ...] | None:
     return tuple(int(p) for p in parts)
 
 
-def installs(claude_dir: Path, plugin: str, marker: str) -> dict[str, Path]:
-    """{version: dir} of the cache dirs of `plugin` (any marketplace) that hold the file `marker` (a path relative to the dir).
-    Half-copied dirs and non-version names are left out; the same version in two marketplaces keeps the first by name."""
+def installs(claude_dir: Path, plugin: str, marker: str | tuple[str, ...]) -> dict[str, Path]:
+    """{version: dir} of the cache dirs of `plugin` (any marketplace) that hold every file in `marker` (paths relative to the dir; pass
+    the plugin's manifest and main file so a copy that wrote only one of them is not an install). Incomplete dirs and non-version
+    names are left out; the same version in two marketplaces keeps the first by name."""
+    marks = (marker,) if isinstance(marker, str) else marker
     out: dict[str, Path] = {}
-    for d in sorted((claude_dir / "plugins" / "cache").glob(f"*/{plugin}/*")):
-        if version_key(d.name) and (d / marker).is_file():
+    for d in sorted((claude_dir / "plugins" / "cache").glob(f"*/{glob.escape(plugin)}/*")):
+        if version_key(d.name) and all((d / m).is_file() for m in marks):
             out.setdefault(d.name, d)
     return out
 
@@ -38,16 +41,23 @@ def installed_version(claude_dir: Path, plugin: str) -> str:
     return ""
 
 
-def pin_ok(found: dict[str, Path], version: str) -> bool:
-    """A pin must name an installed dir: True only when `version` is one of `found`."""
-    return version in found
-
-
 def previous(found: dict[str, Path], current: str) -> str:
-    """The newest installed version strictly below `current` (the rollback target), "" when there is none."""
-    cur = version_key(current) or ()
+    """The newest installed version strictly below `current`, "" when there is none or `current` is not a dotted version."""
+    cur = version_key(current)
+    if cur is None:
+        return ""
     below = [v for v in found if (version_key(v) or ()) < cur]
     return max(below, key=lambda v: version_key(v) or ()) if below else ""
+
+
+def rollback_target(found: dict[str, Path], pinned: str = "", installed: str = "") -> tuple[str, str]:
+    """(version to pin, "" or why not): the newest install below the current one, where current is `pinned`, else `installed`
+    (see installed_version), else the newest install. A pin is valid when it is in `found`: use `version in found`."""
+    cur = pinned or installed or max(found, key=lambda v: version_key(v) or (), default="")
+    if not cur:
+        return "", "no install to roll back from"
+    prev = previous(found, cur)
+    return (prev, "") if prev else ("", f"no version older than {cur} is installed")
 
 
 def behind(found: dict[str, Path], version: str) -> int:

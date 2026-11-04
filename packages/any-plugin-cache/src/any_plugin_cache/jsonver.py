@@ -11,7 +11,7 @@ class NoVersionError(Exception):
 
 def set_json_version(text: str, new: str, after: int = 0) -> str:
     """`text` with the first "version" at or after offset `after` set to `new`, everything else byte-for-byte as it was."""
-    m = re.compile(r'("version"\s*:\s*")[^"]*(")').search(text, after)
+    m = re.compile(r'("version"\s*:\s*")(?:[^"\\]|\\.)*(")').search(text, after)
     if not m:
         msg = "no version field to set"
         raise NoVersionError(msg)
