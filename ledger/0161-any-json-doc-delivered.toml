@@ -1,0 +1,10 @@
+seq = 161
+date = "2026-11-04"
+event = "delivery"
+software = "any-json-doc"
+release = "any-json-doc-v0.1.0"
+actor = "task-loop"
+consumer = "task-loop"
+verdict = "pass"
+cost = ""
+note = """Promoted from task-loop's `contracts/stores.py` JsonStore and `stores/files.py` FileDocSet (bead tl-w7lt.17): one JSON document per file, replaced atomically, read as Present, Absent, Torn or ForeignVersion. The msgspec and version-envelope coupling is removed: the host injects load/dump and raises ForeignVersionError. Builds on atomic-io for the write. FileTickets stays in task-loop. Acceptance: real-file tests including a leftover temp from a killed writer and a concurrent reader that never sees a torn document. Candidate contract; the task-loop repoint is not done yet, so no adoption verdict."""
