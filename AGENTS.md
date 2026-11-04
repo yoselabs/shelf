@@ -27,7 +27,7 @@ not just the files the task touched:
 
 ```bash
 just check      # ruff + format + pyrefly (strict) + codespell + deptry + the tests the change reaches
-just check-all  # the same, every test, with the coverage floor (CI runs this)
+just check-all  # the same, every test, with the coverage floor (run locally; the shelf has no CI, ADR 0027)
 ```
 
 The runner is [just](https://just.systems) ([ADR 0023](docs/adr/0023-the-gate-runner-is-just.md)), pinned as the
@@ -41,7 +41,7 @@ Both run in a Linux container when Docker answers (the macOS endpoint scanner ma
 dockerfmt, shellcheck) run on the changed files only (`tools/changed.py`; a changed linter config selects
 everything). The cross-file checks (types, architecture, dependencies, blueprint) always cover the whole
 repo, and the tests are narrowed to the changed packages and every package depending on them (`tools/affected.py`).
-CI (`just check-all`) runs everything.
+There is no CI ([ADR 0027](docs/adr/0027-the-shelf-has-no-ci.md)): the pre-push hook runs the gate, and `just check-all` is run locally before a tag.
 
 **No carve-outs.** "Pre-existing drift", "unrelated file", or "that's a separate change" do **not**
 satisfy Done. If `just check` is red for any reason, the task is not finished. This toolchain is the

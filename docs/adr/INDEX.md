@@ -22,6 +22,7 @@ the file holds the reasons, the rejected options and the history.
 - [0021](0021-affected-tests-stay-on-affected-py.md) **Affected-only tests stay on tools/affected.py; moon is the migration target**: just check narrows tests with tools/affected.py; no build tool yet. Migrate to moon's generic task graph when the shelf gets its first non-Python package (bead shelf-qgz).
 - [0022](0022-every-exception-is-justified.md) **Every exception to a blueprint rule is justified**: An override or ignored path in blueprint.toml needs a reason and either an expires date or an adr naming the accepted ADR that records the durable decision; the gate reports one without.
 - [0023](0023-the-gate-runner-is-just.md) **The gate runner is just**: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`.
+- [0027](0027-the-shelf-has-no-ci.md) **The shelf has no CI; the local gate is the gate**: The shelf runs no CI. Done is the local `just check` (the container gate) green on the tree pushed; the pre-push hook enforces it. A macOS-only change is run on the macOS host.
 
 ## knowledge
 

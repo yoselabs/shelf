@@ -4,3 +4,9 @@
 # gate.clean-clone: a fresh clone's `just check`, measured at 19 s with the gate image cached
 # (2026-10-10); an image rebuild after a lockfile change takes about 1-2 min more.
 clean-clone-seconds = 240
+
+[[override]]
+id = "gate.ci"
+reason = "the shelf runs no CI: the pre-push hook runs the gate, and the owner does not wait for a pipeline"
+decided_by = "owner"
+adr = "0027"
