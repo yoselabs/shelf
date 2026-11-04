@@ -1,0 +1,10 @@
+seq = 162
+date = "2026-11-03"
+event = "delivery"
+software = "any-lease"
+release = "any-lease-v0.1.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = """Promoted from task-loop's resource lease (`app/checks/resources.py` _take over `adapters/locks.py`): a counting lease of N process-lock flocks per named resource, queue with timeout and cancel, ordered multi-acquire, holders without a lock. New package rather than a process-lock change, because process-lock promises one holder per path. Stdlib plus process-lock. Candidate; the task-loop repoint is not done yet, so no adoption verdict."""

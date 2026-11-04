@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "iorlas-task-loop"
+software = "any-lease"
+why = "A task-loop check holds a machine-wide lease per scarce tool it needs (unity limit 1, dotnet limit 2) across slots and loops; app/checks/resources.py _take polls N named flocks and adapters/locks.py wraps process-lock. Not yet adopted: the planned repoint (tl-w7lt.11) deletes that local copy; lifesim tools/unity_slot.py is the second counter to fold in (tl-w7lt.36). Loss on adoption: Windows. lifesim's unity_slot.py has an msvcrt byte-range branch and tools/test_suites.py handles os.name nt; any-lease is POSIX only (fcntl), so lifesim must not need Windows before it adopts (check with the owner; there is no CI config in the repo to say)."
+needs = "Leases(root).acquire(name, limit=, timeout=, cancel=, label=, meta=, on_wait=) -> Held(slot, waited); acquire_all(wants) in sorted order; holders(name) of the units taken now; declare(name, limit); python -m any_lease run NAME LIMIT LABEL -- cmd; LeaseCancelledError and LeaseTimeoutError."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired -- the gate refuses a package with no active use-case (orphaned, Article VIII), so this is the planned retention claim until the repoint lands
