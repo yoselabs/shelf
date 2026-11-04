@@ -33,6 +33,18 @@ class MissingRevision(GitUnavailable):
     """A revision does not identify a git object."""
 
 
+class MissingRemote(GitUnavailable):
+    """The requested named remote is not configured."""
+
+
+class GitReadFailure(GitUnavailable):
+    """An observation failed; absence cannot be inferred."""
+
+
+class GitTimeout(GitUnavailable):
+    """The child exceeded its deadline; distinct from a failure to invoke it."""
+
+
 class DirtyTree(GitUnavailable):
     """Local changes would be overwritten by the requested operation."""
 
@@ -119,8 +131,11 @@ __all__ = [
     "BranchPinned",
     "DirtyTree",
     "GitError",
+    "GitReadFailure",
+    "GitTimeout",
     "GitUnavailable",
     "IndexLocked",
+    "MissingRemote",
     "MissingRevision",
     "NotARepo",
     "RefRace",

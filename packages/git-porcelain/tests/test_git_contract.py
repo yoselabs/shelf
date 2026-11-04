@@ -16,16 +16,20 @@ import re
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from git_porcelain import Change, GitUnavailable, Identity, RealRepo, Worktree, WorktreeRemoveRefused
+from git_porcelain import Change, CommandResult, GitTimeout, GitUnavailable, Identity, RealRepo, Rebased, Worktree, WorktreeRemoveRefused
 from git_porcelain.fake_ops import stage
+from git_porcelain.real_done import Done
 from git_porcelain.real_parse import parse_status
 from git_porcelain.testing import QUIET, FakeRemote, FakeRepo, FakeWorktree, apply_hermetic_env
 from git_porcelain.testing import git as run
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 scenarios("features/git_contract.feature")
 
@@ -415,8 +419,8 @@ def _writes(world: World, name: str, files: str) -> None:
         world.rig.write(world.wts[name], rel, text)
 
 
-@given(parsers.parse('"{name}" stages {paths}'))
-@when(parsers.parse('"{name}" stages {paths}'))
+@given(parsers.re(r'"(?P<name>\w+)" stages (?P<paths>\[.*\])'))
+@when(parsers.re(r'"(?P<name>\w+)" stages (?P<paths>\[.*\])'))
 def _stages(world: World, name: str, paths: str) -> None:
     wt = world.wts[name]
     picks = ast.literal_eval(paths)
@@ -528,6 +532,131 @@ def _ref_lock(world: World, ref: str) -> None:
 
 
 # -- checking ------------------------------------------------------------------------------------------
+@given(parsers.parse('the observations of "{name}" will fail'))
+def _observations_fail(world: World, name: str) -> None:
+    wt = world.wts[name]
+
+    def failed_anchor() -> object:
+        msg = "unknown observation failure"
+        raise GitUnavailable(msg)
+
+    if isinstance(wt, FakeWorktree):
+        world.monkeypatch.setattr(wt, "state", failed_anchor)
+        world.monkeypatch.setattr(wt.repo, "_anchor", failed_anchor)
+        return
+    repo = wt.repo
+    assert isinstance(repo, RealRepo)
+
+    def failed_process(
+        cwd: Path,
+        *args: str,
+        check: bool = True,
+        pin: bool = True,
+        stdin: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Done:
+        msg = "unknown observation failure"
+        raise GitUnavailable(msg)
+
+    world.monkeypatch.setattr(repo, "run", failed_process)
+
+
+@given(parsers.parse('the LFS command of "{name}" will {outcome}'))
+@given(parsers.parse('the LFS command of "{name}" cannot {outcome}'))
+def _lfs_outcome(world: World, name: str, outcome: str) -> None:
+    repo = world.wts[name].repo
+    if isinstance(repo, FakeRepo):
+        repo.hooks.lfs_available = True
+        repo.hooks.lfs_push_failure = "git lfs timed out after 60 min" if outcome == "time out" else None
+        repo.hooks.lfs_spawn_failure = "failed to invoke git" if outcome == "start" else None
+        return
+    assert isinstance(repo, RealRepo)
+    original = repo.run
+
+    def lfs_process(
+        cwd: Path,
+        *args: str,
+        check: bool = True,
+        pin: bool = True,
+        stdin: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Done:
+        if args[:2] == ("lfs", "push"):
+            if outcome == "time out":
+                msg = "git lfs timed out after 3600s"
+                raise GitTimeout(msg)
+            if outcome == "start":
+                msg = "failed to invoke git"
+                raise GitUnavailable(msg)
+            return Done(0, b"", "")
+        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+
+    world.monkeypatch.setattr(repo, "run", lfs_process)
+
+
+@given(parsers.parse('the origin "{name}" refuses non fast forward pushes'))
+def _remote_policy(world: World, name: str) -> None:
+    url = str(world.memory[f"origin:{name}"])
+    if isinstance(world.rig, FakeRig):
+        world.rig._origins[url].state.config["receive.denynonfastforwards"] = "true"
+    else:
+        run(Path(url), "config", "receive.denyNonFastForwards", "true")
+
+
+@given(parsers.parse('the squash commit of "{name}" will fail'))
+def _squash_fails(world: World, name: str) -> None:
+    repo = world.wts[name].repo
+    if isinstance(repo, FakeRepo):
+        repo.hooks.squash_failure = "squash failed"
+        return
+    assert isinstance(repo, RealRepo)
+    original = repo.run
+
+    def fail_commit(
+        cwd: Path,
+        *args: str,
+        check: bool = True,
+        pin: bool = True,
+        stdin: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Done:
+        if "commit" in args:
+            return Done(1, b"", "squash failed")
+        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+
+    world.monkeypatch.setattr(repo, "run", fail_commit)
+
+
+@then(parsers.parse('the squash policy outcome is "{outcome}"'))
+def _squash_outcome(world: World, outcome: str) -> None:
+    wt = world.wts["r"]
+    if outcome == "raised":
+        assert isinstance(world.error, GitUnavailable)
+        assert world.rig.head(wt) == world.memory["before"]
+    else:
+        assert world.error is None
+        assert type(world.result).__name__ == "Rebased"
+        assert isinstance(world.result, Rebased)
+        assert world.result.squash_failure == "squash failed"
+        assert world.result.squashed is False
+        assert [row.subject for row in wt.repo.history(["HEAD"], limit=2)] == ["second", "first"]
+
+
+@then(parsers.parse('the branch "{branch}" of "{name}" rewritten is {expected}'))
+def _branch_rewritten(world: World, branch: str, name: str, expected: str) -> None:
+    sha = world.wts[name].repo.history([branch], limit=1)[0].sha
+    assert (sha != world.memory[branch]) == ast.literal_eval(expected)
+
+
+@then(parsers.parse('the command output contains "{text}"'))
+def _command_output(world: World, text: str) -> None:
+    assert isinstance(world.result, CommandResult)
+    assert text in world.result.output
+
+
 @then(parsers.parse('the refusal reason is "{reason}"'))
 def _refusal_reason(world: World, reason: str) -> None:
     assert isinstance(world.error, WorktreeRemoveRefused)

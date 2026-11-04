@@ -13,10 +13,10 @@ from __future__ import annotations
 import shutil
 import subprocess
 import time
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
-from git_porcelain import real_checkout, real_env, real_read, real_worktrees, real_write
-from git_porcelain.errors import GitUnavailable
+from git_porcelain import real_checkout, real_commands, real_env, real_observe, real_read, real_remote, real_worktrees, real_write
+from git_porcelain.errors import GitTimeout, GitUnavailable
 from git_porcelain.real_done import Done, unavailable
 
 if TYPE_CHECKING:
@@ -25,11 +25,13 @@ if TYPE_CHECKING:
     from typing import Literal
 
     from git_porcelain.api import (
+        CommandResult,
         Diff,
         Dirty,
         FinishResult,
         Health,
         LogEntry,
+        Pick,
         PushResult,
         RebaseResult,
         RecordResult,
@@ -47,8 +49,6 @@ if TYPE_CHECKING:
     from git_porcelain.history import Identity
 
 __all__ = ["Done", "RealRepo", "RealWorktree", "unavailable"]
-
-_T = TypeVar("_T")
 
 
 class RealRepo:
@@ -107,7 +107,7 @@ class RealRepo:
             )
         except subprocess.TimeoutExpired as exc:
             msg = f"git {args[0] if args else ''} timed out after {timeout}s"
-            raise GitUnavailable(msg, retryable=True) from exc
+            raise GitTimeout(msg, retryable=True) from exc
         except OSError as exc:
             msg = f"failed to invoke git: {exc}"
             raise GitUnavailable(msg) from exc
@@ -117,7 +117,7 @@ class RealRepo:
         return result
 
     # -- the memo --------------------------------------------------------------------------------------
-    def memo(self, key: object, compute: Callable[[], _T], *, forever: bool = True) -> _T:
+    def memo[T](self, key: object, compute: Callable[[], T], *, forever: bool = True) -> T:
         store = self._forever if forever else self._mutable
         if self.memoize and key in store:
             return store[key]  # type: ignore[return-value]  # keys are tagged by the call site
@@ -133,6 +133,21 @@ class RealRepo:
         self.refs_seen.clear()
 
     # -- Repo ------------------------------------------------------------------------------------------
+    def merge_base(self, a: str, b: str) -> Sha | None:
+        return real_observe.merge_base(self, a, b)
+
+    def cherry(self, upstream: str, head: str) -> tuple[Pick, ...]:
+        return real_observe.cherry(self, upstream, head)
+
+    def remote_url(self, remote: str) -> str:
+        return real_observe.remote_url(self, remote)
+
+    def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> None:
+        real_remote.fetch(self, remote, refspecs, timeout)
+
+    def delete_remote_at(self, remote: str, ref: str, expected: Sha) -> None:
+        real_remote.delete_remote_at(self, remote, ref, expected)
+
     def identity(self) -> RepoIdentity:
         return real_read.identity(self)
 
@@ -258,8 +273,57 @@ class RealWorktree:
     def park(self, base: str, *, clean_keep: Sequence[str] | None = None) -> Sha:
         return real_write.park(self, base, clean_keep)
 
-    def rebase_onto(self, base: str, *, squash_message: str | None = None) -> RebaseResult:
-        return real_write.rebase_onto(self, base, squash_message)
+    def rebase_onto(
+        self,
+        base: str,
+        *,
+        squash_message: str | None = None,
+        squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
+        update_refs: bool | None = None,
+    ) -> RebaseResult:
+        return real_write.rebase_onto(self, base, squash_message, squash_failure=squash_failure, update_refs=update_refs)
+
+    def rebase(self, base: str, *, update_refs: bool | None = None) -> CommandResult:
+        return real_commands.rebase(self, base, update_refs=update_refs)
+
+    def rebasing(self) -> bool:
+        return real_observe.rebasing(self)
+
+    def unmerged(self) -> tuple[str, ...]:
+        return real_observe.unmerged(self)
+
+    def continue_rebase(self, *, stage_conflicts: bool = False, check_markers: bool = False, missing_ok: bool = False) -> CommandResult:
+        return real_commands.continue_rebase(self, stage_conflicts=stage_conflicts, check_markers=check_markers, missing_ok=missing_ok)
+
+    def abort_rebase(self, *, missing_ok: bool = True, restore_to: Sha | None = None) -> CommandResult:
+        return real_commands.abort_rebase(self, missing_ok=missing_ok, restore_to=restore_to)
+
+    def push_request(
+        self,
+        remote: str | None,
+        refspecs: Sequence[str],
+        *,
+        options: Sequence[str] = (),
+        hook_env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> CommandResult:
+        return real_remote.push_request(self, remote, refspecs, options=options, hook_env=hook_env, timeout=timeout)
+
+    def push_refspecs(
+        self,
+        remote: str,
+        refspecs: Sequence[str],
+        *,
+        hook_env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> PushResult:
+        return real_remote.push_refspecs(self, remote, refspecs, hook_env=hook_env, timeout=timeout)
+
+    def push_lease(self, remote: str, refspec: str, *, timeout: float = 3600) -> CommandResult:
+        return self.push_request(remote, [refspec], options=["--force-with-lease"], timeout=timeout)
+
+    def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = 3600) -> CommandResult:
+        return real_commands.command(self, ["lfs", "push", remote, *refs], timeout=timeout, lfs=True)
 
     def finish_rebase(self, action: Literal["continue", "abort"], *, restore_to: Sha | None = None) -> FinishResult:
         return real_write.finish_rebase(self, action, restore_to)

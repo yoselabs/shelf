@@ -3,6 +3,353 @@ Feature: One Repo and Worktree, real or fake
   Every intent operation a driver such as task-loop takes on a checkout behaves the same on the git binary
   (RealRepo) and in memory (FakeRepo). These scenarios run against both; @real_only names a gap of the fake.
 
+  Scenario: Fresh rebase observations and command refusals are explicit
+    Given a repository "r"
+    When "r" calls rebasing()
+    Then the result is False
+    When "r" calls unmerged()
+    Then the result is []
+    When "r" calls abort_rebase()
+    Then the result's ok is True
+    When "r" calls continue_rebase()
+    Then the result's ok is False
+    When "r" calls rebase("missing")
+    Then the result's ok is False
+
+  Scenario: Merge base permits missing revisions and cherry preserves oldest first picks
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "root"
+    And "r" commits "first" with b="first"
+    And "r" remembers its head as "first"
+    And "r" commits "second" with c="second"
+    When "r" calls merge_base("missing", "HEAD")
+    Then the result is None
+    When "r" calls merge_base("<mem:root>", "HEAD")
+    Then the result is "<mem:root>"
+    When "r" calls cherry("<mem:root>", "HEAD")
+    Then the oid of each result entry is ["<mem:first>", "<head:r>"]
+    And the upstream of each result entry is [False, False]
+
+  Scenario: Named remote URL absence is typed
+    Given a repository "r"
+    When "r" tries remote_url("missing")
+    Then the call raises MissingRemote
+
+  Scenario Outline: Observation faults stay failures instead of becoming absence
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And the observations of "r" will fail
+    When "r" tries <operation>
+    Then the call raises GitReadFailure
+
+    Examples:
+      | operation                 |
+      | merge_base("HEAD", "HEAD") |
+      | remote_url("origin")       |
+      | rebasing()                 |
+      | unmerged()                 |
+
+  Scenario: Explicit refspecs keep source commits and guarded deletion keeps moved refs
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And "r" commits "local" with b="local"
+    When "r" calls remote_url("origin")
+    Then the result is "<mem:origin:o>"
+    When "r" calls push_refspecs("origin", ["<mem:root>:refs/heads/pinned"])
+    Then the result is a Pushed
+    When "r" calls fetch("origin", refspecs=["refs/heads/pinned"])
+    Then the result is None
+    When "r" calls delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
+    Then the result is None
+    When "r" calls delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
+    Then the result is None
+
+  Scenario: Push requests preserve namespaces multiple refs and deletion
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" calls push_request("origin", ["HEAD:refs/heads/one", "+HEAD:refs/tags/two"])
+    Then the result's ok is True
+    When "r" calls push_request("origin", [":refs/heads/one", ":refs/tags/two"])
+    Then the result's ok is True
+
+  Scenario: A lease refuses a branch changed since fetching
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "local" with b="local"
+    And the origin "o" advances "main" with c="elsewhere"
+    When "r" calls push_lease("origin", "HEAD:refs/heads/main")
+    Then the result's ok is False
+    And the command output contains "stale info"
+
+  Scenario Outline: Configured landing push forms retain HEAD destinations and options
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "local" with b="local"
+    When "r" calls push_request(<remote>, <refspecs>, options=<options>)
+    Then the result's ok is True
+
+    Examples:
+      | remote   | refspecs          | options        |
+      | "origin" | ["HEAD"]          | []             |
+      | "origin" | ["HEAD:main"]     | []             |
+      | "origin" | ["+HEAD:main"]    | []             |
+      | "origin" | []                | []             |
+      | None     | []                | []             |
+      | None     | ["HEAD:main"]     | ["--dry-run"]  |
+
+  Scenario: Remote policy refusal is distinct from a ref race
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "before"
+    And "r" commits "local" with b="local"
+    And "r" calls push_request("origin", ["HEAD:refs/heads/main"])
+    And the origin "o" refuses non fast forward pushes
+    When "r" calls push_refspecs("origin", ["+<mem:before>:refs/heads/main"])
+    Then the result is a RemoteRejected
+
+  Scenario: An explicit push reports a ref race separately
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "local" with b="local"
+    And the origin "o" advances "main" with c="remote"
+    When "r" calls push_refspecs("origin", ["HEAD:refs/heads/main"])
+    Then the result is a RefRejected
+
+  Scenario: Cherry recognizes equivalent patches on separate branches
+    Given a repository "r"
+    And "r" commits "root" with a="root\n"
+    And "r" calls checkout_new("topic")
+    And "r" commits "mine" with b="shared\n"
+    And "r" remembers its head as "mine"
+    And "r" calls checkout("main")
+    And "r" commits "equivalent" with b="shared\n"
+    When "r" calls cherry("main", "topic")
+    Then the oid of each result entry is ["<mem:mine>"]
+    And the upstream of each result entry is [True]
+
+  Scenario: No common ancestor is a known absence
+    Given an origin "o"
+    And the origin "o" holds a="remote"
+    And a repository "r"
+    And "r" commits "unrelated" with b="local"
+    And "r" has the origin "o" as remote "origin"
+    And "r" calls fetch()
+    When "r" calls merge_base("HEAD", "origin/main")
+    Then the result is None
+
+  Scenario: Named remote URLs honor rewrite rules
+    Given an origin "o"
+    And "r" is a clone of the origin "o"
+    And "r" config "url.expanded/.insteadOf" is "<root>/"
+    When "r" calls remote_url("origin")
+    Then the result is "expanded/o.git"
+
+  Scenario: Scoped fetch writes FETCH_HEAD without moving the checkout
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "root"
+    And the origin "o" advances "main" with b="remote"
+    When "r" calls fetch("<mem:origin:o>", refspecs=["main"])
+    Then the result is None
+    When "r" calls history(["FETCH_HEAD"], limit=1)
+    Then the result's 0.subject is "advance"
+    When "r" calls branch()
+    Then the result is "main"
+
+  Scenario: LFS failure remains an outcome
+    Given a repository "r"
+    When "r" calls lfs_push("absent", ["HEAD", "refs/heads/main"])
+    Then the result's ok is False
+
+  Scenario: LFS timeout is an outcome and invocation failure still raises
+    Given a repository "r"
+    And the LFS command of "r" will time out
+    When "r" calls lfs_push("origin", ["HEAD", "refs/heads/main"])
+    Then the result's ok is False
+    And the result's output is "git lfs timed out after 60 min"
+    Given the LFS command of "r" cannot start
+    When "r" tries lfs_push("origin", ["HEAD"])
+    Then the call raises GitUnavailable
+
+  Scenario: LFS uploads can succeed without installing hooks
+    Given a repository "r"
+    And the LFS command of "r" will succeed
+    When "r" calls lfs_push("origin", ["HEAD", "refs/heads/main"])
+    Then the result's ok is True
+
+  Scenario Outline: Rebase update-refs inherits configuration and permits explicit overrides
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" calls checkout_new("topic")
+    And "r" commits "first" with b="first"
+    And "r" calls checkout_new("middle")
+    And "r" remembers its head as "middle"
+    And "r" calls checkout("topic")
+    And "r" commits "second" with c="second"
+    And "r" calls checkout("main")
+    And "r" commits "base" with d="base"
+    And "r" calls checkout("topic")
+    And "r" config "rebase.updateRefs" is "true"
+    When "r" calls rebase_onto("main", update_refs=<option>)
+    Then the result is a Rebased
+    And the branch "middle" of "r" rewritten is <rewritten>
+
+    Examples:
+      | option | rewritten |
+      | None   | True      |
+      | False  | False     |
+      | True   | True      |
+
+  Scenario Outline: A failed squash restores the original work before applying its failure policy
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "first" with b="first"
+    And "r" commits "second" with c="second"
+    And "r" remembers its head as "before"
+    And the origin "o" advances "main" with d="base"
+    And "r" calls fetch()
+    And the squash commit of "r" will fail
+    When "r" tries rebase_onto("origin/main", squash_message="combined", squash_failure="<policy>")
+    Then the squash policy outcome is "<outcome>"
+    And the file "b" of "r" holds "first"
+    And the file "c" of "r" holds "second"
+
+    Examples:
+      | policy             | outcome |
+      | raise              | raised  |
+      | continue_unsquashed | rebased |
+
+  Scenario: Raw rebase continuation uses only the caller's staged resolution
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And "r" remembers its head as "before"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    When "r" calls rebase("origin/main")
+    Then the result's ok is False
+    When "r" calls rebasing()
+    Then the result is True
+    When "r" calls unmerged()
+    Then the result is ["a"]
+    When "r" calls continue_rebase(check_markers=True, stage_conflicts=True)
+    Then the result's ok is False
+    When "r" writes a="resolved\n"
+    And "r" calls continue_rebase()
+    Then the result's ok is False
+    When "r" stages ["a"]
+    And "r" writes a="unstaged\n"
+    And "r" calls continue_rebase()
+    Then the result's ok is False
+    When "r" writes a="resolved\n"
+    And "r" calls continue_rebase()
+    Then the result's ok is True
+    When "r" calls rebasing()
+    Then the result is False
+    When "r" calls abort_rebase(restore_to="<mem:before>")
+    Then the result's ok is True
+    And the file "a" of "r" holds "mine\n"
+
+  Scenario: Rebase abort restores HEAD and clears conflict observations
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And "r" remembers its head as "before"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    And "r" calls rebase_onto("origin/main")
+    When "r" calls abort_rebase(restore_to="<mem:before>")
+    Then the result's ok is True
+    When "r" calls unmerged()
+    Then the result is []
+    When "r" calls rebasing()
+    Then the result is False
+
+  Scenario: Continuation explicitly stages an edited resolution
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    And "r" calls rebase_onto("origin/main")
+    When "r" writes a="resolved\n"
+    And "r" calls continue_rebase(stage_conflicts=True, check_markers=True)
+    Then the result's ok is True
+    When "r" calls continue_rebase(missing_ok=True)
+    Then the result's ok is True
+    When "r" calls abort_rebase(missing_ok=False)
+    Then the result's ok is False
+
+  Scenario: A guarded remote deletion refuses an advanced destination
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "before"
+    And the origin "o" advances "main" with b="other"
+    When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:before>")
+    Then the call raises GitUnavailable
+
+  Scenario: Failed deletion verification cannot report authoritative absence
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "before"
+    And the origin "o" is offline
+    When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:before>")
+    Then the call raises GitReadFailure
+
+  Scenario: Scoped fetch refuses a missing remote ref
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    When "r" tries fetch("origin", refspecs=["missing"])
+    Then the call raises GitUnavailable
+
+  Scenario: Explicit pushes preserve hook environment and distinguish policy from races
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with b="local"
+    And "r" has a pre-push hook that wants env
+    When "r" calls push_refspecs("origin", ["HEAD:refs/heads/main"])
+    Then the result is a HookRejected
+    When "r" calls push_refspecs("origin", ["HEAD:refs/heads/main"], hook_env={"X": "1"})
+    Then the result is a Pushed
+
+  Scenario: A lease can replace a fetched destination without setting an upstream
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" remembers its head as "before"
+    And "r" commits "mine" with b="local"
+    And "r" calls push_lease("origin", "HEAD:refs/heads/main")
+    And "r" calls reset("<mem:before>", mode="hard")
+    When "r" calls push_lease("origin", "HEAD:refs/heads/main")
+    Then the result's ok is True
+
+  Scenario Outline: Checkout observations never manufacture absence outside a repository
+    Given "plain" is the plain folder
+    When "plain" tries <operation>()
+    Then the call raises GitReadFailure
+
+    Examples:
+      | operation |
+      | unmerged  |
+      | rebasing  |
+
   Scenario: Branch names survive unborn HEAD and become absent when detached
     Given a repository "r"
     When "r" calls branch()

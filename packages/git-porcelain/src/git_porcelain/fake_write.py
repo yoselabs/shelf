@@ -20,7 +20,7 @@ from git_porcelain.api import (
     UpToDate,
     WorktreeInfo,
 )
-from git_porcelain.errors import some
+from git_porcelain.errors import GitUnavailable, some
 from git_porcelain.fake_ops import branch_ref, clean, hard_to, is_clean, make_commit, require_index, stage, switch_tree, tracked_dirty
 from git_porcelain.fake_read import dirty, relate, resolve_commit
 from git_porcelain.fake_store import ancestors
@@ -177,7 +177,17 @@ def park(repo: RepoState, wt: CheckoutState, base: str, clean_keep: Sequence[str
     return Sha(sha)
 
 
-def rebase_onto(repo: RepoState, wt: CheckoutState, base: str, squash_message: str | None) -> RebaseResult:
+def rebase_onto(
+    repo: RepoState,
+    wt: CheckoutState,
+    base: str,
+    squash_message: str | None,
+    *,
+    squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
+    update_refs: bool | None = None,
+) -> RebaseResult:
+    if squash_failure not in {"raise", "continue_unsquashed"}:
+        raise ValueError(squash_failure)
     if wt.rebase is not None:
         msg = "a rebase is already paused here: finish_rebase first"
         raise ValueError(msg)
@@ -189,18 +199,27 @@ def rebase_onto(repo: RepoState, wt: CheckoutState, base: str, squash_message: s
     if not ancestors(repo.store, target) - ancestors(repo.store, head):
         return UpToDate()
     squashed = False
+    squash_diagnostic: str | None = None
     if squash_message is not None:
         fork = relate(repo, wt, "HEAD", base).merge_base
         if fork is not None and len(ancestors(repo.store, head) - ancestors(repo.store, fork)) > 1:
-            repo.move_head(wt, fork)
-            make_commit(repo, wt, squash_message, (fork,))
-            squashed = True
+            if repo.hooks.squash_failure is not None:
+                if squash_failure == "raise":
+                    raise GitUnavailable(repo.hooks.squash_failure)
+                squash_diagnostic = repo.hooks.squash_failure
+            else:
+                repo.move_head(wt, fork)
+                make_commit(repo, wt, squash_message, (fork,))
+                squashed = True
     started = repo.head_sha(wt)
     started = some(started)
-    done = flow.start_rebase(repo, wt, started, target)
+    updates = (
+        update_refs if update_refs is not None else repo.config.get("rebase.updaterefs", "false").lower() in {"true", "yes", "on", "1"}
+    )
+    done = flow.start_rebase(repo, wt, started, target, update_refs=updates)
     if isinstance(done, Rebased):
-        return Rebased(Sha(head), done.new_head, squashed=squashed)
-    return replace(done, old_head=Sha(head))
+        return Rebased(Sha(head), done.new_head, squashed=squashed, squash_failure=squash_diagnostic)
+    return replace(done, old_head=Sha(head), squash_failure=squash_diagnostic)
 
 
 def finish_rebase(repo: RepoState, wt: CheckoutState, action: Literal["continue", "abort"], restore_to: Sha | None) -> FinishResult:

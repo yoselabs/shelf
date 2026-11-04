@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Final, Literal
 
-from git_porcelain import real_checkout, real_parse, real_read
+from git_porcelain import real_checkout, real_observe, real_parse, real_read
 from git_porcelain.api import (
     Aborted,
     BranchHeld,
@@ -59,11 +59,11 @@ __all__ = [
 
 # Another process fetching into the same repository at the same moment: the ref is where it should be, the fetch
 # only lost the lock (task-loop measured 150 of 180 simultaneous fetches failing so).
-_REF_RACE: Final = re.compile(
+REF_RACE: Final = re.compile(
     r"incorrect old value|cannot lock ref|unable to update local ref|Unable to create '[^']*\.lock'|failed: reference already exists"
 )
 _FETCH_TRIES: Final = 5
-_TRANSIENT: Final = re.compile(
+TRANSIENT: Final = re.compile(
     r"curl \d+|Broken pipe|Connection (?:reset|timed out|refused)|Could not resolve host|early EOF|RPC failed|remote end hung up|"
     r"SSL_ERROR|TLS|Operation timed out|Network is unreachable|Temporary failure in name resolution|error: 5\d\d|HTTP/\d(?:\.\d)? 5\d\d|"
     r"Could not read from remote repository|does not appear to be a git repository|unable to access",
@@ -90,7 +90,7 @@ def sync(repo: RealRepo, remote: str) -> SyncResult:
             done = repo.run(repo.path, "fetch", "--quiet", remote, check=False, timeout=repo.remote_timeout)
             if done.rc == 0:
                 return Synced()
-            if attempt == _FETCH_TRIES - 1 or not _REF_RACE.search(done.tail):
+            if attempt == _FETCH_TRIES - 1 or not REF_RACE.search(done.tail):
                 return Offline(done.tail)
             repo.sleep(0.1 * (attempt + 1))
         return Offline("fetch gave up")  # pragma: no cover - the loop returns on its last turn
@@ -250,7 +250,32 @@ def _count(wt: RealWorktree, spec: str) -> int:
     return int(wt.run("rev-list", "--count", spec).out.strip())
 
 
-def rebase_onto(wt: RealWorktree, base: str, squash_message: str | None) -> RebaseResult:
+def _squash_before_rebase(
+    wt: RealWorktree, base: str, message: str, old: Sha, *, squash_failure: Literal["raise", "continue_unsquashed"]
+) -> tuple[bool, str | None]:
+    fork = wt.run("merge-base", "HEAD", base, check=False).out.strip()
+    if not fork or _count(wt, f"{fork}..HEAD") <= 1:
+        return False, None
+    wt.run("reset", "-q", "--soft", fork)
+    made = wt.repo.run(wt.path, *_identity_args(wt.repo), "commit", "-q", "--no-verify", "--allow-empty", "-m", message, check=False)
+    if made.rc == 0:
+        return True, None
+    wt.run("reset", "-q", "--hard", str(old))
+    if squash_failure == "raise":
+        raise unavailable(("commit",), made)
+    return False, (made.out + made.err).strip()
+
+
+def rebase_onto(
+    wt: RealWorktree,
+    base: str,
+    squash_message: str | None,
+    *,
+    squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
+    update_refs: bool | None = None,
+) -> RebaseResult:
+    if squash_failure not in {"raise", "continue_unsquashed"}:
+        raise ValueError(squash_failure)
     if _paused(wt):
         msg = "a rebase is already paused here: finish_rebase first"
         raise ValueError(msg)
@@ -264,25 +289,18 @@ def rebase_onto(wt: RealWorktree, base: str, squash_message: str | None) -> Reba
     if _count(wt, f"HEAD..{base}") == 0:
         return UpToDate()
     squashed = False
+    squash_diagnostic: str | None = None
     try:
         if squash_message is not None:
-            fork = wt.run("merge-base", "HEAD", base, check=False).out.strip()
-            if fork and _count(wt, f"{fork}..HEAD") > 1:
-                wt.run("reset", "-q", "--soft", fork)
-                made = wt.repo.run(
-                    wt.path, *_identity_args(wt.repo), "commit", "-q", "--no-verify", "--allow-empty", "-m", squash_message, check=False
-                )
-                if made.rc != 0:
-                    wt.run("reset", "-q", "--hard", str(old))
-                    raise unavailable(("commit",), made)
-                squashed = True
-        done = wt.run("-c", "rebase.updateRefs=false", "-c", "core.editor=true", "rebase", "-q", base, check=False)
+            squashed, squash_diagnostic = _squash_before_rebase(wt, base, squash_message, old, squash_failure=squash_failure)
+        flags = [] if update_refs is None else ["--update-refs" if update_refs else "--no-update-refs"]
+        done = wt.run("-c", "core.editor=true", "rebase", "-q", *flags, "--", base, check=False)
         if done.rc == 0:
             new = real_read.head_of(wt)
             new = some(new)
-            return Rebased(old, new, squashed)
+            return Rebased(old, new, squashed, squash_diagnostic)
         if _paused(wt):
-            return Conflict(real_read.unmerged(wt), done.tail, old)
+            return Conflict(real_observe.unmerged(wt), (done.out + done.err).strip(), old, squash_diagnostic)
         if squashed:
             wt.run("reset", "-q", "--hard", str(old))
         raise unavailable(("rebase",), done)
@@ -317,7 +335,7 @@ def finish_rebase(wt: RealWorktree, action: Literal["continue", "abort"], restor
             return Rebased(head, head, squashed=False)
         orig = _orig_head(wt)
         files = real_read.unmerged(wt)
-        marked = tuple(f for f in files if _has_markers(wt.path / f))
+        marked = tuple(f for f in files if has_markers(wt.path / f))
         if marked:
             return Conflict(marked, "conflict markers remain", orig)
         if files:
@@ -334,7 +352,7 @@ def finish_rebase(wt: RealWorktree, action: Literal["continue", "abort"], restor
         wt.repo.invalidate()
 
 
-def _has_markers(path: Path) -> bool:
+def has_markers(path: Path) -> bool:
     try:
         return _MARKERS.search(path.read_text(encoding="utf-8", errors="replace")) is not None
     except OSError:
@@ -360,7 +378,7 @@ def _classify_push(done: Done, head: Sha) -> PushResult:
         return Pushed(head)
     if any(line.flag == "!" for line in real_parse.parse_push(done.out)):
         return Rejected(done.tail)
-    if _TRANSIENT.search(done.tail):
+    if TRANSIENT.search(done.tail):
         return Transient(done.tail)
     if "failed to push some refs" in done.err or done.out.strip() == "" or "pre-push" in done.err:
         return HookRejected(done.tail)
