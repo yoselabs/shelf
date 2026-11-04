@@ -21,7 +21,8 @@ from typing import Protocol
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from git_porcelain import Change, GitUnavailable, Identity, RealRepo, Worktree
+from git_porcelain import Change, GitUnavailable, Identity, RealRepo, Worktree, WorktreeRemoveRefused
+from git_porcelain.real_parse import parse_status
 from git_porcelain.testing import QUIET, FakeRemote, FakeRepo, FakeWorktree, apply_hermetic_env
 from git_porcelain.testing import git as run
 
@@ -30,7 +31,7 @@ scenarios("features/git_contract.feature")
 _ME = Identity("Contract Author", "author@example.invalid")
 _PLACEHOLDER = re.compile(r"<(\w+)(?::([^>]*))?>")
 _FILE = re.compile(r'("[^"]+"|\S+?)="((?:[^"\\]|\\.)*)"')
-_PATH_ARGS = {"add_worktree", "drop_worktree", "release_branch"}
+_PATH_ARGS = {"add_worktree", "drop_worktree", "release_branch", "worktree_state"}
 
 
 # -- the two ways to arrange a repository -----------------------------------------------------------------
@@ -447,7 +448,8 @@ def _calls(world: World, name: str, call: str) -> None:
 @given(parsers.parse('"{name}" adds a worktree "{rel}" at "{rev}" as "{label}"'))
 @when(parsers.parse('"{name}" adds a worktree "{rel}" at "{rev}" as "{label}"'))
 def _worktree(world: World, name: str, rel: str, rev: str, label: str) -> None:
-    world.wts[label] = world.wts[name].repo.add_worktree(world.rig.root / rel, _expand(world, rev))
+    path = _text(rel).replace("\\t", "\t").replace('\\"', '"')
+    world.wts[label] = world.wts[name].repo.add_worktree(world.rig.root / path, _expand(world, rev))
 
 
 @when(parsers.parse('"{name}" tries {call}'))
@@ -490,6 +492,21 @@ def _ref_lock(world: World, ref: str) -> None:
 
 
 # -- checking ------------------------------------------------------------------------------------------
+@then(parsers.parse('the refusal reason is "{reason}"'))
+def _refusal_reason(world: World, reason: str) -> None:
+    assert isinstance(world.error, WorktreeRemoveRefused)
+    assert world.error.reason == _expand(world, reason)
+
+
+@then(parsers.parse("the status bytes list tracked {tracked} and untracked {untracked}"))
+def _status_bytes(world: World, tracked: str, untracked: str) -> None:
+    assert isinstance(world.result, bytes)
+    assert world.result.endswith(b"\0")
+    state = parse_status(world.result.decode("utf-8", "surrogateescape"))
+    assert list(state.tracked) == ast.literal_eval(tracked)
+    assert list(state.untracked) == ast.literal_eval(untracked)
+
+
 @then(parsers.re(r"the result is a (?P<kind>[A-Z]\w*)"))
 def _result_kind(world: World, kind: str) -> None:
     assert type(world.result).__name__ == kind, world.result

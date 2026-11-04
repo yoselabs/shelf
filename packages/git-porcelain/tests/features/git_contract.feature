@@ -89,6 +89,30 @@ Feature: One Repo and Worktree, real or fake
     Then the result's tracked is []
     And the result's untracked is ["b.txt"]
 
+  Scenario: A declared snapshot input that does not exist is unavailable
+    Given a repository "r"
+    And "r" commits "base" with a.txt="a\n"
+    When "r" tries snapshot("HEAD", inputs=["missing.input"])
+    Then the call raises GitUnavailable
+
+  Scenario: A declared snapshot directory includes ignored descendants
+    Given a repository "r"
+    And "r" commits "base" with a.txt="a\n", .gitignore="*.log\n"
+    And "r" writes inputs/visible.txt="visible\n", inputs/nested/ignored.log="ignored\n", outside.log="outside\n"
+    And "r" remembers snapshot("HEAD").tree as "ordinary"
+    When "r" remembers snapshot("HEAD", inputs=["inputs"]).tree as "declared"
+    And "r" calls tree("<mem:declared>")
+    Then the tree lists [".gitignore", "a.txt", "inputs/nested/ignored.log", "inputs/visible.txt"]
+    And the tree reads "inputs/nested/ignored.log" as "ignored\n"
+    When "r" writes inputs/nested/ignored.log="changed\n"
+    And "r" calls snapshot("HEAD", inputs=["inputs"])
+    Then the result's tree is not "<mem:declared>"
+    When "r" calls snapshot("HEAD")
+    Then the result's tree is "<mem:ordinary>"
+    When "r" calls dirty()
+    Then the result's tracked is []
+    And the result's untracked is ["inputs/visible.txt"]
+
   Scenario: Equal content gives an equal tree in another checkout
     Given a repository "r"
     And "r" commits "base" with a.txt="a\n", dir/b.txt="b\n"
@@ -773,7 +797,8 @@ Feature: One Repo and Worktree, real or fake
     And "r" adds a worktree "w" at "HEAD" as "w"
     And "w" writes junk.txt="j\n"
     When "r" tries drop_worktree("<root>/w")
-    Then the call raises GitUnavailable
+    Then the call raises WorktreeRemoveRefused
+    And the refusal reason is "fatal: '<root>/w' contains modified or untracked files, use --force to delete it"
     When "r" calls drop_worktree("<root>/w", force=True)
     And "r" calls worktrees()
     Then the result has 1 entries
@@ -786,6 +811,132 @@ Feature: One Repo and Worktree, real or fake
     When "r" calls drop_worktree("<root>/w")
     And "r" calls worktrees()
     Then the result has 1 entries
+
+  Scenario: A missing registered checkout needs force to be added again
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "w" at "HEAD" as "w"
+    And the folder of "w" is deleted behind git's back
+    When "r" tries add_worktree("<root>/w", "HEAD")
+    Then the call raises GitUnavailable
+    When "r" calls add_worktree("<root>/w", "HEAD", force=True)
+    And "r" calls worktrees(with_dirty=True)
+    Then the path of each result entry is ["<root>/r", "<root>/w"]
+    And the dirty of each result entry is [False, False]
+    And the file "a.txt" of "w" holds "1\n"
+
+  Scenario: Force does not replace a live checkout
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "w" at "HEAD" as "w"
+    When "r" tries add_worktree("<root>/w", "HEAD", force=True)
+    Then the call raises GitUnavailable
+    And the file "a.txt" of "w" holds "1\n"
+
+  Scenario: Pruning alone forgets missing registrations and keeps live checkouts
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "gone" at "HEAD" as "gone"
+    And "r" adds a worktree "live" at "HEAD" as "live"
+    And the folder of "gone" is deleted behind git's back
+    When "r" calls worktrees()
+    Then the result has 3 entries
+    When "r" calls prune_worktrees()
+    And "r" calls worktrees()
+    Then the path of each result entry is ["<root>/r", "<root>/live"]
+
+  Scenario: Strict removal refuses an unregistered absent path without pruning
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "gone" at "HEAD" as "gone"
+    And the folder of "gone" is deleted behind git's back
+    When "r" tries drop_worktree("<root>/unknown", missing_ok=False)
+    Then the call raises WorktreeRemoveRefused
+    And the refusal reason is "fatal: '<root>/unknown' is not a working tree"
+    When "r" calls worktrees()
+    Then the result has 2 entries
+
+  Scenario: Default removal accepts an absent unregistered path and prunes
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "gone" at "HEAD" as "gone"
+    And the folder of "gone" is deleted behind git's back
+    When "r" calls drop_worktree("<root>/unknown")
+    And "r" calls worktrees()
+    Then the result has 1 entries
+
+  Scenario: Strict removal removes only its target without pruning other registrations
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "gone" at "HEAD" as "gone"
+    And "r" adds a worktree "live" at "HEAD" as "live"
+    And the folder of "gone" is deleted behind git's back
+    When "r" calls drop_worktree("<root>/live", missing_ok=False)
+    And "r" calls worktrees()
+    Then the path of each result entry is ["<root>/r", "<root>/gone"]
+    When "r" calls drop_worktree("<root>/gone", missing_ok=False)
+    And "r" calls worktrees()
+    Then the result has 1 entries
+
+  Scenario: Strict removal preserves a dirty checkout and exposes its refusal
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "w" at "HEAD" as "w"
+    And "w" writes a.txt="edited\n"
+    When "r" tries drop_worktree("<root>/w", missing_ok=False)
+    Then the call raises WorktreeRemoveRefused
+    And the refusal reason is "fatal: '<root>/w' contains modified or untracked files, use --force to delete it"
+    And the file "a.txt" of "w" holds "edited\n"
+    When "r" calls drop_worktree("<root>/w", missing_ok=False, force=True)
+    And "r" calls worktrees()
+    Then the result has 1 entries
+
+  Scenario: Worktree paths round trip quotes tabs newlines and Unicode
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "pool \"quoted\"\té\nslot" at "HEAD" as "w"
+    When "r" calls worktrees()
+    Then the path of each result entry is ["<root>/r", "<root>/pool \"quoted\"\té\nslot"]
+
+  Scenario: Pool operations and state stay pinned under a stray core.worktree
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And a folder "elsewhere"
+    And "r" config "core.worktree" is "<root>/elsewhere"
+    When "r" adds a worktree "w" at "HEAD" as "w"
+    And "r" calls worktree_state("<root>/w")
+    Then the result is b"# branch.oid <head:r>\x00# branch.head (detached)\x00"
+    When "r" calls prune_worktrees()
+    And "r" calls worktrees()
+    Then the path of each result entry is ["<root>/r", "<root>/w"]
+    When "r" calls drop_worktree("<root>/w", missing_ok=False)
+    And "r" calls worktrees()
+    Then the result has 1 entries
+
+  Scenario: Status state is raw NUL terminated bytes with HEAD and branch
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    When "r" calls worktree_state("<root>/r")
+    Then the result is b"# branch.oid <head:r>\x00# branch.head main\x00"
+    When "r" writes a.txt="edited\n", "new file.txt"="new\n"
+    And "r" calls worktree_state("<root>/r")
+    Then the status bytes list tracked ["a.txt"] and untracked ["new file.txt"]
+    When "r" calls worktree_state("<root>/absent")
+    Then the result is None
+
+  Scenario: Status state handles unborn detached ignored and missing checkouts
+    Given a repository "r"
+    When "r" calls worktree_state("<root>/r")
+    Then the result is b"# branch.oid (initial)\x00# branch.head main\x00"
+    When "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "w" at "HEAD" as "w"
+    And "r" calls exclude_locally(["ignored/"])
+    And "w" writes ignored/x="x\n"
+    And "r" calls worktree_state("<root>/w")
+    Then the result is b"# branch.oid <head:r>\x00# branch.head (detached)\x00"
+    When the folder of "w" is deleted behind git's back
+    And "r" calls worktree_state("<root>/w")
+    Then the result is None
 
   Scenario: Local excludes keep paths out of status, and are written once
     Given a repository "r"

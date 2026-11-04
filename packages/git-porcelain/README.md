@@ -107,13 +107,14 @@ land(RealRepo(path).worktree(path))             # the binary, memoized
 land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no subprocess
 ```
 
-- **`Repo`** (23 operations in all, with `Worktree`): `identity sync relate history branches tree
-  worktrees add_worktree drop_worktree exclude_locally worktree`.
+- **`Repo`**: `identity sync relate history branches tree worktrees add_worktree drop_worktree
+  prune_worktrees worktree_state exclude_locally worktree`.
 - **`Worktree`**: `health snapshot diff dirty record take_branch release_branch park rebase_onto
   finish_rebase push landed grep_tracked`.
 - **Results are frozen unions** (`Recorded | NothingToRecord | HookRejected`, `BranchTaken |
   BranchHeld`, `UpToDate | Rebased | Conflict`, `Pushed | Rejected | Transient`, `Synced | Offline`,
-  ...), shared records live in `git_porcelain.api`. An expected condition is a variant. An
+  ...), shared records live in `git_porcelain.api`. An expected condition is a variant, except
+  worktree removal's `WorktreeRemoveRefused` diagnostic. An
   infrastructure failure raises `GitUnavailable` (`.tail`, `.retryable`, `.hint`). A caller
   precondition raises `ValueError`.
 - **`RealRepo` owns the environment**: it strips the variables that make `-C` lie, forbids prompts,
@@ -129,6 +130,24 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   signatures do not cover needs `invalidate()`.
 - **`push(dst)` only.** The old `cfg['land']` configurability is gone (decision 13.1): a repo that
   needs more (a different remote ref, extra checks) does it in its `pre-push` hook.
+- **Worktree pools** stay pinned to the checkout's `.git`, including add, remove and prune.
+  `add_worktree(path, rev, force=True)` passes `--force`: it recreates a registered checkout
+  whose folder disappeared, still detached at `rev`; it cannot replace a live checkout.
+  `prune_worktrees()` independently prunes stale registrations and invalidates the worktree memo.
+  `drop_worktree(path, force=False, missing_ok=True)` retains the original absent-folder acceptance
+  and prune behavior. With `missing_ok=False`, it requires a registered linked worktree and removes
+  only that registration, even if its folder is gone; it never prunes other registrations.
+  Removal refusals raise `WorktreeRemoveRefused` (a `GitUnavailable` subclass) with `.reason` equal
+  to the final nonempty stderr line, so a caller can explain why the checkout stayed. Dirty checkouts
+  need `force=True`; infrastructure errors retain their own types.
+  `worktrees()` reads NUL-delimited porcelain: quotes, tabs, newlines and non-ASCII path bytes
+  round trip, and incomplete records raise `GitUnavailable`.
+- **`repo.worktree_state(path)`** returns the exact bytes from
+  `git --no-optional-locks status --porcelain=v2 --branch -z --untracked-files=all`.
+  It is never memoized, preserves raw path bytes and branch headers, omits ignored files,
+  and returns `None` when the path is not a worktree. Other read failures raise.
+  These are task-loop's `treehash.state_of` status bytes; callers still need file stats/content
+  to distinguish successive edits with the same status. This read leaves the index untouched.
 - **`FakeRepo`** (`git_porcelain.testing`) models the domain state (refs, objects hashed as git
   hashes them, index, files, config, worktrees, remotes, a paused rebase). Arrange with
   `FakeRepo.init/clone`, `add_remote`, `set_remote_url`, `set_config`, `hooks`, `drop_checkout`,
@@ -138,6 +157,15 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   diff (`Change.kind` is never `R`), a `.gitignore` below the root is not read, only rebases merge,
   the commit's author is not kept, and the five `real_only` scenarios (ref-lock races, a broken
   `core.worktree`, git missing) run on real git only.
+  Its `worktree_state` emits deterministic porcelain v2 bytes from virtual HEAD/index/files,
+  with regular-file modes, exact-content staged renames, and placeholder stages for unmerged paths.
+  It has no filesystem stats, executable/symlink/submodule modes, upstream status headers, or
+  similarity-based rename detection; its synthetic commit ids differ from real git's. Refusal
+  reasons model absent, main and dirty worktrees; filesystem permissions, locked worktree
+  registrations and submodule removal refusals are not modeled. Pruning is immediate for missing
+  virtual checkouts; git can retain registrations according to lock and expiration rules.
+  The fake assumes descendant directories exist; it cannot distinguish an absent subdirectory
+  inside a live checkout from an existing one when answering `worktree_state`.
 - **It cannot drift:** `tests/features/git_contract.feature` (`@contract`) holds one scenario per
   behaviour and runs against `RealRepo` on temp repos and against `FakeRepo`. Add a scenario before
   teaching the fake a new behaviour. `tests/test_real_git_cache.py` covers the memo rules on real git.
@@ -159,6 +187,9 @@ peeling, no filesystem ref-lock races, no arbitrary remote transport, and no hoo
 Pull uses the modeled named remote, without custom refspecs or config-driven autostash.
 `Worktree.snapshot(base, inputs=[...])` force-includes literal input files/directories even when
 ignored, without changing the real index; declared inputs bypass the snapshot cache.
+A declared directory includes all its files recursively, including ignored descendants; ignored
+files outside it remain excluded. An input matching no files raises `GitUnavailable` in both the
+real and fake implementations.
 Task-loop's `treehash.state_of` is a status/stat signature, while `tree_of` is the matching tree-id
 operation: both omit ignored files by default. Explicit `inputs` extends that default for declared
 ignored inputs; ordinary snapshots retain `tree_of` semantics.

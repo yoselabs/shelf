@@ -13,6 +13,7 @@ import pytest
 
 import git_porcelain as git
 from git_porcelain import GitError
+from git_porcelain.errors import RefRace, failure
 from git_porcelain.testing import git as _git
 
 
@@ -75,6 +76,26 @@ def test_run_git_returns_stdout_and_fails_loud(tmp_path: Path) -> None:
     assert branch == "main"
     with pytest.raises(GitError):
         git.run_git(repo, "not-a-real-subcommand")
+
+
+@pytest.mark.parametrize(
+    ("stderr", "retryable"),
+    [
+        ("error: cannot lock ref 'refs/heads/main': incorrect old value provided", False),
+        ("error: cannot lock ref 'refs/heads/main': is at abc but expected def", False),
+        ("error: is at abc but expected def", False),
+        ("error: cannot lock ref 'refs/heads/main': '/repo/refs/heads/main.lock': File exists", True),
+        ("error: cannot lock ref 'refs/heads/main': Unable to create '/repo/refs/heads/main.lock': File exists", True),
+        ("fatal: Unable to create '/repo/refs/heads/main.lock': File exists", True),
+        ("error: cannot lock ref 'refs/heads/main': Permission denied", False),
+        ("error: unable to update local ref", False),
+    ],
+)
+@pytest.mark.parametrize("default_retryable", [False, True])
+def test_ref_race_retries_only_lock_contention(stderr: str, retryable: bool, default_retryable: bool) -> None:
+    error = failure(stderr, stderr, 128, retryable=default_retryable)
+    assert isinstance(error, RefRace)
+    assert error.retryable is retryable
 
 
 def test_sync_status_clean_then_dirty(tmp_path: Path) -> None:
