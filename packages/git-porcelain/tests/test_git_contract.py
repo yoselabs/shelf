@@ -431,6 +431,17 @@ def _remember_head(world: World, name: str, label: str) -> None:
     world.memory[label] = world.rig.head(world.wts[name])
 
 
+@given(parsers.parse('"{name}" stages a rename from "{old}" to "{new}"'))
+def _stage_rename(world: World, name: str, old: str, new: str) -> None:
+    wt = world.wts[name]
+    if isinstance(wt, FakeWorktree):
+        state = wt.state()
+        state.files[new] = state.files.pop(old)
+        state.index[new] = state.index.pop(old)
+    else:
+        run(wt.path, "mv", "--", old, new)
+
+
 @given(parsers.re(r'"(?P<name>\w+)" remembers (?P<expr>\w+\(.*\)\.[\w.]+) as "(?P<label>[^"]+)"'))
 @when(parsers.re(r'"(?P<name>\w+)" remembers (?P<expr>\w+\(.*\)\.[\w.]+) as "(?P<label>[^"]+)"'))
 def _remember(world: World, name: str, expr: str, label: str) -> None:
@@ -495,7 +506,9 @@ def _ref_lock(world: World, ref: str) -> None:
 @then(parsers.parse('the refusal reason is "{reason}"'))
 def _refusal_reason(world: World, reason: str) -> None:
     assert isinstance(world.error, WorktreeRemoveRefused)
-    assert world.error.reason == _expand(world, reason)
+    expanded = _expand(world, reason)
+    assert world.error.reason == expanded
+    assert str(world.error) == f"git worktree remove exited 128: {expanded}"
 
 
 @then(parsers.parse("the status bytes list tracked {tracked} and untracked {untracked}"))
@@ -505,6 +518,19 @@ def _status_bytes(world: World, tracked: str, untracked: str) -> None:
     state = parse_status(world.result.decode("utf-8", "surrogateescape"))
     assert list(state.tracked) == ast.literal_eval(tracked)
     assert list(state.untracked) == ast.literal_eval(untracked)
+
+
+@then(parsers.parse("the status records with object ids normalized are {expected}"))
+def _status_records(world: World, expected: str) -> None:
+    assert isinstance(world.result, bytes)
+    assert world.result.endswith(b"\0")
+    records = world.result.split(b"\0")
+    assert records[0].startswith(b"# branch.oid ")
+    assert records[1].startswith(b"# branch.head ")
+    # Preserve every field and NUL separator; only object identities are outside
+    # this structural contract because the fake does not retain conflict stages.
+    normalized = re.sub(rb"\b[0-9a-f]{40}\b", b"<oid>", b"\0".join(records[2:]))
+    assert normalized == ast.literal_eval(expected)
 
 
 @then(parsers.re(r"the result is a (?P<kind>[A-Z]\w*)"))
