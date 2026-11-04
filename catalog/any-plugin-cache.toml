@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-plugin-cache"
+kind = "any-lib"
+tier = "T1"
+release = "any-plugin-cache-v0.1.0"
+capability = "Stop hand-parsing Claude Code's plugin cache: installed versions of a plugin, user-scope installed version, pin validity, rollback target, and a format-preserving version bump for plugin.json and marketplace.json."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from task-loop app/release/catalog.py and adapters/versionfile.py (the pin check from app/release/pins.py). Stdlib only, claude dir injected. Pin storage and the release flow stay in task-loop. Candidate contract: packages/any-plugin-cache/CONTRACT.md. Consumers adopt separately; no release tag created by this change."
