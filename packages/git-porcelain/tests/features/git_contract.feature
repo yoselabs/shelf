@@ -187,9 +187,8 @@ Feature: One Repo and Worktree, real or fake
   Scenario: Amending an unborn branch exposes git's refusal after staging
     Given a repository "r"
     And "r" writes a="pending"
-    When "r" calls record("amend", paths="tracked", mode="amend", hooks=True)
-    Then the result is a HookRejected
-    And the result's output is not ""
+    When "r" tries record("amend", paths="tracked", mode="amend", hooks=True)
+    Then the call raises GitUnavailable
     When "r" tries record("amend", paths="staged", mode="amend")
     Then the call raises GitUnavailable
 
@@ -428,17 +427,59 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "root" with a="root"
     And "r" remembers its head as "before"
     When "r" tries <operation>
-    Then the call raises MissingRevision
+    Then the call raises <error>
     When "r" calls branch()
     Then the result is "main"
     When "r" calls snapshot("HEAD")
     Then the result's head is "<mem:before>"
 
     Examples:
-      | operation                                                  |
-      | take_branch(branch="topic", base="--orphan", mode="restart") |
-      | take_branch(branch="main", base="missing", mode="resume")    |
-      | rebase_onto("--exec=false", squash_message="squash")          |
+      | operation                                                  | error           |
+      | take_branch(branch="topic", base="--orphan", mode="restart") | ValueError      |
+      | take_branch(branch="main", base="missing", mode="resume")    | MissingRevision |
+      | rebase_onto("--exec=false", squash_message="squash")          | ValueError      |
+
+  Scenario Outline: Other revision consumers reject options before changing the checkout
+    Given a repository "r"
+    And "r" commits "root" with a="root"
+    And "r" remembers its head as "before"
+    When "r" tries <operation>
+    Then the call raises ValueError
+    When "r" calls branch()
+    Then the result is "main"
+    When "r" calls history(["HEAD"])
+    Then the sha of each result entry is ["<mem:before>"]
+    When "r" calls refs(["refs/tags/"])
+    Then the result is []
+
+    Examples:
+      | operation                                                            |
+      | checkout("--orphan")                                                 |
+      | checkout_new("topic", "-x")                                          |
+      | checkout_force("topic", "-x")                                        |
+      | reset("--hard")                                                      |
+      | merge_ff("--abort")                                                  |
+      | cherry("--abbrev=1", "HEAD")                                         |
+      | cherry("HEAD", "--abbrev=1")                                         |
+      | relate("--all", "HEAD")                                              |
+      | relate("HEAD", "--all")                                              |
+      | history(["--all"])                                                   |
+      | history(["HEAD"], not_on=["--all"])                                   |
+      | history(["HEAD"], patch_equivalent_to="--all")                         |
+      | tree("--all")                                                        |
+      | snapshot("--all")                                                    |
+      | dirty("--all")                                                       |
+      | landed("--all", "unmatched")                                         |
+      | diff("--output=injected", "HEAD")                                     |
+      | diff("HEAD", "--output=injected")                                     |
+      | tag("probe", "--all")                                                |
+      | count(["--all"])                                                     |
+      | count(["HEAD"], exclude=["--all"])                                    |
+      | add_worktree("<root>/injected", "--orphan")                            |
+      | take_branch(branch="--orphan", base="HEAD", mode="resume")            |
+      | abort_rebase(restore_to="--hard")                                     |
+      | finish_rebase("abort", restore_to="--hard")                           |
+      | record("squash", paths="all", mode="squash_to", squash_to="--hard")    |
 
   Scenario: A signer failure is infrastructure failure rather than hook rejection
     Given a repository "r"
@@ -452,6 +493,21 @@ Feature: One Repo and Worktree, real or fake
     Then the result's head is "<mem:before>"
     And the index of "r" reads "b" as "pending"
 
+  Scenario: Recording an unresolved conflict is a git failure with hooks enabled
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    And "r" calls rebase("origin/main")
+    When "r" tries record("unresolved", paths="staged", hooks=True, allow_empty=True)
+    Then the call raises GitUnavailable
+    When "r" calls rebasing()
+    Then the result is True
+    When "r" calls unmerged()
+    Then the result is ["a"]
+
   Scenario: Fresh rebase observations and command refusals are explicit
     Given a repository "r"
     When "r" calls rebasing()
@@ -462,8 +518,52 @@ Feature: One Repo and Worktree, real or fake
     Then the result's ok is True
     When "r" calls continue_rebase()
     Then the result's ok is False
-    When "r" calls rebase("missing")
+    When "r" tries rebase("missing")
+    Then the call raises MissingRevision
+
+  Scenario Outline: Option-like revisions cannot alter history
+    Given a repository "r"
+    And "r" commits "root" with a="root\n"
+    And "r" commits "next" with b="next\n"
+    Then "r" rejects option-like revision "<revision>" without changing history
+
+    Examples:
+      | revision      |
+      | --root        |
+      | --abort       |
+      | --quit        |
+      | --all         |
+      | --octopus     |
+      | --fork-point  |
+      | --independent |
+      | -x            |
+
+  Scenario Outline: Option-like revisions leave a paused rebase intact
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a="mine\n"
+    And the origin "o" advances "main" with a="theirs\n"
+    And "r" calls fetch()
+    And "r" calls rebase("origin/main")
     Then the result's ok is False
+    And "r" rejects option-like revision "<revision>" without changing history
+    When "r" calls rebasing()
+    Then the result is True
+    When "r" writes a="resolved\n"
+    And "r" calls continue_rebase(stage_conflicts=True, check_markers=True)
+    Then the result's ok is True
+    When "r" calls rebasing()
+    Then the result is False
+
+    Examples:
+      | revision      |
+      | --root        |
+      | --abort       |
+      | --quit        |
+      | --all         |
+      | --independent |
+      | -x            |
 
   Scenario: Merge base permits missing revisions and cherry preserves oldest first picks
     Given a repository "r"

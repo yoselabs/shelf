@@ -36,6 +36,7 @@ from git_porcelain.fake_ops import branch_ref, clean, hard_to
 from git_porcelain.fake_plumbing import FakePlumbing
 from git_porcelain.fake_store import CheckoutState, Hooks, RepoState
 from git_porcelain.fake_worktrees import worktree_state
+from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -249,7 +250,7 @@ class FakeRepo:
 
     def add_worktree(self, path: Path, rev: str, *, force: bool = False) -> FakeWorktree:
         wt = self._anchor()
-        flow.worktree_add(self._state, path, self._state.commit_named(rev, wt), force=force)
+        flow.worktree_add(self._state, path, read.resolve_commit(self._state, wt, rev), force=force)
         return FakeWorktree(self, path)
 
     def drop_worktree(self, path: Path, *, force: bool = False, missing_ok: bool = True) -> None:
@@ -485,6 +486,7 @@ class FakeWorktree:
         return flow.push(self._repo, self.state(), dst, remote, hook_env or {})
 
     def landed(self, base: str, title_suffix: str) -> Sha | None:
+        validate_revisions(base)
         wt = self.state()
         tip = self._repo.head_sha(wt)
         if tip is None or not self._repo.store.commits[tip].message.partition("\n")[0].endswith(title_suffix):

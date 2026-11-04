@@ -30,6 +30,7 @@ from git_porcelain.api import (
 from git_porcelain.errors import GitUnavailable, some
 from git_porcelain.real_done import unavailable
 from git_porcelain.remote_validation import validate_remote
+from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -138,6 +139,7 @@ def record(
     hooks: bool,
     allow_empty: bool,
 ) -> RecordResult:
+    validate_revisions(*([base] if base is not None else []), *([str(squash_to)] if squash_to is not None else []))
     if mode == "squash_to" and squash_to is None:
         msg = "mode='squash_to' needs squash_to"
         raise ValueError(msg)
@@ -191,15 +193,32 @@ def record_args(message: str, mode: Literal["new", "amend", "squash_to"], *, hoo
 def record_failure(args: Sequence[str], done: Done, *, hooks: bool) -> RecordResult:
     """Keep complete command diagnostics, including hooks that never name themselves."""
     output = (done.out + done.err).strip()
-    infrastructure = re.search(
-        r"gpg failed|unable to sign|identity unknown|tell me who you are|empty ident|index\.lock|cannot lock ref", output, re.IGNORECASE
-    )
-    if hooks and not infrastructure:
+    if hooks and _hook_rejection(output):
         return HookRejected(output, output=output)
-    error = unavailable(args, done)
-    error.output = output
-    error.args = (f"git commit exited {done.rc}: {output}",)
-    raise error
+    raise unavailable(args, done, full_output=True)
+
+
+def _hook_rejection(output: str) -> bool:
+    if re.search(
+        r"gpg failed|unable to sign|failed to sign|identity unknown|tell me who you are|empty ident|index\.lock|cannot lock ref|"
+        r"unmerged files|unresolved conflict|nothing to amend|failed to write commit object",
+        output,
+        re.IGNORECASE,
+    ):
+        return False
+    if re.search(r"\b(?:pre-commit|prepare-commit-msg|commit-msg|post-commit)\b", output, re.IGNORECASE):
+        return True
+    if re.search(r"\bhook\b", output, re.IGNORECASE) and re.search(r"\b(?:declined|failed|rejected)\b", output, re.IGNORECASE):
+        return True
+    if re.search(r"^(?:fatal:|error:|warning:|hint:|git:)", output, re.MULTILINE | re.IGNORECASE):
+        return False
+    # Git prefixes diagnostics and indents status details; hooks may print their own refusal verbatim.
+    git_line = re.compile(
+        r"^(?:fatal:|error:|warning:|hint:|git:|On branch |Changes |Unmerged |Untracked |Your branch |"
+        r"You are |nothing |no changes |Aborting|\s|#)",
+        re.IGNORECASE,
+    )
+    return any(line and not git_line.match(line) for line in output.splitlines())
 
 
 def _clean(wt: RealWorktree, clean_keep: Sequence[str] | None) -> None:
@@ -220,6 +239,7 @@ def take_branch(
     keep_aside_as: str | None,
     clean_keep: Sequence[str] | None,
 ) -> TakeResult:
+    validate_revisions(branch, base)
     holders = tuple(w for w in wt.repo.worktrees() if w.branch == branch and not _same(w.path, wt.path))
     if holders:
         return BranchHeld(holders)
@@ -235,7 +255,7 @@ def take_branch(
                 if wt.run("rev-parse", "--verify", "-q", f"refs/heads/{keep_aside_as}", check=False).rc == 0:
                     msg = f"keep_aside_as {keep_aside_as!r} already exists"
                     raise ValueError(msg)
-                wt.run("branch", "-m", branch, keep_aside_as)
+                wt.run("branch", "-m", "--", branch, keep_aside_as)
                 kept = keep_aside_as
             wt.run("checkout", "-q", "-B", branch, "--end-of-options", base, "--")
         _clean(wt, clean_keep)
@@ -306,6 +326,7 @@ def rebase_onto(
     squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
     update_refs: bool | None = None,
 ) -> RebaseResult:
+    validate_revisions(base)
     if squash_failure not in {"raise", "continue_unsquashed"}:
         raise ValueError(squash_failure)
     if _paused(wt):
@@ -352,13 +373,14 @@ def _orig_head(wt: RealWorktree) -> Sha:
 
 
 def finish_rebase(wt: RealWorktree, action: Literal["continue", "abort"], restore_to: Sha | None) -> FinishResult:
+    target = real_checkout.resolve_commit(wt, str(restore_to)) if restore_to is not None else None
     paused = _paused(wt)
     try:
         if action == "abort":
             if paused:
                 wt.run("rebase", "--abort")
-            if restore_to is not None:
-                wt.run("reset", "-q", "--hard", str(restore_to))
+            if target is not None:
+                wt.run("reset", "-q", "--hard", target)
             head = real_read.head_of(wt)
             head = some(head)
             return Aborted(head)

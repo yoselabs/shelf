@@ -24,6 +24,7 @@ from git_porcelain.errors import GitUnavailable, some
 from git_porcelain.fake_ops import branch_ref, clean, hard_to, is_clean, make_commit, require_index, stage, switch_tree, tracked_dirty
 from git_porcelain.fake_read import dirty, relate, resolve_commit
 from git_porcelain.fake_store import ancestors
+from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -56,6 +57,7 @@ def record(
     hooks: bool,
     allow_empty: bool,
 ) -> RecordResult:
+    validate_revisions(*([base] if base is not None else []), *([str(squash_to)] if squash_to is not None else []))
     if mode == "squash_to" and squash_to is None:
         msg = "mode='squash_to' needs squash_to"
         raise ValueError(msg)
@@ -65,21 +67,14 @@ def record(
     if not record_needed(repo, wt, mode, old, squash_to, allow_empty=allow_empty):
         return NothingToRecord()
     if mode == "amend" and old is None:
-        return unborn_amend(hooks=hooks)
+        msg = "fatal: You have nothing to amend."
+        raise GitUnavailable(msg)
     if hooks and repo.hooks.refuse_commit:
         output = repo.hooks.commit_output or "pre-commit hook declined the commit"
         return HookRejected(output, output=output)
     if repo.hooks.commit_failure is not None:
         raise GitUnavailable(repo.hooks.commit_failure)
     return record_commit(repo, wt, message, mode, old, squash_to=squash_to, hooks=hooks)
-
-
-def unborn_amend(*, hooks: bool) -> HookRejected:
-    """Model git's command refusal after staging, without a caller precondition."""
-    msg = "fatal: You have nothing to amend."
-    if hooks:
-        return HookRejected(msg, output=msg)
-    raise GitUnavailable(msg)
 
 
 def record_needed(
@@ -165,6 +160,7 @@ def take_branch(
     keep_aside_as: str | None,
     clean_keep: Sequence[str] | None,
 ) -> TakeResult:
+    validate_revisions(branch, base)
     ref = branch_ref(branch)
     held = _holders(repo, wt, ref)
     if held:
@@ -229,6 +225,7 @@ def rebase_onto(
     squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
     update_refs: bool | None = None,
 ) -> RebaseResult:
+    validate_revisions(base)
     if squash_failure not in {"raise", "continue_unsquashed"}:
         raise ValueError(squash_failure)
     if wt.rebase is not None:
@@ -266,6 +263,7 @@ def rebase_onto(
 
 
 def finish_rebase(repo: RepoState, wt: CheckoutState, action: Literal["continue", "abort"], restore_to: Sha | None) -> FinishResult:
+    restore_to = Sha(resolve_commit(repo, wt, str(restore_to))) if restore_to is not None else None
     if action == "abort":
         if wt.rebase is not None:
             flow.rebase_abort(repo, wt)

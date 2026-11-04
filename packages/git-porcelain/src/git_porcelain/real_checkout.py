@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from git_porcelain.errors import BranchPinned, MissingRevision
 from git_porcelain.real_done import unavailable
+from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -27,6 +28,7 @@ def branch(wt: RealWorktree) -> str | None:
 
 def resolve_commit(wt: RealWorktree, ref: str) -> str:
     """Validate a revision without option parsing and return its commit OID."""
+    validate_revisions(ref)
     done = wt.run("rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}", check=False)
     if done.rc:
         error = unavailable(("rev-parse",), done)

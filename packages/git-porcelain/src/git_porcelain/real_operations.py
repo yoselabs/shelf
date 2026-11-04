@@ -9,6 +9,7 @@ from git_porcelain.api import RefEntry, RemoteRef, Sha
 from git_porcelain.errors import MissingRevision
 from git_porcelain.real_done import unavailable
 from git_porcelain.remote_validation import validate_remote
+from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 
 
 def tag(repo: RealRepo, name: str, rev: str) -> None:
+    validate_revisions(rev)
     try:
         done = repo.run(repo.path, "rev-parse", "--verify", "--end-of-options", rev, check=False)
         if done.rc:
@@ -32,11 +34,13 @@ def tag(repo: RealRepo, name: str, rev: str) -> None:
 def count(repo: RealRepo, include: Sequence[str], exclude: Sequence[str]) -> int:
     if not include:
         return 0
+    validate_revisions(*include, *exclude)
     done = repo.run(repo.path, "rev-list", "--count", "--end-of-options", *include, *(f"^{rev}" for rev in exclude), "--")
     return int(done.out)
 
 
 def refs(repo: RealRepo, prefixes: Sequence[str]) -> tuple[RefEntry, ...]:
+    """List sorted full ref names; empty prefixes intentionally select every ref."""
     done = repo.run(repo.path, "for-each-ref", "--format=%(objectname) %(refname)", "--", *prefixes)
     return tuple(RefEntry(name, Sha(oid)) for oid, name in (line.split(" ", 1) for line in done.out.splitlines()))
 
@@ -74,6 +78,6 @@ def stage_tracked(wt: RealWorktree) -> None:
 def merge_ff(wt: RealWorktree, rev: str) -> None:
     try:
         target = real_checkout.resolve_commit(wt, rev)
-        wt.run("merge", "-q", "--ff-only", "--", target)
+        wt.run("merge", "-q", "--ff-only", "--", target, env={"LC_ALL": "C", "LANG": "C"})
     finally:
         wt.repo.invalidate()

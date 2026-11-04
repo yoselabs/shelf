@@ -12,6 +12,7 @@ from git_porcelain.errors import GitUnavailable, MissingRevision, NotARepo, NotF
 from git_porcelain.fake_ops import ignore_of, require_index, switch_tree, tracked_dirty
 from git_porcelain.fake_store import ancestors
 from git_porcelain.plumbing import Ref
+from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -93,6 +94,7 @@ class FakePlumbing:
         return target
 
     def merge_ff(self, repo: Path, ref: str) -> None:
+        validate_revisions(ref)
         wt = self._checkout(repo)
         target = self.state.commit_named(ref, wt)
         if target is None:

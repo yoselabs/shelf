@@ -277,6 +277,19 @@ def test_is_ancestor_true_for_a_fast_forward(tmp_path: Path) -> None:
     assert git.is_ancestor(repo, "origin/main", "HEAD") is True
 
 
+@pytest.mark.parametrize("revision", ["--root", "--abort", "--all", "--independent", "-x"])
+def test_legacy_revision_helpers_reject_options_before_invoking_git(tmp_path: Path, revision: str) -> None:
+    # No repository exists: validation must run before any git command can fail.
+    with pytest.raises(ValueError, match="revision must not start"):
+        git.is_ancestor(tmp_path, revision, "HEAD")
+    with pytest.raises(ValueError, match="revision must not start"):
+        git.is_ancestor(tmp_path, "HEAD", revision)
+    with pytest.raises(ValueError, match="revision must not start"):
+        git.show_at(tmp_path, "seed.md", revision)
+    with pytest.raises(ValueError, match="revision must not start"):
+        git.merge(tmp_path, revision, author=ROBIN, committer=BOT)
+
+
 def test_push_to_a_missing_remote_is_offline(tmp_path: Path) -> None:
     repo, remote = _with_remote(tmp_path)
     remote.rename(tmp_path / "gone.git")

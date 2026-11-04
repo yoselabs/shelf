@@ -147,8 +147,10 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   returns `NothingToRecord` for a new commit unless `allow_empty=True`.
   `Recorded.output` contains complete stripped stdout plus stderr, including successful hook output.
   `HookRejected.output` and its existing `tail` retain the entire diagnostic, even when the hook
-  prints no hook name. With hooks enabled, command refusals return `HookRejected`; recognized
-  signing, identity and lock failures still raise `GitUnavailable` (or its typed subclass).
+  prints no hook name. Rejection requires positive hook evidence: a hook name, a hook failure
+  marker, or the hook's own output with hooks enabled. Git failures, including unresolved
+  conflicts, unborn amendments, signing, identity and lock failures, raise `GitUnavailable`
+  (or its typed subclass).
   Failures with hooks disabled also raise. Those exceptions carry complete combined command output
   in `output`. `NothingToRecord.output` defaults to empty because no commit command ran.
   Conflict-marker text is not a precondition; git decides whether the selected index can commit.
@@ -239,8 +241,9 @@ implicit HEAD or revision lookup. Missing include/exclude revisions raise `Missi
 other git failures raise `GitUnavailable`.
 
 `Repo.refs(prefixes)` returns sorted `RefEntry(name, sha)` tuples from
-`for-each-ref --format="%(objectname) %(refname)"`. Names retain their full namespace;
-arbitrary ref prefixes and git patterns are accepted, and empty prefixes list all refs.
+`for-each-ref --format="%(objectname) %(refname)"`. Names retain their full namespace.
+Arbitrary ref prefixes and git patterns are accepted. Passing `[]` intentionally lists every
+ref under `refs/`, across all namespaces.
 No matches return an empty tuple; command failures raise `GitUnavailable`.
 `Repo.ls_remote(remote, patterns=())` returns `RemoteRef(name, oid)` tuples, including HEAD
 and peeled tags, filtered by git's tail globs. No matches return an empty tuple; transport
@@ -262,21 +265,24 @@ can restore the pre-squash HEAD.
 `rebase(base, update_refs=None)`, `continue_rebase(stage_conflicts=False,
 check_markers=False, missing_ok=False)` and `abort_rebase(missing_ok=True, restore_to=None)`
 return `CommandResult(ok, output)`. These preserve complete stripped stdout plus stderr;
-git refusals are `ok=False`, while invocation failures raise. Raw rebase always invokes
-git, including for dirty trees and already paused rebases.
-`rebase` runs `git rebase -q base`, adding `-c rebase.updateRefs=true|false` only for an
-explicit `update_refs` value. It still runs when `HEAD..base` is empty.
+git refusals are `ok=False`, while invocation failures raise. `rebase` first resolves `base`
+to a commit OID with `rev-parse --verify --end-of-options`; an absent base raises
+`MissingRevision`. It then runs `git rebase -q <oid>`, including for dirty trees and already
+paused rebases, adding `-c rebase.updateRefs=true|false` only for an explicit `update_refs`
+value. It still runs when `HEAD..base` is empty.
+Revision inputs beginning with `-` raise `ValueError("revision must not start with '-'")`
+in both implementations before git can interpret them as options.
 Continuation uses the caller's index by default; staging conflicted paths and checking markers
 are explicit choices.
 `rebasing()` checks both backends in the checkout's actual git directory; `unmerged()`
 freshly reads NUL-delimited paths in git order, including merge conflicts. Observation
 faults raise `GitReadFailure`, rather than manufacturing an empty answer.
 
-`Repo.is_ancestor(a, b)` uses one `git merge-base --is-ancestor a b` process: equality and
+`Repo.is_ancestor(a, b)` uses one `git merge-base --is-ancestor --end-of-options a b` process: equality and
 ancestry return `True`, other histories return `False`, and missing revisions raise
 `MissingRevision`. Other observation failures raise `GitReadFailure`.
 `Repo.merge_base(a, b)` returns a SHA or `None` for verified missing revisions or unrelated
-histories. It uses one `git merge-base a b` process on success or unrelated histories;
+histories. It uses one `git merge-base --end-of-options a b` process on success or unrelated histories;
 revision verification runs only after a failure. Other observation failures raise
 `GitReadFailure`. `branch()` uses one `git symbolic-ref --short -q HEAD` process, including
 for detached and unborn HEAD. `Repo.cherry(upstream, head)`

@@ -27,9 +27,9 @@ class GitUnavailable(GitError):
     ``tail`` remains the exception's display text; invocation failures have only their failure message.
     """
 
-    def __init__(self, message: str, *, retryable: bool = False, hint: str | None = None) -> None:
+    def __init__(self, message: str, *, retryable: bool = False, hint: str | None = None, output: str | None = None) -> None:
         super().__init__(message, retryable=retryable, hint=hint)
-        self.output = message
+        self.output = message if output is None else output
 
     @property
     def tail(self) -> str:
@@ -94,8 +94,8 @@ class RefRace(GitUnavailable):
 class BranchPinned(GitUnavailable):
     """A worktree has the branch checked out; ``holder`` names it."""
 
-    def __init__(self, message: str, holder: str, *, retryable: bool = False, hint: str | None = None) -> None:
-        super().__init__(message, retryable=retryable, hint=hint)
+    def __init__(self, message: str, holder: str, *, retryable: bool = False, hint: str | None = None, output: str | None = None) -> None:
+        super().__init__(message, retryable=retryable, hint=hint, output=output)
         self.holder = holder
 
 
@@ -117,7 +117,9 @@ def operation_failure(stderr: str) -> type[GitUnavailable]:
     return GitUnavailable
 
 
-def failure(message: str, stderr: str, code: int, *, retryable: bool = False, hint: str | None = None) -> GitUnavailable:
+def failure(
+    message: str, stderr: str, code: int, *, retryable: bool = False, hint: str | None = None, output: str | None = None
+) -> GitUnavailable:
     """Translate git's specific diagnostics; an unknown failure remains ``GitUnavailable``."""
     lines = [line.strip() for line in stderr.splitlines() if line.strip()]
     tail = next((line for line in lines if line.startswith(("fatal:", "error:"))), lines[-1] if lines else "")
@@ -125,7 +127,7 @@ def failure(message: str, stderr: str, code: int, *, retryable: bool = False, hi
     if _INDEX_LOCK.search(stderr):
         kind, retryable = IndexLocked, True
     elif match := _PINNED.search(stderr):
-        return BranchPinned(message, match.group(1).strip(), hint=hint)
+        return BranchPinned(message, match.group(1).strip(), hint=hint, output=output)
     elif re.search(r"(?:local changes|untracked working tree files)[\s\S]*would be overwritten|would be overwritten by checkout", stderr):
         kind = DirtyTree
     elif re.search(r"(?:a branch named|a branch) '.+' already exists", stderr, re.IGNORECASE):
@@ -147,7 +149,7 @@ def failure(message: str, stderr: str, code: int, *, retryable: bool = False, hi
     # merge reports this separately from the revision-reader diagnostics above.
     if re.search(r"merge: .+ - not something we can merge", stderr):
         kind = MissingRevision
-    return kind(message, retryable=retryable, hint=hint)
+    return kind(message, retryable=retryable, hint=hint, output=output)
 
 
 __all__ = [

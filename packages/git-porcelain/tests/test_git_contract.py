@@ -816,6 +816,22 @@ def _command_output(world: World, text: str) -> None:
     assert text in world.result.output
 
 
+@then(parsers.parse('"{name}" rejects option-like revision "{revision}" without changing history'))
+def _reject_revision(world: World, name: str, revision: str) -> None:
+    wt = world.wts[name]
+    repo = wt.repo
+    before = (repo.history(["HEAD"]), repo.refs([]), wt.branch(), wt.rebasing(), wt.unmerged())
+    for rebase in (wt.rebase, wt.rebase_onto):
+        with pytest.raises(ValueError, match=r"^revision must not start with '-'$"):
+            rebase(revision)
+        assert (repo.history(["HEAD"]), repo.refs([]), wt.branch(), wt.rebasing(), wt.unmerged()) == before
+    for observe in (repo.merge_base, repo.is_ancestor):
+        for a, b in ((revision, "HEAD"), ("HEAD", revision)):
+            with pytest.raises(ValueError, match=r"^revision must not start with '-'$"):
+                observe(a, b)
+            assert (repo.history(["HEAD"]), repo.refs([]), wt.branch(), wt.rebasing(), wt.unmerged()) == before
+
+
 @then(parsers.parse('the refusal reason is "{reason}"'))
 def _refusal_reason(world: World, reason: str) -> None:
     assert isinstance(world.error, WorktreeRemoveRefused)

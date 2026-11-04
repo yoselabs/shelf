@@ -11,6 +11,7 @@ from git_porcelain.errors import GitUnavailable, TagExists
 from git_porcelain.fake_read import resolve_commit
 from git_porcelain.fake_store import ancestors
 from git_porcelain.remote_validation import validate_remote
+from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 
 
 def tag(repo: RepoState, wt: CheckoutState, name: str, rev: str) -> None:
+    validate_revisions(rev)
     target = rev if rev in repo.store.trees or rev in repo.store.blobs else resolve_commit(repo, wt, rev)
     ref = f"refs/tags/{name}"
     if ref in repo.refs:
@@ -30,6 +32,7 @@ def tag(repo: RepoState, wt: CheckoutState, name: str, rev: str) -> None:
 def count(repo: RepoState, wt: CheckoutState, include: Sequence[str], exclude: Sequence[str]) -> int:
     if not include:
         return 0
+    validate_revisions(*include, *exclude)
     keep: set[str] = set()
     skip: set[str] = set()
     for rev in include:
@@ -63,6 +66,7 @@ def revision_sets(repo: RepoState, wt: CheckoutState, rev: str) -> tuple[set[str
 
 
 def refs(repo: RepoState, prefixes: Sequence[str]) -> tuple[RefEntry, ...]:
+    """List sorted full ref names; empty prefixes intentionally select every ref."""
     names = {**repo.refs, **{name: repo.refs[target] for name, target in repo.symbolic_refs.items() if target in repo.refs}}
     return tuple(
         RefEntry(name, Sha(oid))

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from git_porcelain import GitReadFailure, Identity, MissingRevision, RealRepo, RealWorktree
+from git_porcelain import GitReadFailure, Identity, MissingRevision, NotFastForward, RealRepo, RealWorktree
 from git_porcelain.real_done import Done
 from git_porcelain.testing import apply_hermetic_env
 from git_porcelain.testing import git as run
@@ -78,10 +78,10 @@ def test_revision_reads_start_one_process_per_ask(rig: Rig, operation: str, a: s
         rig.calls.clear()
         if operation == "is_ancestor":
             assert rig.repo.is_ancestor(a, b) is expected
-            assert rig.calls == [("merge-base", "--is-ancestor", a, b)]
+            assert rig.calls == [("merge-base", "--is-ancestor", "--end-of-options", a, b)]
         else:
             assert rig.repo.merge_base(a, b) == root
-            assert rig.calls == [("merge-base", a, b)]
+            assert rig.calls == [("merge-base", "--end-of-options", a, b)]
 
 
 @pytest.mark.parametrize("detached", [False, True])
@@ -99,17 +99,43 @@ def test_missing_ancestry_still_starts_only_one_process(rig: Rig, a: str, b: str
     rig.calls.clear()
     with pytest.raises(MissingRevision):
         rig.repo.is_ancestor(a, b)
-    assert rig.calls == [("merge-base", "--is-ancestor", a, b)]
+    assert rig.calls == [("merge-base", "--is-ancestor", "--end-of-options", a, b)]
 
 
 def test_unrelated_revision_reads_each_start_one_process(rig: Rig) -> None:
     unrelated = run(rig.path, "commit-tree", "HEAD^{tree}", "-m", "another root").strip()
     rig.calls.clear()
     assert rig.repo.merge_base("HEAD", unrelated) is None
-    assert rig.calls == [("merge-base", "HEAD", unrelated)]
+    assert rig.calls == [("merge-base", "--end-of-options", "HEAD", unrelated)]
     rig.calls.clear()
     assert rig.repo.is_ancestor("HEAD", unrelated) is False
-    assert rig.calls == [("merge-base", "--is-ancestor", "HEAD", unrelated)]
+    assert rig.calls == [("merge-base", "--is-ancestor", "--end-of-options", "HEAD", unrelated)]
+
+
+@pytest.mark.parametrize("revision", ["--root", "--abort", "--all", "--independent", "-x"])
+def test_option_like_revisions_start_no_process(rig: Rig, revision: str) -> None:
+    rig.calls.clear()
+    for operation in (rig.repo.is_ancestor, rig.repo.merge_base):
+        for a, b in ((revision, "HEAD"), ("HEAD", revision)):
+            with pytest.raises(ValueError, match="revision must not start"):
+                operation(a, b)
+    with pytest.raises(ValueError, match="revision must not start"):
+        rig.wt.rebase(revision)
+    assert rig.calls == []
+
+
+def test_fast_forward_failure_is_typed_with_an_injected_non_english_locale(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LANG", "fr_FR.UTF-8")
+    run(rig.path, "checkout", "-qb", "other")
+    run(rig.path, "commit", "--allow-empty", "-qm", "other")
+    run(rig.path, "checkout", "-q", "main")
+    run(rig.path, "commit", "--allow-empty", "-qm", "local")
+    repo = RealRepo(rig.path, env={"LC_ALL": "fr_FR.UTF-8", "LANG": "fr_FR.UTF-8"})
+    wt = repo.worktree(rig.path)
+    before = repo.history(["HEAD"])
+    with pytest.raises(NotFastForward):
+        wt.merge_ff("other")
+    assert repo.history(["HEAD"]) == before
 
 
 @pytest.mark.parametrize("operation", ["is_ancestor", "merge_base"])

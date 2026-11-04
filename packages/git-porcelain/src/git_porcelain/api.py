@@ -382,11 +382,17 @@ class Repo(Protocol):
         ...
 
     def is_ancestor(self, a: str, b: str) -> bool:
-        """Whether a is reachable from b; missing revisions raise MissingRevision, faults raise GitReadFailure."""
+        """Whether a is reachable from b; missing revisions raise MissingRevision, faults raise GitReadFailure.
+
+        Leading-dash revisions raise ValueError before invoking git.
+        """
         ...
 
     def merge_base(self, a: str, b: str) -> Sha | None:
-        """None only for missing revisions or unrelated histories; observation faults raise GitReadFailure."""
+        """None only for missing revisions or unrelated histories; observation faults raise GitReadFailure.
+
+        Leading-dash revisions raise ValueError before invoking git.
+        """
         ...
 
     def cherry(self, upstream: str, head: str) -> tuple[Pick, ...]:
@@ -598,7 +604,11 @@ class Worktree(Protocol):
         ...
 
     def rebase(self, base: str, *, update_refs: bool | None = None) -> CommandResult:
-        """Invoke rebase even when up to date; preserve every git refusal and diagnostic."""
+        """Resolve base to a commit OID, then invoke rebase even when up to date.
+
+        Leading-dash bases raise ValueError; absent bases raise MissingRevision.
+        Preserve every git rebase refusal and diagnostic.
+        """
         ...
 
     def continue_rebase(self, *, stage_conflicts: bool = False, check_markers: bool = False, missing_ok: bool = False) -> CommandResult:

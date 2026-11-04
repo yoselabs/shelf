@@ -100,6 +100,15 @@ def test_fast_forward_preserves_edits_and_pull_rebase_refuses_a_dirty_tree(plumb
         api.merge_ff(path, "does-not-exist")
 
 
+@pytest.mark.parametrize("revision", ["--root", "--abort", "--all", "--independent", "-x"])
+def test_fast_forward_rejects_option_like_revisions(plumbing: tuple[Plumbing, Path], revision: str) -> None:
+    api, path = plumbing
+    before = api.branches(path)
+    with pytest.raises(ValueError, match="revision must not start"):
+        api.merge_ff(path, revision)
+    assert api.branches(path) == before
+
+
 def _worktree(api: Plumbing, path: Path) -> Worktree:
     return FakeRepo(api.state, path).worktree(path) if isinstance(api, FakePlumbing) else RealRepo(path).worktree(path)
 
@@ -156,7 +165,11 @@ def test_pull_fetches_and_rebases_local_commits(plumbing: tuple[Plumbing, Path])
 
 
 @pytest.mark.parametrize("diverged", [False, True])
-def test_merge_fast_forwards_and_refuses_divergence(plumbing: tuple[Plumbing, Path], diverged: bool) -> None:
+def test_merge_fast_forwards_and_refuses_divergence(
+    plumbing: tuple[Plumbing, Path], monkeypatch: pytest.MonkeyPatch, *, diverged: bool
+) -> None:
+    monkeypatch.setenv("LANG", "fr_FR.UTF-8")
+    monkeypatch.setenv("LC_ALL", "fr_FR.UTF-8")
     api, path = plumbing
     wt = _worktree(api, path)
     if diverged:
