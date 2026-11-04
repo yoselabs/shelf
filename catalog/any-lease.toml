@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-lease"
+kind = "any-lib"
+tier = "T1"
+release = "any-lease-v0.1.0"
+capability = "Stop hand-rolling at-most-N-at-a-time across processes: a counting lease of limit units per named resource, each a process-lock flock the kernel drops when its holder dies (kill -9 included), with queuing (timeout, cancel, waiting callback), ordered multi-acquire that cannot deadlock, and holders readable without taking a lock."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from task-loop (app/checks/resources.py _take, adapters/locks.py). A new package, not process-lock: process-lock promises one holder per path, a count would bend that promise; any-lease composes it (reentrant=False also gives the thread exclusion task-loop's per-path mutex supplied). Task-loop keeps its wait log, host.json and Check.needs. POSIX (macOS, Linux), no Windows. Requires process-lock (itself stdlib-only), reused rather than inlining its flock core, so it is not stdlib-only alone; a vendoring consumer copies both. A hold ends only on release or holder death, no TTL. Born candidate; no release tag created by this change."

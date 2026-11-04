@@ -1,0 +1,21 @@
+[project]
+name = "any-lease"
+version = "0.1.0"
+description = "A counting lease across processes: up to N holders of a named resource, each a process-lock flock the kernel drops when its holder dies; queue with timeout and cancel, ordered multi-acquire, holders readable without taking a lock."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "process-lock>=0.2,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/any_lease"]
+
+[tool.ruff]
+extend = "../../pyproject.toml"
