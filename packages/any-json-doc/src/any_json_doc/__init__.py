@@ -26,13 +26,13 @@ __all__ = [
     "ForeignVersionError",
     "Present",
     "Read",
-    "Refused",
+    "RefusedError",
     "Torn",
     "refusal",
 ]
 
 
-class Refused(ValueError):  # noqa: N818 - the name task-loop's callers already catch
+class RefusedError(ValueError):
     """``need`` met a file that is there and cannot be read; the message names the file."""
 
 
@@ -57,7 +57,11 @@ class Absent:
 
 @dataclass(frozen=True)
 class Torn:
-    """A file that is there and is not a record: half written, bad JSON, a wrong shape, or unreadable."""
+    """A file that is there and is not a record: half written, bad JSON, a wrong shape, or unreadable.
+
+    ``why`` is the underlying error text for a human (it goes into the ``need`` message). Callers branch on the state
+    (Torn vs ForeignVersion), never on ``why``: the causes are the stdlib's and the host's own, with no closed set to type.
+    """
 
     path: Path
     why: str
@@ -121,10 +125,10 @@ class Doc[T]:
         return r.rec if isinstance(r, Present) else None
 
     def need(self) -> T | None:
-        """The record, None when there is no file; Refused (naming the file) when one is there and cannot be read."""
+        """The record, None when there is no file; RefusedError (naming the file) when one is there and cannot be read."""
         r = self.read()
         if isinstance(r, (Torn, ForeignVersion)):
-            raise Refused(refusal(r))
+            raise RefusedError(refusal(r))
         return r.rec if isinstance(r, Present) else None
 
     def write(self, rec: T) -> None:
@@ -135,29 +139,40 @@ class Doc[T]:
 
 
 class DocSet[T]:
-    """One :class:`Doc` per key, in the file ``path_of(key)``; ``keys()`` lists the folder."""
+    """One :class:`Doc` per key, kept as ``folder / (key + suffix)``; ``keys()`` lists the folder.
+
+    A flat folder with one suffix; a key is a file stem (no path separator). A layout that is not that is several
+    ``Doc``s, not a ``DocSet``.
+    """
 
     def __init__(
         self,
-        path_of: Callable[[str], Path],
+        folder: Path,
+        suffix: str = ".json",
         load: Callable[[Any], T] = _same,
         dump: Callable[[T], Any] = _same,
         *,
         fsync: bool = False,
     ) -> None:
-        self._path_of = path_of
+        if not suffix.startswith(".") or "/" in suffix:
+            msg = f"suffix must be a dot extension such as '.json', got {suffix!r}"
+            raise ValueError(msg)
+        self._folder = Path(folder)
+        self._suffix = suffix
         self._load = load
         self._dump = dump
         self._fsync = fsync
 
     def of(self, key: str) -> Doc[T]:
-        return Doc(self._path_of(key), self._load, self._dump, fsync=self._fsync)
+        if not key or "/" in key or key.startswith("."):
+            msg = f"key must be a plain file stem, got {key!r}"
+            raise ValueError(msg)
+        return Doc(self._folder / (key + self._suffix), self._load, self._dump, fsync=self._fsync)
 
     def keys(self) -> list[str]:
         """Keys that have a file; dot-files (a writer's leftover temp) are not keys."""
-        probe = self._path_of("x")
         try:
-            names = [p.name for p in probe.parent.iterdir()]
+            names = [p.name for p in self._folder.iterdir()]
         except OSError:
             return []
-        return sorted(n[: -len(probe.suffix)] for n in names if n.endswith(probe.suffix) and not n.startswith("."))
+        return sorted(n[: -len(self._suffix)] for n in names if n.endswith(self._suffix) and not n.startswith("."))
