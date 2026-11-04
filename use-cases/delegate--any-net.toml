@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "delegate"
+software = "any-net"
+why = "delegate routes work to vendor lanes and must know whether a failure is the network (DNS vs vendor vs offline) before it spends quota; the probe, the drop matcher and the cache live in its adapters (tl-w7lt.13)."
+needs = "a stdlib-only probe with a DNS/TCP split bounded by a deadline, injectable sockets, a drop-error regex and a cached last probe, vendorable byte-for-byte."
+sponsor = "yoselabs"
+requester = "delegate"
+status = "active"          # active | retired

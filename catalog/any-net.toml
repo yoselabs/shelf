@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-net"
+kind = "any-lib"
+tier = "T1"
+release = "any-net-v0.1.0"
+capability = "Stop re-writing the online check: a DNS/TCP-split probe bounded by a join deadline with an IP-literal fallback, a connection-drop error matcher and a one-file probe cache."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from delegate adapters/netprobe.py (tl-w7lt.13). Stdlib only (the cache write uses tempfile and os.replace, not atomic_io), so delegate can vendor it byte-for-byte. Resolver, connector and clock are injected; the host list and the reaction to a DNS outage stay in the host. Candidate contract: packages/any-net/CONTRACT.md. Consumers adopt separately; no release tag created by this change."
