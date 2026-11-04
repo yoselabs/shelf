@@ -21,5 +21,7 @@ fresh = cached("net.json", fresh_s=120)   # Probe, or None when absent or older 
 | `looks_dropped(text)` | the text names a connection failure (ECONN*, DNS, TLS handshake, "stream disconnected"); not the model's output cap |
 | `record(path, probe)` | atomic write; `since` moves only when `up` flips; never raises |
 | `cached(path, fresh_s=120)` | the stored `Probe`, or None when absent, corrupt or stale |
+| `last(path)` | the stored `Probe` whatever its age |
+| `view(probe, hosts, now, fresh_s=120)` | `View(up, since, age_s)` for a set of hosts, from a stored probe |
 
 Policy (which hosts matter, what to do on `dns` vs `offline`) stays with the host. Contract: [CONTRACT.md](CONTRACT.md).

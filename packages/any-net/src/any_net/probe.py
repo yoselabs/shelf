@@ -106,7 +106,7 @@ def record(path: str | Path, result: Probe) -> Probe:
 
     `since` moves only when `up` flips, so an outage can be dated.
     """
-    prev = _load(path)
+    prev = last(path)
     since = prev.since if prev is not None and prev.up == result.up and prev.since else result.at
     stored = Probe(result.up, result.ip_up, result.why, result.per_host, result.at, result.ms, since)
     row = {
@@ -120,17 +120,20 @@ def record(path: str | Path, result: Probe) -> Probe:
         "since": since,
     }
     target = Path(path)
+    tmp = None
     try:
+        target.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(row, f)
         Path(tmp).replace(target)
-    except OSError:
-        pass
+    except (OSError, ValueError):
+        if tmp is not None:
+            Path(tmp).unlink(missing_ok=True)
     return stored
 
 
-def _load(path: str | Path) -> Probe | None:
+def last(path: str | Path) -> Probe | None:
     try:
         d = json.loads(Path(path).read_text(encoding="utf-8"))
         return Probe(bool(d["up"]), bool(d["ip_up"]), str(d["why"]), dict(d["hosts"]), float(d["at"]), int(d.get("ms", 0)), d.get("since"))
@@ -140,5 +143,28 @@ def _load(path: str | Path) -> Probe | None:
 
 def cached(path: str | Path, fresh_s: float = 120, *, clock: Callable[[], float] = time.time) -> Probe | None:
     """The probe stored in `path`, or None when absent, unreadable or older than `fresh_s`. Opens no socket."""
-    stored = _load(path)
+    stored = last(path)
     return stored if stored is not None and clock() - stored.at <= fresh_s else None
+
+
+@dataclass(frozen=True)
+class View:
+    """`up` is None when there is no probe or it is older than `fresh_s`; `since` and `age_s` survive staleness."""
+
+    up: bool | None
+    since: float | None
+    age_s: int | None
+
+
+def view(stored: Probe | None, hosts: Iterable[str], now: float, fresh_s: float = 120) -> View:
+    """What a stored probe says about `hosts`, for a status read that opens no socket.
+
+    A host the probe did not test says nothing; when none of them was tested the answer is the probe's overall `up`.
+    """
+    if stored is None:
+        return View(None, None, None)
+    age = int(now - stored.at)
+    if now - stored.at > fresh_s:
+        return View(None, stored.since, age)
+    seen = [stored.per_host[h] for h in hosts if h in stored.per_host]
+    return View(any(x == "ok" for x in seen) if seen else stored.up, stored.since, age)

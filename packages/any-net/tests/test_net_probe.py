@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING
 
-from any_net import Probe, cached, probe, record
+from any_net import Probe, View, cached, last, probe, record, view
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -103,3 +103,27 @@ def test_cached_is_none_for_missing_or_corrupt_file(tmp_path: Path) -> None:
 def test_record_never_raises_on_an_unwritable_path(tmp_path: Path) -> None:
     p = Probe(True, True, "ok", {}, 1.0)
     assert record(tmp_path / "no" / "such" / "dir" / "net.json", p).up is True
+
+
+def test_last_ignores_freshness_and_view_keeps_since_and_age(tmp_path: Path) -> None:
+    path = tmp_path / "net.json"
+    record(path, Probe(True, True, "ok", {VENDOR: "ok", "other:443": "tcp"}, 100.0))
+    stored = last(path)
+    assert stored is not None
+    assert view(stored, [VENDOR], 150.0) == View(True, 100.0, 50)
+    assert view(stored, ["other:443"], 150.0) == View(False, 100.0, 50)
+    assert view(stored, ["untested:443"], 150.0) == View(True, 100.0, 50)
+    assert view(stored, [VENDOR], 1000.0) == View(None, 100.0, 900)
+    assert view(None, [VENDOR], 1000.0) == View(None, None, None)
+
+
+def test_record_creates_the_parent_directory(tmp_path: Path) -> None:
+    path = tmp_path / "new" / "dir" / "net.json"
+    record(path, Probe(True, True, "ok", {}, 1.0))
+    assert last(path) is not None
+
+
+def test_a_failed_write_leaves_no_temp_file(tmp_path: Path) -> None:
+    (tmp_path / "net.json").mkdir()  # replace() onto a directory fails
+    assert record(tmp_path / "net.json", Probe(True, True, "ok", {}, 1.0)).up is True
+    assert [p.name for p in tmp_path.iterdir()] == ["net.json"]
