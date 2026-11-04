@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Final, Literal
 
-from git_porcelain import real_parse, real_read
+from git_porcelain import real_checkout, real_parse, real_read
 from git_porcelain.api import (
     Aborted,
     BranchHeld,
@@ -111,7 +111,12 @@ def exclude_locally(repo: RealRepo, patterns: Sequence[str]) -> None:
 
 
 # -- Worktree ---------------------------------------------------------------------------------------------
-def _stage(wt: RealWorktree, paths: Literal["own", "all"], base: str | None) -> None:
+def _stage(wt: RealWorktree, paths: Literal["own", "all", "tracked", "staged"], base: str | None) -> None:
+    if paths == "staged":
+        return
+    if paths == "tracked":
+        wt.run("add", "-u")
+        return
     if paths == "all":
         wt.run("add", "-A")
         return
@@ -125,7 +130,7 @@ def record(
     wt: RealWorktree,
     message: str,
     *,
-    paths: Literal["own", "all"],
+    paths: Literal["own", "all", "tracked", "staged"],
     base: str | None,
     mode: Literal["new", "amend", "squash_to"],
     squash_to: Sha | None,
@@ -135,6 +140,7 @@ def record(
     if mode == "squash_to" and squash_to is None:
         msg = "mode='squash_to' needs squash_to"
         raise ValueError(msg)
+    wt.run("rev-parse", "--git-dir")
     old = real_read.head_of(wt)
     if mode == "amend" and old is None:
         msg = "nothing to amend: HEAD is unborn"
@@ -143,7 +149,10 @@ def record(
         _stage(wt, paths, base)
         target = squash_to if mode == "squash_to" else old
         against = str(target) if target is not None else "4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # the empty tree
-        if wt.run("diff", "--cached", "--quiet", against, check=False).rc == 0 and not allow_empty:
+        delta = wt.run("diff", "--cached", "--quiet", against, check=False)
+        if delta.rc not in {0, 1}:
+            raise unavailable(("diff",), delta)
+        if delta.rc == 0 and not allow_empty and mode != "amend":
             return NothingToRecord()
         if mode == "squash_to":
             wt.run("reset", "-q", "--soft", str(squash_to))
@@ -165,7 +174,7 @@ def record(
 
 def _clean(wt: RealWorktree, clean_keep: Sequence[str] | None) -> None:
     if clean_keep is not None:
-        wt.run("clean", "-fdq", *(arg for pattern in clean_keep for arg in ("-e", pattern)))
+        real_checkout.clean(wt, clean_keep, ignored=False)
 
 
 def _same(a: Path, b: Path) -> bool:

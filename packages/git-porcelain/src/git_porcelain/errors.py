@@ -33,6 +33,14 @@ class MissingRevision(GitUnavailable):
     """A revision does not identify a git object."""
 
 
+class DirtyTree(GitUnavailable):
+    """Local changes would be overwritten by the requested operation."""
+
+
+class BranchExists(GitUnavailable):
+    """Exclusive branch creation or rename found an existing destination."""
+
+
 class NotARepo(GitUnavailable):
     """The requested path is outside a repository or does not exist."""
 
@@ -79,6 +87,12 @@ def failure(message: str, stderr: str, code: int, *, retryable: bool = False, hi
         kind, retryable = IndexLocked, True
     elif match := _PINNED.search(stderr):
         return BranchPinned(message, match.group(1).strip(), hint=hint)
+    elif re.search(r"(?:local changes|untracked working tree files)[\s\S]*would be overwritten|would be overwritten by checkout", stderr):
+        kind = DirtyTree
+    elif re.search(r"(?:a branch named|a branch) '.+' already exists", stderr, re.IGNORECASE):
+        kind = BranchExists
+    elif re.search(r"fatal: no branch named '.+'\.?", stderr, re.IGNORECASE):
+        kind = MissingRevision
     elif _REF_STALE.search(stderr) or _REF_RACE.search(stderr):
         kind = RefRace
         retryable = _REF_LOCK.search(stderr) is not None and _REF_STALE.search(stderr) is None
@@ -98,7 +112,9 @@ def failure(message: str, stderr: str, code: int, *, retryable: bool = False, hi
 
 
 __all__ = [
+    "BranchExists",
     "BranchPinned",
+    "DirtyTree",
     "GitError",
     "GitUnavailable",
     "IndexLocked",

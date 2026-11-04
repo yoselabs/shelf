@@ -22,6 +22,7 @@ import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from git_porcelain import Change, GitUnavailable, Identity, RealRepo, Worktree, WorktreeRemoveRefused
+from git_porcelain.fake_ops import stage
 from git_porcelain.real_parse import parse_status
 from git_porcelain.testing import QUIET, FakeRemote, FakeRepo, FakeWorktree, apply_hermetic_env
 from git_porcelain.testing import git as run
@@ -412,6 +413,30 @@ def _commit_with(world: World, name: str, message: str, files: str) -> None:
 def _writes(world: World, name: str, files: str) -> None:
     for rel, text in _files(files):
         world.rig.write(world.wts[name], rel, text)
+
+
+@given(parsers.parse('"{name}" stages {paths}'))
+@when(parsers.parse('"{name}" stages {paths}'))
+def _stages(world: World, name: str, paths: str) -> None:
+    wt = world.wts[name]
+    picks = ast.literal_eval(paths)
+    if isinstance(wt, FakeWorktree):
+        stage(wt.repo._state, wt.state(), picks)
+    else:
+        run(wt.path, "--literal-pathspecs", "add", "-A", "--", *picks)
+
+
+@then(parsers.parse('the index of "{name}" reads "{rel}" as "{text}"'))
+def _index_reads(world: World, name: str, rel: str, text: str) -> None:
+    wt = world.wts[name]
+    got = wt.repo._state.store.blobs[wt.state().index[rel]].decode() if isinstance(wt, FakeWorktree) else run(wt.path, "show", f":{rel}")
+    assert got == _text(text)
+
+
+@then("the failure cannot be retried")
+def _not_retryable(world: World) -> None:
+    assert isinstance(world.error, GitUnavailable)
+    assert not world.error.retryable
 
 
 @when(parsers.parse('"{name}" edits "{rel}" to "{text}" within the same clock tick'))

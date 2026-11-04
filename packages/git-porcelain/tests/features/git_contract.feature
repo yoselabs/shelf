@@ -3,6 +3,288 @@ Feature: One Repo and Worktree, real or fake
   Every intent operation a driver such as task-loop takes on a checkout behaves the same on the git binary
   (RealRepo) and in memory (FakeRepo). These scenarios run against both; @real_only names a gap of the fake.
 
+  Scenario: Branch names survive unborn HEAD and become absent when detached
+    Given a repository "r"
+    When "r" calls branch()
+    Then the result is "main"
+    When "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" calls checkout("<mem:root>")
+    And "r" calls branch()
+    Then the result is None
+    When "r" calls checkout("main")
+    And "r" calls branch()
+    Then the result is "main"
+
+  Scenario: New branches are exclusive and ordinary checkout never creates one
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    When "r" calls checkout_new("topic")
+    And "r" calls branch()
+    Then the result is "topic"
+    When "r" tries checkout_new("topic")
+    Then the call raises BranchExists
+    When "r" tries checkout("absent")
+    Then the call raises MissingRevision
+    When "r" calls branch()
+    Then the result is "topic"
+
+  Scenario: Checkout refuses to overwrite local changes
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" calls checkout_new("topic")
+    And "r" commits "topic" with a="two"
+    And "r" calls checkout("main")
+    And "r" writes a="local"
+    When "r" tries checkout("topic")
+    Then the call raises DirtyTree
+    And the file "a" of "r" holds "local"
+
+  Scenario: Checkout refuses another worktree's branch
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" adds a worktree "w" at "HEAD" as "w"
+    And "w" calls checkout_new("topic")
+    When "r" tries checkout("topic")
+    Then the call raises BranchPinned
+    When "r" tries checkout_force("topic", "main")
+    Then the call raises BranchPinned
+    When "w" calls branch()
+    Then the result is "topic"
+
+  Scenario: Creating from an explicit start switches files while compatible local edits survive checkout
+    Given a repository "r"
+    And "r" commits "root" with a="one", unchanged="base"
+    And "r" remembers its head as "root"
+    And "r" commits "next" with a="two"
+    And "r" writes unchanged="local", untracked="keep"
+    When "r" calls checkout_new("topic", "<mem:root>")
+    Then the file "a" of "r" holds "one"
+    And the file "unchanged" of "r" holds "local"
+    And the file "untracked" of "r" holds "keep"
+    When "r" calls checkout("HEAD")
+    And "r" calls branch()
+    Then the result is "topic"
+    When "r" calls checkout("main")
+    Then the file "a" of "r" holds "two"
+    And the file "unchanged" of "r" holds "local"
+
+  Scenario: Clean respects keep patterns and optionally removes ignored files without moving HEAD
+    Given a repository "r"
+    And "r" commits "root" with .gitignore="*.cache\n" tracked="one"
+    And "r" remembers its head as "root"
+    And "r" writes drop/file="trash", keep/file="keep", ignored.cache="cache", saved.cache="saved"
+    When "r" calls clean(["keep/", "saved.cache"])
+    Then the file "drop/file" of "r" is absent
+    And the file "keep/file" of "r" holds "keep"
+    And the file "ignored.cache" of "r" holds "cache"
+    When "r" calls clean(["keep/", "saved.cache"], ignored=True)
+    Then the file "ignored.cache" of "r" is absent
+    And the file "saved.cache" of "r" holds "saved"
+    And the file "tracked" of "r" holds "one"
+    When "r" calls history(["HEAD"], limit=1)
+    Then the result's 0.sha is "<mem:root>"
+    When "r" calls branch()
+    Then the result is "main"
+
+  Scenario Outline: Reset modes separately control HEAD index and files
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" commits "next" with a="two"
+    And "r" writes a="local", untracked="keep"
+    When "r" calls reset("<mem:root>", mode="<mode>")
+    Then the file "a" of "r" holds "<files>"
+    And the file "untracked" of "r" holds "keep"
+    And the index of "r" reads "a" as "<index>"
+    When "r" calls history(["HEAD"], limit=1)
+    Then the result's 0.sha is "<mem:root>"
+
+    Examples:
+      | mode  | files | index |
+      | soft  | local | two   |
+      | mixed | local | one   |
+      | hard  | one   | one   |
+
+  Scenario: Forced checkout resets an existing branch and discards tracked edits
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" calls checkout_new("topic")
+    And "r" commits "next" with a="two"
+    And "r" writes a="local", untracked="keep"
+    When "r" calls checkout_force("topic", "<mem:root>")
+    Then the file "a" of "r" holds "one"
+    And the file "untracked" of "r" holds "keep"
+    When "r" calls branch()
+    Then the result is "topic"
+    When "r" calls checkout_force("new", "main")
+    And "r" calls branch()
+    Then the result is "new"
+
+  Scenario: Renaming updates a checked out branch and refuses a taken name
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    When "r" calls rename_branch("main", "renamed")
+    And "r" calls branch()
+    Then the result is "renamed"
+    When "r" calls checkout_new("topic")
+    And "r" tries rename_branch("renamed", "topic")
+    Then the call raises BranchExists
+    When "r" tries rename_branch("absent", "other")
+    Then the call raises MissingRevision
+
+  Scenario: Branch deletion compares its tip and never retries a stale expectation
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" calls checkout_new("topic")
+    And "r" commits "next" with a="two"
+    And "r" remembers its head as "next"
+    And "r" calls checkout("main")
+    When "r" tries delete_branch("topic", expected="<mem:root>")
+    Then the call raises RefRace
+    And the failure cannot be retried
+    When "r" calls branches("topic")
+    Then the result is [["topic", "<mem:next>"]]
+    When "r" calls delete_branch("topic", expected="<mem:next>")
+    And "r" calls branches("topic")
+    Then the result is []
+    When "r" tries delete_branch("topic", expected="<mem:next>")
+    Then the call raises RefRace
+    And the failure cannot be retried
+
+  Scenario: Reset defaults to mixed and can run while detached
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" commits "next" with a="two"
+    And "r" remembers its head as "next"
+    And "r" calls checkout("<mem:next>")
+    When "r" calls reset("<mem:root>")
+    Then the file "a" of "r" holds "two"
+    And the index of "r" reads "a" as "one"
+    When "r" calls branch()
+    Then the result is None
+
+  Scenario: Staged recording works on an unborn branch and can explicitly create an empty commit
+    Given a repository "r"
+    And "r" writes a="staged", untracked="keep"
+    And "r" stages ["a"]
+    When "r" calls record("root", paths="staged")
+    Then the result is a Recorded
+    When "r" calls tree("HEAD")
+    Then the tree lists ["a"]
+    When "r" calls record("empty", paths="staged", allow_empty=True)
+    Then the result is a Recorded
+    When "r" calls history(["HEAD"])
+    Then the subject of each result entry is ["empty", "root"]
+
+  Scenario: Staged recording preserves the staged contents and leaves unstaged work alone
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" writes a="staged", added="new"
+    And "r" stages ["a", "added"]
+    And "r" writes a="unstaged", untracked="keep"
+    When "r" calls record("staged only", paths="staged")
+    Then the result is a Recorded
+    And the index of "r" reads "a" as "staged"
+    And the file "a" of "r" holds "unstaged"
+    When "r" calls tree("HEAD")
+    Then the tree reads "a" as "staged"
+    And the tree reads "added" as "new"
+    And the tree reads "untracked" as nothing
+    When "r" calls record("no staged changes", paths="staged")
+    Then the result is a NothingToRecord
+
+  Scenario: Tracked recording includes deletions and staged additions but excludes untracked files
+    Given a repository "r"
+    And "r" commits "root" with a="one", deleted="old"
+    And "r" writes added="new"
+    And "r" stages ["added"]
+    And "r" writes a="changed", untracked="keep"
+    And "r" removes "deleted"
+    When "r" calls record("tracked only", paths="tracked")
+    Then the result is a Recorded
+    When "r" calls tree("HEAD")
+    Then the tree lists ["a", "added"]
+    And the tree reads "a" as "changed"
+    And the file "untracked" of "r" holds "keep"
+
+  Scenario: Amend can change only the message or keep the message while folding staged work
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" commits "original" with a="two"
+    When "r" calls record("renamed", paths="staged", mode="amend")
+    Then the result is a Recorded
+    When "r" calls history(["HEAD"])
+    Then the subject of each result entry is ["renamed", "root"]
+    When "r" writes a="staged"
+    And "r" stages ["a"]
+    And "r" writes a="unstaged"
+    And "r" calls record("", paths="staged", mode="amend")
+    Then the result is a Recorded
+    And the file "a" of "r" holds "unstaged"
+    When "r" calls history(["HEAD"])
+    Then the subject of each result entry is ["renamed", "root"]
+    When "r" calls tree("HEAD")
+    Then the tree reads "a" as "staged"
+
+  Scenario: A refusing hook leaves the staged index and unstaged work intact
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    And "r" writes a="staged"
+    And "r" stages ["a"]
+    And "r" writes a="unstaged"
+    And "r" has a pre-commit hook that refuses
+    When "r" calls record("blocked", paths="staged", hooks=True)
+    Then the result is a HookRejected
+    And the index of "r" reads "a" as "staged"
+    And the file "a" of "r" holds "unstaged"
+    When "r" calls history(["HEAD"], limit=1)
+    Then the result's 0.sha is "<mem:root>"
+    When "r" calls record("accepted", paths="staged")
+    Then the result is a Recorded
+
+  Scenario: New checkout and reset report a missing start without changing branches
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    When "r" tries checkout_new("topic", "absent")
+    Then the call raises MissingRevision
+    When "r" tries reset("absent")
+    Then the call raises MissingRevision
+    When "r" tries checkout_force("topic", "absent")
+    Then the call raises MissingRevision
+    When "r" calls branch()
+    Then the result is "main"
+
+  Scenario: Index locks stop checkout and reset with a typed retryable failure
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" holds an index lock
+    When "r" tries checkout_new("topic")
+    Then the call raises IndexLocked
+    And the failure may be retried
+    When "r" tries reset("HEAD", mode="hard")
+    Then the call raises IndexLocked
+    And the failure may be retried
+
+  Scenario Outline: Checkout primitives fail loudly outside a repository
+    Given "plain" is the plain folder
+    When "plain" tries <call>
+    Then the call raises NotARepo
+
+    Examples:
+      | call                                 |
+      | branch()                             |
+      | checkout("main")                     |
+      | checkout_new("topic")                |
+      | clean()                              |
+      | reset("HEAD")                        |
+      | checkout_force("topic", "HEAD")      |
+      | record("work", paths="staged")       |
+
   # -- identity ----------------------------------------------------------------------------------------
   Scenario: A repository says where it is, and names itself the same from every worktree
     Given a repository "r"

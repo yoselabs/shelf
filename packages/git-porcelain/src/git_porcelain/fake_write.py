@@ -49,7 +49,7 @@ def record(
     wt: CheckoutState,
     message: str,
     *,
-    paths: Literal["own", "all"],
+    paths: Literal["own", "all", "tracked", "staged"],
     base: str | None,
     mode: Literal["new", "amend", "squash_to"],
     squash_to: Sha | None,
@@ -66,13 +66,15 @@ def record(
     require_index(wt)
     if paths == "all":
         stage(repo, wt, None)
-    else:
+    elif paths == "tracked":
+        stage(repo, wt, list(wt.index))
+    elif paths == "own":
         state = dirty(repo, wt, base=base, ignored_under=())
         picks = [*state.tracked, *(p for p in state.untracked if p not in state.base_ignored)]
         if picks:
             stage(repo, wt, picks)
     target = squash_to if mode == "squash_to" else old
-    if dict(wt.index) == (dict(repo.store.commits[target].files) if target else {}) and not allow_empty:
+    if dict(wt.index) == (dict(repo.store.commits[target].files) if target else {}) and not allow_empty and mode != "amend":
         return NothingToRecord()
     if hooks and repo.hooks.refuse_commit:
         return HookRejected("pre-commit hook declined the commit")

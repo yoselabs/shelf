@@ -24,13 +24,14 @@ from __future__ import annotations
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Literal, Self
 
+from git_porcelain import fake_checkout as checkout_ops
 from git_porcelain import fake_flow as flow
 from git_porcelain import fake_read as read
 from git_porcelain import fake_write as write
 from git_porcelain.api import Sha
 from git_porcelain.errors import NotARepo
 from git_porcelain.fake_diff import grep_files
-from git_porcelain.fake_ops import branch_ref, hard_to
+from git_porcelain.fake_ops import branch_ref, clean, hard_to
 from git_porcelain.fake_plumbing import FakePlumbing
 from git_porcelain.fake_store import CheckoutState, Hooks, RepoState
 from git_porcelain.fake_worktrees import worktree_state
@@ -179,6 +180,13 @@ class FakeRepo:
         self._anchor()
         return read.branches(self._state, prefix)
 
+    def rename_branch(self, old: str, new: str) -> None:
+        checkout_ops.rename_branch(self._state, self._anchor(), old, new)
+
+    def delete_branch(self, branch: str, *, expected: Sha) -> None:
+        self._anchor()
+        checkout_ops.delete_branch(self._state, branch, expected=expected)
+
     def tree(self, rev: str) -> Tree | None:
         return read.tree(self._state, self._anchor(), rev)
 
@@ -232,7 +240,7 @@ class FakeWorktree:
 
     def state(self) -> CheckoutState:
         found = self._find()
-        if found is None:
+        if found is None or found.missing:
             msg = f"git exited 128: fatal: not a git repository: {self.path}"
             raise NotARepo(msg)
         return found
@@ -268,6 +276,24 @@ class FakeWorktree:
     def health(self) -> Health:
         return read.health(self._repo, self._find(), self.path)
 
+    def branch(self) -> str | None:
+        return checkout_ops.branch(self.state())
+
+    def checkout(self, ref: str) -> None:
+        checkout_ops.checkout(self._repo, self.state(), ref)
+
+    def checkout_new(self, branch: str, start: str = "HEAD") -> None:
+        checkout_ops.checkout_new(self._repo, self.state(), branch, start)
+
+    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False) -> None:
+        clean(self._repo, self.state(), keep, ignored=ignored)
+
+    def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
+        checkout_ops.reset(self._repo, self.state(), rev, mode=mode)
+
+    def checkout_force(self, branch: str, start: str) -> None:
+        checkout_ops.checkout_force(self._repo, self.state(), branch, start)
+
     def snapshot(self, base: str, *, inputs: Sequence[str] = ()) -> Snapshot:
         return read.snapshot(self._repo, self.state(), base, inputs=inputs)
 
@@ -281,7 +307,7 @@ class FakeWorktree:
         self,
         message: str,
         *,
-        paths: Literal["own", "all"] = "own",
+        paths: Literal["own", "all", "tracked", "staged"] = "own",
         base: str | None = None,
         mode: Literal["new", "amend", "squash_to"] = "new",
         squash_to: Sha | None = None,

@@ -15,7 +15,7 @@ import subprocess
 import time
 from typing import TYPE_CHECKING, TypeVar
 
-from git_porcelain import real_env, real_read, real_worktrees, real_write
+from git_porcelain import real_checkout, real_env, real_read, real_worktrees, real_write
 from git_porcelain.errors import GitUnavailable
 from git_porcelain.real_done import Done, unavailable
 
@@ -155,6 +155,12 @@ class RealRepo:
     def branches(self, prefix: str = "") -> tuple[tuple[str, Sha], ...]:
         return real_read.branches(self, prefix)
 
+    def rename_branch(self, old: str, new: str) -> None:
+        real_checkout.rename_branch(self, old, new)
+
+    def delete_branch(self, branch: str, *, expected: Sha) -> None:
+        real_checkout.delete_branch(self, branch, expected=expected)
+
     def tree(self, rev: str) -> Tree | None:
         return real_read.tree(self, rev)
 
@@ -193,6 +199,24 @@ class RealWorktree:
     def health(self) -> Health:
         return real_read.health(self)
 
+    def branch(self) -> str | None:
+        return real_checkout.branch(self)
+
+    def checkout(self, ref: str) -> None:
+        real_checkout.checkout(self, ref)
+
+    def checkout_new(self, branch: str, start: str = "HEAD") -> None:
+        real_checkout.checkout_new(self, branch, start)
+
+    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False) -> None:
+        real_checkout.clean(self, keep, ignored=ignored)
+
+    def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
+        real_checkout.reset(self, rev, mode=mode)
+
+    def checkout_force(self, branch: str, start: str) -> None:
+        real_checkout.checkout_force(self, branch, start)
+
     def snapshot(self, base: str, *, inputs: Sequence[str] = ()) -> Snapshot:
         return real_read.snapshot(self, base, inputs=inputs)
 
@@ -206,7 +230,7 @@ class RealWorktree:
         self,
         message: str,
         *,
-        paths: Literal["own", "all"] = "own",
+        paths: Literal["own", "all", "tracked", "staged"] = "own",
         base: str | None = None,
         mode: Literal["new", "amend", "squash_to"] = "new",
         squash_to: Sha | None = None,

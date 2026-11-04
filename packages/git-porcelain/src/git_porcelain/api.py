@@ -335,6 +335,14 @@ class Repo(Protocol):
         """Local branches whose name starts with ``prefix``, sorted, with their tips."""
         ...
 
+    def rename_branch(self, old: str, new: str) -> None:
+        """Rename a local branch without replacing an existing branch."""
+        ...
+
+    def delete_branch(self, branch: str, *, expected: Sha) -> None:
+        """Atomically delete only at ``expected``; a stale tip raises non-retryable ``RefRace``."""
+        ...
+
     def tree(self, rev: str) -> Tree | None:
         """The tree of a commit-ish or tree id; None when ``rev`` names nothing."""
         ...
@@ -376,6 +384,30 @@ class Worktree(Protocol):
 
     path: Path
 
+    def branch(self) -> str | None:
+        """Symbolic HEAD's short branch name, including unborn branches; None when detached."""
+        ...
+
+    def checkout(self, ref: str) -> None:
+        """Check out an existing branch or commit-ish, preserving compatible local edits."""
+        ...
+
+    def checkout_new(self, branch: str, start: str = "HEAD") -> None:
+        """Create and check out a branch exclusively; ``BranchExists`` if already present."""
+        ...
+
+    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False) -> None:
+        """Remove untracked files except keep patterns; optionally remove ignored files too."""
+        ...
+
+    def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
+        """Move HEAD; mixed also resets the index, hard also discards tracked file edits."""
+        ...
+
+    def checkout_force(self, branch: str, start: str) -> None:
+        """Create or reset a branch at start and check it out, discarding local changes."""
+        ...
+
     @property
     def repo(self) -> Repo:
         """The repository this checkout belongs to."""
@@ -404,7 +436,7 @@ class Worktree(Protocol):
         self,
         message: str,
         *,
-        paths: Literal["own", "all"] = "own",
+        paths: Literal["own", "all", "tracked", "staged"] = "own",
         base: str | None = None,
         mode: Literal["new", "amend", "squash_to"] = "new",
         squash_to: Sha | None = None,
@@ -412,7 +444,9 @@ class Worktree(Protocol):
         allow_empty: bool = False,
     ) -> RecordResult:
         """Stage and commit. ``own``: tracked changes plus untracked files base's ignore rules do not cover, by
-        exact path. ``all``: everything. ``amend`` folds into HEAD (empty ``message`` keeps its message);
+        exact path. ``all``: everything. ``tracked``: index-tracked changes, including staged additions,
+        without untracked files. ``staged``: commit the existing index without staging working files.
+        ``amend`` folds into HEAD (empty ``message`` keeps its message), even without staged changes;
         ``squash_to`` first moves HEAD softly to ``squash_to``. Hooks are skipped unless ``hooks``."""
         ...
 

@@ -50,7 +50,9 @@ from git_porcelain.api import (
     WorktreeInfo,
 )
 from git_porcelain.errors import (
+    BranchExists,
     BranchPinned,
+    DirtyTree,
     GitError,
     GitUnavailable,
     IndexLocked,
@@ -104,6 +106,7 @@ from git_porcelain.real_refs import branches, delete_ref_at, ls_remote, symbolic
 
 __all__ = [
     "Aborted",
+    "BranchExists",
     "BranchHeld",
     "BranchPinned",
     "BranchTaken",
@@ -112,6 +115,7 @@ __all__ = [
     "Conflict",
     "Diff",
     "Dirty",
+    "DirtyTree",
     "GitError",
     "GitUnavailable",
     "Health",
