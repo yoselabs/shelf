@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-json-doc"
+kind = "any-lib"
+tier = "T1"
+release = "any-json-doc-v0.1.0"
+capability = "Stop re-writing the one-JSON-file store: a document replaced atomically and read as Present, Absent, Torn (half written, bad JSON, wrong shape) or ForeignVersion (another install's schema), with a lossy get, a strict need and a keyed set."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from task-loop stores (contracts/stores.py JsonStore, stores/files.py FileDocSet). The msgspec and version-envelope coupling (wire.load/dump) is replaced by injected load/dump callables and ForeignVersionError. Builds on atomic-io (evolve, not duplicate: atomic-io is the write half only). FileTickets stays in the host (a hard-link lock protocol). Candidate contract: packages/any-json-doc/CONTRACT.md. Consumers adopt separately; no release tag created by this change."

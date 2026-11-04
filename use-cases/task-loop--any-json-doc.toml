@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "task-loop"
+software = "any-json-doc"
+why = "task-loop keeps pins, bad-versions, repos and many other state files as one atomically replaced JSON document each, and must tell a missing file from a torn one and from another install's version; the store is generic and lives in stores/ (tl-w7lt.17)."
+needs = "Doc with read() -> Present|Absent|Torn|ForeignVersion, get, need, write, delete, and a keyed DocSet; the host injects its msgspec load/dump and raises ForeignVersionError from load."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active"          # active | retired

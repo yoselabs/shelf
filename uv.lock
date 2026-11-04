@@ -18,6 +18,7 @@ members = [
     "any-failure-fp",
     "any-file",
     "any-frontmatter",
+    "any-json-doc",
     "any-markdown",
     "any-path-glob",
     "any-proc",
@@ -245,6 +246,17 @@ requires-dist = [
     { name = "yaml-merge", marker = "extra == 'merge'", editable = "packages/yaml-merge" },
 ]
 provides-extras = ["merge"]
+
+[[package]]
+name = "any-json-doc"
+version = "0.1.0"
+source = { editable = "packages/any-json-doc" }
+dependencies = [
+    { name = "atomic-io" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "atomic-io", editable = "packages/atomic-io" }]
 
 [[package]]
 name = "any-markdown"
