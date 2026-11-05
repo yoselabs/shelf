@@ -174,3 +174,110 @@ def test_other_thread_is_refused() -> None:
     worker.join()
     assert len(errors) == 1
     assert clock.current() == "run"
+
+
+def test_book_moves_seconds_out_of_the_owning_phase() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick)
+    tick.advance(10)
+    assert clock.book("wait", 4) == 4
+    assert clock.totals() == {"run": 6, "wait": 4}
+    assert sum(clock.totals().values()) == pytest.approx(clock.wall())
+
+
+def test_book_into_an_exempt_phase_reduces_charged() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick, exempt={"wait"})
+    tick.advance(10)
+    assert clock.charged() == 10
+    clock.book("wait", 3)
+    assert clock.charged() == 7
+
+
+def test_book_is_capped_at_what_the_donor_owns() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick)
+    tick.advance(2)
+    assert clock.book("wait", 5) == 2
+    assert clock.totals() == {"run": 0, "wait": 2}
+    assert clock.book("wait", 1) == 0
+    assert all(s >= 0 for s in clock.totals().values())
+
+
+def test_book_keeps_the_invariant_while_time_moves() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick, exempt={"wait"})
+    tick.advance(3)
+    clock.book("wait", 1)
+    tick.advance(2)
+    with clock.phase("a"):
+        tick.advance(4)
+        clock.book("wait", 1.5)
+    tick.advance(1)
+    assert sum(clock.totals().values()) == pytest.approx(clock.wall())
+
+
+def test_book_donor_is_the_innermost_open_phase() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick)
+    tick.advance(10)
+    with clock.phase("outer"):
+        tick.advance(6)
+        with clock.phase("inner"):
+            tick.advance(4)
+            assert clock.book("wait", 100) == 4
+    assert clock.totals() == {"run": 10, "outer": 6, "inner": 0, "wait": 4}
+
+
+def test_book_into_the_donor_itself_moves_nothing() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick)
+    tick.advance(5)
+    assert clock.book("run", 3) == 0
+    assert clock.totals() == {"run": 5}
+
+
+def test_book_into_a_limited_phase_can_trip_over() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick, {"wait": 2}, budget=5)
+    tick.advance(10)
+    assert clock.over() == [("charged", 10, 5)]
+    clock.book("wait", 3)
+    assert clock.over() == [("wait", 3, 2), ("charged", 10, 5)]
+
+
+def test_book_into_an_exempt_phase_clears_a_budget_overrun() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick, exempt={"wait"}, budget=5)
+    tick.advance(8)
+    assert clock.over() == [("charged", 8, 5)]
+    clock.book("wait", 4)
+    assert clock.over() == []
+
+
+@pytest.mark.parametrize("seconds", [-1.0, 0.0, float("nan"), float("-inf")])
+def test_book_of_nothing_or_nonsense_books_zero(seconds: float) -> None:
+    tick = Tick()
+    clock = PhaseClock(tick)
+    tick.advance(5)
+    assert clock.book("wait", seconds) == 0
+    assert clock.totals() == {"run": 5}
+
+
+def test_book_from_another_thread_is_refused() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick)
+    tick.advance(5)
+    errors: list[BaseException] = []
+
+    def go() -> None:
+        try:
+            clock.book("wait", 1)
+        except RuntimeError as exc:
+            errors.append(exc)
+
+    worker = threading.Thread(target=go)
+    worker.start()
+    worker.join()
+    assert len(errors) == 1
+    assert clock.totals() == {"run": 5}
