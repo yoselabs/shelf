@@ -16,7 +16,20 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from blueprint import gate_graph
-from blueprint.model import Finding, Sub, check_each, dockerfiles, failing, is_skipped, not_applicable, not_checked, not_set_up, passing
+from blueprint.model import (
+    Finding,
+    FixedBy,
+    Sub,
+    Verdict,
+    check_each,
+    dockerfiles,
+    failing,
+    is_skipped,
+    not_applicable,
+    not_checked,
+    not_set_up,
+    passing,
+)
 
 if TYPE_CHECKING:
     from blueprint.model import Context
@@ -372,6 +385,28 @@ def finding_for(judged: _Judged) -> Finding:
     return passing(judged.evidence)
 
 
+_UNPROVEN = "unproven-standard: "
+
+
+def provisional_finding(status: str, finding: Finding) -> Finding:
+    """A red row from a provisional profile is the owner's to fix, its standard named unproven.
+
+    Why: a provisional recipe applied on a blanket yes broke lifesim clones (shelf-o5a: a tool pin
+    that broke git clone) and package compiles (shelf-ir7: a csc.rsp that hit packages); until the
+    profile is evidenced in a second repo, each red row needs the owner's own decision, so its
+    evidence and remediation carry the prefix and `fixed_by` is the owner's. Every other verdict —
+    passing, not applicable, not checked, a blueprint gap — passes through unchanged.
+    """
+    if status == "evidenced" or finding.verdict not in {Verdict.FAILING, Verdict.NOT_SET_UP}:
+        return finding
+    return replace(
+        finding,
+        evidence=_UNPROVEN + finding.evidence,
+        remediation=_UNPROVEN + finding.remediation if finding.remediation else finding.remediation,
+        fixed_by=FixedBy.OWNER,
+    )
+
+
 def _profile_row(stack: str, prof: StackProfile | None, origin: str = "") -> Sub:
     statement = f"the shelf has a profile for {stack}: the tool for every role"
     if prof is None:
@@ -410,5 +445,5 @@ def roles(ctx: Context) -> list[Sub]:
         for role in (*ROLES, *(r for r in prof.roles if r not in ROLES)):
             judged = judge_role(ctx, stack, prof, role, reached)
             statement = f"{stack} {role}: the profile's tool is set up and run by `just check`"
-            subs.append(Sub(f"stack/{stack}", f"stack.{stack}.{role}", statement, finding_for(judged)))
+            subs.append(Sub(f"stack/{stack}", f"stack.{stack}.{role}", statement, provisional_finding(prof.status, finding_for(judged))))
     return subs

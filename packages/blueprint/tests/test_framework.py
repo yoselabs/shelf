@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from blueprint.model import Verdict
+from blueprint.model import FixedBy, Verdict
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -271,6 +271,19 @@ def test_unity_rsp_without_the_strict_flags_does_not_count(repo: Repo) -> None:
     verdict, evidence = _rows(repo)["framework.unity.architecture"]
     assert verdict is Verdict.NOT_SET_UP
     assert "Runtime" in evidence
+
+
+def test_a_red_unity_row_after_the_rsp_replacement_is_still_the_owners_with_the_prefix(repo: Repo) -> None:
+    # shelf-fkx (shelf-ir7): Assets/csc.rsp with -warnaserror+ broke package compiles on 6000.7; the row a
+    # framework-specific replacement produces keeps the provisional policy: the owner decides, unproven-standard first.
+    _unity_architecture(repo)
+    repo.write("Game/Assets/Scripts/Core/csc.rsp", _STRICT)
+    row = next(r for r in run(repo.root, concern="framework", env=repo.env).rows if r.id == "framework.unity.architecture")
+    assert row.verdict is Verdict.NOT_SET_UP
+    assert row.fixed_by is FixedBy.OWNER
+    assert row.evidence.startswith("unproven-standard: ")
+    assert row.remediation.startswith("unproven-standard: ")
+    assert "csc.rsp" in row.remediation
 
 
 def test_unity_package_asmdefs_are_not_asked_for_an_rsp(repo: Repo) -> None:
