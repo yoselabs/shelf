@@ -8,6 +8,7 @@ coverage rides the bake-off + the `browser`-marked smoke. Mirrors
 from __future__ import annotations
 
 import asyncio
+import shutil
 import sys
 import types
 from typing import Any
@@ -449,7 +450,7 @@ async def test_launch_failure_distinguishes_healthy_binary(monkeypatch: pytest.M
     detail says so. This is the discrimination that was missing: 'no binary' and
     'binary present, handshake failed' need opposite operator actions."""
     _clear_browser_env(monkeypatch)
-    monkeypatch.setenv("ANY_BROWSER_EXECUTABLE_PATH", "/bin/echo")  # exits 0
+    monkeypatch.setenv("ANY_BROWSER_EXECUTABLE_PATH", shutil.which("echo") or "/bin/echo")  # exits 0
     _install_fake_zendriver(monkeypatch, start_exc=RuntimeError("Failed to connect to browser"))
     page = await ZendriverBackend().render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.unavailable
