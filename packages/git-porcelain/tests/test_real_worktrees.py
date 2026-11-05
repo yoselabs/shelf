@@ -97,6 +97,13 @@ def test_locked_worktree_removal_keeps_fatal_reason_and_hint(tmp_path: Path) -> 
     ("stderr", "error"),
     [
         ("fatal: not a git repository (or any of the parent directories): .git", NotARepo),
+        (
+            (
+                "fatal: not a git repository (or any parent up to mount point /)\n"
+                "Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set)."
+            ),
+            NotARepo,
+        ),
         ("fatal: cannot lock ref 'HEAD'", GitUnavailable),
     ],
 )
