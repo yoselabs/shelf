@@ -1,0 +1,10 @@
+seq = 164
+date = "2026-11-05"
+event = "delivery"
+software = "any-mailbox"
+release = "any-mailbox-v0.1.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = """Promoted from task-loop's owner-request file (`app/run/requests.py` post, take, peek): a one-slot mailbox, merge under a process-lock, take once, peek unlocked. Candidate; the task-loop repoint is not done yet, so no adoption verdict."""

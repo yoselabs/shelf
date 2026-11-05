@@ -21,6 +21,7 @@ members = [
     "any-frontmatter",
     "any-json-doc",
     "any-lease",
+    "any-mailbox",
     "any-markdown",
     "any-net",
     "any-path-glob",
@@ -278,6 +279,21 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "process-lock", editable = "packages/process-lock" }]
+
+[[package]]
+name = "any-mailbox"
+version = "0.1.0"
+source = { editable = "packages/any-mailbox" }
+dependencies = [
+    { name = "atomic-io" },
+    { name = "process-lock" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "process-lock", editable = "packages/process-lock" },
+]
 
 [[package]]
 name = "any-markdown"

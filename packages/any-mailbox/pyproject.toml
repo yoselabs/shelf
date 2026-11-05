@@ -1,0 +1,26 @@
+[project]
+name = "any-mailbox"
+version = "0.1.0"
+description = "A one-slot mailbox in a file: post merges a message under a cross-process lock, take hands it over exactly once, peek reads without the lock. The caller owns the codec."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "atomic-io>=0.2,<1",
+    "process-lock>=0.2,<1",
+]
+
+[tool.uv.sources]
+atomic-io = { workspace = true }
+process-lock = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/any_mailbox"]
+
+[tool.ruff]
+extend = "../../pyproject.toml"
