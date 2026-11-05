@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "iorlas-task-loop"
+software = "task-spec"
+why = "The factory picks only tasks the owner trusts and lints each task as a specification; both need one task model and a port to the tracker instead of bd-shaped dicts."
+needs = "Task, Finding, Trust, Remedy; TaskStore.get/all/save; AttentionStore.ask/pending/resolve; task_spec.testing contracts."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired -- the planned retention claim until the adapter lands

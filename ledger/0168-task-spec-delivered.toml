@@ -1,0 +1,10 @@
+seq = 168
+date = "2026-11-05"
+event = "delivery"
+software = "task-spec"
+release = "task-spec-v0.1.0"
+actor = "claude"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = """Model and ports of the task-discipline epic (shelf-9zhu.1): Task, Finding, remedy, trust, TaskStore and AttentionStore with a shared contract. Candidate; no consumer adopts it yet."""
