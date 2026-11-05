@@ -17,6 +17,7 @@ members = [
     "any-breaker",
     "any-browser",
     "any-clock",
+    "any-contract",
     "any-failure-fp",
     "any-file",
     "any-frontmatter",
@@ -234,6 +235,11 @@ provides-extras = ["patchright", "zendriver"]
 name = "any-clock"
 version = "0.3.0"
 source = { editable = "packages/any-clock" }
+
+[[package]]
+name = "any-contract"
+version = "0.1.0"
+source = { editable = "packages/any-contract" }
 
 [[package]]
 name = "any-failure-fp"
