@@ -37,7 +37,7 @@ why = classify(s.rc, s.vendor, s.stderr, out.timed_out, s.work, {"watchdog": out
   `subscription` (default; `claude.launch_env` drops `ANTHROPIC_API_KEY` so the run stays on the login) or `api_key` (the key must be in
   the environment, else `ValueError`). `ClaudeHarness.launch_spec` applies both.
 - **`run` supervises, the caller injects.** What it needs from the caller comes as callables, never as imports: `live` (a
-  `LiveSink`: `started/feed/poll/end`), `gone() -> str | None` (the lane was marked out: stop and say why), `policy(event) -> str | None`
+  `LiveSink`: `started/feed/poll/end`), `gone() -> (why, msg) | None` (the lane was marked out, why = limit|credit|logged_out: stop and say why), `policy(event) -> str | None`
   (a command names a secret path: stop before it uses what it read), `net_up() -> bool` (one probe once the worker has waited
   for the network past 15 s), `log` (a `LogWatcher` over the CLI's own log: opencode retries a limit forever without exiting), and
   `RunHooks` (`started`, `ref`, `beat`, `idle_s`, `unattended`, `stops`).

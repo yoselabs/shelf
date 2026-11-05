@@ -8,11 +8,11 @@ error event, or the CLI's own error result) and `stderr`; the model's answer tex
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from functools import cache
 from typing import NamedTuple
 
-from any_agent import vendors
+from any_agent import drops, vendors
 from any_agent._json import Json
 
 
@@ -30,6 +30,9 @@ def _ladder_words(vendor_names: tuple[str, ...]) -> vendors.Words:
     return vendors.Words(limit=w.limit, credit=w.credit, spend=w.spend, login=w.login, network=w.network, bad_request=bad)
 
 
+NET_AMBIGUOUS = ("worker_failed", "vendor_blip", "hung")  # failures that name no cause of their own: the network may be it
+
+
 class Outcome(NamedTuple):
     reason: str
     detail: str
@@ -43,6 +46,10 @@ def _ours(s: Mapping[str, Json], timed_out: bool, w: vendors.Words) -> Outcome |
     if s.get("watchdog") == "limit":
         msg = str(s.get("msg") or "")
         return Outcome("credit_exhausted" if w.credit.search(msg) else "rate_limited", msg, "ours")
+    if s.get("watchdog") == "credit":  # another process marked the lane out: its own words, not a guess from text
+        return Outcome("credit_exhausted", str(s.get("msg") or ""), "ours")
+    if s.get("watchdog") == "logged_out":
+        return Outcome("logged_out", str(s.get("msg") or ""), "ours")
     if s.get("watchdog") == "hung":
         return Outcome("network" if s.get("net_up") is False else "hung", "", "ours")
     return Outcome("timeout", "", "ours") if timed_out else None
@@ -99,7 +106,8 @@ def classify(
 
     rc: exit code (negative = a signal); vendor_err: the vendor's error text from its event stream; stderr: the CLI's stderr; timed_out: our
     --timeout fired; work_seen: the worker did something before it failed; structured: facts we measured ourselves:
-    {"secret": cmd, "watchdog": "limit"|"hung", "msg": log line, "http_status": int, "net_up": False}; only: vendor names whose words count
+    {"secret": cmd, "watchdog": "limit"|"credit"|"logged_out"|"hung", "msg": log line, "http_status": int, "net_up": False};
+    only: vendor names whose words count
     beside `common` and the CLIs' own (none = every registered vendor)."""
     s = structured or {}
     vendor_event, code = (vendor_err or "").strip(), rc or 0
@@ -112,6 +120,20 @@ def classify(
     return (
         _by_status(s.get("http_status"), text, src) or _by_text(text, src, work_seen, w) or _by_exit(code, vendor_event, stderr, work_seen)
     )
+
+
+def with_network(o: Outcome, net_up: Callable[[], bool]) -> Outcome:
+    """`o`, or the network outcome when it was the network. `classify` trusts network words only before the worker did anything, and a
+    silent hang is only a network drop if the net is down: a failure with no cause of its own is checked against the words of a dropped
+    connection, then against one probe (`net_up`). Limits, logins, bad requests, secrets and timeouts are never second-guessed."""
+    if o.reason in NET_AMBIGUOUS and (drops.looks_dropped(o.detail) or not net_up()):
+        return Outcome("network", o.detail, o.source)
+    return o
+
+
+def network_stop(evidence: str) -> Outcome:
+    """The outcome of a worker we stopped because the net probe stayed down: the harness's own words for a transient failure."""
+    return Outcome("network", evidence, "event")
 
 
 def says_login(text: str, only: tuple[str, ...] = ()) -> bool:
