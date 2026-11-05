@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-agent"
+kind = "any-lib"
+tier = "T1"
+release = "any-agent-v0.1.0"
+capability = "Stop writing a supervisor per agent CLI: claude -p, codex exec --json and opencode run behind one Harness protocol (launch spec, each stream line parsed once into typed events and evidence, summary, transcript, login probe), a run() that spawns the worker in a session of its own, watches silence, first event, answer grace, stall, the CLI's own log, a lane marked out and the network, stops the whole tree, and one outcome ladder from what the vendor said to a reason."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from task-loop's delegate (adapters/harness/*, app/supervisor.py, app/watch.py, reset_parse). A sibling of anyllm, not a merge: anyllm is an async one-shot complete(); a harness is a supervised long-running process. Seam: the Supervisor no longer imports delegate's publish or watch.limits; LiveSink, gone, policy, net_up and the per-run hooks are injected, Limits live on each harness. Per-vendor regex tables sit inside each harness module and classify merges them. Claude's launch rules (never --bare, no ANTHROPIC_API_KEY in the child's environment) are one function pair in claude.py. Stays in delegate: router, lanes, leases, health, holds, cockpit, publish, Settler.apply, the limits table, the live-file writer, WorkerEnd/Orphan. Requires stream-proc (stdlib-only, the shelf's one place that signals a process), so a vendoring consumer copies both; POSIX only; the opencode sandbox shell is macOS (sandbox-exec). Golden streams and 488 classify rows come from delegate's own fixtures. Born candidate; no release tag created by this change, and task-loop and delegate are not repointed yet."

@@ -30,6 +30,8 @@ any-frontmatter = { workspace = true }
 page-tsv = { workspace = true }
 # any-lease composes process-lock.
 process-lock = { workspace = true }
+# any-agent composes stream-proc.
+stream-proc = { workspace = true }
 # The dev group installs `anyembed[llamacpp,transformers]` so both backends' imports resolve.
 anyembed = { workspace = true }
 
@@ -267,6 +269,7 @@ testpaths = [
     "packages/plugin-surface/tests",
     "packages/process-lock/tests",
     "packages/any-lease/tests",
+    "packages/any-agent/tests",
     "packages/record-mine/tests",
     "packages/settings-base/tests",
     "packages/static-page-check/tests",
@@ -299,6 +302,7 @@ asyncio_mode = "auto"
 [tool.importlinter]
 root_packages = [
     "a2effect",
+    "any_agent",
     "any_browser",
     "any_file",
     "any_frontmatter",
@@ -377,6 +381,7 @@ name = "no shelf package imports a consumer app"
 type = "forbidden"
 source_modules = [
     "a2effect",
+    "any_agent",
     "any_browser",
     "any_file",
     "any_frontmatter",
@@ -457,6 +462,7 @@ name = "shelf packages are independent except declared edges"
 type = "independence"
 modules = [
     "a2effect",
+    "any_agent",
     "any_browser",
     "any_file",
     "any_frontmatter",
@@ -535,6 +541,7 @@ ignore_imports = [
     "page_tsv.page -> lean_wire",
     "page_tsv.render -> lean_wire",
     "any_lease.leases -> process_lock",
+    "any_agent.procs -> stream_proc",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",
 ]
