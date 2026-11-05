@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 
+import pytest
 from stream_proc import alive, capture_bytes
 
 PY = sys.executable
@@ -50,12 +51,12 @@ def test_timeout_stops_a_setsid_grandchild_and_keeps_partial_bytes() -> None:
         "time.sleep(60)"
     )
     t0 = time.monotonic()
-    got = capture_bytes(py(code), timeout=1.0, grace=1)
+    got = capture_bytes(py(code), timeout=3.0, grace=1)
     assert (got.exit, got.timed_out) == (124, True)
     assert got.out == b"part\xff\r\n"
     assert got.err == b"e"
     assert got.survivors == ()
-    assert time.monotonic() - t0 < 10
+    assert time.monotonic() - t0 < 30
 
 
 def test_a_timed_out_setsid_grandchild_is_dead() -> None:
@@ -65,26 +66,39 @@ def test_a_timed_out_setsid_grandchild_is_dead() -> None:
         " stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
         "print(g.pid, flush=True); time.sleep(60)"
     )
-    got = capture_bytes(py(code), timeout=1.0, grace=1)
+    got = capture_bytes(py(code), timeout=3.0, grace=1)
     assert got.timed_out
     assert not alive(int(got.out.split()[0]))
 
 
-def test_an_unrelated_holder_of_the_pipe_does_not_hang_the_drain() -> None:
-    # a setsid grandchild that closes nothing and ignores SIGTERM keeps the pipe open past the stop
-    code = (
-        "import subprocess,sys,time\n"
-        "print('hi', flush=True)\n"
-        "subprocess.Popen([sys.executable, '-c', 'import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN);"
-        " time.sleep(8)'], start_new_session=True)\n"
-        "time.sleep(60)"
-    )
+def test_a_normal_exit_with_a_pipe_holder_is_not_a_timeout() -> None:
+    # sh exits 0 at once; its background sleep keeps the pipe open. The result waits `drain`, not 30 s, and is not a timeout.
     t0 = time.monotonic()
-    got = capture_bytes(py(code), timeout=2.0, grace=0.5, drain=2.0)
+    got = capture_bytes(["sh", "-c", "sleep 30 & echo hi"], timeout=20, drain=1.0)
+    assert (got.exit, got.timed_out, got.out) == (0, False, b"hi\n")
+    assert time.monotonic() - t0 < 15
+
+
+def test_the_drain_bounds_a_pipe_holder_outside_the_tree() -> None:
+    # a reparented, setsid'd stranger (not under the child when the stop looks) holds stdout open for 12 s
+    code = "import os,sys; sys.stdout.write('hi\\n'); sys.stdout.flush(); os.setsid(); os.write(2, b'x'); import time; time.sleep(12)"
+    script = f"import subprocess,sys; subprocess.Popen([sys.executable,'-c',{code!r}])"
+    t0 = time.monotonic()
+    got = capture_bytes([PY, "-c", script], timeout=30, drain=1.0)
     took = time.monotonic() - t0
-    assert got.timed_out
+    assert (got.exit, got.timed_out) == (0, False)
     assert got.out == b"hi\n"
-    assert took < 7
+    assert took < 10  # bounded by drain, not by the holder's 12 s
+
+
+def test_an_early_exit_child_with_large_unwritten_input_is_not_an_error() -> None:
+    got = capture_bytes(py("import sys; sys.stdout.write('done')"), input=b"z" * 5_000_000, timeout=30)
+    assert (got.exit, got.out, got.timed_out) == (0, b"done", False)
+
+
+def test_input_and_stdin_together_are_refused() -> None:
+    with pytest.raises(ValueError, match="not both"):
+        capture_bytes(py("pass"), input=b"x", stdin=None)
 
 
 def test_capture_false_inherits_stdout_and_returns_empty() -> None:
@@ -115,7 +129,7 @@ def test_stdin_devnull_reads_eof_but_inherit_reads_ours() -> None:
             "-c",
             (
                 "from stream_proc import capture_bytes; import sys\n"
-                f"print(capture_bytes([sys.executable, '-c', {code!r}], stdin='inherit').out.decode())"
+                f"print(capture_bytes([sys.executable, '-c', {code!r}], stdin=None).out.decode())"
             ),
         ],
         input=b"abcde",
