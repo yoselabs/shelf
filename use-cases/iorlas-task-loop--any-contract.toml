@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "iorlas-task-loop"
+software = "any-contract"
+why = "Task-loop reads delegate's contract-4 answers: adapters/delegate_wire.py result_of synthesizes a contract_violation for an answer of another number, and tests/contracts/test_delegate_contract.py diffs the mirror records against delegate's contract.json. Not yet adopted: the planned repoint (tl-w7lt.18) replaces both with check_contract and diff_schema; delegate's require_writer_exec_allow becomes the capabilities argument."
+needs = "check_contract(local_number, remote, capabilities=) -> Violation | None; diff_schema(want, have) -> dict; undeclared(found, known) -> (new, resolved)."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired -- the planned retention claim until the repoint lands

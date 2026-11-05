@@ -1,0 +1,10 @@
+seq = 166
+date = "2026-11-05"
+event = "delivery"
+software = "any-contract"
+release = "any-contract-v0.1.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = """Promoted the neutral parts of task-loop's and delegate's wire contracts: the contract-number handshake with a violation text, and the schema-keys diff with an exact accepted-drift list. Candidate; the task-loop repoint is not done yet, so no adoption verdict."""
