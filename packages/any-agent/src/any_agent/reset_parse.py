@@ -66,10 +66,11 @@ def parse_reset(msg: str | None, t: float) -> tuple[float | None, str | None]:
     if m:
         h, mi = int(m.group(1)) % 12 if m.group(3) else int(m.group(1)), int(m.group(2))
         h += 12 if (m.group(3) or "").upper() == "PM" else 0
-        at = dt.datetime.fromtimestamp(t).astimezone().replace(hour=h % 24, minute=mi, second=0, microsecond=0)
-        if at.timestamp() <= t:
-            at += dt.timedelta(days=1)
-        return at.timestamp(), "local " + (time.tzname[time.localtime(at.timestamp()).tm_isdst > 0] or "")
+        wall = dt.datetime.fromtimestamp(t).astimezone().replace(tzinfo=None, hour=h % 24, minute=mi, second=0, microsecond=0)
+        if wall.astimezone().timestamp() <= t:
+            wall += dt.timedelta(days=1)
+        at = wall.astimezone().timestamp()  # after the replace, so a day the clocks change keeps the offset of the time named
+        return at, "local " + (time.tzname[time.localtime(at).tm_isdst > 0] or "")
     m = IN_RE.search(msg)
     if m:
         secs = float(m.group(1)) * UNIT_S[m.group(2)[0].lower()] + (int(m.group(3)) * 60 if m.group(3) else 0)

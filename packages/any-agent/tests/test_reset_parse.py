@@ -1,6 +1,7 @@
 """Limit prose -> a reset time, and the guess when the message names none."""
 
 import datetime as dt
+import time
 
 from any_agent.reset_parse import RESET_LADDER_MIN, limit_until, parse_reset
 
@@ -37,3 +38,15 @@ def test_the_vendors_usage_reading_or_the_lanes_soonest_window_comes_before_the_
     assert limit_until("x", T, {}, reset=lambda: T + 99) == (T + 99, "vendor", None)
     assert limit_until("x", T, {"limit_reset": T + 500}) == (T + 500, "guess", None)
     assert limit_until("x", T, {}, reset=lambda: None)[1] == "guess"
+
+
+def test_try_again_at_on_a_day_the_clocks_change_keeps_the_offset_of_the_time_named(monkeypatch):
+    monkeypatch.setenv("TZ", "Europe/Berlin")
+    time.tzset()
+    try:
+        at, _ = parse_reset("try again at 5:50 AM", dt.datetime(2026, 10, 25, 0, 0, tzinfo=dt.UTC).timestamp())  # DST ends at 03:00
+        assert at is not None
+        assert dt.datetime.fromtimestamp(at, dt.UTC).strftime("%H:%M") == "04:50"  # 05:50 CET
+    finally:
+        monkeypatch.undo()
+        time.tzset()
