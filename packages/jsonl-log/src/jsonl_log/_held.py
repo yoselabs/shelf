@@ -2,8 +2,8 @@
 
 - A log belongs to the process that opened it: after a fork the child closes its copy of the inherited ones and opens its own.
 - At most ``MAX_OPEN`` are kept; the least recently used one is evicted: its descriptor closes, but the log stays
-  usable, so a thread still holding it reopens the descriptor on its next append (and then keeps it until
-  :meth:`JsonlLog.close`). Eviction never raises ``LogClosedError`` in another thread.
+  usable, so a thread still holding it reopens the descriptor for its next append and closes it again
+  right after (:meth:`JsonlLog.release_fd`). Eviction never raises ``LogClosedError`` in another thread.
 - The key is the resolved path. Options apply on first sight; a later ``held`` of the same path with other
   options raises ``ValueError`` rather than silently ignoring them.
 - A path whose file was removed or replaced is reopened by the log itself (one stat per append).

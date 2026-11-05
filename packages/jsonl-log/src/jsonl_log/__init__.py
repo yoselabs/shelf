@@ -198,12 +198,12 @@ class JsonlLog:
         if b"\n" in data[:-1]:
             raise LineError(self._path)
         with self._mutex:
-            fd = self._current_fd()
-            size = os.fstat(fd).st_size
-            if size and size + len(data) > self._rotate_bytes:
-                self._rotate(len(data))
-                fd = self._current_fd()
             try:
+                fd = self._current_fd()
+                size = os.fstat(fd).st_size
+                if size and size + len(data) > self._rotate_bytes:
+                    self._rotate(len(data))
+                    fd = self._current_fd()
                 at = append_line(fd, data)
                 for attempt in range(_REAPPEND + 1):
                     if os.fstat(fd).st_nlink:

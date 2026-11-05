@@ -2,7 +2,7 @@
 name = "jsonl-log"
 kind = "primitive"
 tier = "T0"
-release = "jsonl-log-v0.3.1"
+release = "jsonl-log-v0.4.0"
 capability = "Stop caring how an append-only JSON-lines log rotates, ages out and reads back — one line per write in a single O_APPEND write call (safe across processes), size rotation that never splits a line and keeps at most N files, age retention for rotated files, reads newest file first that skip a blank, torn or undecodable line, a read-only handle that never writes, an opt-in cross-process rotate lock (process-lock) so two rotators drop no file, an atomic rewrite(keep), held handles per process, and a byte-cursor reader and tail whose torn last line waits."
 implementation = "ours"
 status = "candidate"
