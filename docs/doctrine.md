@@ -76,7 +76,7 @@ need exists is not.
 
 ```
 doctrine.md      the why (this file)
-constitution.md  the operating rules that follow from it (the 9 articles)
+constitution.md  the operating rules that follow from it (the 8 articles)
 CONTEXT.md      the vocabulary (root file) — TYPES only, never instances
 adr/             living decisions (ADRs), one per topic; adr/INDEX.md is the list
 missions/        scoped future objectives (e.g. onboarding runbook + skill)

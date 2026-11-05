@@ -1,20 +1,21 @@
 ---
 id: 0028
 title: The shelf and everything built on it are hard opinionated
-statement: No optionality, no backward compatibility in code, no redundancy; behaviour is decomposed behind owners, injected as instances, and checked against the shelf first. Constitution Article IX.
+statement: No optionality, no backward compatibility in code, no redundancy; behaviour is decomposed behind owners, injected as instances, and checked against the shelf first. Constitution Articles II and III.
 concerns: [doctrine, design]
 status: accepted
 decided_by: owner
 updated: 2026-11-05
-distilled_into: docs/constitution.md Article IX
+distilled_into: docs/constitution.md Articles II, III
 ---
 
 # 0028 — Hard opinions
 
 ## Decision
 
-Add Article IX to the constitution (no optionality, no backward compatibility in code, no redundancy,
-decomposition and isolation, dependency injection, shelf awareness). Owner, 2026-11-05: "Our systems should be
+Fold the rules into the constitution without a new article: Article II (decomposition and isolation, dependency
+injection) and Article III (no optionality, no backward compatibility in code, no redundancy);
+shelf awareness joins Article VI. Owner, 2026-11-05: "Our systems should be
 opinionated, hard opinionated. No optionalities, no backward compatibility, no redundancy. Those are hard
 requirements for everything we build."
 

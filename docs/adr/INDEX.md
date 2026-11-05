@@ -12,7 +12,7 @@ the file holds the reasons, the rejected options and the history.
 
 - [0002](0002-doctrine-homes-in-the-shelf.md) **Doctrine homes in the shelf**: The shelf is the single self-contained home of its own operating model; consumers only point to it, and no external knowledge base is needed to use it.
 - [0003](0003-ontology-lives-as-flat-files.md) **The ontology lives as flat files**: The shelf's catalog, use-cases and ledger are plain files under version control, one per instance, with every rollup derived; they are never a2kay EntityTypes.
-- [0028](0028-hard-opinions.md) **The shelf and everything built on it are hard opinionated**: No optionality, no backward compatibility in code, no redundancy; behaviour is decomposed behind owners, injected as instances, and checked against the shelf first. Constitution Article IX.
+- [0028](0028-hard-opinions.md) **The shelf and everything built on it are hard opinionated**: No optionality, no backward compatibility in code, no redundancy; behaviour is decomposed behind owners, injected as instances, and checked against the shelf first. Constitution Articles II and III.
 
 ## gate
 
