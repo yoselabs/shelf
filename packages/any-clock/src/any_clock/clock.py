@@ -15,7 +15,7 @@ class PhaseClock:
 
     Entering a phase pauses the one around it; leaving resumes it. Time outside every `phase()` block belongs to
     `root`, so no instant is unowned and `sum(totals().values()) == wall()` (both share one clock read). The clock cannot stop a caller
-    entering the wrong phase. Not thread-safe: `phase()` from a thread other than the creating one raises.
+    entering the wrong phase. Not thread-safe: `phase()` or `book()` from a thread other than the creating one raises.
     """
 
     def __init__(
