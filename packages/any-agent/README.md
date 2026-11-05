@@ -24,8 +24,13 @@ why = classify(s.rc, s.vendor, s.stderr, out.timed_out, s.work, {"watchdog": out
 
 ## Rules
 
-- **One Harness protocol.** Everything about one CLI lives in its module (`claude.py`, `codex.py`, `opencode.py`): argv, env, event
-  parser, usage arithmetic, transcript, login probe, its own regex tables and its measured `limits`. `parse_line` is called once
+- **Two axes, two folders.** A *harness* is a CLI (`harnesses/claude.py`, `codex.py`, `opencode.py`): argv, env, event parser, usage
+  arithmetic, transcript, login probe, its measured `limits` and the few words only it speaks (a `--resume` thread it does not know). A
+  *vendor* is an API (`vendors/anthropic.py`, `openai.py`, `xai.py`, and `common.py` for what every HTTP API and OS shares): the words its
+  errors use for a limit, a spent balance, a login, a refused request, a broken network. One CLI (opencode) speaks to many vendors and
+  one vendor (Anthropic) is spoken to by more than one CLI, so the two never share a file. A vendor is data (`Vendor`), added to
+  `vendors.registry()`.
+- **One Harness protocol.** `protocol.py`: `launch_spec`, `parse_line`, `summary`, `transcript`, `login_probe`, `limits`. `parse_line` is called once
   per line; the live sink, the turn rules and the classifier all read the same `HarnessEvent` records (`any_agent.events`).
 - **Claude's launch rules are in one place.** `claude.launch_argv` never passes `--bare` (it skips OAuth and the keychain, so a
   subscription run would need an API key) and raises `ValueError` if it would. `LaunchInputs.auth` picks exactly one of two modes:
@@ -44,8 +49,8 @@ why = classify(s.rc, s.vendor, s.stderr, out.timed_out, s.work, {"watchdog": out
 - **One ladder.** `classify(rc, vendor_err, stderr, timed_out, work_seen, structured) -> Outcome(reason, detail, source) | None`.
   First match wins: our own facts (secret, watchdog, timeout), a 4xx status we measured, the vendor's words (credit, limit, login,
   bad request, network), then the exit code. The model's answer is never an argument, so a worker that says "rate limit" cannot
-  take its lane out. The generic words live in `classify.py`; each harness module owns the patterns only its CLI speaks and the
-  ladder merges them. A `None` result means the run is done.
+  take its lane out. The ladder merges `common`, every registered vendor (or the ones named in `only=`) and the CLIs' own words. A
+  `None` result means the run is done.
 - **Limits are the harness's.** `harness.limits` holds the measured first-event, silence and grace seconds; the caller overrides
   with `run(limits=Limits(...))` and `RunHooks(idle_s=)`.
 - **Sandboxed opencode.** `OpenCodeHarness(profile, root, sandbox=Sandbox(readable=..., scratch=..., runners=...))` writes a
