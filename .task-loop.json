@@ -1,0 +1,16 @@
+{
+  "slots": {
+    "count": 2,
+    "dir": ".slots",
+    "base": "origin/main",
+    "setup": ["uv", "sync", "--locked"]
+  },
+  "engine": {
+    "owner_author": "Denis Tomilin",
+    "land_mode": "pr",
+    "pick_label": "auto",
+    "checks": [
+      {"id": "gate", "argv": ["uv", "run", "just", "check"], "group": "tests", "run": "gate"}
+    ]
+  }
+}
