@@ -71,9 +71,7 @@ starts per test.
 | # | rule | why | check |
 |---|---|---|---|
 | M1 | Measure the machine's per-operation tax before optimising code: file write+close, first read, process start. | An endpoint scanner (MS Defender, MDM, no exclusions possible) made write+close 1-14 ms vs 0.05, a process start 24-32 ms vs 0.8-9; the suite was O(tests × processes × files) | a recorded benchmark per machine |
-| M2 | Heavy check commands (tests, builds) run in a Linux container on a clone on the container's own disk, never a bind mount. Fall back to the host when Docker is down. | 895 s host vs 122 s container; a bind mount is as slow as the host (192 s vs 184 s) | the gate command |
-| M3 | The agent itself stays on the host; per stage, its checks may run elsewhere (a stage asks for a runner by plain label, `needs: {docker: true}`; the host is one runner). No affinity, taints or scoring. | Agent edits are tens of files; checks are the mass churn. Agent logins (Keychain) do not carry into containers | stage config names its needs |
-| M4 | A framework that cannot run in the container stays on the host, measured not assumed. | Unity 6000.7 on Apple Silicon: no arm64 Linux editor, the amd64 editor crashes under Rosetta (study 94); `dotnet test` under emulation was slower (151 s vs 110 s) | a trial result per framework |
+| M3 | The agent itself stays on the host, with its checks. | Agent logins (Keychain) and edits live on the host; checks are the mass churn | the gate command |
 | M5 | Shard the suite on measured per-test durations (heaviest first onto the lightest shard, stable by name), refreshed by an explicit record command, not on every run. Unknown tests use a per-module estimate. | Count-based shards were 1.47x unbalanced, duration-based 1.19x | the splitter's input |
 | M6 | Tests that race real processes or the clock run serially after the shards, each listed with its reason. | Under load they time out next to others | the serial list has a reason per entry |
 | M7 | Keep log handles open; append, do not open-close per record. | Every close is a scan | grep `open(... "a")` inside loops |
@@ -83,9 +81,9 @@ starts per test.
 | # | rule | why | check |
 |---|---|---|---|
 | D1 | No retries and no `sleep` to sync; wait on a condition. A flaky test is fixed or deleted. | A retry hides the bug that made it flaky | grep retries in test helpers |
-| D2 | Ids that name runs, dirs or checkpoints are unique beyond the clock's resolution. | A second-resolution run id let a fast rerun reuse the first run's checkpoint and skip the work; only the fast container gate exposed it | id generator test: two ids in one tick differ |
+| D2 | Ids that name runs, dirs or checkpoints are unique beyond the clock's resolution. | A second-resolution run id let a fast rerun reuse the first run's checkpoint and skip the work; only a fast gate exposed it | id generator test: two ids in one tick differ |
 | D3 | A gate or check killed by a signal is a fault (retry or block), never "red tests". | A killed gate counted as red ran a needless fix round and closed the task blocked | exit < 0 maps to a fault |
-| D4 | Kill only confirmed PIDs (process group, then proof of death); never by name or pattern. The process that starts a worker owns its death; `docker exec` forwards no signals, so container processes are killed through the runner. | Pattern kills hit other agents' processes; a lost signal left two writers in one tree | grep `pkill`, `killall` |
+| D4 | Kill only confirmed PIDs (process group, then proof of death); never by name or pattern. The process that starts a worker owns its death. | Pattern kills hit other agents' processes; a lost signal left two writers in one tree | grep `pkill`, `killall` |
 | D5 | Tests are hermetic: own HOME, temp dir, git config, no real network or OS service. | Local config makes tests pass here and fail elsewhere | the test base class |
 
 ## 8. Review

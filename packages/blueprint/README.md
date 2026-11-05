@@ -19,7 +19,7 @@ PYTHONPATH=../shelf/packages/blueprint/src python3 -m blueprint check --repo .
 | `--gate` | one line per checkpoint that is not passing; what `just blueprint` prints |
 | `--json` | the run as JSON, for agents and evals |
 | `--write` | `docs/blueprint/README.md` (the summary) and `<concern>.md`, one table per concern |
-| `--audit` | also the audit-only checkpoints: slow ones (a fresh clone running `just check`) and ones that read this machine's bd database, which CI and the gate container do not have |
+| `--audit` | also the audit-only checkpoints: slow ones (a fresh clone running `just check`) and ones that read this machine's bd database, which a bare clone does not have |
 | `--concern X` | one concern only |
 
 Exit codes: `0` everything passes or does not apply · `1` something fails or is not set up ·

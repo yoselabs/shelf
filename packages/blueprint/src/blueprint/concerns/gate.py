@@ -377,78 +377,9 @@ def _gate_scripts(ctx: Context, gate: Gate) -> list[str]:
     return list(dict.fromkeys(m for m in found if ctx.path(m).is_file()))
 
 
-# The tracked files blueprint reads. A container gate whose image leaves one out judges a different repo.
-_BLUEPRINT_READS = (
-    "justfile",
-    "Makefile",
-    "AGENTS.md",
-    "CLAUDE.md",
-    ".gitignore",
-    ".pre-commit-config.yaml",
-    ".beads/config.yaml",
-    ".beads/.gitignore",
-    ".claude/settings.json",
-    "docs/blueprint/blueprint.toml",
-    "docs/agents/*",
-    ".github/workflows/*",
-)
-_DOCKER_BUILD = re.compile(r"\bdocker\s+(?:buildx\s+)?build\b")
-_DOCKER_FILE_FLAG = re.compile(r"\bdocker\s+(?:buildx\s+)?build\b[^\n]*?\s(?:-f|--file)[\s=](\S+)")
-
-
-def _ignore_regex(pattern: str) -> re.Pattern[str]:
-    """A .dockerignore pattern as a regex over a slash path (`*` stays inside a folder, `**` crosses them)."""
-    out, i = "", 0
-    while i < len(pattern):
-        if pattern.startswith("**/", i):
-            out, i = out + "(?:.*/)?", i + 3
-        elif pattern.startswith("**", i):
-            out, i = out + ".*", i + 2
-        else:
-            out += {"*": "[^/]*", "?": "[^/]"}.get(pattern[i], re.escape(pattern[i]))
-            i += 1
-    return re.compile(f"^{out}$")
-
-
-def _dropped(path: str, ignore: str) -> bool:
-    """Whether the image's ignore file leaves `path` out of the build context: the last matching line wins, `!` re-includes."""
-    parts = path.split("/")
-    prefixes = ["/".join(parts[: i + 1]) for i in range(len(parts))]
-    dropped = False
-    for raw in ignore.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        negated = line.startswith("!")
-        regex = _ignore_regex(line.lstrip("!").strip("/"))
-        # A pattern naming a folder drops everything under it, so any parent of the file counts.
-        if any(regex.match(prefix) for prefix in prefixes):
-            dropped = not negated
-    return dropped
-
-
-def _image_ignores(ctx: Context, gate_text: str) -> dict[str, str]:
-    """Ignore file name -> text, for each image the gate file builds: `<Dockerfile>.dockerignore` first, else the root one."""
-    if not _DOCKER_BUILD.search(gate_text):
-        return {}
-    ignores: dict[str, str] = {}
-    for dockerfile in _DOCKER_FILE_FLAG.findall(gate_text) or [""]:
-        for name in (f"{dockerfile}.dockerignore" if dockerfile else "", ".dockerignore"):
-            if name and (text := ctx.read(name)) is not None:
-                ignores[name] = text
-                break
-    return ignores
-
-
-def _dropped_reads(ctx: Context, gate_text: str) -> list[str]:
-    tracked = (ctx.git("ls-files") or "").splitlines()
-    reads = [f for f in tracked if any(fnmatch(f, pattern) for pattern in _BLUEPRINT_READS)]
-    return [f"{name} drops {f}" for name, text in _image_ignores(ctx, gate_text).items() for f in reads if _dropped(f, text)]
-
-
 @check(
     "gate.runs-blueprint",
-    "`just check` runs blueprint's per-commit checkpoints (`just blueprint`), on the files blueprint reads",
+    "`just check` runs blueprint's per-commit checkpoints (`just blueprint`)",
     version=2,
 )
 def runs_blueprint(ctx: Context) -> Finding:
@@ -461,13 +392,6 @@ def runs_blueprint(ctx: Context) -> Finding:
             "`just check` never runs blueprint",
             "copy the shelf's `blueprint` recipe into the justfile and add it to `check` (`just bootstrap` does both)",
             FixedBy.AUTO,
-        )
-    dropped = _dropped_reads(ctx, gate.text)
-    if dropped:
-        return failing(
-            f"the gate image's ignore file leaves out tracked files blueprint reads: {'; '.join(dropped)}",
-            "re-include each with a `!<path>` line after the drop (a container without .beads/config.yaml reports a false 'no tracker'), "
-            "or keep the file in the build context; docs/agents/gate.md lists what a container gate must carry",
         )
     return passing("`just check` reaches `blueprint check --gate`")
 
@@ -491,7 +415,7 @@ def guards_have_red_tests(ctx: Context) -> Finding:
     if untested:
         return failing(
             f"no test names {', '.join(untested)}",
-            # A gate script is a guard (it fails the gate on a violation) or a helper the gate calls (a2kay's container slot queue).
+            # A gate script is a guard (it fails the gate on a violation) or a helper the gate calls (a queue, a generator).
             "add a test per script: for a guard, plant the violation it guards against and assert it fails; "
             "for a helper (a queue, a generator, a launcher), test the behaviour the gate relies on",
         )

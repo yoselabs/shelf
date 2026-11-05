@@ -83,8 +83,7 @@ deps:
     uv run deptry .
 
 """
-# The shelf's `check` dispatches to a container and to recipes a consumer is not given
-# (check-host, test-affected); a consumer gets the plain gate.
+# The shelf's `check` runs recipes a consumer is not given (test-affected); a consumer gets the plain gate.
 _CONSUMER_CHECK = """# The gate: every step at once (`steps`), one timing line, a warning for a step over its budget.
 # A green run records the tree it checked (tools/gate_state.py), so the pre-push hook does not run it again on that tree.
 [group('gate')]

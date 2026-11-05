@@ -36,9 +36,7 @@ plain commands, `mise trust --yes && mise install --locked` (the exact uv, prek 
 [ADR 0024](docs/adr/0024-mise-pins-every-repo-tool.md); until the trust every mise shim refuses, uv included), then
 `uv sync --locked` and `bd bootstrap`. After a pin bump: `uv run just tools`. Never install those tools another way.
 
-Both run in a Linux container when Docker answers (the macOS endpoint scanner made the host run
-10-17 min); `SHELF_HOST_CHECK=1` forces the host. Locally the per-file linters (ruff, codespell, hadolint,
-dockerfmt, shellcheck) run on the changed files only (`tools/changed.py`; a changed linter config selects
+Both run natively on the Mac, one way. In `check` the per-file linters (ruff, codespell, shellcheck) run on the changed files only (`tools/changed.py`; a changed linter config selects
 everything). The cross-file checks (types, architecture, dependencies, blueprint) always cover the whole
 repo, and the tests are narrowed to the changed packages and every package depending on them (`tools/affected.py`).
 There is no CI ([ADR 0027](docs/adr/0027-the-shelf-has-no-ci.md)): the pre-push hook runs the gate, and `just check-all` is run locally before a tag.
