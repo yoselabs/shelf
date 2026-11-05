@@ -34,6 +34,12 @@ from hypothesis import HealthCheck, settings
 for _var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"):
     os.environ.pop(_var, None)
 
+# A task-loop run hands every child its hooks dir as core.hooksPath through git's env config (GIT_CONFIG_COUNT and
+# GIT_CONFIG_KEY_n/VALUE_n). Inherited, `tl pre-push` judged the `git push` of a test's own temp repo and refused it
+# (tests/test_changed.py, 2026-11-05). The numbered entries go; GIT_CONFIG_GLOBAL and _NOSYSTEM stay, they isolate.
+for _var in [v for v in os.environ if v == "GIT_CONFIG_COUNT" or v.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))]:
+    os.environ.pop(_var, None)
+
 # too_slow times input generation by the wall clock. With one pytest worker per core
 # (`just test`, pytest-xdist) a cold first draw on a loaded machine trips it -- a red
 # caused by the machine, not the change.
