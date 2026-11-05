@@ -146,7 +146,7 @@ Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest, rei
 - **`tests/test_arch_rules.py`** (blocking, via `tools/arch_rules.py`): dependency **upper-bounds**;
   **body-duplication** within a package and across packages, **private-name-collision** within a package.
   Suppress with a reasoned entry in `tests/arch_allowlist.toml`; a cross-package duplicate has no entry,
-  it is lifted or filed as a task.
+  the only exit is to lift the shared body into one package (promote or evolve) or fix the check.
 
 The import graph is enforced by **import-linter** (`just arch`, contracts in `[tool.importlinter]`): no
 package imports a consumer app, and packages stay independent except the workspace edges they declare.

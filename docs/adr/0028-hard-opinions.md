@@ -29,13 +29,7 @@ row, not a flag).
 
 ## How each rule is checked
 
-| Rule | Check | State |
-|---|---|---|
-| No optionality | review check; lint on boolean mode parameters | lint untested, to file |
-| No backward compatibility | grep ban on shim / legacy / compat / deprecated in code | to file |
-| No redundancy | `test_no_intra_package_body_duplication`, `test_no_cross_package_body_duplication` (ADR 0005); reconciliation pass (VIII) | exists, blocking |
-| Dependency injection | architecture fitness test: no module-level I/O or global state (python.md already states it) | to file |
-| Decomposition and isolation | Article IV per-file limit in the repo linter | exists in task-loop once its ratchet is replaced |
+The rule-to-check table lives in [the constitution](../constitution.md) (Article III), the single place.
 
 Adopting the rule includes filing each missing check.
 
@@ -54,3 +48,4 @@ The gate's mode switches `SHELF_HOST_CHECK` and `GATE_LOCK` (and the Docker gate
 
 - 2026-11-05: decided by the owner (quote above).
 - 2026-11-05: the gate's mode switches (`SHELF_HOST_CHECK`, `GATE_LOCK`, the Docker gate) were removed; `just check` runs natively.
+- 2026-11-05: removed "Breaches already known" (the advisory it cited is gone, ADR 0005) and this ADR's rule-to-check table; the constitution holds the one table, with task ids shelf-ufmg, shelf-cypc, shelf-au97, shelf-26qe.

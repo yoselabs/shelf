@@ -48,7 +48,7 @@ the file holds the reasons, the rejected options and the history.
 ## workflow
 
 - [0006](0006-aggressive-capitalization-reconcile-later.md) **Promote aggressively at writing time, reconcile later**: Generic substrate is promoted to the shelf when you write it, on a self-assessed "feels reusable"; adoption stays conservative and a mandatory reconcile pass prunes over-promotion.
-- [0007](0007-evolve-on-monotonic-contracts.md) **Evolve on monotonic contracts**: Evolve the one package to the richer superset instead of cutting a sibling; converge on a contract that exposes more and removes nothing, and keep a narrower one only for a stated requirement.
+- [0007](0007-evolve-on-monotonic-contracts.md) **Evolve on monotonic contracts**: Evolve the one package to the richer superset instead of cutting a sibling; converge on a contract that exposes more and loses no capability, and keep a narrower one only for a stated requirement.
 - [0009](0009-close-the-loop-on-every-mutating-workflow.md) **Close the loop on every mutating workflow**: PROMOTE, RECEIVE and RECONCILE are done only when catalog, ledger and the main branch agree: just catalog, a ledger row per event, just check green, merged and pushed, worktree removed.
 - [0010](0010-generic-first-specific-second.md) **Generic first, consumer second**: Define a package's capability across the whole class of inputs first, then let the live consumer only rank what ships by default versus opt-in; never narrow the grid to one consumer's diet.
 - [0011](0011-benchmarking-is-a-named-workflow.md) **Benchmarking is a named workflow (BENCH)**: Contested keep-vs-replace and build-vs-adopt calls between tools are decided by the BENCH workflow on isolated, model-free, dated evidence, not by reputation or inheritance.
