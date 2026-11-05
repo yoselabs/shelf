@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "iorlas-task-loop"
+software = "any-agent"
+why = "task-loop's delegate runs claude, codex and opencode headless on subscription lanes: adapters/harness/* build each launch and parse each stream, app/supervisor.py and app/watch.py spawn, watch and stop the worker, classify.py turns vendor words into a reason. That is generic substrate under a router, lanes, leases and a cockpit that stay in the app. Not yet adopted: the repoint is a separate change in iorlas-task-loop (tl-w7lt.19 acceptance: the local copy is deleted). Loss on adoption: none known; delegate passes its own limits table, its live-file sink, the lane-gone check and the secret policy in, and keeps WorkerEnd and Orphan."
+needs = "ClaudeHarness, CodexHarness, OpenCodeHarness(profile, root, sandbox) with launch_spec, parse_line, parse_log_line, summary, vendor_error, transcript, login_probe; run(harness, spec, timeout, hooks, live=, limits=, gone=, log=, policy=, net_up=) -> RunOutcome; RunHooks, LiveSink; classify(rc, vendor_err, stderr, timed_out, work_seen, structured) -> Outcome; Limits; reset_parse.limit_until; the events module."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired -- the gate refuses a package with no active use-case (orphaned, Article VIII), so this is the planned retention claim until the repoint lands
