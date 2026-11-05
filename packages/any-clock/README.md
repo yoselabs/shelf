@@ -19,9 +19,14 @@ clock.over()     # [("review", spent, 600)] once past its limit; ("charged", spe
 |---|---|
 | `PhaseClock(now, limits=, root=, exempt=, budget=)` | start the stopwatch; `budget` caps `charged()`; unphased time goes to `root` |
 | `phase(name)` | context manager; nests, the inner phase pauses the outer, exceptions close it |
+| `book(phase, seconds)` | move seconds you measured yourself out of the innermost open phase into `phase`; capped at what that phase owns, returns what moved |
 | `current()` / `wall()` | the owning phase / seconds since start |
 | `total(name)` / `totals()` | live seconds per phase |
 | `charged()` | seconds in non-exempt phases |
 | `over()` | `(phase, spent, limit)` for limited phases past their limit, plus `("charged", spent, budget)` |
 
-Single-threaded by design; another thread entering a phase raises. Contract: [CONTRACT.md](CONTRACT.md).
+```python
+clock.book("network", waited)  # waited seconds measured elsewhere; the open phase gives them up, wall() is unchanged
+```
+
+Single-threaded by design; another thread calling `phase()` or `book()` raises. Contract: [CONTRACT.md](CONTRACT.md).

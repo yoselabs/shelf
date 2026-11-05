@@ -46,12 +46,15 @@ class PhaseClock:
         self._last = t
         return t
 
+    def _check_thread(self, caller: str) -> None:
+        if threading.get_ident() != self._owner:
+            msg = f"PhaseClock is single-threaded: {caller}() called from another thread"
+            raise RuntimeError(msg)
+
     @contextmanager
     def phase(self, name: str) -> Iterator[None]:
         """Own the time inside the block; the surrounding phase pauses. Leaves cleanly on an exception."""
-        if threading.get_ident() != self._owner:
-            msg = "PhaseClock is single-threaded: phase() called from another thread"
-            raise RuntimeError(msg)
+        self._check_thread("phase")
         self._book()
         self._stack.append(name)
         self._totals.setdefault(name, 0.0)
@@ -62,6 +65,25 @@ class PhaseClock:
                 self._book()
             finally:
                 self._stack.pop()
+
+    def book(self, phase: str, seconds: float) -> float:
+        """Move already-measured `seconds` from the innermost open phase (the donor) into `phase`; returns what moved.
+
+        For time the caller measured itself, after the fact, where a `phase()` block cannot wrap it. The donor is
+        `current()` at call time, so the moved seconds were being counted there and `sum(totals().values())` stays
+        `wall()`. The move is capped at the donor's total so no total goes negative; a negative, zero or NaN `seconds`
+        moves nothing, and booking into the donor itself moves nothing (returns 0.0). A booked exempt phase lowers
+        `charged()`; a booked limited phase can make `over()` report it. Same single-thread rule as `phase()`.
+        """
+        self._check_thread("book")
+        self._book()
+        donor = self._stack[-1]
+        if phase == donor or not seconds > 0:
+            return 0.0
+        moved = min(seconds, self._totals[donor])
+        self._totals[donor] -= moved
+        self._totals[phase] = self._totals.get(phase, 0.0) + moved
+        return moved
 
     def current(self) -> str:
         return self._stack[-1]
