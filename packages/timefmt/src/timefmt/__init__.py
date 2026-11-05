@@ -10,19 +10,26 @@ precision and every duration in a codebase looks alike.
 ``fmt_until(when)`` the same toward a moment (``"now"`` once it has passed), and
 ``human_count(n)`` a magnitude-matched count (``"950"``, ``"12k"``, ``"1.5M"``).
 
+``parse_until(value, now)`` and ``to_epoch(value)`` are the way back from text: ``"+90m"`` / ``"+2h"`` /
+``"+3d"``, epoch seconds, epoch milliseconds or an ISO time in, epoch seconds out (``None`` when unparsable).
+
 Zero-dependency and domain-free — number in, string out; the *policy* for where a
 duration appears lives above this primitive.
 """
 
 from __future__ import annotations
 
+import math
 import time
+from datetime import datetime
 
-__all__ = ["fmt_dur", "fmt_span", "fmt_until", "human_count"]
+__all__ = ["fmt_dur", "fmt_span", "fmt_until", "human_count", "parse_until", "to_epoch"]
 
 _MINUTE = 60
 _HOUR = 3600
 _DAY = 86400
+_MS_THRESHOLD = 1e11  # above this a bare number is epoch milliseconds (1e11 s is year 5138)
+_UNIT_SECONDS = {"m": _MINUTE, "h": _HOUR, "d": _DAY}
 
 
 def fmt_dur(ms: int) -> str:
@@ -95,3 +102,39 @@ def human_count(n: float) -> str:
     if mag >= 1e3:
         return f"{sign}{thousands}k"
     return f"{sign}{int(mag)}"
+
+
+def to_epoch(value: object) -> float | None:
+    """Normalise ``value`` to epoch seconds: a number (seconds, or milliseconds above 1e11) or an ISO string.
+
+    ``None``, ``""``, a bool, a non-finite number and anything unparsable give ``None``. A trailing
+    ``Z`` reads as UTC; an ISO time without an offset reads as local time.
+    """
+    if value is None or value == "" or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if not math.isfinite(number):
+            return None
+        return number / 1000.0 if number > _MS_THRESHOLD else number
+    try:
+        return datetime.fromisoformat(str(value).strip()).timestamp()
+    except ValueError:
+        return None
+
+
+def parse_until(value: object, now: float) -> float | None:
+    """Resolve a deadline to epoch seconds: ``"+90m"`` / ``"+2h"`` / ``"+3d"`` relative to ``now``, else :func:`to_epoch`.
+
+    A numeric string (``"1700000000"``, ``"1700000000000"``) reads as the number. ``None`` when
+    unparsable: a bad unit (``"+5x"``), no count (``"+h"``), garbage, ``None`` or ``""``.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if len(text) > 2 and text[0] == "+" and text[-1] in _UNIT_SECONDS and text[1:-1].isdigit():
+        return now + int(text[1:-1]) * _UNIT_SECONDS[text[-1]]
+    try:
+        return to_epoch(float(text))
+    except ValueError:
+        return to_epoch(text)

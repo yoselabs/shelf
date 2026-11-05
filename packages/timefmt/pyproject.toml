@@ -1,7 +1,7 @@
 [project]
 name = "timefmt"
-version = "0.2.0"
-description = "Human strings for durations, spans and counts — fmt_dur (ms / s / m·s), fmt_span and fmt_until (d / h / m), human_count (k / M)."
+version = "0.3.0"
+description = "Human strings for durations, spans and counts — fmt_dur (ms / s / m·s), fmt_span and fmt_until (d / h / m), human_count (k / M); parse_until and to_epoch read deadlines back to epoch seconds."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
