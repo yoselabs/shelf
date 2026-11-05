@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import signal
 import subprocess
 import sys
 import time
+from typing import TYPE_CHECKING, Any
 
 import pytest
-from stream_proc import alive, capture_bytes
+from stream_proc import alive, capture, capture_bytes
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
 
 PY = sys.executable
 
@@ -138,3 +143,39 @@ def test_stdin_devnull_reads_eof_but_inherit_reads_ours() -> None:
         timeout=30,
     )
     assert host.stdout == b"5\n\n"
+
+
+class BoomError(Exception):
+    pass
+
+
+@pytest.fixture
+def sigterm_during_spawn(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[int]]:
+    """Popen delivers SIGTERM right after the real spawn; the handler raises ``BoomError``. Yields the spawned pids."""
+    pids: list[int] = []
+    real_init = subprocess.Popen.__init__
+
+    def init(self: subprocess.Popen[bytes], *args: Any, **kwargs: Any) -> None:
+        real_init(self, *args, **kwargs)
+        pids.append(self.pid)
+        signal.raise_signal(signal.SIGTERM)
+
+    def handler(signum: int, frame: object) -> None:
+        raise BoomError
+
+    old = signal.signal(signal.SIGTERM, handler)
+    monkeypatch.setattr(subprocess.Popen, "__init__", init)
+    try:
+        yield pids
+    finally:
+        signal.signal(signal.SIGTERM, old)
+
+
+@pytest.mark.parametrize("run", [capture_bytes, capture])
+def test_raising_sigterm_handler_during_spawn_propagates_and_child_is_gone(
+    sigterm_during_spawn: list[int], run: Callable[..., Any]
+) -> None:
+    with pytest.raises(BoomError):
+        run(["sleep", "60"])
+    assert len(sigterm_during_spawn) == 1
+    assert not alive(sigterm_during_spawn[0])
