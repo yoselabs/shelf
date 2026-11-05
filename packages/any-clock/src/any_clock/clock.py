@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import threading
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
@@ -14,7 +15,8 @@ class PhaseClock:
     """Time attributed to named phases; the innermost open phase owns the current instant.
 
     Entering a phase pauses the one around it; leaving resumes it. Time outside every `phase()` block belongs to
-    `root`, so no instant is unowned and `sum(totals().values()) == wall()` (both share one clock read). The clock cannot stop a caller
+    `root`, so no instant is unowned and `sum(totals().values()) == wall()` within float rounding (both share one clock read).
+    The clock cannot stop a caller
     entering the wrong phase.
 
     Thread-safe: one lock guards all state, and no time is lost or counted twice under concurrent calls. The phase stack
@@ -40,7 +42,7 @@ class PhaseClock:
         self._limits = dict(limits or {})
         self._exempt = frozenset(exempt)
         self._budget = budget
-        if not elapsed >= 0:
+        if not (math.isfinite(elapsed) and elapsed >= 0):
             msg = f"elapsed must be a non-negative number of seconds, got {elapsed!r}"
             raise ValueError(msg)
         self._lock = threading.Lock()

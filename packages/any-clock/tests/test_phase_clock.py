@@ -278,8 +278,8 @@ def test_book_after_restore_is_capped_at_elapsed() -> None:
     assert clock.totals() == {"run": 0, "wait": 30}
 
 
-@pytest.mark.parametrize("elapsed", [-1.0, float("nan")])
-def test_elapsed_must_be_a_non_negative_number(elapsed: float) -> None:
+@pytest.mark.parametrize("elapsed", [-1.0, float("nan"), float("inf")])
+def test_elapsed_must_be_a_finite_non_negative_number(elapsed: float) -> None:
     with pytest.raises(ValueError, match="elapsed"):
         PhaseClock(Tick(), elapsed=elapsed)
 

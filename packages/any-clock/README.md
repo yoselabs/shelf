@@ -37,4 +37,4 @@ clock = PhaseClock(time.time, exempt={"wait"}, budget=10800, elapsed=elapsed)  #
 clock.book("wait", waited)  # capped at elapsed, moved out of root
 ```
 
-Thread-safe: one lock guards all state, so `book()` from many threads (check lanes) is safe and `sum(totals().values()) == wall()` holds throughout. The phase stack is shared by every thread, not per thread: `phase()` from two threads at once nests in arrival order, an exit pops the innermost open phase, and `book()`'s donor is the innermost open phase at call time. Contract: [CONTRACT.md](CONTRACT.md).
+Thread-safe: one lock guards all state, so `book()` from many threads (check lanes) is safe and `sum(totals().values()) == wall()` (within float rounding) holds throughout. The phase stack is shared by every thread, not per thread: `phase()` from two threads at once nests in arrival order, an exit pops the innermost open phase, and `book()`'s donor is the innermost open phase at call time. Contract: [CONTRACT.md](CONTRACT.md).
