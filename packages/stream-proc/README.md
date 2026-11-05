@@ -67,3 +67,5 @@ stop_pid(pid, start)   # a recorded holder, a server from an earlier run: stops 
 - **`stop_pid` signals only the process it names**: the pid must still carry the `start` token you
   stored (`proc_start(pid)`; `None` takes the current token). A reused pid, a dead one or a system with no
   process table returns `()` and sends no signal. `PidHandle` is the `Popen` look-alike `stop_tree` takes.
+- **Limits**: the token check and the signal are two steps, so a pid reused in that gap can still be hit. With
+  no `start` token (`None` or empty and the pid already gone) there is no reuse protection: always store `proc_start`.

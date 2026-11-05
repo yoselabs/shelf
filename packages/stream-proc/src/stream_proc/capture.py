@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -41,7 +42,8 @@ def capture(
     """:func:`run` to the end, stdout and stderr collected as text (UTF-8, bad bytes replaced, newlines kept as written).
 
     ``timeout`` is the wall limit; hitting it stops the whole tree and reports exit 124. ``tick`` runs every ``poll_s``
-    seconds on a helper thread while the child lives, and once more after it ends (a heartbeat). An exception that
+    seconds on a helper thread while the child lives, and once more after it ends (a heartbeat;
+    an exception from it is ignored). An exception that
     unwinds the wait stops the tree first, as in :func:`run`. The output is not capped: it all sits in memory.
     """
     out: list[str] = []
@@ -53,7 +55,8 @@ def capture(
 
         def ticker() -> None:
             while not done.wait(poll_s):
-                beat()
+                with contextlib.suppress(Exception):
+                    beat()
 
         helper = threading.Thread(target=ticker, daemon=True)
         helper.start()
@@ -64,7 +67,8 @@ def capture(
         if helper is not None:
             helper.join(2)
     if tick is not None:
-        tick()
+        with contextlib.suppress(Exception):
+            tick()  # a failing heartbeat never costs the result
     timed = res.timed_out is not None
     code = TIMEOUT_EXIT if timed else (res.returncode if res.returncode is not None else -(res.signal or 1))
     return Captured(code, "".join(out), "".join(err), res.secs, timed, res.survivors)

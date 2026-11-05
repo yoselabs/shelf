@@ -71,3 +71,24 @@ def test_handle_reads_a_mismatched_token_as_gone() -> None:
         if p.poll() is None:
             p.kill()
             p.wait()
+
+
+@needs_proc
+def test_stop_pid_takes_a_setsid_grandchild_too() -> None:
+    code = (
+        "import subprocess,sys,time\n"
+        "g = subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'], start_new_session=True)\n"
+        "print(g.pid, flush=True); time.sleep(60)\n"
+    )
+    p = subprocess.Popen([sys.executable, "-c", code], start_new_session=True, stdout=subprocess.PIPE, text=True)
+    assert p.stdout is not None
+    gpid = int(p.stdout.readline())
+    try:
+        assert stop_pid(p.pid, proc_start(p.pid), grace=1) == ()
+        p.wait(timeout=5)
+        assert not alive(gpid)
+    finally:
+        p.stdout.close()
+        if p.poll() is None:
+            p.kill()
+            p.wait()
