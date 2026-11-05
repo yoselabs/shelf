@@ -24,7 +24,7 @@ def _cli_bad_request() -> tuple[str, ...]:
 
 
 @cache
-def _words(vendor_names: tuple[str, ...]) -> vendors.Words:
+def _ladder_words(vendor_names: tuple[str, ...]) -> vendors.Words:
     w = vendors.words(vendor_names)
     bad = re.compile(w.bad_request.pattern + "|" + "|".join(_cli_bad_request()), re.IGNORECASE)
     return vendors.Words(limit=w.limit, credit=w.credit, spend=w.spend, login=w.login, network=w.network, bad_request=bad)
@@ -103,7 +103,7 @@ def classify(
     beside `common` and the CLIs' own (none = every registered vendor)."""
     s = structured or {}
     vendor_event, code = (vendor_err or "").strip(), rc or 0
-    w = _words(tuple(sorted(only)))
+    w = _ladder_words(tuple(sorted(only)))
     ours = _ours(s, timed_out, w)
     if ours:
         return ours
@@ -115,11 +115,11 @@ def classify(
 
 
 def says_login(text: str, only: tuple[str, ...] = ()) -> bool:
-    return bool(_words(tuple(sorted(only))).login.search(text))
+    return bool(_ladder_words(tuple(sorted(only))).login.search(text))
 
 
 def says_spend(text: str, only: tuple[str, ...] = ()) -> bool:
-    return bool(_words(tuple(sorted(only))).spend.search(text))
+    return bool(_ladder_words(tuple(sorted(only))).spend.search(text))
 
 
 def limit_words(text: str, top: str | None) -> str:
