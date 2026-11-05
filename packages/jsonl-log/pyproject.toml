@@ -1,11 +1,18 @@
 [project]
 name = "jsonl-log"
-version = "0.2.0"
-description = "An append-only JSON-lines log: one line per write (safe across processes), size and age retention, newest-first reads that skip a line that does not decode, and a byte-cursor reader whose torn last line waits."
+version = "0.3.0"
+description = "An append-only JSON-lines log: one line per write (safe across processes), size and age retention (an opt-in cross-process rotate lock, an atomic rewrite, held handles), newest-first reads that skip a line that does not decode, and a byte-cursor reader whose torn last line waits."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
+dependencies = [
+    "atomic-io>=0.2,<1",
+    "process-lock>=0.2,<1",
+]
+
+[tool.uv.sources]
+atomic-io = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -535,6 +535,8 @@ ignore_imports = [
     "page_tsv.page -> lean_wire",
     "page_tsv.render -> lean_wire",
     "any_lease.leases -> process_lock",
+    "jsonl_log._rewrite -> atomic_io",
+    "jsonl_log -> process_lock",
 ]
 
 # ── ty — type checking ─────────────────────────────────────────────────────

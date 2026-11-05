@@ -2004,8 +2004,18 @@ source = { editable = "packages/json-match" }
 
 [[package]]
 name = "jsonl-log"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/jsonl-log" }
+dependencies = [
+    { name = "atomic-io" },
+    { name = "process-lock" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "process-lock", editable = "packages/process-lock" },
+]
 
 [[package]]
 name = "jsonref"
