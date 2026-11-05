@@ -11,7 +11,7 @@ contract-guarantee, not "micro"/smallness.)*
 - `packages/` — the software. Each is a uv-workspace member, versioned by **git tag**
   (`anyllm-v0.2.0`). Consumers in other repos pin `{ git, subdirectory, tag }`. No PyPI.
 - `docs/doctrine.md` — the *why*: what the shelf is and the load-bearing ideas.
-- `docs/constitution.md` — the 8 load-bearing rules.
+- `docs/constitution.md` — the 9 load-bearing rules.
 - `CONTEXT.md` — the ontology (TYPES only, never instances).
 - `docs/` — thoughts → tracks → missions → ADRs (see `docs/adr/README.md`; the list is `docs/adr/INDEX.md`).
 - `tests/` — repo-level fitness tests (the boundary spine lives in `[tool.importlinter]`, run by `just arch`; these tests guard it and the AST rules).
