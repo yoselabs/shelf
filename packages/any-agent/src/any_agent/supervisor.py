@@ -85,8 +85,8 @@ class RunHooks:
 
 @mutable
 class Stop:
-    """Why a watcher stopped the worker: "limit" (the lane is out) or "hung" (a deadline), the deadline's kind and words, the vendor's
-    line."""
+    """Why a watcher stopped the worker: "limit" | "credit" | "logged_out" (the lane is out) or "hung" (a deadline), the deadline's kind and
+    words, the vendor's line."""
 
     why: str | None = None
     msg: str = ""
@@ -112,7 +112,7 @@ class RunOutcome:
 class LaneGoneWatcher:
     """Stops a worker whose lane another process marked out for a limit, credit or login reason: it is burning an exhausted lane."""
 
-    def __init__(self, gone: Callable[[], str | None], every: float = LANE_GONE_EVERY) -> None:
+    def __init__(self, gone: Callable[[], tuple[str, str] | None], every: float = LANE_GONE_EVERY) -> None:
         self.gone, self.every = gone, every
         self.last: float | None = None
 
@@ -120,8 +120,8 @@ class LaneGoneWatcher:
         if self.last is not None and time.monotonic() - self.last < self.every:
             return None
         self.last = time.monotonic()
-        msg = self.gone()
-        return Stop(why="limit", msg=msg) if msg is not None else None
+        mark = self.gone()
+        return Stop(why=mark[0], msg=mark[1]) if mark is not None else None  # the mark's own reason
 
 
 class LogWatcher:
@@ -158,7 +158,7 @@ class Supervisor:
         live: LiveSink | None = None,
         *,
         limits: Limits | None = None,
-        gone: Callable[[], str | None] | None = None,
+        gone: Callable[[], tuple[str, str] | None] | None = None,
         log: LogWatcher | None = None,
         policy: Callable[[ev.HarnessEvent], str | None] | None = None,
         net_up: Callable[[], bool] | None = None,
@@ -254,8 +254,11 @@ class Supervisor:
         self.out.worker = worker
         self.live.started(worker.pid)
         if self.hooks.started:
-            with contextlib.suppress(Exception):
+            try:
                 self.hooks.started(worker)
+            except Exception:  # an unregistered worker could never be reaped: stop its tree now and let the caller see the failure
+                self.hooks.stops.append(procs.kill_tree(p))
+                raise
         out: list[str] = []
         err: list[str] = []
         killed: list[int] = []
@@ -343,14 +346,15 @@ def run(
     *,
     live: LiveSink | None = None,
     limits: Limits | None = None,
-    gone: Callable[[], str | None] | None = None,
+    gone: Callable[[], tuple[str, str] | None] | None = None,
     log: LogWatcher | None = None,
     policy: Callable[[ev.HarnessEvent], str | None] | None = None,
     net_up: Callable[[], bool] | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> RunOutcome:
     """Run `spec` under `harness` to its end -> RunOutcome. `timeout` of 0 = none. What the caller wants to hear comes in `hooks`, `live`,
-    `gone` (the lane marked out: its message), `log` (the harness's own log), `policy` (a secret path a command names: its words) and
+    `gone` (the lane marked out: its reason and message), `log` (the harness's own log),
+    `policy` (a secret path a command names: its words) and
     `net_up` (one probe once the worker has waited for the network past the grace)."""
     sup = Supervisor(harness, hooks, live, limits=limits, gone=gone, log=log, policy=policy, net_up=net_up, clock=clock)
     return sup.run(spec, timeout)

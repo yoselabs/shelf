@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from any_agent import classify
-from any_agent.classify import limit_words, says_login, says_spend
+from any_agent.classify import Outcome, limit_words, network_stop, says_login, says_spend, with_network
 
 FIXTURES = sorted((Path(__file__).parent / "fixtures").glob("*.json"))
 
@@ -89,3 +89,17 @@ def test_helpers_read_words():
     assert limit_words("Free usage exceeded", None) == "free usage limit reached"
     assert limit_words("nothing", "5-hour") == "5-hour limit hit"
     assert limit_words("nothing", None) == "usage limit hit"
+
+
+def test_a_lane_mark_for_credit_or_login_is_its_own_reason_whatever_the_words():
+    assert reason(-15, structured={"watchdog": "credit", "msg": "marked out"}) == "credit_exhausted"
+    assert reason(-15, structured={"watchdog": "logged_out", "msg": "usage limit"}) == "logged_out"
+
+
+def test_with_network_turns_only_a_cause_less_failure_into_the_network():
+    down, up = (lambda: False), (lambda: True)
+    assert with_network(Outcome("hung", "", "ours"), down).reason == "network"
+    assert with_network(Outcome("hung", "", "ours"), up).reason == "hung"
+    assert with_network(Outcome("worker_failed", "ECONNRESET", "event"), up).reason == "network"
+    assert with_network(Outcome("rate_limited", "429", "event"), down).reason == "rate_limited"
+    assert network_stop("waiting for network") == Outcome("network", "waiting for network", "event")

@@ -107,8 +107,24 @@ def test_a_policy_is_not_asked_of_a_harness_that_blocks_it_itself(tmp_path):
 
 
 def test_a_lane_marked_out_stops_the_worker(tmp_path):
-    out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, gone=lambda: "usage limit reached", limits=FAST)
+    out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, gone=lambda: ("limit", "usage limit reached"), limits=FAST)
     assert (out.watch.why, out.watch.msg) == ("limit", "usage limit reached")
+
+
+@pytest.mark.parametrize("why", ["credit", "logged_out"])
+def test_a_lane_mark_keeps_its_own_reason(tmp_path, why):
+    out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, gone=lambda: (why, "marked out"), limits=FAST)
+    assert (out.watch.why, out.watch.msg) == (why, "marked out")
+
+
+def test_a_started_hook_that_raises_reaps_the_tree_and_reraises(tmp_path):
+    def boom(w: object) -> None:
+        raise ZeroDivisionError
+
+    hooks = RunHooks(started=boom)
+    with pytest.raises(ZeroDivisionError):
+        run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, hooks, limits=FAST)
+    assert len(hooks.stops) == 1
 
 
 def test_a_limit_line_in_the_harness_log_stops_the_worker_unless_it_echoes_the_workers_input(tmp_path):
