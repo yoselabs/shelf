@@ -1,8 +1,8 @@
 """Architectural fitness rules — blocking, intra-package (ADR 0005).
 
 Native reimplementation of a2kit's Rego policies (no OPA). These BLOCK on within-package
-findings; cross-package duplication is advisory only (`just advisory`) for now: it is the
-no-redundancy check of constitution IX and becomes blocking once its noise is gone (ADR 0028).
+findings; cross-package body duplication blocks too (Article III, no redundancy). Cross-package
+private-name collisions are not checked: the same name over different bodies is not redundancy.
 """
 
 import re
@@ -10,6 +10,8 @@ import sys
 import tomllib
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "tools"))
@@ -101,6 +103,51 @@ def test_no_intra_package_body_duplication() -> None:
         if frozenset({a.name, b.name}) not in allowed
     ]
     assert not dups, f"duplicated function bodies within a package (extract a canonical impl): {dups}"
+
+
+def test_no_cross_package_body_duplication() -> None:
+    # Article III — one implementation of a behaviour per repo. No allowlist: the only exits are
+    # lifting the shared body to one package or fixing the check.
+    dups = [(a.file, a.name, b.file, b.name) for a, b in arch_rules.body_dups(arch_rules.function_facts(), cross_package=True)]
+    assert not dups, (
+        f"function bodies duplicated across packages (lift the shared body to one package; filing a task does not pass the gate): {dups}"
+    )
+
+
+_TOTAL = """
+def {name}(items):
+    total = 0
+    for item in items:
+        total += item
+    return total
+"""
+_PRODUCT = """
+def {name}(items):
+    total = 1
+    for item in items:
+        total *= item
+    return total
+"""
+
+
+def _two_packages(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, first: str, second: str) -> list[arch_rules.FunctionFact]:
+    for package, source in (("pa", first), ("pb", second)):
+        module = tmp_path / "packages" / package / "src" / package / "mod.py"
+        module.parent.mkdir(parents=True)
+        module.write_text(source)
+    monkeypatch.setattr(arch_rules, "_ROOT", tmp_path)
+    monkeypatch.setattr(arch_rules, "_PACKAGES", tmp_path / "packages")
+    return arch_rules.function_facts()
+
+
+def test_cross_package_check_reports_a_renamed_identical_body(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    facts = _two_packages(tmp_path, monkeypatch, _TOTAL.format(name="add_up"), _TOTAL.format(name="sum_all"))
+    assert [(a.name, b.name) for a, b in arch_rules.body_dups(facts, cross_package=True)] == [("add_up", "sum_all")]
+
+
+def test_cross_package_check_passes_bodies_of_a_different_shape(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    facts = _two_packages(tmp_path, monkeypatch, _TOTAL.format(name="fold"), _PRODUCT.format(name="fold"))
+    assert arch_rules.body_dups(facts, cross_package=True) == []
 
 
 def test_no_intra_package_private_name_collision() -> None:

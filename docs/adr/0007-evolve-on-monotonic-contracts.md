@@ -1,16 +1,16 @@
 ---
 id: 0007
 title: Evolve on monotonic contracts
-statement: Evolve the one package to the richer superset instead of cutting a sibling; converge on a contract that exposes more and removes nothing, and keep a narrower one only for a stated requirement.
+statement: Evolve the one package to the richer superset instead of cutting a sibling; converge on a contract that exposes more and loses no capability, and keep a narrower one only for a stated requirement.
 concerns: [workflow]
 status: accepted
 decided_by: owner
-updated: 2026-07-08
+updated: 2026-11-05
 expires: 2027-01-08
 distilled_into: agent-loop.md WORKFLOW: SEAM (EVOLVE direction)
 ---
 
-# 0007 — Evolve on a monotonic contract: one call, one response, expose more never less
+# 0007 — Evolve on a monotonic contract: one call, one response, expose more, lose no capability
 
 ## Decision
 
@@ -18,7 +18,7 @@ When a candidate is a richer superset of a package the shelf already has, **evol
 and do the reconciliation *in the moment*, rather than cutting a sibling and promising to merge later
 (ADR 0006's "reconcile later" is for over-reach found with hindsight, not a licence to ship
 known-duplicate siblings). Decide each contract axis by the **monotonicity test**: does the new shape
-**expose more and remove nothing**?
+**expose more and lose no capability a caller relied on**?
 
 - Only expands exposure (more returned, surfaced, expressible), reduces nothing a caller relied on:
   **converge everyone on it**. The thin caller ignores the extra.
@@ -32,7 +32,7 @@ accounting, cache breakpoints). Net: **one `complete`, one `Completion`, fail-lo
 
 | Axis | Unified contract | Why |
 |---|---|---|
-| Response | rich `Completion` (text, tokens, `cost_usd`, `latency_ms`, cache tiers) | adds accounting, removes nothing; thin caller reads `.text` |
+| Response | rich `Completion` (text, tokens, `cost_usd`, `latency_ms`, cache tiers) | adds accounting, loses nothing; thin caller reads `.text` |
 | Failure | fail-loud `AnyLLMError(retryable, hint)` | raising surfaces failure; errors-as-values hides it as an empty string |
 | Call | async + structured `complete(*, system, user, model, ...)` | can carry a flat sync prompt (`user=prompt, system=()`); the reverse cannot carry concurrency or a system/cache split |
 
@@ -59,3 +59,6 @@ holder outside the LLM path wants them.
   Trigger: the first real case, a2web's LLM `Provider` vs `anyllm`. Expires 2027-01-08 (re-justify,
   especially whether any consumer ever needed the escape valve). Track: governance / promotion model,
   follows ADR 0006.
+- 2026-11-05: amended (ADR 0028). "Removes nothing" means no capability is lost at a merge, not that an old API
+  shape stays: the superset replaces the old shape outright, with no shim, alias or dual path; consumers move or
+  stay pinned to the old tag.

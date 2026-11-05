@@ -298,10 +298,5 @@ eval *args:
 catalog:
     uv run python tools/catalog.py
 
-# cross-package duplication / name-collision signals (T0-primitive candidates).
-# NON-blocking on purpose -- constitution VI values some duplication. Not in `check`.
-advisory:
-    uv run python tools/arch_advisory.py
-
 sync:
     uv sync

@@ -94,7 +94,7 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
    severities and the lighter test bar, without the shelf's own paths.
 2. The `justfile` recipes (`check guard preset blueprint bootstrap bootstrap-verify tools lint format typecheck
    spell deps test cov sync`); `deps` becomes a single-package `uv run deptry .`. The shelf-only
-   recipes (`catalog advisory test-browser`) are not copied and are not drift. Pin the runner with
+   recipes (`catalog test-browser`) are not copied and are not drift. Pin the runner with
    `uv add --dev rust-just` and run it as `uv run just check` (the `dev` group below carries it). Copy `guard` and `bootstrap`/`bootstrap-verify` **verbatim** — each resolves the
    shelf clone itself (`$SHELF_HOME` → `../shelf` → `~/Workspaces/shelf`), so they work unchanged
    in your repo. `guard` is what actually enforces the no-committed-local-shelf-source rule; the
@@ -144,10 +144,9 @@ is not this one's. A check that fails on every consumer forever teaches everyone
 Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest, reimplementing a2kit's Rego policies without dragging OPA in:
 
 - **`tests/test_arch_rules.py`** (blocking, via `tools/arch_rules.py`): dependency **upper-bounds**;
-  **body-duplication** and **private-name-collision** *within* a package. Suppress with a reasoned entry
-  in `tests/arch_allowlist.toml`.
-- **`just advisory`** (non-blocking): *cross-package* duplication — a T0-primitive candidate, not a
-  violation (constitution VI values some duplication).
+  **body-duplication** within a package and across packages, **private-name-collision** within a package.
+  Suppress with a reasoned entry in `tests/arch_allowlist.toml`; a cross-package duplicate has no entry,
+  the only exit is to lift the shared body into one package (promote or evolve) or fix the check.
 
 The import graph is enforced by **import-linter** (`just arch`, contracts in `[tool.importlinter]`): no
 package imports a consumer app, and packages stay independent except the workspace edges they declare.

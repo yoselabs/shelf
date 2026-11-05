@@ -160,9 +160,7 @@ def test_the_shelf_does_not_compare_against_itself(shelf: Path) -> None:
 
 
 def test_a_shelf_only_target_missing_from_a_consumer_is_not_drift(tmp_path: Path) -> None:
-    shelf = _write(
-        tmp_path / "shelf", _SHELF, justfile=_JUSTFILE + "\ncatalog:\n    @true\nadvisory:\n    @true\ntest-browser:\n    @true\n"
-    )
+    shelf = _write(tmp_path / "shelf", _SHELF, justfile=_JUSTFILE + "\ncatalog:\n    @true\ntest-browser:\n    @true\n")
     consumer = _write(tmp_path / "consumer", _SHELF)
     result = _run(consumer, shelf)
     assert result.returncode == 0, result.stderr

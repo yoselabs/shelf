@@ -1,11 +1,11 @@
 ---
 id: 0005
 title: Architecture rules run in the toolchain; AST facts are native tests
-statement: Import-graph rules run in-toolchain (import-linter in pyproject; ruff TID251 for banned APIs); AST-fact rules stay pure-stdlib pytest, blocking in a package, advisory across; no policy engine.
+statement: Import-graph rules run in-toolchain (import-linter in pyproject; ruff TID251 for banned APIs); AST-fact rules stay pure-stdlib pytest, body duplication blocking across packages too; no policy engine.
 concerns: [gate, tooling]
 status: accepted
 decided_by: owner
-updated: 2026-10-11
+updated: 2026-11-05
 expires: 2027-01-08
 distilled_into: blueprint python-uv architecture role; tests/test_arch_rules.py for the AST facts
 ---
@@ -34,19 +34,18 @@ allowlist-hygiene, RG004 dependency-upper-bounds) are reimplemented by *intent* 
 fitness tests, walk the AST
 (`ast`), read the manifests (`tomllib`), pure stdlib, inside `just check`, ownable, deletable.
 
-**Scope rule** (load-bearing, departs from a2kit). Constitution IX forbids redundancy, but the check for it is
-still advisory across packages (see ADR 0028); a2kit was one package, the shelf is many independent ones:
+**Scope rule** (load-bearing, departs from a2kit). a2kit was one package, the shelf is many independent ones:
 
 - **Within a package:** duplication or name collision is a bug. **Blocking** (`tests/test_arch_rules.py`).
-- **Across packages:** duplication is a *signal*, not a sin: a body shared by two packages is a
-  candidate for a T0 primitive (rule of three). **Advisory only** (`just advisory`, never a build
-  failure) until it stops flagging private-name collisions and the findings are reconciled (ADR 0028).
+- **Across packages:** body duplication is **blocking** too (Article III: one implementation per repo), with
+  no allowlist; the only exits are lifting the shared body to one package or fixing the check. A private name shared by two packages is not
+  checked: the same name over different bodies is not redundancy (the advisory report flagged only those).
 - **Dependency upper bounds:** always blocking; an unbounded dep breaks silently on a major bump
   (ADR 0001's ethos). Exceptions go in `tests/arch_allowlist.toml` **with a reason** (RG003).
 
 Built: `tools/arch_rules.py` (engine: alpha-equivalence body hashing with local names and literals
 abstracted but call targets/attributes kept for precision; private-name and dep-bound extractors;
-allowlist loader), the four blocking rules, `tools/arch_advisory.py`, the allowlist, and upper bounds
+allowlist loader), the blocking rules, the allowlist, and upper bounds
 on package deps (`torch<3`, `docling<3`, ...); `html2text` is allowlisted (date-versioned upstream, no
 semver bound is meaningful).
 
@@ -70,3 +69,6 @@ needs cross-repo fact-sharing only a policy engine can give, that is a new fork 
 - 2026-10-11: amended (shelf-435). The 2026-07-08 text was written for a2kit's four AST-fact rules and was read as
   covering the import DAG too. The bench on shelf, a2kay and a2web chose import-linter and TID251; tach was refused.
   `tests/test_boundary.py` retired in favour of the `forbidden` contract. AST rules, scope rule, allowlist and expiry unchanged.
+- 2026-11-05: amended. Article III makes redundancy a defect, so cross-package body duplication blocks and
+  `just advisory` / `tools/arch_advisory.py` are removed. Zero cross-package body duplicates existed; the
+  advisory's findings were all private-name collisions, which are no longer checked across packages.
