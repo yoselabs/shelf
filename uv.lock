@@ -73,6 +73,7 @@ members = [
     "process-lock",
     "record-mine",
     "settings-base",
+    "shelf-vendor",
     "sqlite-resource",
     "sqlite-sidecar",
     "sqlite-store",
@@ -4072,6 +4073,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/12/44/c00420a3b7bcdf830
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ad/32/fdea8e7f7b2b8bae13ee6ab7df1a10d28a24dbeb03a62ff033563f95d77c/shadowcopy-0.0.4-py3-none-any.whl", hash = "sha256:fc51e59a639dc6a5a3a7a9b4e3ecadc71989e339f2d995d90aaa491acd4ba4eb", size = 4212, upload-time = "2023-07-08T00:01:34.042Z" },
 ]
+
+[[package]]
+name = "shelf-vendor"
+version = "0.1.0"
+source = { editable = "packages/shelf-vendor" }
 
 [[package]]
 name = "shellingham"

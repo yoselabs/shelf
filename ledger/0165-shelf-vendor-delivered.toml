@@ -1,0 +1,10 @@
+seq = 165
+date = "2026-11-05"
+event = "delivery"
+software = "shelf-vendor"
+release = "shelf-vendor-v0.1.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = """Promoted from the two diverging dev/vendor.py copies in task-loop and delegate: sync a package from a shelf tag, record its tree hash, check drift, warn on a newer shelf tag. Candidate; neither repo is repointed yet, so no adoption verdict."""
