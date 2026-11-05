@@ -53,17 +53,35 @@ res.survivors    # pids of its tree still alive after the stop (normally ())
 ## Capture and stopping a pid we did not spawn
 
 ```python
-from stream_proc import capture, stop_pid
+from stream_proc import capture, capture_bytes, stop_pid
 
 got = capture(["git", "status"], cwd=repo, timeout=30, tick=heartbeat)   # tick: every 0.2 s while it lives, once after
 got.exit        # the exit code; 124 on a timeout (tree stopped); -N when signal N ended it
 got.out, got.err, got.secs, got.timed_out, got.survivors
 
+raw = capture_bytes(["cat"], input=b"\xff\r\n", timeout=30)   # exact bytes: raw.out == b"\xff\r\n"
+capture_bytes(argv, capture=False, stdin=None)                  # child writes to our stdout/stderr; out/err are b""
+
 stop_pid(pid, start)   # a recorded holder, a server from an earlier run: stops its tree, -> pids still alive
 ```
 
-- **`capture` is `run` to the end**: both streams as one `str` each (UTF-8, bad bytes replaced), the
+- **`capture` is `capture_bytes` decoded**: both streams as one `str` each (UTF-8, bad bytes replaced), the
   same wall timeout and tree stop. There is no size cap; all output is held in memory.
+- **`capture_bytes(argv, cwd=, env=, timeout=, input=, stdin=subprocess.DEVNULL, capture=True, grace=, drain=2.0)`** is
+  `capture` for bytes, and `capture` is built on it (it only decodes): `out`/`err` are the exact bytes (no decoding,
+  `\r\n` kept) in a `CapturedBytes` (`exit, out, err, secs, timed_out, survivors`). `stdin` is a `subprocess` value:
+  `DEVNULL` (default), `None` (inherit ours), an fd or a file. `input` instead feeds bytes through a pipe while output
+  is read, so large in and out never deadlock, and a child that exits without reading it all is no error; `input` with a
+  non-default `stdin` raises `ValueError`. `capture=False` inherits stdout/stderr (both come back `b""`).
+- **No controlling terminal**: every child is a session leader (`start_new_session`), so with `stdin=None` and/or
+  `capture=False` it shares our descriptors but has no controlling tty: no job control, no `/dev/tty`, no tty-driven
+  SIGINT from Ctrl-C (the caller's own SIGINT still stops the tree). Do not use it for an interactive child.
+- **`timeout` and `drain`**: the wait is on the child, not its pipes. `timeout` is the wall limit for the child; at
+  the limit the tree is stopped, exit 124, `timed_out=True`, partial bytes in `out`/`err`, no exception (unlike
+  `subprocess.run`). After the child ends the pipes are read for at most `drain` more seconds, so a process that
+  outlived the child and holds a pipe (`sh -c "sleep 30 & echo hi"`) costs `drain`, not its lifetime, and the result
+  is the child's real exit code. A SIGTERM/SIGINT during the spawn or any unwinding exception stops the tree first.
+  No `tick`, no size cap.
 - **`stop_pid` signals only the process it names**: the pid must still carry the `start` token you
   stored (`proc_start(pid)`; `None` takes the current token). A reused pid, a dead one or a system with no
   process table returns `()` and sends no signal. `PidHandle` is the `Popen` look-alike `stop_tree` takes.
