@@ -5,7 +5,7 @@ statement: Every agent session works in its own worktree and branch; worktree fo
 concerns: [agents]
 status: accepted
 decided_by: owner
-updated: 2026-10-11
+updated: 2026-11-05
 distilled_into: blueprint agents.worktrees, agents.worktrees-in-sync; templates/agents/working-with-agents.md
 ---
 
@@ -14,8 +14,7 @@ distilled_into: blueprint agents.worktrees, agents.worktrees-in-sync; templates/
 ## Decision
 
 Each agent session gets its own worktree. bd shares the main database through git's common dir;
-prek's hooks install once and run in every worktree; the container gate mounts the main `.git`
-read-only when run from a worktree.
+prek's hooks install once and run in every worktree.
 
 Merge often: rebase on main at least daily and merge finished slices to main the same day, so no
 worktree is more than a day behind main or holds work unmerged for more than a day. A long task
@@ -34,3 +33,4 @@ Every hook manager that stashes does this.
 - 2026-10-11: decided.
 - 2026-10-11: added the one-day sync rule (owner): drifting worktrees turn merges into conflict work
   and let agents build on a main that no longer exists.
+- 2026-11-05: the shelf's container gate (which mounted the main `.git` read-only) is gone; the gate runs natively in the worktree (ADR 0027).

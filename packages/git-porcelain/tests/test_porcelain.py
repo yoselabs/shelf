@@ -87,6 +87,7 @@ def test_run_git_returns_stdout_and_fails_loud(tmp_path: Path) -> None:
         ("error: cannot lock ref 'refs/heads/main': '/repo/refs/heads/main.lock': File exists", True),
         ("error: cannot lock ref 'refs/heads/main': Unable to create '/repo/refs/heads/main.lock': File exists", True),
         ("fatal: Unable to create '/repo/refs/heads/main.lock': File exists", True),
+        ("error: fetching ref refs/remotes/origin/main failed: reference already exists", True),
         ("error: cannot lock ref 'x': Unable to create '/repo/x.lock': Permission denied", False),
         ("error: cannot lock ref 'x': Unable to create '/repo/x.lock': Read-only file system", False),
         ("fatal: Unable to create '/repo/x.lock': Permission denied", False),
