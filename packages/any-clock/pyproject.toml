@@ -1,6 +1,6 @@
 [project]
 name = "any-clock"
-version = "0.2.0"
+version = "0.3.0"
 description = "A nested phase stopwatch: exactly one phase owns every instant, so per-phase totals always add up to wall time; limits and exempt phases turn that into a budget."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

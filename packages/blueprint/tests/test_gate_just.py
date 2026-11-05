@@ -144,16 +144,6 @@ def test_a_checker_script_nothing_runs_fails_and_one_the_gate_reaches_passes(rep
     assert "check_names.py" not in evidence
 
 
-def test_the_gate_image_ignore_file_is_judged_for_a_justfile_gate(repo: Repo) -> None:
-    repo.write("justfile", _JUSTFILE_BLUEPRINT + "image:\n    docker build -f tools/gate.Dockerfile -t gate .\n")
-    repo.write(".beads/config.yaml", "")
-    repo.write(".dockerignore", ".beads\n")
-    repo.commit()
-    verdict, evidence = _row(repo, "gate.runs-blueprint", audit=False)
-    assert verdict is Verdict.FAILING
-    assert ".beads/config.yaml" in evidence
-
-
 def test_clean_clone_runs_just_check(repo: Repo) -> None:
     repo.write("justfile", "check:\n    test -f committed.txt\n")
     repo.write("committed.txt", "x")

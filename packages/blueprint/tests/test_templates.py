@@ -122,7 +122,6 @@ def test_the_no_ci_trait_writes_no_ci_wording_into_the_gate_template(repo: Repo)
     assert "and CI all call" not in text
     assert "no CI" in text
     assert "## Hooks" in text
-    assert "## A gate in a container" in text
 
 
 def test_the_no_ci_wording_never_overwrites_a_gate_file_the_repo_has(repo: Repo) -> None:

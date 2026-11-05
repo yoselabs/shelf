@@ -285,51 +285,6 @@ def test_no_workflows_means_the_manifest_check_does_not_apply(repo: Repo) -> Non
     assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.NOT_APPLICABLE
 
 
-_BLUEPRINT_GATE = "check: blueprint\nblueprint:\n\tpython3 -m blueprint check --repo . --gate\n"
-_IMAGE = "image:\n\tdocker build -f tools/gate.Dockerfile -t gate .\n"
-
-
-def _container_gate(repo: Repo, dockerignore: str, *, image_ignore: str | None = None, image: str = _IMAGE) -> None:
-    repo.write("Makefile", _BLUEPRINT_GATE + image)
-    repo.write(".beads/config.yaml", "")
-    repo.write(".claude/settings.json", "{}")
-    repo.write(".dockerignore", dockerignore)
-    if image_ignore is not None:
-        repo.write("tools/gate.Dockerfile.dockerignore", image_ignore)
-    repo.commit()
-
-
-def test_a_gate_image_that_drops_files_blueprint_reads_fails_naming_them(repo: Repo) -> None:
-    # a2kay: the image's dockerignore dropped .beads and .claude, so `make blueprint` in the container reported
-    # "no .beads/config.yaml"; the Makefile text alone looked fine.
-    _container_gate(repo, ".beads\n.claude\n")
-    verdict, evidence = _verdict(repo, "gate.runs-blueprint", audit=False)
-    assert verdict is Verdict.FAILING
-    assert ".beads/config.yaml" in evidence
-    assert ".claude/settings.json" in evidence
-    assert ".dockerignore" in evidence
-
-
-def test_files_re_included_after_the_drop_are_not_dropped(repo: Repo) -> None:
-    _container_gate(repo, ".beads\n.claude\n!.beads/config.yaml\n")
-    verdict, evidence = _verdict(repo, "gate.runs-blueprint", audit=False)
-    assert verdict is Verdict.FAILING
-    assert ".beads/config.yaml" not in evidence
-    assert ".claude/settings.json" in evidence
-    _container_gate(repo, ".beads\n.claude\n!.beads/config.yaml\n!.claude/settings.json\n")
-    assert _verdict(repo, "gate.runs-blueprint", audit=False)[0] is Verdict.PASSING
-
-
-def test_the_images_own_ignore_file_outranks_the_root_one(repo: Repo) -> None:
-    _container_gate(repo, ".beads\n.claude\n", image_ignore=".venv\n")
-    assert _verdict(repo, "gate.runs-blueprint", audit=False)[0] is Verdict.PASSING
-
-
-def test_a_gate_with_no_container_is_not_judged_by_the_dockerignore(repo: Repo) -> None:
-    _container_gate(repo, ".beads\n.claude\n", image="")
-    assert _verdict(repo, "gate.runs-blueprint", audit=False)[0] is Verdict.PASSING
-
-
 _NO_CI_ADR = (
     "---\nid: 0003\ntitle: Builds on owner machines\nstatement: No CI; the gate runs on the owner's Mac and PC through the commit hook.\n"
     "concerns: [gate]\nstatus: accepted\ndecided_by: owner\nupdated: 2026-10-09\n---\n# 0003\n"

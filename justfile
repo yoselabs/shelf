@@ -14,33 +14,24 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 # pytest runs one worker per core (pytest-xdist).
 pytest_par := "-n auto"
 
-# One image per checkout, so worktrees never run each other's code. Image: tools/gate/gate.Dockerfile.
-test_image := "shelf-gate-" + file_name(justfile_directory())
-
 # The gate. Fast, deterministic tools first; tests last. Tests cover only what the change
-# touches (`test-affected`); `check-all` runs every test with the coverage floor, and CI runs
-# `check-all`.
+# touches (`test-affected`); `check-all` runs every test with the coverage floor.
 #
-# The per-file linters (images, scripts, lint-changed, spell-changed) check only the files changed against the base
+# The per-file linters (scripts, lint-changed, spell-changed) check only the files changed against the base
 # in `check` (tools/changed.py; a changed config file, or no base, selects everything). `check-all` runs them on every
-# file (`images "all"`, `scripts "all"`, `lint`, `spell`). The cross-file checks (typecheck, arch, deps, blueprint)
+# file (`scripts "all"`, `lint`, `spell`). The cross-file checks (typecheck, arch, deps, blueprint)
 # always cover the whole repo. A linter with nothing changed prints "skipped <linter>: ..." and the gate
 # repeats that line.
-#
-# Both run inside a Linux container when Docker answers: on the macOS host an endpoint scanner
-# inspects every process start and file write, and the suite took 10-17 min there (2026-10-10).
-# In CI, inside a container, or with SHELF_HOST_CHECK=1 they run in place; the container
-# speeds the gate up and is never required.
 #
 # A green `check` records the tree it checked (tools/gate_state.py, `blueprint recipe gate-state`): `gate-start` notes the
 # working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
 # pre-push hook then skips the gate for that exact tree.
 [group('gate')]
-check: gate-start beads-lint images scripts (gate "check-host")
+check: gate-start beads-lint scripts (steps "guard" "preset" "blueprint" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test-affected")
     python3 -I tools/gate_state.py passed --gate check
 
 [group('gate')]
-check-all: beads-lint (images "all") (scripts "all") (gate "check-all-host")
+check-all: beads-lint (scripts "all") (steps "guard" "preset" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test")
 
 # Notes the working tree as the gate starts, for `check` to record when it passes.
 [private]
@@ -48,8 +39,7 @@ gate-start:
     python3 -I tools/gate_state.py start
 
 # Every bead still to be started (open or blocked) carries its acceptance criteria: criteria are what make a bead
-# ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. Runs on the
-# host, before the container: bd's database lives in this clone (CI bootstraps it from refs/dolt/data first).
+# ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. bd's database lives in this clone.
 [group('gate')]
 beads-lint:
     #!/usr/bin/env bash
@@ -66,26 +56,8 @@ beads-lint:
     for status in open blocked; do BD_DISABLE_METRICS=1 bd lint --status "$status" || rc=1; done
     exit "$rc"
 
-# Every Dockerfile passes hadolint (each ignored rule's reason is in .hadolint.yaml), is dockerfmt-formatted, and pins
-# every image by digest (Dependabot bumps them). The tools are pinned in mise.toml. On the host, beside beads-lint: the
-# image has neither tool.
-[group('gate')]
-images scope="changed":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    command -v hadolint >/dev/null || { echo "images: hadolint is not installed -- run just tools" >&2; exit 2; }
-    # dockerfmt is optional (no Windows build): a missing one is a warning, the format check is skipped.
-    have_dockerfmt=1
-    command -v dockerfmt >/dev/null || { have_dockerfmt=0; echo "images: warning: dockerfmt is not installed, skipping the format check" >&2; }
-    list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --scope {{ scope }} --config .hadolint.yaml --not '*.dockerignore' '*Dockerfile' '*Dockerfile.*' '*Containerfile' > "$list"
-    [ -s "$list" ] || { echo "skipped images: no Dockerfile changed"; exit 0; }
-    xargs -0 hadolint < "$list"
-    [ "$have_dockerfmt" = 0 ] || xargs -0 -n1 dockerfmt --check -n < "$list"
-    xargs -0 python3 -I packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py < "$list"
-
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
-# blueprint's for this step in every repo (stack/shell). On the host, beside images.
+# blueprint's for this step in every repo (stack/shell).
 [group('gate')]
 scripts scope="changed":
     #!/usr/bin/env bash
@@ -95,24 +67,6 @@ scripts scope="changed":
     python3 -I tools/changed.py --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
     [ -s "$list" ] || { echo "skipped scripts: no shell script changed"; exit 0; }
     xargs -0 shellcheck < "$list"
-
-# The dispatch sits in its own private recipe so `check` and `check-all` stay plain dependency edges
-# for the graph reader.
-[private]
-gate target:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "${CI:-}" ] && [ -z "${SHELF_HOST_CHECK:-}" ] && [ ! -f /.dockerenv ] && docker info >/dev/null 2>&1; then
-        {{ just_executable() }} container {{ target }}
-    else
-        {{ just_executable() }} {{ target }}
-    fi
-
-[group('gate')]
-check-host: (steps "guard" "preset" "blueprint" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test-affected")
-
-[group('gate')]
-check-all-host: (steps "guard" "preset" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test")
 
 # Runs the gate's steps at once, each into its own log, then prints one timing line (a step over its budget is
 # marked) and the log of every step that failed. Each name is a recipe, so the gate graph still reads the edges.
@@ -144,22 +98,6 @@ steps +names:
     summary=$(printf '%s · ' "${line[@]}"); echo "gate: ${summary% · } -- total ${total}s" >&2
     [ "$total" -gt $gate_budget ] && echo "gate: ⚠ ${total}s is over the ${gate_budget}s gate budget: find the slow step above" >&2
     [ "${#failed[@]}" -eq 0 ] || { echo "gate: failed: ${failed[*]}" >&2; exit 1; }
-
-test-image:
-    docker build -q -f tools/gate/gate.Dockerfile -t {{ test_image }} .
-
-# In a git worktree `.git` is a file pointing into the main checkout's .git; the image holds only
-# that pointer, so the main .git is mounted read-only at its own path and git skips optional locks.
-# The result cache lives in a named volume per checkout, so it survives between container runs.
-container target: test-image
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mounts=()
-    if [ ! -e .git/HEAD ]; then
-        common="$(git rev-parse --path-format=absolute --git-common-dir)"
-        mounts=(-v "$common:$common:ro" -e GIT_OPTIONAL_LOCKS=0)
-    fi
-    docker run --rm "${mounts[@]}" -v {{ test_image }}-cache:/app/.cache {{ test_image }} just {{ target }}
 
 # The blueprint's per-commit checkpoints (packages/blueprint): one line per one that is not
 # passing. The audit-only ones (slow, or reading this clone's bd database) run in the
@@ -306,7 +244,7 @@ deps:
     echo "deptry: every package clean"
 
 # The test runs take the box-wide test lock (tools/gate_state.py lock): each takes every core, so gates started at once
-# on one box queue for it instead of thrashing (2026-10-20: four at once took 11-14 min each). Off in CI or GATE_LOCK=off.
+# on one box queue for it instead of thrashing (2026-10-20: four at once took 11-14 min each).
 #
 # tests with coverage; the floor guards against REGRESSION (set just below current).
 # Substrate adapters (docling/torch/subprocess) are legitimately hard to unit-test,

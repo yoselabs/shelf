@@ -5,7 +5,7 @@ statement: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev
 concerns: [gate]
 status: accepted
 decided_by: owner
-updated: 2026-10-11
+updated: 2026-11-05
 distilled_into: blueprint gate.runner, gate_graph.py; the shelf justfile; tools/onboard/linter_preset.py
 ---
 
@@ -34,7 +34,7 @@ dry-run that is unsafe by construction; just gives a JSON graph and a safe dry-r
 ## Rejected
 
 - **make:** no way to dump the graph (blueprint scrapes targets with regexes); `-n` still runs any recipe line naming
-  `$(MAKE)` (the `container-%` dispatch had to move into its own target to be dry-run safe); `$$` escapes and
+  `$(MAKE)` (a dispatch target had to be split out to be dry-run safe); `$$` escapes and
   mandatory tabs; no Windows story.
 - **Taskfile:** the JSON listing has no dependencies; dispatch needs Go templates; dependencies run in parallel by
   default (order of the gate is part of its meaning); `--dry` still evaluates `sh:` variables.
@@ -44,7 +44,7 @@ dry-run that is unsafe by construction; just gives a JSON graph and a safe dry-r
 - **nox, invoke, doit:** a Python program is the gate, so reading it means running it.
 - **npm scripts:** a flat map of strings, no dependencies, and a Node requirement in non-Node repos.
 - **A `scripts/` folder:** no graph at all, and every repo grows its own conventions.
-- **dagger, earthly:** a container engine becomes a gate prerequisite, which the host fallback (`SHELF_HOST_CHECK=1`) exists to avoid.
+- **dagger, earthly:** a container engine becomes a gate prerequisite.
 
 ## Weak spot
 
@@ -54,4 +54,5 @@ works on any clone with uv; `gate.one-command` reports "not checked" (never a pa
 ## History
 
 - 2026-10-11: decided by the owner after a runner comparison (make, just, Taskfile, mise, poe against the same
-  gate); the shelf's Makefile became a justfile, and blueprint, onboarding, CI and the gate image moved with it.
+  gate); the shelf's Makefile became a justfile, and blueprint, onboarding and CI moved with it.
+- 2026-11-05: the container dispatch and `SHELF_HOST_CHECK` left the justfile with the Docker gate (ADR 0027).

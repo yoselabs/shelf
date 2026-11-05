@@ -10,7 +10,7 @@ One command decides done. Humans, agents, hooks and CI all call the same one.
 
 ## Changed files and the whole repo
 
-Locally, a linter that judges one file at a time (formatter, per-file linter, shellcheck, hadolint, spelling) runs on
+Locally, a linter that judges one file at a time (formatter, per-file linter, shellcheck, spelling) runs on
 the files changed against the base: committed on the branch, staged, unstaged, untracked and not ignored; never a
 deleted one. A linter with nothing to look at is skipped and says so in one line. A change to a linter's own
 config runs it over everything. A check that reads across files (types, architecture, dependencies) always
@@ -43,7 +43,7 @@ Makefile fails `gate.runner`. Three rules keep the file readable by blueprint, w
 
 - No backticks: `just --dry-run check` evaluates them, and blueprint dry-runs `check`. Put anything that needs a command's output inside a recipe body.
 - Loops and multi-line shell go in a shebang recipe (`#!/usr/bin/env bash`, then `set -euo pipefail`); just has no loops.
-- A dependency, or a recipe argument that names a recipe (`check: (gate "check-host")`), is an edge in the graph.
+- A dependency, or a recipe argument that names a recipe (`check: (steps "lint")`), is an edge in the graph.
 
 ## One box, many gates
 
@@ -53,7 +53,7 @@ script that prevents both halves of that (stdlib only; `--help` documents it):
 
 | piece | in the justfile | does |
 |---|---|---|
-| the test lock | the test command runs as `python3 -I tools/gate_state.py lock -- <command>` | one test run per box at a time; a second gate waits and says who holds it. Off when `CI` is set or `GATE_LOCK=off` |
+| the test lock | the test command runs as `python3 -I tools/gate_state.py lock -- <command>` | one test run per box at a time; a second gate waits and says who holds it. |
 | the green record | `check` takes a first dependency running `gate_state.py start`, and its body runs `gate_state.py passed --gate check` | records the tree a green `check` saw, if no file changed during the run |
 | the pre-push skip | the hook's entry is `python3 -I tools/gate_state.py pre-push --gate check -- uv run just check` | no second run when the working tree is clean and HEAD's tree is recorded; any doubt runs it |
 
@@ -104,15 +104,6 @@ CI reads the beads database before the gate: `bd bootstrap` with git's HTTPS rew
 (`GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0=ssh://git@github.com/`). A public repo rewrites to
 `url.https://github.com/.insteadOf`; a private one carries the job token,
 `url.https://x-access-token:${{ github.token }}@github.com/.insteadOf`, or the anonymous clone asks for a username.
-
-## A gate in a container
-
-When `just check` builds an image and runs inside it, `just blueprint` runs there too and judges only what the image
-carries. The image's ignore file (`<Dockerfile>.dockerignore`, else `.dockerignore`) must keep every tracked file
-blueprint reads: `justfile` (or `Makefile`), `AGENTS.md`, `.gitignore`, `.pre-commit-config.yaml`, `.beads/config.yaml`,
-`.beads/.gitignore`, `.claude/settings.json`, `docs/blueprint/blueprint.toml`, `docs/agents/`, `.github/workflows/`.
-Dropping `.beads` or `.claude` whole makes the container report a false "no tracker"; keep the folder out of the
-context and re-include those files after it with `!.beads/config.yaml` lines. `gate.runs-blueprint` names a dropped file.
 
 ## Exceptions
 

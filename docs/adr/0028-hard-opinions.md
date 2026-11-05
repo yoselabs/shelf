@@ -45,8 +45,7 @@ Adopting the rule includes filing each missing check.
 `sqlite-store`). Whether `sqlite-resource` and `sqlite-store` overlap is for reconciliation to answer.
 
 
-The gate's own mode switches (`SHELF_HOST_CHECK`, `GATE_LOCK`, `just check` vs `check-all`) are optionality in
-dev tooling. Remove them or justify each under ADR 0022; not done here.
+The gate's mode switches `SHELF_HOST_CHECK` and `GATE_LOCK` (and the Docker gate behind them) are removed (2026-11-05). `just check` vs `check-all` (changed files vs all) stays: it is scope, not a behaviour switch.
 
 ## Open
 
@@ -60,3 +59,4 @@ dev tooling. Remove them or justify each under ADR 0022; not done here.
 ## History
 
 - 2026-11-05: decided by the owner (quote above).
+- 2026-11-05: the gate's mode switches (`SHELF_HOST_CHECK`, `GATE_LOCK`, the Docker gate) were removed; `just check` runs natively.

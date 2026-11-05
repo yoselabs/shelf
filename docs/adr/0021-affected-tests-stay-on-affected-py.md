@@ -5,7 +5,7 @@ statement: just check narrows tests with tools/affected.py; no build tool yet. M
 concerns: [gate, tooling]
 status: accepted
 decided_by: owner
-updated: 2026-10-11
+updated: 2026-11-05
 distilled_into: tools/affected.py; justfile check / test-affected
 ---
 
@@ -36,3 +36,4 @@ pyproject, `cacheStrategy: hash` on task deps, plain `moon run :check` (not `--a
 ## History
 
 - 2026-10-11: decided after round 3.
+- 2026-11-05: the Turborepo trial's "drops the container gate" note is moot: the shelf has no container gate (ADR 0027).
