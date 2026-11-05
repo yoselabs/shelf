@@ -1,0 +1,3 @@
+- [x] Plugin and pure judging functions (`tools/blueprint_fitness.py`), registered in `conftest.py`
+- [x] Known-gaps manifest with a bead per entry and validation
+- [ ] Close the gaps with scenarios (shelf-fkx.11)

@@ -1,0 +1,287 @@
+# Checkpoint directions the blueprint suite does not yet exercise through blueprint.runner (tools/blueprint_fitness.py).
+# The list only shrinks: close a gap with a scenario, then delete its entry. Every entry names its bead.
+
+[[gap]]
+id = "framework.godot.agent-guidance"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.godot.architecture"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.godot.binary-assets"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.godot.build"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.godot.ci"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.godot.ci"
+direction = "adverse"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.godot.framework-version"
+direction = "adverse"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.godot.hooks"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.godot.project-hygiene"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.mcp.agent-guidance"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.unity.agent-guidance"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.unity.binary-assets"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.unity.build"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.unity.ci"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.unity.ci"
+direction = "adverse"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.unity.hooks"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.unity.project-hygiene"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.unity.surface-integrity"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "framework.unity.tests"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.compose.agent-guidance"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.compose.dependencies"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.compose.formatter"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.compose.hooks"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.compose.linter"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.compose.spelling"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.compose.types"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dockerfile.dependencies"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dockerfile.formatter"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dockerfile.hooks"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dotnet.agent-guidance"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dotnet.architecture"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dotnet.dependencies"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dotnet.formatter"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dotnet.hooks"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dotnet.linter"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dotnet.spelling"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dotnet.tests"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.dotnet.types"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.nix.agent-guidance"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.nix.dependencies"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.nix.formatter"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.nix.hooks"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.nix.linter"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.nix.spelling"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.python-pin"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.python-pin"
+direction = "adverse"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.python-uv.agent-guidance"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.python-uv.hooks"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.python-uv.spelling"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.python-uv.tests"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.python-uv.types"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.shell-strict"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.shell-strict"
+direction = "adverse"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.shell.agent-guidance"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.shell.formatter"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.shell.hooks"
+direction = "passing"
+bead = "shelf-fkx.11"
+
+[[gap]]
+id = "stack.shell.linter"
+direction = "passing"
+bead = "shelf-fkx.11"
