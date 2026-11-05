@@ -132,8 +132,11 @@ def parse_until(value: object, now: float) -> float | None:
     if value is None:
         return None
     text = str(value).strip()
-    if len(text) > 2 and text[0] == "+" and text[-1] in _UNIT_SECONDS and text[1:-1].isdigit():
-        return now + int(text[1:-1]) * _UNIT_SECONDS[text[-1]]
+    if len(text) > 2 and text[0] == "+" and text[-1] in _UNIT_SECONDS and text[1:-1].isascii() and text[1:-1].isdigit():
+        try:
+            return now + int(text[1:-1]) * _UNIT_SECONDS[text[-1]]
+        except OverflowError:
+            return None
     try:
         return to_epoch(float(text))
     except ValueError:

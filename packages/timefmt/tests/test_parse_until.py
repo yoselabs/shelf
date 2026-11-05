@@ -74,3 +74,12 @@ def test_zero_is_a_real_epoch() -> None:
 def test_to_epoch_converts_ms_and_seconds() -> None:
     assert to_epoch(1_700_000_000) == 1_700_000_000.0
     assert to_epoch(1_700_000_000_000) == 1_700_000_000.0
+
+
+@pytest.mark.parametrize("value", ["+²h", "+" + "9" * 400 + "d", "+٣h"])
+def test_odd_counts_are_none_not_errors(value: str) -> None:
+    assert parse_until(value, NOW) is None
+
+
+def test_whitespace_around_an_iso_time_is_ignored() -> None:
+    assert parse_until(" 2026-10-24T18:00:00Z \n", NOW) == parse_until("2026-10-24T18:00:00Z", NOW)
