@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-contract"
+kind = "any-lib"
+tier = "T1"
+release = "any-contract-v0.1.0"
+capability = "Stop writing the contract handshake twice: check that a remote speaks my contract number and capabilities (a Violation with a bounded excerpt, never an exception, ready to become a synthesized contract_violation result), and diff a local mirror's JSON schema against the remote's published one by fields and enum values, with an exact accepted-drift list. Standard library only; the codec stays the caller's."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from task-loop (adapters/delegate_wire.py result_of, tests/contracts/test_delegate_contract.py differences) and delegate (contracts/wire.py require_writer_exec_allow). The msgspec/dataclass codec unification is out of scope; lean-wire and mcp-result-wire are a different problem. Born candidate; no release tag created by this change."

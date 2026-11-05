@@ -32,6 +32,7 @@ page-tsv = { workspace = true }
 process-lock = { workspace = true }
 any-mailbox = { workspace = true }
 shelf-vendor = { workspace = true }
+any-contract = { workspace = true }
 # The dev group installs `anyembed[llamacpp,transformers]` so both backends' imports resolve.
 anyembed = { workspace = true }
 
@@ -271,6 +272,7 @@ testpaths = [
     "packages/any-lease/tests",
     "packages/any-mailbox/tests",
     "packages/shelf-vendor/tests",
+    "packages/any-contract/tests",
     "packages/record-mine/tests",
     "packages/settings-base/tests",
     "packages/static-page-check/tests",
@@ -362,6 +364,7 @@ root_packages = [
     "any_lease",
     "any_mailbox",
     "shelf_vendor",
+    "any_contract",
     "record_mine",
     "settings_base",
     "sqlite_resource",
@@ -442,6 +445,7 @@ source_modules = [
     "any_lease",
     "any_mailbox",
     "shelf_vendor",
+    "any_contract",
     "record_mine",
     "settings_base",
     "sqlite_resource",
@@ -524,6 +528,7 @@ modules = [
     "any_lease",
     "any_mailbox",
     "shelf_vendor",
+    "any_contract",
     "record_mine",
     "settings_base",
     "sqlite_resource",
