@@ -45,8 +45,8 @@ jl.read_from(path, decode, cursor)            # the same with your own decode(by
 - **Rotation.** Before an append would take the file past `rotate_bytes`, the files shift:
   `.{keep-2}` → `.{keep-1}` (the oldest is dropped), …, the file → `.1`. At most `keep` files
   exist, and a line is never split across two. **Without `rotate_lock`**, two processes rotating
-  at the same moment shift twice and drop a file. **With it** (opt-in; `True` is `<path>.lock`,
-  or pass a path; uses `process-lock`) the shift runs under an exclusive lock and the size is
+  at the same moment shift twice and drop a file. **With it** (opt-in; `True` is `<path>.lock` for a
+  `Path` or `str` path alike, or pass a path; uses `process-lock`) the shift runs under an exclusive lock and the size is
   checked again once the lock is held, so the second rotator finds the file already rotated and
   does nothing. An append never takes the lock, so the common path costs the same.
 - **Rewrite.** `rewrite(keep)` (needs `rotate_lock`) keeps the lines `keep(line_bytes)` accepts
@@ -57,15 +57,18 @@ jl.read_from(path, decode, cursor)            # the same with your own decode(by
   carried over before the replace and, from the old inode, after it (these land after the lines
   already kept). An `append` also checks that its file was not unlinked by a rewrite right after
   its write and, if so, appends again: **at-least-once** around a rewrite, so a line may then
-  appear twice and dedup is the caller's job. For exactly-once wrap appends in
+  appear twice and dedup is the caller's job. If the file is replaced under the append on all four
+  attempts (the write and three re-appends) it raises `LineLostError`: the line may not be in the log.
+  For exactly-once wrap appends in
   `with log.locked(): log.append(...)`.
 - **Held handles.** A `JsonlLog` keeps its descriptor open between appends (an append is one
   `fstat` and one `write`, no open or close; a path stat notices a rotated-away file).
   `held(path, **open_options)` returns the process's one open log for a resolved path; the options
   apply on first sight and asking again with other options raises `ValueError`. A fork child
   closes its inherited copy and opens its own. At most 16 stay open: the least recently used is
-  evicted, its descriptor closes but the log stays usable (a thread still holding it reopens the
-  descriptor on its next append). `close_held(path=None)` and `held_count(path=None)`.
+  evicted, its descriptor closes but the log stays usable: a thread still holding it reopens the
+  descriptor for each append and closes it again before returning, so an evicted log never owns a
+  descriptor between appends and nothing leaks (it is slower: one open and close per append). `close_held(path=None)` and `held_count(path=None)`.
   `process-lock` is imported only when `rotate_lock` is used.
 - **Retention.** With `max_age` (seconds) a rotated file not written to for that long is deleted,
   at open, at each rotation and on `prune()`. `expire(paths, max_age)` applies the rule to any files.
@@ -78,7 +81,8 @@ jl.read_from(path, decode, cursor)            # the same with your own decode(by
   callable refuses with `ValueError` (a torn last line, `json.JSONDecodeError`, a pydantic
   `ValidationError`) is skipped.
 - **Errors.** `append` on a closed log raises `LogClosedError`; a line holding a newline
-  before its end raises `LineError`. Both are `JsonlLogError`.
+  before its end raises `LineError`; an append lost to repeated rewrites raises `LineLostError`.
+  All are `JsonlLogError`.
 - A `read_only` log never opens the file for writing and its `append` returns `False`.
 
 Codec-agnostic: the caller owns what a line means. Stdlib plus `atomic-io` (rewrite) and `process-lock` (imported only with `rotate_lock`).

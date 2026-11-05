@@ -7,15 +7,12 @@ import multiprocessing as mp
 import os
 import threading
 import time
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import jsonl_log
 import pytest
 from jsonl_log import JsonlLog, JsonlLogError, LogClosedError
 from process_lock import ProcessLock
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 _PAD = "x" * 100
 
@@ -284,3 +281,52 @@ def test_an_append_that_met_a_replacing_rewrite_is_not_lost(tmp_path: Path, monk
         log.append(b"mine")
     other.close()
     assert b"mine\n" in path.read_bytes()
+
+
+def test_rotate_lock_true_means_path_dot_lock_for_path_and_str(tmp_path: Path) -> None:
+    for name, path in (("a.jsonl", tmp_path / "a.jsonl"), ("b.jsonl", str(tmp_path / "b.jsonl"))):
+        with JsonlLog(path, rotate_lock=True) as log:
+            assert log.path == tmp_path / name
+            assert log.rewrite(lambda _line: True) == 0
+        assert JsonlLog.open(path, rotate_lock=True)._lock_path == tmp_path / (name + ".lock")
+        assert jsonl_log.held(path, rotate_lock=True)._lock_path == tmp_path / (name + ".lock")
+    jsonl_log.close_held()
+
+
+def _open_fds() -> int:
+    return len(list(Path("/dev/fd").iterdir()))
+
+
+def test_an_evicted_log_that_is_appended_to_leaks_no_descriptor(tmp_path: Path) -> None:
+    jsonl_log.close_held()
+    first = jsonl_log.held(tmp_path / "first.jsonl")
+    for i in range(20):  # past MAX_OPEN: `first` is evicted
+        _ = jsonl_log.held(tmp_path / f"other{i}.jsonl")
+    try:
+        before = _open_fds()
+        for _ in range(5):
+            assert first.append(b"{}")  # reopens the descriptor each time
+        assert _open_fds() == before
+        assert len((tmp_path / "first.jsonl").read_bytes().splitlines()) == 5
+    finally:
+        jsonl_log.close_held()
+
+
+def test_an_append_whose_file_is_replaced_on_every_attempt_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "l.jsonl"
+    real = jsonl_log.append_line
+    calls: list[int] = []
+
+    def append_then_unlink(fd: int, data: bytes) -> int:
+        calls.append(fd)
+        at = real(fd, data)
+        path.unlink()  # a rewrite replaced the file under the descriptor
+        return at
+
+    with JsonlLog.open(path) as log:
+        monkeypatch.setattr(jsonl_log, "append_line", append_then_unlink)
+        with pytest.raises(jsonl_log.LineLostError):
+            _ = log.append(b"{}")
+        assert len(calls) == 4  # the first write and three re-appends, the last one checked too
+        monkeypatch.undo()
+        assert log.append(b"{}")  # the log stays usable

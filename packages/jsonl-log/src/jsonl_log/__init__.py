@@ -66,6 +66,14 @@ class LogClosedError(JsonlLogError):
         super().__init__(f"the log {path} is closed")
 
 
+class LineLostError(JsonlLogError):
+    """An append whose file a rewrite replaced under it on every attempt: the line may not be in the log."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        super().__init__(f"the line for {path} may be lost: the file was replaced under every append attempt")
+
+
 class LineError(JsonlLogError):
     """A line that holds a newline before its end: it would become two lines."""
 
@@ -95,13 +103,13 @@ def read(path: Path, decode: Callable[[bytes], _T]) -> Iterator[_T]:
 class JsonlLog:
     """One rotated JSON-lines log. Append-only at the application level.
 
-    ``rotate_lock`` (``True`` for ``<path>.lock``, or a path) makes rotation and :meth:`rewrite`
+    ``rotate_lock`` (``True`` for ``<path>.lock``, or a path; ``path`` may be a ``str``) makes rotation and :meth:`rewrite`
     exclusive across processes; an append never takes it.
     """
 
     def __init__(
         self,
-        path: Path,
+        path: Path | str,
         *,
         rotate_bytes: int = ROTATE_BYTES,
         keep: int = KEEP,
@@ -112,6 +120,7 @@ class JsonlLog:
         if keep < 1:
             msg = f"keep must be at least 1, got {keep}"
             raise ValueError(msg)
+        path = Path(path)
         self._path = path
         self._rotate_bytes = rotate_bytes
         self._keep = keep
@@ -119,6 +128,7 @@ class JsonlLog:
         self._max_age = max_age
         self._fd: int | None = None
         self._closed = False
+        self._transient = False  # the held cache evicted this log: a reopened descriptor lasts one append
         self._mutex = threading.RLock()
         self._lock_path: Path | None = (
             path.with_name(path.name + ".lock") if rotate_lock is True else Path(rotate_lock) if rotate_lock else None
@@ -188,21 +198,27 @@ class JsonlLog:
         if b"\n" in data[:-1]:
             raise LineError(self._path)
         with self._mutex:
-            fd = self._current_fd()
-            size = os.fstat(fd).st_size
-            if size and size + len(data) > self._rotate_bytes:
-                self._rotate(len(data))
+            try:
                 fd = self._current_fd()
-            at = append_line(fd, data)
-            for _ in range(_REAPPEND):
-                if os.fstat(fd).st_nlink:
-                    break
-                # A rewrite replaced the file under this descriptor: the line went to an unlinked inode
-                # (the rewrite may have carried it over too, so it can now be there twice).
-                self._close_file()
-                fd = self._current_fd()
+                size = os.fstat(fd).st_size
+                if size and size + len(data) > self._rotate_bytes:
+                    self._rotate(len(data))
+                    fd = self._current_fd()
                 at = append_line(fd, data)
-            return at
+                for attempt in range(_REAPPEND + 1):
+                    if os.fstat(fd).st_nlink:
+                        return at
+                    if attempt == _REAPPEND:
+                        break
+                    # A rewrite replaced the file under this descriptor: the line went to an unlinked inode
+                    # (the rewrite may have carried it over too, so it can now be there twice).
+                    self._close_file()
+                    fd = self._current_fd()
+                    at = append_line(fd, data)
+                raise LineLostError(self._path)
+            finally:
+                if self._transient:
+                    self._close_file()  # evicted from the held cache: never keep a descriptor nobody can release
 
     def append_json(self, value: object) -> bool:
         """:meth:`append` of ``value`` as compact JSON."""
@@ -272,8 +288,13 @@ class JsonlLog:
             return rewrite_file(self._path, keep, then=self._close_file)
 
     def release_fd(self) -> None:
-        """Close the descriptor but not the log: the next append reopens it. What the held cache's eviction uses."""
+        """Close the descriptor but not the log; what the held cache's eviction uses.
+
+        The log is then transient: an append reopens the descriptor and closes it again before returning, so a
+        thread still holding an evicted log never leaves a descriptor open that nothing would release.
+        """
         with self._mutex:
+            self._transient = True
             self._close_file()
 
     def _rotate(self, incoming: int = 0) -> None:
@@ -330,6 +351,7 @@ __all__ = [
     "JsonlLog",
     "JsonlLogError",
     "LineError",
+    "LineLostError",
     "LogClosedError",
     "append_line",
     "close_held",
