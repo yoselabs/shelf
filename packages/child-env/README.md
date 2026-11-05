@@ -14,6 +14,7 @@ env["DELEGATE_DEPTH"] = "1"                      # add your own after scrubbing
 subprocess.Popen(argv, env=env)
 ```
 
+- `strip_venv=True` (or `without_venv(env)` alone) also strips an active Python virtualenv, see below.
 - `keep` / `drop` entries are exact names, or a prefix when they end with `*`.
 - Precedence: `drop` beats everything; `keep` beats the defaults; anything else not matched by a default stays
   (`PATH`, `HOME`, `LANG`, `XDG_*`, `GIT_*`, `TERM`, ...).
@@ -47,6 +48,15 @@ Credentials (a worker should not inherit the launcher's secrets), matched case-i
 
 Known false positives: anything with the marker words in a harmless name (`TOKENIZERS_PARALLELISM`, a `GITHUB_*`
 feature flag). Rescue them with `keep`.
+
+## Virtualenv strip (opt-in)
+
+A child that inherits our `VIRTUAL_ENV` runs in our venv (the task-loop leak of 2026-10-30). Off by default;
+`scrub(env, strip_venv=True)` or `without_venv(env)` removes `VENV_NAMES` (`VIRTUAL_ENV`, `VIRTUAL_ENV_PROMPT`,
+`PYTHONHOME`, `__PYVENV_LAUNCHER__`, `PYTHONEXECUTABLE`) and, when `VIRTUAL_ENV` is set, the exact entry
+`$VIRTUAL_ENV/bin` from `PATH` (other entries and their order stay; with no `VIRTUAL_ENV`, `PATH` is untouched).
+`strip_venv` wins over `keep`, and still cleans `PATH` when `drop` removed `VIRTUAL_ENV`. `PYTHONPATH`, `UV_*` and
+the rest are not touched. There is no allowlist mode.
 
 ## Provenance: two copies, one union
 
