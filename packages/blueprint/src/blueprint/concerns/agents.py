@@ -253,9 +253,13 @@ def worktrees_in_sync(ctx: Context) -> Finding:
         if missing is not None and missing < limit:
             stale.append(f"{branch}: behind main since {_ago(missing)}")
     if stale:
+        # Another session works in each of these worktrees: whoever audits must not reach into them
+        # (live run #7: the audit told an agent to rebase another session's worktree).
         return failing(
             "; ".join(stale),
-            "in each worktree: rebase on main, `just check`, merge to main on the owner's yes; remove worktrees whose work is done",
+            "each named worktree belongs to a session; ask the one working there to land its work into main or take "
+            "main's changes, and remove worktrees whose work is done",
+            FixedBy.OWNER,
         )
     return passing(f"{len(branches)} worktrees, each within {_SYNC_HOURS}h of main both ways")
 

@@ -45,7 +45,8 @@ def printing(*lines, then="true"):
     return "".join(f"echo '{ln}'; " for ln in lines) + then
 
 
-FAST = Limits(first_event_s=30, silence_s=30, grace_s=0.4)
+FAST = Limits(first_event_s=30, silence_s=30, grace_s=30)  # nothing here is stopped by the grace unless a test shortens it
+SHORT_GRACE = Limits(first_event_s=30, silence_s=30, grace_s=0.4)
 
 
 def test_a_worker_that_exits_is_summarised_by_its_harness(tmp_path):
@@ -65,7 +66,7 @@ def test_the_prompt_goes_in_on_stdin(tmp_path):
 
 def test_a_worker_that_answers_and_lingers_is_stopped_after_the_grace(tmp_path):
     hooks = RunHooks()
-    out = run(ClaudeHarness(), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT, then="sleep 60")), 30, hooks, limits=FAST)
+    out = run(ClaudeHarness(), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT, then="sleep 60")), 30, hooks, limits=SHORT_GRACE)
     assert (out.stop, out.timed_out) == ("answer", False)
     assert out.summary.rc == 0 and out.summary.text == "claude answer"
     assert len(hooks.stops) == 1 and hooks.stops[0].term_sent and hooks.stops[0].survivors == []

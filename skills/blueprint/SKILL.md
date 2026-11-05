@@ -70,11 +70,14 @@ the next audit takes it in. So rerun the audit whenever the shelf moves.
 
 ## 3. Remediate (after the owner's yes)
 
-The owner's one yes covers the whole plan. Per concern, in layer order (generic, stack, agent):
+The owner's one yes covers the `auto` and `agent` rows, never the `owner` rows. Per concern, in layer order (generic, stack, agent):
 
 - `auto` rows: run the engine's remediation as written.
 - `agent` rows: do them, or delegate (§5) when a concern has several.
-- `owner` rows: one batched question round, your default worded so "yes" accepts it.
+- `owner` rows: one decision per row, asked for that row by name (a round may group them for reading,
+  but a blanket yes never applies an owner row); an `unproven-standard:` row is a provisional
+  profile's recipe, which applied wholesale broke lifesim clones (shelf-o5a) and packages
+  (shelf-ir7), so show its evidence with the question. Your default worded so "yes" accepts it.
 - Re-run `check --concern <c> --audit`; a fix never seen ✅ is unverified, and you say so.
 - A row right to leave failing becomes an override in `docs/blueprint/blueprint.toml` only with the
   owner's yes. Every exception is justified: a reason, and either `expires` (temporary) or
