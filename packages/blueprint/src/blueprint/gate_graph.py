@@ -26,7 +26,7 @@ _MAKE_VARIABLE_USE = re.compile(r"\$[({]([A-Za-z_]\w*)[)}]")
 # A gate that runs the hook config (`pre-commit run --all-files`, `prek run`): every hook in it is part of the gate.
 HOOK_RUN = re.compile(r"\b(?:pre-commit|prek)\s+run\b")
 HOOK_CONFIG = ".pre-commit-config.yaml"
-# `just container check-host`, `uv run just check`, `{{just_executable()}} test`: a body that runs another recipe.
+# `just container check`, `uv run just check`, `{{just_executable()}} test`: a body that runs another recipe.
 _JUST_CALL = re.compile(r"\bjust\s+(?:--?[\w-]+(?:=\S+)?\s+)*([A-Za-z_][\w-]*)")
 
 
@@ -111,7 +111,7 @@ def _just(ctx: Context, name: str, text: str) -> Gate:
     for recipe_name, recipe in dump["recipes"].items():
         body = "\n".join("".join(_fragment(part, assignments, 0) for part in line) for line in recipe["body"])
         names = [dep["recipe"] for dep in recipe["dependencies"]]
-        # An argument that is a recipe's name is an edge: check -> gate("check-host") reaches check-host.
+        # An argument that is a recipe's name is an edge: check -> steps("lint") reaches lint.
         names += [arg for dep in recipe["dependencies"] for arg in dep["arguments"] if isinstance(arg, str) and arg in known]
         names += [m for m in _JUST_CALL.findall(body) if m in known]
         recipes[recipe_name] = Recipe(tuple(dict.fromkeys(names)), body)

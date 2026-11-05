@@ -7,8 +7,7 @@ Two jobs, both stdlib only so the script runs as bare `python3 -I`:
 takes every core; four at once on one box took 11-14 min each instead of 2). A run that has to wait says so once,
 naming the holder, and again when it gets the lock. The lock is an flock on `$GATE_LOCK_FILE`, default
 `${XDG_CACHE_HOME:-~/.cache}/gate-test.lock`, held by CMD itself (the script execs it) and freed when CMD exits or
-dies. A CMD run under the lock that asks for it again does not wait on itself (`GATE_LOCK_HELD`). It is off when
-`CI` is set (a CI runner is single-tenant) or `GATE_LOCK=off`. Notices go to the file descriptor in
+dies. A CMD run under the lock that asks for it again does not wait on itself (`GATE_LOCK_HELD`). Notices go to the file descriptor in
 `$GATE_NOTICE_FD` when that is open (the gate's parallel runner points it at its terminal; a step's own output is
 logged), else to stderr. Only the expensive step takes it, so the gate's other steps never wait on it.
 
@@ -42,7 +41,6 @@ if TYPE_CHECKING:
 RECORD = "gate-green"
 START = "gate-green.start"
 _KEEP = 50  # trees remembered per repo
-_OFF = frozenset({"0", "off", "false", "no"})
 
 
 def _notice(text: str) -> None:
@@ -81,22 +79,10 @@ def lock_file() -> Path:
     return Path(cache) / "gate-test.lock"
 
 
-def _lock_off() -> str | None:
-    if os.environ.get("GATE_LOCK", "").strip().lower() in _OFF:
-        return "GATE_LOCK=off"
-    if os.environ.get("CI", "").strip().lower() not in {"", *_OFF}:
-        return "CI"
-    return None
-
-
 def run_locked(cmd: Sequence[str]) -> int:
     """Exec `cmd` holding the box-wide lock (see the module docstring); returns only when it cannot exec."""
     env = dict(os.environ)
     path = lock_file()
-    off = _lock_off()
-    if off is not None:
-        _notice(f"gate-lock: off ({off})")
-        return _exec(cmd, env)
     if env.get("GATE_LOCK_HELD") == str(path):
         return _exec(cmd, env)
     try:

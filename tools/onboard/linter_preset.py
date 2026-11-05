@@ -6,7 +6,7 @@ Implements `docs/linting.md`'s own copy list, mechanically:
    `[tool.coverage.*]` blocks from shelf's `pyproject.toml`.
 2. The `justfile` recipes (`check gate-start guard preset bootstrap bootstrap-verify tools lint format typecheck spell deps test`),
    with the attributes and comments that sit directly above each (ADR 0023: the gate runner is just);
-   `check` is the plain gate (the shelf's own dispatches to its container), and `deps` is rewritten
+   `check` is the plain gate (the shelf's own also runs the affected-only tests), and `deps` is rewritten
    for a single-package repo, since the shelf's own loops over `packages/*`. `check` and `test` call
    `tools/gate_state.py` (the blueprint's gate-state recipe), copied when absent.
 3. The `dev` dependency-group.
@@ -83,8 +83,7 @@ deps:
     uv run deptry .
 
 """
-# The shelf's `check` dispatches to a container and to recipes a consumer is not given
-# (check-host, test-affected); a consumer gets the plain gate.
+# The shelf's `check` runs recipes a consumer is not given (test-affected); a consumer gets the plain gate.
 _CONSUMER_CHECK = """# The gate: every step at once (`steps`), one timing line, a warning for a step over its budget.
 # A green run records the tree it checked (tools/gate_state.py), so the pre-push hook does not run it again on that tree.
 [group('gate')]

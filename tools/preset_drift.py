@@ -60,11 +60,12 @@ _JUSTFILES = ("justfile", "Justfile", ".justfile")
 
 # Recipes that operate on the shelf's own layout (its catalog, its cross-package
 # advisory, its import-graph contracts (`arch`: a consumer's layers are its own), its
-# any-browser lane, its gate container and affected-only run). `blueprint`
+# any-browser lane, its affected-only run). `blueprint`
 # is copied (the per-commit blueprint checks), so it is not shelf-only. A consumer
 # has nothing for them to act on, so their absence is not drift; without this every
 # fresh consumer failed `just preset`. `images` and `scripts` are the blueprint's names for the hadolint and
 # shellcheck steps: owed only by a repo with Dockerfiles or scripts (its stack rows say so), so never drift either way.
+# The shelf itself has no `images` recipe (no Dockerfile); a consumer with Dockerfiles does.
 _SHELF_ONLY_TARGETS = frozenset(
     {
         "catalog",
@@ -74,13 +75,8 @@ _SHELF_ONLY_TARGETS = frozenset(
         "arch",
         "test-browser",
         "check-all",
-        "check-host",
-        "check-all-host",
-        "test-image",
         "test-affected",
         "eval",
-        "gate",
-        "container",
         "images",
         "scripts",
     }
@@ -176,7 +172,7 @@ def main() -> int:
     # checkout — so identity is "this script lives in the repo under test", not a path
     # comparison. Without it, `just preset` in a shelf worktree grades the branch
     # against `main` and fails on every change the branch is making. Checked before the
-    # clone lookup: the shelf's own gate container has no clone beside it.
+    # clone lookup.
     shelf = _shelf_root(args.shelf_home)
     if Path(__file__).resolve().parent.parent == repo or shelf == repo:
         print("preset-drift: this IS the shelf; nothing to compare against")

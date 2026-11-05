@@ -25,10 +25,10 @@ def test_a_live_group_is_alive_and_a_reaped_one_is_not() -> None:
 
 
 def test_our_own_group_is_alive() -> None:
-    # group_alive never probes group 1 (by contract), and a container's `docker run <cmd>` puts the whole
-    # test process in group 1: there is no own group to probe, and the case above covers a live one.
+    # group_alive never probes group 1 (by contract): a process that is pid 1's group has no own group to
+    # probe, and the case above covers a live one.
     if os.getpgrp() <= 1:
-        pytest.skip("this process is in process group 1 (container pid 1's group)")
+        pytest.skip("this process is in process group 1 (pid 1's group)")
     assert group_alive(os.getpgrp())
 
 
