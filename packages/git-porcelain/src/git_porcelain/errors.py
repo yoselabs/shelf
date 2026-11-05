@@ -154,6 +154,7 @@ def failure(
     elif code == 128:
         if (
             tail == "fatal: not a git repository (or any of the parent directories): .git"
+            or re.fullmatch(r"fatal: not a git repository \(or any parent up to mount point .+\)", tail)
             or re.fullmatch(r"fatal: cannot change to '.+': No such file or directory", tail)
             or tail.startswith("fatal: not a git repository:")
         ):
