@@ -10,7 +10,7 @@
     "land_mode": "pr",
     "pick_label": "auto",
     "checks": [
-      {"id": "gate", "argv": ["uv", "run", "just", "check"], "group": "tests", "run": "gate"}
+      {"id": "gate", "argv": ["python3", "-I", "tools/gate_state.py", "pre-push", "--gate", "check", "--", "uv", "run", "just", "check"], "group": "tests", "run": "gate"}
     ]
   }
 }
