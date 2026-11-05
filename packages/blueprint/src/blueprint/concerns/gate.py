@@ -444,7 +444,7 @@ def _cause(done: subprocess.CompletedProcess[str]) -> str:
     return "no output"
 
 
-def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budget: object, word: str = "just") -> Finding:
+def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budget: object, ctx: Context, word: str = "just") -> Finding:
     if done is None:
         return failing(f"`{word} check` in a fresh clone did not finish within an hour", "find the step that hangs")
     if done.returncode != 0:
@@ -456,10 +456,24 @@ def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budge
             FixedBy.AUTO,
         )
     if took > budget:
+        # The load is context for the owner's call (a busy machine reads as a slow gate), never a threshold.
         return failing(
-            f"fresh-clone gate took {took}s, budget {budget}s", "speed the gate up, or raise the budget with the owner", FixedBy.OWNER
+            f"fresh-clone gate took {took}s, budget {budget}s, this machine's {_load_average(ctx)}",
+            "speed the gate up, or raise the budget with the owner",
+            FixedBy.OWNER,
         )
     return passing(f"fresh-clone gate passed in {took}s (budget {budget}s)")
+
+
+# `uptime` on macOS ("load averages: 2.31 2.05 1.90") and Linux ("load average: 0.08, 0.03, 0.05"): the 1-minute first.
+_LOAD_AVERAGE = re.compile(r"load averages?:\s*([\d.]+)")
+
+
+def _load_average(ctx: Context) -> str:
+    """This machine's 1-minute load average, or that it could not be read: context for an over-budget gate."""
+    done = ctx.run("uptime", timeout=30)
+    found = _LOAD_AVERAGE.search(done.stdout) if done is not None and done.returncode == 0 else None
+    return f"load average {found.group(1)}" if found else "load average unavailable (`uptime` did not answer)"
 
 
 # What a fresh clone needs before its gate can run, in order: until `mise trust` every mise shim refuses (uv
@@ -555,7 +569,7 @@ def _gate_in(ctx: Context, folder: Path, word: str, budget: object) -> Finding:
     if (failed := _fresh_clone_steps(ctx, folder)) is not None:
         return failed
     done = ctx.run(gate_graph.just_command(ctx) if word == "just" else word, "check", cwd=folder, timeout=3600)
-    return _judge_clone(done, round(time.monotonic() - start), budget, word)
+    return _judge_clone(done, round(time.monotonic() - start), budget, ctx, word)
 
 
 def _snapshot(ctx: Context, folder: Path) -> bool:

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import shutil
 import subprocess
 from datetime import date
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
 from blueprint.__main__ import RECIPES
+from blueprint.concerns import gate
 from blueprint.model import FixedBy, Verdict
 from blueprint.report import gate as gate_report
 from blueprint.runner import run
@@ -182,6 +185,37 @@ def test_clean_clone_passes_within_its_budget(repo: Repo) -> None:
     repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
     repo.commit()
     assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.PASSING
+
+
+def _runaway_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A clock that counts a second a call, so a real sub-second gate reads as over any budget."""
+    ticks = itertools.count(step=1000)
+    monkeypatch.setattr(gate, "time", SimpleNamespace(monotonic=lambda: float(next(ticks))))
+
+
+def test_clean_clone_over_budget_reports_this_machines_load_average(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
+    _runaway_clock(monkeypatch)
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
+    repo.commit()
+    repo.fake_tool(repo.bin_dir / "uptime", " 12:00  up 2 days, 1 user, load averages: 2.31 2.05 1.90")
+    verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
+    assert verdict is Verdict.FAILING
+    assert "budget 60s" in evidence
+    assert "2.31" in evidence
+
+
+def test_clean_clone_over_budget_without_a_load_reading_still_fails_and_says_so(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
+    _runaway_clock(monkeypatch)
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
+    repo.commit()
+    (repo.bin_dir / "uptime").write_text("#!/bin/sh\nexit 1\n")
+    (repo.bin_dir / "uptime").chmod(0o755)
+    verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
+    assert verdict is Verdict.FAILING
+    assert "budget 60s" in evidence
+    assert "load average unavailable" in evidence
 
 
 def test_clean_clone_never_passes_on_an_uncommitted_file_and_names_it(repo: Repo) -> None:

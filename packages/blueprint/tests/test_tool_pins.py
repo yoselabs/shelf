@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from blueprint.model import Verdict
-from blueprint.runner import run
+import pytest
+from blueprint.model import FixedBy, Verdict
+from blueprint.runner import Row, run
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from blueprint.testing import Repo
 
 _LOCK = """lockfile_version = 3
@@ -28,6 +31,16 @@ _JUSTFILE = "check:\n    true\n\ntools:\n    mise install --locked\n"
 def _rows(repo: Repo, *, audit: bool = False) -> dict[str, tuple[Verdict, str]]:
     report = run(repo.root, concern="stack", audit=audit, env=repo.env)
     return {r.id: (r.verdict, r.evidence) for r in report.rows if r.id in {"stack.tool-pins", "stack.tools-installed"}}
+
+
+def _installed_row(repo: Repo) -> Row:
+    return next(r for r in run(repo.root, concern="stack", audit=True, env=repo.env).rows if r.id == "stack.tools-installed")
+
+
+def _refusing_tool(path: Path, stderr: str) -> None:
+    """A probe that fails with `stderr` on its mind and exits 1."""
+    path.write_text(f"#!/bin/sh\ncat >&2 <<'EOF'\n{stderr}\nEOF\nexit 1\n")
+    path.chmod(0o755)
 
 
 def _tools_repo(repo: Repo, pins: str = _PINS, lock: str = _LOCK) -> None:
@@ -147,6 +160,35 @@ def test_an_installed_tool_at_another_version_fails_the_audit(repo: Repo) -> Non
 def test_the_installed_versions_are_audit_only(repo: Repo) -> None:
     _tools_repo(repo)
     assert "stack.tools-installed" not in _rows(repo)
+
+
+@pytest.mark.parametrize("tool", ["uv", "just", "prek", "bd", "godot"])
+def test_an_untrusted_mise_config_is_a_trust_finding_not_a_missing_install(repo: Repo, tool: str) -> None:
+    # Live run #6: every probe refused over the untrusted mise.toml and the audit said "not installed" three times.
+    # The stderr line carries a mise version; it is the cause, never this tool's version.
+    repo.write("mise.toml", f'[tools]\n{tool} = "1.2.3"\n')
+    _refusing_tool(repo.bin_dir / tool, f"mise 2025.10.12 ERROR: {repo.root}/mise.toml is not trusted, run `mise trust`")
+    row = _installed_row(repo)
+    assert row.verdict is Verdict.FAILING
+    assert "is not installed" not in row.evidence
+    assert "not trusted" in row.evidence
+    assert f"{tool} 2025.10.12" not in row.evidence
+    assert "(pin" not in row.evidence
+    assert "mise trust" in row.remediation
+    assert "mise install" not in row.remediation
+    assert row.fixed_by is FixedBy.OWNER
+
+
+def test_a_probe_failing_for_another_reason_is_still_not_installed(repo: Repo) -> None:
+    _tools_repo(repo)
+    repo.fake_tool(repo.bin_dir / "prek", "prek 0.5.5")
+    repo.fake_tool(repo.bin_dir / "just", "just 1.58.0")
+    _refusing_tool(repo.bin_dir / "bd", "dyld[123]: Library not loaded: libbeads.dylib")
+    row = _installed_row(repo)
+    assert row.verdict is Verdict.FAILING
+    assert "bd is not installed" in row.evidence
+    assert "trust" not in row.evidence
+    assert row.fixed_by is not FixedBy.OWNER
 
 
 def test_git_lfs_is_not_asked_for_in_mise_even_when_gitattributes_uses_lfs(repo: Repo) -> None:

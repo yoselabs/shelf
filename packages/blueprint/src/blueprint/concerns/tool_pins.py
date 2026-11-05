@@ -13,7 +13,7 @@ import re
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
-from blueprint.model import check, failing, not_applicable, not_set_up, passing, toml_table, uses_beads
+from blueprint.model import FixedBy, check, failing, not_applicable, not_set_up, passing, toml_table, uses_beads
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
@@ -180,13 +180,30 @@ def tools_installed(ctx: Context) -> Finding:
     if not pins:
         return not_applicable("mise.toml pins no tool blueprint knows how to ask for its version")
     drift: list[str] = []
+    untrusted: list[str] = []
     for tool, pinned in sorted(pins.items()):
         done = ctx.run(*_VERSION_ARGV[tool], timeout=30)
-        said = _SAID.search(done.stdout) if done is not None and done.returncode == 0 else None
+        if done is None:
+            drift.append(f"{tool} is not installed")
+            continue
+        # A mise shim over an untrusted mise.toml refuses before the tool runs; that is a trust problem,
+        # not a missing install, and its error text may carry numbers (a mise version) that are not the tool's.
+        if done.returncode != 0 and (complaint := _trust_complaint(done.stderr)) is not None:
+            untrusted.append(f"{tool}: {complaint}")
+            continue
+        said = _SAID.search(done.stdout) if done.returncode == 0 else None
         if said is None:
             drift.append(f"{tool} is not installed")
         elif _numbers(said.group()) != _numbers(pinned.removeprefix("v")):
             drift.append(f"{tool} {said.group()} (pin {pinned})")
+    if untrusted:
+        # One untrusted config makes every mise-managed probe refuse the same way, so any not-installed
+        # diagnoses beside it are the same cause misread (live run #6: three wrong remediations).
+        return failing(
+            f"this machine's mise refuses the repo's config: {'; '.join(untrusted)}",
+            "run `mise trust` in the repo (it runs the config: an owner's yes), then re-run the audit",
+            FixedBy.OWNER,
+        )
     if drift:
         return failing(
             "; ".join(drift) + " on this machine's PATH",
@@ -194,3 +211,10 @@ def tools_installed(ctx: Context) -> Finding:
             "shell's rc file, or prepend ~/.local/share/mise/shims; a brew or system copy earlier on PATH wins otherwise",
         )
     return passing("installed as pinned: " + ", ".join(f"{t} {v}" for t, v in pins.items()))
+
+
+def _trust_complaint(stderr: str) -> str | None:
+    """The stderr line saying a mise shim refused over an untrusted config, or None when stderr says something else."""
+    if "mise" not in stderr.lower():
+        return None
+    return next((line.strip() for line in stderr.splitlines() if "not trusted" in line.lower()), None)
