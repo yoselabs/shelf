@@ -1,8 +1,8 @@
 """Architectural fitness rules — blocking, intra-package (ADR 0005).
 
 Native reimplementation of a2kit's Rego policies (no OPA). These BLOCK on within-package
-findings; cross-package duplication is advisory only (`just advisory`) for now: it is the
-no-redundancy check of constitution IX and becomes blocking once its noise is gone (ADR 0028).
+findings; cross-package body duplication blocks too (Article III, no redundancy). Cross-package
+private-name collisions are not checked: the same name over different bodies is not redundancy.
 """
 
 import re
@@ -101,6 +101,12 @@ def test_no_intra_package_body_duplication() -> None:
         if frozenset({a.name, b.name}) not in allowed
     ]
     assert not dups, f"duplicated function bodies within a package (extract a canonical impl): {dups}"
+
+
+def test_no_cross_package_body_duplication() -> None:
+    # Article III — one implementation of a behaviour per repo. No allowlist: lift it to one package or file a task.
+    dups = [(a.file, a.name, b.file, b.name) for a, b in arch_rules.body_dups(arch_rules.function_facts(), cross_package=True)]
+    assert not dups, f"function bodies duplicated across packages (lift to one package, or file a task): {dups}"
 
 
 def test_no_intra_package_private_name_collision() -> None:

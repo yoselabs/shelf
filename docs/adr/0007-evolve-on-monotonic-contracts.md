@@ -5,7 +5,7 @@ statement: Evolve the one package to the richer superset instead of cutting a si
 concerns: [workflow]
 status: accepted
 decided_by: owner
-updated: 2026-07-08
+updated: 2026-11-05
 expires: 2027-01-08
 distilled_into: agent-loop.md WORKFLOW: SEAM (EVOLVE direction)
 ---
@@ -59,3 +59,6 @@ holder outside the LLM path wants them.
   Trigger: the first real case, a2web's LLM `Provider` vs `anyllm`. Expires 2027-01-08 (re-justify,
   especially whether any consumer ever needed the escape valve). Track: governance / promotion model,
   follows ADR 0006.
+- 2026-11-05: amended (ADR 0028). "Removes nothing" means no capability is lost at a merge, not that an old API
+  shape stays: the superset replaces the old shape outright, with no shim, alias or dual path; consumers move or
+  stay pinned to the old tag.

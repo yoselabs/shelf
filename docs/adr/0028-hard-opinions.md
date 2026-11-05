@@ -33,17 +33,11 @@ row, not a flag).
 |---|---|---|
 | No optionality | review check; lint on boolean mode parameters | lint untested, to file |
 | No backward compatibility | grep ban on shim / legacy / compat / deprecated in code | to file |
-| No redundancy | reconciliation pass (VIII); the cross-package duplicate check (`just advisory`, ADR 0005) | advisory today; blocking once private-name collisions are not flagged and current findings are reconciled |
+| No redundancy | `test_no_intra_package_body_duplication`, `test_no_cross_package_body_duplication` (ADR 0005); reconciliation pass (VIII) | exists, blocking |
 | Dependency injection | architecture fitness test: no module-level I/O or global state (python.md already states it) | to file |
 | Decomposition and isolation | Article IV per-file limit in the repo linter | exists in task-loop once its ratchet is replaced |
 
 Adopting the rule includes filing each missing check.
-
-## Breaches already known
-
-`just advisory` today lists private-name collisions across packages (e.g. `_open` in `sqlite-resource` and
-`sqlite-store`). Whether `sqlite-resource` and `sqlite-store` overlap is for reconciliation to answer.
-
 
 The gate's mode switches `SHELF_HOST_CHECK` and `GATE_LOCK` (and the Docker gate behind them) are removed (2026-11-05). `just check` vs `check-all` (changed files vs all) stays: it is scope, not a behaviour switch.
 

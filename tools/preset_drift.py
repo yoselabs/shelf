@@ -58,8 +58,7 @@ _AXES = (
 _RECIPE = re.compile(r"^@?([A-Za-z_][\w-]*)(?:[ \t]+[^:=\n]*?)?[ \t]*:(?!=)")
 _JUSTFILES = ("justfile", "Justfile", ".justfile")
 
-# Recipes that operate on the shelf's own layout (its catalog, its cross-package
-# advisory, its import-graph contracts (`arch`: a consumer's layers are its own), its
+# Recipes that operate on the shelf's own layout (its catalog, its import-graph contracts (`arch`: a consumer's layers are its own), its
 # any-browser lane, its affected-only run). `blueprint`
 # is copied (the per-commit blueprint checks), so it is not shelf-only. A consumer
 # has nothing for them to act on, so their absence is not drift; without this every
@@ -71,7 +70,6 @@ _SHELF_ONLY_TARGETS = frozenset(
         "catalog",
         "lint-changed",
         "spell-changed",
-        "advisory",
         "arch",
         "test-browser",
         "check-all",

@@ -5,7 +5,7 @@ statement: Each audit records the checkpoints it judged in docs/blueprint/checkp
 concerns: [gate]
 status: accepted
 decided_by: owner
-updated: 2026-10-11
+updated: 2026-11-05
 distilled_into: blueprint runner.ACCEPTED; report.write
 ---
 
@@ -29,3 +29,4 @@ Why: the shelf moving must not turn every consumer's pre-push red in the middle 
 ## History
 
 - 2026-10-11: decided (shelf-pqu).
+- 2026-11-05: note (ADR 0028). Warn-first is a rollout rule for consumer repos, not a code path: no warn-mode exists in code.

@@ -3,8 +3,7 @@
 
 ADR 0005: the shelf models AST-fact architecture rules as pure-stdlib Python, NOT as OPA/Rego — OPA is a non-hermetic binary substrate
 the shelf exists to shed. This engine is the shared machinery; the blocking assertions
-live in ``tests/test_arch_rules.py`` and the non-blocking cross-package report in
-``tools/arch_advisory.py``.
+live in ``tests/test_arch_rules.py``.
 
 Three rules (a2kit lineage in parens):
 - **dep upper-bound** (RG004): every runtime dependency must declare an upper bound.
@@ -12,9 +11,9 @@ Three rules (a2kit lineage in parens):
   *normalized* body (alpha-equivalent — local names + literals abstracted).
 - **private-name collision** (RG002): a ``_``-prefixed helper name reused across files.
 
-Scope matters (constitution VI values *some* duplication): the tests block only
-**within a package**; **across packages** duplication is advisory — a "consider a T0
-primitive" nudge, never a build failure.
+Scope: body duplication blocks within a package and across packages (constitution III, one
+implementation per repo). Private-name collision blocks only within a package: the same private name
+in two packages is two bodies, not a duplicate behaviour.
 """
 
 from __future__ import annotations

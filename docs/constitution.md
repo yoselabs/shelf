@@ -35,7 +35,15 @@ Accumulation without consolidation is drift. Hard opinions, a breach is a defect
   bumps the package tag; consumers move or stay pinned (tags are never deleted).
 - **No redundancy.** One implementation of a behaviour per repo. A duplicate is allowed only as a recorded
   task that reconciliation (Article VIII) must resolve, never as the end state.
-Each rule names its check; where the check does not exist yet, adopting the rule includes filing it.
+Each rule names its check; where the check does not exist yet, adopting the rule includes filing it:
+
+| Rule | Check | State |
+|---|---|---|
+| Injection (II) | module-level I/O and global-state fitness test | task shelf-ufmg |
+| No optionality | boolean-mode-parameter lint | task shelf-cypc |
+| No backward compatibility | shim / legacy / compat ban | task shelf-au97 |
+| No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
+| Size limit (IV) | per-file line limit in the linter | task shelf-26qe |
 
 ### IV. Size is a hard limit for code; structure is the cure.
 Code files stay under a per-repo line limit (set in the repo's linter, no exceptions list, no ratchet file).
