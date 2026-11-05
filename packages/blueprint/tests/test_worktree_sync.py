@@ -7,8 +7,8 @@ import subprocess
 import time
 from typing import TYPE_CHECKING
 
-from blueprint.model import Verdict
-from blueprint.runner import run
+from blueprint.model import FixedBy, Verdict
+from blueprint.runner import Row, run
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -26,8 +26,12 @@ def _commit(cwd: Path, name: str, age_s: int) -> None:
     subprocess.run(["git", "commit", "-qm", name], cwd=cwd, check=True, env=env)
 
 
+def _rows(repo: Repo) -> dict[str, Row]:
+    return {r.id: r for r in run(repo.root, concern="agents", audit=True, env=repo.env).rows}
+
+
 def _verdict(repo: Repo) -> tuple[Verdict, str]:
-    row = next(r for r in run(repo.root, concern="agents", audit=True, env=repo.env).rows if r.id == "agents.worktrees-in-sync")
+    row = _rows(repo)["agents.worktrees-in-sync"]
     return row.verdict, row.evidence
 
 
@@ -48,18 +52,22 @@ def test_work_unmerged_for_over_a_day_fails_and_is_named(repo: Repo) -> None:
     _commit(repo.root, "base", 3 * _DAY)
     tree = _worktree(repo, "slow")
     _commit(tree, "work", 2 * _DAY)
-    verdict, evidence = _verdict(repo)
-    assert verdict is Verdict.FAILING
-    assert "slow" in evidence
+    row = _rows(repo)["agents.worktrees-in-sync"]
+    assert row.verdict is Verdict.FAILING
+    assert "slow" in row.evidence
+    assert row.fixed_by is FixedBy.OWNER
+    assert "rebase" not in row.remediation.lower()
 
 
 def test_a_worktree_missing_day_old_main_commits_fails(repo: Repo) -> None:
     _commit(repo.root, "base", 3 * _DAY)
     _worktree(repo, "behind")
     _commit(repo.root, "main-moved", 2 * _DAY)
-    verdict, evidence = _verdict(repo)
-    assert verdict is Verdict.FAILING
-    assert "behind" in evidence
+    row = _rows(repo)["agents.worktrees-in-sync"]
+    assert row.verdict is Verdict.FAILING
+    assert "behind" in row.evidence
+    assert row.fixed_by is FixedBy.OWNER
+    assert "rebase" not in row.remediation.lower()
 
 
 def test_no_worktrees_is_not_applicable(repo: Repo) -> None:
