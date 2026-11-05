@@ -2,36 +2,6 @@
 
 lockfile_version = 3
 
-[[tools."aqua:reteps/dockerfmt"]]
-version = "0.5.4"
-backend = "aqua:reteps/dockerfmt"
-specifiers = ["0.5.4"]
-
-[tools."aqua:reteps/dockerfmt"."platforms.linux-arm64"]
-checksum = "sha256:f8b37047f35a24fe09df7c7341b826acd7f25917f5757fd72c3e8eef17b66e5d"
-url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759353"
-
-[tools."aqua:reteps/dockerfmt"."platforms.linux-arm64-musl"]
-checksum = "sha256:f8b37047f35a24fe09df7c7341b826acd7f25917f5757fd72c3e8eef17b66e5d"
-url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759353"
-
-[tools."aqua:reteps/dockerfmt"."platforms.linux-x64"]
-checksum = "sha256:0a0f5eafd81a76c8a5d04be8d9b5a5fc00c0054a0ea5cc0512377c13c86859bc"
-url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759354"
-
-[tools."aqua:reteps/dockerfmt"."platforms.linux-x64-musl"]
-checksum = "sha256:0a0f5eafd81a76c8a5d04be8d9b5a5fc00c0054a0ea5cc0512377c13c86859bc"
-url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759354"
-
-[tools."aqua:reteps/dockerfmt"."platforms.macos-arm64"]
-checksum = "sha256:161b00d14c9b8851e601b665412ae2e9229aa2754e329ce632d60df3d0661c9e"
-url = "https://github.com/reteps/dockerfmt/releases/download/v0.5.4/dockerfmt-v0.5.4-darwin-arm64.tar.gz"
-url_api = "https://api.github.com/repos/reteps/dockerfmt/releases/assets/459759365"
-
 [[tools.conftest]]
 version = "0.71.1"
 backend = "aqua:open-policy-agent/conftest"
@@ -124,54 +94,6 @@ provenance = "github-attestations"
 checksum = "sha256:48cd82e1d3e311c9bf9a5d6d67ad1a8542ae13d4e20c5bfb527656c5e666af76"
 url = "https://github.com/gastownhall/beads/releases/download/v1.3.1/beads_1.3.1_windows_amd64.zip"
 url_api = "https://api.github.com/repos/gastownhall/beads/releases/assets/602014845"
-provenance = "github-attestations"
-
-
-[[tools.hadolint]]
-version = "2.15.1"
-backend = "aqua:hadolint/hadolint"
-specifiers = ["2.15.1"]
-
-[tools.hadolint."platforms.linux-arm64"]
-checksum = "sha256:f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-arm64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546507"
-provenance = "github-attestations"
-
-[tools.hadolint."platforms.linux-arm64-musl"]
-checksum = "sha256:f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-arm64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546507"
-provenance = "github-attestations"
-
-[tools.hadolint."platforms.linux-x64"]
-checksum = "sha256:c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546506"
-provenance = "github-attestations"
-
-[tools.hadolint."platforms.linux-x64-musl"]
-checksum = "sha256:c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546506"
-provenance = "github-attestations"
-
-[tools.hadolint."platforms.macos-arm64"]
-checksum = "sha256:5c09f3213f8e40406abe048233d985eebef336d4a6a20021be47fadb6cf480a2"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-macos-arm64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546505"
-provenance = "github-attestations"
-
-[tools.hadolint."platforms.macos-x64"]
-checksum = "sha256:ffe9bb18b23d5ed1eae50237aecdbb523d016e96da0bd4e7aa432040acfc3fde"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-macos-x86_64"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546509"
-provenance = "github-attestations"
-
-[tools.hadolint."platforms.windows-x64"]
-checksum = "sha256:01d927294962b5387f9ead4f18679158452be4f17c765ad0bdffe5264b9c7b0a"
-url = "https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-windows-x86_64.exe"
-url_api = "https://api.github.com/repos/hadolint/hadolint/releases/assets/496546508"
 provenance = "github-attestations"
 
 [[tools.prek]]

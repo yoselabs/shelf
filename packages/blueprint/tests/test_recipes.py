@@ -335,7 +335,7 @@ def test_the_shipped_gate_state_is_the_one_the_shelf_runs() -> None:
     assert "shelf" not in shelf.read_text().lower()
 
 
-_GATE_ENV = ("CI", "GATE_LOCK", "GATE_LOCK_FILE", "GATE_LOCK_HELD", "GATE_NOTICE_FD", "PRE_COMMIT_TO_REF")
+_GATE_ENV = ("GATE_LOCK_FILE", "GATE_LOCK_HELD", "GATE_NOTICE_FD", "PRE_COMMIT_TO_REF")
 
 
 @pytest.fixture
@@ -375,20 +375,6 @@ def test_a_gate_waits_for_the_lock_and_names_who_holds_it(gate_env: dict[str, st
     out, err = run.communicate(timeout=10)
     assert (run.returncode, out) == (3, "ran\n")
     assert "gate-lock: acquired after" in err
-
-
-@pytest.mark.parametrize(
-    ("name", "value", "notice"),
-    [("CI", "true", "gate-lock: off (CI)"), ("GATE_LOCK", "off", "gate-lock: off (GATE_LOCK=off)"), ("GATE_LOCK_HELD", "", "")],
-)
-def test_a_run_skips_the_lock_in_ci_when_opted_out_or_already_under_it(
-    gate_env: dict[str, str], name: str, value: str, notice: str
-) -> None:
-    env = {**gate_env, name: value or gate_env["GATE_LOCK_FILE"]}
-    with _held(gate_env["GATE_LOCK_FILE"]):
-        out, err = _locked(env, "echo", "ran").communicate(timeout=10)
-    assert out == "ran\n"
-    assert err.strip() == notice
 
 
 def test_a_command_under_the_lock_can_take_it_again_without_waiting_on_itself(gate_env: dict[str, str]) -> None:

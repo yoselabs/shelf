@@ -5,7 +5,7 @@ statement: Checkpoints apply because of facts (technology, surface, trait, what 
 concerns: [stack, gate, workflow]
 status: accepted
 decided_by: owner
-updated: 2026-10-12
+updated: 2026-11-05
 distilled_into: blueprint facts.py (facts, evidence, closed lists, classification), profile.py ([[override]] with scope, [profile] classified/rejected), checkpoints.py (`blueprint checkpoints`), stack.py (requires = shipped-image | deployed), tools/changed.py and the justfile (changed-file linting); bead shelf-6q1
 ---
 
@@ -63,3 +63,4 @@ five shapes in two days.
   in the report, one scoped `[[override]]` (old markers still honoured, each reported with its replacement), the
   classification in `[profile]`, ship-smoke/ship-updater and deploy-only compose policy, changed-file linting in the
   shelf. Consumers' changed-file recipe is shelf-6q1.9.
+- 2026-11-05: the shelf itself no longer pins hadolint or dockerfmt (its Docker gate is gone, ADR 0027); the Dockerfile checkpoints above stay for consumer repos that have Dockerfiles, via blueprint's dockerfile profile.
