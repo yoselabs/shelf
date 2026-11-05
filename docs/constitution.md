@@ -25,11 +25,11 @@ remove dead lines, collapse duplication, delete the unused, every time you build
 consolidation is drift. Deletion is the virtue (Article VIII); a growing file that no one prunes is a
 smoke alarm (Article IV), not progress.
 
-### IV. Structure controls size, not caps.
-A large file is a **smoke alarm** that a structural boundary is missing — a pattern un-applied, two
-responsibilities fused, a list that should be files. The response is to find the missing boundary,
-never to swing a line-count axe. A size signal may *trigger a design review*; it is never the law.
-Arbitrary caps force arbitrary splits — the wrong abstraction, which is more expensive than a big file.
+### IV. Size is a hard limit for code; structure is the cure.
+Code files stay under a per-repo line limit (set in the repo's linter, no exceptions list, no ratchet file).
+A file over the limit is a **smoke alarm** that a boundary is missing: find it and split along it.
+The limit yields only where code cannot comply, and data files (YAML, XML, JSON, generated output) are
+outside it. A split made only to dodge the limit is the wrong abstraction: redesign instead.
 
 ### V. Protection is EARNED.
 A contract is born `candidate` (inert — it cannot block a refactor). It becomes `active`/protected

@@ -32,21 +32,24 @@ row, not a flag).
 |---|---|---|
 | No optionality | review check; lint on boolean mode parameters | lint untested, to file |
 | No backward compatibility | grep ban on shim / legacy / compat / deprecated in code | to file |
-| No redundancy | reconciliation pass (VIII); duplicate-code check in the gate | tool untested, to file |
+| No redundancy | reconciliation pass (VIII); the cross-package duplicate check (`just advisory`, ADR 0005) | advisory today; blocking once private-name collisions are not flagged and current findings are reconciled |
 | Dependency injection | architecture fitness test: no module-level I/O or global state (python.md already states it) | to file |
-| Decomposition and isolation | Article IV review trigger | exists |
+| Decomposition and isolation | Article IV per-file limit in the repo linter | exists in task-loop once its ratchet is replaced |
 
 Adopting the rule includes filing each missing check.
 
 ## Breaches already known
+
+`just advisory` today lists private-name collisions across packages (e.g. `_open` in `sqlite-resource` and
+`sqlite-store`). Whether `sqlite-resource` and `sqlite-store` overlap is for reconciliation to answer.
+
 
 The gate's own mode switches (`SHELF_HOST_CHECK`, `GATE_LOCK`, `just check` vs `check-all`) are optionality in
 dev tooling. Remove them or justify each under ADR 0022; not done here.
 
 ## Open
 
-- Article IV says size is a smoke alarm, never a cap. The owner also wants a hard per-file size limit in
-  task-loop. Not changed here; decide whether Article IV yields.
+- Article IV was amended on the owner's word (2026-11-05): size is a hard limit for code; only data files and code that cannot comply may exceed it. A size review trigger is no longer enough.
 
 ## Rejected
 
