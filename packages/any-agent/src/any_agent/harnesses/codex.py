@@ -16,13 +16,13 @@ from typing import TYPE_CHECKING, override
 from any_agent import events as ev
 from any_agent import procs
 from any_agent._json import Json, obj, objs, opt_int, opt_str, text
-from any_agent.harness import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
+from any_agent.protocol import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from any_agent.watch import Limits
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from any_agent.codex_overlay import CodexOverlay
+    from any_agent.harnesses.codex_overlay import CodexOverlay
 
 RECONNECT_RE = re.compile(r"^\s*Reconnecting\.\.\.\s*(\d+)/(\d+)")  # codex retrying its stream: progress until n == of
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")

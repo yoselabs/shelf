@@ -4,9 +4,9 @@ from typing import Any
 
 import pytest
 
-from any_agent import claude
-from any_agent.claude import ClaudeHarness, launch_argv, launch_env
-from any_agent.harness import LaunchInputs
+from any_agent.harnesses import claude
+from any_agent.harnesses.claude import ClaudeHarness, launch_argv, launch_env
+from any_agent.protocol import LaunchInputs
 
 INPUTS: dict[str, Any] = {
     "exe": "/bin/claude",

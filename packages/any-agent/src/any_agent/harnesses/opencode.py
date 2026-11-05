@@ -12,11 +12,11 @@ from pathlib import Path
 from typing import override
 
 from any_agent import events as ev
-from any_agent import opencode_sandbox as box
 from any_agent import procs
 from any_agent._json import Json, num, obj, opt_str, record, text
-from any_agent.harness import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
-from any_agent.opencode_sandbox import Sandbox
+from any_agent.harnesses import opencode_sandbox as box
+from any_agent.harnesses.opencode_sandbox import Sandbox
+from any_agent.protocol import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from any_agent.watch import Limits
 
 LIMITS = Limits(first_event_s=120, silence_s=900)

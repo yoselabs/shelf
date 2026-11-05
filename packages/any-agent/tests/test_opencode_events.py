@@ -13,11 +13,11 @@ from unittest import mock
 import pytest
 
 from any_agent import events as ev
-from any_agent import opencode_sandbox as box
 from any_agent import procs
 from any_agent._json import obj
-from any_agent.harness import LaunchInputs
-from any_agent.opencode import OpenCodeHarness, Profile
+from any_agent.harnesses import opencode_sandbox as box
+from any_agent.harnesses.opencode import OpenCodeHarness, Profile
+from any_agent.protocol import LaunchInputs
 
 HERE = Path(__file__).resolve().parent
 

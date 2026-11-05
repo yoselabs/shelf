@@ -10,7 +10,7 @@ from pathlib import Path
 from any_agent import drops, procs
 from any_agent import events as ev
 from any_agent._json import Json, container, num, obj, objs, opt_int, opt_str, text
-from any_agent.harness import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
+from any_agent.protocol import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from any_agent.watch import Limits
 
 ARG_KEYS = (

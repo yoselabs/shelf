@@ -9,49 +9,25 @@ error event, or the CLI's own error result) and `stderr`; the model's answer tex
 
 import re
 from collections.abc import Mapping
+from functools import cache
 from typing import NamedTuple
 
-from any_agent import claude, codex
+from any_agent import vendors
 from any_agent._json import Json
 
-# ---- PATTERNS: every regex that turns vendor text into a reason lives here -----------------------------------------------------
-LIMIT_RE = re.compile(r"usage limit|rate.?limit|quota|too many requests|\b429\b|try again (later|in)|credit balance", re.IGNORECASE)
-CREDIT_RE = re.compile(
-    r"spend(ing)?[- ]?(limit|control)|out of credits|credit balance|insufficient (funds|credit)|credits? (exhausted|too low)"
-    r"|personal-team-blocked",
-    re.IGNORECASE,
-)
-SPEND_RE = re.compile(
-    CREDIT_RE.pattern + r"|top[- ]?up|billing|cycle cap|cap reached", re.IGNORECASE
-)  # cockpit: any prose that means money
-LOGIN_RE = re.compile(
-    r"not logged in|please (run|use) [`'\"]?\S*\s*login|oauth session expired|failed to authenticate|invalid api key|401 unauthorized",
-    re.IGNORECASE,
-)
-NETWORK_RE = re.compile(
-    r"ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|getaddrinfo|could not resolve host|network is unreachable"
-    r"|cannot connect to api|unable to connect",
-    re.IGNORECASE,
-)
-BAD_REQUEST_RE = re.compile(
-    "|".join(
-        (
-            r"invalid_request_error|invalid_json_schema|Invalid schema for response_format|unrecognized arguments:|error: unknown argument",
-            *codex.BAD_REQUEST_PATTERNS,
-            *claude.BAD_REQUEST_PATTERNS,
-        )
-    ),
-    re.IGNORECASE,
-)  # the vendor refused the request itself: schema, a flag its CLI no longer takes, or a --resume thread it does not know
-PATTERNS = {
-    "limit": LIMIT_RE,
-    "credit": CREDIT_RE,
-    "spend": SPEND_RE,
-    "login": LOGIN_RE,
-    "network": NETWORK_RE,
-    "codex_status": codex.STATUS_4XX_RE,
-    "bad_request": BAD_REQUEST_RE,
-}
+
+# ---- PATTERNS: what vendors say lives in any_agent.vendors, what only a CLI says in its harness module ---------------------------
+def _cli_bad_request() -> tuple[str, ...]:
+    from any_agent.harnesses import claude, codex  # noqa: PLC0415 - harness modules do not import the ladder, but keep the edge lazy
+
+    return (*codex.BAD_REQUEST_PATTERNS, *claude.BAD_REQUEST_PATTERNS)  # a --resume thread the CLI does not know, a 4xx body it forwards
+
+
+@cache
+def _words(vendor_names: tuple[str, ...]) -> vendors.Words:
+    w = vendors.words(vendor_names)
+    bad = re.compile(w.bad_request.pattern + "|" + "|".join(_cli_bad_request()), re.IGNORECASE)
+    return vendors.Words(limit=w.limit, credit=w.credit, spend=w.spend, login=w.login, network=w.network, bad_request=bad)
 
 
 class Outcome(NamedTuple):
@@ -60,13 +36,13 @@ class Outcome(NamedTuple):
     source: str  # ours | event | stderr | exit
 
 
-def _ours(s: Mapping[str, Json], timed_out: bool) -> Outcome | None:
+def _ours(s: Mapping[str, Json], timed_out: bool, w: vendors.Words) -> Outcome | None:
     """The reasons only facts we measured ourselves give: a secret, the watchdog, our own timeout."""
     if s.get("secret"):
         return Outcome("secrets", str(s["secret"]), "ours")
     if s.get("watchdog") == "limit":
         msg = str(s.get("msg") or "")
-        return Outcome("credit_exhausted" if CREDIT_RE.search(msg) else "rate_limited", msg, "ours")
+        return Outcome("credit_exhausted" if w.credit.search(msg) else "rate_limited", msg, "ours")
     if s.get("watchdog") == "hung":
         return Outcome("network" if s.get("net_up") is False else "hung", "", "ours")
     return Outcome("timeout", "", "ours") if timed_out else None
@@ -83,17 +59,17 @@ def _by_status(http: Json, text: str, src: str) -> Outcome | None:
     return Outcome("bad_request", text, src)
 
 
-def _by_text(text: str, src: str, work_seen: bool) -> Outcome | None:
+def _by_text(text: str, src: str, work_seen: bool, w: vendors.Words) -> Outcome | None:
     """The reason the vendor's words give, first match wins."""
-    if CREDIT_RE.search(text):
+    if w.credit.search(text):
         return Outcome("credit_exhausted", text, src)
-    if LIMIT_RE.search(text):
+    if w.limit.search(text):
         return Outcome("rate_limited", text, src)
-    if LOGIN_RE.search(text):
+    if w.login.search(text):
         return Outcome("logged_out", text, src)
-    if BAD_REQUEST_RE.search(text):
+    if w.bad_request.search(text):
         return Outcome("bad_request", text, src)
-    if NETWORK_RE.search(text) and not work_seen:
+    if w.network.search(text) and not work_seen:
         return Outcome("network", text, src)
     return None
 
@@ -117,28 +93,33 @@ def classify(
     timed_out: bool = False,
     work_seen: bool = False,
     structured: Mapping[str, Json] | None = None,
+    only: tuple[str, ...] = (),
 ) -> Outcome | None:
     """-> Outcome, or None when the run is done. First match wins.
 
     rc: exit code (negative = a signal); vendor_err: the vendor's error text from its event stream; stderr: the CLI's stderr; timed_out: our
     --timeout fired; work_seen: the worker did something before it failed; structured: facts we measured ourselves:
-    {"secret": cmd, "watchdog": "limit"|"hung", "msg": log line, "http_status": int, "net_up": False}."""
+    {"secret": cmd, "watchdog": "limit"|"hung", "msg": log line, "http_status": int, "net_up": False}; only: vendor names whose words count
+    beside `common` and the CLIs' own (none = every registered vendor)."""
     s = structured or {}
     vendor_event, code = (vendor_err or "").strip(), rc or 0
-    ours = _ours(s, timed_out)
+    w = _words(tuple(sorted(only)))
+    ours = _ours(s, timed_out, w)
     if ours:
         return ours
     text = vendor_event + ("\n" + (stderr or "") if code != 0 else "")
     src = "event" if vendor_event else "stderr"
-    return _by_status(s.get("http_status"), text, src) or _by_text(text, src, work_seen) or _by_exit(code, vendor_event, stderr, work_seen)
+    return (
+        _by_status(s.get("http_status"), text, src) or _by_text(text, src, work_seen, w) or _by_exit(code, vendor_event, stderr, work_seen)
+    )
 
 
-def says_login(text: str) -> bool:
-    return bool(LOGIN_RE.search(text))
+def says_login(text: str, only: tuple[str, ...] = ()) -> bool:
+    return bool(_words(tuple(sorted(only))).login.search(text))
 
 
-def says_spend(text: str) -> bool:
-    return bool(SPEND_RE.search(text))
+def says_spend(text: str, only: tuple[str, ...] = ()) -> bool:
+    return bool(_words(tuple(sorted(only))).spend.search(text))
 
 
 def limit_words(text: str, top: str | None) -> str:

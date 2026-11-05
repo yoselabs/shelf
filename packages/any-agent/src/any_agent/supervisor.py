@@ -22,7 +22,7 @@ from typing import IO, Literal, Protocol
 from any_agent import events as ev
 from any_agent import procs, watch
 from any_agent._json import mutable
-from any_agent.harness import Harness, LaunchSpec, Summary
+from any_agent.protocol import Harness, LaunchSpec, Summary
 from any_agent.watch import Limits
 
 LANE_GONE_EVERY = 10  # seconds between looks at whether the lane was marked out by someone else

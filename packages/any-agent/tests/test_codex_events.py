@@ -14,8 +14,8 @@ from unittest import mock
 import pytest
 
 from any_agent import events as ev
-from any_agent.codex import CodexHarness
-from any_agent.harness import LaunchInputs
+from any_agent.harnesses.codex import CodexHarness
+from any_agent.protocol import LaunchInputs
 
 HERE = Path(__file__).resolve().parent
 
