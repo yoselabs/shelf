@@ -33,6 +33,15 @@ def test_the_api_key_never_reaches_the_child():
     assert launch_env({"ANTHROPIC_API_KEY": "k"}) == {}
 
 
+def test_an_api_key_lane_keeps_its_key_and_needs_one():
+    env = {"ANTHROPIC_API_KEY": "sk-x", "PATH": "/bin"}
+    assert ClaudeHarness().launch_spec(make(env=env, auth="api_key")).env == env
+    with pytest.raises(ValueError, match="needs ANTHROPIC_API_KEY"):
+        launch_env({"PATH": "/bin"}, "api_key")
+    with pytest.raises(ValueError, match="one of subscription, api_key"):
+        launch_env({}, "both")
+
+
 def test_a_launch_never_passes_bare():
     kws: list[dict[str, Any]] = [{}, {"write": True}, {"resume": "old"}]
     for kw in kws:

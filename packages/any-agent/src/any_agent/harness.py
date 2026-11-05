@@ -35,6 +35,9 @@ class LaunchInputs:
     system: str = ""  # claude: the appended system prompt
     settings: str = ""  # claude: --settings JSON (the PreToolUse guard)
     write: bool = False  # claude, opencode: may the worker edit
+    auth: str = (
+        "subscription"  # claude: "subscription" (the login; an API key in env is dropped) or "api_key" (ANTHROPIC_API_KEY must be in env)
+    )
     engine_only: tuple[str, ...] = ()  # opencode: recipes only the caller runs, denied in the bash permission rules of a write step
 
 

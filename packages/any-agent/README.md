@@ -28,8 +28,9 @@ why = classify(s.rc, s.vendor, s.stderr, out.timed_out, s.work, {"watchdog": out
   parser, usage arithmetic, transcript, login probe, its own regex tables and its measured `limits`. `parse_line` is called once
   per line; the live sink, the turn rules and the classifier all read the same `HarnessEvent` records (`any_agent.events`).
 - **Claude's launch rules are in one place.** `claude.launch_argv` never passes `--bare` (it skips OAuth and the keychain, so a
-  subscription run would need an API key) and raises `ValueError` if it would; `claude.launch_env` drops `ANTHROPIC_API_KEY` from
-  the child's environment so a run stays on the login. `ClaudeHarness.launch_spec` applies both.
+  subscription run would need an API key) and raises `ValueError` if it would. `LaunchInputs.auth` picks exactly one of two modes:
+  `subscription` (default; `claude.launch_env` drops `ANTHROPIC_API_KEY` so the run stays on the login) or `api_key` (the key must be in
+  the environment, else `ValueError`). `ClaudeHarness.launch_spec` applies both.
 - **`run` supervises, the caller injects.** What it needs from the caller comes as callables, never as imports: `live` (a
   `LiveSink`: `started/feed/poll/end`), `gone() -> str | None` (the lane was marked out: stop and say why), `policy(event) -> str | None`
   (a command names a secret path: stop before it uses what it read), `net_up() -> bool` (one probe once the worker has waited

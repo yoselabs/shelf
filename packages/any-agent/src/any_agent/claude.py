@@ -100,8 +100,20 @@ def vendor_error(j: dict[str, Json]) -> str:
     return ""
 
 
-def launch_env(env: dict[str, str]) -> dict[str, str]:
-    """The child's environment: `env` without the variables that would move the run from the login to an API key."""
+AUTH_MODES = ("subscription", "api_key")
+
+
+def launch_env(env: dict[str, str], auth: str = "subscription") -> dict[str, str]:
+    """The child's environment for one auth mode. `subscription`: `env` without the variables that would move the run from the login to an
+    API key. `api_key`: `env` as given, which must carry ANTHROPIC_API_KEY (ValueError otherwise). Exactly one of the two is in force."""
+    if auth not in AUTH_MODES:
+        msg = f"claude auth is one of {', '.join(AUTH_MODES)}, not {auth!r}"
+        raise ValueError(msg)
+    if auth == "api_key":
+        if not env.get("ANTHROPIC_API_KEY"):
+            msg = "claude auth api_key needs ANTHROPIC_API_KEY in the environment"
+            raise ValueError(msg)
+        return dict(env)
     return {k: v for k, v in env.items() if k not in SCRUBBED_ENV}
 
 
@@ -147,7 +159,7 @@ class ClaudeHarness(Quiet):
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec:
         argv = launch_argv(i)
         self.evidence.ref = i.resume or i.session  # claude takes the session id from us: known before the first event
-        return LaunchSpec(argv=argv, env=launch_env(i.env), cwd=i.cwd, stdin=i.prompt)
+        return LaunchSpec(argv=argv, env=launch_env(i.env, i.auth), cwd=i.cwd, stdin=i.prompt)
 
     # -- the event stream, parsed once -----------------------------------------------------------------------------------------------------
     def parse_line(self, line: str) -> list[ev.HarnessEvent]:
