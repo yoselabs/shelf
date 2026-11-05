@@ -132,7 +132,7 @@ def test_a_read_only_log_appends_nothing(tmp_path: Path) -> None:
 
 
 def test_the_module_only_appends() -> None:
-    """No rewrite path exists: the log is opened with O_APPEND, never truncating or rewriting."""
+    """The append path never rewrites: O_APPEND, no truncating. Replacing a file lives only in _rewrite.py (the opt-in rewrite)."""
     body = Path(jsonl_log.__file__).read_text(encoding="utf-8")
     appender = Path(jsonl_log.__file__).with_name("_append.py").read_text(encoding="utf-8")
     assert "os.O_APPEND" in appender

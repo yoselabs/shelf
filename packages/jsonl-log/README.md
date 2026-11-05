@@ -19,6 +19,9 @@ jl.JsonlLog.open(path, read_only=True)        # a reader beside the writer: appe
 
 jl.JsonlLog.open(path, max_age=7 * 86400)     # rotated files untouched for 7 days are deleted
 log.append_at(b'{"verb": "read"}')            # like append, returns the line's byte offset
+jl.JsonlLog.open(path, rotate_lock=True)      # rotation (and rewrite) exclusive across processes: path.lock
+log.rewrite(lambda line: json.loads(line)["t"] >= cutoff)  # keep what is accepted; returns how many lines went
+jl.held(path, rotate_lock=True).append_json(row)  # one open log per path per process; jl.close_held() at exit
 jl.expire(Path("runs").glob("*.jsonl"), 7 * 86400)  # the same age rule for any files
 
 # Follow a live file by byte cursor (what task-loop's contracts/jsonl.py does):
@@ -32,14 +35,31 @@ jl.read_from(path, decode, cursor)            # the same with your own decode(by
 
 ## Rules
 
-- **Writes.** One `write` call per line on an `O_APPEND` descriptor, no `fsync`: processes
-  appending to one file never interleave bytes, however long the line. The size is read from
-  the descriptor at each append, and a file another process rotated away is reopened. The file
-  is opened in append mode only.
+- **Writes.** One `write` call per line on an `O_APPEND` descriptor, no `fsync`. The kernel
+  moves to the end and writes under one lock, so lines from several processes do not interleave
+  on a **local** filesystem (APFS, ext4), the case this is tested on. POSIX promises that only
+  up to `PIPE_BUF` (512 bytes to 4 KiB, by system); past it the guarantee is that of the local
+  filesystem, and **NFS gives none** (`O_APPEND` is emulated client-side there: lines may overlap
+  or tear). Do not share a log across hosts. The size is read from the descriptor at each append,
+  and a file another process rotated away is reopened. The file is opened in append mode only.
 - **Rotation.** Before an append would take the file past `rotate_bytes`, the files shift:
   `.{keep-2}` → `.{keep-1}` (the oldest is dropped), …, the file → `.1`. At most `keep` files
-  exist, and a line is never split across two. Two processes rotating at the same moment may
-  drop one extra file: appends are coordinated, rotation is not.
+  exist, and a line is never split across two. **Without `rotate_lock`**, two processes rotating
+  at the same moment shift twice and drop a file. **With it** (opt-in; `True` is `<path>.lock`,
+  or pass a path; uses `process-lock`) the shift runs under an exclusive lock and the size is
+  checked again once the lock is held, so the second rotator finds the file already rotated and
+  does nothing. An append never takes the lock, so the common path costs the same.
+- **Rewrite.** `rewrite(keep)` (needs `rotate_lock`) keeps the lines `keep(line_bytes)` accepts
+  and returns how many it dropped; blank lines go uncounted, a torn last line is kept. It writes
+  `<path>.rewrite` and replaces the file atomically, only when a line goes. Lines appended
+  meanwhile by a process not holding the lock are carried over before and after the replace;
+  only an append descheduled mid-call for the whole replace could be lost. To rule that out wrap
+  those appends in `with log.locked(): log.append(...)`.
+- **Held handles.** A `JsonlLog` keeps its descriptor open between appends (an append is one
+  `fstat` and one `write`, no open or close; a path stat notices a rotated-away file).
+  `held(path, **open_options)` returns the process's one open log for a path (options apply on
+  first sight); a fork child closes its inherited copy and opens its own; at most 16 stay open,
+  the least recently used closes first; `close_held(path=None)` and `held_count(path=None)`.
 - **Retention.** With `max_age` (seconds) a rotated file not written to for that long is deleted,
   at open, at each rotation and on `prune()`. `expire(paths, max_age)` applies the rule to any files.
 - **Cursor.** `read_from(path, decode, offset, limit)` returns `Entry(start, end, data)` and the
@@ -54,4 +74,4 @@ jl.read_from(path, decode, cursor)            # the same with your own decode(by
   before its end raises `LineError`. Both are `JsonlLogError`.
 - A `read_only` log never opens the file for writing and its `append` returns `False`.
 
-Codec-agnostic: the caller owns what a line means. Stdlib only.
+Codec-agnostic: the caller owns what a line means. Stdlib plus `process-lock` (used only with `rotate_lock`).
