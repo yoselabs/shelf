@@ -36,7 +36,7 @@ need exists is not.
    adopt on GREEN, never on hope.
 
 3. **Adopt conservatively — only if DEEP · STABLE · WINS.** *Pulling a shelf dep into a consumer* is the
-   cautious act: reuse is encouraged, the wrong abstraction is not, and duplication beats a shallow or
+   cautious act: reuse is encouraged, the wrong abstraction is not, and a single local implementation beats a shallow or
    churning dependency. The three gates pick candidates; a contract's tests adjudicate them.
 
 4. **Promote aggressively — capitalize generic substrate at writing time; reconcile later** (ADR
