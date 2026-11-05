@@ -30,6 +30,7 @@ any-frontmatter = { workspace = true }
 page-tsv = { workspace = true }
 # any-lease composes process-lock.
 process-lock = { workspace = true }
+any-mailbox = { workspace = true }
 # The dev group installs `anyembed[llamacpp,transformers]` so both backends' imports resolve.
 anyembed = { workspace = true }
 
@@ -267,6 +268,7 @@ testpaths = [
     "packages/plugin-surface/tests",
     "packages/process-lock/tests",
     "packages/any-lease/tests",
+    "packages/any-mailbox/tests",
     "packages/record-mine/tests",
     "packages/settings-base/tests",
     "packages/static-page-check/tests",
@@ -356,6 +358,7 @@ root_packages = [
     "plugin_surface",
     "process_lock",
     "any_lease",
+    "any_mailbox",
     "record_mine",
     "settings_base",
     "sqlite_resource",
@@ -434,6 +437,7 @@ source_modules = [
     "plugin_surface",
     "process_lock",
     "any_lease",
+    "any_mailbox",
     "record_mine",
     "settings_base",
     "sqlite_resource",
@@ -514,6 +518,7 @@ modules = [
     "plugin_surface",
     "process_lock",
     "any_lease",
+    "any_mailbox",
     "record_mine",
     "settings_base",
     "sqlite_resource",
@@ -537,6 +542,8 @@ ignore_imports = [
     "any_lease.leases -> process_lock",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",
+    "any_mailbox -> atomic_io",
+    "any_mailbox -> process_lock",
 ]
 
 # ── ty — type checking ─────────────────────────────────────────────────────

@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "iorlas-task-loop"
+software = "any-mailbox"
+why = "The owner's requests to a live run (park, stop, notes) go through one file per run: app/run/requests.py post merges under a lock, take hands the file to the run once, peek reads it unlocked. Not yet adopted: the planned repoint (tl-w7lt.14) deletes that local copy and keeps the codec and the identity check."
+needs = "Mailbox(path, lock=None).post(update) -> bool; take() -> bytes | None; peek() -> bytes | None."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired -- the planned retention claim until the repoint lands
