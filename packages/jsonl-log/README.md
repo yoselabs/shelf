@@ -50,16 +50,23 @@ jl.read_from(path, decode, cursor)            # the same with your own decode(by
   checked again once the lock is held, so the second rotator finds the file already rotated and
   does nothing. An append never takes the lock, so the common path costs the same.
 - **Rewrite.** `rewrite(keep)` (needs `rotate_lock`) keeps the lines `keep(line_bytes)` accepts
-  and returns how many it dropped; blank lines go uncounted, a torn last line is kept. It writes
-  `<path>.rewrite` and replaces the file atomically, only when a line goes. Lines appended
-  meanwhile by a process not holding the lock are carried over before and after the replace;
-  only an append descheduled mid-call for the whole replace could be lost. To rule that out wrap
-  those appends in `with log.locked(): log.append(...)`.
+  and returns how many it dropped; blank lines go uncounted. The new file is fsynced, keeps the
+  old file's mode and is swapped in with `os.replace` (then the directory is fsynced), only when
+  a line goes: a crash leaves the old log or the new one, never an empty one. A torn last line is
+  kept and closed with a newline. Lines appended meanwhile by a process not holding the lock are
+  carried over before the replace and, from the old inode, after it (these land after the lines
+  already kept). An `append` also checks that its file was not unlinked by a rewrite right after
+  its write and, if so, appends again: **at-least-once** around a rewrite, so a line may then
+  appear twice and dedup is the caller's job. For exactly-once wrap appends in
+  `with log.locked(): log.append(...)`.
 - **Held handles.** A `JsonlLog` keeps its descriptor open between appends (an append is one
   `fstat` and one `write`, no open or close; a path stat notices a rotated-away file).
-  `held(path, **open_options)` returns the process's one open log for a path (options apply on
-  first sight); a fork child closes its inherited copy and opens its own; at most 16 stay open,
-  the least recently used closes first; `close_held(path=None)` and `held_count(path=None)`.
+  `held(path, **open_options)` returns the process's one open log for a resolved path; the options
+  apply on first sight and asking again with other options raises `ValueError`. A fork child
+  closes its inherited copy and opens its own. At most 16 stay open: the least recently used is
+  evicted, its descriptor closes but the log stays usable (a thread still holding it reopens the
+  descriptor on its next append). `close_held(path=None)` and `held_count(path=None)`.
+  `process-lock` is imported only when `rotate_lock` is used.
 - **Retention.** With `max_age` (seconds) a rotated file not written to for that long is deleted,
   at open, at each rotation and on `prune()`. `expire(paths, max_age)` applies the rule to any files.
 - **Cursor.** `read_from(path, decode, offset, limit)` returns `Entry(start, end, data)` and the
@@ -74,4 +81,4 @@ jl.read_from(path, decode, cursor)            # the same with your own decode(by
   before its end raises `LineError`. Both are `JsonlLogError`.
 - A `read_only` log never opens the file for writing and its `append` returns `False`.
 
-Codec-agnostic: the caller owns what a line means. Stdlib plus `process-lock` (used only with `rotate_lock`).
+Codec-agnostic: the caller owns what a line means. Stdlib plus `atomic-io` (rewrite) and `process-lock` (imported only with `rotate_lock`).

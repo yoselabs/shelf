@@ -32,8 +32,6 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Self, TypeVar
 
-from process_lock import ProcessLock
-
 from jsonl_log._append import append_line, open_append
 from jsonl_log._retention import expire
 from jsonl_log._rewrite import rewrite_file
@@ -52,6 +50,8 @@ KEEP = 5
 
 #: How long a rotation or rewrite waits for ``rotate_lock`` before :class:`process_lock.LockHeldError`.
 LOCK_TIMEOUT = 30.0
+
+_REAPPEND = 3
 
 
 class JsonlLogError(Exception):
@@ -193,7 +193,16 @@ class JsonlLog:
             if size and size + len(data) > self._rotate_bytes:
                 self._rotate(len(data))
                 fd = self._current_fd()
-            return append_line(fd, data)
+            at = append_line(fd, data)
+            for _ in range(_REAPPEND):
+                if os.fstat(fd).st_nlink:
+                    break
+                # A rewrite replaced the file under this descriptor: the line went to an unlinked inode
+                # (the rewrite may have carried it over too, so it can now be there twice).
+                self._close_file()
+                fd = self._current_fd()
+                at = append_line(fd, data)
+            return at
 
     def append_json(self, value: object) -> bool:
         """:meth:`append` of ``value`` as compact JSON."""
@@ -239,6 +248,8 @@ class JsonlLog:
         """Hold ``rotate_lock`` (re-entrant): wrap appends in it where an append must not meet a :meth:`rewrite`. No-op without one."""
         if self._lock_path is None:
             return contextlib.nullcontext()
+        from process_lock import ProcessLock  # noqa: PLC0415  imported only by a caller that opted in to the lock
+
         return ProcessLock.acquire(self._lock_path, timeout=timeout, label="jsonl-log")
 
     def rewrite(self, keep: Callable[[bytes], bool]) -> int:
@@ -259,6 +270,11 @@ class JsonlLog:
             return 0
         with self._mutex, self.locked():
             return rewrite_file(self._path, keep, then=self._close_file)
+
+    def release_fd(self) -> None:
+        """Close the descriptor but not the log: the next append reopens it. What the held cache's eviction uses."""
+        with self._mutex:
+            self._close_file()
 
     def _rotate(self, incoming: int = 0) -> None:
         with self.locked():

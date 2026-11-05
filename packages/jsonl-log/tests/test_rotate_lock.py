@@ -67,7 +67,7 @@ def test_a_rotator_that_waited_finds_the_file_already_rotated(tmp_path: Path) ->
         with ProcessLock.acquire(lock, reentrant=False):  # another rotator is mid-shift
             t = threading.Thread(target=lambda: log.append(b"c" * 20))  # needs a rotation: waits on the lock
             t.start()
-            time.sleep(0.2)
+            time.sleep(0.2)  # no hook shows a thread blocked on the lock; a miss only weakens the assert
             assert t.is_alive()
             path.replace(tmp_path / "log.jsonl.1")  # the other rotator finishes
             path.write_bytes(b"b\n")
@@ -109,7 +109,7 @@ def test_rewrite_leaves_a_torn_last_line_and_blank_lines_alone(tmp_path: Path) -
     path.write_bytes(b'{"i":1}\n\n{"i":2}\n{"i":3')
     with JsonlLog.open(path, rotate_lock=True) as log:
         assert log.rewrite(lambda line: json.loads(line)["i"] == 2) == 1
-    assert path.read_bytes() == b'{"i":2}\n{"i":3'
+    assert path.read_bytes() == b'{"i":2}\n{"i":3\n'
 
 
 def _appender(path: str, count: int, locked: bool) -> None:
@@ -138,7 +138,11 @@ def test_rewrite_under_concurrent_appends_loses_no_kept_line(tmp_path: Path, loc
         dropped += log.rewrite(lambda line: json.loads(line)["tag"] != "old")
         rows = [(r["tag"], r["i"]) for r in log.records(json.loads)]
     assert dropped == 200
-    assert sorted(rows) == [("w", i) for i in range(1500)]
+    want = [("w", i) for i in range(1500)]
+    if locked:
+        assert sorted(rows) == want
+    else:  # at-least-once: a line met by the replace may be carried over and re-appended both
+        assert sorted(set(rows)) == want
 
 
 def test_a_held_log_is_the_same_object_and_appends_correctly(tmp_path: Path) -> None:
@@ -189,7 +193,9 @@ def test_held_logs_are_bounded_and_the_oldest_closes_first(tmp_path: Path) -> No
         for n in range(1, _held.MAX_OPEN + 1):
             _ = jsonl_log.held(tmp_path / str(n))
         assert jsonl_log.held_count() == _held.MAX_OPEN
-        assert first.closed
+        assert not first.closed  # evicted, not closed: a thread still using it keeps working
+        first.append(b"after eviction")
+        assert (tmp_path / "0").read_bytes() == b"after eviction\n"
     finally:
         jsonl_log.close_held()
 
@@ -213,3 +219,68 @@ def test_a_fork_child_opens_its_own_held_log(tmp_path: Path) -> None:
         assert sorted(path.read_bytes().splitlines()) == [b"child", b"parent", b"parent2"]
     finally:
         jsonl_log.close_held()
+
+
+def test_held_refuses_other_options_for_a_held_path_and_resolves_the_path(tmp_path: Path) -> None:
+    path = tmp_path / "h.jsonl"
+    try:
+        log = jsonl_log.held(path)
+        assert jsonl_log.held(tmp_path / "sub" / ".." / "h.jsonl") is log
+        with pytest.raises(ValueError, match="held with options"):
+            jsonl_log.held(path, rotate_lock=True)
+        assert jsonl_log.held(path) is log
+    finally:
+        jsonl_log.close_held()
+
+
+def test_importing_jsonl_log_does_not_import_process_lock() -> None:
+    code = "import sys, jsonl_log; log = jsonl_log.JsonlLog.open(sys.argv[1]); log.append(b'x'); sys.exit('process_lock' in sys.modules)"
+    import subprocess  # noqa: PLC0415
+    import sys  # noqa: PLC0415
+    import tempfile  # noqa: PLC0415
+
+    with tempfile.TemporaryDirectory() as d:
+        assert subprocess.run([sys.executable, "-c", code, d + "/l"], check=False).returncode == 0
+
+
+def test_rewrite_keeps_the_file_mode_and_never_leaves_a_temp_file(tmp_path: Path) -> None:
+    path = tmp_path / "log.jsonl"
+    with JsonlLog.open(path, rotate_lock=True) as log:
+        log.append(b"drop")
+        log.append(b"keep")
+        path.chmod(0o640)
+        assert log.rewrite(lambda line: line == b"keep") == 1
+    assert path.stat().st_mode & 0o777 == 0o640
+    assert sorted(p.name for p in tmp_path.iterdir() if not p.name.endswith(".lock")) == ["log.jsonl"]
+
+
+def test_a_torn_last_line_is_closed_not_glued_to_the_kept_lines(tmp_path: Path) -> None:
+    path = tmp_path / "log.jsonl"
+    path.write_bytes(b"drop\nkeep\ntor")
+    with JsonlLog.open(path, rotate_lock=True) as log:
+        assert log.rewrite(lambda line: line == b"keep") == 1
+    assert path.read_bytes() == b"keep\ntor\n"
+
+
+def test_an_append_that_met_a_replacing_rewrite_is_not_lost(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "log.jsonl"
+    real = jsonl_log.append_line
+    other = JsonlLog.open(path, rotate_lock=True)
+    fired: list[int] = []
+
+    def racing(fd: int, data: bytes) -> int:
+        at = real(fd, data)
+        if not fired:  # the rewrite replaces the file right after this write, before it is carried over
+            fired.append(1)
+            monkeypatch.setattr(jsonl_log, "append_line", real)
+            other.rewrite(lambda line: line != b"old")
+            path.unlink()  # and whatever carried it over is gone: only the writer's own check can save the line
+            path.write_bytes(b"")
+        return at
+
+    with JsonlLog.open(path, rotate_lock=True) as log:
+        log.append(b"old")
+        monkeypatch.setattr(jsonl_log, "append_line", racing)
+        log.append(b"mine")
+    other.close()
+    assert b"mine\n" in path.read_bytes()

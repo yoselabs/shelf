@@ -7,8 +7,12 @@ authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
+    "atomic-io>=0.2,<1",
     "process-lock>=0.2,<1",
 ]
+
+[tool.uv.sources]
+atomic-io = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
