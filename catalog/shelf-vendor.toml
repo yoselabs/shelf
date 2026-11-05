@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "shelf-vendor"
+kind = "any-lib"
+tier = "T1"
+release = "shelf-vendor-v0.1.0"
+capability = "Stop keeping two copies of dev/vendor.py: vendor shelf packages byte-for-byte into a plugin skill directory from a recorded shelf tag, record each tree hash in a manifest, check for drift (against the manifest and the tag's own content), and warn when a newer shelf tag of a vendored package exists. Standard library only."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from task-loop and delegate (dev/vendor.py, two copies differing by about 66 lines). Git-pinned dependencies do not work for plugin-shipped skill dirs, so vendoring stays. Sunset: remove when plugins can depend on the shelf directly. Born candidate; no release tag created by this change."
