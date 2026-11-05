@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-mailbox"
+kind = "any-lib"
+tier = "T1"
+release = "any-mailbox-v0.1.0"
+capability = "Stop hand-rolling a request file between processes: a one-slot mailbox where post merges a message under a cross-process lock and an atomic write, take hands it over exactly once, and peek reads without the lock; the caller owns the codec."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from task-loop (app/run/requests.py post, take, peek). Composes atomic-io and process-lock. update may return None to refuse under the lock (an identity re-check). Level-triggered state is not a mailbox and stays on a JSON store. Born candidate; no release tag created by this change."

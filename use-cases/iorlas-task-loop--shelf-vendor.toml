@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "iorlas-task-loop"
+software = "shelf-vendor"
+why = "Task-loop and delegate each carry dev/vendor.py and vendor.json to copy shelf packages into skills/<plugin>/_vendor/ (git-pinned deps do not work for plugin skill dirs); the copies already differ and vendor stream_proc at different versions. Not yet adopted: the planned repoint (tl-w7lt.16) deletes both copies."
+needs = "Vendor(vendor_dir, manifest_path).sync(name, tag, shelf=) and .check(shelf) -> (drift, warnings); python -m shelf_vendor --vendor-dir D --manifest M sync|check."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired -- the planned retention claim until the repoint lands
