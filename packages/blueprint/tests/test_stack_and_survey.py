@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint import survey
-from blueprint.model import Verdict
+from blueprint.model import FixedBy, Verdict
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -75,6 +75,43 @@ def test_a_role_with_no_config_is_not_set_up_and_says_what_to_install(repo: Repo
     types = next(r for r in run_.rows if r.id == "stack.python-uv.types")
     assert types.verdict is Verdict.NOT_SET_UP
     assert "pyrefly" in types.remediation
+
+
+@pytest.mark.parametrize(
+    ("configured", "verdict"),
+    [(False, Verdict.NOT_SET_UP), (True, Verdict.FAILING)],
+)
+def test_a_red_row_from_a_provisional_profile_is_the_owners_to_fix(repo: Repo, configured: bool, verdict: Verdict) -> None:
+    # shelf-fkx: provisional recipes applied on a blanket yes broke lifesim clones (shelf-o5a) and packages (shelf-ir7).
+    _dotnet_repo(repo)
+    if configured:
+        repo.write(".config/dotnet-tools.json", '{"tools": {"csharpier": {"version": "1.3.0"}}}')
+    repo.write("justfile", "check:\n    true\n")
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == "stack.dotnet.formatter")
+    assert row.verdict is verdict
+    assert row.fixed_by is FixedBy.OWNER
+    assert row.evidence.startswith("unproven-standard: ")
+    assert row.remediation.startswith("unproven-standard: ")
+    assert "csharpier" in row.remediation  # the recipe keeps its text under the prefix
+
+
+def test_a_green_row_from_a_provisional_profile_stays_the_agents(repo: Repo) -> None:
+    repo.write("hosts/bee/flake.nix", "{ }")
+    repo.write("hosts/bee/flake.lock", "{}")
+    repo.write("justfile", "check:\n    nix flake lock --no-update-lock-file path:hosts/bee\n")
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == "stack.nix.toolchain")
+    assert row.verdict is Verdict.PASSING
+    assert row.fixed_by is FixedBy.AGENT
+    assert "unproven-standard" not in row.evidence
+
+
+def test_a_red_row_from_an_evidenced_profile_stays_the_agents(repo: Repo) -> None:
+    _python_repo(repo)
+    repo.write("Makefile", "check:\n\tuv run ruff check .\n")
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == "stack.python-uv.formatter")
+    assert row.verdict is Verdict.FAILING
+    assert row.fixed_by is FixedBy.AGENT
+    assert "unproven-standard" not in row.evidence
 
 
 def test_the_profile_row_lists_the_expected_toolset(repo: Repo) -> None:

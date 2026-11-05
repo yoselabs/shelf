@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 from blueprint import report
 from blueprint.__main__ import main
-from blueprint.model import REGISTRY, Check, Finding, Profile, Verdict, check, failing, not_checked, passing
+from blueprint.model import REGISTRY, Check, Finding, FixedBy, Profile, Verdict, check, failing, not_checked, passing
 from blueprint.report import clip
 from blueprint.runner import Row, Run, active, run, set_hash
 
@@ -166,6 +166,27 @@ def test_the_cli_prints_json_and_exits_with_the_runs_code(repo: Repo, capsys: py
     rows = json.loads(capsys.readouterr().out)["rows"]
     assert code == 1
     assert {r["id"] for r in rows} >= {"gate.one-command", "backlog.tracker"}
+
+
+def test_red_rows_from_a_provisional_profile_reach_the_reports_as_owner_rows(repo: Repo) -> None:
+    # shelf-fkx: the owner attribution and the unproven-standard prefix must survive every public surface.
+    repo.write("global.json", '{"sdk": {"version": "10.0.301", "rollForward": "latestPatch"}}')
+    repo.write(
+        "Directory.Build.props",
+        "<Project><PropertyGroup><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile></PropertyGroup></Project>",
+    )
+    repo.write("src/App/App.csproj", "<Project/>")
+    result = run(repo.root, concern="stack", env=repo.env)
+    red = [r for r in result.rows if r.verdict in {Verdict.FAILING, Verdict.NOT_SET_UP}]
+    assert red
+    assert all(r.fixed_by is FixedBy.OWNER and r.evidence.startswith("unproven-standard: ") for r in red)
+    data = json.loads(report.as_json(result))
+    row = next(r for r in data["rows"] if r["id"] == "stack.dotnet.formatter")
+    assert row["fixed_by"] == "owner"
+    assert row["evidence"].startswith("unproven-standard: ")
+    assert row["remediation"].startswith("unproven-standard: ")
+    line = next(line for line in report.markdown(result).splitlines() if "| ⚠️ | `stack.dotnet.formatter`" in line)
+    assert line.rstrip().endswith("| owner |")
 
 
 def test_the_gate_form_lists_only_what_is_not_passing(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:

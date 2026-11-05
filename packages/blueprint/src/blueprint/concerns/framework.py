@@ -8,7 +8,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from blueprint.concerns.stack import FRAMEWORK_ROLES, PROFILE_DIR, finding_for, gate_text, judge_role, load_profiles
+from blueprint.concerns.stack import (
+    FRAMEWORK_ROLES,
+    PROFILE_DIR,
+    finding_for,
+    gate_text,
+    judge_role,
+    load_profiles,
+    provisional_finding,
+)
 from blueprint.model import Finding, Sub, check_each, is_skipped, not_checked, not_set_up, passing
 
 if TYPE_CHECKING:
@@ -49,7 +57,14 @@ def roles(ctx: Context) -> list[Sub]:
             finding = finding_for(judged)
             if name == "unity" and role == "architecture" and judged.verdict in {"pass", "not-set-up"}:
                 finding = _with_rsp_problems(ctx, root, judged, finding)
-            subs.append(Sub(concern, f"framework.{key}.{role}", f"{name} {role}: the profile's tool is set up and run", finding))
+            subs.append(
+                Sub(
+                    concern,
+                    f"framework.{key}.{role}",
+                    f"{name} {role}: the profile's tool is set up and run",
+                    provisional_finding(prof.status, finding),
+                )
+            )
     return subs
 
 
