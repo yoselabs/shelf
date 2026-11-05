@@ -106,7 +106,8 @@ def test_no_intra_package_body_duplication() -> None:
 
 
 def test_no_cross_package_body_duplication() -> None:
-    # Article III — one implementation of a behaviour per repo. No allowlist: lift it to one package or file a task.
+    # Article III — one implementation of a behaviour per repo. No allowlist: the only exits are
+    # lifting the shared body to one package or fixing the check.
     dups = [(a.file, a.name, b.file, b.name) for a, b in arch_rules.body_dups(arch_rules.function_facts(), cross_package=True)]
     assert not dups, (
         f"function bodies duplicated across packages (lift the shared body to one package; filing a task does not pass the gate): {dups}"

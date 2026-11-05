@@ -38,7 +38,7 @@ fitness tests, walk the AST
 
 - **Within a package:** duplication or name collision is a bug. **Blocking** (`tests/test_arch_rules.py`).
 - **Across packages:** body duplication is **blocking** too (Article III: one implementation per repo), with
-  no allowlist; lift the body to one package or file a task. A private name shared by two packages is not
+  no allowlist; the only exits are lifting the shared body to one package or fixing the check. A private name shared by two packages is not
   checked: the same name over different bodies is not redundancy (the advisory report flagged only those).
 - **Dependency upper bounds:** always blocking; an unbounded dep breaks silently on a major bump
   (ADR 0001's ethos). Exceptions go in `tests/arch_allowlist.toml` **with a reason** (RG003).
