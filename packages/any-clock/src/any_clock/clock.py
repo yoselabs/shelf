@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import threading
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
@@ -14,8 +15,17 @@ class PhaseClock:
     """Time attributed to named phases; the innermost open phase owns the current instant.
 
     Entering a phase pauses the one around it; leaving resumes it. Time outside every `phase()` block belongs to
-    `root`, so no instant is unowned and `sum(totals().values()) == wall()` (both share one clock read). The clock cannot stop a caller
-    entering the wrong phase. Not thread-safe: `phase()` or `book()` from a thread other than the creating one raises.
+    `root`, so no instant is unowned and `sum(totals().values()) == wall()` within float rounding (both share one clock read).
+    The clock cannot stop a caller
+    entering the wrong phase.
+
+    Thread-safe: one lock guards all state, and no time is lost or counted twice under concurrent calls. The phase stack
+    is shared by every thread, not kept per thread: `phase()` from two threads at once nests in arrival order (the
+    later one sits inside the earlier), exits pop the innermost open phase whichever thread leaves, and `book()`'s donor
+    is the innermost open phase at the moment of the call. Time is attributed to that one shared stack, so use
+    `phase()` from several threads only if that reading is what you mean; `book()` from many threads is the safe case.
+
+    `elapsed` starts the clock part-way through: it has already run that many seconds, all owned by `root`.
     """
 
     def __init__(
@@ -26,15 +36,25 @@ class PhaseClock:
         root: str = "run",
         exempt: Iterable[str] = (),
         budget: float | None = None,
+        elapsed: float = 0.0,
     ) -> None:
         self._now = now
         self._limits = dict(limits or {})
         self._exempt = frozenset(exempt)
         self._budget = budget
-        self._owner = threading.get_ident()
-        self._t0 = self._last = now()
+        if not (math.isfinite(elapsed) and elapsed >= 0):
+            msg = f"elapsed must be a non-negative number of seconds, got {elapsed!r}"
+            raise ValueError(msg)
+        self._lock = threading.Lock()
+        start = self._last = now()
+        self._t0 = start - elapsed
         self._stack = [root]
-        self._totals = {root: 0.0}
+        self._totals = {root: elapsed}
+
+    @property
+    def started(self) -> float:
+        """The `now()` reading the clock counts from: the construction reading minus `elapsed` (back-dated)."""
+        return self._t0
 
     def _book(self) -> float:
         """Book the time since the last read to the owning phase; returns the high-water clock reading.
@@ -46,25 +66,21 @@ class PhaseClock:
         self._last = t
         return t
 
-    def _check_thread(self, caller: str) -> None:
-        if threading.get_ident() != self._owner:
-            msg = f"PhaseClock is single-threaded: {caller}() called from another thread"
-            raise RuntimeError(msg)
-
     @contextmanager
     def phase(self, name: str) -> Iterator[None]:
         """Own the time inside the block; the surrounding phase pauses. Leaves cleanly on an exception."""
-        self._check_thread("phase")
-        self._book()
-        self._stack.append(name)
-        self._totals.setdefault(name, 0.0)
+        with self._lock:
+            self._book()
+            self._stack.append(name)
+            self._totals.setdefault(name, 0.0)
         try:
             yield
         finally:
-            try:
-                self._book()
-            finally:
-                self._stack.pop()
+            with self._lock:
+                try:
+                    self._book()
+                finally:
+                    self._stack.pop()
 
     def book(self, phase: str, seconds: float) -> float:
         """Move already-measured `seconds` from the innermost open phase (the donor) into `phase`; returns what moved.
@@ -73,32 +89,37 @@ class PhaseClock:
         `current()` at call time, so the moved seconds were being counted there and `sum(totals().values())` stays
         `wall()`. The move is capped at the donor's total so no total goes negative; a negative, zero or NaN `seconds`
         moves nothing, and booking into the donor itself moves nothing (returns 0.0). A booked exempt phase lowers
-        `charged()`; a booked limited phase can make `over()` report it. Same single-thread rule as `phase()`.
+        `charged()`; a booked limited phase can make `over()` report it. Safe from any thread;
+        the donor is the shared stack's innermost phase.
         """
-        self._check_thread("book")
-        self._book()
-        donor = self._stack[-1]
-        if phase == donor or not seconds > 0:
-            return 0.0
-        moved = min(seconds, self._totals[donor])
-        self._totals[donor] -= moved
-        self._totals[phase] = self._totals.get(phase, 0.0) + moved
-        return moved
+        with self._lock:
+            self._book()
+            donor = self._stack[-1]
+            if phase == donor or not seconds > 0:
+                return 0.0
+            moved = min(seconds, self._totals[donor])
+            self._totals[donor] -= moved
+            self._totals[phase] = self._totals.get(phase, 0.0) + moved
+            return moved
 
     def current(self) -> str:
-        return self._stack[-1]
+        with self._lock:
+            return self._stack[-1]
 
     def wall(self) -> float:
-        return self._book() - self._t0
+        with self._lock:
+            return self._book() - self._t0
 
     def total(self, name: str) -> float:
         """Seconds owned by `name` so far, live while it is open; 0 for a phase never entered."""
-        self._book()
-        return self._totals.get(name, 0.0)
+        with self._lock:
+            self._book()
+            return self._totals.get(name, 0.0)
 
     def totals(self) -> dict[str, float]:
-        self._book()
-        return dict(self._totals)
+        with self._lock:
+            self._book()
+            return dict(self._totals)
 
     def charged(self) -> float:
         """Seconds owned by every phase that is not exempt."""

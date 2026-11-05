@@ -158,24 +158,6 @@ def test_clock_raising_inside_the_exit_still_pops_the_phase() -> None:
     assert clock.current() == "run"
 
 
-def test_other_thread_is_refused() -> None:
-    clock = PhaseClock(Tick())
-    errors: list[BaseException] = []
-
-    def enter() -> None:
-        try:
-            with clock.phase("x"):
-                pass
-        except RuntimeError as exc:
-            errors.append(exc)
-
-    worker = threading.Thread(target=enter)
-    worker.start()
-    worker.join()
-    assert len(errors) == 1
-    assert clock.current() == "run"
-
-
 def test_book_moves_seconds_out_of_the_owning_phase() -> None:
     tick = Tick()
     clock = PhaseClock(tick)
@@ -264,20 +246,89 @@ def test_book_of_nothing_or_nonsense_books_zero(seconds: float) -> None:
     assert clock.totals() == {"run": 5}
 
 
-def test_book_from_another_thread_is_refused() -> None:
+def test_elapsed_starts_the_clock_part_way_owned_by_root() -> None:
     tick = Tick()
-    clock = PhaseClock(tick)
-    tick.advance(5)
-    errors: list[BaseException] = []
+    clock = PhaseClock(tick, elapsed=90)
+    assert clock.wall() == 90
+    assert clock.totals() == {"run": 90}
+    tick.advance(10)
+    assert clock.wall() == 100
+    assert sum(clock.totals().values()) == clock.wall()
 
-    def go() -> None:
+
+def test_started_is_the_back_dated_reading() -> None:
+    tick = Tick()
+    assert PhaseClock(tick).started == 1000
+    assert PhaseClock(tick, elapsed=250).started == 750
+
+
+def test_restore_then_book_moves_the_waited_part_out_of_root() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick, exempt={"wait"}, elapsed=600)
+    assert clock.book("wait", 200) == 200
+    tick.advance(60)
+    assert clock.charged() == pytest.approx(460)
+    assert clock.wall() == 660
+
+
+def test_book_after_restore_is_capped_at_elapsed() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick, elapsed=30)
+    assert clock.book("wait", 100) == 30
+    assert clock.totals() == {"run": 0, "wait": 30}
+
+
+@pytest.mark.parametrize("elapsed", [-1.0, float("nan"), float("inf")])
+def test_elapsed_must_be_a_finite_non_negative_number(elapsed: float) -> None:
+    with pytest.raises(ValueError, match="elapsed"):
+        PhaseClock(Tick(), elapsed=elapsed)
+
+
+def test_restored_clock_keeps_the_high_water_mark() -> None:
+    tick = Tick()
+    clock = PhaseClock(tick, elapsed=5)
+    tick.advance(10)
+    assert clock.wall() == 15
+    tick.advance(-10)
+    assert clock.wall() == 15
+
+
+def test_concurrent_book_and_phase_lose_and_double_count_nothing() -> None:
+    clock_t = [0.0]
+    step = threading.Lock()
+
+    def now() -> float:
+        with step:  # every read moves time on, so threads really interleave
+            clock_t[0] += 0.001
+            return clock_t[0]
+
+    clock = PhaseClock(now, exempt={"wait"}, elapsed=1000)
+    errors: list[BaseException] = []
+    start = threading.Barrier(16)
+
+    def work(n: int) -> None:
         try:
-            clock.book("wait", 1)
-        except RuntimeError as exc:
+            start.wait()
+            for i in range(200):
+                if n % 4 == 0:
+                    with clock.phase(f"p{n}"):
+                        clock.book("wait", 0.0005)
+                else:
+                    clock.book(f"lane{n}", 0.001)
+                if i % 20 == 0:
+                    assert sum(clock.totals().values()) == pytest.approx(clock.wall(), abs=0.5)
+                    clock.over()
+                    clock.charged()
+        except BaseException as exc:  # noqa: BLE001 - surfaced below
             errors.append(exc)
 
-    worker = threading.Thread(target=go)
-    worker.start()
-    worker.join()
-    assert len(errors) == 1
-    assert clock.totals() == {"run": 5}
+    threads = [threading.Thread(target=work, args=(n,)) for n in range(16)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert errors == []
+    assert clock.current() == "run"
+    totals = clock.totals()
+    assert all(s >= 0 for s in totals.values())
+    assert sum(totals.values()) == pytest.approx(clock.wall())

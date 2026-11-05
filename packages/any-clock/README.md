@@ -17,7 +17,8 @@ clock.over()     # [("review", spent, 600)] once past its limit; ("charged", spe
 
 | call | job |
 |---|---|
-| `PhaseClock(now, limits=, root=, exempt=, budget=)` | start the stopwatch; `budget` caps `charged()`; unphased time goes to `root` |
+| `PhaseClock(now, limits=, root=, exempt=, budget=, elapsed=)` | start the stopwatch; `budget` caps `charged()`; unphased time goes to `root`; `elapsed` starts it part-way (seconds already run, all in `root`) |
+| `started` | the `now()` reading the clock counts from: construction reading minus `elapsed` |
 | `phase(name)` | context manager; nests, the inner phase pauses the outer, exceptions close it |
 | `book(phase, seconds)` | move seconds you measured yourself out of the innermost open phase into `phase`; capped at what that phase owns, returns what moved |
 | `current()` / `wall()` | the owning phase / seconds since start |
@@ -29,4 +30,11 @@ clock.over()     # [("review", spent, 600)] once past its limit; ("charged", spe
 clock.book("network", waited)  # waited seconds measured elsewhere; the open phase gives them up, wall() is unchanged
 ```
 
-Single-threaded by design; another thread calling `phase()` or `book()` raises. Contract: [CONTRACT.md](CONTRACT.md).
+Restore after a restart: the host stored how long the run had gone and how much of it was waiting.
+
+```python
+clock = PhaseClock(time.time, exempt={"wait"}, budget=10800, elapsed=elapsed)  # started == time.time() - elapsed
+clock.book("wait", waited)  # capped at elapsed, moved out of root
+```
+
+Thread-safe: one lock guards all state, so `book()` from many threads (check lanes) is safe and `sum(totals().values()) == wall()` (within float rounding) holds throughout. The phase stack is shared by every thread, not per thread: `phase()` from two threads at once nests in arrival order, an exit pops the innermost open phase, and `book()`'s donor is the innermost open phase at call time. Contract: [CONTRACT.md](CONTRACT.md).
