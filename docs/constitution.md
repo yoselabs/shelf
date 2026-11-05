@@ -1,6 +1,6 @@
 # The shelf constitution
 
-Small on purpose. A constitution that grows long is already failing. Eight articles.
+Small on purpose. A constitution that grows long is already failing. Nine articles.
 
 Seeded from a2kay's AGENTS.md (whole-codebase Definition of Done, no carve-outs), its glossary
 discipline (one canonical name per concept), the primitive-shelf rule-of-three, and R154's factory
@@ -39,8 +39,8 @@ freezes the evolution the shelf exists to enable. Protection is budgeted and exp
 ### VI. Adopt conservatively — reach for the shelf first, pull only if DEEP · STABLE · WINS.
 *Pulling a shelf dep into a consumer* is the cautious act. Grep the shelf first; adopt an existing piece
 only if it hides real complexity (deep, not a restatement), has a settled API, and wins the
-weight-vs-saved trade. Any gate fails → duplicate locally; duplication is cheaper than the wrong
-abstraction. If the shelf *lacks* the piece and it is generic substrate, don't just duplicate — **promote
+weight-vs-saved trade. Any gate fails → do not adopt; the local code stays the single implementation (never
+a second copy beside a shelf piece that serves the same behaviour: evolve that piece instead, Article IX). If the shelf *lacks* the piece and it is generic substrate, don't just duplicate — **promote
 it** (Article VII).
 
 ### VII. Promote aggressively — capitalize generic substrate at writing time; reconcile later.
@@ -62,13 +62,34 @@ coherent subject is growth, not the accretion Article III forbids.
 At a **seam** (substrate that looks like shelf material) there are **four directions**, not one verdict:
 **adopt** (a piece fits), **evolve** (a piece *almost* fits → grow its contract to serve both cases —
 one evolving piece beats two similar ones, when it stays coherent), **promote** (nothing covers it →
-capitalize), **duplicate/skip** (evolving would distort the piece, or yours is too niche → keep it
-local). Aggressive promote + conservative adopt is self-correcting.
+capitalize), **keep local** (yours is too niche for the shelf; never generic substrate, Article IX). Aggressive promote + conservative adopt is self-correcting.
 
 ### VIII. Decay and reconciliation are mandatory.
 Every piece carries a TTL; unreused past it → deprecate → retire. And a recurring **reconciliation** pass
 adjudicates the aggressively-promoted catalog *with hindsight* — **merge** overlaps, **split** a
-kitchen-sink, **delete** the unused, **demote / duplicate back** an over-promotion (lineage arcs record
+kitchen-sink, **delete** the unused, **demote back** to its one consumer (no copy left on the shelf) an over-promotion (lineage arcs record
 it). This is where "was that the right abstraction?" is answered. Deletion is a virtue; a smaller shelf is
 a healthier one. Neglect reconciliation and aggressive promotion rots the catalog — it is the load-bearing
 other half, not optional garnish.
+
+### IX. Hard opinions: one way, one owner, injected.
+Everything we build, apps and shelf packages alike, obeys these. A breach is a defect, not a trade-off.
+- **No optionality.** One behaviour per concern: no flags, modes or config switches that choose between
+  behaviours. A real variant is a separate type behind an injected interface. An exception is a named,
+  justified row ([ADR 0022](adr/0022-every-exception-is-justified.md)), never a flag.
+- **No backward compatibility in code.** No shims, aliases, deprecated paths or dual code paths (the
+  catalog's `deprecated` state, Article VIII, is a lifecycle label, not a code path). A breaking
+  change bumps the package tag; consumers move or stay pinned (tags are never deleted, Article VIII).
+- **No redundancy.** One implementation of a behaviour per repo. A duplicate is allowed only as a recorded
+  task that reconciliation (Article VIII) must resolve, never as the end state. Article VI's "duplicate
+  locally" is a debt, not a decision.
+- **Decomposition and isolation.** Before code goes anywhere, name its concern and its owner. Behaviour
+  lives in a class or module that owns it; callers hold an instance and use its methods, never its
+  internals (process ids, file layouts, tool or harness names). A caller that must know how has found a
+  missing boundary (Article IV).
+- **Dependency injection.** Collaborators arrive as instances passed in at the edge. No module-level I/O,
+  no global state, no constructing a collaborator inside the code that uses it.
+- **Shelf awareness.** Every time code is written: does the shelf have it (borrow, Article VI), is it generic
+  (promote, Article VII)? A local copy of generic substrate is redundancy.
+
+Each rule names its check; where the check does not exist yet, adopting the rule includes filing it.

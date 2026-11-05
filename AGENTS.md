@@ -14,7 +14,7 @@ If you catch this file naming a specific package count or roster, that's a bug �
 ## Read in this order
 
 1. **[docs/doctrine.md](docs/doctrine.md)** — the *why*: what the shelf is and the load-bearing ideas.
-2. **[docs/constitution.md](docs/constitution.md)** — the 8 operating rules that follow from the doctrine.
+2. **[docs/constitution.md](docs/constitution.md)** — the 9 operating rules that follow from the doctrine.
 3. **[CONTEXT.md](CONTEXT.md)** — the ontology / vocabulary (**types only**, never instances).
 4. **§ The working agreement** (below) — Definition of Done, conventions, the one invariant.
 
