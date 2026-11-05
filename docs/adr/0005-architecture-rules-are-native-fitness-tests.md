@@ -34,13 +34,13 @@ allowlist-hygiene, RG004 dependency-upper-bounds) are reimplemented by *intent* 
 fitness tests, walk the AST
 (`ast`), read the manifests (`tomllib`), pure stdlib, inside `just check`, ownable, deletable.
 
-**Scope rule** (load-bearing, departs from a2kit). Constitution VI values some duplication; a2kit was
-one package, the shelf is many deliberately independent ones:
+**Scope rule** (load-bearing, departs from a2kit). Constitution IX forbids redundancy, but the check for it is
+still advisory across packages (see ADR 0028); a2kit was one package, the shelf is many independent ones:
 
 - **Within a package:** duplication or name collision is a bug. **Blocking** (`tests/test_arch_rules.py`).
 - **Across packages:** duplication is a *signal*, not a sin: a body shared by two packages is a
   candidate for a T0 primitive (rule of three). **Advisory only** (`just advisory`, never a build
-  failure); forcing the abstraction would violate VI.
+  failure) until it stops flagging private-name collisions and the findings are reconciled (ADR 0028).
 - **Dependency upper bounds:** always blocking; an unbounded dep breaks silently on a major bump
   (ADR 0001's ethos). Exceptions go in `tests/arch_allowlist.toml` **with a reason** (RG003).
 

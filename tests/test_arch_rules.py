@@ -1,8 +1,8 @@
 """Architectural fitness rules — blocking, intra-package (ADR 0005).
 
 Native reimplementation of a2kit's Rego policies (no OPA). These BLOCK on within-package
-findings; cross-package duplication is advisory only (`just advisory`), because
-constitution VI values some duplication ("cheaper than the wrong abstraction").
+findings; cross-package duplication is advisory only (`just advisory`) for now: it is the
+no-redundancy check of constitution IX and becomes blocking once its noise is gone (ADR 0028).
 """
 
 import re
