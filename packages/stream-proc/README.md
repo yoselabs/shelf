@@ -53,17 +53,28 @@ res.survivors    # pids of its tree still alive after the stop (normally ())
 ## Capture and stopping a pid we did not spawn
 
 ```python
-from stream_proc import capture, stop_pid
+from stream_proc import capture, capture_bytes, stop_pid
 
 got = capture(["git", "status"], cwd=repo, timeout=30, tick=heartbeat)   # tick: every 0.2 s while it lives, once after
 got.exit        # the exit code; 124 on a timeout (tree stopped); -N when signal N ended it
 got.out, got.err, got.secs, got.timed_out, got.survivors
+
+raw = capture_bytes(["cat"], input=b"\xff\r\n", timeout=30)   # exact bytes: raw.out == b"\xff\r\n"
+capture_bytes(argv, capture=False, stdin="inherit")             # child writes to our stdout/stderr; out/err are b""
 
 stop_pid(pid, start)   # a recorded holder, a server from an earlier run: stops its tree, -> pids still alive
 ```
 
 - **`capture` is `run` to the end**: both streams as one `str` each (UTF-8, bad bytes replaced), the
   same wall timeout and tree stop. There is no size cap; all output is held in memory.
+- **`capture_bytes(argv, cwd=, env=, timeout=, input=, stdin="devnull"|"inherit", capture=True, grace=, drain=)`** is
+  `capture` for bytes: `out`/`err` are the exact bytes (no decoding, `\r\n` kept) in a `CapturedBytes`
+  (`exit, out, err, secs, timed_out, survivors`). `input` goes to stdin while output is read, so large in and
+  out never deadlock; `stdin` picks /dev/null or inherited when there is no `input`; `capture=False` inherits
+  stdout/stderr (both come back `b""`). **Timeout contract = `capture`'s**: tree stopped, exit 124,
+  `timed_out=True`, the partial bytes in `out`/`err`, no exception (unlike `subprocess.run`); the last read is
+  bounded to `drain` (2 s) so an unrelated process holding a pipe cannot hang it. A SIGTERM/SIGINT during the
+  spawn or any unwinding exception stops the tree first. No `tick`, no size cap.
 - **`stop_pid` signals only the process it names**: the pid must still carry the `start` token you
   stored (`proc_start(pid)`; `None` takes the current token). A reused pid, a dead one or a system with no
   process table returns `()` and sends no signal. `PidHandle` is the `Popen` look-alike `stop_tree` takes.
