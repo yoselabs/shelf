@@ -2004,7 +2004,7 @@ source = { editable = "packages/json-match" }
 
 [[package]]
 name = "jsonl-log"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/jsonl-log" }
 dependencies = [
     { name = "atomic-io" },
