@@ -49,3 +49,21 @@ res.survivors    # pids of its tree still alive after the stop (normally ())
   cannot load does it degrade to signal 0 on the pid and the group alone.
 - `run` raises only for a spawn failure (`OSError`) or an exception that unwinds the wait; a child's
   failure is a `Result`.
+
+## Capture and stopping a pid we did not spawn
+
+```python
+from stream_proc import capture, stop_pid
+
+got = capture(["git", "status"], cwd=repo, timeout=30, tick=heartbeat)   # tick: every 0.2 s while it lives, once after
+got.exit        # the exit code; 124 on a timeout (tree stopped); -N when signal N ended it
+got.out, got.err, got.secs, got.timed_out, got.survivors
+
+stop_pid(pid, start)   # a recorded holder, a server from an earlier run: stops its tree, -> pids still alive
+```
+
+- **`capture` is `run` to the end**: both streams as one `str` each (UTF-8, bad bytes replaced), the
+  same wall timeout and tree stop. There is no size cap; all output is held in memory.
+- **`stop_pid` signals only the process it names**: the pid must still carry the `start` token you
+  stored (`proc_start(pid)`; `None` takes the current token). A reused pid, a dead one or a system with no
+  process table returns `()` and sends no signal. `PidHandle` is the `Popen` look-alike `stop_tree` takes.
