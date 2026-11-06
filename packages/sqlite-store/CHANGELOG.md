@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- A read-only open of an empty, version-0 file (a writer is creating it) returns None like a missing file instead of
+  raising `SchemaError`; a non-empty version-0 file still raises.
+
 ## 0.1.0
 
 - Evict dead threads' shared writers on every request and register process-exit
