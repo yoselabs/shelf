@@ -103,3 +103,22 @@ def test_with_network_turns_only_a_cause_less_failure_into_the_network():
     assert with_network(Outcome("worker_failed", "ECONNRESET", "event"), up).reason == "network"
     assert with_network(Outcome("rate_limited", "429", "event"), down).reason == "rate_limited"
     assert network_stop("waiting for network") == Outcome("network", "waiting for network", "event")
+
+
+@pytest.mark.parametrize(
+    ("fact", "want"),
+    [
+        ("free_model_gone", "rate_limited"),
+        ("setup_failed", "setup"),
+        ("crashed", "crash"),
+        ("signal", "killed"),
+    ],
+)
+def test_a_fact_the_caller_measured_is_a_reason_without_words(fact, want):
+    o = classify(None, structured={fact: "the caller's words"})
+    assert o == Outcome(want, "the caller's words", "ours")
+
+
+def test_a_measured_fact_outranks_the_vendors_words():
+    assert reason(1, "429 rate limit", structured={"crashed": "boom"}) == "crash"
+    assert reason(0, structured={"secret": "cat ~/.ssh/id", "setup_failed": "x"}) == "secrets"
