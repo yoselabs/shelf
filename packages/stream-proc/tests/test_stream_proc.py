@@ -252,3 +252,36 @@ def test_table_rows_carry_cpu_and_command() -> None:
     assert row.cpu_s >= 0
     assert row.cmd
     assert [r.pid for r in proctable.descendants(os.getppid())].count(os.getpid()) == 1
+
+
+class _Child:
+    """A Popen stand-in: running for `polls` polls, its wait(timeout) recording each timeout it was given."""
+
+    def __init__(self, polls: int) -> None:
+        self.polls, self.waits = polls, []
+
+    def poll(self) -> int | None:
+        self.polls -= 1
+        return None if self.polls >= 0 else 0
+
+    def wait(self, timeout: float) -> int:
+        self.waits.append(timeout)
+        raise subprocess.TimeoutExpired("child", timeout)
+
+
+def test_waiting_for_a_child_starts_short_and_doubles_up_to_20_ms(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A fixed 20 ms sleep per poll made every short child cost 20 ms of wall (a git call, a check): the wait is p.wait(nap), nap 1 ms doubling."""
+    from stream_proc import runner
+
+    monkeypatch.setattr(runner.time, "sleep", lambda _s: pytest.fail("the unbounded sleep is back"))
+    child = _Child(polls=8)
+    assert runner._wait(child, t0=time.monotonic(), last=[time.monotonic()], timeout=None, idle=None, stop=None) is None  # type: ignore[arg-type]
+    assert child.waits == [0.001, 0.002, 0.004, 0.008, 0.016, 0.02, 0.02, 0.02]
+
+
+def test_a_short_child_is_seen_to_end_well_inside_20_ms() -> None:
+    """The point of the doubling nap, on a real child: 30 runs of a process that ends at once all finish in far less than 30 x 20 ms of naps."""
+    started = time.monotonic()
+    for _ in range(30):
+        assert run(py("pass")).returncode == 0
+    assert time.monotonic() - started < 30 * 0.2  # starting python itself is most of it; the old floor added 20 ms to each
