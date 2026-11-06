@@ -96,7 +96,9 @@ def test_a_secret_path_in_a_command_stops_the_worker_before_it_goes_on(tmp_path)
     h = CodexHarness()
     out = run(h, spec(tmp_path, printing(CODEX_CMD, then="sleep 60")), 30, policy=policy, limits=FAST)
     assert out.secret == "~/.ssh/id_rsa"
-    assert h.evidence.denials == [ev.Denied(tool="Bash", input={"command": "~/.ssh/id_rsa"}, kind="secret")]
+    assert h.evidence.denials == [
+        ev.Denied(tool="Bash", input={"command": "~/.ssh/id_rsa"}, kind="secret", reason="the command names a secret path")
+    ]
     assert (out.rc or 0) < 0
 
 
