@@ -30,6 +30,11 @@ def test_show_unknown_bead_is_none(bd: Bd, script: Script) -> None:
     assert bd.show("zz-x") is None
 
 
+def test_show_empty_list_reply_is_none(bd: Bd, script: Script) -> None:
+    script.say("[]")
+    assert bd.show("zz-x") is None
+
+
 @pytest.mark.parametrize("out", ["", "not json", '{"no": "id"}', '[{"id": ""}]', "[1]"])
 def test_show_malformed_reply_raises_never_absence(bd: Bd, script: Script, out: str) -> None:
     script.say(out)
