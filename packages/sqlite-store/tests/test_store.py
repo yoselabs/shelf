@@ -4,7 +4,7 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import replace
-from threading import Barrier
+from threading import Barrier, Event
 from typing import TYPE_CHECKING, Literal
 from unittest.mock import Mock
 
@@ -207,6 +207,46 @@ def test_concurrent_creation(tmp_path: Path, schema: Schema, monkeypatch: pytest
     with ThreadPoolExecutor(max_workers=2) as pool:
         first, second = pool.submit(opener), pool.submit(opener)
         assert [first.result(timeout=15), second.result(timeout=15)] == [2, 2]
+
+
+def test_readonly_open_of_an_uninitialised_file_is_none_not_a_schema_error(tmp_path: Path, schema: Schema) -> None:
+    path = tmp_path / "journal.db"
+    path.touch()  # a writer has created the file and not yet run the DDL
+    assert open_ro(path, schema) is None
+    sqlite3.connect(path).execute("CREATE TABLE foreign_table (a)").connection.close()
+    with pytest.raises(SchemaError, match="schema v0"):  # a v0 file with tables is someone else's, not a creation in progress
+        open_ro(path, schema)
+
+
+def test_reader_during_first_creation_sees_not_there_yet(tmp_path: Path, schema: Schema, monkeypatch: pytest.MonkeyPatch) -> None:
+    inside, release = Event(), Event()
+    begin = store_module.begin_immediate
+
+    @contextmanager
+    def paused(con: sqlite3.Connection) -> Generator[None]:
+        inside.set()  # the file exists at user_version 0; the DDL has not run
+        assert release.wait(timeout=10)
+        with begin(con):
+            yield
+
+    monkeypatch.setattr(store_module, "begin_immediate", paused)
+    def create() -> int:
+        con = open_rw(tmp_path / "journal.db", schema)
+        assert con is not None
+        try:
+            return int(con.execute("PRAGMA user_version").fetchone()[0])
+        finally:
+            con.close()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        writer = pool.submit(create)
+        assert inside.wait(timeout=10)
+        assert open_ro(tmp_path / "journal.db", schema) is None
+        release.set()
+        assert writer.result(timeout=15) == schema.version
+    reader = open_ro(tmp_path / "journal.db", schema)
+    assert reader is not None
+    reader.close()
 
 
 def test_filesystem_refusal_prevents_connect(tmp_path: Path, store: Store, monkeypatch: pytest.MonkeyPatch) -> None:
