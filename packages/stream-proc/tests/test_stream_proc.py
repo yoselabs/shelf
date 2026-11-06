@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import stream_proc
-from stream_proc import Proc, Result, proctable, run, stop_tree
+from stream_proc import Proc, Result, proctable, run, runner, stop_tree
 from stream_proc.hold import TermHold, popen_held
 
 if TYPE_CHECKING:
@@ -266,21 +266,21 @@ class _Child:
 
     def wait(self, timeout: float) -> int:
         self.waits.append(timeout)
-        raise subprocess.TimeoutExpired("child", timeout)
+        cmd = "child"
+        raise subprocess.TimeoutExpired(cmd, timeout)
 
 
 def test_waiting_for_a_child_starts_short_and_doubles_up_to_20_ms(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A fixed 20 ms sleep per poll made every short child cost 20 ms of wall (a git call, a check): the wait is p.wait(nap), nap 1 ms doubling."""
-    from stream_proc import runner
-
+    """A fixed 20 ms sleep per poll cost every short child 20 ms of wall: the wait is p.wait(nap), nap 1 ms doubling."""
     monkeypatch.setattr(runner.time, "sleep", lambda _s: pytest.fail("the unbounded sleep is back"))
     child = _Child(polls=8)
-    assert runner._wait(child, t0=time.monotonic(), last=[time.monotonic()], timeout=None, idle=None, stop=None) is None  # type: ignore[arg-type]
+    now = time.monotonic()
+    assert runner._wait(child, t0=now, last=[now], timeout=None, idle=None, stop=None) is None  # type: ignore[arg-type]
     assert child.waits == [0.001, 0.002, 0.004, 0.008, 0.016, 0.02, 0.02, 0.02]
 
 
 def test_a_short_child_is_seen_to_end_well_inside_20_ms() -> None:
-    """The point of the doubling nap, on a real child: 30 runs of a process that ends at once all finish in far less than 30 x 20 ms of naps."""
+    """The doubling nap on a real child: 30 runs of a process that ends at once finish far inside 30 x 20 ms of naps."""
     started = time.monotonic()
     for _ in range(30):
         assert run(py("pass")).returncode == 0

@@ -104,10 +104,9 @@ def _wait(
         if stop is not None:
             stop.wait(nap)
         else:
-            try:
-                p.wait(nap)  # returns the moment the child exits: a fixed 20 ms sleep made every short child cost 20 ms of wall
-            except subprocess.TimeoutExpired:
-                pass
+            # returns the moment the child exits: a fixed 20 ms sleep made every short child cost 20 ms of wall
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                p.wait(nap)
         nap = min(nap * 2, _NAP_S)
     return None
 
