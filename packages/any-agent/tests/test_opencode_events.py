@@ -273,3 +273,23 @@ class TestWorld:
         assert not box.network_refusal("cat: /Users/x/.ssh/id_rsa: Operation not permitted")
         assert box.permissions(box.Sandbox(), True)["external_directory"] == "deny"
         assert obj(box.permissions(box.Sandbox(), False)["read"])[str(Path.home() / ".ssh")] == "deny"
+
+
+class TestReadRoots:
+    @staticmethod
+    def outside(write: bool, roots: tuple[str, ...] = ()):
+        return box.permissions(box.Sandbox(), write, (), roots)["external_directory"]
+
+    def test_a_write_step_reads_nothing_outside_its_cwd_without_a_root(self):
+        assert self.outside(True) == "deny"
+
+    def test_a_write_step_reads_a_listed_root_and_nothing_else(self):
+        assert self.outside(True, ("/data/shots/", "/opt/ref")) == {"*": "deny", "/data/shots/**": "allow", "/opt/ref/**": "allow"}
+
+    def test_a_read_only_step_ignores_the_list(self):
+        assert self.outside(False, ("/data/shots",)) == self.outside(False)
+
+    def test_a_denial_from_the_stream_carries_the_tools_words(self):
+        h = OpenCodeHarness()
+        events = h._denials("bash", {"command": "x"}, "Operation not permitted: /etc/x")
+        assert [e.reason for e in events if isinstance(e, ev.Denied)] == ["Operation not permitted: /etc/x"]
