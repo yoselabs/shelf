@@ -76,6 +76,7 @@ Guarantees:
   and returns the archive path; direct callers supply their own coordination.
 - `PRAGMA quick_check` runs on creation or the first writable open of each resolved
   file identity per process and cache owner. Read-only opens never check integrity.
+- `Schema.read_from` (optional) is the oldest version a read-only open accepts; read-only opens never upgrade.
   Optional `Schema.checks` are additional SQL queries with the same exact result
   contract: `[("ok",)]`. Failed checks are never cached. In-place damage after a
   successful check is left to SQLite's ordinary error handling.
