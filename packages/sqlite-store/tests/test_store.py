@@ -249,6 +249,40 @@ def test_reader_during_first_creation_sees_not_there_yet(tmp_path: Path, schema:
     reader.close()
 
 
+def test_reader_that_read_version_zero_before_the_creator_committed_decides_on_the_second_read(
+    tmp_path: Path, schema: Schema, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "journal.db"
+    path.touch()
+    real_connect = sqlite3.connect
+
+    class Interleaved:
+        """Forces the interleaving: user_version read as 0, the creator commits, then sqlite_master is read."""
+
+        def __init__(self, con: sqlite3.Connection) -> None:
+            self.con, self.created = con, False
+
+        def execute(self, sql: str, *args: object) -> sqlite3.Cursor:
+            if "sqlite_master" in sql and not self.created:
+                self.created = True
+                writer = open_rw(path, schema)
+                assert writer is not None
+                writer.close()
+            return self.con.execute(sql, *args)
+
+        def __getattr__(self, name: str) -> object:
+            return getattr(self.con, name)
+
+    def connect(address: str, *args: object, **kwargs: object) -> object:
+        con = real_connect(address, *args, **kwargs)  # type: ignore[arg-type]
+        return Interleaved(con) if kwargs.get("uri") else con
+
+    monkeypatch.setattr(store_module.sqlite3, "connect", connect)
+    reader = open_ro(path, schema)
+    assert reader is not None
+    reader.close()
+
+
 def test_filesystem_refusal_prevents_connect(tmp_path: Path, store: Store, monkeypatch: pytest.MonkeyPatch) -> None:
     connect = Mock(side_effect=AssertionError("must refuse before connecting"))
     monkeypatch.setattr(store_module, "filesystem_allowed", lambda _parent: False)
@@ -286,3 +320,19 @@ def test_journal_mode_retry_window(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(store_module.time, "monotonic", Mock(side_effect=[0.0, 5.0]))
     with pytest.raises(sqlite3.OperationalError, match="locked"):
         store_module._journal_mode(con, readonly=False)
+
+
+def test_readonly_open_accepts_from_read_from_and_never_upgrades(tmp_path: Path, schema: Schema) -> None:
+    path = tmp_path / "journal.db"
+    old = open_rw(path, schema)
+    assert old is not None
+    old.close()
+    newer = replace(schema, version=schema.version + 1, steps={schema.version: lambda con: con.execute("CREATE TABLE added (a)")})
+    with pytest.raises(SchemaError, match="the writer has not upgraded"):
+        open_ro(path, newer)
+    reader = open_ro(path, replace(newer, read_from=schema.version))
+    assert reader is not None
+    assert reader.execute("PRAGMA user_version").fetchone() == (schema.version,)  # not upgraded
+    reader.close()
+    with pytest.raises(SchemaError, match="the writer has not upgraded"):
+        open_ro(path, replace(newer, read_from=schema.version + 1))

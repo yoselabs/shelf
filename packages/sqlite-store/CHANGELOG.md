@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `Schema.read_from` (default None = `version`): the oldest version a read-only open accepts; it never upgrades, below it still raises `SchemaError` (writer has not upgraded).
+- A read-only open re-reads `user_version` after seeing a non-empty `sqlite_master`, so a creator committing between the two reads no longer raises `SchemaError` v0.
 - A read-only open of an empty, version-0 file (a writer is creating it) returns None like a missing file instead of
   raising `SchemaError`; a non-empty version-0 file still raises.
 
