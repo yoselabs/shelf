@@ -1,0 +1,19 @@
+[project]
+name = "task-spec"
+version = "0.1.0"
+description = "Tasks as specifications: the Task and Finding model, the remedy a finding carries, and the TaskStore and AttentionStore ports. Stdlib only."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/task_spec"]
+
+[tool.ruff]
+extend = "../../pyproject.toml"

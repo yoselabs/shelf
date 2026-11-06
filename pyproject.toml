@@ -33,6 +33,7 @@ process-lock = { workspace = true }
 # any-agent composes stream-proc.
 stream-proc = { workspace = true }
 any-mailbox = { workspace = true }
+task-spec = { workspace = true }
 shelf-vendor = { workspace = true }
 any-contract = { workspace = true }
 # The dev group installs `anyembed[llamacpp,transformers]` so both backends' imports resolve.
@@ -188,6 +189,8 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 # tools are CLI scripts: printing is their job, `git`/`opa` on PATH is deliberate,
 # and a module docstring is enough (no per-function D).
 "tools/**" = ["T201"]
+# the pytest plugin the root conftest loads as `tools.blueprint_fitness` (implicit namespace package, like the tests).
+"tools/blueprint_fitness.py" = ["INP001"]
 # package benches (convert-md's engine-comparison harnesses, D4): throwaway CLI
 # probe scripts + fixture generators, not shipped library code — same shape as
 # tools/**, plus INP001 (deliberately not a package), PLC0415 (isolated engines
@@ -274,6 +277,7 @@ testpaths = [
     "packages/any-lease/tests",
     "packages/any-agent/tests",
     "packages/any-mailbox/tests",
+    "packages/task-spec/tests",
     "packages/shelf-vendor/tests",
     "packages/any-contract/tests",
     "packages/record-mine/tests",
@@ -367,6 +371,7 @@ root_packages = [
     "process_lock",
     "any_lease",
     "any_mailbox",
+    "task_spec",
     "shelf_vendor",
     "any_contract",
     "record_mine",
@@ -449,6 +454,7 @@ source_modules = [
     "process_lock",
     "any_lease",
     "any_mailbox",
+    "task_spec",
     "shelf_vendor",
     "any_contract",
     "record_mine",
@@ -533,6 +539,7 @@ modules = [
     "process_lock",
     "any_lease",
     "any_mailbox",
+    "task_spec",
     "shelf_vendor",
     "any_contract",
     "record_mine",

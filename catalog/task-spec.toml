@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "task-spec"
+kind = "any-lib"
+tier = "T1"
+release = "task-spec-v0.1.0"
+capability = "Stop re-inventing what a task is: one stdlib-only model (Task, Finding, remedy owner|mechanical|agent, trust proposed|owned) and the TaskStore and AttentionStore ports, with a shared contract any tracker adapter must pass."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Owner chose the name task-spec (not any-task) on 2026-11-05. Born candidate; no release tag created by this change. The linter rules and the bd adapter are later beads under shelf-9zhu."

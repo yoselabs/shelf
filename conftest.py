@@ -50,4 +50,6 @@ settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 
 # `pytester` runs a small suite in a sandbox; bdd-tags proves its plugin hooks with it.
 # Declared here because pytest accepts `pytest_plugins` only in the rootdir conftest.
-pytest_plugins = ["pytester"]
+# `tools.blueprint_fitness` is the blueprint registry fitness (W2): every checkpoint seen passing and not passing over a
+# whole blueprint-suite run.
+pytest_plugins = ["pytester", "tools.blueprint_fitness"]
