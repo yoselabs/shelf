@@ -162,10 +162,20 @@ networks:
 """.format(d="a" * 64)
 
 
+def _conftest_binary() -> str | None:
+    """The real conftest, not the mise shim: a shim run from a temp repo finds no mise.toml and refuses to pick a version."""
+    if mise := shutil.which("mise"):
+        found = subprocess.run([mise, "which", "conftest"], cwd=Path(__file__).parent, capture_output=True, text=True, check=False)
+        if found.returncode == 0 and found.stdout.strip():
+            return found.stdout.strip()
+    return shutil.which("conftest")
+
+
 def _conftest(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
     # Pinned in the shelf's mise.toml; a missing conftest is a failure, never a skipped test.
-    assert shutil.which("conftest"), "conftest is not installed: run `just tools`"
-    return subprocess.run(["conftest", *args], cwd=cwd, capture_output=True, text=True, check=False)
+    binary = _conftest_binary()
+    assert binary, "conftest is not installed: run `just tools`"
+    return subprocess.run([binary, *args], cwd=cwd, capture_output=True, text=True, check=False)
 
 
 def _policy(repo: Repo) -> None:
