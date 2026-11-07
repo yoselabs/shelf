@@ -29,6 +29,7 @@ members = [
     "any-path-glob",
     "any-plugin-cache",
     "any-proc",
+    "any-recorded-fixture",
     "any-shell-policy",
     "anyembed",
     "anyllm",
@@ -345,6 +346,11 @@ source = { editable = "packages/any-plugin-cache" }
 name = "any-proc"
 version = "0.3.0"
 source = { editable = "packages/any-proc" }
+
+[[package]]
+name = "any-recorded-fixture"
+version = "0.1.0"
+source = { editable = "packages/any-recorded-fixture" }
 
 [[package]]
 name = "any-shell-policy"

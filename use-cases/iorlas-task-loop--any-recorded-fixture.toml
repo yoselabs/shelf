@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "iorlas-task-loop"
+software = "any-recorded-fixture"
+why = "Real model-call exchanges are recorded per case and replayed as a golden. Not yet adopted; the consumer repoint remains separate."
+needs = "Case; cases(root); read_json; write_json; record; golden with GoldenMismatch diffs; update_requested; scrub."
+sponsor = "yoselabs"
+requester = "iorlas-task-loop"
+status = "active"          # active | retired -- the planned retention claim until the repoint lands
