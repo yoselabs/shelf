@@ -281,14 +281,18 @@ provides-extras = ["merge"]
 
 [[package]]
 name = "any-json-doc"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-json-doc" }
 dependencies = [
     { name = "atomic-io" },
+    { name = "process-lock" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "atomic-io", editable = "packages/atomic-io" }]
+requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "process-lock", editable = "packages/process-lock" },
+]
 
 [[package]]
 name = "any-lease"

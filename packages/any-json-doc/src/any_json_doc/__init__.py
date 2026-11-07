@@ -8,18 +8,22 @@ value). ``load`` raises ``ValueError`` for a bad shape and :class:`ForeignVersio
 
 from __future__ import annotations
 
+import hashlib
 import json
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from atomic_io import atomic_write_json
+from process_lock import ProcessLock
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 __all__ = [
     "Absent",
+    "ConflictError",
     "Doc",
     "DocSet",
     "ForeignVersion",
@@ -30,6 +34,24 @@ __all__ = [
     "Torn",
     "refusal",
 ]
+
+
+class _Updates(threading.local):
+    def __init__(self) -> None:
+        self.paths: set[Path] = set()
+
+
+_UPDATES = _Updates()
+
+
+class ConflictError(ValueError):
+    """An update's expected revision differs from the bytes currently at ``path``."""
+
+    def __init__(self, path: Path, found: str, expected: str) -> None:
+        super().__init__(f"{path}: revision {found!r}, expected {expected!r}")
+        self.path = path
+        self.found = found
+        self.expected = expected
 
 
 class RefusedError(ValueError):
@@ -106,18 +128,56 @@ class Doc[T]:
         self._fsync = fsync
 
     def read(self) -> Read[T]:
+        return self.read_rev()[0]
+
+    def read_rev(self) -> tuple[Read[T], str]:
+        """Read once, returning the decoded state and SHA-256 of those bytes (absent: '').
+
+        Revisions are opaque strings. Equal bytes = equal state, so an A->B->A change
+        is not a conflict (intended). An unreadable file is Torn with revision ''.
+        """
         try:
-            text = self.path.read_text(encoding="utf-8")
+            raw = self.path.read_bytes()
         except FileNotFoundError:
-            return Absent()
-        except (OSError, ValueError) as err:  # unreadable, or not UTF-8
-            return Torn(self.path, str(err))
+            return Absent(), ""
+        except (OSError, ValueError) as err:
+            return Torn(self.path, str(err)), ""
+        return self._decode(raw), hashlib.sha256(raw).hexdigest()
+
+    def _decode(self, raw: bytes) -> Read[T]:
         try:
-            return Present(self._load(json.loads(text)))
+            return Present(self._load(json.loads(raw.decode("utf-8"))))
         except ForeignVersionError as err:
             return ForeignVersion(self.path, err.found, err.want)
-        except ValueError as err:  # bad JSON, a host's shape refusal
+        except ValueError as err:  # bad UTF-8, JSON, or a host's shape refusal
             return Torn(self.path, str(err))
+
+    def update(self, fn: Callable[[T | None], T], *, expect: str | None = None) -> T:
+        """Lock, re-read, optionally compare revision, transform, and atomically write.
+
+        Equal bytes = equal state: an A->B->A change is not a conflict (intended).
+        Writers must use update to participate in locking; write/delete do not lock.
+        Torn/ForeignVersion raise RefusedError; stale expect raises ConflictError; lock
+        timeouts propagate LockHeldError. Recursive updates of this path raise RuntimeError.
+        """
+        key = self.path.resolve()
+        if key in _UPDATES.paths:
+            msg = f"recursive update of {self.path}"
+            raise RuntimeError(msg)
+        lock = ProcessLock.acquire(Path(str(self.path) + ".lock"), timeout=10.0, reentrant=False)
+        _UPDATES.paths.add(key)
+        try:
+            current, revision = self.read_rev()
+            if isinstance(current, (Torn, ForeignVersion)):
+                raise RefusedError(refusal(current))
+            if expect is not None and expect != revision:
+                raise ConflictError(self.path, revision, expect)
+            rec = fn(current.rec if isinstance(current, Present) else None)
+            self.write(rec)
+            return rec
+        finally:
+            _UPDATES.paths.remove(key)
+            lock.release()
 
     def get(self) -> T | None:
         """The record, None for anything else (Absent, Torn, ForeignVersion): for files that can be derived again."""

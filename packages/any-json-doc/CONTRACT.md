@@ -10,5 +10,17 @@ Status: **candidate**. Shape: flexible. Protection is not yet earned by a live c
 - `DocSet` is a flat folder with one suffix; keys are plain file stems.
 - A version is never migrated and never read as empty.
 
-Imports: stdlib and `atomic-io`. A repo vendoring this package vendors `atomic-io` with it.
+- `read_rev()` reads bytes once, decodes through the same path as `read`, and returns the state plus
+  their SHA-256 hex digest (absent: `''`; unreadable: `Torn` with `''`). Revisions are opaque strings.
+- `update(fn, *, expect=None)` exclusively locks `<path>.lock` with `ProcessLock.acquire`, timeout
+  10 seconds and `reentrant=False`, then re-reads, transforms and atomically writes, returning the record.
+  Absent passes `None` to `fn`; present passes the record, including false-valued records.
+- Torn/ForeignVersion raise `RefusedError` before revision comparison or transform. Mismatching `expect`
+  raises `ConflictError(path, found, expected)` without writing or calling `fn`. Matching revisions proceed.
+- Equal bytes = equal state: A->B->A is not a conflict (intended).
+- Participating threads and processes cannot lose updates. `write` and `delete` do not acquire the lock.
+- Same-thread recursive updates of the same resolved path raise `RuntimeError`. The lock is released
+  in `finally`, including transform/write failures. `LockHeldError` propagates on timeout.
+
+Imports: stdlib, `atomic-io` and `process-lock`. Vendoring takes both dependencies along.
 No consumer app is imported. Executable acceptance: `tests/`.

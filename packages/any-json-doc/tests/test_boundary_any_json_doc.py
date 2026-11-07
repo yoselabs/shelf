@@ -1,4 +1,4 @@
-"""The package can be imported without a consumer app and needs only the standard library plus atomic_io."""
+"""The package can be imported without a consumer app and needs only the standard library plus atomic_io and process_lock."""
 
 from __future__ import annotations
 
@@ -26,5 +26,9 @@ def test_imports_no_consumer() -> None:
     assert _imports() & _CONSUMERS == set()
 
 
-def test_imports_only_the_standard_library_atomic_io_and_itself() -> None:
-    assert {m for m in _imports() if m not in sys.stdlib_module_names} <= {"any_json_doc", "atomic_io"}
+def test_imports_only_the_standard_library_and_declared_dependencies() -> None:
+    assert {m for m in _imports() if m not in sys.stdlib_module_names} <= {
+        "any_json_doc",
+        "atomic_io",
+        "process_lock",
+    }
