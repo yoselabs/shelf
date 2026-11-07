@@ -16,7 +16,7 @@ from stream_proc import Proc, Result, proctable, run, runner, stop_tree
 from stream_proc.hold import TermHold, popen_held
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 PY = sys.executable
 needs_proc = pytest.mark.skipif(not proctable.has_table(), reason="needs a process table")
@@ -280,8 +280,19 @@ def test_waiting_for_a_child_starts_short_and_doubles_up_to_20_ms(monkeypatch: p
 
 
 def test_a_short_child_is_seen_to_end_well_inside_20_ms() -> None:
-    """The doubling nap on a real child: 30 runs of a process that ends at once finish far inside 30 x 20 ms of naps."""
-    started = time.monotonic()
-    for _ in range(30):
-        assert run(py("pass")).returncode == 0
-    assert time.monotonic() - started < 30 * 0.2  # starting python itself is most of it; the old floor added 20 ms to each
+    """The doubling nap on a real child: the fastest of 30 runs costs under 15 ms more than the fastest bare subprocess.run.
+
+    The old fixed 20 ms sleep added 20 ms to every run, so even the fastest paid it; a minimum against a same-moment
+    baseline is blind to load spikes, which a wall-clock total over all runs was not."""
+
+    def fastest(call: Callable[[], object]) -> float:
+        best = float("inf")
+        for _ in range(30):
+            started = time.monotonic()
+            call()
+            best = min(best, time.monotonic() - started)
+        return best
+
+    bare = fastest(lambda: subprocess.run(py("pass"), check=True))
+    ours = fastest(lambda: run(py("pass")).returncode == 0 or pytest.fail("child failed"))
+    assert ours - bare < 0.015
