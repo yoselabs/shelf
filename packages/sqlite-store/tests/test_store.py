@@ -230,6 +230,7 @@ def test_reader_during_first_creation_sees_not_there_yet(tmp_path: Path, schema:
             yield
 
     monkeypatch.setattr(store_module, "begin_immediate", paused)
+
     def create() -> int:
         con = open_rw(tmp_path / "journal.db", schema)
         assert con is not None
@@ -268,7 +269,7 @@ def test_reader_that_read_version_zero_before_the_creator_committed_decides_on_t
                 writer = open_rw(path, schema)
                 assert writer is not None
                 writer.close()
-            return self.con.execute(sql, *args)
+            return self.con.execute(sql, *args)  # pyrefly: ignore[bad-argument-type]
 
         def __getattr__(self, name: str) -> object:
             return getattr(self.con, name)
@@ -322,12 +323,16 @@ def test_journal_mode_retry_window(monkeypatch: pytest.MonkeyPatch) -> None:
         store_module._journal_mode(con, readonly=False)
 
 
+def _add_table(con: sqlite3.Connection) -> None:
+    con.execute("CREATE TABLE added (a)")
+
+
 def test_readonly_open_accepts_from_read_from_and_never_upgrades(tmp_path: Path, schema: Schema) -> None:
     path = tmp_path / "journal.db"
     old = open_rw(path, schema)
     assert old is not None
     old.close()
-    newer = replace(schema, version=schema.version + 1, steps={schema.version: lambda con: con.execute("CREATE TABLE added (a)")})
+    newer = replace(schema, version=schema.version + 1, steps={schema.version: _add_table})
     with pytest.raises(SchemaError, match="the writer has not upgraded"):
         open_ro(path, newer)
     reader = open_ro(path, replace(newer, read_from=schema.version))
