@@ -37,7 +37,7 @@ Not here: task-loop's `FileTickets` (hard-link ticket line) is a lock protocol, 
 
 `update` serializes participating writers with an exclusive `<path>.lock` lock (10-second timeout).
 `Torn` and `ForeignVersion` raise `RefusedError` before calling the transform. A stale `expect` raises
-`Conflict` carrying `path`, `found`, and `expected`, leaving the file unchanged. Lock timeouts propagate
+`ConflictError` carrying `path`, `found`, and `expected`, leaving the file unchanged. Lock timeouts propagate
 `process_lock.LockHeldError`. Recursive updates of the same path in one thread raise `RuntimeError`.
 The lock is released even when the transform or write raises. `write` and `delete` remain unlocked.
 

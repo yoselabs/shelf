@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "Absent",
-    "Conflict",
+    "ConflictError",
     "Doc",
     "DocSet",
     "ForeignVersion",
@@ -44,7 +44,7 @@ class _Updates(threading.local):
 _UPDATES = _Updates()
 
 
-class Conflict(ValueError):
+class ConflictError(ValueError):
     """An update's expected revision differs from the bytes currently at ``path``."""
 
     def __init__(self, path: Path, found: str, expected: str) -> None:
@@ -157,7 +157,7 @@ class Doc[T]:
 
         Equal bytes = equal state: an A->B->A change is not a conflict (intended).
         Writers must use update to participate in locking; write/delete do not lock.
-        Torn/ForeignVersion raise RefusedError; stale expect raises Conflict; lock
+        Torn/ForeignVersion raise RefusedError; stale expect raises ConflictError; lock
         timeouts propagate LockHeldError. Recursive updates of this path raise RuntimeError.
         """
         key = self.path.resolve()
@@ -171,7 +171,7 @@ class Doc[T]:
             if isinstance(current, (Torn, ForeignVersion)):
                 raise RefusedError(refusal(current))
             if expect is not None and expect != revision:
-                raise Conflict(self.path, revision, expect)
+                raise ConflictError(self.path, revision, expect)
             rec = fn(current.rec if isinstance(current, Present) else None)
             self.write(rec)
             return rec

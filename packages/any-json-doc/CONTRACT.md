@@ -16,7 +16,7 @@ Status: **candidate**. Shape: flexible. Protection is not yet earned by a live c
   10 seconds and `reentrant=False`, then re-reads, transforms and atomically writes, returning the record.
   Absent passes `None` to `fn`; present passes the record, including false-valued records.
 - Torn/ForeignVersion raise `RefusedError` before revision comparison or transform. Mismatching `expect`
-  raises `Conflict(path, found, expected)` without writing or calling `fn`. Matching revisions proceed.
+  raises `ConflictError(path, found, expected)` without writing or calling `fn`. Matching revisions proceed.
 - Equal bytes = equal state: A->B->A is not a conflict (intended).
 - Participating threads and processes cannot lose updates. `write` and `delete` do not acquire the lock.
 - Same-thread recursive updates of the same resolved path raise `RuntimeError`. The lock is released

@@ -14,9 +14,9 @@ from hashlib import sha256
 from typing import TYPE_CHECKING, Any
 
 import pytest
-
-from any_json_doc import Absent, Conflict, Doc, DocSet, ForeignVersion, ForeignVersionError, Present, RefusedError, Torn
 from process_lock import LockHeldError, ProcessLock
+
+from any_json_doc import Absent, ConflictError, Doc, DocSet, ForeignVersion, ForeignVersionError, Present, RefusedError, Torn
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -211,7 +211,7 @@ def test_update_checks_revision_after_another_writer(tmp_path: Path) -> None:
     assert doc.update(lambda _: 1, expect=old) == 1
     _, current = doc.read_rev()
     before = doc.path.read_bytes()
-    with pytest.raises(Conflict) as caught:
+    with pytest.raises(ConflictError) as caught:
         Doc[int](doc.path).update(lambda _: 2, expect=old)
     assert caught.value.path == doc.path
     assert caught.value.found == current
