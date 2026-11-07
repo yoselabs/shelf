@@ -1,0 +1,10 @@
+seq = 169
+date = "2026-11-07"
+event = "delivery"
+software = "any-recorded-fixture"
+release = "any-recorded-fixture-v0.1.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = "Real model-call exchanges are recorded per case and replayed as a golden. Delivered stdlib JSON recording, sorted discovery, text golden diffs and placeholder scrubbing. Candidate; no adoption verdict yet."

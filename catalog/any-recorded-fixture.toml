@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-recorded-fixture"
+kind = "any-lib"
+tier = "T1"
+release = "any-recorded-fixture-v0.1.0"
+capability = "Stop hand-rolling recorded exchanges: store JSON cases, replay text goldens with unified diffs, and scrub unstable paths."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted for task-loop's real model-call recordings and golden replay. Standard library only. Born candidate; no release tag created by this change."

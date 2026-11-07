@@ -33,6 +33,7 @@ process-lock = { workspace = true }
 # any-agent composes stream-proc.
 stream-proc = { workspace = true }
 any-mailbox = { workspace = true }
+any-recorded-fixture = { workspace = true }
 task-spec = { workspace = true }
 shelf-vendor = { workspace = true }
 any-contract = { workspace = true }
@@ -277,6 +278,7 @@ testpaths = [
     "packages/any-lease/tests",
     "packages/any-agent/tests",
     "packages/any-mailbox/tests",
+    "packages/any-recorded-fixture/tests",
     "packages/task-spec/tests",
     "packages/shelf-vendor/tests",
     "packages/any-contract/tests",
@@ -371,6 +373,7 @@ root_packages = [
     "process_lock",
     "any_lease",
     "any_mailbox",
+    "any_recorded_fixture",
     "task_spec",
     "shelf_vendor",
     "any_contract",
@@ -454,6 +457,7 @@ source_modules = [
     "process_lock",
     "any_lease",
     "any_mailbox",
+    "any_recorded_fixture",
     "task_spec",
     "shelf_vendor",
     "any_contract",
@@ -539,6 +543,7 @@ modules = [
     "process_lock",
     "any_lease",
     "any_mailbox",
+    "any_recorded_fixture",
     "task_spec",
     "shelf_vendor",
     "any_contract",
