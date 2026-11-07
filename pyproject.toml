@@ -556,6 +556,7 @@ modules = [
 ignore_imports = [
     "any_frontmatter.document -> yaml_merge",
     "any_json_doc -> atomic_io",
+    "any_json_doc -> process_lock",
     "content_extract -> convert_md",
     "http_cache -> sqlite_resource",
     "llm_cache -> anyllm",

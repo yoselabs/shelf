@@ -9,11 +9,14 @@ import sys
 import textwrap
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from hashlib import sha256
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from any_json_doc import Absent, Doc, DocSet, ForeignVersion, ForeignVersionError, Present, RefusedError, Torn
+from any_json_doc import Absent, Conflict, Doc, DocSet, ForeignVersion, ForeignVersionError, Present, RefusedError, Torn
+from process_lock import LockHeldError, ProcessLock
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -181,3 +184,168 @@ def test_a_writer_killed_before_the_replace_leaves_the_old_document(tmp_path: Pa
     assert DocSet(tmp_path).keys() == ["d"]  # the leftover temp is no key
     old.write({"old": False})
     assert old.get() == {"old": False}
+
+
+def test_read_revision_tracks_exact_bytes(tmp_path: Path) -> None:
+    doc: Doc[int] = Doc(tmp_path / "counter.json")
+    assert doc.read_rev() == (Absent(), "")
+    doc.path.write_bytes(b" 0\n")
+    assert doc.read_rev() == (Present(0), sha256(b" 0\n").hexdigest())
+    doc.path.write_bytes(b"\xff")
+    state, revision = doc.read_rev()
+    assert isinstance(state, Torn)
+    assert revision == sha256(b"\xff").hexdigest()
+
+
+def test_update_checks_revision_after_another_writer(tmp_path: Path) -> None:
+    doc: Doc[int] = Doc(tmp_path / "counter.json")
+    seen: list[int | None] = []
+
+    def initial(current: int | None) -> int:
+        seen.append(current)
+        return 0
+
+    assert doc.update(initial, expect="") == 0
+    assert seen == [None]
+    _, old = doc.read_rev()
+    assert doc.update(lambda _: 1, expect=old) == 1
+    _, current = doc.read_rev()
+    before = doc.path.read_bytes()
+    with pytest.raises(Conflict) as caught:
+        Doc[int](doc.path).update(lambda _: 2, expect=old)
+    assert caught.value.path == doc.path
+    assert caught.value.found == current
+    assert caught.value.expected == old
+    assert doc.path.read_bytes() == before
+    assert doc.update(lambda _: 2, expect=current) == 2
+
+
+@pytest.mark.parametrize("raw", [b"{", b'{"v": 1, "n": 1}'])
+def test_update_refuses_unusable_document(tmp_path: Path, raw: bytes) -> None:
+    doc = _doc(tmp_path)
+    doc.path.write_bytes(raw)
+    with pytest.raises(RefusedError):
+        doc.update(lambda _: {"v": WANT, "n": 0}, expect="stale")
+    assert doc.path.read_bytes() == raw
+    doc.delete()
+    assert doc.update(lambda _: {"v": WANT, "n": 1}) == {"v": WANT, "n": 1}
+
+
+def test_recursive_update_refuses_and_releases_lock(tmp_path: Path) -> None:
+    doc: Doc[int] = Doc(tmp_path / "counter.json")
+    with pytest.raises(RuntimeError, match="update"):
+        doc.update(lambda _: Doc[int](doc.path.parent / "." / doc.path.name).update(lambda _: 1))
+    assert doc.update(lambda _: 2) == 2
+
+
+def test_thread_updates_do_not_lose_increments(tmp_path: Path) -> None:
+    doc: Doc[int] = Doc(tmp_path / "counter.json")
+    ready = threading.Barrier(8)
+
+    def increment() -> None:
+        ready.wait(timeout=10)
+        for _ in range(25):
+            Doc[int](doc.path).update(lambda n: (n or 0) + 1)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(increment) for _ in range(8)]
+        for future in futures:
+            future.result(timeout=30)
+    assert doc.need() == 200
+
+
+_INCREMENT_WRITER = textwrap.dedent(
+    """
+    import sys
+    from pathlib import Path
+    from any_json_doc import Doc
+
+    doc = Doc(Path(sys.argv[1]))
+    print("ready", flush=True)
+    sys.stdin.readline()
+    for _ in range(50):
+        doc.update(lambda n: (n or 0) + 1)
+    """
+)
+
+
+def test_process_updates_do_not_lose_increments(tmp_path: Path) -> None:
+    doc: Doc[int] = Doc(tmp_path / "counter.json")
+    children = [
+        subprocess.Popen(
+            [sys.executable, "-c", _INCREMENT_WRITER, str(doc.path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        for _ in range(2)
+    ]
+    try:
+        for child in children:
+            assert child.stdout is not None
+            assert child.stdout.readline() == "ready\n"
+        for child in children:
+            assert child.stdin is not None
+            child.stdin.write("go\n")
+            child.stdin.flush()
+        for child in children:
+            assert child.wait(timeout=30) == 0
+    finally:
+        for child in children:
+            if child.poll() is None:
+                child.kill()
+            child.communicate(timeout=30)
+    assert doc.need() == 100
+
+
+def test_read_revision_uses_one_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    doc: Doc[int] = Doc(tmp_path / "counter.json")
+    reads: list[Path] = []
+
+    def read_bytes(path: Path) -> bytes:
+        reads.append(path)
+        return b"0" if len(reads) == 1 else b"1"
+
+    monkeypatch.setattr(type(doc.path), "read_bytes", read_bytes)
+    assert doc.read_rev() == (Present(0), sha256(b"0").hexdigest())
+    assert reads == [doc.path]
+
+
+def test_equal_bytes_after_intervening_write_match_revision(tmp_path: Path) -> None:
+    doc: Doc[int] = Doc(tmp_path / "counter.json")
+    doc.write(0)
+    _, revision = doc.read_rev()
+    doc.update(lambda _: 1)
+    doc.update(lambda _: 0)
+    assert doc.update(lambda n: 2 if n == 0 else 3, expect=revision) == 2
+
+
+def test_update_lock_timeout_propagates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    doc: Doc[int] = Doc(tmp_path / "counter.json")
+    error = LockHeldError(doc.path, None)
+
+    def acquire(cls: type[ProcessLock], path: Path, *, timeout: float, reentrant: bool) -> ProcessLock:
+        assert path == type(doc.path)(str(doc.path) + ".lock")
+        assert timeout == 10.0
+        assert reentrant is False
+        raise error
+
+    with monkeypatch.context() as patch:
+        patch.setattr(ProcessLock, "acquire", classmethod(acquire))
+        with pytest.raises(LockHeldError) as caught:
+            doc.update(lambda _: 1)
+        assert caught.value is error
+    assert doc.update(lambda _: 2) == 2
+
+
+def test_update_write_failure_releases_lock(tmp_path: Path) -> None:
+    def dump(n: int) -> int:
+        if n == 1:
+            msg = "cannot encode"
+            raise ValueError(msg)
+        return n
+
+    doc: Doc[int] = Doc(tmp_path / "counter.json", dump=dump)
+    with pytest.raises(ValueError, match="cannot encode"):
+        doc.update(lambda _: 1)
+    assert doc.update(lambda _: 2) == 2

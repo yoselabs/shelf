@@ -1,6 +1,6 @@
 [project]
 name = "any-json-doc"
-version = "0.1.0"
+version = "0.2.0"
 description = "One JSON document per file, replaced atomically, read as one of four states: Present, Absent, Torn (half-written or unreadable) or ForeignVersion (another install's schema)."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
@@ -8,10 +8,12 @@ requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     "atomic-io>=0.2,<1",
+    "process-lock>=0.2,<1",
 ]
 
 [tool.uv.sources]
 atomic-io = { workspace = true }
+process-lock = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]
