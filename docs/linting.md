@@ -20,6 +20,26 @@ The one rule that never bends: **`just check` is green over the WHOLE repo — n
 Run the whole thing with `just check`. Individual targets: `just lint typecheck spell deps test`
 (and `just format`, `just cov` for a human coverage view).
 
+## Size caps
+
+The shared preset's `[tool.shelf-size]` table in `pyproject.toml` sets **400 SLOC per
+code file, 80 per function, 800 per test file**. Onboarding copies this table for
+consumers to read; `just preset` checks it for drift.
+
+Counting matches task-loop's `tests/rules/gate_rules.py`: count the distinct physical
+source lines spanned by tokens other than comments, newlines, indentation, encoding
+and end markers, then remove every line spanned by module, class and function
+docstrings. Blank and comment-only lines do not count; docstrings count **zero**
+(not one statement). Other multiline strings count every spanned line. Function
+sizes include the definition, decorators and nested definitions; repeated qualified
+names use their maximum size. Data files (YAML, XML, JSON, generated output) are outside.
+
+`tests/test_size_caps.py` enforces Python files in `packages/*/src`, `tools`, root
+`tests` and package tests selected against the upstream merge-base by `tools/changed.py`
+(including staged, unstaged and untracked files). With no base it checks everything.
+Existing oversized files must comply when changed; there is no exceptions list or
+ratchet file. This changed-file scope also applies when the test runs in `check-all`.
+
 ## Why the ruff config looks the way it does
 
 - **Curated-broad, not `ALL`.** An explicit, grouped `select` reads as a *reference* — it teaches the
@@ -88,7 +108,7 @@ Raise the floor as real coverage climbs; never lower it to make a red build gree
 
 When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
 
-1. The `[tool.ruff]`, `[tool.ruff.lint]`, `[tool.codespell]`, `[tool.coverage.*]` blocks from
+1. The `[tool.ruff]`, `[tool.ruff.lint]`, `[tool.codespell]`, `[tool.coverage.*]`, `[tool.shelf-size]` blocks from
    `pyproject.toml`, and each package's `[tool.deptry]` if it needs ignores. `[tool.pyrefly]` and
    `[tool.pytest.ini_options]` are generated for the consumer: the strict preset, the same error
    severities and the lighter test bar, without the shelf's own paths.
@@ -121,7 +141,7 @@ reached ten rule sets without anyone deciding to.
 
 `tools/preset_drift.py`, wired as `just preset` and copied verbatim like `guard`, compares three axes
 — `[tool.ruff.lint] select`/`ignore`, `[tool.pyrefly.errors]`, and the `justfile` recipe set — plus the ruff and
-pyrefly versions both `uv.lock` files hold (one config under another ruff is another rule set: a2kay's ruff 0.17 raised
+pyrefly versions both `uv.lock` files hold and the shared size-cap table (one config under another ruff is another rule set: a2kay's ruff 0.17 raised
 30 findings the shelf's 0.15 does not), and fails on any difference the consumer has not declared in its own:
 
 ```toml

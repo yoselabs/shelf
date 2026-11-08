@@ -43,7 +43,7 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 | No optionality | boolean-mode-parameter lint | task shelf-cypc |
 | No backward compatibility | shim / legacy / compat ban | task shelf-au97 |
 | No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
-| Size limit (IV) | per-file line limit in the linter | task shelf-26qe |
+| Size limit (IV) | `tests/test_size_caps.py` file and function SLOC caps | blocking on changed files |
 
 ### IV. Size is a hard limit for code; structure is the cure.
 Code files stay under a per-repo line limit (set in the repo's linter, no exceptions list, no ratchet file).
