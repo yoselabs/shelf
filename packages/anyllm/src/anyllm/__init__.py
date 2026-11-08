@@ -1,11 +1,12 @@
 """anyllm — stop caring which LLM provider is underneath.
 
 One async, structured completion contract (:class:`LLMProvider`) returning a rich
-:class:`Completion` (text + token/cost/latency accounting), with four shipped
+:class:`Completion` (text + token/cost/latency accounting), with five shipped
 backends behind one interface:
 
-- ``claude-code-cli`` — subscription-billed ``claude -p`` (stdlib subprocess, no
-  extra; scrubs ``ANTHROPIC_API_KEY`` so it never silently bills the API),
+- ``claude-code-cli`` — subscription-billed ``claude -p`` (``anyllm[agent]``;
+  scrubs ``ANTHROPIC_API_KEY`` so it never silently bills the API),
+- ``codex-cli`` — CodexHarness (``anyllm[agent]``),
 - ``claude-code-sdk`` — the OAuth OS session via ``claude-agent-sdk``
   (``anyllm[claude-code-sdk]``),
 - ``anthropic-api`` — per-token Messages API (``anyllm[anthropic]``),
@@ -44,9 +45,8 @@ from anyllm.providers import (
     AnthropicApiAdapter,
     ClaudeCodeCliAdapter,
     ClaudeCodeSdkAdapter,
+    CodexCliAdapter,
     OpenAICompatibleAdapter,
-    build_argv,
-    child_env,
 )
 from anyllm.select import DEFAULT_ORDER, DEFAULT_PROVIDER, build_adapter, resolve_provider
 
@@ -58,6 +58,7 @@ __all__ = [
     "AnyLLMError",
     "ClaudeCodeCliAdapter",
     "ClaudeCodeSdkAdapter",
+    "CodexCliAdapter",
     "Completion",
     "CostPolicy",
     "CostViolation",
@@ -68,8 +69,6 @@ __all__ = [
     "anthropic_cost_usd",
     "assert_within_budget",
     "build_adapter",
-    "build_argv",
-    "child_env",
     "extract_token_counts",
     "resolve_provider",
     "with_cost_guard",

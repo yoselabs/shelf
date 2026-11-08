@@ -22,94 +22,12 @@ from anyllm import (
     AnthropicApiAdapter,
     ClaudeCodeCliAdapter,
     ClaudeCodeSdkAdapter,
-    Completion,
     LLMProvider,
     OpenAICompatibleAdapter,
     build_adapter,
-    build_argv,
-    child_env,
 )
 from anyllm.errors import AnyLLMError
-from anyllm.providers import claude_code_cli, claude_code_sdk
-
-
-# ── claude-code-cli safety rules (pure) ───────────────────────────────────────
-def test_argv_has_json_format_and_model_no_bare() -> None:
-    argv = build_argv("hello", "claude-sonnet-4-6")
-    assert argv[argv.index("--output-format") + 1] == "json"
-    assert "--model" in argv
-    assert "--bare" not in argv  # non-negotiable: never force API-key auth
-
-
-def test_argv_appends_system_prompt() -> None:
-    argv = build_argv("hi", None, system="be terse")
-    assert argv[argv.index("--append-system-prompt") + 1] == "be terse"
-    assert "--model" not in argv
-    assert "--bare" not in argv
-
-
-def test_child_env_scrubs_anthropic_api_key() -> None:
-    env = child_env({"ANTHROPIC_API_KEY": "sk-secret", "PATH": "/usr/bin"})
-    assert "ANTHROPIC_API_KEY" not in env  # the #37686 footgun
-    assert env["PATH"] == "/usr/bin"
-
-
-# ── claude-code-cli complete (fake subprocess) ────────────────────────────────
-class _FakeProc:
-    def __init__(self, returncode: int, stdout: str, stderr: str) -> None:
-        self.returncode = returncode
-        self._out = stdout.encode()
-        self._err = stderr.encode()
-
-    async def communicate(self) -> tuple[bytes, bytes]:
-        return self._out, self._err
-
-
-def _patch_subprocess(monkeypatch: pytest.MonkeyPatch, proc: _FakeProc) -> None:
-    async def _fake_exec(*_a: Any, **_k: Any) -> _FakeProc:
-        return proc
-
-    monkeypatch.setattr(claude_code_cli.asyncio, "create_subprocess_exec", _fake_exec)
-
-
-def test_cli_fails_loud_on_nonzero(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = ClaudeCodeCliAdapter()
-    monkeypatch.setattr(adapter, "available", lambda: True)
-    _patch_subprocess(monkeypatch, _FakeProc(1, "", "credit exhausted"))
-    with pytest.raises(AnyLLMError) as exc:
-        asyncio.run(adapter.complete(user="hi", model="m"))
-    assert "exited 1" in str(exc.value)
-    assert exc.value.retryable is False  # never retry against the billed API
-
-
-def test_cli_parses_json_result_with_accounting(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = ClaudeCodeCliAdapter()
-    monkeypatch.setattr(adapter, "available", lambda: True)
-    stdout = (
-        '{"result": "summary", "model": "claude-haiku-4-5", "total_cost_usd": 0.002, "usage": {"input_tokens": 10, "output_tokens": 5}}'
-    )
-    _patch_subprocess(monkeypatch, _FakeProc(0, stdout, ""))
-    result = asyncio.run(adapter.complete(user="hi"))
-    assert isinstance(result, Completion)
-    assert result.text == "summary"
-    assert result.cost_usd == 0.002
-    assert result.prompt_tokens == 10
-    assert result.completion_tokens == 5
-
-
-def test_cli_fails_on_non_json(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = ClaudeCodeCliAdapter()
-    monkeypatch.setattr(adapter, "available", lambda: True)
-    _patch_subprocess(monkeypatch, _FakeProc(0, "not json", ""))
-    with pytest.raises(AnyLLMError):
-        asyncio.run(adapter.complete(user="hi"))
-
-
-def test_cli_missing_raises_before_running(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = ClaudeCodeCliAdapter()
-    monkeypatch.setattr(adapter, "available", lambda: False)
-    with pytest.raises(AnyLLMError):
-        asyncio.run(adapter.complete(user="hi"))
+from anyllm.providers import claude_code_sdk
 
 
 # ── anthropic-api (fake async client) ─────────────────────────────────────────

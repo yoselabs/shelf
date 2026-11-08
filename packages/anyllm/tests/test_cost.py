@@ -39,6 +39,7 @@ class _FakeProvider:
     [
         # Subscription backends (flat cost) — any model is fine.
         (ProviderName.CLAUDE_CODE_CLI, "claude-opus-4-8", True),
+        (ProviderName.CODEX_CLI, "gpt-5", True),
         (ProviderName.CLAUDE_CODE_SDK, "claude-sonnet-4-6", True),
         (ProviderName.CLAUDE_CODE_SDK, "claude-opus-4-8", True),
         # Metered anthropic-api — cheap models only.

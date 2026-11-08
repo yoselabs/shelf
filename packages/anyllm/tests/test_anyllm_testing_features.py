@@ -6,7 +6,7 @@ import os
 from typing import TYPE_CHECKING
 
 from anyllm import resolve_provider
-from anyllm.providers import ClaudeCodeCliAdapter, ClaudeCodeSdkAdapter, OpenAICompatibleAdapter
+from anyllm.providers import ClaudeCodeCliAdapter, ClaudeCodeSdkAdapter, CodexCliAdapter, OpenAICompatibleAdapter
 from anyllm.testing import hermetic_llm_env
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -51,6 +51,7 @@ def _none_set() -> None:
 def _unavailable() -> None:
     assert ClaudeCodeCliAdapter().available() is False
     assert ClaudeCodeSdkAdapter().available() is False
+    assert CodexCliAdapter().available() is False
 
 
 @then("no provider is selected")
