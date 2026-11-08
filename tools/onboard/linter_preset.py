@@ -3,7 +3,7 @@
 Implements `docs/linting.md`'s own copy list, mechanically:
 
 1. The `[tool.ruff]`, `[tool.ruff.lint]` (+ subtables), `[tool.codespell]`,
-   `[tool.coverage.*]` blocks from shelf's `pyproject.toml`.
+   `[tool.coverage.*]` and `[tool.shelf-size]` blocks from shelf's `pyproject.toml`.
 2. The `justfile` recipes (`check gate-start guard preset bootstrap bootstrap-verify tools lint format typecheck spell deps test`),
    with the attributes and comments that sit directly above each (ADR 0023: the gate runner is just);
    `check` is the plain gate (the shelf's own also runs the affected-only tests), and `deps` is rewritten
@@ -48,7 +48,7 @@ _SHELF_PYPROJECT = _SHELF_ROOT / "pyproject.toml"
 _SHELF_JUSTFILE = _SHELF_ROOT / "justfile"
 _JUSTFILES = ("justfile", "Justfile", ".justfile")
 
-_TABLE_PREFIXES = ("tool.ruff", "tool.codespell", "tool.coverage")
+_TABLE_PREFIXES = ("tool.ruff", "tool.codespell", "tool.coverage", "tool.shelf-size")
 _DEV_GROUP_TABLE = "dependency-groups"
 # Shelf-specific ruff tables a consumer must not inherit: the banned-api list bans the consumer apps
 # (a2kay, ...), which would ban a consumer from importing itself.

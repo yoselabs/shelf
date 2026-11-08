@@ -11,7 +11,8 @@ repos here reached ten different rule sets with no one deciding to.
 This closes that loop without taking the ownership away. It compares three axes —
 ``[tool.ruff.lint] select``/``ignore``, ``[tool.pyrefly.errors]``, and the
 ``justfile`` recipe set (a consumer still on a ``Makefile`` is compared by its targets) — plus the ruff and pyrefly
-versions both ``uv.lock`` files hold, and fails on any difference the consumer has not declared in its own::
+versions both ``uv.lock`` files hold and the shared ``[tool.shelf-size]`` caps.
+Size differences always fail; other differences fail unless the consumer declares them in its own::
 
     [tool.shelf-preset]
     ruff-select-omitted = []
@@ -154,6 +155,13 @@ def _compare(axis: str, shelf: set[str], consumer: set[str], declared: dict[str,
     ]
 
 
+def size_drift(reference: dict[str, Any], consumer: dict[str, Any]) -> list[str]:
+    """Size caps are a shared contract, with no exception declarations."""
+    expected = reference.get("tool", {}).get("shelf-size", {})
+    actual = consumer.get("tool", {}).get("shelf-size", {})
+    return [] if expected == actual else [f"  shelf-size: expected {expected!r}, got {actual!r}"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", default=".", help="the consumer repo to check (default: cwd)")
@@ -200,6 +208,7 @@ def main() -> int:
 
     findings = [line for axis, _ in _AXES for line in _compare(axis, *values[axis], declared)]
     findings += _version_drift(shelf, repo, declared)
+    findings += size_drift(reference, consumer)
     if not findings:
         print(f"preset-drift: {repo.name} matches the shelf preset (or declares every difference)")
         return 0

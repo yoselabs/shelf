@@ -735,3 +735,9 @@ exclude_lines = [
     "raise NotImplementedError",
     "\\.\\.\\.",  # protocol/abstract stubs
 ]
+
+# Shared SLOC caps, copied to consumers with the linter preset.
+[tool.shelf-size]
+code-file = 400
+function = 80
+test-file = 800
