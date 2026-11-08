@@ -1734,7 +1734,7 @@ requires-dist = [{ name = "sqlite-resource", editable = "packages/sqlite-resourc
 
 [[package]]
 name = "http-fetch"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/http-fetch" }
 dependencies = [
     { name = "curl-cffi" },

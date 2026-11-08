@@ -39,3 +39,37 @@ elif out.conditional_hit:
 - `FetchOutcome` — `body, content_type, status_code, final_url, headers, verdict, conditional_hit`
 - `FetchVerdict` — the closed transport verdict enum
 - `conditional_headers(extras) -> dict[str, str]`
+
+## Link liveness (0.4.0)
+
+`LinkChecker` checks public HTTP(S) links, pins validated DNS addresses for TLS
+connections, validates every redirect, and tries GET when HEAD is refused.
+No result cache or consumer URL extraction, placeholder, or credential policy.
+
+```python
+from http_fetch import LinkChecker, LinkState
+
+checker = LinkChecker(timeout=15, max_redirects=5)
+result = await checker.check("https://example.com")
+results = await checker.check_all(urls, concurrency=8, deadline=120)
+if result.state is LinkState.dead:
+    report(result.reason)
+```
+
+- `LinkChecker(*, resolver=..., opener=..., clock=..., timeout=15, max_redirects=5)`
+- `await checker.check(url) -> LinkResult`: alive for 2xx or non-redirect 3xx;
+  dead with reason for HTTP errors, unsafe hosts/peers, DNS/connection failures,
+  timeout, malformed URLs, and exhausted redirects. HEAD 400/403/405/406/429/501
+  retries with GET. Timeout covers DNS and opening each hop.
+- `await checker.check_all(urls, *, concurrency=8, deadline=120) -> dict[str, LinkResult]`:
+  distinct URLs; unfinished checks return unknown with reason `deadline`. Workers
+  are cancelled and awaited on deadline or caller cancellation; no detached work.
+- `LinkResult(state, reason="")` and `LinkState.alive / dead / unknown`.
+- `LinkReply(status, location="", peer_ip="")`: response from an injected opener.
+  Resolver signature: `async (host, port) -> list[str]`; all returned IPs must be
+  public. Opener signature: `async (url, method, validated_ip, timeout_s) -> LinkReply`.
+  It must connect only to that IP, preserve hostname TLS verification, disable
+  proxies and redirects, return headers without consuming bodies, and clean up
+  on cancellation. Resolver and opener must be cancellable. Clock is a monotonic
+  seconds callable. Production DNS uses a cancellable, reaped subprocess rather
+  than an executor thread; production requests use curl_cffi with proxies disabled.
