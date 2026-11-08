@@ -2,10 +2,10 @@
 
 A suite that reads whether the developer's machine has a provider (an API key in the shell, a
 logged-in Claude Code) is green on a laptop and red on a bare runner with no code difference.
-:func:`hermetic_llm_env` removes the provider variables and reports the two subscription
+:func:`hermetic_llm_env` removes the provider variables and reports the subscription
 backends unavailable, so a test that wants a provider configures its own.
 
-It establishes only that: the named variables are absent and the two CLI-backed adapters say
+It establishes only that: the named variables are absent and the CLI-backed adapters say
 unavailable. A new adapter with its own probe passes straight through; add it here. Does not
 import pytest.
 """
@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Final, Protocol
 
 from anyllm.providers.claude_code_cli import ClaudeCodeCliAdapter
 from anyllm.providers.claude_code_sdk import ClaudeCodeSdkAdapter
+from anyllm.providers.codex_cli import CodexCliAdapter
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -45,9 +46,10 @@ def _unavailable(_self: object) -> bool:
 
 def hermetic_llm_env(monkeypatch: _Patch, *, extra_env: Iterable[str] = ()) -> None:
     """Remove :data:`SCRUBBED_ENV` and ``extra_env`` (a consumer's own key names), and make the
-    Claude Code CLI and SDK adapters report unavailable."""
+    Claude Code CLI, SDK and Codex CLI adapters report unavailable."""
     for name in (*SCRUBBED_ENV, *extra_env):
         monkeypatch.delenv(name, raising=False)
     # raising=True: if either adapter loses `available`, this fails instead of reopening the hole.
     monkeypatch.setattr(ClaudeCodeCliAdapter, "available", _unavailable)
     monkeypatch.setattr(ClaudeCodeSdkAdapter, "available", _unavailable)
+    monkeypatch.setattr(CodexCliAdapter, "available", _unavailable)

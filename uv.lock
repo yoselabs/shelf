@@ -92,7 +92,7 @@ members = [
 dev = [
     { name = "any-frontmatter", extras = ["merge"], editable = "packages/any-frontmatter" },
     { name = "anyembed", extras = ["llamacpp", "transformers"], editable = "packages/anyembed" },
-    { name = "anyllm", extras = ["anthropic", "openai", "claude-code-sdk"], editable = "packages/anyllm" },
+    { name = "anyllm", extras = ["agent", "anthropic", "openai", "claude-code-sdk"], editable = "packages/anyllm" },
     { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
     { name = "browser-cookie3", specifier = ">=0.20,<1" },
     { name = "codespell", specifier = ">=2.3,<3" },
@@ -413,10 +413,13 @@ wheels = [
 
 [[package]]
 name = "anyllm"
-version = "0.7.0"
+version = "0.8.0"
 source = { editable = "packages/anyllm" }
 
 [package.optional-dependencies]
+agent = [
+    { name = "any-agent" },
+]
 anthropic = [
     { name = "anthropic" },
 ]
@@ -430,10 +433,11 @@ openai = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.40,<1" },
+    { name = "any-agent", marker = "extra == 'agent'", editable = "packages/any-agent" },
     { name = "claude-agent-sdk", marker = "extra == 'claude-code-sdk'", specifier = ">=0.1.80,<1" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.50" },
 ]
-provides-extras = ["anthropic", "openai", "claude-code-sdk"]
+provides-extras = ["agent", "anthropic", "openai", "claude-code-sdk"]
 
 [[package]]
 name = "app-dirs"

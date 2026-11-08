@@ -2,7 +2,7 @@
 
 Stop caring which LLM provider is underneath. One async, structured completion
 contract returning a rich `Completion` (text + token/cost/latency accounting),
-with four shipped backends behind one interface. No dependency on any host
+with five shipped backends behind one interface. No dependency on any host
 framework — backends **fail loud** with `AnyLLMError`; you translate it into your
 own error type, or catch it to degrade, at your own seam.
 
@@ -16,13 +16,17 @@ print(result.text, result.cost_usd, result.prompt_tokens)
 
 ## Backends
 
-Base install is featherweight (the CLI backend is stdlib-only). Each SDK-backed
-backend is an opt-in extra so you pull only the provider libraries you use.
+Base install has no dependencies. Install `anyllm[agent]` for either CLI backend
+(any-agent brings stream-proc). Without it, CLI adapters report unavailable and
+completion fails with `hint="install anyllm[agent]"`. The default remains
+`claude-code-cli`; consumers using it, including a2kay, must add the extra when upgrading.
 
-- **`claude-code-cli`** *(no extra)* — subscription-billed `claude -p --output-format json`.
+- **`claude-code-cli`** *(`anyllm[agent]`)* — subscription-billed `claude -p --output-format json`.
   Scrubs `ANTHROPIC_API_KEY` from the child env and never passes `--bare`, so it
   cannot silently fall back to (and bill) the per-token API. Fails loud on a
   non-zero exit; never retries against the API.
+- **`codex-cli`** *(`anyllm[agent]`)* — CodexHarness with `codex exec --json`,
+  a read-only sandbox, and a temporary answer file. CLI failures never fall back to the API.
 - **`claude-code-sdk`** *(`anyllm[claude-code-sdk]`)* — the OAuth OS session via
   `claude-agent-sdk`. Single-turn pure completion; host CLAUDE.md / skills / MCP
   servers / subagents are all blocked so no personal context leaks in.
@@ -79,7 +83,7 @@ await provider.complete(user="hi", model="claude-sonnet-4-6")  # raises CostViol
 ```
 
 The default policy encodes *"expensive models only via subscription, never
-metered"*: the subscription backends (`claude-code-cli` / `-sdk`) allow any model,
+metered"*: the subscription backends (`claude-code-cli` / `-sdk` / `codex-cli`) allow any model,
 metered `anthropic-api` allows Haiku-class only, `openai-compatible` a conservative
 cheap allowlist, and any pair not in the table is denied (opt in deliberately).
 Pass your own `CostPolicy` to change the rules; the guard raises `CostViolation`,
@@ -96,7 +100,7 @@ tagged — upgrade when you're ready.
 | `LLMAdapter` | `LLMProvider` |
 | `text = adapter.complete("prompt")` (sync, `-> str`) | `result = await adapter.complete(user="prompt")` (async, `-> Completion`); read `result.text` |
 | provider failure raises `AnyLLMError` | unchanged — still fail-loud (`retryable`/`hint` preserved) |
-| `anthropic-api` pulled `httpx` | now `anyllm[anthropic]` (official SDK); `claude-code-cli` stays dependency-free |
+| `anthropic-api` pulled `httpx` | now `anyllm[anthropic]` (official SDK); the base stays dependency-free (CLI backends now need `anyllm[agent]`) |
 
 New in v0.2: token/cost/latency on every result, prompt-cache breakpoints
 (`PromptParts`), and two more backends (`claude-code-sdk`, `openai-compatible`).
@@ -108,3 +112,9 @@ New in v0.2: token/cost/latency on every result, prompt-cache breakpoints
 backends unavailable, so a test sees no LLM it did not configure. A test that wants one sets
 its own variable or patches `available` after it. It does not cover an adapter added later
 with its own probe; add it there.
+
+CLI accounting comes from the harness summary. `model` echoes the requested model
+(or an empty string when omitted): summaries do not report a resolved model.
+Codex supplies tokens but no price (`cost_usd=0.0` means unknown). Latency is
+measured around supervision. CLI adapters do not expose max_tokens, temperature,
+or thinking_disabled controls; prompt parts are flattened.

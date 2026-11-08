@@ -32,6 +32,7 @@ page-tsv = { workspace = true }
 process-lock = { workspace = true }
 # any-agent composes stream-proc.
 stream-proc = { workspace = true }
+any-agent = { workspace = true }
 any-mailbox = { workspace = true }
 any-recorded-fixture = { workspace = true }
 task-spec = { workspace = true }
@@ -57,7 +58,7 @@ dev = [
     "browser-cookie3>=0.20,<1",  # browser-cookies' optional [read] engine — installed here so its tests exercise the real reader path (the package itself keeps it optional/lazy)
     "python-docx>=1.1,<2",       # docx WRITER for convert-md's dispatch tests (build a .docx fixture in-test); convert-md itself only READS docx, never writes — so this is test-only, not a package dep
     "convert-md[documents]",     # convert-md's heavy document engines (mammoth/office; docling dropped v0.5.0, pandoc dropped v0.7.0) — moved to the [documents] extra in v0.3.0; installed here so convert-md's dispatch tests still exercise the real engines (base stays HTML-only)
-    "anyllm[anthropic,openai,claude-code-sdk]",  # anyllm's SDK-backed provider extras — installed here so the anthropic/openai/claude-code-sdk backends' imports resolve for tests + deptry (base anyllm stays SDK-free; each backend is opt-in)
+    "anyllm[agent,anthropic,openai,claude-code-sdk]",  # anyllm's SDK-backed provider extras — installed here so the anthropic/openai/claude-code-sdk backends' imports resolve for tests + deptry (base anyllm stays SDK-free; each backend is opt-in)
     "zendriver>=0.15,<1",  # any-browser's CDP engine — installed here (NOT patchright, whose vendored Chromium is heavy) so its fake-fidelity contract (`test_fake_config_matches_real_add_argument`) checks the fake against the REAL Config every commit instead of importorskip-ing away. patchright + the browser binaries are installed only in the `just test-browser` lane.
     "pyrefly>=1.3,<2",
     "types-openpyxl>=3.1.5.20260827",
@@ -565,6 +566,7 @@ ignore_imports = [
     "content_extract -> convert_md",
     "http_cache -> sqlite_resource",
     "llm_cache -> anyllm",
+    "anyllm.providers.* -> any_agent",
     "mcp_result_wire._format_routing -> page_tsv",
     "page_tsv.page -> lean_wire",
     "page_tsv.render -> lean_wire",

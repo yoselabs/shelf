@@ -12,7 +12,7 @@ Keyed on :class:`~anyllm.base.ProviderName` (the canonical backend id), not a
 host's own provider alias: the cost distinction (flat subscription vs. metered
 per-token) is a property of the *backend*, so the enum is exactly the right key.
 The default policy encodes "expensive models only via subscription, never
-metered": the two subscription backends (``claude-code-cli`` / ``-sdk``) allow
+metered": the subscription backends (``claude-code-cli`` / ``-sdk`` / ``codex-cli``) allow
 any model, the metered ``anthropic-api`` allows cheap (Haiku-class) models only,
 ``openai-compatible`` allows a conservative cheap allowlist, and any pair not in
 the table is DENIED — a new model is opted in deliberately, never by accident.
@@ -61,7 +61,7 @@ class CostPolicy:
 
 
 # "Expensive models only via subscription, never metered." The two claude-code
-# backends are flat-cost (subscription) so any model is fine — the Sonnet judge
+# backends and codex-cli are flat-cost (subscription) so any model is fine — the Sonnet judge
 # is free there. Metered anthropic-api is cheap-models-only (Haiku-class).
 # openai-compatible is a last-resort gateway: a conservative cheap allowlist,
 # everything else denied, so an unrecognised OpenAI model is refused (fail loud)
@@ -69,6 +69,7 @@ class CostPolicy:
 DEFAULT_COST_POLICY = CostPolicy(
     allow=(
         (ProviderName.CLAUDE_CODE_CLI, ("*",)),
+        (ProviderName.CODEX_CLI, ("*",)),
         (ProviderName.CLAUDE_CODE_SDK, ("*",)),
         (ProviderName.ANTHROPIC_API, ("*haiku*",)),
         (ProviderName.OPENAI_COMPATIBLE, ("*mini*", "*nano*", "*flash*", "*small*", "*7b*", "*8b*", "*haiku*")),

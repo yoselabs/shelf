@@ -34,6 +34,7 @@ class ProviderName(StrEnum):
     """
 
     CLAUDE_CODE_CLI = "claude-code-cli"
+    CODEX_CLI = "codex-cli"
     CLAUDE_CODE_SDK = "claude-code-sdk"
     ANTHROPIC_API = "anthropic-api"
     OPENAI_COMPATIBLE = "openai-compatible"

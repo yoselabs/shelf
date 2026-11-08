@@ -34,6 +34,7 @@ from anyllm.providers import (
     AnthropicApiAdapter,
     ClaudeCodeCliAdapter,
     ClaudeCodeSdkAdapter,
+    CodexCliAdapter,
     OpenAICompatibleAdapter,
 )
 
@@ -50,6 +51,7 @@ DEFAULT_PROVIDER = ProviderName.CLAUDE_CODE_CLI
 # only the "I don't care, pick something reasonable" default.
 DEFAULT_ORDER: tuple[ProviderName, ...] = (
     ProviderName.CLAUDE_CODE_CLI,
+    ProviderName.CODEX_CLI,
     ProviderName.CLAUDE_CODE_SDK,
     ProviderName.ANTHROPIC_API,
     ProviderName.OPENAI_COMPATIBLE,
@@ -72,6 +74,8 @@ def build_adapter(provider: str, config: dict | None = None) -> LLMProvider:
     cfg = config or {}
     if provider == ProviderName.CLAUDE_CODE_CLI:
         adapter: LLMProvider = ClaudeCodeCliAdapter()
+    elif provider == ProviderName.CODEX_CLI:
+        adapter = CodexCliAdapter()
     elif provider == ProviderName.CLAUDE_CODE_SDK:
         adapter = ClaudeCodeSdkAdapter()
     elif provider == ProviderName.ANTHROPIC_API:

@@ -4,6 +4,13 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see `ledger/0032-anyllm-v2-delivered.toml` for why). Read this before source/README when
 reconciling a pin (agent-loop.md WORKFLOW: RECEIVE).
 
+## 0.8.0
+
+- BREAKING: claude-code-cli and codex-cli need anyllm[agent]; consumers on the default backend (a2kay) must add the extra when they bump
+- Claude subprocess implementation ⇒ any-agent ClaudeHarness; add CodexCliAdapter / ProviderName.CODEX_CLI after Claude CLI in DEFAULT_ORDER; both CLI failures are non-retryable.
+- Remove build_argv / child_env exports; billing safeguards are asserted on LaunchSpec.
+- CLI model ⇒ requested model (summary does not supply resolved model); Codex cost remains unknown (0.0).
+
 ## 0.4.0
 
 - `ClaudeCodeSdkAdapter.available()`: true when `claude_agent_sdk` is importable  ⇒  true only when a `claude` CLI is locatable AND a session credential exists (`CLAUDE_CODE_OAUTH_TOKEN` / `~/.claude/.credentials.json` / macOS Keychain item)
