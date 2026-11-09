@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 from blueprint.__main__ import RECIPES
-from blueprint.concerns import gate
+from blueprint.concerns import gate_clone
 from blueprint.model import FixedBy, Verdict
 from blueprint.report import gate as gate_report
 from blueprint.runner import run
@@ -190,7 +190,7 @@ def test_clean_clone_passes_within_its_budget(repo: Repo) -> None:
 def _runaway_clock(monkeypatch: pytest.MonkeyPatch) -> None:
     """A clock that counts a second a call, so a real sub-second gate reads as over any budget."""
     ticks = itertools.count(step=1000)
-    monkeypatch.setattr(gate, "time", SimpleNamespace(monotonic=lambda: float(next(ticks))))
+    monkeypatch.setattr(gate_clone, "time", SimpleNamespace(monotonic=lambda: float(next(ticks))))
 
 
 def test_clean_clone_over_budget_reports_this_machines_load_average(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
