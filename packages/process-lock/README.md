@@ -48,6 +48,7 @@ pl.holder(path)             # Holder(pid, start, created, label, meta) -- no loc
   descriptor on the file closes, so an unrelated `open().close()` would end it.
 - **Not inherited.** The descriptor is close-on-exec, so a child process does not keep the
   lock after its parent lets go.
+- **Failed acquisition.** Until the registry owns the descriptor, refusal and any failure close it, including holder observation, metadata serialization/write/truncate and registry adoption. The original error propagates; no inaccessible kernel lock remains.
 - The lock file is created `0600`, with its parent folders.
 
 POSIX only (`fcntl`). Stdlib only.

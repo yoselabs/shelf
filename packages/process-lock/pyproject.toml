@@ -1,6 +1,6 @@
 [project]
 name = "process-lock"
-version = "0.2.0"
+version = "0.2.1"
 description = "One process owns a path: an exclusive flock the kernel drops when its holder dies, with blocking acquire (timeout, waiting callback), a JSON holder record readable without the lock, stale-holder break, optional non-reentrant mode, never inherited by a child."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

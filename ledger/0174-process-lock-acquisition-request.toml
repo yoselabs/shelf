@@ -1,0 +1,10 @@
+seq = 174
+date = "2026-11-09"
+event = "request"
+software = "process-lock"
+release = "process-lock-v0.2.1"
+actor = "tl-shelf-git-porcelain-66"
+consumer = "iorlas-task-loop"
+verdict = ""
+cost = ""
+note = "shelf-7c34 requests failed-acquisition descriptor cleanup through registry handoff. Candidate patch has real independent-contender regressions; native final verification, independent review and publication remain separate."

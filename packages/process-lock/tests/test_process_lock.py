@@ -6,14 +6,17 @@ by design, so only another process can be refused.
 
 from __future__ import annotations
 
+import contextlib
+import errno
 import fcntl
 import os
 import signal
 import subprocess
 import sys
 import textwrap
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
+import process_lock
 import pytest
 from process_lock import LockHeldError, ProcessLock, held
 from process_lock import holder as read_holder
@@ -52,7 +55,7 @@ def _release(holder: subprocess.Popen[str]) -> None:
 
 
 def _can_acquire_elsewhere(lock_path: Path) -> bool:
-    return subprocess.run([sys.executable, "-c", _PROBE, str(lock_path)], capture_output=True, check=False).returncode == 0
+    return subprocess.run([sys.executable, "-c", _PROBE, str(lock_path)], capture_output=True, check=False, timeout=10).returncode == 0
 
 
 @pytest.fixture
@@ -137,3 +140,85 @@ def test_a_failure_while_locking_closes_the_descriptor(tmp_path: Path, monkeypat
     with pytest.raises(OSError, match="no locks here"):
         ProcessLock.acquire(tmp_path / "owner.lock")
     assert not held()
+
+
+@pytest.mark.parametrize("failure", ["serialization", "write", "truncate", "registry", "interrupted"])
+def test_failed_acquisition_does_not_keep_a_kernel_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str) -> None:
+    path = tmp_path / "failed.lock"
+    descriptors: list[int] = []
+    original_write = process_lock._write
+    original_dumps = process_lock.json.dumps
+
+    def recording_write(fd: int, record: dict[str, object]) -> None:
+        descriptors.append(fd)
+        if failure == "interrupted":
+            raise KeyboardInterrupt
+        original_write(fd, record)
+
+    def serialize(value: object) -> str:
+        if isinstance(value, dict) and "pid" in value:
+            msg = "metadata serialization failed after flock"
+            raise TypeError(msg)
+        return original_dumps(value)
+
+    def fail(*_args: object) -> NoReturn:
+        msg = "metadata write failed after flock"
+        raise OSError(msg)
+
+    def fail_registry(*_args: object, **_kwargs: object) -> NoReturn:
+        msg = "registry adoption failed"
+        raise MemoryError(msg)
+
+    expected_error = {"serialization": TypeError, "registry": MemoryError, "interrupted": KeyboardInterrupt}.get(failure, OSError)
+    try:
+        with monkeypatch.context() as fault:
+            fault.setattr(process_lock, "_write", recording_write)
+            if failure == "serialization":
+                fault.setattr(process_lock.json, "dumps", serialize)
+            elif failure == "registry":
+                fault.setattr(process_lock, "_Held", fail_registry)
+            elif failure != "interrupted":
+                fault.setattr(process_lock.os, "pwrite" if failure == "write" else "ftruncate", fail)
+            with pytest.raises(expected_error):
+                ProcessLock.acquire(path, label="failed acquisition", meta={"task": "shelf-7c34"})
+        assert path.resolve() not in held()
+        assert _can_acquire_elsewhere(path), "failed acquisition retained an unregistered kernel lock"
+        with pytest.raises(OSError) as closed:
+            os.fstat(descriptors[0])
+        assert closed.value.errno == errno.EBADF
+    finally:
+        for fd in descriptors:
+            with contextlib.suppress(OSError):
+                actual, expected = os.fstat(fd), path.stat()
+                if (actual.st_dev, actual.st_ino) == (expected.st_dev, expected.st_ino):
+                    os.close(fd)
+
+
+def test_refused_holder_read_failure_closes_its_unregistered_descriptor(
+    tmp_path: Path, holder: subprocess.Popen[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "owner.lock"
+    descriptors: list[int] = []
+
+    def unreadable(fd: int, _size: int, _offset: int) -> NoReturn:
+        descriptors.append(fd)
+        msg = "holder metadata unreadable"
+        raise OSError(msg)
+
+    try:
+        with monkeypatch.context() as fault:
+            fault.setattr(process_lock.os, "pread", unreadable)
+            with pytest.raises(OSError, match="holder metadata unreadable"):
+                ProcessLock.acquire(path)
+        assert not _can_acquire_elsewhere(path), "metadata failure bypassed a live foreign holder"
+        with pytest.raises(OSError) as closed:
+            os.fstat(descriptors[0])
+        assert closed.value.errno == errno.EBADF
+        _release(holder)
+        assert _can_acquire_elsewhere(path)
+    finally:
+        for fd in descriptors:
+            with contextlib.suppress(OSError):
+                actual, expected = os.fstat(fd), path.stat()
+                if (actual.st_dev, actual.st_ino) == (expected.st_dev, expected.st_ino):
+                    os.close(fd)

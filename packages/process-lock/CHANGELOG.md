@@ -10,3 +10,5 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 - 0.2.0: `LockHeldError(path, pid)`  ⇒  `LockHeldError(path, pid, holder=None)`; new exports `Holder`, `Waiting`, `holder`
 - 0.2.0: tests: `test_held_names_what_this_process_holds` asserted the file body is the bare pid  ⇒  asserts `holder(path).pid`
 - 0.2.0: a held lock is never broken; timeout while the recorded pid is dead ⇒ `LockHeldError` text "held by an inherited descriptor; recorded holder pid N is gone" (`.path/.pid/.holder` kept); no subprocess, no /proc
+
+- 0.2.1: failed acquire could retain an unregistered descriptor/kernel lock after metadata or holder-read failure ⇒ the acquisition owns and closes its descriptor until registry adoption; no public API change
