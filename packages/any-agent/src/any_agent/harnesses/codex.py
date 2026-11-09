@@ -17,6 +17,7 @@ from any_agent import events as ev
 from any_agent import procs
 from any_agent._json import Json, obj, objs, opt_int, opt_str, text
 from any_agent.protocol import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
+from any_agent.sealed import SealedDir
 from any_agent.watch import Limits
 
 if TYPE_CHECKING:
@@ -78,15 +79,21 @@ class CodexHarness(Quiet):
         self.evidence = Evidence(ref=resume)
         self.out_file = ""
         self.overlay: CodexOverlay | None = None
+        self.sealed_dir: SealedDir | None = None
 
     @override
     def cleanup(self) -> None:
+        if self.sealed_dir is not None:
+            self.sealed_dir.cleanup()
+            self.sealed_dir = None
         if self.overlay is not None:
             self.overlay.cleanup()
             self.overlay = None
 
     # -- launch ----------------------------------------------------------------------------------------------------------------------------
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec:
+        if i.sealed:
+            return self._sealed_spec(i)
         self.out_file = i.out_file
         out = ["--json", "-o", i.out_file]
         schema = ["--output-schema", i.schema] if i.schema else []
@@ -96,6 +103,17 @@ class CodexHarness(Quiet):
         else:
             argv = [i.exe, *i.cli[1:], *out, *schema, "-"]
         return LaunchSpec(argv=argv, env=i.env, cwd=i.cwd, stdin=i.prompt)
+
+    def _sealed_spec(self, i: LaunchInputs) -> LaunchSpec:
+        """A pure completion: the user's config and exec rules ignored, a read-only sandbox, no session file, an empty cwd (so no AGENTS.md
+        is discovered), the answer file inside that directory."""
+        self.cleanup()
+        self.sealed_dir = SealedDir("codex-sealed-")
+        self.out_file = str(self.sealed_dir.path / "answer.txt")
+        argv = [i.exe, "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral"]
+        argv += ["--model", i.model] if i.model else []
+        argv += ["--json", "-o", self.out_file, "-"]
+        return LaunchSpec(argv=argv, env=i.env, cwd=str(self.sealed_dir.path), stdin=i.prompt)
 
     # -- the event stream, parsed once -----------------------------------------------------------------------------------------------------
     def parse_line(self, line: str) -> list[ev.HarnessEvent]:

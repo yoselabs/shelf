@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -52,22 +51,17 @@ class CodexCliAdapter:
             msg = "codex CLI not found on PATH"
             raise AnyLLMError(msg, retryable=False, hint="install Codex or pick another provider")
         harness = any_agent.CodexHarness()
-        cli = [exe, "exec", "--sandbox", "read-only", "--skip-git-repo-check"]
-        if model:
-            cli += ["--model", model]
         prompt = "\n\n".join(p for p in (flat_system(parts, system), flat_user(parts, user)) if p)
-        with tempfile.TemporaryDirectory(prefix="anyllm-codex-") as directory:
-            inputs = any_agent.LaunchInputs(
-                exe=exe,
-                cwd=str(Path.cwd()),
-                model=model or "",
-                effort="low",
-                prompt=prompt,
-                env={k: v for k, v in os.environ.items() if k not in {"ANTHROPIC_API_KEY", "OPENAI_API_KEY"}},
-                cli=cli,
-                out_file=str(Path(directory) / "answer.txt"),
-            )
-            return await complete_run(any_agent, harness, harness.launch_spec(inputs), model or "")
+        inputs = any_agent.LaunchInputs(
+            exe=exe,
+            cwd=str(Path.cwd()),
+            model=model or "",
+            effort="low",
+            prompt=prompt,
+            env={k: v for k, v in os.environ.items() if k not in {"ANTHROPIC_API_KEY", "OPENAI_API_KEY"}},
+            sealed=True,
+        )
+        return await complete_run(any_agent, harness, harness.launch_spec(inputs), model or "")
 
 
 __all__ = ["CodexCliAdapter"]

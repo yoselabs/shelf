@@ -6,11 +6,13 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from typing import override
 
 from any_agent import drops, procs
 from any_agent import events as ev
 from any_agent._json import Json, container, num, obj, objs, opt_int, opt_str, text
 from any_agent.protocol import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
+from any_agent.sealed import SealedDir
 from any_agent.watch import Limits
 
 ARG_KEYS = (
@@ -144,6 +146,20 @@ def launch_argv(i: LaunchInputs) -> list[str]:
     return argv
 
 
+def sealed_argv(i: LaunchInputs) -> list[str]:
+    """The argv of a pure completion: one JSON result from one turn. `--system-prompt` always replaces the default coding prompt, even
+    with empty text; `--safe-mode` drops personal customizations while the login stays; the rest close tools, MCP, settings, slash commands
+    and the session file. Never `--bare`: it would move the run from the subscription to an API key."""
+    argv = [i.exe, "-p", "--output-format", "json", "--safe-mode", "--setting-sources", "", "--tools", "", "--strict-mcp-config"]
+    argv += ["--disable-slash-commands", "--no-session-persistence", "--max-turns", "1", "--system-prompt", i.system]
+    argv += ["--model", i.model] if i.model else []
+    bad = [f for f in FORBIDDEN_FLAGS if f in argv]
+    if bad:
+        msg = f"claude is never launched with {', '.join(bad)}"
+        raise ValueError(msg)
+    return argv
+
+
 class ClaudeHarness(Quiet):
     kind = "claude"
     limits = LIMITS
@@ -154,9 +170,20 @@ class ClaudeHarness(Quiet):
         self.evidence = Evidence()
         self.open: dict[str | None, tuple[bool, str, str]] = {}  # tool_use id -> (shell, name, arg), until its tool_result
         self.seen_usage: set[str | None] = set()
+        self.sealed_dir: SealedDir | None = None
+
+    @override
+    def cleanup(self) -> None:
+        if self.sealed_dir is not None:
+            self.sealed_dir.cleanup()
+            self.sealed_dir = None
 
     # -- launch ----------------------------------------------------------------------------------------------------------------------------
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec:
+        if i.sealed:
+            self.cleanup()
+            self.sealed_dir = SealedDir("claude-sealed-")
+            return LaunchSpec(argv=sealed_argv(i), env=launch_env(i.env, i.auth), cwd=str(self.sealed_dir.path), stdin=i.prompt)
         argv = launch_argv(i)
         self.evidence.ref = i.resume or i.session  # claude takes the session id from us: known before the first event
         return LaunchSpec(argv=argv, env=launch_env(i.env, i.auth), cwd=i.cwd, stdin=i.prompt)
