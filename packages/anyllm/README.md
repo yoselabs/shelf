@@ -24,9 +24,13 @@ completion fails with `hint="install anyllm[agent]"`. The default remains
 - **`claude-code-cli`** *(`anyllm[agent]`)* — subscription-billed `claude -p --output-format json`.
   Scrubs `ANTHROPIC_API_KEY` from the child env and never passes `--bare`, so it
   cannot silently fall back to (and bill) the per-token API. Fails loud on a
-  non-zero exit; never retries against the API.
+  non-zero exit; never retries against the API. A **pure completion**: only your system and
+  user text reach the model (system *replaces* the default coding prompt), with no host hooks,
+  CLAUDE.md, memory, skills, plugins, MCP or tools, one turn, in an empty temp directory.
+  Needs a Claude CLI with `--safe-mode` (checked on 2.1.296).
 - **`codex-cli`** *(`anyllm[agent]`)* — CodexHarness with `codex exec --json`,
-  a read-only sandbox, and a temporary answer file. CLI failures never fall back to the API.
+  a read-only sandbox, the user's Codex config and rules ignored, no session file, and a
+  temporary answer file in an empty directory. CLI failures never fall back to the API.
 - **`claude-code-sdk`** *(`anyllm[claude-code-sdk]`)* — the OAuth OS session via
   `claude-agent-sdk`. Single-turn pure completion; host CLAUDE.md / skills / MCP
   servers / subagents are all blocked so no personal context leaks in.

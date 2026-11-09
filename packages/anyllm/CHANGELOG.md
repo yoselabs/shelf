@@ -9,6 +9,7 @@ reconciling a pin (agent-loop.md WORKFLOW: RECEIVE).
 - BREAKING: claude-code-cli and codex-cli need anyllm[agent]; consumers on the default backend (a2kay) must add the extra when they bump
 - Claude subprocess implementation ⇒ any-agent ClaudeHarness; add CodexCliAdapter / ProviderName.CODEX_CLI after Claude CLI in DEFAULT_ORDER; both CLI failures are non-retryable.
 - Remove build_argv / child_env exports; billing safeguards are asserted on LaunchSpec.
+- Pure completion by default on claude-code-cli and codex-cli: only the caller's system and user text; no host hooks, CLAUDE.md/AGENTS.md, memory, skills, plugins, MCP, tools or default coding prompt; one turn; empty temp cwd. System text REPLACES the default prompt (was appended on 0.7.0). Needs any-agent>=0.1.3 (`LaunchInputs.sealed`); subscription auth kept, ANTHROPIC_API_KEY scrubbed, never `--bare`
 - CLI model ⇒ requested model (summary does not supply resolved model); Codex cost remains unknown (0.0).
 
 ## 0.4.0
