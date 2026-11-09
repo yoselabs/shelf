@@ -224,7 +224,7 @@ def _purpose(ctx: Context, requires: str) -> tuple[bool, str]:
 def _describe(spec: dict[str, Any]) -> str:
     if "any" in spec:
         return " or ".join(_describe(alt) for alt in spec["any"])
-    return spec["path"] + (f" with {spec['contains']!r}" if "contains" in spec else "")
+    return str(spec["path"]) + (f" with {spec['contains']!r}" if "contains" in spec else "")
 
 
 def _alternative_runs(ctx: Context, alt: dict[str, Any], gate_text: str) -> bool:
@@ -262,7 +262,7 @@ def _judge_set_up(ctx: Context, stack: str, spec: Role, role: str, gate_text: st
     plain = [c for c in spec.config if not {"lacks", "built", "smoked"} & c.keys()]
     missing = [_describe(c).replace("{root}", root) for c in plain if not _config_holds(ctx, c, root)]
     missing += [f"nothing builds {r}" for c in spec.config if "built" in c for r in _unbuilt(ctx)]
-    shipped = _shipped(ctx) if any("smoked" in c for c in spec.config) else []
+    shipped: list[str] = _shipped(ctx) if any("smoked" in c for c in spec.config) else []
     missing += [f"no CI job builds and runs {r}" for c in spec.config if "smoked" in c for r in _unsmoked(ctx, shipped)]
     forbidden = [f"{hit} has {c['lacks']!r}" for c in spec.config if "lacks" in c for hit in _offenders(ctx, c, root)]
     if missing or forbidden:

@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 from blueprint.model import FixedBy, Sub, check_each, dockerfiles, failing, not_set_up, passing, toml_table
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from blueprint.model import Context, Finding
 
 _STACK = "python-uv"
@@ -35,7 +37,7 @@ def _ranges(ctx: Context) -> dict[str, str]:
     root = ctx.toml("pyproject.toml")
     found = {".": str(toml_table(root, "project").get("requires-python", ""))}
     members = toml_table(root, "tool", "uv", "workspace").get("members", [])
-    patterns = [str(m) for m in members] if isinstance(members, list) else []
+    patterns: list[str] = [str(m) for m in members] if isinstance(members, list) else []
     for path in sorted(ctx.repo.glob("**/pyproject.toml")):
         folder = path.parent.relative_to(ctx.repo).as_posix()
         if folder != "." and any(fnmatch.fnmatch(folder, p) for p in patterns):
@@ -184,7 +186,7 @@ def _setup_uv_problems(rel: str, text: str, pin: str, *, exact_floor: bool) -> l
 
 def _uv_ci(ctx: Context) -> Finding:
     folder = ctx.repo / _WORKFLOWS
-    workflows = sorted(folder.glob("*.y*ml")) if folder.is_dir() else []
+    workflows: list[Path] = sorted(folder.glob("*.y*ml")) if folder.is_dir() else []
     images = dockerfiles(ctx.repo, ctx.profile.ignore)
     installs = [p for p in workflows if "astral-sh/setup-uv" in p.read_text(errors="replace")]
     copies = [p for p in images if _UV_IMAGE.search(p.read_text(errors="replace"))]

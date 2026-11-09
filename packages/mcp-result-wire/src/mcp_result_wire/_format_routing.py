@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from fastmcp.server.middleware import Middleware
 from mcp.types import TextContent
@@ -45,6 +45,7 @@ class FormatRoutingMiddleware(Middleware):
         # hosts that forward structuredContent to the model.
         self._structured_output = structured_output
 
+    @override
     async def on_call_tool(  # noqa: PLR0911 -- three mutually exclusive wire modes (dual / compact / strict) + early-exit guards
         self,
         context: MiddlewareContext[Any],

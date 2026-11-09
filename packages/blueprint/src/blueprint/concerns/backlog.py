@@ -243,7 +243,7 @@ def hooks_spare_beads(ctx: Context) -> Finding:
     text = ctx.read(".pre-commit-config.yaml") or ""
     top = "\n".join(line for line in text.splitlines() if line.startswith("exclude:"))
     starts = list(_HOOK_ID.finditer(text))
-    ends = [found.start() for found in starts[1:]] + [len(text)] if starts else []
+    ends: list[int] = [found.start() for found in starts[1:]] + [len(text)] if starts else []
     bare = [
         found.group(2)
         for found, end in zip(starts, ends, strict=True)

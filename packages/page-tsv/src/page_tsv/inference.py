@@ -184,7 +184,7 @@ def build_encoding_plan(return_type: Any) -> EncodingPlan:
     return EncodingPlan("json")
 
 
-def _page_item_type(cls: type[Page]) -> Any | None:
+def _page_item_type(cls: type[Page[object]]) -> Any | None:
     """Extract the bound item type from a ``Page`` subclass, or None if bare.
 
     For ``class SearchPage(Page[Task])`` this returns ``Task``.

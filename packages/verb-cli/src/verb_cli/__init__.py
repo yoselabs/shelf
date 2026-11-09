@@ -27,13 +27,13 @@ if TYPE_CHECKING:
 
 _SCALAR_TYPES = (str, int, float, bool, Path)
 _CONVERTED = (int, float, Path)
-_LABELS: tuple[tuple[type, str], ...] = (
+_LABELS: tuple[tuple[type | tuple[type, ...], str], ...] = (
     (bool, "true or false"),
     (Path, "path"),
     (int, "integer"),
     (float, "number"),
     (str, "text"),
-    ((list, tuple, set, frozenset), "JSON array"),  # type: ignore[arg-type]
+    ((list, tuple, set, frozenset), "JSON array"),
     (dict, "JSON object"),
 )
 

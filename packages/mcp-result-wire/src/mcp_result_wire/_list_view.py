@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, override
 
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 
@@ -58,6 +58,7 @@ class ListViewMiddleware(Middleware):
     def __init__(self, settings: dict[str, ListViewSettings]) -> None:
         self._settings = settings
 
+    @override
     async def on_call_tool(
         self,
         context: MiddlewareContext[Any],

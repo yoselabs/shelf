@@ -19,6 +19,7 @@ from convert_md.base import ConversionError, ConversionResult
 from convert_md.fidelity import grade
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
 
@@ -58,10 +59,13 @@ class PymupdfLlmEngine:
             msg = f"pymupdf4llm unavailable: {exc}"
             raise ConversionError(msg) from exc
         try:
-            markdown = pymupdf4llm.to_markdown(str(path))
+            markdown = pymupdf4llm.to_markdown(str(path), page_chunks=False)
         except Exception as exc:
             msg = f"pymupdf4llm failed on {path.name}: {exc}"
             raise ConversionError(msg) from exc
+        if not isinstance(markdown, str):
+            msg = "pymupdf4llm returned page chunks instead of Markdown"
+            raise ConversionError(msg)
         return _result(markdown, self.name, path.stat().st_size, check_yield=False)
 
 
@@ -222,13 +226,14 @@ def _pptx_notes(path: Path) -> str:
     chunks: list[str] = []
     for i, slide in enumerate(prs.slides, start=1):
         if slide.has_notes_slide:
-            text = slide.notes_slide.notes_text_frame.text.strip()
+            frame = slide.notes_slide.notes_text_frame
+            text = frame.text.strip() if frame is not None else ""
             if text:
                 chunks.append(f"**Slide {i}:** {text}")
     return "\n\n".join(chunks)
 
 
-def _rows_to_markdown(rows: list[tuple]) -> list[str]:
+def _rows_to_markdown(rows: Sequence[tuple[object, ...]]) -> list[str]:
     if not rows:
         return [""]
     out: list[str] = []

@@ -24,7 +24,7 @@ async def raises_as(awaitable: Awaitable[T], mapping: _Mapping) -> T:
     except BaseException as exc:
         for source, target in mapping.items():
             if isinstance(exc, source):
-                if isinstance(target, type) and issubclass(target, AppError):
+                if isinstance(target, type):
                     new = target(str(exc) or type(exc).__name__)
                     new.__cause__ = exc
                     raise new from exc

@@ -43,10 +43,10 @@ def read(pid: int) -> Proc | None:
     The command name may hold spaces and parentheses, so the fields are split after the last ``)``.
     """
     with contextlib.suppress(OSError, ValueError, IndexError):
-        head, _, tail = (PROC / str(int(pid)) / "stat").read_text(encoding="utf-8", errors="replace").rpartition(")")
+        head, _, tail = (PROC / str(pid) / "stat").read_text(encoding="utf-8", errors="replace").rpartition(")")
         rest = tail.split()
         cpu = (int(rest[11]) + int(rest[12])) / CLK_TCK
-        return Proc(int(pid), int(rest[1]), int(rest[2]), int(rest[3]), rest[19], rest[0], cpu, head.partition("(")[2])
+        return Proc(pid, int(rest[1]), int(rest[2]), int(rest[3]), rest[19], rest[0], cpu, head.partition("(")[2])
     return None
 
 
