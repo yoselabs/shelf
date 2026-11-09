@@ -94,14 +94,29 @@ class CodexHarness(Quiet):
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec:
         if i.sealed:
             return self._sealed_spec(i)
+        for name, value in (("exe", i.exe), ("cwd", i.cwd)):
+            if not value.strip():
+                msg = f"Codex {name} must not be empty"
+                raise ValueError(msg)
+        if i.resume is not None and not i.resume.strip():
+            msg = "Codex resume must name an explicit session"
+            raise ValueError(msg)
         self.out_file = i.out_file
-        out = ["--json", "-o", i.out_file]
-        schema = ["--output-schema", i.schema] if i.schema else []
-        if i.resume:
-            argv = [i.exe, "exec", "resume", "-m", i.model, "-c", f"model_reasoning_effort={i.effort}", "-c", f'sandbox_mode="{i.sandbox}"']
-            argv += i.access + i.isolation + [x for x in i.cli if x == "--skip-git-repo-check"] + out + schema + [i.resume, "-"]
-        else:
-            argv = [i.exe, *i.cli[1:], *out, *schema, "-"]
+        argv = [i.exe, "exec", *(["resume"] if i.resume is not None else [])]
+        if i.model:
+            argv += ["-m", i.model]
+        if i.effort:
+            argv += ["-c", "model_reasoning_effort=" + json.dumps(i.effort)]
+        if i.sandbox:
+            argv += ["-c", "sandbox_mode=" + json.dumps(i.sandbox)] if i.resume is not None else ["-s", i.sandbox]
+        argv += i.access + i.isolation + ["--json"]
+        if i.out_file:
+            argv += ["-o", i.out_file]
+        if i.schema:
+            argv += ["--output-schema", i.schema]
+        if i.resume is not None:
+            argv.append(i.resume)
+        argv.append("-")
         return LaunchSpec(argv=argv, env=i.env, cwd=i.cwd, stdin=i.prompt)
 
     def _sealed_spec(self, i: LaunchInputs) -> LaunchSpec:

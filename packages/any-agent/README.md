@@ -111,3 +111,33 @@ drainage. Keep accepted registration facts on postpermit uncertainty. Factory-ow
 publication/reconciliation and custody remain outside this package. For a surviving
 attempt process, explicitly use RunHooks(unattended=False): True watches its parent
 and stops work when that parent changes, including coordinator death.
+
+## Semantic Codex launch (0.4.0 API cut)
+
+Fresh and resumed nonsealed launches both use declared LaunchInputs choices:
+
+```python
+harness = CodexHarness()
+spec = harness.launch_spec(LaunchInputs(
+    exe="/path/to/codex", cwd="/worktree", model="chosen-model", effort="high",
+    sandbox="workspace-write", prompt="plan the task", env=credential_environment,
+    schema="/artifacts/plan-schema.json", out_file="/artifacts/answer.txt",
+))
+```
+
+The harness builds `exec` or explicit `exec resume`; callers do not build vendor
+argv. Model uses -m, effort a quoted config string. Fresh sandbox uses -s; resume
+uses its supported sandbox_mode config. Cwd, environment and prompt remain the
+LaunchSpec process context/stdin. Existing access/isolation lists are passed in
+both modes without redesigning those grant capabilities.
+
+Empty model, effort or sandbox omits that choice and leaves native configuration
+in effect; no safe default is invented. Factory admission must require its chosen
+values. Empty schema/output paths omit those flags; without an output file the
+existing summary uses stream evidence. Nonsealed executable/cwd must be nonblank,
+and an explicitly empty resume session refuses instead of starting fresh.
+
+LaunchInputs.cli and arbitrary full-command replacement are removed. Old nonsealed
+skip-Git extraction is also removed; no replacement skip flag was added. Existing
+sealed completion retains its own skip-Git behavior and ignores nonsealed choices
+as before. This is an opt-in pre-1.0 breaking release; previous tags are immutable.

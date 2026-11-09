@@ -8,7 +8,6 @@ import stat
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
 from unittest import mock
 
 import pytest
@@ -91,34 +90,35 @@ class TestFacts:
         assert [h.parse_line(x) for x in ("", "oops", "[1]", "3")] == ([[]] * 4)
 
 
-INPUTS: dict[str, Any] = {
-    "exe": "/bin/codex",
-    "cwd": "/w",
-    "model": "gpt",
-    "effort": "high",
-    "sandbox": "read-only",
-    "prompt": "rules\n\nbrief",
-    "out_file": "/c/last.txt",
-    "env": {"A": "1"},
-    "cli": ["codex", "exec", "-C", "/w", "-s", "read-only", "-m", "gpt", "--skip-git-repo-check"],
-    "access": ["--ignore-rules"],
-    "isolation": ["-c", "skills.config=[]"],
-}
+INPUTS = LaunchInputs(
+    exe="/bin/codex",
+    cwd="/w",
+    model="gpt",
+    effort="high",
+    sandbox="read-only",
+    prompt="rules\n\nbrief",
+    out_file="/c/last.txt",
+    env={"A": "1"},
+    access=["--ignore-rules"],
+    isolation=["-c", "skills.config=[]"],
+)
 
 
 class TestWorld:
     def test_a_fresh_launch(self):
-        s = CodexHarness().launch_spec(LaunchInputs(**INPUTS, schema="s.json"))
+        s = CodexHarness().launch_spec(dataclasses.replace(INPUTS, schema="s.json"))
         assert s.argv == [
             "/bin/codex",
             "exec",
-            "-C",
-            "/w",
-            "-s",
-            "read-only",
             "-m",
             "gpt",
-            "--skip-git-repo-check",
+            "-c",
+            'model_reasoning_effort="high"',
+            "-s",
+            "read-only",
+            "--ignore-rules",
+            "-c",
+            "skills.config=[]",
             "--json",
             "-o",
             "/c/last.txt",
@@ -129,7 +129,7 @@ class TestWorld:
         assert (s.cwd, s.stdin, s.env) == ("/w", "rules\n\nbrief", {"A": "1"})
 
     def test_a_resume_launch(self):
-        s = CodexHarness("th-9").launch_spec(LaunchInputs(**INPUTS, resume="th-9"))
+        s = CodexHarness("th-9").launch_spec(dataclasses.replace(INPUTS, resume="th-9", schema="s.json"))
         assert s.argv == [
             "/bin/codex",
             "exec",
@@ -137,16 +137,17 @@ class TestWorld:
             "-m",
             "gpt",
             "-c",
-            "model_reasoning_effort=high",
+            'model_reasoning_effort="high"',
             "-c",
             'sandbox_mode="read-only"',
             "--ignore-rules",
             "-c",
             "skills.config=[]",
-            "--skip-git-repo-check",
             "--json",
             "-o",
             "/c/last.txt",
+            "--output-schema",
+            "s.json",
             "th-9",
             "-",
         ]
@@ -178,3 +179,33 @@ if __name__ == "__main__" and "--regen" in sys.argv:
     for n in NAMES:
         h, pl = parse(n)
         (GOLDEN / f"codex_{n}.expected.json").write_text(json.dumps(as_json(h, pl), indent=1) + "\n")
+
+
+@pytest.mark.parametrize("resume", [None, "session"])
+def test_empty_optional_codex_choices_are_omitted(resume: str | None) -> None:
+    inputs = dataclasses.replace(INPUTS, model="", effort="", sandbox="", out_file="", schema="", access=[], isolation=[], resume=resume)
+    spec = CodexHarness().launch_spec(inputs)
+    assert spec.argv == ["/bin/codex", "exec", *(["resume"] if resume else []), "--json", *([resume] if resume else []), "-"]
+    assert (spec.cwd, spec.env, spec.stdin) == (inputs.cwd, inputs.env, inputs.prompt)
+
+
+@pytest.mark.parametrize(
+    "inputs, field",
+    [
+        (dataclasses.replace(INPUTS, exe=""), "exe"),
+        (dataclasses.replace(INPUTS, cwd=""), "cwd"),
+        (dataclasses.replace(INPUTS, resume=""), "resume"),
+    ],
+)
+def test_nonsealed_codex_requires_executable_directory_and_explicit_session(inputs: LaunchInputs, field: str) -> None:
+    with pytest.raises(ValueError, match=field):
+        CodexHarness().launch_spec(inputs)
+
+
+@pytest.mark.parametrize("resume", [None, "session"])
+def test_codex_effort_is_one_literal_toml_string(resume: str | None) -> None:
+    effort = 'high"\nother="value'
+    inputs = dataclasses.replace(INPUTS, effort=effort, resume=resume)
+    spec = CodexHarness().launch_spec(inputs)
+    assert "model_reasoning_effort=" + json.dumps(effort) in spec.argv
+    assert "--skip-git-repo-check" not in spec.argv
