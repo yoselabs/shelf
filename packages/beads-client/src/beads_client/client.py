@@ -108,7 +108,10 @@ class Bd:
                 return None
             raise err
         found = beads_of(loads(r.out), r.out)
-        return found[0] if found else None  # `[]`: bd answered and the bead is not there
+        if len(found) != 1 or found[0].id != bead:
+            msg = f"bd show {bead!r} must return exactly one matching record; received {[row.id for row in found]!r}"
+            raise malformed(msg)
+        return found[0]
 
     def comments(self, bead: str) -> list[Comment]:
         r = self._must("comments", bead)

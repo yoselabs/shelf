@@ -1,0 +1,10 @@
+seq = 171
+date = "2026-11-09"
+event = "delivery"
+software = "beads-client"
+release = "beads-client-v0.1.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = "Typed single-task read protocol and owning semantic fake share success, absence and failure contracts. Present malformed requirements/dependencies and mismatched or empty show responses fail loudly; backend missing-database/table errors remain failures. Candidate contract; publication and consumer adoption are separate actions after required verification."

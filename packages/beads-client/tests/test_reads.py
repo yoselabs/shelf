@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -30,9 +31,11 @@ def test_show_unknown_bead_is_none(bd: Bd, script: Script) -> None:
     assert bd.show("zz-x") is None
 
 
-def test_show_empty_list_reply_is_none(bd: Bd, script: Script) -> None:
+def test_show_empty_list_reply_is_malformed(bd: Bd, script: Script) -> None:
     script.say("[]")
-    assert bd.show("zz-x") is None
+    with pytest.raises(BdError) as caught:
+        bd.show("zz-x")
+    assert caught.value.kind == "malformed"
 
 
 @pytest.mark.parametrize("out", ["", "not json", '{"no": "id"}', '[{"id": ""}]', "[1]"])
@@ -116,3 +119,97 @@ def test_at_asks_another_tracker(script: Script) -> None:
 
     Bd("t", run=run).at("/x").ready()
     assert seen == ["/x"]
+
+
+@pytest.mark.parametrize("field", ["title", "description", "acceptance_criteria"])
+@pytest.mark.parametrize("value", [None, 1, False, [], {}])
+def test_present_consumed_text_is_never_silently_erased(bd: Bd, script: Script, field: str, value: object) -> None:
+    script.say(json.dumps([{"id": "a-1", field: value}]))
+    with pytest.raises(BdError) as caught:
+        bd.show("a-1")
+    assert caught.value.kind == "malformed"
+
+
+@pytest.mark.parametrize(
+    "dependencies",
+    [
+        None,
+        {},
+        "a-0",
+        [None],
+        ["a-0"],
+        [{}],
+        [{"id": "a-0"}],
+        [{"type": "blocks"}],
+        [{"id": "", "type": "blocks"}],
+        [{"id": "   ", "type": "blocks"}],
+        [{"id": "a-0", "type": ""}],
+        [{"id": "a-0", "type": 1}],
+        [{"id": "a-0", "type": "blocks", "title": None}],
+        [{"id": "a-0", "type": "blocks", "status": []}],
+        [{"id": 1, "depends_on_id": "a-0", "type": "blocks"}],
+        [{"id": "a-0", "dependency_type": None, "type": "blocks"}],
+    ],
+)
+def test_malformed_dependencies_are_never_dropped(bd: Bd, script: Script, dependencies: object) -> None:
+    script.say(json.dumps([{"id": "a-1", "dependencies": dependencies}]))
+    with pytest.raises(BdError) as caught:
+        bd.show("a-1")
+    assert caught.value.kind == "malformed"
+
+
+@pytest.mark.parametrize("rows", [[{"id": "a-2"}], [{"id": "a-1"}, {"id": "a-2"}], [{"id": "a-1"}, {"id": "a-1"}]])
+def test_show_requires_one_row_matching_the_requested_identity(bd: Bd, script: Script, rows: list[dict[str, str]]) -> None:
+    script.say(json.dumps(rows))
+    with pytest.raises(BdError) as caught:
+        bd.show("a-1")
+    assert caught.value.kind == "malformed"
+
+
+def test_omitted_optional_fields_keep_the_documented_empty_defaults(bd: Bd, script: Script) -> None:
+    script.say('{"id":"a-1","future_key":42}')
+    bead = bd.show("a-1")
+    assert bead is not None
+    assert (bead.title, bead.description, bead.acceptance_criteria, bead.dependencies) == ("", "", "", ())
+
+
+@pytest.mark.parametrize("kind", ["blocks", "parent-child", "related", "custom-relationship"])
+def test_show_preserves_dependency_relationships_and_optional_details(bd: Bd, script: Script, kind: str) -> None:
+    script.say(
+        json.dumps(
+            [
+                {
+                    "id": "a-1",
+                    "dependencies": [
+                        {"id": "a-0", "dependency_type": kind, "title": "  Raw target title  ", "status": "closed"},
+                        {"depends_on_id": "a-parent", "type": "parent-child"},
+                    ],
+                }
+            ]
+        )
+    )
+    bead = bd.show("a-1")
+    assert bead is not None
+    assert [(d.id, d.type, d.title, d.status) for d in bead.dependencies] == [
+        ("a-0", kind, "  Raw target title  ", "closed"),
+        ("a-parent", "parent-child", "", ""),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("out", "err"),
+    [
+        ("", "database not found"),
+        ('{"error":"table not found"}', ""),
+        ("", "no issue table is available: database unavailable"),
+        ('{"error":"no issues found matching the provided IDs"}', "database not found"),
+        ("", "Issue zz-x not found\nError: connection refused"),
+        ('{"error":"backend unavailable"}', "Issue zz-x not found"),
+    ],
+)
+def test_backend_failures_and_mixed_diagnostics_never_become_absent(bd: Bd, script: Script, out: str, err: str) -> None:
+    script.say(out, err=err, code=1)
+    with pytest.raises(BdError) as caught:
+        bd.show("zz-x")
+    assert caught.value.kind == "other"
+    assert err in caught.value.text
