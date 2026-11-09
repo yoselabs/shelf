@@ -65,3 +65,11 @@ why = classify(s.rc, s.vendor, s.stderr, out.timed_out, s.work, {"watchdog": out
 
 A router, a lane or lease table, a health or hold record, a cockpit, a publisher or a settler: those stay with the app, which
 turns a `classify` reason into effects. It does not install or log in to a CLI, and no part of it calls a model by itself.
+
+`RunHooks.started(worker)` now runs behind stream-proc's exec gate: the process
+exists but target execution is withheld until the callback returns. Persist the
+Worker's PID, process group, native start token and boot UUID there. Callback or
+live-start failure, including BaseException, aborts before target execution. The
+callback must be a bounded durable registration operation. This closes the initial
+registration window; it does not provide coordinator restart/result collection or
+whole-workload custody after a supervisor dies.

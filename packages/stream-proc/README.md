@@ -87,3 +87,23 @@ stop_pid(pid, start)   # a recorded holder, a server from an earlier run: stops 
   process table returns `()` and sends no signal. `PidHandle` is the `Popen` look-alike `stop_tree` takes.
 - **Limits**: the token check and the signal are two steps, so a pid reused in that gap can still be hit. With
   no `start` token (`None` or empty and the pid already gone) there is no reuse protection: always store `proc_start`.
+
+`popen_registered(argv, registered=..., cwd=..., env=...)` starts a child behind an
+isolated installed Python exec gate. The callback receives `OwnedProcess(pid, pgid,
+start, boot)` and must durably register it before returning. EOF, invalid permission,
+callback failure and held signal replay cannot execute the target. Prompt stdin and
+stdout/stderr remain separate from private control pipes. Target exec errors raise
+native OSError; exact argv/environment/cwd and PID/session are preserved.
+
+`inspect_process(pid)` and `observe_owned(identity)` return `ProcessObservation`:
+matching, gone, different_process or unknown. A missing boot/native identity refuses
+registered spawn. Observation concerns the leader only; it is not whole-tree stop
+proof. Registration callbacks must use their own bounded persistence operation.
+Successful spawn reports registered permission, not proof that target code ran.
+Coordinator restart/result collection and surviving-workload custody are separate.
+
+If permission transmission has begun and its acknowledgment is interrupted,
+`RegisteredStartUncertainError` retains the registered identity and `leader_reaped`.
+Its chained cause retains the original interruption. The target may have executed;
+leader cleanup does not establish whole-workload stop. Confirmed private exec
+rejection still raises the native OSError instead of uncertainty.

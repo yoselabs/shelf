@@ -5,7 +5,7 @@ stream_proc, the shelf's one place that signals a process. What lives here is wh
 import os
 import subprocess
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import field
 
 import stream_proc
@@ -22,7 +22,8 @@ class Worker:
 
     pid: int
     pgid: int
-    start: str | None
+    start: str
+    boot: str
 
 
 @record
@@ -49,14 +50,18 @@ def spawn(
     *,
     stderr: int = subprocess.PIPE,
     session: bool = True,
+    registered: Callable[[Worker], None] | None = None,
 ) -> tuple[subprocess.Popen[bytes], Worker]:
     """Start the worker as its own session leader (`session`) with piped stdin and stdout; `stderr` is a pipe unless the caller discards it.
     -> (the Popen, the worker's record)."""
-    p, hold = stream_proc.popen_held(
-        argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, cwd=cwd, env=env, start_new_session=session
-    )
-    hold.replay()  # a SIGTERM or SIGINT noted during the spawn is delivered now, as without the hold
-    return p, Worker(pid=p.pid, pgid=p.pid, start=proc_start(p.pid))
+
+    def register(identity: stream_proc.OwnedProcess) -> None:
+        worker = Worker(pid=identity.pid, pgid=identity.pgid, start=identity.start, boot=identity.boot)
+        if registered is not None:
+            registered(worker)
+
+    p, identity = stream_proc.popen_registered(argv, registered=register, cwd=cwd, env=env, stderr=stderr, start_new_session=session)
+    return p, Worker(pid=identity.pid, pgid=identity.pgid, start=identity.start, boot=identity.boot)
 
 
 def stop(p: subprocess.Popen[bytes], grace: float) -> StopReport:

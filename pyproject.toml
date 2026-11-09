@@ -182,6 +182,10 @@ builtins-allowed-modules = ["types"]
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.ruff.lint.per-file-ignores]
+# The isolated gate must exec-replace itself to retain the durably registered PID.
+# Its validated private payload is explicit caller argv, never shell text (shelf-4426).
+# S606 flags the required exec primitive itself; keep it enabled everywhere else.
+"packages/stream-proc/src/stream_proc/_exec_gate.py" = ["S606"]
 # One relaxation list, shared with every consumer (a2kay carries the same one under its
 # own `tests/**`). A test asserts, uses magic numbers and fake tokens, binds a boolean
 # positionally, reaches into the private of the thing it tests, and prints its report —

@@ -78,7 +78,7 @@ def end_status(timed_out: bool, hung: str | None, stop: str | None, rc: int | No
 class RunHooks:
     """What the caller of a run wants to hear, for this run only."""
 
-    started: Callable[[procs.Worker], None] | None = None  # the process exists: its pid, group and start token
+    started: Callable[[procs.Worker], None] | None = None  # durable registration before target exec; failure forbids exec
     ref: Callable[[str], None] | None = None  # the vendor named its session
     beat: Callable[[float], None] | None = None  # the worker printed something (wall time, at most every 30 s)
     idle_s: float | None = None  # seconds of silence before the worker is hung (None = the harness's limit)
@@ -255,15 +255,15 @@ class Supervisor:
 
     def run(self, spec: LaunchSpec, timeout: float) -> RunOutcome:
         """-> RunOutcome. Own process group; the timeout kills the group; stdin carries the prompt then closes; UTF-8, errors replaced."""
-        p, worker = procs.spawn(spec.argv, spec.cwd, spec.env)
-        self.out.worker = worker
-        self.live.started(worker.pid)
-        if self.hooks.started:
-            try:
+
+        def register(worker: procs.Worker) -> None:
+            self.out.worker = worker
+            if self.hooks.started:
                 self.hooks.started(worker)
-            except Exception:  # an unregistered worker could never be reaped: stop its tree now and let the caller see the failure
-                self.hooks.stops.append(procs.kill_tree(p))
-                raise
+            self.live.started(worker.pid)
+
+        p, worker = procs.spawn(spec.argv, spec.cwd, spec.env, registered=register)
+        self.out.worker = worker
         out: list[str] = []
         err: list[str] = []
         killed: list[int] = []
