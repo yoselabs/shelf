@@ -36,7 +36,14 @@ LIMITS = Limits(first_event_s=120, silence_s=600, grace_s=5)  # its `result` eve
 # The launch rules, in one place. `--bare` makes claude skip OAuth and the keychain and read an API key only, so a subscription lane would
 # bill the API; and an ANTHROPIC_API_KEY left in the child's environment does the same without it.
 FORBIDDEN_FLAGS = ("--bare",)
-SCRUBBED_ENV = ("ANTHROPIC_API_KEY",)
+SCRUBBED_ENV = ("ANTHROPIC_API_KEY", "CLAUDE_CODE_SIMPLE")  # CLAUDE_CODE_SIMPLE is what --bare sets: an API key only, never the login
+LANE_ENV = (
+    "ANTHROPIC_AUTH_TOKEN",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "CLAUDE_CODE_USE_FOUNDRY",
+)  # each moves the run off the login
+OFF = ("", "0", "false")
 SUBSCRIPTION_TTL_S = 3600  # prompt-cache life: a -p main conversation on a subscription gets 1 h
 
 
@@ -107,7 +114,9 @@ AUTH_MODES = ("subscription", "api_key")
 
 def launch_env(env: dict[str, str], auth: str = "subscription") -> dict[str, str]:
     """The child's environment for one auth mode. `subscription`: `env` without the variables that would move the run from the login to an
-    API key. `api_key`: `env` as given, which must carry ANTHROPIC_API_KEY (ValueError otherwise). Exactly one of the two is in force."""
+    API key or into bare mode. A variable that moves the run to another vendor or token (LANE_ENV) is refused with ValueError, not scrubbed:
+    the caller set it on purpose, and the run would otherwise leave the login unseen. `api_key`: `env` as given, which must carry
+    ANTHROPIC_API_KEY (ValueError otherwise). Exactly one of the two is in force."""
     if auth not in AUTH_MODES:
         msg = f"claude auth is one of {', '.join(AUTH_MODES)}, not {auth!r}"
         raise ValueError(msg)
@@ -116,6 +125,10 @@ def launch_env(env: dict[str, str], auth: str = "subscription") -> dict[str, str
             msg = "claude auth api_key needs ANTHROPIC_API_KEY in the environment"
             raise ValueError(msg)
         return dict(env)
+    moved = [k for k in LANE_ENV if env.get(k, "").strip().lower() not in OFF]
+    if moved:
+        msg = f"a subscription run cannot carry {', '.join(moved)}: it moves the run off the login; unset it or use auth='api_key'"
+        raise ValueError(msg)
     return {k: v for k, v in env.items() if k not in SCRUBBED_ENV}
 
 
