@@ -36,6 +36,9 @@ why = classify(s.rc, s.vendor, s.stderr, out.timed_out, s.work, {"watchdog": out
   subscription run would need an API key) and raises `ValueError` if it would. `LaunchInputs.auth` picks exactly one of two modes:
   `subscription` (default; `claude.launch_env` drops `ANTHROPIC_API_KEY` so the run stays on the login) or `api_key` (the key must be in
   the environment, else `ValueError`). `ClaudeHarness.launch_spec` applies both.
+- **A sealed launch is a pure completion.** `LaunchInputs.sealed=True` makes claude and codex take only `system` and `prompt`: no tools, MCP,
+  skills, hooks, memory, user or project instructions, one turn, an empty temp cwd. The default for completions (anyllm); an agent leaves it
+  off. Call `harness.cleanup()` afterwards to remove the directory.
 - **`run` supervises, the caller injects.** What it needs from the caller comes as callables, never as imports: `live` (a
   `LiveSink`: `started/feed/poll/end`), `gone() -> (why, msg) | None` (the lane was marked out, why = limit|credit|logged_out: stop and say why), `policy(event) -> str | None`
   (a command names a secret path: stop before it uses what it read), `net_up() -> bool` (one probe once the worker has waited

@@ -8,6 +8,7 @@ import sys
 import tomllib
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
@@ -65,9 +66,37 @@ def test_success_and_launch_safeguards(backend, monkeypatch):
     if binary == "claude":
         assert spec.argv[spec.argv.index("--output-format") + 1] == "json"
         assert "stream-json" not in spec.argv
-        assert spec.argv[spec.argv.index("--append-system-prompt") + 1] == "rules"
+        assert spec.argv[spec.argv.index("--system-prompt") + 1] == "rules"
+        assert "--append-system-prompt" not in spec.argv
     else:
         assert "exec" in spec.argv and "--json" in spec.argv
+    assert spec.cwd != str(Path.cwd())  # an empty directory: no project instruction file is discovered
+
+
+def test_pure_completion_closes_the_same_doors_on_every_cli(backend, monkeypatch):
+    """The final LaunchSpec of each CLI provider names what it shuts: user config, rules, tools, hooks, session file."""
+    provider, adapter, binary = backend
+    seen: dict[str, Any] = {}
+
+    def run(harness, spec, timeout):
+        seen["argv"], seen["cwd"] = spec.argv, spec.cwd
+        seen["empty"] = list(Path(spec.cwd).iterdir()) == []
+        return provider.any_agent.RunOutcome(rc=0, summary=harness.summary(0, "", "", None, False))
+
+    monkeypatch.setattr(provider.any_agent, "run", run)
+    with pytest.raises(AnyLLMError):
+        asyncio.run(adapter.complete(user="question", system=""))
+    argv = seen["argv"]
+    shut = {
+        "claude": ["--safe-mode", "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence"],
+        "codex": ["--ignore-user-config", "--ignore-rules", "--ephemeral"],
+    }[binary]
+    assert all(flag in argv for flag in shut)
+    assert seen["empty"] is True
+    assert not Path(str(seen["cwd"])).exists()  # removed once the call ends, failed or not
+    if binary == "claude":
+        assert argv[argv.index("--system-prompt") + 1] == ""  # empty system still replaces the default prompt
+        assert argv[argv.index("--max-turns") + 1] == "1"
 
 
 @pytest.mark.parametrize(("rc", "vendor"), [(1, "broken"), (0, "Not logged in"), (0, "Credit balance is too low")])
@@ -131,7 +160,7 @@ assert not anyllm.CodexCliAdapter().available()
     subprocess.run([sys.executable, "-c", code], check=True, capture_output=True)
     project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())["project"]
     assert project["dependencies"] == []
-    assert project["optional-dependencies"]["agent"] == ["any-agent>=0.1.2,<1"]
+    assert project["optional-dependencies"]["agent"] == ["any-agent>=0.1.3,<1"]
 
 
 def test_invalid_output_fails_loud(backend, monkeypatch):

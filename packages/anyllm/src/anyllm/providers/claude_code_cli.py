@@ -59,16 +59,9 @@ class ClaudeCodeCliAdapter:
             prompt=flat_user(parts, user),
             system=flat_system(parts, system),
             env=dict(os.environ),
+            sealed=True,  # a pure completion: the harness owns every flag, this adapter reconstructs none
         )
-        launch = harness.launch_spec(inputs)
-        # The completion surface consumes one JSON result, not an interactive agent stream.
-        argv = [exe, "-p", "--output-format", "json", "--tools", "", "--strict-mcp-config"]
-        if inputs.system:
-            argv += ["--append-system-prompt", inputs.system]
-        if model:
-            argv += ["--model", model]
-        spec = any_agent.LaunchSpec(argv=argv, env=launch.env, cwd=launch.cwd, stdin=launch.stdin)
-        result = await complete_run(any_agent, harness, spec, model or "")
+        result = await complete_run(any_agent, harness, harness.launch_spec(inputs), model or "")
         envelope = harness.evidence.final
         if envelope is None or not isinstance(envelope.get("result"), str):
             msg = "claude CLI JSON lacked a string `result`"

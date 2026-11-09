@@ -23,6 +23,8 @@ async def complete_run(agent: types.ModuleType, harness: Harness, spec: LaunchSp
     except OSError as exc:
         msg = f"failed to invoke {harness.kind} CLI: {exc}"
         raise AnyLLMError(msg, retryable=False) from exc
+    finally:
+        harness.cleanup()  # the sealed launch's empty directory
     summary = result.summary
     outcome = agent.classify(
         summary.rc,

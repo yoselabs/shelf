@@ -122,6 +122,9 @@ class OpenCodeHarness(Quiet):
 
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec:
         """Writes the sandboxed shell this run's commands use (`cleanup` removes it). The env is `i.env` plus OpenCode's isolation."""
+        if i.sealed:
+            msg = "opencode has no sealed launch: its config cannot be cut off from the user's, so a pure completion is refused"
+            raise ValueError(msg)
         if self.root is None:
             msg = "OpenCodeHarness needs a `root` folder to launch"
             raise ValueError(msg)
