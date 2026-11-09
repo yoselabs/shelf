@@ -73,3 +73,41 @@ live-start failure, including BaseException, aborts before target execution. The
 callback must be a bounded durable registration operation. This closes the initial
 registration window; it does not provide coordinator restart/result collection or
 whole-workload custody after a supervisor dies.
+
+## Validated answers from one execution
+
+`decode_answer(text, decode)` parses one complete JSON value and passes it to the
+caller's typed decoder. The decoder returns its domain record or raises ValueError
+for expected schema rejection; unexpected programming errors propagate.
+
+```python
+from any_agent import DecodedAnswer, decode_answer
+
+raw = run(harness, spec, timeout, hooks)  # existing supervised execution, once
+answer = decode_answer(raw.summary.text, decode_plan)
+# DecodedAnswer(value), MissingAnswer(), or InvalidAnswer(kind="json"|"schema", reason=...)
+```
+
+Whitespace-only text is missing; JSON null is a value for the decoder to validate.
+Trailing prose/documents, fences, duplicate keys and nonfinite numbers are invalid.
+There is no extraction, repair or retry. Forward the caller's corresponding schema
+file through nonsealed Codex LaunchInputs.schema; schema forwarding alone does not
+validate the returned answer. Keep the raw outcome alongside answer validity:
+valid JSON does not establish execution success, and existing answer-grace/stands
+facts must not be replaced with an rc-only decision. Usage absent from the harness
+remains unknown; Summary.cost's default zero is not measured free cost.
+
+`any_agent.testing.FakeRun(outcome, refs=())` substitutes for the four-positional-
+argument `run(harness, spec, timeout, hooks)` call. Supply an explicit outcome.worker;
+the fake calls started, delivers refs, then returns that same raw outcome. It records
+calls and refuses a second invocation. Registration refusal propagates before refs
+or a return. Consumer tests call the same decode_answer afterward, using raw text
+fixtures rather than a fabricated validated answer. The fake supplies no optional
+observers, process state, timing, drainage or descendant-stop proof.
+
+Ref callbacks must be bounded and nonraising: they run in the real output pump,
+where an exception can terminate that thread. Pump joins do not guarantee complete
+drainage. Keep accepted registration facts on postpermit uncertainty. Factory-owned
+publication/reconciliation and custody remain outside this package. For a surviving
+attempt process, explicitly use RunHooks(unattended=False): True watches its parent
+and stops work when that parent changes, including coordinator death.

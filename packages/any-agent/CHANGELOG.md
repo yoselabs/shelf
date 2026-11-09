@@ -18,3 +18,5 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 - 0.1.4: `launch_env(subscription)` also drops `CLAUDE_CODE_SIMPLE` (what `--bare` sets) and raises ValueError naming `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX` or `CLAUDE_CODE_USE_FOUNDRY` when set to anything but ""/0/false; `api_key` keeps the env as given; `LANE_ENV`
 
 - 0.2.0: `Worker(pid, pgid, start)` -> `Worker(pid, pgid, start, boot)` with required start; `RunHooks.started` after target launch -> once before target exec; requires `stream-proc>=0.5.0`
+
+- 0.3.0: `decode_answer(text, decode) -> Answer[T]` (`DecodedAnswer(value) | MissingAnswer() | InvalidAnswer(kind, reason)`); strict complete JSON, ValueError-only schema rejection; `testing.FakeRun(outcome, refs=())` consumes one existing four-positional-argument run call, preserving registration/ref/raw outcome facts
