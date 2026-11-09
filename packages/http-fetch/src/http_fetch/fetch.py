@@ -9,7 +9,7 @@ failure (timeout, connection error, proxy error, non-2xx) — every outcome maps
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
 
 from curl_cffi import requests as cr
 from curl_cffi.requests import exceptions as ce
@@ -19,6 +19,17 @@ from .models import FetchOutcome, FetchVerdict
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
     from contextlib import AbstractAsyncContextManager
+
+    from curl_cffi.requests.session import ProxySpec
+
+
+class _RequestOptions(TypedDict):
+    headers: dict[str, str]
+    timeout: float
+    allow_redirects: bool
+    proxies: NotRequired[ProxySpec]
+    cookies: NotRequired[dict[str, str]]
+
 
 _DEFAULT_IMPERSONATE = "chrome120"
 _DEFAULT_TIMEOUT_S = 10.0
@@ -159,7 +170,7 @@ async def fetch_bytes(
     request_headers.update(conditional_headers(conditional_extras))
 
     async def _do() -> FetchOutcome:
-        request_kwargs: dict[str, object] = {
+        request_kwargs: _RequestOptions = {
             "headers": request_headers,
             "timeout": timeout_s,
             "allow_redirects": True,

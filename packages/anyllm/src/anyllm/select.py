@@ -60,7 +60,7 @@ DEFAULT_ORDER: tuple[ProviderName, ...] = (
 _KNOWN = tuple(ProviderName)
 
 
-def build_adapter(provider: str, config: dict | None = None) -> LLMProvider:
+def build_adapter(provider: str, config: dict[str, object] | None = None) -> LLMProvider:
     """Return the configured backend, or raise :class:`AnyLLMError` if it is unusable.
 
     ``provider`` is any of :class:`~anyllm.base.ProviderName`'s values — callers may pass
@@ -80,11 +80,11 @@ def build_adapter(provider: str, config: dict | None = None) -> LLMProvider:
         adapter = ClaudeCodeSdkAdapter()
     elif provider == ProviderName.ANTHROPIC_API:
         raw = cfg.get("anthropic_api")
-        api_cfg: dict = raw if isinstance(raw, dict) else {}
+        api_cfg: dict[str, object] = raw if isinstance(raw, dict) else {}
         adapter = AnthropicApiAdapter(api_key_env=str(api_cfg.get("api_key_env", "ANTHROPIC_API_KEY")))
     elif provider == ProviderName.OPENAI_COMPATIBLE:
         raw = cfg.get("openai_compatible")
-        oai_cfg: dict = raw if isinstance(raw, dict) else {}
+        oai_cfg: dict[str, object] = raw if isinstance(raw, dict) else {}
         adapter = OpenAICompatibleAdapter(
             base_url=str(oai_cfg.get("base_url", "")),
             api_key_env=str(oai_cfg.get("api_key_env", "OPENAI_API_KEY")),
@@ -162,7 +162,7 @@ class _FallbackProvider:
 
 def resolve_provider(
     order: Sequence[ProviderName | str] = DEFAULT_ORDER,
-    config: dict | None = None,
+    config: dict[str, object] | None = None,
     *,
     wrap: Callable[[LLMProvider], LLMProvider] | None = None,
     fallback: bool = True,

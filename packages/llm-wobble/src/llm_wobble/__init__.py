@@ -104,12 +104,12 @@ Wobbled = NewType("Wobbled", _Parsed[Any])
 
 def unwrap(w: Wobbled) -> Any:
     """Extract the wrapped value. Caller's local annotation narrows the type."""
-    return w.value  # type: ignore[attr-defined]
+    return w.value
 
 
 def recovered_fields(w: Wobbled) -> tuple[str, ...]:
     """Names of fields that fell back to DERIVE/DEFAULT/SKIP recovery."""
-    return w.recovered_fields  # type: ignore[attr-defined]
+    return w.recovered_fields
 
 
 def _strip_fences(text: str) -> str:

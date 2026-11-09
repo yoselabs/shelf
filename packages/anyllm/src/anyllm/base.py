@@ -80,7 +80,10 @@ class Completion:
 class LLMProvider(Protocol):
     """A completion backend. Implementations fail loud, never silent."""
 
-    name: ProviderName
+    @property
+    def name(self) -> ProviderName:
+        """The backend identity exposed by this provider."""
+        ...
 
     async def complete(
         self,

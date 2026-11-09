@@ -27,7 +27,7 @@ import sys
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator
 
 LOOPBACK = "127.0.0.1"
 
@@ -69,7 +69,7 @@ async def serve_asgi(
     startup_timeout: float = 10.0,
     shutdown_grace: float = 2.0,
     log_level: str = "warning",
-) -> AsyncIterator[str]:
+) -> AsyncGenerator[str]:
     """Serve ``app`` on ``host:port`` for the body, yielding its base URL.
 
     Yields ``http://host:port`` with no trailing slash and no path — append your

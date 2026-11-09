@@ -81,7 +81,7 @@ class LlmCache:
                 every entry is born expired — useful for disabling reuse in tests.
         """
         self._conn = conn
-        self._ttl_s = max(0, int(ttl_s))
+        self._ttl_s = max(0, ttl_s)
         self._schema_ready = False
 
     @property

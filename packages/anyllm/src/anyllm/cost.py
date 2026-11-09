@@ -169,7 +169,7 @@ def with_cost_guard(provider: LLMProvider, policy: CostPolicy = DEFAULT_COST_POL
         A guarded provider that raises :class:`CostViolation` on a denied pair
         before issuing any network call.
     """
-    return _GuardedProvider(provider, policy)  # type: ignore[return-value]
+    return _GuardedProvider(provider, policy)
 
 
 __all__ = [

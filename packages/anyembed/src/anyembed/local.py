@@ -16,6 +16,8 @@ from anyembed.errors import AnyEmbedError
 
 if TYPE_CHECKING:
     import numpy as np
+    from numpy.typing import NDArray
+    from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 
 class LocalEmbedder:
@@ -37,8 +39,8 @@ class LocalEmbedder:
         self._batch = batch
         self._max_tokens = max_tokens
         self._offline = offline
-        self._tokenizer = None
-        self._model = None
+        self._tokenizer: PreTrainedTokenizerBase | None = None
+        self._model: PreTrainedModel | None = None
 
     def _ensure_model(self) -> None:
         """Lazily load the tokenizer + model once. Fail loud if unavailable."""
@@ -63,7 +65,7 @@ class LocalEmbedder:
             msg = f"embedding model {self.model_id!r} could not be loaded (offline={self._offline}): {exc}"
             raise AnyEmbedError(msg) from exc
 
-    def _encode(self, texts: list[str]) -> np.ndarray:
+    def _encode(self, texts: list[str]) -> NDArray[np.float32]:
         self._ensure_model()
         import numpy as np  # noqa: PLC0415
         import torch  # noqa: PLC0415 — present: _ensure_model checked it
@@ -72,7 +74,7 @@ class LocalEmbedder:
         if tok is None or model is None:  # pragma: no cover -- _ensure_model guarantees load
             msg = "tokenizer/model not initialised after _ensure_model()"
             raise AnyEmbedError(msg)
-        out: list[np.ndarray] = []
+        out: list[NDArray[np.float32]] = []
         with torch.no_grad():
             for i in range(0, len(texts), self._batch):
                 batch = texts[i : i + self._batch]
@@ -86,11 +88,11 @@ class LocalEmbedder:
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Embed passages for indexing. Returns one ``dim``-length vector per text."""
-        return [row.tolist() for row in self._encode(texts)]
+        return [[float(value) for value in row] for row in self._encode(texts)]
 
     def embed_query(self, text: str) -> list[float]:
         """Embed a search query (the configured instruction prefix applied)."""
-        return self._encode([self._query_prefix + text])[0].tolist()
+        return [float(value) for value in self._encode([self._query_prefix + text])[0]]
 
 
 __all__ = ["LocalEmbedder"]
