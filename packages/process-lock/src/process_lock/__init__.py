@@ -173,27 +173,21 @@ def _try(key: Path, record: dict[str, object], *, reentrant: bool) -> _Refused |
                 entry.count += 1
                 return None
             return _Refused(holder(key))
-        fd = _lock(key, record)
-        if isinstance(fd, _Refused):
-            return fd
-        _REGISTRY[key] = _Held(fd=fd, reentrant=reentrant, count=1)
+        key.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(key, os.O_RDWR | os.O_CREAT, 0o600)  # non-inheritable (PEP 446)
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return _Refused(_parse(os.pread(fd, _READ_BYTES, 0)))
+            _write(fd, record)
+            _REGISTRY[key] = _Held(fd=fd, reentrant=reentrant, count=1)
+        finally:
+            # The registry is the ownership handoff; every earlier exit still owns fd here.
+            owner = _REGISTRY.get(key)
+            if owner is None or owner.fd != fd:
+                os.close(fd)
         return None
-
-
-def _lock(path: Path, record: dict[str, object]) -> int | _Refused:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)  # non-inheritable (PEP 446)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        seen = _parse(os.pread(fd, _READ_BYTES, 0))
-        os.close(fd)
-        return _Refused(seen)
-    except BaseException:
-        os.close(fd)
-        raise
-    _write(fd, record)
-    return fd
 
 
 def _write(fd: int, record: dict[str, object]) -> None:
