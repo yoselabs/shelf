@@ -84,6 +84,15 @@ repos:
     files: ^pyproject\.toml$
     pass_filenames: false
     stages: [pre-commit]
+  - id: tag-check
+    name: every package version on main is tagged
+    # 2026-11-09: anyllm 0.8.0 was merged and never tagged, so a consumer could not pin it. Reads origin/main, not the pushed branch
+    # (tools/tag_check.py): a release is bump, merge, tag, so the push after an untagged merge is the one that stops.
+    entry: python3 -I tools/tag_check.py
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [pre-push]
   - id: gate
     name: just check
     # The whole gate before code leaves the machine (blueprint gate.hooks-recipe); the per-commit hooks above stay fast.
