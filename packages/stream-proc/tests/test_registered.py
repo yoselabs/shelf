@@ -239,3 +239,42 @@ def test_controller_death_after_permission_keeps_prior_registration(tmp_path: Pa
         if controller.poll() is None:
             controller.kill()
             controller.communicate(timeout=5)
+
+
+@pytest.mark.parametrize("flag, expected", [("--help", 0), ("--unknown-gate-option", 2)])
+def test_exec_gate_cli_help_and_unknown_flag_are_safe(tmp_path: Path, flag: str, expected: int) -> None:
+    script = Path(registered.__file__).with_name("_exec_gate.py")
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", str(script), flag],
+        cwd=tmp_path,
+        input=b"unrelated prompt stdin",
+        capture_output=True,
+        timeout=5,
+        check=False,
+    )
+    assert result.returncode == expected
+    assert b"usage:" in (result.stdout + result.stderr).lower()
+    assert b"Traceback" not in result.stderr
+    if flag == "--help":
+        assert b"registration" in result.stdout.lower() and result.stderr == b""
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize(
+    "values", [["3", "4", "1", "--unknown-gate-option"], ["0", "4", "1"], ["3", "3", "1"], ["3", "4", "nan"], ["3", "4", "-1"]]
+)
+def test_exec_gate_invalid_arguments_do_not_touch_protocol_descriptors(tmp_path: Path, values: list[str]) -> None:
+    script = Path(registered.__file__).with_name("_exec_gate.py")
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", str(script), *values],
+        cwd=tmp_path,
+        input=b"unrelated prompt stdin",
+        capture_output=True,
+        timeout=5,
+        check=False,
+    )
+    assert result.returncode == 2 and result.stdout == b""
+    assert b"usage:" in result.stderr.lower() and b"Traceback" not in result.stderr
+    if "--unknown-gate-option" in values:
+        assert b"--unknown-gate-option" in result.stderr
+    assert not list(tmp_path.iterdir())

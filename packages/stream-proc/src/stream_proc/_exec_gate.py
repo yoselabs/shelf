@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import errno
 import json
+import math
 import os
 import select
 import struct
@@ -12,6 +14,40 @@ import sys
 import time
 
 MAX_FRAME = 8 * 1024 * 1024
+
+
+class GateArguments(argparse.Namespace):
+    control: int
+    status: int
+    timeout: float
+
+
+def private_fd(value: str) -> int:
+    result = int(value)
+    if result < 3:
+        msg = "a private descriptor must be at least 3"
+        raise argparse.ArgumentTypeError(msg)
+    return result
+
+
+def positive_timeout(value: str) -> float:
+    result = float(value)
+    if result <= 0 or not math.isfinite(result):
+        msg = "registration timeout must be finite and positive"
+        raise argparse.ArgumentTypeError(msg)
+    return result
+
+
+def arguments() -> tuple[int, int, float]:
+    parser = argparse.ArgumentParser(description="Execute a target only after durable process registration permits it.")
+    parser.add_argument("control", type=private_fd, help="Private descriptor carrying the framed execution permission.")
+    parser.add_argument("status", type=private_fd, help="Private descriptor reporting bootstrap readiness and exec errors.")
+    parser.add_argument("timeout", type=positive_timeout, help="Maximum registration wait in seconds.")
+    parsed = GateArguments()
+    parser.parse_args(namespace=parsed)
+    if parsed.control == parsed.status:
+        parser.error("control and status descriptors must differ")
+    return parsed.control, parsed.status, parsed.timeout
 
 
 def read_exact(fd: int, size: int, deadline: float) -> bytes:
@@ -47,13 +83,13 @@ def permitted(control: int, deadline: float) -> tuple[list[str], dict[str, str]]
 
 
 def main() -> int:
-    control, status = int(sys.argv[1]), int(sys.argv[2])
+    control, status, timeout = arguments()
     inherit = False
     try:
         os.set_inheritable(control, inherit)
         os.set_inheritable(status, inherit)
         os.write(status, b"R")
-        deadline = time.monotonic() + float(sys.argv[3])
+        deadline = time.monotonic() + timeout
         argv, env = permitted(control, deadline)
         os.close(control)
         os.execvpe(argv[0], argv, env)
