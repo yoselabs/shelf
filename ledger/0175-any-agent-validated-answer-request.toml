@@ -1,0 +1,10 @@
+seq = 175
+date = "2026-11-09"
+event = "request"
+software = "any-agent"
+release = "any-agent-v0.3.0"
+actor = "tl-shelf-git-porcelain-66"
+consumer = "iorlas-task-loop"
+verdict = ""
+cost = ""
+note = "shelf-7a2v requests strict typed answer decoding and an owning semantic fake of one existing run call. Candidate API retains raw execution facts and performs no retry or workflow classification. Factory integration, independent final review, native exact-tree proof and publication remain separate."

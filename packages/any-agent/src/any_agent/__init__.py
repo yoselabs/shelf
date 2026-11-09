@@ -6,6 +6,7 @@ vendor said into one reason. Callers inject what they own: the live sink, the la
 """
 
 from any_agent import events, vendors
+from any_agent.answer import Answer, DecodedAnswer, InvalidAnswer, MissingAnswer, decode_answer
 from any_agent.classify import Outcome, classify
 from any_agent.harnesses.claude import ClaudeHarness
 from any_agent.harnesses.codex import CodexHarness
@@ -15,15 +16,19 @@ from any_agent.supervisor import LiveSink, LogWatcher, NullSink, RunHooks, RunOu
 from any_agent.watch import Limits
 
 __all__ = [
+    "Answer",
     "ClaudeHarness",
     "CodexHarness",
+    "DecodedAnswer",
     "Evidence",
     "Harness",
+    "InvalidAnswer",
     "LaunchInputs",
     "LaunchSpec",
     "Limits",
     "LiveSink",
     "LogWatcher",
+    "MissingAnswer",
     "NullSink",
     "OpenCodeHarness",
     "Outcome",
@@ -34,6 +39,7 @@ __all__ = [
     "Summary",
     "Supervisor",
     "classify",
+    "decode_answer",
     "events",
     "run",
     "vendors",
