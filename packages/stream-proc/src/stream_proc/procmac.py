@@ -13,8 +13,10 @@ cannot load, :func:`has_table` is False and everything here answers "unavailable
 from __future__ import annotations
 
 import ctypes
+import errno
 import functools
 import sys
+from typing import Literal
 
 from stream_proc.procfs import Proc, signal0
 
@@ -126,13 +128,21 @@ def has_table() -> bool:
     return _lib() is not None
 
 
-def _bsdinfo(pid: int) -> ProcBsdInfo | None:
+def _inspect_bsdinfo(pid: int) -> ProcBsdInfo | Literal["gone", "unknown"]:
     lib = _lib()
     if lib is None or pid <= 0:
-        return None
+        return "unknown"
     info = ProcBsdInfo()
+    ctypes.set_errno(0)
     got = lib.proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, ctypes.byref(info), ctypes.sizeof(info))
-    return info if got == ctypes.sizeof(info) and info.pbi_pid == pid else None
+    if got == ctypes.sizeof(info) and info.pbi_pid == pid:
+        return info
+    return "gone" if ctypes.get_errno() == errno.ESRCH else "unknown"
+
+
+def _bsdinfo(pid: int) -> ProcBsdInfo | None:
+    info = _inspect_bsdinfo(pid)
+    return info if isinstance(info, ProcBsdInfo) else None
 
 
 def _cpu_s(pid: int) -> float:
@@ -152,14 +162,20 @@ def _token(info: ProcBsdInfo) -> str:
     return f"{info.pbi_start_tvsec}.{info.pbi_start_tvusec:06d}"
 
 
-def read(pid: int) -> Proc | None:
-    """One process as a ``Proc``, or None when it is gone or unreadable. ``sid`` is 0 (libproc does not give it)."""
-    info = _bsdinfo(pid)
-    if info is None:
-        return None
+def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
+    """One libproc read, preserving absence versus failed observation."""
+    info = _inspect_bsdinfo(pid)
+    if isinstance(info, str):
+        return info
     state = "Z" if info.pbi_status == SZOMB else "R"
     cmd = (info.pbi_comm or info.pbi_name).decode("utf-8", errors="replace")
     return Proc(pid, info.pbi_ppid, info.pbi_pgid, 0, _token(info), state, _cpu_s(pid), cmd)
+
+
+def read(pid: int) -> Proc | None:
+    """One row, or None for absent/unavailable table consumers."""
+    row = inspect(pid)
+    return row if isinstance(row, Proc) else None
 
 
 def all_pids() -> list[int]:

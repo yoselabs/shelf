@@ -16,18 +16,24 @@ Stdlib only (``ctypes`` on macOS), POSIX.
 
 from stream_proc.capture import Captured, CapturedBytes, capture, capture_bytes
 from stream_proc.hold import TermHold, popen_held
+from stream_proc.owned import IdentityUnavailableError, OwnedProcess, ProcessObservation, inspect_process, observe_owned
 from stream_proc.pid import PidHandle, stop_pid
 from stream_proc.procfs import Proc
 from stream_proc.proctable import alive, descendants, group_alive, proc_start, table
+from stream_proc.registered import RegisteredStartUncertainError, popen_registered
 from stream_proc.runner import Kind, Result, run
 from stream_proc.tree import stop_tree
 
 __all__ = [
     "Captured",
     "CapturedBytes",
+    "IdentityUnavailableError",
     "Kind",
+    "OwnedProcess",
     "PidHandle",
     "Proc",
+    "ProcessObservation",
+    "RegisteredStartUncertainError",
     "Result",
     "TermHold",
     "alive",
@@ -35,7 +41,10 @@ __all__ = [
     "capture_bytes",
     "descendants",
     "group_alive",
+    "inspect_process",
+    "observe_owned",
     "popen_held",
+    "popen_registered",
     "proc_start",
     "run",
     "stop_pid",

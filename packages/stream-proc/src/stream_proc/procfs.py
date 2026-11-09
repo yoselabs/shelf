@@ -14,6 +14,7 @@ import contextlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 PROC = Path("/proc")
 CLK_TCK = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") and "SC_CLK_TCK" in os.sysconf_names else 100
@@ -37,17 +38,25 @@ def has_proc() -> bool:
     return (PROC / "self" / "stat").is_file()
 
 
-def read(pid: int) -> Proc | None:
-    """``/proc/<pid>/stat`` as a ``Proc``, or None when it is gone or unreadable.
-
-    The command name may hold spaces and parentheses, so the fields are split after the last ``)``.
-    """
-    with contextlib.suppress(OSError, ValueError, IndexError):
-        head, _, tail = (PROC / str(pid) / "stat").read_text(encoding="utf-8", errors="replace").rpartition(")")
+def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
+    """One native read, preserving absent versus inaccessible/malformed."""
+    try:
+        head, _, tail = (PROC / str(pid) / "stat").read_text(encoding="utf-8", errors="strict").rpartition(")")
         rest = tail.split()
         cpu = (int(rest[11]) + int(rest[12])) / CLK_TCK
-        return Proc(pid, int(rest[1]), int(rest[2]), int(rest[3]), rest[19], rest[0], cpu, head.partition("(")[2])
-    return None
+        if int(head.partition("(")[0].strip()) != pid:
+            return "unknown"
+        return Proc(pid, int(rest[1]), int(rest[2]), int(rest[3]), str(int(rest[19])), rest[0], cpu, head.partition("(")[2])
+    except (FileNotFoundError, ProcessLookupError):
+        return "gone"
+    except (OSError, ValueError, IndexError, UnicodeError):
+        return "unknown"
+
+
+def read(pid: int) -> Proc | None:
+    """One row, or None for absent/unavailable table consumers."""
+    row = inspect(pid)
+    return row if isinstance(row, Proc) else None
 
 
 def table() -> dict[int, Proc]:
