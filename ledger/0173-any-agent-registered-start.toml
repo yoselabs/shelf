@@ -1,0 +1,10 @@
+seq = 173
+date = "2026-11-09"
+event = "delivery"
+software = "any-agent"
+release = "any-agent-v0.2.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = "Existing Supervisor uses one pre-exec started callback with boot-aware Worker identity; held signals and callback failures retain cleanup ownership. The execution lifetime/result-collection extension is not implemented by this gate."

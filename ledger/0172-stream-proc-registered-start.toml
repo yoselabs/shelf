@@ -1,0 +1,10 @@
+seq = 172
+date = "2026-11-09"
+event = "delivery"
+software = "stream-proc"
+release = "stream-proc-v0.5.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = "Registered process start preserves target I/O, environment and PID while gating exec on durable boot-aware identity registration. Native unknown observation and post-permission uncertainty remain explicit. Full descendant/restart proof and consumer adoption are separate."
