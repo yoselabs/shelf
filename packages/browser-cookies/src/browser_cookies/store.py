@@ -82,7 +82,7 @@ def _samesite(cookie: Cookie) -> SameSite:
     raw = cookie.get_nonstandard_attr("SameSite") or cookie.get_nonstandard_attr("samesite")
     if raw is None:
         return None
-    s = str(raw).lower()
+    s = raw.lower()
     if s == "lax":
         return "lax"
     if s == "strict":
@@ -95,7 +95,7 @@ def _samesite(cookie: Cookie) -> SameSite:
 def _to_row(cookie: Cookie) -> CookieRow:
     # `http.cookiejar.Cookie.domain` is the on-disk host_key shape: either bare
     # host or leading-dot domain-match form. Pass through unchanged.
-    expires = int(cookie.expires) if cookie.expires else None
+    expires = cookie.expires or None
     is_secure = 1 if cookie.secure else 0
     is_httponly = 1 if cookie.has_nonstandard_attr("HttpOnly") else 0
     return CookieRow(

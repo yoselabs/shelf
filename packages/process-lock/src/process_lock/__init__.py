@@ -124,7 +124,7 @@ class ProcessLock:
         :class:`LockHeldError`. ``on_wait`` is called on every poll while waiting.
         """
         key = path.resolve()
-        record = {"label": label, "meta": dict(meta or {})}
+        record: dict[str, object] = {"label": label, "meta": dict(meta or {})}
         json.dumps(record)  # refuse an unserializable record before taking anything
         began = time.monotonic()
         while True:

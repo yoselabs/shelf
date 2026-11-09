@@ -2,12 +2,26 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, final
 
 from a2effect.errors import AppError
 
 
-class UnexpectedDefect(AppError):  # noqa: N818 - deliberate public name (a "defect", not an "…Error")
+class _DefectType(type):
+    def __new__(
+        mcls: type[_DefectType], name: str, bases: tuple[type[object], ...], namespace: dict[str, object], /, **kwargs: Any
+    ) -> _DefectType:
+        if any(isinstance(base, _DefectType) for base in bases):
+            msg = (
+                f"UnexpectedDefect is final and SHALL NOT be subclassed; got {name!r}. "
+                "To carry a typed defect, subclass AppError directly with kind='bug'."
+            )
+            raise TypeError(msg)
+        return super().__new__(mcls, name, bases, namespace, **kwargs)
+
+
+@final
+class UnexpectedDefect(AppError, metaclass=_DefectType):  # noqa: N818 - deliberate public name (a "defect", not an "…Error")
     """A bug-kind error wrapping an exception that was never typed.
 
     Final — it must not be subclassed; a typed defect subclasses :class:`AppError`
@@ -17,13 +31,6 @@ class UnexpectedDefect(AppError):  # noqa: N818 - deliberate public name (a "def
     kind = "bug"
     code = "internal_error"
     retryable = False
-
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        msg = (
-            f"UnexpectedDefect is final and SHALL NOT be subclassed; got {cls.__name__!r}. "
-            f"To carry a typed defect, subclass AppError directly with kind='bug'."
-        )
-        raise TypeError(msg)
 
 
 def quarantine(exc: BaseException) -> AppError:

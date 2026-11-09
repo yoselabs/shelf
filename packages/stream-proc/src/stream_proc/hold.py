@@ -13,7 +13,7 @@ from __future__ import annotations
 import signal
 import subprocess
 import threading
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -33,7 +33,8 @@ class TermHold:
         self.held: list[int] = []
 
     def __enter__(self) -> Self:
-        self.old, self.held = {}, []
+        self.old = {}
+        self.held = []
         if threading.current_thread() is threading.main_thread():
             for signum in HELD:
                 old = signal.getsignal(signum)
@@ -42,7 +43,7 @@ class TermHold:
                     signal.signal(signum, self._note)
         return self
 
-    def __exit__(self, kind: type[BaseException] | None, value: BaseException | None, tb: TracebackType | None) -> bool:
+    def __exit__(self, kind: type[BaseException] | None, value: BaseException | None, tb: TracebackType | None) -> Literal[False]:
         if kind is not None:  # a failed spawn has nothing to stop: run a held handler now, never lose the signal
             self.replay()
         return False
@@ -58,7 +59,8 @@ class TermHold:
     def replay(self) -> None:
         """Put the real handlers back; run the handler of each held signal, in arrival order."""
         self.release()
-        held, self.held = self.held, []
+        held = self.held
+        self.held = []
         for signum in held:
             self.old[signum](signum, None)
 

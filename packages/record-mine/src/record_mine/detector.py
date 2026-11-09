@@ -335,7 +335,7 @@ def _select(candidates: list[_Candidate]) -> _Candidate | None:
 def _parse_tree(html: str, base_url: str) -> lxml.html.HtmlElement | None:
     """Parse `html`, resolving relative hrefs against `base_url` when given."""
     try:
-        tree = lxml.html.fromstring(html)
+        tree: lxml.html.HtmlElement = lxml.html.fromstring(html)
     except (ValueError, SyntaxError):
         return None
     if base_url:

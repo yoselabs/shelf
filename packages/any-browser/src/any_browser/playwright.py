@@ -26,7 +26,7 @@ from urllib.parse import urlparse
 from .base import BackendCookie, RenderedPage, RenderOutcome
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable, Coroutine
+    from collections.abc import AsyncGenerator, Callable, Coroutine
 
 _DEFAULT_LOG = logging.getLogger("any_browser")
 
@@ -51,7 +51,7 @@ def camoufox_launcher() -> Any:
 
 
 @asynccontextmanager
-async def chromium_launch(async_playwright_fn: Callable[[], Any]) -> AsyncIterator[Any]:
+async def chromium_launch(async_playwright_fn: Callable[[], Any]) -> AsyncGenerator[Any]:
     """Two-step Playwright launch flattened into a one-shot CM yielding a Browser.
 
     Drop-in Chromium engines (Patchright, rebrowser-playwright) expose
@@ -402,14 +402,14 @@ class PlaywrightBackend:
         self._stderr_read_fd = read_fd
         self._stderr_write_fd = write_fd
         real = sys.stderr
-        sys.stderr = _StderrFilenoShim(real, write_fd)  # type: ignore[assignment]
+        sys.stderr = _StderrFilenoShim(real, write_fd)
         return real
 
     def _restore_stderr(self, saved: Any) -> None:
         """Restore `sys.stderr` and drop the parent's copy of the pipe writer."""
         if self._stderr_sink is None or self._stderr_read_fd is None:
             return
-        sys.stderr = saved  # type: ignore[assignment]
+        sys.stderr = saved
         with suppress(OSError):
             os.close(self._stderr_write_fd)
 
@@ -555,7 +555,7 @@ class PlaywrightBackend:
         await self.close()
 
     @asynccontextmanager
-    async def acquire(self, url: str) -> AsyncIterator[Any]:
+    async def acquire(self, url: str) -> AsyncGenerator[Any]:
         """Yield a fresh page for `url`'s host. Closes the page on exit.
 
         The host's BrowserContext is reused across fetches (cookie jar warm);

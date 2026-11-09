@@ -74,7 +74,7 @@ def parse_worktrees(text: str) -> list[tuple[Path, str | None, str | None]]:
     found: list[tuple[Path, str | None, str | None]] = []
     for block in text[:-2].split("\0\0"):
         records = block.split("\0")
-        fields = dict(line.partition(" ")[::2] for line in records)
+        fields = {key: value for key, _, value in (line.partition(" ") for line in records)}
         bare = "bare" in fields
         if (
             not records[0].startswith("worktree ")

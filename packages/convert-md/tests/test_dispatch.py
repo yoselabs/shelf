@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import docx as docx_writer
+import pytest
 from convert_md import (
     Html2TextEngine,
     MammothEngine,
@@ -179,3 +182,32 @@ def test_pdf_round_trip_via_pymupdf4llm(tmp_path: Path) -> None:
     assert result.engine.startswith("pymupdf4llm@")
     assert result.fidelity == "high"
     assert "Hello docling two" in result.body_markdown
+
+
+@pytest.mark.parametrize("chunks", [False, True])
+def test_pdf_dispatch_requests_markdown_and_refuses_page_chunks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, chunks: bool) -> None:
+    path = tmp_path / "paper.pdf"
+    path.write_bytes(b"PDF fixture")
+
+    def to_markdown(source: str, *, page_chunks: bool) -> str | list[dict[str, str]]:
+        assert source == str(path)
+        assert not page_chunks
+        return [{"text": "page"}] if chunks else "# A document\n\nDocument text."
+
+    monkeypatch.setitem(sys.modules, "pymupdf4llm", SimpleNamespace(to_markdown=to_markdown))
+    result = convert(path)
+    if chunks:
+        assert result.fidelity == "failed"
+        assert "page chunks" in result.warnings[0]
+    else:
+        assert result.body_markdown == "# A document\n\nDocument text."
+
+
+def test_pptx_notes_without_a_text_frame_keep_the_converted_body(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "slides.pptx"
+    path.write_bytes(b"PPTX fixture")
+    slide = SimpleNamespace(has_notes_slide=True, notes_slide=SimpleNamespace(notes_text_frame=None))
+    monkeypatch.setitem(sys.modules, "pptx", SimpleNamespace(Presentation=lambda _source: SimpleNamespace(slides=[slide])))
+    converter = SimpleNamespace(convert=lambda _source: SimpleNamespace(text_content="# Slides"))
+    monkeypatch.setitem(sys.modules, "markitdown", SimpleNamespace(MarkItDown=lambda: converter))
+    assert convert(path).body_markdown == "# Slides"

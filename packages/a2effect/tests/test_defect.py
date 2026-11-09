@@ -43,11 +43,29 @@ def test_quarantine_wraps_keyboard_interrupt() -> None:
     assert isinstance(defect.__cause__, KeyboardInterrupt)
 
 
-def test_unexpected_defect_cannot_be_subclassed() -> None:
-    with pytest.raises(TypeError, match="final"):
-
-        class _Subclass(UnexpectedDefect):
-            pass
+@pytest.mark.parametrize("attributes", [{}, {"kind": "unknown"}, {"code": "INVALID"}])
+@pytest.mark.parametrize(
+    "keywords",
+    [
+        {},
+        {"abstract": True},
+        {"abstract": False},
+        {"unknown": True},
+        {"name": "value"},
+        {"bases": "value"},
+        {"namespace": "value"},
+        {"mcls": "value"},
+    ],
+)
+def test_unexpected_defect_cannot_be_subclassed(attributes: dict[str, object], keywords: dict[str, object]) -> None:
+    before = dict(UnexpectedDefect.__dict__)
+    with pytest.raises(TypeError, match="UnexpectedDefect is final") as caught:
+        type("_Subclass", (UnexpectedDefect,), attributes, **keywords)
+    assert str(caught.value) == (
+        "UnexpectedDefect is final and SHALL NOT be subclassed; got '_Subclass'. "
+        "To carry a typed defect, subclass AppError directly with kind='bug'."
+    )
+    assert dict(UnexpectedDefect.__dict__) == before
 
 
 def test_quarantine_idempotent_on_app_error() -> None:
@@ -58,3 +76,19 @@ def test_quarantine_idempotent_on_app_error() -> None:
     original = _NotFoundError("x")
     result = quarantine(original)
     assert result is original
+
+
+@pytest.mark.parametrize("mixin_first", [False, True])
+def test_final_defect_rejection_does_not_execute_a_mixin_hook(mixin_first: bool) -> None:
+    calls: list[str] = []
+
+    class Mixin:
+        def __init_subclass__(cls, **kwargs: object) -> None:
+            calls.append(cls.__name__)
+            msg = "mixin hook must not run for a final defect"
+            raise RuntimeError(msg)
+
+    with pytest.raises(TypeError, match="UnexpectedDefect is final"):
+        bases = (Mixin, UnexpectedDefect) if mixin_first else (UnexpectedDefect, Mixin)
+        type("Child", bases, {})
+    assert calls == []

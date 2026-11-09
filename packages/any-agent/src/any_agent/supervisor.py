@@ -17,13 +17,16 @@ import time
 from collections.abc import Callable
 from dataclasses import field
 from pathlib import Path
-from typing import IO, Literal, Protocol
+from typing import IO, TYPE_CHECKING, Literal, Protocol
 
 from any_agent import events as ev
 from any_agent import procs, watch
 from any_agent._json import mutable
 from any_agent.protocol import Harness, LaunchSpec, Summary
 from any_agent.watch import Limits
+
+if TYPE_CHECKING:
+    from types import FrameType
 
 LANE_GONE_EVERY = 10  # seconds between looks at whether the lane was marked out by someone else
 NET_GRACE_S = 15  # how long a worker may say "waiting for network" before one probe decides whether to stop it
@@ -294,7 +297,9 @@ class Supervisor:
             raise SystemExit(128 + signum)
 
         mine = threading.current_thread() is threading.main_thread()  # a library caller runs on any thread; only the main one takes signals
-        old = {g: signal.signal(g, bye) for g in (signal.SIGTERM, signal.SIGHUP)} if mine else {}
+        old: dict[int, Callable[[int, FrameType | None], object] | int | None] = (
+            {g: signal.signal(g, bye) for g in (signal.SIGTERM, signal.SIGHUP)} if mine else {}
+        )
         try:
             while True:
                 try:

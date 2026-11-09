@@ -91,7 +91,7 @@ class FakeRemote:
         """Someone else pushed: a new commit on ``branch`` writing ``files`` (None deletes a path). Returns its sha."""
         ref = branch_ref(branch)
         tip = self.state.refs.get(ref)
-        tree = dict(self.state.store.commits[tip].files) if tip else {}
+        tree: dict[str, str] = dict(self.state.store.commits[tip].files) if tip else {}
         for path, text in files.items():
             if text is None:
                 tree.pop(path, None)

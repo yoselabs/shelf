@@ -52,7 +52,10 @@ def registry() -> dict[str, Vendor]:
 @cache
 def _words(names: tuple[str, ...]) -> Words:
     vs = [v for n, v in registry().items() if n == "common" or not names or n in names]
-    pick = lambda f: [p for v in vs for p in getattr(v, f)]  # noqa: E731
+
+    def pick(field: str) -> list[str]:
+        return [p for v in vs for p in getattr(v, field)]
+
     return Words(
         limit=_join(pick("limit")),
         credit=_join(pick("credit")),

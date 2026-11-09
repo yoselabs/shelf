@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator, Mapping
+    from collections.abc import Callable, Generator, Iterable, Mapping
 
 
 class PhaseClock:
@@ -67,7 +67,7 @@ class PhaseClock:
         return t
 
     @contextmanager
-    def phase(self, name: str) -> Iterator[None]:
+    def phase(self, name: str) -> Generator[None]:
         """Own the time inside the block; the surrounding phase pauses. Leaves cleanly on an exception."""
         with self._lock:
             self._book()

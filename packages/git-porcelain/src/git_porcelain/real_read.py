@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Final
 
 from git_porcelain import ignore_rules, real_cache, real_env, real_parse
 from git_porcelain.api import Diff, Dirty, Health, LogEntry, Relation, RepoIdentity, Sha, Snapshot, Tree, TreeId, WorktreeInfo
+from git_porcelain.errors import MissingRemote
 from git_porcelain.real_done import unavailable
 from git_porcelain.revision_validation import validate_revisions
 
@@ -67,9 +68,12 @@ def unmerged(wt: RealWorktree) -> tuple[str, ...]:
 def identity(repo: RealRepo) -> RepoIdentity:
     def compute() -> RepoIdentity:
         common = Path(repo.run(repo.path, "rev-parse", "--path-format=absolute", "--git-common-dir").out.strip())
-        url = repo.run(repo.path, "remote", "get-url", "origin", check=False).out.strip()
+        try:
+            url = repo.remote_url("origin")
+        except MissingRemote:
+            url = None
         root = common.parent if common.name == ".git" else common
-        return RepoIdentity(root, common, url or None, hashlib.sha1(str(common).encode(), usedforsecurity=False).hexdigest()[:12])
+        return RepoIdentity(root, common, url, hashlib.sha1(str(common).encode(), usedforsecurity=False).hexdigest()[:12])
 
     return repo.memo(("identity",), compute)
 

@@ -346,7 +346,7 @@ class ZendriverBackend:
                 await tab.send(zd.cdp.network.enable())
                 tab.add_handler(zd.cdp.network.ResponseReceived, _on_cdp_response)
         await tab.get(url)
-        await tab.wait_for_ready_state("complete", timeout=int(self.page_budget_s))
+        await tab.wait_for_ready_state("complete", timeout=self.page_budget_s)
         html = await tab.get_content()
         if len(html) < _THIN_FLOOR and js_heavy:
             html = await _scroll_and_retry_cdp(tab, html)

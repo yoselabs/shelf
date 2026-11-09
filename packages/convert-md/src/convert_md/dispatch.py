@@ -18,7 +18,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from convert_md.base import ConversionError, ConversionResult
+from convert_md.base import ConversionEngine, ConversionError, ConversionResult
 from convert_md.engines import (
     Html2TextEngine,
     MammothEngine,
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 # image refs). Mammoth renders clean semantic HTML through convert-md's own
 # `source_kind="clean"` render path; markitdown stays as the cheap already-a-dep
 # fallback if mammoth ever fails.
-_CHAINS: dict[str, list[type]] = {
+_CHAINS: dict[str, list[type[ConversionEngine]]] = {
     ".pdf": [PymupdfLlmEngine],
     ".docx": [MammothEngine, MarkitdownEngine],
     ".pptx": [MarkitdownEngine],
@@ -61,12 +61,12 @@ _LEGACY = {".doc", ".ppt", ".xls"}  # LibreOffice-normalized then re-dispatched
 _LEGACY_TARGET = {".doc": ".docx", ".ppt": ".pptx", ".xls": ".xlsx"}
 
 
-def fallback_chain_for(path: Path) -> list[type]:
+def fallback_chain_for(path: Path) -> list[type[ConversionEngine]]:
     """Return the engine classes to try for ``path``, in order."""
     return _CHAINS.get(path.suffix.lower(), [])
 
 
-def select_engine(path: Path) -> type | None:
+def select_engine(path: Path) -> type[ConversionEngine] | None:
     """The primary engine class for ``path`` (None if the format is unsupported)."""
     chain = fallback_chain_for(path)
     return chain[0] if chain else None

@@ -180,7 +180,7 @@ def log_grep(repo: Path, pattern: str, *, limit: int = 20) -> list[Commit]:
     commits: list[Commit] = []
     for record in out.split(_RECORD)[1:]:
         sha, at, name, email, subject, trailer_text, rest = record.split(_FIELD, 6)
-        trailers = tuple(tuple(t.split(": ", 1)) for t in trailer_text.split("\x1d") if ": " in t)
+        trailers = tuple((key, value) for key, sep, value in (t.partition(": ") for t in trailer_text.split("\x1d")) if sep)
         paths = tuple(p.strip("\n") for p in rest.split("\0") if p.strip("\n"))
         commits.append(
             Commit(
@@ -188,7 +188,7 @@ def log_grep(repo: Path, pattern: str, *, limit: int = 20) -> list[Commit]:
                 at=datetime.fromisoformat(at),
                 author=Identity(name, email),
                 subject=subject,
-                trailers=trailers,  # pyright: ignore[reportArgumentType]
+                trailers=trailers,
                 paths=paths,
             )
         )

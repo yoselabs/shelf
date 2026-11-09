@@ -16,7 +16,7 @@ from fnmatch import fnmatch
 from typing import TYPE_CHECKING, Literal
 
 from blueprint.concerns.cli_parse import _scripts
-from blueprint.concerns.gate import _workflows
+from blueprint.concerns.gate_ci import workflows
 from blueprint.concerns.secrets import _RULES, _sops_files
 from blueprint.model import walk
 
@@ -114,7 +114,7 @@ def _where(rel: str, line: int) -> str:
 
 
 def _workflow_files(ctx: Context) -> list[tuple[str, list[str]]]:
-    return [(p.relative_to(ctx.repo).as_posix(), p.read_text(errors="replace").splitlines()) for p in _workflows(ctx)]
+    return [(p.relative_to(ctx.repo).as_posix(), p.read_text(errors="replace").splitlines()) for p in workflows(ctx)]
 
 
 def _code(lines: list[str]) -> list[tuple[int, str]]:

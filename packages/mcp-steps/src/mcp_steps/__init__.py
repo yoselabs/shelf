@@ -53,7 +53,7 @@ def refusal_of(result: CallToolResult) -> dict[str, Any]:
     if not isinstance(body, dict):
         text = _text(result.content[0]) if result.content else None
         try:
-            body = json.loads(text) if text is not None else {}
+            body = json.loads(text) if text is not None else dict[str, object]()
         except json.JSONDecodeError:
             return {"message": text}
     error = body.get("error", body) if isinstance(body, dict) else {"message": str(body)}

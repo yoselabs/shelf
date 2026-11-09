@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-import tomllib  # type: ignore[no-redef]
+import tomllib
 
 _STUB_PATH = Path(__file__).parent / "_stubs" / "raises_registry.json"
 

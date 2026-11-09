@@ -46,7 +46,8 @@ class Breaker:
         elif fact.kind == OK:
             state.outs.pop(fact.key, None)
             k = state.keys.setdefault(fact.key, KeyState())
-            k.streak, k.rung, k.until, k.kind, k.fp, k.evidence, k.source, k.last_ok = [], 0, 0.0, None, None, "", None, fact.ts
+            k.streak = []
+            k.rung, k.until, k.kind, k.fp, k.evidence, k.source, k.last_ok = 0, 0.0, None, None, "", None, fact.ts
         elif fact.kind in self.policy.outs:
             state.outs[fact.key] = self._out(fact)
         else:

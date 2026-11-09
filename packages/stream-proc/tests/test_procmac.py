@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import time
+from types import SimpleNamespace
 
 import pytest
 from stream_proc import procmac
@@ -165,3 +166,29 @@ def test_a_zombie_is_not_alive() -> None:
         assert not procmac.alive(p.pid)
     finally:
         p.wait()
+
+
+@pytest.mark.parametrize("failure", ["load", "symbols"])
+@pytest.mark.parametrize("recover", [False, True])
+def test_library_loading_tries_the_fallback_and_preserves_unavailability(
+    monkeypatch: pytest.MonkeyPatch, failure: str, recover: bool
+) -> None:
+    attempted: list[str] = []
+    functions = {name: SimpleNamespace() for name in ("proc_listpids", "proc_listchildpids", "proc_pidinfo", "mach_timebase_info")}
+    library = SimpleNamespace(**functions)
+
+    def load(name: str, *, use_errno: bool) -> SimpleNamespace:
+        assert use_errno
+        attempted.append(name)
+        if recover and len(attempted) == 2:
+            return library
+        if failure == "load":
+            msg = "library unavailable"
+            raise OSError(msg)
+        return SimpleNamespace()
+
+    monkeypatch.setattr(procmac.sys, "platform", "darwin")
+    monkeypatch.setattr(procmac.ctypes, "CDLL", load)
+    result = procmac._lib.__wrapped__()
+    assert attempted == ["libproc.dylib", "/usr/lib/libSystem.B.dylib"]
+    assert result is (library if recover else None)

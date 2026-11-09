@@ -10,7 +10,7 @@ string ``items`` value (and can fall back to splitting on ``\n`` to inspect rows
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, get_args, get_origin
+from typing import TYPE_CHECKING, Any, TypeVar, get_args, get_origin
 
 from lean_wire import derive_columns, encode_tsv
 
@@ -18,7 +18,10 @@ if TYPE_CHECKING:
     from page_tsv.response import Page
 
 
-def _item_columns(page: Page) -> list[str]:
+T = TypeVar("T")
+
+
+def _item_columns(page: Page[T]) -> list[str]:
     """Pull the TSV header columns from the resolved item type's ``model_fields``.
 
     Falls back to the UNION of every item's dump keys when the type isn't
@@ -53,7 +56,7 @@ def assemble_page_envelope(envelope_no_items: dict[str, Any], rows: list[Any], c
     return json.dumps(envelope, separators=(",", ":"), ensure_ascii=False)
 
 
-def encode_page_tsv(page: Page) -> str:
+def encode_page_tsv(page: Page[T]) -> str:
     """Encode a ``Page[T]`` as a JSON envelope with an embedded TSV ``items`` string.
 
     The envelope also carries a ``_items_format = "tsv"`` discriminator.

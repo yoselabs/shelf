@@ -12,7 +12,6 @@ cannot load, :func:`has_table` is False and everything here answers "unavailable
 
 from __future__ import annotations
 
-import contextlib
 import ctypes
 import functools
 import sys
@@ -91,8 +90,12 @@ def _lib() -> ctypes.CDLL | None:
     """libproc (re-exported by libSystem), or None off macOS or when it will not load. Touched only here."""
     if sys.platform != "darwin":
         return None
-    for name in ("libproc.dylib", "/usr/lib/libSystem.B.dylib"):
-        with contextlib.suppress(OSError, AttributeError):
+    return _load_libs(("libproc.dylib", "/usr/lib/libSystem.B.dylib"))
+
+
+def _load_libs(names: tuple[str, ...]) -> ctypes.CDLL | None:
+    for name in names:
+        try:
             lib = ctypes.CDLL(name, use_errno=True)
             lib.proc_listpids.argtypes = (ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_int)
             lib.proc_listpids.restype = ctypes.c_int
@@ -102,6 +105,9 @@ def _lib() -> ctypes.CDLL | None:
             lib.proc_pidinfo.restype = ctypes.c_int
             lib.mach_timebase_info.argtypes = (ctypes.POINTER(TimebaseInfo),)
             lib.mach_timebase_info.restype = ctypes.c_int
+        except (OSError, AttributeError):
+            continue
+        else:
             return lib
     return None
 
@@ -138,7 +144,8 @@ def _cpu_s(pid: int) -> float:
     if lib.proc_pidinfo(pid, PROC_PIDTASKINFO, 0, ctypes.byref(task), ctypes.sizeof(task)) != ctypes.sizeof(task):
         return 0.0
     mul, div = _timebase()
-    return (task.pti_total_user + task.pti_total_system) * mul / div / 1e9
+    ticks: int = task.pti_total_user + task.pti_total_system
+    return ticks * mul / div / 1e9
 
 
 def _token(info: ProcBsdInfo) -> str:

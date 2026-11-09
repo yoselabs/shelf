@@ -82,12 +82,13 @@ def main(argv: list[str] | None = None) -> int:
     cps.add_argument("--json", action="store_true", help="print JSON")
     args = parser.parse_args(argv)
 
+    if args.command == "survey":
+        return _survey(args.repo, args.check)
     commands = {
         "checkpoints": _checkpoints,
         "template": _template,
         "adr-index": _adr_index,
         "recipe": _recipe,
-        "survey": lambda a: _survey(a.repo, a.check),
     }
     if args.command in commands:
         return commands[args.command](args)

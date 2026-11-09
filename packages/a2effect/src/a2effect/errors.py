@@ -80,8 +80,8 @@ class AppError(Exception):
 
     kind: ClassVar[str]
     code: ClassVar[str]
-    retryable: ClassVar[bool] = False
-    hint: ClassVar[str | None] = None
+    retryable: bool = False
+    hint: str | None = None
     http_status: ClassVar[int | None] = None
     cli_exit_code: ClassVar[int | None] = None
     #: Overrides the default kind label in error prose (e.g.,

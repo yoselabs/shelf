@@ -547,10 +547,11 @@ def _microdata_value_of(node: Any) -> str:
     tag = (node.tag or "").lower()
     attr = _MICRODATA_VALUE_ATTR.get(tag)
     if attr:
-        value = node.attributes.get(attr)
+        value: str | None = node.attributes.get(attr)
         if value is not None:
             return value
-    return (node.text(strip=True) or "").strip()
+    text: str = (node.text(strip=True) or "").strip()
+    return text
 
 
 _OG_PROPERTY_PREFIXES: tuple[str, ...] = ("og:", "article:", "product:", "book:", "profile:")

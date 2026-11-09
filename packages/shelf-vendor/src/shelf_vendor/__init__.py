@@ -107,7 +107,8 @@ class Vendor:
     def load(self) -> list[dict[str, str]]:
         if not self.manifest_path.is_file():
             return []
-        return json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        entries: list[dict[str, str]] = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        return entries
 
     def sync(self, name: str, tag: str | None = None, *, shelf: Path) -> dict[str, str]:
         """Copy ``name`` from ``tag`` (default: the recorded one) and record it. ``process-lock`` is ``process_lock``."""

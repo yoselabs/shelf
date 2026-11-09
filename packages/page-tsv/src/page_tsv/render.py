@@ -112,7 +112,7 @@ def encode_envelope(value: Any, tsv_fields: tuple[str, ...]) -> str:
             # something that WAS found and encoded one layer down.
             envelope[f"_{name}_format"] = "tsv"
             continue
-        rows = list(raw) if isinstance(raw, (list, tuple)) else []
+        rows: list[object] = list(raw) if isinstance(raw, (list, tuple)) else []
         if rows and not _is_tsv_shaped(rows):
             # SHAPE GUARD. Leaving a non-tabular field as JSON is the honest
             # outcome — a list of `[level, text]` pairs is already lean and a

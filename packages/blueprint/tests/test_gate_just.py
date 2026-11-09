@@ -209,3 +209,33 @@ def test_the_runner_fix_without_a_pyproject_pins_just_in_mise(repo: Repo) -> Non
     assert 'just = "' in fix
     assert "mise.toml" in fix
     assert "ADR 0024" in fix
+
+
+def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> None:
+    # shelf-50w.1: domain ownership must not change the checkpoint contract.
+    expected = (
+        ("gate.one-command", 1, False),
+        ("gate.runner", 1, False),
+        ("gate.ci", 1, False),
+        ("gate.ci-no-manifest-edit", 1, False),
+        ("gate.hooks-recipe", 3, False),
+        ("gate.hooks-installed", 2, True),
+        ("gate.runs-blueprint", 2, False),
+        ("gate.guards-have-red-tests", 2, False),
+        ("gate.clean-clone", 1, True),
+        ("gate.checkers-wired", 1, False),
+        ("gate.default-branch", 1, True),
+        ("gate.git-remote", 1, True),
+        ("gate.ci-green", 1, True),
+        ("gate.lfs-binaries", 1, False),
+        ("gate.git-config-clean", 1, True),
+        ("gate.lfs-installed", 1, True),
+    )
+    audited = run(repo.root, concern="gate", audit=True, env=repo.env)
+    gated = run(repo.root, concern="gate", env=repo.env)
+    assert [(r.id, r.version) for r in audited.rows] == [(key, version) for key, version, _ in expected]
+    assert [(r.id, r.version) for r in gated.rows] == [(key, version) for key, version, audit in expected if not audit]
+    assert all(r.concern == "gate" and r.layer == "generic" for r in audited.rows)
+    assert gated.skipped_audit == sum(audit for _, _, audit in expected)
+    assert audited.set_hash == gated.set_hash
+    assert not run(repo.root, concern="gate_ci", audit=True, env=repo.env).rows
