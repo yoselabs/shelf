@@ -59,7 +59,10 @@ __all__ = [
 
 
 class _Output:
-    output: str
+    if TYPE_CHECKING:
+
+        @property
+        def output(self) -> str: ...
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "output", redact_output(self.output))
@@ -72,8 +75,11 @@ TreeId = NewType("TreeId", str)
 # -- facts ------------------------------------------------------------------------------------------------
 @dataclass(frozen=True)
 class RepoIdentity:
-    """Where the repository lives and one stable name for it. ``root`` is the main checkout, ``key`` is
-    ``sha1(common_dir)[:12]`` (the same for every worktree)."""
+    """Canonical common directory and its stable local key, ``sha1(common_dir)[:12]``.
+
+    ``root`` is the common directory's parent when named ``.git``, otherwise the common
+    directory itself. It does not identify a selected checkout for separate Git directories.
+    """
 
     root: Path
     common_dir: Path

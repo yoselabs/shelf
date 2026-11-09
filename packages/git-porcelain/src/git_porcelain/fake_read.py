@@ -174,7 +174,7 @@ def cherry(repo: RepoState, wt: CheckoutState, upstream: str, head: str) -> tupl
 
 
 def _patch_id(repo: RepoState, commit: CommitObj) -> frozenset[tuple[str, tuple[str, ...]]]:
-    before = repo.store.commits[commit.parents[0]].files if commit.parents else {}
+    before: Mapping[str, str] = repo.store.commits[commit.parents[0]].files if commit.parents else {}
     found: list[tuple[str, tuple[str, ...]]] = []
     for path in sorted(set(before) | set(commit.files)):
         if before.get(path) != commit.files.get(path):

@@ -87,7 +87,7 @@ def sync(repo: RealRepo, remote: str) -> SyncResult:
 
 def exclude_locally(repo: RealRepo, patterns: Sequence[str]) -> None:
     target = repo.identity().common_dir / "info" / "exclude"
-    have = target.read_text(encoding="utf-8").splitlines() if target.exists() else []
+    have: list[str] = target.read_text(encoding="utf-8").splitlines() if target.exists() else []
     missing = [p for p in dict.fromkeys(patterns) if p not in have]
     if not missing:
         return
