@@ -62,7 +62,7 @@ def decode_answer[T](text: str, decode: Callable[[object], T]) -> Answer[T]:
         return MissingAnswer()
     try:
         value: object = json.loads(text, object_pairs_hook=_pairs, parse_float=_finite, parse_constant=_finite)
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         return InvalidAnswer(kind="json", reason=str(exc)[:300])
     try:
         return DecodedAnswer(decode(value))

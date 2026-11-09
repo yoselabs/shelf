@@ -24,6 +24,9 @@ class FakeRun:
         if outcome.worker is None:
             msg = "FakeRun requires an explicit outcome.worker fixture"
             raise ValueError(msg)
+        if refs and "ref" in outcome.summary.res and outcome.summary.res["ref"] != refs[-1]:
+            msg = "FakeRun final observed ref must match the reported terminal ref"
+            raise ValueError(msg)
         self._outcome, self._worker, self._refs = outcome, outcome.worker, refs
         self.calls: list[tuple[Harness, LaunchSpec, float, RunHooks | None]] = []
 

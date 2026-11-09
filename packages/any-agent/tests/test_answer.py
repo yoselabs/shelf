@@ -102,7 +102,7 @@ def test_json_null_is_not_missing_and_schema_error_is_bounded() -> None:
     assert len(answer.reason) == 300
 
 
-@pytest.mark.parametrize("failure", [TypeError, RuntimeError, KeyboardInterrupt])
+@pytest.mark.parametrize("failure", [TypeError, RuntimeError, RecursionError, KeyboardInterrupt])
 def test_decoder_programming_fault_is_not_invalid_model_output(failure: type[BaseException]) -> None:
     def broken(_value: object) -> Plan:
         msg = "decoder fault"
@@ -238,3 +238,30 @@ def test_fake_is_consumed_once_and_preserves_answer_grace_facts(tmp_path: Path) 
 def test_fake_requires_explicit_worker() -> None:
     with pytest.raises(ValueError, match="worker"):
         FakeRun(RunOutcome())
+
+
+def test_excessive_json_depth_is_invalid_output_not_decoder_fault() -> None:
+    text = "[" * 10_000
+    answer = decode_answer(text, decode_plan)
+    assert isinstance(answer, InvalidAnswer)
+    assert answer.kind == "json"
+    assert 0 < len(answer.reason) <= 300
+
+
+@pytest.mark.parametrize("terminal_ref", ["other-session", None])
+def test_fake_refuses_inconsistent_reported_session(terminal_ref: str | None) -> None:
+    raw = fake_outcome("{}", 0, ())
+    raw.summary.res["ref"] = terminal_ref
+    with pytest.raises(ValueError, match="ref"):
+        FakeRun(raw, refs=("observed-session",))
+
+
+@pytest.mark.parametrize("reported", [False, True])
+def test_fake_accepts_matching_or_unspecified_terminal_ref(tmp_path: Path, *, reported: bool) -> None:
+    raw = fake_outcome("{}", 0, ("observed-session",))
+    if not reported:
+        del raw.summary.res["ref"]
+    fake = FakeRun(raw, refs=("older-session", "observed-session"))
+    refs: list[str] = []
+    assert fake(CodexHarness(), spec_for(tmp_path, "unused", 0, ()), 10, RunHooks(ref=refs.append)) is raw
+    assert refs == ["older-session", "observed-session"]

@@ -4,7 +4,7 @@
 
 ### Requirement: Strict typed answer decoding
 The library MUST consume one complete JSON value and use the caller's typed decoder.
-Whitespace-only text MUST be missing. Malformed/ambiguous JSON and expected decoder
+Whitespace-only text MUST be missing. Malformed/ambiguous JSON (including parser depth exhaustion) and expected decoder
 ValueError rejection MUST be distinct invalid outcomes. Unexpected decoder faults
 MUST propagate. No extraction, correction, retry or launch is allowed in decoding.
 
@@ -39,3 +39,7 @@ parent-death, descendant-stop or raising-ref behavior beyond the real contract.
 #### Scenario: Missing or late session
 - WHEN no ref is configured or a ref arrives just before return
 - THEN only configured observations reach the callback, without an invented session.
+
+#### Scenario: Inconsistent fake session fixture
+- WHEN observed refs are configured and the raw summary explicitly supplies a different terminal ref
+- THEN constructing the fake raises ValueError instead of fabricating inconsistent observations.
