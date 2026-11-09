@@ -589,6 +589,9 @@ ignore_imports = [
 # `warn` — set that way they are found, reported as "N warnings not shown", and never
 # counted. A run must end at `0 errors` with no warning tail.
 [tool.pyrefly]
+# Editable workspace sources appear on the interpreter search path; they are still project code.
+# Keep the declared exclusions below without implicitly excluding every installed src directory.
+disable-project-excludes-heuristics = true
 project-includes = ["packages", "tools"]
 # Off: pyrefly matches .gitignore and .git/info/exclude against absolute paths, so in a worktree under .claude/worktrees/
 # (an excluded path Claude Code adds) it matched no file and passed (homelab, 2026-10-11).
