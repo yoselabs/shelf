@@ -173,7 +173,13 @@ class Repo(Protocol):
         ...
 
     def identity(self) -> RepoIdentity:
-        """Root, common dir, origin url and key. Asked once per process."""
+        """Canonical common dir and local key, with optional origin metadata.
+
+        Linked worktrees share a key; independent clones differ. Only missing origin yields
+        None; other origin observation faults raise GitReadFailure. Root is the common dir's
+        parent when named .git, otherwise the common dir, not a selected checkout.
+        RealRepo memoizes by default; disable memoization for fresh observations.
+        """
         ...
 
     def sync(self, remote: str = "origin") -> SyncResult:

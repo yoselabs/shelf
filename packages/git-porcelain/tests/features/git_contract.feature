@@ -1337,6 +1337,15 @@ Feature: One Repo and Worktree, real or fake
     Then the result's key is "<mem:key>"
     And the result's root is "<root>/r"
 
+  # shelf-7qsd
+  Scenario: Independent clones of one origin have distinct local identities
+    Given an origin "o"
+    And "r" is a clone of the origin "o"
+    And "s" is a clone of the origin "o"
+    When "r" remembers identity().key as "key"
+    And "s" calls identity()
+    Then the result's key is not "<mem:key>"
+
   Scenario: The origin url is read from the remote
     Given a repository "r"
     And an origin "o"

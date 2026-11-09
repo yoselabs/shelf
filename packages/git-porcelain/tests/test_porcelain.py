@@ -13,7 +13,7 @@ import pytest
 
 import git_porcelain as git
 from git_porcelain import GitError
-from git_porcelain.errors import RefRace, failure
+from git_porcelain.errors import GitUnavailable, NotARepo, RefRace, failure
 from git_porcelain.testing import git as _git
 
 
@@ -192,3 +192,26 @@ def test_an_explicit_env_still_wins(tmp_path: Path) -> None:
     _init_repo(other)
     top = git.run_git(repo, "rev-parse", "--absolute-git-dir", env={"GIT_DIR": str(other / ".git")}).strip()
     assert Path(top).resolve() == (other / ".git").resolve()
+
+
+@pytest.mark.parametrize(
+    ("stderr", "code", "expected"),
+    [
+        ("fatal: not a git repository (or any of the parent directories): .git", 128, NotARepo),
+        (
+            (
+                "fatal: not a git repository (or any parent up to mount point /)\n"
+                "Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set)."
+            ),
+            128,
+            NotARepo,
+        ),
+        ("fatal: not a git repository (or any parent up to mount point /mnt/work)", 128, NotARepo),
+        ("fatal: not a git repository (or any parent up to mount point /)", 1, GitUnavailable),
+        ("fatal: not a git repository (or any parent up to mount point", 128, GitUnavailable),
+        ("fatal: cannot read repository config: Permission denied", 128, GitUnavailable),
+    ],
+)
+def test_repository_discovery_classifies_only_known_absence(stderr: str, code: int, expected: type[GitUnavailable]) -> None:
+    """shelf-7qsd: filesystem-limited discovery is absence; unknown faults stay unavailable."""
+    assert type(failure(stderr, stderr, code)) is expected
