@@ -4,7 +4,7 @@
 name = "anyllm"
 kind = "any-lib"                 # primitive | any-lib | composite | cli | framework | config-preset
 tier = "T1"                      # T0 primitive · T1 any-* · T2 composite
-release = "anyllm-v0.8.0"        # current git tag (v0.1.0 stays tagged for un-upgraded consumers)
+release = "anyllm-v0.8.1"        # current git tag (v0.1.0 stays tagged for un-upgraded consumers)
 capability = "Stop caring which LLM provider is underneath — which backend serves (a single pin, or an ordered auto-select with runtime fallback) and whether a (provider, model) pair is affordable before you spend."
 implementation = "hybrid-adapter"  # ours | third-party | hybrid-adapter
 status = "active"                # candidate | active | deprecated | retired

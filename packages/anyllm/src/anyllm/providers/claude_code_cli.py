@@ -61,7 +61,12 @@ class ClaudeCodeCliAdapter:
             env=dict(os.environ),
             sealed=True,  # a pure completion: the harness owns every flag, this adapter reconstructs none
         )
-        result = await complete_run(any_agent, harness, harness.launch_spec(inputs), model or "")
+        try:
+            spec = harness.launch_spec(inputs)
+        except ValueError as exc:  # the environment would move the run off the login
+            harness.cleanup()
+            raise AnyLLMError(str(exc), retryable=False, hint="unset the variable, or use an API-key provider on purpose") from exc
+        result = await complete_run(any_agent, harness, spec, model or "")
         envelope = harness.evidence.final
         if envelope is None or not isinstance(envelope.get("result"), str):
             msg = "claude CLI JSON lacked a string `result`"

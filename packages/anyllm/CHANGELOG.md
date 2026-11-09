@@ -4,6 +4,10 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see `ledger/0032-anyllm-v2-delivered.toml` for why). Read this before source/README when
 reconciling a pin (agent-loop.md WORKFLOW: RECEIVE).
 
+## 0.8.1
+
+- claude-code-cli: an ambient `CLAUDE_CODE_SIMPLE` no longer reaches the child (it hid the subscription login); `ANTHROPIC_AUTH_TOKEN` or `CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY` set in the environment ⇒ `ValueError` from the harness at launch. `anyllm[agent]` needs any-agent>=0.1.4
+
 ## 0.8.0
 
 - BREAKING: claude-code-cli and codex-cli need anyllm[agent]; consumers on the default backend (a2kay) must add the extra when they bump
