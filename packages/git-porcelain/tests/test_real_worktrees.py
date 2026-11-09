@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from git_porcelain import GitUnavailable, IndexLocked, NotARepo, RealRepo, WorktreeRemoveRefused
+from git_porcelain import GitUnavailable, Identity, IndexLocked, NotARepo, RealRepo, WorktreeRemoveRefused
 from git_porcelain.real_done import Done
-from git_porcelain.testing import git
+from git_porcelain.testing import apply_hermetic_env, git
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -112,3 +112,28 @@ def test_remove_preserves_infrastructure_errors(
     with pytest.raises(error) as caught:
         repo.drop_worktree(tmp_path / "w", missing_ok=False)
     assert not isinstance(caught.value, WorktreeRemoveRefused)
+
+
+@pytest.mark.parametrize("common_symlink", [False, True])
+def test_identity_is_canonical_across_linked_and_symlinked_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, common_symlink: bool
+) -> None:
+    """shelf-7qsd: all paths into one local repository name the same canonical common directory."""
+    apply_hermetic_env(monkeypatch, identity=Identity("Test", "test@example.invalid"), home=tmp_path / "home")
+    main = tmp_path / "main"
+    main.mkdir()
+    git(main, "init", "-q", "-b", "main")
+    git(main, "commit", "--allow-empty", "-qm", "seed")
+    common = main / ".git"
+    if common_symlink:
+        common = tmp_path / "metadata"
+        (main / ".git").rename(common)
+        (main / ".git").symlink_to(common, target_is_directory=True)
+    linked = tmp_path / "linked"
+    git(main, "worktree", "add", "--detach", str(linked), "HEAD")
+    alias = tmp_path / "alias"
+    alias.symlink_to(main, target_is_directory=True)
+    identities = [RealRepo(path, memoize=False).identity() for path in (main, linked, alias)]
+    assert all(value.common_dir == common.resolve() for value in identities)
+    assert len({value.key for value in identities}) == 1
+    assert all(value.origin_url is None for value in identities)

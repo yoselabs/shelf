@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from git_porcelain import GitUnavailable, RealRepo, RefRace
+from git_porcelain import GitReadFailure, GitUnavailable, RealRepo, RefRace
+from git_porcelain.testing import FakeRemote, FakeRepo, apply_hermetic_env, git
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -58,3 +59,48 @@ def test_fetch_does_not_retry_other_failures(tmp_path: Path, monkeypatch: pytest
         assert type(repo.sync()).__name__ == "Offline"
     assert len(calls) == 1
     assert rests == []
+
+
+@pytest.mark.parametrize(
+    ("rc", "stdout", "stderr"), [(128, b"", b"fatal: cannot read config\n"), (0, b"", b""), (1, b"partial", b"read failed")]
+)
+def test_identity_does_not_turn_origin_read_failure_into_absence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, rc: int, stdout: bytes, stderr: bytes
+) -> None:
+    """shelf-7qsd: an observer must distinguish unknown origin from a missing origin."""
+
+    def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        if "rev-parse" in args:
+            return subprocess.CompletedProcess(args, 0, str(tmp_path / ".git").encode(), b"")
+        return subprocess.CompletedProcess(args, rc, stdout, stderr)
+
+    monkeypatch.setattr(subprocess, "run", process)
+    with pytest.raises(GitReadFailure):
+        RealRepo(tmp_path, memoize=False).identity()
+
+
+@pytest.mark.parametrize("implementation", ["real", "fake"])
+def test_origin_changes_do_not_change_local_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, implementation: str) -> None:
+    """shelf-7qsd: origin is optional display metadata, independent of local identity."""
+    apply_hermetic_env(monkeypatch, home=tmp_path / "home")
+    if implementation == "real":
+        git(tmp_path, "init", "-q", "-b", "main")
+        repo = RealRepo(tmp_path, memoize=False)
+    else:
+        repo = FakeRepo.init(tmp_path)
+    before = repo.identity()
+    assert before.origin_url is None
+    if isinstance(repo, FakeRepo):
+        repo.add_remote("origin", FakeRemote("https://example.invalid/first"))
+    else:
+        git(tmp_path, "remote", "add", "origin", "https://example.invalid/first")
+    first = repo.identity()
+    if isinstance(repo, FakeRepo):
+        repo.set_remote_url("origin", "https://example.invalid/second")
+    else:
+        git(tmp_path, "remote", "set-url", "origin", "https://example.invalid/second")
+    second = repo.identity()
+    assert first.origin_url == "https://example.invalid/first"
+    assert second.origin_url == "https://example.invalid/second"
+    assert before.key == first.key == second.key
+    assert before.common_dir == first.common_dir == second.common_dir
