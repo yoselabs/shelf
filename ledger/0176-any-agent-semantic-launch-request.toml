@@ -1,0 +1,10 @@
+seq = 176
+date = "2026-11-09"
+event = "request"
+software = "any-agent"
+release = "any-agent-v0.4.0"
+actor = "tl-shelf-git-porcelain-66"
+consumer = "iorlas-task-loop"
+verdict = ""
+cost = ""
+note = "shelf-evlp requests the hard cut from raw Codex cli input to semantic fresh/resume launch construction for factory admitted-plan execution. Candidate0.4.0 removes cli/old nonsealed skip-Git extraction; sealed completion is unchanged. Native exact-tree verification and publication remain separate."

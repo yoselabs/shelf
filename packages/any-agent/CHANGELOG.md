@@ -20,3 +20,5 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 - 0.2.0: `Worker(pid, pgid, start)` -> `Worker(pid, pgid, start, boot)` with required start; `RunHooks.started` after target launch -> once before target exec; requires `stream-proc>=0.5.0`
 
 - 0.3.0: `decode_answer(text, decode) -> Answer[T]` (`DecodedAnswer(value) | MissingAnswer() | InvalidAnswer(kind, reason)`); strict complete JSON, ValueError-only schema rejection; `testing.FakeRun(outcome, refs=())` consumes one existing four-positional-argument run call, preserving registration/ref/raw outcome facts
+
+- 0.4.0: `LaunchInputs.cli` removed; `CodexHarness.launch_spec` builds fresh/resume argv from model/effort/sandbox/access/isolation; empty optional choices/schema/output omitted, empty nonsealed exe/cwd/explicit resume refused; old arbitrary fresh argv and nonsealed skip-Git extraction removed; sealed completion unchanged

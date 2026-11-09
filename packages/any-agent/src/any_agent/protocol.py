@@ -28,7 +28,6 @@ class LaunchInputs:
     resume: str | None = None
     sandbox: str = ""  # codex
     out_file: str = ""  # codex
-    cli: list[str] = field(default_factory=list)  # codex: the caller's argv for a fresh run (`codex exec -C ... -s ... -m ...`), exe first
     access: list[str] = field(default_factory=list)  # codex: the caller's fixed sandbox and network flags
     isolation: list[str] = field(default_factory=list)  # codex: skills turned off by path
     session: str = ""  # claude: the session id we fix up front (--session-id)

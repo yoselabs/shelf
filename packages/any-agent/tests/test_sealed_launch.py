@@ -160,9 +160,9 @@ def test_codex_sealed_runs_in_an_empty_directory_that_cleanup_removes(tmp_path):
     assert not out.parent.exists()
 
 
-def test_codex_unsealed_launch_is_unchanged(tmp_path):
+def test_codex_unsealed_launch_keeps_project_configuration(tmp_path):
     _, project, _ = hostile(tmp_path)
-    inputs = codex_inputs(project, sealed=False, cli=["/bin/codex", "exec", "-s", "read-only"], out_file="/o")
+    inputs = codex_inputs(project, sealed=False, sandbox="read-only", out_file="/o")
     spec = CodexHarness().launch_spec(inputs)
     assert spec.cwd == str(project)
     assert "--ignore-user-config" not in spec.argv
