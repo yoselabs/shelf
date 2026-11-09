@@ -43,14 +43,14 @@ def test_boot_change_during_observation_is_unknown(monkeypatch: pytest.MonkeyPat
 @pytest.mark.skipif(sys.platform != "linux", reason="Linux native /proc path")
 @pytest.mark.parametrize("failure", [PermissionError(errno.EACCES, "denied"), OSError(errno.EIO, "unreadable")])
 def test_unreadable_native_process_is_unknown(monkeypatch: pytest.MonkeyPatch, failure: OSError) -> None:
-    original = Path.read_text
+    original = Path.read_bytes
 
-    def read(path: Path, *, encoding: str | None = None, errors: str | None = None) -> str:
+    def read(path: Path) -> bytes:
         if path.name == "stat":
             raise failure
-        return original(path, encoding=encoding, errors=errors)
+        return original(path)
 
-    monkeypatch.setattr(Path, "read_text", read)
+    monkeypatch.setattr(Path, "read_bytes", read)
     assert inspect_process(os.getpid()).kind == "unknown"
 
 
@@ -116,3 +116,44 @@ def test_process_group_change_preserves_the_registered_process() -> None:
         if child.poll() is None:
             child.kill()
         child.communicate(timeout=5)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux /proc stat command encoding")
+def test_non_utf8_command_label_preserves_native_process_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pid = os.getpid()
+    original = (Path("/proc") / str(pid) / "stat").read_bytes()
+    head, separator, tail = original.rpartition(b")")
+    assert separator
+    changed = head.partition(b"(")[0] + b"(bad-\xff-name)" + tail
+    directory = tmp_path / str(pid)
+    directory.mkdir()
+    (directory / "stat").write_bytes(changed)
+    monkeypatch.setattr(procfs, "PROC", tmp_path)
+    row = procfs.read(pid)
+    assert row is not None
+    assert row.cmd == "bad-\ufffd-name"
+    assert procfs.table()[pid].start == row.start
+    observation = inspect_process(pid)
+    assert observation.kind == "matching" and observation.identity is not None
+    assert (observation.identity.pid, observation.identity.start) == (pid, row.start)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux /proc stat identity fields")
+@pytest.mark.parametrize("field, replacement", [(1, b"bad-\xff"), (19, b"not-a-number")])
+def test_malformed_native_identity_stays_unknown(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: int,
+    replacement: bytes,
+) -> None:
+    pid = os.getpid()
+    original = (Path("/proc") / str(pid) / "stat").read_bytes()
+    head, _, tail = original.rpartition(b")")
+    fields = tail.split()
+    fields[field] = replacement
+    directory = tmp_path / str(pid)
+    directory.mkdir()
+    (directory / "stat").write_bytes(head + b") " + b" ".join(fields))
+    monkeypatch.setattr(procfs, "PROC", tmp_path)
+    assert procfs.inspect(pid) == "unknown"
+    assert inspect_process(pid).kind == "unknown"

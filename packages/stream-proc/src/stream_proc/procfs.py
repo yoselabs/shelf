@@ -41,12 +41,15 @@ def has_proc() -> bool:
 def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
     """One native read, preserving absent versus inaccessible/malformed."""
     try:
-        head, _, tail = (PROC / str(pid) / "stat").read_text(encoding="utf-8", errors="strict").rpartition(")")
-        rest = tail.split()
+        head, _, tail = (PROC / str(pid) / "stat").read_bytes().rpartition(b")")
+        prefix, _, command = head.partition(b"(")
+        rest = tail.decode("ascii").split()
         cpu = (int(rest[11]) + int(rest[12])) / CLK_TCK
-        if int(head.partition("(")[0].strip()) != pid:
+        if int(prefix.strip()) != pid:
             return "unknown"
-        return Proc(pid, int(rest[1]), int(rest[2]), int(rest[3]), str(int(rest[19])), rest[0], cpu, head.partition("(")[2])
+        return Proc(
+            pid, int(rest[1]), int(rest[2]), int(rest[3]), str(int(rest[19])), rest[0], cpu, command.decode("utf-8", errors="replace")
+        )
     except (FileNotFoundError, ProcessLookupError):
         return "gone"
     except (OSError, ValueError, IndexError, UnicodeError):
