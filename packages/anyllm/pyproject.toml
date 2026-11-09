@@ -1,6 +1,6 @@
 [project]
 name = "anyllm"
-version = "0.8.0"
+version = "0.8.1"
 description = "Stop caring which LLM provider is underneath — one async completion contract with token/cost accounting and five backends (claude-code-cli/-sdk, codex-cli, anthropic-api, openai-compatible)."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
@@ -10,7 +10,7 @@ license = "Apache-2.0"
 dependencies = []
 
 [project.optional-dependencies]
-agent = ["any-agent>=0.1.3,<1"]
+agent = ["any-agent>=0.1.4,<1"]
 anthropic = ["anthropic>=0.40,<1"]
 openai = ["openai>=1.50"]
 claude-code-sdk = ["claude-agent-sdk>=0.1.80,<1"]

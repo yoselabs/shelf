@@ -34,6 +34,7 @@ def backend(request, monkeypatch):
 def test_success_and_launch_safeguards(backend, monkeypatch):
     provider, adapter, binary = backend
     monkeypatch.setenv("ANTHROPIC_API_KEY", "must-not-bill")
+    monkeypatch.setenv("CLAUDE_CODE_SIMPLE", "1")  # what --bare sets: it would hide the subscription login from claude
     specs = []
 
     def run(harness, spec, timeout):
@@ -62,6 +63,8 @@ def test_success_and_launch_safeguards(backend, monkeypatch):
     assert result.latency_ms >= 0
     spec = specs[0]
     assert "ANTHROPIC_API_KEY" not in spec.env
+    if binary == "claude":
+        assert "CLAUDE_CODE_SIMPLE" not in spec.env
     assert "--bare" not in spec.argv
     if binary == "claude":
         assert spec.argv[spec.argv.index("--output-format") + 1] == "json"
@@ -160,7 +163,7 @@ assert not anyllm.CodexCliAdapter().available()
     subprocess.run([sys.executable, "-c", code], check=True, capture_output=True)
     project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())["project"]
     assert project["dependencies"] == []
-    assert project["optional-dependencies"]["agent"] == ["any-agent>=0.1.3,<1"]
+    assert project["optional-dependencies"]["agent"] == ["any-agent>=0.1.4,<1"]
 
 
 def test_invalid_output_fails_loud(backend, monkeypatch):
@@ -172,3 +175,15 @@ def test_invalid_output_fails_loud(backend, monkeypatch):
     monkeypatch.setattr(provider.any_agent, "run", run)
     with pytest.raises(AnyLLMError):
         asyncio.run(adapter.complete(user="hello"))
+
+
+def test_an_environment_that_moves_the_lane_fails_loud_before_launch(monkeypatch):
+    provider = importlib.import_module("anyllm.providers.claude_code_cli")
+    monkeypatch.setattr(provider.shutil, "which", lambda _: "/bin/claude")
+    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+    run = Mock()
+    monkeypatch.setattr(provider.any_agent, "run", run)
+    with pytest.raises(AnyLLMError, match="CLAUDE_CODE_USE_BEDROCK") as caught:
+        asyncio.run(provider.ClaudeCodeCliAdapter().complete(user="hello"))
+    assert not caught.value.retryable
+    run.assert_not_called()
