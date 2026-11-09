@@ -305,6 +305,7 @@ def test_concurrent_book_and_phase_lose_and_double_count_nothing() -> None:
     clock = PhaseClock(now, exempt={"wait"}, elapsed=1000)
     errors: list[BaseException] = []
     start = threading.Barrier(16)
+    epsilon = 1e-9  # Float accumulation across thousands of transfers, not elapsed-time slack.
 
     def work(n: int) -> None:
         try:
@@ -316,7 +317,10 @@ def test_concurrent_book_and_phase_lose_and_double_count_nothing() -> None:
                 else:
                     clock.book(f"lane{n}", 0.001)
                 if i % 20 == 0:
-                    assert sum(clock.totals().values()) == pytest.approx(clock.wall(), abs=0.5)
+                    before = clock.wall()
+                    total = sum(clock.totals().values())
+                    after = clock.wall()
+                    assert before - epsilon <= total <= after + epsilon
                     clock.over()
                     clock.charged()
         except BaseException as exc:  # noqa: BLE001 - surfaced below
@@ -331,4 +335,4 @@ def test_concurrent_book_and_phase_lose_and_double_count_nothing() -> None:
     assert clock.current() == "run"
     totals = clock.totals()
     assert all(s >= 0 for s in totals.values())
-    assert sum(totals.values()) == pytest.approx(clock.wall())
+    assert sum(totals.values()) == pytest.approx(clock_t[0] - clock.started, rel=0, abs=epsilon)

@@ -15,9 +15,9 @@ class PhaseClock:
     """Time attributed to named phases; the innermost open phase owns the current instant.
 
     Entering a phase pauses the one around it; leaving resumes it. Time outside every `phase()` block belongs to
-    `root`, so no instant is unowned and `sum(totals().values()) == wall()` within float rounding (both share one clock read).
-    The clock cannot stop a caller
-    entering the wrong phase.
+    `root`, so no instant is unowned and total attributed time equals wall time at the same instant, within float rounding.
+    Separate totals() and wall() calls read the clock separately; time may advance between them.
+    The clock cannot stop a caller entering the wrong phase.
 
     Thread-safe: one lock guards all state, and no time is lost or counted twice under concurrent calls. The phase stack
     is shared by every thread, not kept per thread: `phase()` from two threads at once nests in arrival order (the
