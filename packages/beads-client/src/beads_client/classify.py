@@ -16,6 +16,15 @@ PUSH_REJECTED = re.compile(r"Updates were rejected|failed to push some refs|tip 
 # "Processes %s (bd/dolt) may be holding the lock."). Not yet captured from a live contention: pinned by tests as strings.
 LOCKED = re.compile(r"acquiring lock|failed to acquire .*lock|may be holding the lock", re.IGNORECASE)
 
+# Only complete issue-absence diagnostics are evidence of a missing task. Backend
+# errors can also say "not found"; an extra diagnostic must not erase that failure.
+_ISSUE_ABSENCE = re.compile(r"(?:Error:\s*)?(?:Issue\s+\S+\s+not found|no issues found matching the provided IDs)", re.IGNORECASE)
+
+
+def _only_issue_absence(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return bool(lines) and all(_ISSUE_ABSENCE.fullmatch(line) for line in lines)
+
 
 def loads(text: str) -> object:
     try:
@@ -29,7 +38,8 @@ def error_of(run: BdRun) -> BdError:
         return BdError("missing_binary" if run.code == EXIT_MISSING else "timeout", run.err.strip()[:500])
     said = loads(run.out)
     asked = said.get("error") if isinstance(said, dict) else None
-    text = f"{run.err}\n{asked if isinstance(asked, str) else run.out}".strip()[:500]
+    diagnostic = f"{run.err}\n{asked if isinstance(asked, str) else run.out}".strip()
+    text = diagnostic[:500]
     # unclaim reports a stale fence with exit 1, not 13
     if run.code == EXIT_PRECONDITION or "assignee mismatch" in text.lower() or "status mismatch" in text.lower():
         return BdError("precondition", text)
@@ -42,7 +52,7 @@ def error_of(run: BdRun) -> BdError:
         "not_claimable"
         if any(w in low for w in ("not claimable", "already claimed", "claimed by a different actor"))
         else "not_found"
-        if "not found" in low or "no issue" in low
+        if _only_issue_absence(diagnostic)
         else "other"
     )
     return BdError(kind, text)

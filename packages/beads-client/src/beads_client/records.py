@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from beads_client.errors import malformed
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @dataclass(frozen=True)
@@ -65,33 +68,59 @@ def _str(d: dict[str, Any], key: str) -> str:
     return v if isinstance(v, str) else ""
 
 
+def _text(d: Mapping[str, object], key: str) -> str:
+    value = d.get(key, "")
+    if not isinstance(value, str):
+        msg = f"present {key!r} must be text, got {type(value).__name__}"
+        raise malformed(msg)
+    return value
+
+
+def _dependency_value(d: Mapping[str, object], keys: tuple[str, str]) -> str:
+    values = [_text(d, key) for key in keys if key in d]
+    if not values or any(not value.strip() for value in values):
+        msg = f"dependency requires a nonempty {' or '.join(keys)}"
+        raise malformed(msg)
+    return values[0]
+
+
+def _dependencies(d: Mapping[str, object]) -> tuple[Dep, ...]:
+    if "dependencies" not in d:
+        return ()
+    rows = d["dependencies"]
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        msg = "present dependencies must be an array of dependency records"
+        raise malformed(msg)
+    return tuple(dep_of(row) for row in rows)
+
+
 def dep_of(d: dict[str, Any]) -> Dep:
     # `list` prints depends_on_id/type, `show` prints id/dependency_type
     return Dep(
-        id=_str(d, "id") or _str(d, "depends_on_id"),
-        type=_str(d, "dependency_type") or _str(d, "type"),
-        title=_str(d, "title"),
-        status=_str(d, "status"),
-        close_reason=_str(d, "close_reason"),
+        id=_dependency_value(d, ("id", "depends_on_id")),
+        type=_dependency_value(d, ("dependency_type", "type")),
+        title=_text(d, "title"),
+        status=_text(d, "status"),
+        close_reason=_text(d, "close_reason"),
     )
 
 
 def bead_of(d: dict[str, Any]) -> Bead:
-    prio, labels, deps, meta = d.get("priority"), d.get("labels"), d.get("dependencies"), d.get("metadata")
+    prio, labels, meta = d.get("priority"), d.get("labels"), d.get("metadata")
     return Bead(
         id=str(d["id"]),
-        title=_str(d, "title"),
+        title=_text(d, "title"),
         status=_str(d, "status"),
         issue_type=_str(d, "issue_type"),
         priority=prio if isinstance(prio, int) else None,
         assignee=_str(d, "assignee"),
         labels=tuple(sorted(x for x in labels if isinstance(x, str))) if isinstance(labels, list) else (),
         parent=_str(d, "parent"),
-        description=_str(d, "description"),
+        description=_text(d, "description"),
         design=_str(d, "design"),
-        acceptance_criteria=_str(d, "acceptance_criteria"),
+        acceptance_criteria=_text(d, "acceptance_criteria"),
         notes=_str(d, "notes"),
-        dependencies=tuple(dep_of(x) for x in deps if isinstance(x, dict)) if isinstance(deps, list) else (),
+        dependencies=_dependencies(d),
         metadata=dict(meta) if isinstance(meta, dict) else {},
         lease_expires_at=_str(d, "lease_expires_at"),
         close_reason=_str(d, "close_reason"),
