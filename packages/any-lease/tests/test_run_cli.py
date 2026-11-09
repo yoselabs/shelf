@@ -50,8 +50,9 @@ def test_sigterm_reaches_the_command_and_the_exit_code_says_so(tmp_path: Path) -
     root = tmp_path / "locks"
     script = textwrap.dedent(
         """
-        import signal, sys, time
-        signal.signal(signal.SIGTERM, lambda *_: (print("got term", flush=True), sys.exit(7)))
+        import os, signal, sys, time
+        # A handler can interrupt readiness while stdout holds its buffered-writer lock.
+        signal.signal(signal.SIGTERM, lambda *_: (os.write(1, b"got term\\n"), sys.exit(7)))
         print("ready", flush=True)
         time.sleep(60)
         """
@@ -60,8 +61,11 @@ def test_sigterm_reaches_the_command_and_the_exit_code_says_so(tmp_path: Path) -
     assert proc.stdout is not None
     assert proc.stdout.readline().strip() == "ready"
     proc.send_signal(signal.SIGTERM)
-    assert proc.wait(timeout=15) == 7
-    assert "got term" in proc.stdout.read()
+    out, err = proc.communicate(timeout=15)
+    assert proc.returncode == 7, (out, err)
+    assert "got term" in out
+    assert not err
+    assert Leases(root).holders("unity") == ()
 
 
 def test_a_nested_run_of_a_held_name_runs_without_waiting(tmp_path: Path) -> None:
