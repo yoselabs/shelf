@@ -70,3 +70,7 @@ Each fake instance represents its own configured backlog. Faults are persistent 
 take precedence over seeded records. `task_read_contract(make)` is a plain shared
 contract function; owning tests run it against both the semantic fake and real `Bd`
 with controlled transport. `Script` remains solely a transport fixture for library tests.
+
+The ready set has the same seam: `ReadyReadClient` exposes `ready(label="", /) -> list[Bead]`, and
+`FakeTaskReadClient(records, ready=("demo-1",), ready_fault=None)` seeds which records are ready, in order (it never
+computes readiness); `ready_read_contract(make)` checks fake and `Bd` alike.
