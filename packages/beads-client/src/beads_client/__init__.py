@@ -2,7 +2,7 @@
 
 from beads_client.client import TESTED_BELOW, TESTED_FROM, Bd, SyncResult
 from beads_client.errors import BdError, ErrorKind
-from beads_client.reads import TaskReadClient
+from beads_client.reads import ReadyReadClient, TaskReadClient
 from beads_client.records import Bead, Comment, Dep, NewBead
 from beads_client.runner import BdRun, Runner, subprocess_runner
 
@@ -17,6 +17,7 @@ __all__ = [
     "Dep",
     "ErrorKind",
     "NewBead",
+    "ReadyReadClient",
     "Runner",
     "SyncResult",
     "TaskReadClient",

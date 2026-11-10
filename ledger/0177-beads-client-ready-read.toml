@@ -1,0 +1,10 @@
+seq = 177
+date = "2026-11-10"
+event = "delivery"
+software = "beads-client"
+release = "beads-client-v0.2.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "pass"
+cost = ""
+note = "The existing Bd.ready becomes the structural ReadyReadClient; FakeTaskReadClient seeds the ready set and a whole-read fault without computing readiness, and ready_read_contract checks order, label filter, empty results, scheduling fields and typed failures against both. Additive minor release. Candidate contract; tag publication and consumer adoption are separate actions."

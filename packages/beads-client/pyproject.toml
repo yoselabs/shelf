@@ -1,6 +1,6 @@
 [project]
 name = "beads-client"
-version = "0.1.0"
+version = "0.2.0"
 description = "A lean, typed, fail-loud client over the bd (beads) CLI."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

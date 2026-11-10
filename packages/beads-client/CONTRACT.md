@@ -23,8 +23,13 @@ records requested IDs; record snapshots are isolated from caller mutation. No ru
 `task_read_contract(make)` checks success, empty text, dependency preservation, absence, independent backlogs and typed
 read failures against both this fake and `Bd` over a controlled Runner.
 
+`ReadyReadClient` exposes the existing `ready(label)` read: the tracker's ready set in its own order, label-filtered, `[]`
+when empty, `BdError` on any failure. `FakeTaskReadClient(..., ready=ids, ready_fault=...)` seeds readiness (never
+computes it); ready ids must be unique seeded records, per-id `faults` apply to `show` only, `ready_reads` records labels.
+`ready_read_contract(make)` checks both.
+
 `update(..., if_assignee=, if_status=)` passes bd's fences; exit 13 is
 `precondition`. `claim` and `unclaim` answer whether the bead changed hands. `sync` never raises for bd's refusal.
 
 Executable acceptance: `tests/test_reads.py`, `tests/test_writes.py`, `tests/test_classify.py` over recorded bd 1.3.1 JSON in
-`tests/fixtures/`, `tests/test_task_read.py` for the shared semantic contract, and `tests/test_boundary_beads_client.py` (stdlib only, no consumer imported).
+`tests/fixtures/`, `tests/test_task_read.py` and `tests/test_ready_read.py` for the shared semantic contracts, and `tests/test_boundary_beads_client.py` (stdlib only, no consumer imported).
