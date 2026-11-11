@@ -663,6 +663,27 @@ def _calls(world: World, name: str, call: str) -> None:
     world.result = _call(world, name, call)
 
 
+def _refs_head_status(world: World, name: str) -> object:
+    wt = world.wts[name]
+    return (wt.repo.refs([]), world.rig.head(wt), wt.branch(), wt.repo.worktree_state(wt.path))
+
+
+@given(parsers.parse('"{name}" remembers its refs, head and status'))
+def _remember_refs_head_status(world: World, name: str) -> None:
+    world.memory[f"refs-head-status:{name}"] = _refs_head_status(world, name)
+
+
+@then(parsers.parse('the refs, head and status of "{name}" are unchanged'))
+def _refs_head_status_unchanged(world: World, name: str) -> None:
+    assert _refs_head_status(world, name) == world.memory[f"refs-head-status:{name}"]
+
+
+@then(parsers.parse('the author and committer of "{rev}" in "{name}" are "{who}"'))
+def _author_and_committer(world: World, rev: str, name: str, who: str) -> None:
+    shown = run(world.wts[name].path, "show", "-s", "--format=%an <%ae>%n%cn <%ce>", _expand(world, rev))
+    assert shown.strip().splitlines() == [who, who]
+
+
 @given(parsers.parse('"{name}" adds a worktree "{rel}" at "{rev}" as "{label}"'))
 @when(parsers.parse('"{name}" adds a worktree "{rel}" at "{rev}" as "{label}"'))
 def _worktree(world: World, name: str, rel: str, rev: str, label: str) -> None:

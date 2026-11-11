@@ -2383,3 +2383,167 @@ Feature: One Repo and Worktree, real or fake
     When "r" writes c.txt="ripgrep too\n"
     And "r" calls grep_tracked("ripgrep")
     Then the result is ["a.txt"]
+
+  # -- squash: one commit in Git objects, never a checkout ---------------------------------------------
+  Scenario: A branch squashes onto a moved target as one commit whose parent is the target
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n2\n3\n", b.txt="b\n"
+    And "r" calls checkout_new("task")
+    And "r" commits "first" with a.txt="one\n2\n3\n"
+    And "r" commits "second" with c.txt="c\n"
+    And "r" calls checkout("main")
+    And "r" commits "moved" with a.txt="1\n2\nthree\n"
+    And "r" remembers its head as "target"
+    And "r" writes a.txt="edited, not staged\n"
+    And "r" stages ["a.txt"]
+    And "r" remembers its refs, head and status
+    When "r" remembers squash("main", "task", "land the task\n\nbody\n").sha as "s"
+    Then the refs, head and status of "r" are unchanged
+    When "r" calls history(["<mem:s>"], limit=2)
+    Then the subject of each result entry is ["land the task", "moved"]
+    And the sha of each result entry is ["<mem:s>", "<mem:target>"]
+    When "r" calls tree("<mem:s>")
+    Then the tree lists ["a.txt", "b.txt", "c.txt"]
+    And the tree reads "a.txt" as "one\n2\nthree\n"
+    And the tree reads "c.txt" as "c\n"
+
+  Scenario: The squash's tree id is the tree its commit holds
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    And "r" calls checkout_new("task")
+    And "r" commits "work" with b.txt="b\n"
+    And "r" remembers snapshot("HEAD").tree as "task_tree"
+    And "r" calls checkout("main")
+    When "r" calls squash("main", "task", "land")
+    Then the result is a Squashed
+    And the result's tree is "<mem:task_tree>"
+
+  Scenario: A squash of work already on the target holds the target's tree
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    And "r" calls checkout_new("task")
+    And "r" commits "work" with b.txt="b\n"
+    And "r" calls checkout("main")
+    And "r" commits "landed by hand" with b.txt="b\n"
+    And "r" remembers snapshot("HEAD").tree as "main_tree"
+    When "r" calls squash("main", "task", "land")
+    Then the result is a Squashed
+    And the result's tree is "<mem:main_tree>"
+    When "r" calls squash("main", "main", "nothing")
+    Then the result is a Squashed
+    And the result's tree is "<mem:main_tree>"
+
+  Scenario: A conflicting squash names each conflicted path once and makes nothing
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n", b.txt="b\n", "my file"="x\n"
+    And "r" calls checkout_new("task")
+    And "r" commits "work" with a.txt="task\n", "my file"="task\n", b.txt="b\nmore\n"
+    And "r" calls checkout("main")
+    And "r" commits "moved" with a.txt="main\n", "my file"="main\n"
+    And "r" remembers its refs, head and status
+    When "r" calls squash("main", "task", "land")
+    Then the result is a Conflicted
+    And the result's paths are ["a.txt", "my file"]
+    And the refs, head and status of "r" are unchanged
+
+  Scenario: A squash refuses missing and option-like revisions
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    When "r" tries squash("main", "absent", "land")
+    Then the call raises MissingRevision
+    When "r" tries squash("-x", "main", "land")
+    Then the call raises ValueError
+
+  Scenario: A squash runs no hook
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    And "r" calls checkout_new("task")
+    And "r" commits "work" with b.txt="b\n"
+    And "r" calls checkout("main")
+    And "r" has a pre-commit hook that refuses
+    When "r" calls squash("main", "task", "land")
+    Then the result is a Squashed
+
+  @real_only
+  Scenario: A squash is never signed and runs no commit hook (the fake has neither)
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    And "r" has a post-commit hook that refuses
+    And "r" config "commit.gpgSign" is "true"
+    And "r" config "gpg.program" is "false"
+    When "r" calls squash("main", "main", "land")
+    Then the result is a Squashed
+
+  @real_only
+  Scenario: A squash's author and committer are the configured identity (the fake has no authors)
+    Given the machine has no git identity
+    And a repository "r"
+    And "r" config "user.name" is "Config Author"
+    And "r" config "user.email" is "config@example.invalid"
+    And "r" commits "root" with a.txt="1\n"
+    When "r" remembers squash("main", "main", "land").sha as "s"
+    Then the author and committer of "<mem:s>" in "r" are "Config Author <config@example.invalid>"
+
+  @real_only
+  Scenario: A squash's author and committer are the injected identity over the config (the fake has no authors)
+    Given the repositories commit as "Injected Author"
+    And a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    When "r" remembers squash("main", "main", "land").sha as "s"
+    Then the author and committer of "<mem:s>" in "r" are "Injected Author <injected@example.invalid>"
+
+  Scenario: A squash onto origin's moved tip is on origin only once pushed
+    Given an origin "o"
+    And the origin "o" holds a="root"
+    And "r" is a clone of the origin "o"
+    And "r" calls checkout_new("task/x")
+    And "r" commits "work" with b="task"
+    And the origin "o" advances "main" with c="moved"
+    And "r" calls fetch("origin", refspecs=["+refs/heads/main:refs/remotes/origin/main"])
+    And "r" remembers history(["origin/main"], limit=1).0.sha as "moved"
+    And "r" remembers its refs, head and status
+    When "r" remembers squash("origin/main", "task/x", "land").sha as "s"
+    Then the refs, head and status of "r" are unchanged
+    When "r" calls ls_remote("origin", ["refs/heads/main"])
+    Then the oid of each result entry is ["<mem:moved>"]
+    When "r" calls history(["<mem:s>"], limit=2)
+    Then the sha of each result entry is ["<mem:s>", "<mem:moved>"]
+    When "r" calls push_refspecs("origin", ["<mem:s>:refs/heads/main"])
+    Then the result is a Pushed
+    When "r" calls ls_remote("origin", ["refs/heads/main"])
+    Then the oid of each result entry is ["<mem:s>"]
+
+  # -- the push URL ------------------------------------------------------------------------------------
+  Scenario: The push URL is the fetch URL when nothing redirects pushes
+    Given an origin "o"
+    And "r" is a clone of the origin "o"
+    When "r" calls remote_url("origin", push=True)
+    Then the result is "<mem:origin:o>"
+    When "r" tries remote_url("missing", push=True)
+    Then the call raises MissingRemote
+
+  Scenario Outline: The push URL follows pushurl, pushInsteadOf and insteadOf
+    Given an origin "o"
+    And "r" is a clone of the origin "o"
+    And "r" config "<key>" is "<value>"
+    When "r" calls remote_url("origin")
+    Then the result is "<fetch>"
+    When "r" calls remote_url("origin", push=True)
+    Then the result is "<push>"
+
+    Examples:
+      | key                         | value               | fetch           | push               |
+      | remote.origin.pushurl       | <root>/elsewhere.git | <mem:origin:o>  | <root>/elsewhere.git |
+      | url.pushed/.pushInsteadOf   | <root>/             | <mem:origin:o>  | pushed/o.git       |
+      | url.expanded/.insteadOf     | <root>/             | expanded/o.git  | expanded/o.git     |
+
+  Scenario: An explicit pushurl ignores pushInsteadOf but takes insteadOf
+    Given an origin "o"
+    And "r" is a clone of the origin "o"
+    And "r" config "remote.origin.pushurl" is "<root>/elsewhere.git"
+    And "r" config "url.pushed/.pushInsteadOf" is "<root>/"
+    When "r" calls remote_url("origin", push=True)
+    Then the result is "<root>/elsewhere.git"
+    When "r" config "url.expanded/.insteadOf" becomes "<root>/"
+    And "r" calls remote_url("origin", push=True)
+    Then the result is "expanded/elsewhere.git"

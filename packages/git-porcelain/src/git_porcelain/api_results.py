@@ -18,6 +18,7 @@ __all__ = [
     "Change",
     "CommandResult",
     "Conflict",
+    "Conflicted",
     "Diff",
     "Dirty",
     "FinishResult",
@@ -46,6 +47,8 @@ __all__ = [
     "RepoIdentity",
     "Sha",
     "Snapshot",
+    "SquashResult",
+    "Squashed",
     "StillHeld",
     "SyncResult",
     "Synced",
@@ -315,6 +318,21 @@ class Conflict:
 
 
 @dataclass(frozen=True)
+class Squashed:
+    """``Repo.squash`` made one commit: ``sha`` (parent ``onto``) and its ``tree``. No ref names it yet."""
+
+    sha: Sha
+    tree: TreeId
+
+
+@dataclass(frozen=True)
+class Conflicted:
+    """``Repo.squash`` could not merge ``head`` onto ``onto``: the conflicted paths, each once. Nothing was made."""
+
+    paths: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Aborted(_Output):
     head: Sha
     output: str = ""
@@ -395,6 +413,7 @@ RebaseResult = UpToDate | Rebased | Conflict
 FinishResult = Rebased | Conflict | Aborted
 PushResult = Pushed | Rejected | Transient | HookRejected | RemoteRejected
 SyncResult = Synced | Offline
+SquashResult = Squashed | Conflicted
 
 
 @dataclass(frozen=True)

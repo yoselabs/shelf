@@ -27,6 +27,7 @@ from git_porcelain import (
     real_operations,
     real_read,
     real_remote,
+    real_squash,
     real_worktrees,
     real_write,
 )
@@ -55,6 +56,7 @@ if TYPE_CHECKING:
         RepoIdentity,
         Sha,
         Snapshot,
+        SquashResult,
         StillHeld,
         SyncResult,
         TakeResult,
@@ -239,8 +241,11 @@ class RealRepo:
     def cherry(self, upstream: str, head: str) -> tuple[Pick, ...]:
         return real_observe.cherry(self, upstream, head)
 
-    def remote_url(self, remote: str) -> str:
-        return real_observe.remote_url(self, remote)
+    def remote_url(self, remote: str, *, push: bool = False) -> str:
+        return real_observe.remote_url(self, remote, push=push)
+
+    def squash(self, onto: str, head: str, message: str) -> SquashResult:
+        return real_squash.squash(self, onto, head, message)
 
     def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> CommandResult:
         return real_remote.fetch(self, remote, refspecs, timeout)
