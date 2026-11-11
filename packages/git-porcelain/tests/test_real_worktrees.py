@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
-from git_porcelain import GitUnavailable, Identity, IndexLocked, NotARepo, RealRepo, WorktreeRemoveRefused
+from git_porcelain import GitUnavailable, Identity, IndexLocked, NotARepo, RealRepo, Recorded, WorktreeRemoveRefused
 from git_porcelain.real_done import Done
 from git_porcelain.testing import apply_hermetic_env, git
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def test_worktree_state_preserves_bytes_and_asks_each_time(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -144,3 +141,59 @@ def test_identity_is_canonical_across_linked_and_symlinked_paths(
     assert all(value.common_dir == common.resolve() for value in identities)
     assert len({value.key for value in identities}) == 1
     assert all(value.origin_url is None for value in identities)
+
+
+def _hostile(tmp_path: Path, mark: Path) -> Path:
+    """A git directory whose clean filter and post-commit hook each leave ``mark``: what a swapped pointer would name."""
+    hostile = tmp_path / "hostile"
+    hostile.mkdir()
+    git(hostile, "init", "-q", "-b", "main")
+    git(hostile, "commit", "--allow-empty", "-qm", "seed")
+    git(hostile, "config", "filter.mark.clean", f"touch {mark} && cat")
+    git(hostile, "config", "filter.mark.required", "true")
+    for folder in ("info", "hooks"):
+        (hostile / ".git" / folder).mkdir(exist_ok=True)
+    (hostile / ".git" / "info" / "attributes").write_text("* filter=mark\n", encoding="utf-8")
+    hook = hostile / ".git" / "hooks" / "post-commit"
+    hook.write_text(f"#!/bin/sh\ntouch {mark}\n", encoding="utf-8")
+    hook.chmod(0o755)
+    return hostile / ".git"
+
+
+def test_a_pinned_checkout_keeps_its_verified_git_directory_after_the_pointer_is_swapped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    apply_hermetic_env(monkeypatch, identity=Identity("Test", "test@example.invalid"), home=tmp_path / "home")
+    main = tmp_path / "main"
+    main.mkdir()
+    git(main, "init", "-q", "-b", "main")
+    git(main, "commit", "--allow-empty", "-qm", "seed")
+    slot = tmp_path / "slot"
+    git(main, "worktree", "add", "-q", "-b", "task", str(slot), "HEAD")
+    verified = Path(git(slot, "rev-parse", "--absolute-git-dir").strip())
+    wt = RealRepo(slot, memoize=False, pins={slot: verified}).worktree(slot)
+    mark = tmp_path / "mark"
+    hostile = _hostile(tmp_path, mark)
+
+    (slot / ".git").write_text(f"gitdir: {hostile}\n", encoding="utf-8")
+    (slot / "note.txt").write_text("hello\n", encoding="utf-8")
+    wt.stage(["note.txt"])
+    made = wt.record("pinned", paths="staged", hooks=True)
+
+    assert isinstance(made, Recorded)
+    assert git(main, "log", "-1", "--format=%H %s", "task").split() == [made.sha, "pinned"]
+    assert git(hostile.parent, "log", "--format=%s").split() == ["seed"]
+    assert not mark.exists()
+    (slot / ".git").unlink()  # gone after the check: still the pin, never a discovered enclosing repository
+    assert wt.branch() == "task"
+
+
+def test_a_checkout_without_a_pin_is_not_a_repo_and_runs_no_git(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q", "-b", "main")
+    ran: list[tuple[str, ...]] = []
+    repo = RealRepo(tmp_path, pins={}, observer=ran.append)
+    with pytest.raises(NotARepo, match="no pinned git directory"):
+        repo.identity()
+    with pytest.raises(NotARepo):
+        repo.worktree(tmp_path).health()
+    assert ran == []

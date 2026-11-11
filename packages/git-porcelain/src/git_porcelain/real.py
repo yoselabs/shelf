@@ -30,7 +30,7 @@ from git_porcelain import (
     real_worktrees,
     real_write,
 )
-from git_porcelain.errors import GitTimeout, GitUnavailable
+from git_porcelain.errors import GitTimeout, GitUnavailable, NotARepo
 from git_porcelain.real_done import Done, unavailable
 
 if TYPE_CHECKING:
@@ -96,7 +96,14 @@ def _trace_hooks(trace: Path) -> tuple[tuple[str, ...], tuple[tuple[str, int], .
 
 
 class RealRepo:
-    """The git binary behind :class:`~git_porcelain.api.Repo`. ``path`` is any checkout of the repository."""
+    """The git binary behind :class:`~git_porcelain.api.Repo`. ``path`` is any checkout of the repository.
+
+    ``pins`` maps each checkout path this repo may run in (``path`` and every worktree view, keyed by the exact path
+    they are opened with) to the git directory the caller verified. Every call in a pinned checkout then sets
+    ``GIT_DIR`` and ``GIT_WORK_TREE`` from that value and never reads ``<checkout>/.git``, so a pointer swapped after the
+    caller's check is not followed; a call in a checkout with no pin raises :class:`NotARepo` before any git process
+    runs (no discovery either). Without ``pins``, each call reads the checkout's ``.git`` entry as it is then.
+    """
 
     def __init__(
         self,
@@ -109,8 +116,10 @@ class RealRepo:
         remote_timeout: float = 600.0,
         sleep: Callable[[float], None] = time.sleep,
         observer: Callable[[tuple[str, ...]], None] | None = None,
+        pins: Mapping[Path, Path] | None = None,
     ) -> None:
         self.path = path
+        self.pins = None if pins is None else dict(pins)
         self.who = identity
         self.extra_env = dict(env or {})
         # A snapshot of the ambient environment, taken once: every call then skips the os.environ scan and the PATH
@@ -141,7 +150,7 @@ class RealRepo:
         if (shutil.which("git") if self._git is False else self._git) is None:
             msg = "git not found on PATH"
             raise GitUnavailable(msg, hint="install git")
-        pin_env = real_env.pinned(cwd) if pin else {}
+        pin_env = self._checkout_pin(cwd) if pin or self.pins is not None else {}
         extra = {**self.extra_env, **pin_env, **(env or {})}
         child = real_env.base(extra) if self._ambient is None else {**self._ambient, **extra}
         if self.observer is not None:
@@ -177,6 +186,20 @@ class RealRepo:
         if check and result.rc != 0:
             raise unavailable(args, result)
         return result
+
+    def git_dir(self, checkout: Path) -> Path | None:
+        """The git directory of ``checkout``: its pin when this repo has ``pins`` (None when it has none), else what its
+        ``.git`` entry names now."""
+        return real_env.git_dir(checkout) if self.pins is None else self.pins.get(checkout)
+
+    def _checkout_pin(self, cwd: Path) -> dict[str, str]:
+        if self.pins is None:
+            return real_env.pinned(cwd)
+        found = self.pins.get(cwd)
+        if found is None:
+            msg = f"{cwd}: no pinned git directory"
+            raise NotARepo(msg, hint="open the RealRepo with pins={checkout: git_dir} for every checkout it runs in")
+        return {"GIT_DIR": str(found), "GIT_WORK_TREE": str(cwd)}
 
     # -- the memo --------------------------------------------------------------------------------------
     def memo[T](self, key: object, compute: Callable[[], T], *, forever: bool = True) -> T:
