@@ -244,6 +244,9 @@ class RealRepo:
     def remote_url(self, remote: str, *, push: bool = False) -> str:
         return real_observe.remote_url(self, remote, push=push)
 
+    def remote_urls(self, remote: str, *, push: bool = False) -> tuple[str, ...]:
+        return real_observe.remote_urls(self, remote, push=push)
+
     def squash(self, onto: str, head: str, message: str) -> SquashResult:
         return real_squash.squash(self, onto, head, message)
 

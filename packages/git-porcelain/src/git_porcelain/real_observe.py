@@ -92,14 +92,23 @@ def cherry(repo: RealRepo, upstream: str, head: str) -> tuple[Pick, ...]:
     return tuple(rows)
 
 
-def remote_url(repo: RealRepo, remote: str, *, push: bool = False) -> str:
-    done = _read(repo, "remote", "get-url", *(["--push"] if push else []), "--", remote)
+def _get_url(repo: RealRepo, remote: str, *flags: str) -> str:
+    done = _read(repo, "remote", "get-url", *flags, "--", remote)
     if done.rc == 2 and done.err.strip() == f"error: No such remote '{remote}'":
         raise MissingRemote(done.err.strip())
     if done.rc or not done.out.strip():
         msg = f"remote get-url failed: {done.out}{done.err}"
         raise GitReadFailure(msg)
-    return done.out.strip()
+    return done.out
+
+
+def remote_url(repo: RealRepo, remote: str, *, push: bool = False) -> str:
+    return _get_url(repo, remote, *(["--push"] if push else [])).strip()
+
+
+def remote_urls(repo: RealRepo, remote: str, *, push: bool = False) -> tuple[str, ...]:
+    """``remote get-url --all [--push]``: one URL per line, in configuration order."""
+    return tuple(line for line in _get_url(repo, remote, "--all", *(["--push"] if push else [])).splitlines() if line)
 
 
 def rebasing(wt: RealWorktree) -> bool:

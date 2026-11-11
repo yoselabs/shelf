@@ -161,6 +161,7 @@ class RepoState:
     symbolic_refs: dict[str, str] = field(default_factory=dict)
     default_branch: str = "main"
     config: dict[str, str] = field(default_factory=dict)
+    more_config: dict[str, list[str]] = field(default_factory=dict)  # a multi-valued key's values after the first
     remotes: dict[str, str] = field(default_factory=dict)
     remote_repos: dict[str, RepoState] = field(default_factory=dict)
     worktrees: dict[Path, CheckoutState] = field(default_factory=dict)

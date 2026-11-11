@@ -146,6 +146,16 @@ class FakeRepo:
 
     def set_config(self, key: str, value: str) -> None:
         self._state.config[key.lower()] = value
+        self._state.more_config.pop(key.lower(), None)
+
+    def add_config(self, key: str, value: str) -> None:
+        """``git config --add``: one more value of a multi-valued key (a remote's second ``url`` or ``pushurl``)."""
+        name = key.lower()
+        first = name in self._state.config or any(name == f"remote.{remote}.url" for remote in self._state.remotes)
+        if first:
+            self._state.more_config.setdefault(name, []).append(value)
+        else:
+            self._state.config[name] = value
 
     def plumbing(self) -> FakePlumbing:
         """The public path-based functions over this repository's state."""
@@ -191,6 +201,10 @@ class FakeRepo:
     def remote_url(self, remote: str, *, push: bool = False) -> str:
         self._read_anchor()
         return fake_remote.remote_url(self._state, remote, push=push)
+
+    def remote_urls(self, remote: str, *, push: bool = False) -> tuple[str, ...]:
+        self._read_anchor()
+        return fake_remote.remote_urls(self._state, remote, push=push)
 
     def squash(self, onto: str, head: str, message: str) -> SquashResult:
         return fake_squash.squash(self._state, self._anchor(), onto, head, message)

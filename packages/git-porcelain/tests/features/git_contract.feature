@@ -2537,6 +2537,40 @@ Feature: One Repo and Worktree, real or fake
       | url.pushed/.pushInsteadOf   | <root>/             | <mem:origin:o>  | pushed/o.git       |
       | url.expanded/.insteadOf     | <root>/             | expanded/o.git  | expanded/o.git     |
 
+  Scenario: Every URL of a remote: a push goes to each pushurl, else to each url
+    Given an origin "o"
+    And "r" is a clone of the origin "o"
+    When "r" calls remote_urls("origin")
+    Then the result is ["<mem:origin:o>"]
+    When "r" calls remote_urls("origin", push=True)
+    Then the result is ["<mem:origin:o>"]
+    When "r" tries remote_urls("missing", push=True)
+    Then the call raises MissingRemote
+
+  Scenario: A second url is listed on both sides; the first stays the one URL
+    Given an origin "o"
+    And "r" is a clone of the origin "o"
+    And "r" config "remote.origin.url" also has "<root>/second.git"
+    And "r" config "url.expanded/.insteadOf" is "<root>/second"
+    When "r" calls remote_urls("origin")
+    Then the result is ["<mem:origin:o>", "expanded/.git"]
+    When "r" calls remote_urls("origin", push=True)
+    Then the result is ["<mem:origin:o>", "expanded/.git"]
+    When "r" calls remote_url("origin", push=True)
+    Then the result is "<mem:origin:o>"
+
+  Scenario: Every pushurl is listed on the push side only
+    Given an origin "o"
+    And "r" is a clone of the origin "o"
+    And "r" config "remote.origin.pushurl" is "<root>/a.git"
+    And "r" config "remote.origin.pushurl" also has "<root>/b.git"
+    When "r" calls remote_urls("origin", push=True)
+    Then the result is ["<root>/a.git", "<root>/b.git"]
+    When "r" calls remote_urls("origin")
+    Then the result is ["<mem:origin:o>"]
+    When "r" calls remote_url("origin", push=True)
+    Then the result is "<root>/a.git"
+
   Scenario: An explicit pushurl ignores pushInsteadOf but takes insteadOf
     Given an origin "o"
     And "r" is a clone of the origin "o"
