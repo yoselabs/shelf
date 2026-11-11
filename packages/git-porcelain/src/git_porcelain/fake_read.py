@@ -140,7 +140,11 @@ def dirty(repo: RepoState, wt: CheckoutState, *, base: str | None, ignored_under
         mine = ignore_of(repo, wt)
         prefixes = tuple(p.rstrip("/") for p in ignored_under)
         ignored = tuple(
-            sorted(p for p in wt.files if p not in wt.index and mine.ignores(p) and any(p == q or p.startswith(q + "/") for q in prefixes))
+            sorted(
+                p
+                for p in wt.files
+                if p not in wt.index and mine.ignores(p) and any(q in {".", p} or p.startswith(q + "/") for q in prefixes)
+            )
         )
     return Dirty(tuple(tracked), untracked, ignored_by_base, ignored)
 

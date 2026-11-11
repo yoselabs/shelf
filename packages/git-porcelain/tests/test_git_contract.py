@@ -590,6 +590,16 @@ def _writes(world: World, name: str, files: str) -> None:
         world.rig.write(world.wts[name], rel, text)
 
 
+@when(parsers.parse('"{name}" makes a nested repository "{rel}" holding {files}'))
+def _nested_repository(world: World, name: str, rel: str, files: str) -> None:
+    wt = world.wts[name]
+    assert not isinstance(wt, FakeWorktree), "FakeRepo holds no nested repositories"
+    (wt.path / rel).mkdir(parents=True)
+    run(wt.path / rel, "init", "-q")
+    for path, text in _files(files):
+        world.rig.write(wt, f"{rel}/{path}", text)
+
+
 @given(parsers.re(r'"(?P<name>\w+)" stages (?P<paths>\[.*\])'))
 @when(parsers.re(r'"(?P<name>\w+)" stages (?P<paths>\[.*\])'))
 def _stages(world: World, name: str, paths: str) -> None:

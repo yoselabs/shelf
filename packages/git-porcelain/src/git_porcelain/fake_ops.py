@@ -140,8 +140,10 @@ def make_commit(repo: RepoState, wt: CheckoutState, message: str, parents: tuple
     return made.sha
 
 
-def clean(repo: RepoState, wt: CheckoutState, keep: Sequence[str], *, ignored: bool = False) -> None:
-    """Remove untracked files except keep patterns; optionally include ignored files."""
+def clean(repo: RepoState, wt: CheckoutState, keep: Sequence[str], *, ignored: bool = False, nested: bool = False) -> None:
+    """Remove untracked files except keep patterns; optionally include ignored files. The model holds no nested
+    repositories, so ``nested`` changes nothing here."""
+    del nested
     lines = [] if ignored else [*repo.info_exclude, *wt.files.get(".gitignore", b"").decode("utf-8", "replace").splitlines()]
     ignore = Ignore([*lines, *keep])
     for path in [p for p in wt.files if p not in wt.index and not ignore.ignores(p)]:

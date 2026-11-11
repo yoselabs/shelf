@@ -279,8 +279,9 @@ class Worktree(Protocol):
         """Create and check out a branch exclusively; ``BranchExists`` if already present."""
         ...
 
-    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False) -> None:
-        """Remove untracked files except keep patterns; optionally remove ignored files too."""
+    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False, nested: bool = False) -> None:
+        """Remove untracked files except keep patterns; optionally remove ignored files too. ``nested`` also removes
+        nested repositories (directories holding their own ``.git``; ``git clean -ff``), which git skips otherwise."""
         ...
 
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
@@ -312,7 +313,8 @@ class Worktree(Protocol):
 
     def dirty(self, base: str | None = None, *, ignored_under: Sequence[str] = ()) -> Dirty:
         """Tracked and untracked changes in one read. With ``base``, also the untracked paths that base's
-        ``.gitignore`` files would ignore; with ``ignored_under``, the ignored files below those prefixes."""
+        ``.gitignore`` files would ignore; with ``ignored_under``, the ignored files below those prefixes (``"."`` is the
+        whole checkout; a nested repository in an ignored directory is listed as that directory, with a trailing ``/``)."""
         ...
 
     def record(

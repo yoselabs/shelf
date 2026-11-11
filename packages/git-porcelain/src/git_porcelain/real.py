@@ -332,8 +332,8 @@ class RealWorktree:
     def checkout_new(self, branch: str, start: str = "HEAD") -> None:
         real_checkout.checkout_new(self, branch, start)
 
-    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False) -> None:
-        real_checkout.clean(self, keep, ignored=ignored)
+    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False, nested: bool = False) -> None:
+        real_checkout.clean(self, keep, ignored=ignored, nested=nested)
 
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
         real_checkout.reset(self, rev, mode=mode)

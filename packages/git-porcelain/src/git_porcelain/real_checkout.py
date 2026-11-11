@@ -56,10 +56,11 @@ def checkout_new(wt: RealWorktree, branch: str, start: str) -> None:
         wt.repo.invalidate()
 
 
-def clean(wt: RealWorktree, keep: Sequence[str], *, ignored: bool) -> None:
-    """Remove untracked files, preserving the supplied exclusion patterns."""
+def clean(wt: RealWorktree, keep: Sequence[str], *, ignored: bool, nested: bool) -> None:
+    """Remove untracked files, preserving the supplied exclusion patterns; a second ``-f`` takes nested repositories."""
+    flags = "-f" + ("f" if nested else "") + "d" + ("x" if ignored else "") + "q"
     try:
-        wt.run("clean", "-fdxq" if ignored else "-fdq", *(arg for pattern in keep for arg in ("-e", pattern)))
+        wt.run("clean", flags, *(arg for pattern in keep for arg in ("-e", pattern)))
     finally:
         wt.repo.invalidate()
 

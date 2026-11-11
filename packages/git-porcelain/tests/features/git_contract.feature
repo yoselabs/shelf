@@ -1580,8 +1580,28 @@ Feature: One Repo and Worktree, real or fake
     And "r" calls dirty(ignored_under=["build"])
     Then the result's ignored is ["build/a.log"]
     And the result's untracked is ["build/keep.txt"]
+    When "r" calls dirty(ignored_under=["."])
+    Then the result's ignored is ["build/a.log", "other/b.log"]
     When "r" calls dirty()
     Then the result's ignored is []
+
+  @real_only
+  Scenario: A nested repository in an ignored folder survives an ignored clean and goes with nested (the fake has none)
+    Given a repository "r"
+    And "r" commits "base" with .gitignore=".venv/\n", a.txt="a\n"
+    When "r" writes .venv/lib/x.py="x\n"
+    And "r" makes a nested repository ".venv/src/dep" holding f.txt="f\n"
+    And "r" calls clean(ignored=True)
+    Then the file ".venv/src/dep/f.txt" of "r" holds "f\n"
+    And the file ".venv/lib/x.py" of "r" is absent
+    When "r" calls dirty(ignored_under=["."])
+    Then the result's ignored is [".venv/src/dep/"]
+    When "r" calls clean(ignored=True, nested=True)
+    Then the file ".venv/src/dep/f.txt" of "r" is absent
+    And the file "a.txt" of "r" holds "a\n"
+    When "r" calls dirty(ignored_under=["."])
+    Then the result's ignored is []
+    And the result's untracked is []
 
   # -- record ------------------------------------------------------------------------------------------
   Scenario: Own paths leave out what the base would ignore, all paths take everything

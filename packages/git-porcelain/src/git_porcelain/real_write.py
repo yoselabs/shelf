@@ -208,7 +208,7 @@ def _hook_rejection(output: str) -> bool:
 
 def _clean(wt: RealWorktree, clean_keep: Sequence[str] | None) -> None:
     if clean_keep is not None:
-        real_checkout.clean(wt, clean_keep, ignored=False)
+        real_checkout.clean(wt, clean_keep, ignored=False, nested=False)
 
 
 def _same(a: Path, b: Path) -> bool:
