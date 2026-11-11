@@ -28,6 +28,7 @@ from git_porcelain.api_results import (
     Change,
     CommandResult,
     Conflict,
+    Conflicted,
     Diff,
     Dirty,
     FinishResult,
@@ -56,6 +57,8 @@ from git_porcelain.api_results import (
     RepoIdentity,
     Sha,
     Snapshot,
+    Squashed,
+    SquashResult,
     StillHeld,
     Synced,
     SyncResult,
@@ -79,6 +82,7 @@ __all__ = [
     "Change",
     "CommandResult",
     "Conflict",
+    "Conflicted",
     "Diff",
     "Dirty",
     "FinishResult",
@@ -109,6 +113,8 @@ __all__ = [
     "RepoIdentity",
     "Sha",
     "Snapshot",
+    "SquashResult",
+    "Squashed",
     "StillHeld",
     "SyncResult",
     "Synced",
@@ -160,8 +166,17 @@ class Repo(Protocol):
         """Non-merge picks in git cherry order with patch equivalence."""
         ...
 
-    def remote_url(self, remote: str) -> str:
-        """Expanded fetch URL; MissingRemote only for a missing named remote."""
+    def remote_url(self, remote: str, *, push: bool = False) -> str:
+        """Expanded fetch URL (``insteadOf`` applied); with ``push``, the URL a push goes to (``remote get-url --push``:
+        the first ``pushurl``, else ``pushInsteadOf`` or ``insteadOf`` over the URL). MissingRemote only for a missing
+        named remote."""
+        ...
+
+    def squash(self, onto: str, head: str, message: str) -> SquashResult:
+        """One commit whose parent is ``onto`` and whose tree is ``head``'s changes merged onto ``onto`` (their merge
+        base as the base), made in Git objects only: no checkout, index, ref or hook is touched and nothing is signed.
+        ``Conflicted`` with the conflicted paths when the merge does not resolve. Author and committer are the
+        repository's identity. Missing revisions raise MissingRevision, unrelated histories GitUnavailable."""
         ...
 
     def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> CommandResult:

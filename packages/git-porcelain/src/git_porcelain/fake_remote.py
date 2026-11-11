@@ -25,20 +25,29 @@ def _source(state: RepoState, remote: str) -> tuple[str, RepoState]:
     return name, there
 
 
-def remote_url(state: RepoState, remote: str) -> str:
+def _rewrite(state: RepoState, url: str, suffix: str) -> str | None:
+    """``url`` with the longest matching ``url.<base>.<suffix>`` prefix replaced by ``<base>``; None when none matches."""
+    matches = [
+        (value, key[4 : -len(suffix) - 1])
+        for key, value in state.config.items()
+        if key.startswith("url.") and key.endswith(f".{suffix}") and url.startswith(value)
+    ]
+    if not matches:
+        return None
+    prefix, replacement = max(matches, key=lambda pair: len(pair[0]))
+    return replacement + url[len(prefix) :]
+
+
+def remote_url(state: RepoState, remote: str, *, push: bool = False) -> str:
+    """As ``remote get-url [--push]``: an explicit ``pushurl`` wins (``insteadOf`` applies to it, ``pushInsteadOf``
+    does not), else ``pushInsteadOf`` over the URL, else ``insteadOf``."""
     if remote not in state.remotes:
         msg = f"error: No such remote '{remote}'"
         raise MissingRemote(msg)
-    url = state.remotes[remote]
-    matches = [
-        (value, key[4:-10])
-        for key, value in state.config.items()
-        if key.startswith("url.") and key.endswith(".insteadof") and url.startswith(value)
-    ]
-    if matches:
-        prefix, replacement = max(matches, key=lambda pair: len(pair[0]))
-        return replacement + url[len(prefix) :]
-    return url
+    url = state.config.get(f"remote.{remote}.pushurl", state.remotes[remote]) if push else state.remotes[remote]
+    explicit = push and f"remote.{remote}.pushurl" in state.config
+    pushed = _rewrite(state, url, "pushinsteadof") if push and not explicit else None
+    return pushed or _rewrite(state, url, "insteadof") or url
 
 
 def fetch(state: RepoState, remote: str, refspecs: Sequence[str]) -> CommandResult:

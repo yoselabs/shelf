@@ -25,7 +25,7 @@ from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Literal, Self
 
 from git_porcelain import fake_checkout as checkout_ops
-from git_porcelain import fake_commands, fake_operations, fake_remote
+from git_porcelain import fake_commands, fake_operations, fake_remote, fake_squash
 from git_porcelain import fake_flow as flow
 from git_porcelain import fake_read as read
 from git_porcelain import fake_write as write
@@ -57,6 +57,7 @@ if TYPE_CHECKING:
         RemoteRefs,
         RepoIdentity,
         Snapshot,
+        SquashResult,
         StillHeld,
         SyncResult,
         TakeResult,
@@ -187,9 +188,12 @@ class FakeRepo:
         wt = self._anchor()
         return read.cherry(self._state, wt, upstream, head)
 
-    def remote_url(self, remote: str) -> str:
+    def remote_url(self, remote: str, *, push: bool = False) -> str:
         self._read_anchor()
-        return fake_remote.remote_url(self._state, remote)
+        return fake_remote.remote_url(self._state, remote, push=push)
+
+    def squash(self, onto: str, head: str, message: str) -> SquashResult:
+        return fake_squash.squash(self._state, self._anchor(), onto, head, message)
 
     def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> CommandResult:
         _ = timeout  # In-memory operations have no elapsed process time.

@@ -107,12 +107,12 @@ land(RealRepo(path).worktree(path))             # the binary, memoized
 land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no subprocess
 ```
 
-- **`Repo`**: `identity sync fetch remote_url ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch tree worktrees add_worktree drop_worktree
+- **`Repo`**: `identity sync fetch remote_url ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch tree squash worktrees add_worktree drop_worktree
   prune_worktrees worktree_state exclude_locally worktree`.
 - **`Worktree`**: `health branch checkout checkout_new clean reset checkout_force snapshot diff dirty stage stage_tracked record merge_ff take_branch release_branch park rebase_onto
   finish_rebase rebase continue_rebase abort_rebase rebasing unmerged push push_refspecs push_request push_lease lfs_push landed grep_tracked`.
 - **Results are frozen unions** (`Recorded | NothingToRecord | HookRejected`, `BranchTaken |
-  BranchHeld`, `UpToDate | Rebased | Conflict`, `Pushed | Rejected | Transient`, `Synced | Offline`,
+  BranchHeld`, `UpToDate | Rebased | Conflict`, `Squashed | Conflicted`, `Pushed | Rejected | Transient`, `Synced | Offline`,
   ...), shared records live in `git_porcelain.api`. An expected condition is a variant, except
   worktree removal's `WorktreeRemoveRefused` diagnostic. An
   infrastructure failure raises `GitUnavailable` (`.tail`, `.retryable`, `.hint`). A caller
@@ -296,7 +296,19 @@ for detached and unborn HEAD. `Repo.cherry(upstream, head)`
 returns oldest-first `Pick(oid, upstream)` rows matching git cherry's non-merge selection;
 `upstream=True` denotes patch equivalence. `Repo.remote_url(remote)` uses remote get-url,
 including URL rewrites; missing named remotes raise `MissingRemote`, distinct from failed
-observations. Both errors extend `GitUnavailable`.
+observations. Both errors extend `GitUnavailable`. `remote_url(remote, push=True)` is
+`remote get-url --push`: the first explicit `pushurl` (with `insteadOf` applied, `pushInsteadOf`
+ignored), else the URL rewritten by `pushInsteadOf`, else by `insteadOf`. A caller that reads a
+remote to decide what a push delivered compares the two to know both go to one repository.
+
+`Repo.squash(onto, head, message)` makes one commit whose parent is `onto` and whose tree is
+`head`'s changes merged onto `onto` over their merge base, in Git objects only: `git merge-tree
+--write-tree` then `git commit-tree --no-gpg-sign -p <onto>`. No checkout, index, HEAD or ref
+changes, no hook runs and nothing is signed; author and committer are `RealRepo(identity=...)`, else
+git's configuration. It returns `Squashed(sha, tree)` (no ref names the commit until a push or ref
+write does) or `Conflicted(paths)`, each conflicted path once, with nothing made. When `onto` is an
+ancestor of `head` the tree is `head`'s; when `head`'s changes are already on `onto` it is `onto`'s.
+Missing revisions raise `MissingRevision`, unrelated histories `GitUnavailable`. Git 2.38 or later.
 
 `Repo.fetch(remote="origin", refspecs=(), timeout=None)` accepts a named remote or a source
 URL/path, writes `FETCH_HEAD`, and returns `CommandResult(ok=True, output=...)`.

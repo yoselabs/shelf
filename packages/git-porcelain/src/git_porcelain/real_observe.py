@@ -92,8 +92,8 @@ def cherry(repo: RealRepo, upstream: str, head: str) -> tuple[Pick, ...]:
     return tuple(rows)
 
 
-def remote_url(repo: RealRepo, remote: str) -> str:
-    done = _read(repo, "remote", "get-url", "--", remote)
+def remote_url(repo: RealRepo, remote: str, *, push: bool = False) -> str:
+    done = _read(repo, "remote", "get-url", *(["--push"] if push else []), "--", remote)
     if done.rc == 2 and done.err.strip() == f"error: No such remote '{remote}'":
         raise MissingRemote(done.err.strip())
     if done.rc or not done.out.strip():
