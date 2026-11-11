@@ -349,8 +349,8 @@ class FakeWorktree:
     def checkout_new(self, branch: str, start: str = "HEAD") -> None:
         checkout_ops.checkout_new(self._repo, self.state(), branch, start)
 
-    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False) -> None:
-        clean(self._repo, self.state(), keep, ignored=ignored)
+    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False, nested: bool = False) -> None:
+        clean(self._repo, self.state(), keep, ignored=ignored, nested=nested)
 
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
         checkout_ops.reset(self._repo, self.state(), rev, mode=mode)

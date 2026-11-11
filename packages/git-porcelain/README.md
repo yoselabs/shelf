@@ -125,9 +125,11 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   `DirtyTree`. A branch held by another worktree raises `BranchPinned` with its `holder`.
   `checkout_force(branch, start)` runs checkout with `-B -f`: create or reset the branch and
   discard local changes, while still respecting another worktree's branch pin.
-- **Cleanup and reset**: `clean(keep=(), ignored=False)` removes untracked files and directories
+- **Cleanup and reset**: `clean(keep=(), ignored=False, nested=False)` removes untracked files and directories
   except gitignore-style `keep` patterns, without moving HEAD or changing tracked files.
-  `ignored=True` also removes ignored files. `reset(rev, mode="mixed")` moves HEAD; `soft`
+  `ignored=True` also removes ignored files. `nested=True` also removes nested repositories (git skips a
+  directory holding its own `.git` without a second `-f`); `ignored=True, nested=True` is `git clean -ffdx`.
+  `dirty(ignored_under=["."])` then lists what is still ignored in the whole checkout (empty after that clean). `reset(rev, mode="mixed")` moves HEAD; `soft`
   preserves the index and working files, `mixed` resets the index, and `hard` also resets tracked
   files, discarding edits. Unrelated untracked files survive a hard reset or forced checkout;
   untracked files obstructing the target's tracked files may be removed by git.
