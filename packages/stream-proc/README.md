@@ -107,3 +107,12 @@ If permission transmission has begun and its acknowledgment is interrupted,
 Its chained cause retains the original interruption. The target may have executed;
 leader cleanup does not establish whole-workload stop. Confirmed private exec
 rejection still raises the native OSError instead of uncertainty.
+
+`run_registered(argv, registered=..., cwd=..., env=..., timeout=..., on_line=..., stop=...)` is that gate plus
+`run`'s supervision, for a command whose identity a store must hold before it executes. stdin is /dev/null and
+stderr is merged into stdout: `on_line` gets each line as exact bytes, in the order written (one log). The wall
+`timeout` counts from the call, registration included; it and `stop` stop and prove the whole tree. An exec
+failure after registration (ENOENT, EACCES) is a `Result` with `exec_errno` set and no return code: the
+registered identity never ran the command. A failure before the callback returned propagates (nothing ran);
+`RegisteredStartUncertainError` propagates as from `popen_registered`. After a normal exit a descendant still in
+the group is not stopped: `Result.pgid` names the group for the caller's `group_alive` proof.

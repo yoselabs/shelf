@@ -10,6 +10,7 @@ import signal
 import struct
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -18,10 +19,14 @@ from stream_proc import (
     OwnedProcess,
     ProcessObservation,
     RegisteredStartUncertainError,
+    group_alive,
     inspect_process,
     observe_owned,
     popen_registered,
+    proc_start,
     registered,
+    run_registered,
+    stop_pid,
 )
 
 
@@ -278,3 +283,100 @@ def test_exec_gate_invalid_arguments_do_not_touch_protocol_descriptors(tmp_path:
     if "--unknown-gate-option" in values:
         assert b"--unknown-gate-option" in result.stderr
     assert not list(tmp_path.iterdir())
+
+
+def test_run_registered_registers_before_the_command_and_logs_one_merged_stream(tmp_path: Path) -> None:
+    marker = tmp_path / "ran"
+    events: list[object] = []
+
+    def register(identity: OwnedProcess) -> None:
+        assert observe_owned(identity).kind == "matching" and not marker.exists()
+        events.append(identity)
+
+    script = f"touch {marker}; echo out; echo err >&2; cat; echo after"
+    result = run_registered(["/bin/sh", "-c", script], registered=register, cwd=tmp_path, timeout=5, on_line=events.append)
+    identity = events[0]
+    assert isinstance(identity, OwnedProcess)
+    assert events[1:] == [b"out\n", b"err\n", b"after\n"]
+    assert (result.returncode, result.signal, result.timed_out, result.exec_errno) == (0, None, None, None)
+    assert result.pid == result.pgid == identity.pid == identity.pgid and result.start == identity.start
+    assert observe_owned(identity).kind == "gone" and not group_alive(result.pgid)
+
+
+def test_run_registered_reports_a_nonzero_exit_with_its_partial_log() -> None:
+    lines: list[bytes] = []
+    result = run_registered(["/bin/sh", "-c", "echo partial; printf torn; exit 3"], registered=lambda _: None, on_line=lines.append)
+    assert (result.returncode, result.timed_out, result.exec_errno) == (3, None, None)
+    assert lines == [b"partial\n", b"torn"]
+
+
+@pytest.mark.parametrize("ending", ["wall", "stopped"])
+def test_run_registered_stops_and_proves_the_whole_tree_on_deadline_or_stop(ending: str) -> None:
+    stop = threading.Event()
+    lines: list[bytes] = []
+
+    def line(raw: bytes) -> None:
+        lines.append(raw)
+        if ending == "stopped":
+            stop.set()
+
+    result = run_registered(
+        ["/bin/sh", "-c", "sleep 30 & echo started; wait"],
+        registered=lambda _: None,
+        on_line=line,
+        timeout=0.5 if ending == "wall" else 30,
+        stop=stop,
+        grace=0.5,
+    )
+    assert result.timed_out == ending and result.returncode is None and result.signal is not None
+    assert result.survivors == () and not group_alive(result.pgid)
+    assert lines == [b"started\n"]
+
+
+@pytest.mark.parametrize(("make", "number"), [(False, errno.ENOENT), (True, errno.EACCES)])
+def test_run_registered_exec_failure_after_registration_is_a_result(tmp_path: Path, *, make: bool, number: int) -> None:
+    program = tmp_path / "program"
+    if make:
+        program.write_text("#!/bin/sh\necho never\n")
+        program.chmod(0o600)
+    identities: list[OwnedProcess] = []
+    lines: list[bytes] = []
+    result = run_registered([str(program)], registered=identities.append, on_line=lines.append)
+    assert result.exec_errno == number and result.returncode is None and result.timed_out is None
+    assert [result.pid, result.pgid] == [identities[0].pid, identities[0].pgid] and lines == []
+    assert observe_owned(identities[0]).kind == "gone"
+
+
+def test_run_registered_leaves_a_descendant_in_the_group_to_the_caller() -> None:
+    lines: list[bytes] = []
+    result = run_registered(["/bin/sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $!"], registered=lambda _: None, on_line=lines.append)
+    sleeper = int(lines[0])
+    try:
+        assert result.returncode == 0 and result.timed_out is None
+        assert group_alive(result.pgid) and os.getpgid(sleeper) == result.pgid
+    finally:
+        assert stop_pid(sleeper, proc_start(sleeper), grace=0.5) == ()
+    assert not group_alive(result.pgid)
+
+
+def test_run_registered_never_runs_the_command_when_registration_fails(tmp_path: Path) -> None:
+    marker = tmp_path / "ran"
+
+    def reject(_identity: OwnedProcess) -> None:
+        raise OSError(errno.EIO, "store unavailable")
+
+    with pytest.raises(OSError, match="store unavailable"):
+        run_registered(["/bin/sh", "-c", f"touch {marker}"], registered=reject)
+    assert not marker.exists()
+
+
+def test_run_registered_propagates_an_uncertain_start_with_the_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    identities: list[OwnedProcess] = []
+
+    def lost_status(_fd: int, _deadline: float) -> int | None:
+        raise RuntimeError
+
+    monkeypatch.setattr(registered, "_exec_status", lost_status)
+    with pytest.raises(RegisteredStartUncertainError) as failure:
+        run_registered(["/bin/true"], registered=identities.append)
+    assert failure.value.identity == identities[0]
