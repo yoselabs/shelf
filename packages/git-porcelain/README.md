@@ -155,9 +155,14 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   in `output`. `NothingToRecord.output` defaults to empty because no commit command ran.
   Conflict-marker text is not a precondition; git decides whether the selected index can commit.
 - **`RealRepo` owns the environment**: it strips the variables that make `-C` lie, forbids prompts,
-  pins `GIT_DIR`/`GIT_WORK_TREE` from the checkout's `.git`, sets `LC_ALL=C`, and runs hooks:
+  pins `GIT_DIR`/`GIT_WORK_TREE` from the checkout's `.git` (re-read on every call), sets `LC_ALL=C`, and runs hooks:
   `record(hooks=False)` skips them, `push` always runs `pre-push`. Under `user.useConfigOnly` a
   missing identity is a `GitUnavailable` whose hint says to set `user.name` and `user.email`.
+- **A verified git directory**: `RealRepo(path, pins={path: git_dir})` pins each listed checkout to the git
+  directory the caller already checked, on every call, and never reads `<checkout>/.git` again: a process that swaps
+  or deletes the pointer after the check cannot aim a commit (or a `clean` filter, a hook) at another git directory.
+  Keys are the exact paths the repo and its worktree views are opened with; a call anywhere else raises `NotARepo`
+  before any git process runs, so git never discovers an enclosing repository. `health` runs pinned too.
 - **`RealRepo` memoizes inside**: identity and shas are kept for good; `worktrees` until the
   repo's own write or `invalidate()`; ref-named answers are checked against file signatures of
   HEAD, loose refs, `packed-refs` and `shallow` (a reftable repo skips the memo); `health`,

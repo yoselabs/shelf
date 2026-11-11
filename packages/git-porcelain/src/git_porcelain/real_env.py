@@ -4,8 +4,9 @@ The ambient set (``base``) strips the variables that would aim git at another re
 prompts, so a missing credential fails loud instead of hanging. ``pinned`` adds ``GIT_DIR`` and
 ``GIT_WORK_TREE`` read from the checkout's ``.git`` entry, so a stray ``core.worktree`` in a shared config
 cannot redirect a slot; only ``Worktree.health`` runs without the pin, on purpose: it asks what a worker's own
-git would see. The user's config is left alone (credential helpers, ``insteadOf`` and signing must keep working);
-the hermetic test env is ``git_porcelain.testing``'s business.
+git would see. A ``RealRepo`` opened with ``pins`` uses the caller's verified git directory instead and reads no
+``.git`` entry (``RealRepo._checkout_pin``). The user's config is left alone (credential helpers, ``insteadOf``
+and signing must keep working); the hermetic test env is ``git_porcelain.testing``'s business.
 """
 
 from __future__ import annotations

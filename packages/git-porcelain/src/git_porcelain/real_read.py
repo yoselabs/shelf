@@ -55,7 +55,7 @@ def head_of(wt: RealWorktree) -> Sha | None:
 
 
 def git_dir_of(wt: RealWorktree) -> Path:
-    found = real_env.git_dir(wt.path)
+    found = wt.repo.git_dir(wt.path)
     return found if found is not None else Path(wt.run("rev-parse", "--absolute-git-dir").out.strip())
 
 
@@ -169,7 +169,7 @@ def worktrees(repo: RealRepo, *, with_dirty: bool) -> tuple[WorktreeInfo, ...]:
 # -- Worktree ---------------------------------------------------------------------------------------------
 def health(wt: RealWorktree) -> Health:
     asked = wt.run("config", "--show-origin", "--get-regexp", _CONFIG_KEYS, pin=False, check=False)
-    if asked.rc > 1 and (found := real_env.git_dir(wt.path)) is not None:
+    if asked.rc > 1 and (found := wt.repo.git_dir(wt.path)) is not None:
         # a core.worktree that points nowhere makes git die in setup: read the config file itself
         asked = wt.run(
             "config",

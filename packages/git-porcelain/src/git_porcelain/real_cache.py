@@ -50,7 +50,7 @@ def sig(path: Path) -> Sig:
 
 def _dirs(repo: RealRepo) -> tuple[Path, Path] | None:
     """(git dir, common dir) of the repository's checkout; None for a layout this cannot vouch for (reftable)."""
-    gd = real_env.git_dir(repo.path)
+    gd = repo.git_dir(repo.path)
     if gd is None:
         return None
     common = real_env.common_of(gd)
