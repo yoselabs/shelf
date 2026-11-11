@@ -39,6 +39,7 @@ def _bootstrap(
     *,
     cwd: str | os.PathLike[str] | None,
     env: Mapping[str, str],
+    stdin: int,
     stderr: int,
     start_new_session: bool,
 ) -> tuple[subprocess.Popen[bytes], TermHold]:
@@ -46,7 +47,7 @@ def _bootstrap(
         [sys.executable, "-I", "-S", str(Path(__file__).with_name("_exec_gate.py")), str(control), str(status), str(timeout)],
         cwd=cwd,
         env=env,
-        stdin=subprocess.PIPE,
+        stdin=stdin,
         stdout=subprocess.PIPE,
         stderr=stderr,
         start_new_session=start_new_session,
@@ -139,11 +140,12 @@ def popen_registered(
     registered: Callable[[OwnedProcess], None],
     cwd: str | os.PathLike[str] | None = None,
     env: Mapping[str, str] | None = None,
+    stdin: int = subprocess.PIPE,
     stderr: int = subprocess.PIPE,
     start_new_session: bool = True,
     registration_timeout: float = 5.0,
 ) -> tuple[subprocess.Popen[bytes], OwnedProcess]:
-    """Spawn with piped stdin/stdout; callback must durably register before returning.
+    """Spawn with piped stdout (stdin piped unless ``stdin`` says otherwise); callback must durably register before returning.
 
     The isolated child exits without target exec on lost/invalid permission. Failure
     cleans up the freshly owned child. Successful return means registered permission,
@@ -174,6 +176,7 @@ def popen_registered(
             registration_timeout,
             cwd=cwd,
             env=target_env,
+            stdin=stdin,
             stderr=stderr,
             start_new_session=start_new_session,
         )
