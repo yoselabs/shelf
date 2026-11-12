@@ -1,6 +1,6 @@
 [project]
 name = "any-agent"
-version = "0.5.1"
+version = "0.6.0"
 description = "Headless agent CLIs (claude, codex, opencode) behind one Harness protocol: launch spec, each stream line parsed once into typed events, a supervisor that spawns in a session of its own, watches silence, answer grace, stall, the CLI's own log and the network, stops the whole tree, and one outcome ladder from vendor words to a reason."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

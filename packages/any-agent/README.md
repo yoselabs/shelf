@@ -49,6 +49,10 @@ why = classify(s.rc, s.vendor, s.stderr, out.timed_out, s.work, {"watchdog": out
   response and nothing printed for 900 s = `stall`), the lane check, the log watcher, the network. The whole process tree is
   stopped (SIGTERM, grace, SIGKILL); each stop is a `StopReport` in `hooks.stops`. A caller that dies takes its worker along
   (`unattended`).
+- **Activity is the display form of the events.** `any_agent.activity.Timeline().add(event, now)` folds the typed events of any harness (and the
+  caller's wall-clock time, which no CLI line carries) into `Activity` records: a command or tool as `running` then `finished` with its
+  `duration_ms`, the agent's `waited_ms` before it, a message, an error, a wait. `encode`/`decode` carry one as one JSON line, so a consumer
+  can keep a file of them and show it without parsing any vendor line. Display only: it decides nothing.
 - **One ladder.** `classify(rc, vendor_err, stderr, timed_out, work_seen, structured) -> Outcome(reason, detail, source) | None`.
   First match wins: our own facts (secret, watchdog, timeout), a 4xx status we measured, the vendor's words (credit, limit, login,
   bad request, network), then the exit code. The model's answer is never an argument, so a worker that says "rate limit" cannot
