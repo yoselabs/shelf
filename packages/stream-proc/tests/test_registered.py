@@ -380,3 +380,16 @@ def test_run_registered_propagates_an_uncertain_start_with_the_identity(monkeypa
     with pytest.raises(RegisteredStartUncertainError) as failure:
         run_registered(["/bin/true"], registered=identities.append)
     assert failure.value.identity == identities[0]
+
+
+def test_run_registered_caps_a_newline_less_line() -> None:
+    got: list[bytes] = []
+    res = run_registered(
+        [sys.executable, "-c", "import sys; sys.stdout.write('q' * 5000)"],
+        registered=lambda _identity: None,
+        on_line=got.append,
+        max_line=2048,
+    )
+    assert res.returncode == 0
+    assert [len(piece) for piece in got] == [2048, 2048, 904]
+    assert res.split_lines == 2

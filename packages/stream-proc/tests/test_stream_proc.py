@@ -296,3 +296,40 @@ def test_a_short_child_is_seen_to_end_well_inside_20_ms() -> None:
     bare = fastest(lambda: subprocess.run(py("pass"), check=True))
     ours = fastest(lambda: run(py("pass")).returncode == 0 or pytest.fail("child failed"))
     assert ours - bare < 0.015
+
+
+def test_a_newline_less_stream_is_emitted_in_capped_pieces() -> None:
+    got: list[str] = []
+    res = run(py("import sys; sys.stdout.write('x' * 10000)"), on_stdout=got.append, max_line=1000)
+    assert res.returncode == 0
+    assert [len(piece) for piece in got] == [1000] * 10
+    assert "".join(got) == "x" * 10000
+    assert res.split_lines == 10
+
+
+def test_a_long_line_with_a_newline_keeps_every_byte_and_the_newline_last() -> None:
+    got: list[str] = []
+    res = run(py("print('y' * 2500)"), on_stdout=got.append, max_line=1000)
+    assert "".join(got) == "y" * 2500 + "\n"
+    assert all(len(piece) <= 1000 for piece in got)
+    assert got[-1].endswith("\n")
+    assert res.split_lines == 2
+
+
+def test_short_lines_are_untouched_and_not_counted() -> None:
+    got: list[str] = []
+    res = run(py("print('a'); print('b')"), on_stdout=got.append, max_line=1000)
+    assert got == ["a\n", "b\n"]
+    assert res.split_lines == 0
+
+
+def test_no_piece_exceeds_the_cap_on_a_large_newline_less_stream() -> None:
+    sizes: list[int] = []
+    run(py("import sys; sys.stdout.write('z' * 3_000_000)"), on_stdout=lambda piece: sizes.append(len(piece)), max_line=65536)
+    assert max(sizes) <= 65536
+    assert sum(sizes) == 3_000_000
+
+
+def test_a_cap_below_one_is_refused() -> None:
+    with pytest.raises(ValueError, match="max_line"):
+        run(py("pass"), max_line=0)
