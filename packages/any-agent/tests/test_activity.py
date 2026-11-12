@@ -93,23 +93,29 @@ class TestCodec:
             assert decode(line) is None
 
 
+def decoded(line):
+    found = decode(line)
+    assert found is not None
+    return found
+
+
 class TestHostileLines:
     def test_a_time_that_is_not_finite_is_not_a_record(self):
         for at in ("NaN", "Infinity", "-Infinity", "1e999", "1" + "0" * 400):
             assert decode(f'{{"k":"message","s":"finished","at":{at},"t":"x"}}') is None
 
     def test_counts_are_whole_non_negative_and_bounded(self):
-        a = decode('{"k":"command","s":"finished","at":1,"t":"x","w":2.6,"d":-5,"x":1}')
+        a = decoded('{"k":"command","s":"finished","at":1,"t":"x","w":2.6,"d":-5,"x":1}')
         assert (a.waited_ms, a.duration_ms, a.exit_code) == (3, 0, 1)
-        b = decode('{"k":"command","s":"finished","at":1,"t":"x","w":NaN,"d":1e30}')
+        b = decoded('{"k":"command","s":"finished","at":1,"t":"x","w":NaN,"d":1e30}')
         assert (b.waited_ms, b.duration_ms) == (None, 10**12)
-        assert decode('{"k":"command","s":"finished","at":1,"t":"x","d":"7"}').duration_ms is None
+        assert decoded('{"k":"command","s":"finished","at":1,"t":"x","d":"7"}').duration_ms is None
 
     def test_an_id_and_a_name_are_capped_on_both_sides(self):
         a = Activity(kind="tool", state="running", at=1.0, text="t", id="i" * 500, name="n" * 500)
-        back = decode(encode(a))
-        assert (len(back.id), len(back.name)) == (200, 200)
-        assert len(decode(f'{{"k":"tool","s":"running","at":1,"t":"x","id":"{"j" * 900}"}}').id) == 200
+        back = decoded(encode(a))
+        assert back.id is not None and (len(back.id), len(back.name)) == (200, 200)
+        assert len(decoded(f'{{"k":"tool","s":"running","at":1,"t":"x","id":"{"j" * 900}"}}').id or "") == 200
 
 
 class TestScope:
