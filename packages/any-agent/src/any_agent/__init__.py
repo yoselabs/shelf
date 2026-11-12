@@ -5,7 +5,7 @@ A harness builds the launch and parses the CLI's stream into typed events once; 
 vendor said into one reason. Callers inject what they own: the live sink, the lane-gone check, the secret policy, the network probe.
 """
 
-from any_agent import events, vendors
+from any_agent import activity, events, vendors
 from any_agent.answer import Answer, DecodedAnswer, InvalidAnswer, MissingAnswer, decode_answer
 from any_agent.classify import Outcome, classify
 from any_agent.harnesses.claude import ClaudeHarness
@@ -38,6 +38,7 @@ __all__ = [
     "Stop",
     "Summary",
     "Supervisor",
+    "activity",
     "classify",
     "decode_answer",
     "events",
