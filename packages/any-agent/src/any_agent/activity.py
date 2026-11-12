@@ -4,6 +4,7 @@
 command or tool is written twice, `running` then `finished` with the same `id`, so a reader keeps the latest of each id."""
 
 import json
+import math
 import shlex
 from pathlib import PurePath
 from typing import Literal
@@ -15,6 +16,8 @@ Kind = Literal["command", "tool", "message", "error", "waiting"]
 State = Literal["running", "finished"]
 KINDS: tuple[Kind, ...] = ("command", "tool", "message", "error", "waiting")
 STATES: tuple[State, ...] = ("running", "finished")
+ID_CAP = 200  # characters of an `id` or a tool `name`
+MS_MAX = 10**12  # a duration or wait bigger than this (31 years) is not one
 CAPS: dict[str, int] = {"command": 600, "tool": 300, "message": 2000, "error": 500, "waiting": 200}
 
 
@@ -53,7 +56,10 @@ class Timeline:
     """One run's folding state: the open commands and tools by id and the end of the last action. Feed events in order with the time
     each arrived; the result of `add` is the records to append."""
 
-    def __init__(self) -> None:
+    def __init__(self, scope: str = "") -> None:
+        """`scope` prefixes every id: two runs that append to one file (a resumed session) give it different scopes, since a vendor
+        restarts its ids (`item_1`) with each process."""
+        self._scope = scope
         self._open: dict[str, tuple[float, int | None]] = {}
         self._end: float | None = None
         self._count = 0
@@ -63,7 +69,7 @@ class Timeline:
 
     def _begin(self, kind: Kind, ident: str | None, now: float, text: str, name: str = "") -> Activity:
         self._count += 1
-        key = ident or f"n{self._count}"
+        key = self._scope + (ident or f"n{self._count}")
         waited = self._waited(now)
         self._open[key] = (now, waited)
         return Activity(kind=kind, state="running", at=now, text=_cut(kind, text), id=key, name=name, waited_ms=waited)
@@ -71,6 +77,7 @@ class Timeline:
     def _finish(
         self, kind: Kind, ident: str | None, now: float, text: str, secs: float | None, name: str = "", exit_code: int | None = None
     ) -> Activity:
+        ident = self._scope + ident if ident else None
         started, waited = self._open.pop(ident, (None, None)) if ident else (None, None)
         self._end = now
         took = _ms(secs) if secs is not None else None if started is None else _ms(now - started)
@@ -115,10 +122,23 @@ class Timeline:
 
 def encode(a: Activity) -> str:
     """One JSON line, no newline."""
-    optional: tuple[tuple[str, Json], ...] = (("id", a.id), ("n", a.name), ("w", a.waited_ms), ("d", a.duration_ms), ("x", a.exit_code))
+    optional: tuple[tuple[str, Json], ...] = (
+        ("id", a.id and a.id[:ID_CAP]),
+        ("n", a.name[:ID_CAP]),
+        ("w", a.waited_ms),
+        ("d", a.duration_ms),
+        ("x", a.exit_code),
+    )
     fields: dict[str, Json] = {"k": a.kind, "s": a.state, "at": a.at, "t": a.text}
     fields.update({k: v for k, v in optional if v not in (None, "")})
     return json.dumps(fields, separators=(",", ":"))
+
+
+def _count(x: Json) -> int | None:
+    """A millisecond count from a decoded value: a finite number, whole, from 0 to MS_MAX; anything else is unknown."""
+    if isinstance(x, bool) or not isinstance(x, int | float) or not math.isfinite(x):
+        return None
+    return min(max(round(x), 0), MS_MAX)
 
 
 def decode(line: str) -> Activity | None:
@@ -132,14 +152,20 @@ def decode(line: str) -> Activity | None:
     kind, state, at, body = raw.get("k"), raw.get("s"), raw.get("at"), raw.get("t")
     if kind not in KINDS or state not in STATES or not isinstance(at, int | float) or isinstance(at, bool) or not isinstance(body, str):
         return None
+    try:
+        when = float(at)
+    except OverflowError:
+        return None
+    if not math.isfinite(when):
+        return None
     return Activity(
         kind=kind,
         state=state,
-        at=float(at),
+        at=when,
         text=body,
-        id=opt_str(raw.get("id")),
-        name=opt_str(raw.get("n")) or "",
-        waited_ms=opt_int(raw.get("w")),
-        duration_ms=opt_int(raw.get("d")),
+        id=(opt_str(raw.get("id")) or "")[:ID_CAP] or None,
+        name=(opt_str(raw.get("n")) or "")[:ID_CAP],
+        waited_ms=_count(raw.get("w")),
+        duration_ms=_count(raw.get("d")),
         exit_code=opt_int(raw.get("x")),
     )
