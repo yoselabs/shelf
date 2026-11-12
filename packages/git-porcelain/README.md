@@ -107,7 +107,7 @@ land(RealRepo(path).worktree(path))             # the binary, memoized
 land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no subprocess
 ```
 
-- **`Repo`**: `identity sync fetch remote_url ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch tree squash worktrees add_worktree drop_worktree
+- **`Repo`**: `identity sync fetch remote_url remote_urls ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch tree squash worktrees add_worktree drop_worktree
   prune_worktrees worktree_state exclude_locally worktree`.
 - **`Worktree`**: `health branch checkout checkout_new clean reset checkout_force snapshot diff dirty stage stage_tracked record merge_ff take_branch release_branch park rebase_onto
   finish_rebase rebase continue_rebase abort_rebase rebasing unmerged push push_refspecs push_request push_lease lfs_push landed grep_tracked`.
@@ -300,6 +300,10 @@ observations. Both errors extend `GitUnavailable`. `remote_url(remote, push=True
 `remote get-url --push`: the first explicit `pushurl` (with `insteadOf` applied, `pushInsteadOf`
 ignored), else the URL rewritten by `pushInsteadOf`, else by `insteadOf`. A caller that reads a
 remote to decide what a push delivered compares the two to know both go to one repository.
+`remote_urls(remote, push=False)` is `remote get-url --all [--push]`: every URL, each rewritten as
+`remote_url` rewrites one. Only the first `url` is fetched from, but a push goes to every `pushurl`
+(else to every `url`), so such a caller also requires exactly one URL on each side. In the fake,
+`FakeRepo.add_config(key, value)` adds a second value as `git config --add` does.
 
 `Repo.squash(onto, head, message)` makes one commit whose parent is `onto` and whose tree is
 `head`'s changes merged onto `onto` over their merge base, in Git objects only: `git merge-tree

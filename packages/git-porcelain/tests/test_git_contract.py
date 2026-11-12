@@ -67,6 +67,7 @@ class Rig(Protocol):
     def read(self, wt: Worktree, rel: str) -> str | None: ...
     def head(self, wt: Worktree) -> str: ...
     def set_config(self, wt: Worktree, key: str, value: str) -> None: ...
+    def add_config(self, wt: Worktree, key: str, value: str) -> None: ...
     def make_origin(self, name: str) -> str: ...
     def add_remote(self, wt: Worktree, name: str, url: str) -> None: ...
     def clone(self, url: str, name: str) -> Worktree: ...
@@ -123,6 +124,9 @@ class RealRig:
 
     def set_config(self, wt: Worktree, key: str, value: str) -> None:
         run(wt.path, "config", key, value)
+
+    def add_config(self, wt: Worktree, key: str, value: str) -> None:
+        run(wt.path, "config", "--add", key, value)
 
     def make_origin(self, name: str) -> str:
         path = self.root / f"{name}.git"
@@ -224,6 +228,9 @@ class FakeRig:
 
     def set_config(self, wt: Worktree, key: str, value: str) -> None:
         self._repo(wt).set_config(key, value)
+
+    def add_config(self, wt: Worktree, key: str, value: str) -> None:
+        self._repo(wt).add_config(key, value)
 
     def make_origin(self, name: str) -> str:
         url = str(self.root / f"{name}.git")
@@ -413,6 +420,11 @@ def _sub_folder(world: World, name: str, sub: str, parent: str) -> None:
 @when(parsers.parse('"{name}" config "{key}" becomes "{value}"'))
 def _config(world: World, name: str, key: str, value: str) -> None:
     world.rig.set_config(world.wts[name], key, _expand(world, value))
+
+
+@given(parsers.parse('"{name}" config "{key}" also has "{value}"'))
+def _config_added(world: World, name: str, key: str, value: str) -> None:
+    world.rig.add_config(world.wts[name], key, _expand(world, value))
 
 
 @given(parsers.parse('"{name}" has a {kind} hook that {mode}'))

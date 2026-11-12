@@ -41,13 +41,22 @@ def _rewrite(state: RepoState, url: str, suffix: str) -> str | None:
 def remote_url(state: RepoState, remote: str, *, push: bool = False) -> str:
     """As ``remote get-url [--push]``: an explicit ``pushurl`` wins (``insteadOf`` applies to it, ``pushInsteadOf``
     does not), else ``pushInsteadOf`` over the URL, else ``insteadOf``."""
+    return remote_urls(state, remote, push=push)[0]
+
+
+def remote_urls(state: RepoState, remote: str, *, push: bool = False) -> tuple[str, ...]:
+    """As ``remote get-url --all [--push]``: every ``pushurl`` (each with ``insteadOf``) when one is set, else every
+    ``url`` (each with ``pushInsteadOf``, else ``insteadOf``, for a push)."""
     if remote not in state.remotes:
         msg = f"error: No such remote '{remote}'"
         raise MissingRemote(msg)
-    url = state.config.get(f"remote.{remote}.pushurl", state.remotes[remote]) if push else state.remotes[remote]
-    explicit = push and f"remote.{remote}.pushurl" in state.config
-    pushed = _rewrite(state, url, "pushinsteadof") if push and not explicit else None
-    return pushed or _rewrite(state, url, "insteadof") or url
+    key = f"remote.{remote}.pushurl"
+    urls = [state.remotes[remote], *state.more_config.get(f"remote.{remote}.url", [])]
+    explicit = push and key in state.config
+    if explicit:
+        urls = [state.config[key], *state.more_config.get(key, [])]
+    rewritten = [(_rewrite(state, url, "pushinsteadof") if push and not explicit else None) for url in urls]
+    return tuple(pushed or _rewrite(state, url, "insteadof") or url for pushed, url in zip(rewritten, urls, strict=True))
 
 
 def fetch(state: RepoState, remote: str, refspecs: Sequence[str]) -> CommandResult:

@@ -172,6 +172,12 @@ class Repo(Protocol):
         named remote."""
         ...
 
+    def remote_urls(self, remote: str, *, push: bool = False) -> tuple[str, ...]:
+        """Every URL, as ``remote get-url --all [--push]``, each rewritten as ``remote_url`` rewrites one: a fetch reads
+        only the first ``url``, but a push goes to every ``pushurl`` (else to every ``url``). MissingRemote only for a
+        missing named remote."""
+        ...
+
     def squash(self, onto: str, head: str, message: str) -> SquashResult:
         """One commit whose parent is ``onto`` and whose tree is ``head``'s changes merged onto ``onto`` (their merge
         base as the base), made in Git objects only: no checkout, index, ref or hook is touched and nothing is signed.
