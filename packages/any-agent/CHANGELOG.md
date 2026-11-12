@@ -24,3 +24,5 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 - 0.4.0: `LaunchInputs.cli` removed; `CodexHarness.launch_spec` builds fresh/resume argv from model/effort/sandbox/access/isolation; empty optional choices/schema/output omitted, empty nonsealed exe/cwd/explicit resume refused; old arbitrary fresh argv and nonsealed skip-Git extraction removed; sealed completion unchanged
 
 - 0.5.0: no API change; requires `stream-proc>=0.6.0` (adds `run_registered`), released from the same commit so a consumer pins both at one tag
+
+- 0.5.1: no API change; requires `stream-proc>=0.7.0` (line buffer bounded by default via `max_line`), released from the same commit so a consumer pins both at one tag
