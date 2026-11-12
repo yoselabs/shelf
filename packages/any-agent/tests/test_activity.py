@@ -66,6 +66,10 @@ class TestTimeline:
         (done,) = Timeline().add(ev.CmdEnd(id="a", text="make", exit=0), 30.0)
         assert (done.at, done.duration_ms) == (30.0, None)
 
+    def test_a_shell_wrapper_is_not_shown(self):
+        wrapped = ("/run/bin/bash -lc 'ls -la'", "sh -c \"echo 'a b'\"", "bash -lc", "ls -la")
+        assert [Timeline().add(ev.Cmd(id="a", text=t), 1.0)[0].text for t in wrapped] == ["ls -la", "echo 'a b'", "bash -lc", "ls -la"]
+
     def test_text_is_cut_to_its_cap(self):
         (found,) = Timeline().add(ev.Msg(text="x" * 5000), 1.0)
         assert len(found.text) == 2000 and found.text.endswith("…")

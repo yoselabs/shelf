@@ -4,6 +4,8 @@
 command or tool is written twice, `running` then `finished` with the same `id`, so a reader keeps the latest of each id."""
 
 import json
+import shlex
+from pathlib import PurePath
 from typing import Literal
 
 from any_agent import events as ev
@@ -32,6 +34,15 @@ class Activity:
 def _cut(kind: str, text: str) -> str:
     cap = CAPS[kind]
     return text if len(text) <= cap else text[: cap - 1] + "…"
+
+
+def shown(command: str) -> str:
+    """The command a person typed: Codex reports `/bin/bash -lc 'ls -la'`, which reads as `ls -la`."""
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        return command
+    return words[2] if len(words) == 3 and PurePath(words[0]).name in ("bash", "sh", "zsh") and words[1] in ("-c", "-lc") else command
 
 
 def _ms(seconds: float) -> int:
@@ -84,9 +95,9 @@ class Timeline:
         found: Activity | None = None
         match event:
             case ev.Cmd():
-                found = self._begin("command", event.id, now, event.text)
+                found = self._begin("command", event.id, now, shown(event.text))
             case ev.CmdEnd():
-                found = self._finish("command", event.id, now, event.text, event.secs, exit_code=event.exit)
+                found = self._finish("command", event.id, now, shown(event.text), event.secs, exit_code=event.exit)
             case ev.Tool():
                 found = self._begin("tool", event.id, now, event.arg, event.name)
             case ev.ToolEnd():
