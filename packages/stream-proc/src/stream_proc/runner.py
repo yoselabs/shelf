@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 Kind = Literal["wall", "idle", "stopped"]
 _FIRST_NAP_S = 0.001  # the wait for a child starts short and doubles to _NAP_S: a child that ends in a few ms is seen in a few ms
 _NAP_S = 0.02
+MAX_LINE = 1 << 20  # default cap of one emitted piece and of the pending bytes of an unfinished line (1 MiB)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +38,9 @@ class Result:
     ``pid``, ``pgid`` (the child's own group) and ``start`` (its start token, None without ``/proc``) name it
     for good: a pid alone can be reused. ``survivors`` are pids of its tree still alive after the stop.
     ``exec_errno`` (:func:`run_registered` only) is the errno of an exec that failed after registration: the
-    command never ran, ``returncode`` and ``signal`` are None.
+    command never ran, ``returncode`` and ``signal`` are None. ``split_lines`` counts the times a line (or its
+    unfinished part) reached ``max_line`` bytes and was emitted in pieces without a newline: 0 means every
+    callback got whole lines.
     """
 
     returncode: int | None
@@ -49,6 +52,7 @@ class Result:
     secs: float
     survivors: tuple[int, ...] = ()
     exec_errno: int | None = None
+    split_lines: int = 0
 
 
 def _emit(cb: Callable[[bytes], None] | None, raw: bytes) -> None:
@@ -66,21 +70,35 @@ def _pump(
     cb: Callable[[bytes], None] | None,
     touch: Callable[[], None],
     quit_: threading.Event,
+    *,
+    max_line: int = MAX_LINE,
+    splits: list[int] | None = None,
 ) -> None:
     """Read lines until EOF (a torn last line included) so a full pipe never blocks; a failing callback never stops it.
 
-    Polls the descriptor so ``quit_`` ends the reader even when a grandchild keeps the pipe open: the caller
-    can then close the pipe without a reader inside it.
+    A line is held at most ``max_line`` bytes: when more arrives before its newline, the callback gets pieces of
+    exactly ``max_line`` bytes (no newline) and ``splits[0]`` counts them, so a child that never prints a newline
+    cannot grow memory. Polls the descriptor so ``quit_`` ends the reader even when a grandchild keeps the pipe
+    open: the caller can then close the pipe without a reader inside it.
     """
     if stream is None:
         return
     fd = stream.fileno()
     buf = b""
+
+    def emit_capped(data: bytes) -> bytes:
+        while len(data) >= max_line:
+            _emit(cb, data[:max_line])
+            data = data[max_line:]
+            if splits is not None:
+                splits[0] += 1
+        return data
+
     while not quit_.is_set():
         if not select.select([fd], [], [], 0.05)[0]:
             continue
         try:
-            chunk = os.read(fd, 65536)
+            chunk = os.read(fd, min(65536, max_line))
         except OSError:
             break
         if not chunk:
@@ -89,7 +107,10 @@ def _pump(
         buf += chunk
         *lines, buf = buf.split(b"\n")
         for line in lines:
-            _emit(cb, line + b"\n")
+            rest = emit_capped(line + b"\n")
+            if rest:
+                _emit(cb, rest)
+        buf = emit_capped(buf)
     if buf:
         _emit(cb, buf)
 
@@ -135,6 +156,7 @@ def run(
     grace: float = 5.0,
     prove: float = 2.0,
     drain: float = 5.0,
+    max_line: int = MAX_LINE,
 ) -> Result:
     """Run ``argv`` in a session of its own and stream each output line (newline kept) to the callbacks.
 
@@ -143,7 +165,10 @@ def run(
     for ``prove`` seconds). If anything unwinds the wait (KeyboardInterrupt, a SIGTERM handler that raises, even
     one landing during the spawn) the tree is stopped first and the exception goes on. ``env`` is used as given
     (None inherits); stdin is /dev/null. ``drain`` bounds the wait for the last output after the child exited.
+    ``max_line`` (>= 1, default 1 MiB) caps the bytes held for one line: a longer line reaches the callback in
+    pieces of ``max_line`` bytes and ``Result.split_lines`` counts the cuts.
     """
+    _check_max_line(max_line)
     t0 = time.monotonic()
     p, hold = popen_held(
         list(argv),
@@ -154,7 +179,7 @@ def run(
         stderr=subprocess.PIPE,
         start_new_session=True,
     )
-    limits = _Limits(timeout, idle, stop, grace, prove, drain)
+    limits = _Limits(timeout, idle, stop, grace, prove, drain, max_line)
     return _supervise(p, ((p.stdout, _text(on_stdout)), (p.stderr, _text(on_stderr))), t0=t0, replay=hold.replay, limits=limits)
 
 
@@ -171,6 +196,7 @@ def run_registered(
     grace: float = 5.0,
     prove: float = 2.0,
     drain: float = 5.0,
+    max_line: int = MAX_LINE,
 ) -> Result:
     """:func:`popen_registered`'s gate, then :func:`run`'s supervision: ``argv`` executes only after ``registered``
     returned with its identity, so a durable record names the process before any of its code runs.
@@ -182,7 +208,9 @@ def run_registered(
     raised before the callback returned (a failing callback included) propagates with nothing executed;
     :class:`RegisteredStartUncertainError` propagates when the command may have started. On a normal exit, a
     descendant still in the group is left to the caller (``pgid`` names it, :func:`group_alive` observes it).
+    ``max_line`` caps a held line as in :func:`run`.
     """
+    _check_max_line(max_line)
     t0 = time.monotonic()
     committed: list[OwnedProcess] = []
 
@@ -205,7 +233,7 @@ def run_registered(
             raise
         who = committed[0]
         return Result(None, None, None, who.pid, who.pgid, who.start, time.monotonic() - t0, exec_errno=error.errno or errno.EIO)
-    limits = _Limits(timeout, None, stop, grace, prove, drain)
+    limits = _Limits(timeout, None, stop, grace, prove, drain, max_line)
     return _supervise(p, ((p.stdout, on_line),), t0=t0, replay=lambda: None, limits=limits)
 
 
@@ -217,6 +245,13 @@ class _Limits:
     grace: float
     prove: float
     drain: float
+    max_line: int = MAX_LINE
+
+
+def _check_max_line(max_line: int) -> None:
+    if max_line < 1:
+        message = f"max_line must be >= 1, got {max_line}"
+        raise ValueError(message)
 
 
 def _supervise(
@@ -230,6 +265,7 @@ def _supervise(
     """Pump ``pumps`` until the child ends or a limit stops its tree; on any unwinding the tree is stopped first."""
     last = [t0]
     readers: list[threading.Thread] = []
+    splits: list[list[int]] = []
     quit_ = threading.Event()
     kind: Kind | None = None
     survivors: tuple[int, ...] = ()
@@ -238,7 +274,11 @@ def _supervise(
             replay()
             for stream, cb in pumps:
                 touch = lambda: last.__setitem__(0, time.monotonic())  # noqa: E731
-                reader = threading.Thread(target=_pump, args=(stream, cb, touch, quit_), daemon=True)
+                cuts = [0]
+                splits.append(cuts)
+                reader = threading.Thread(
+                    target=_pump, args=(stream, cb, touch, quit_), kwargs={"max_line": limits.max_line, "splits": cuts}, daemon=True
+                )
                 reader.start()
                 readers.append(reader)
             start = proctable.proc_start(p.pid)
@@ -255,7 +295,9 @@ def _supervise(
         _release(p, readers, quit_)
     code = p.returncode
     sig = -code if code is not None and code < 0 else None
-    return Result(None if sig else code, sig, kind, p.pid, p.pid, start, time.monotonic() - t0, survivors)
+    return Result(
+        None if sig else code, sig, kind, p.pid, p.pid, start, time.monotonic() - t0, survivors, split_lines=sum(c[0] for c in splits)
+    )
 
 
 def _release(p: subprocess.Popen[bytes], readers: list[threading.Thread], quit_: threading.Event) -> None:
