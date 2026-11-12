@@ -160,6 +160,7 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   pins `GIT_DIR`/`GIT_WORK_TREE` from the checkout's `.git` (re-read on every call), sets `LC_ALL=C`, and runs hooks:
   `record(hooks=False)` skips them, `push` always runs `pre-push`. Under `user.useConfigOnly` a
   missing identity is a `GitUnavailable` whose hint says to set `user.name` and `user.email`.
+- **A bounded read**: `RealRepo(path, read_timeout=30)` kills a read-only command (`status`, `diff`, `ls-files`, `rev-parse`, ... see `real_reads`) after 30 s and raises `GitTimeout`; they run with `GIT_OPTIONAL_LOCKS=0`. Writes are never bounded (a killed write leaves `index.lock`).
 - **A verified git directory**: `RealRepo(path, pins={path: git_dir})` pins each listed checkout to the git
   directory the caller already checked, on every call, and never reads `<checkout>/.git` again: a process that swaps
   or deletes the pointer after the check cannot aim a commit (or a `clean` filter, a hook) at another git directory.

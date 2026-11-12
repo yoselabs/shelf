@@ -26,6 +26,7 @@ from git_porcelain import (
     real_observe,
     real_operations,
     real_read,
+    real_reads,
     real_remote,
     real_squash,
     real_worktrees,
@@ -104,7 +105,9 @@ class RealRepo:
     they are opened with) to the git directory the caller verified. Every call in a pinned checkout then sets
     ``GIT_DIR`` and ``GIT_WORK_TREE`` from that value and never reads ``<checkout>/.git``, so a pointer swapped after the
     caller's check is not followed; a call in a checkout with no pin raises :class:`NotARepo` before any git process
-    runs (no discovery either). Without ``pins``, each call reads the checkout's ``.git`` entry as it is then.
+    runs (no discovery either). ``read_timeout`` (seconds; default none) bounds every read-only command (``real_reads``): on
+    expiry the command is killed and :class:`GitTimeout` raised; those commands also run with ``GIT_OPTIONAL_LOCKS=0``.
+    Without ``pins``, each call reads the checkout's ``.git`` entry as it is then.
     """
 
     def __init__(
@@ -116,6 +119,7 @@ class RealRepo:
         ambient: Mapping[str, str] | None = None,
         memoize: bool = True,
         remote_timeout: float = 600.0,
+        read_timeout: float | None = None,
         sleep: Callable[[float], None] = time.sleep,
         observer: Callable[[tuple[str, ...]], None] | None = None,
         pins: Mapping[Path, Path] | None = None,
@@ -130,6 +134,7 @@ class RealRepo:
         self._git: str | bool | None = False if ambient is None else shutil.which("git", path=ambient.get("PATH"))
         self.memoize = memoize
         self.remote_timeout = remote_timeout
+        self.read_timeout = read_timeout
         self.sleep = sleep
         self.observer = observer
         self._forever: dict[object, object] = {}
@@ -154,6 +159,9 @@ class RealRepo:
             raise GitUnavailable(msg, hint="install git")
         pin_env = self._checkout_pin(cwd) if pin or self.pins is not None else {}
         extra = {**self.extra_env, **pin_env, **(env or {})}
+        if self.read_timeout is not None and timeout is None and real_reads.is_read(args):
+            timeout = self.read_timeout
+            extra["GIT_OPTIONAL_LOCKS"] = "0"
         child = real_env.base(extra) if self._ambient is None else {**self._ambient, **extra}
         if self.observer is not None:
             self.observer(args)
