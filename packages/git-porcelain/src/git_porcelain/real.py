@@ -28,6 +28,7 @@ from git_porcelain import (
     real_read,
     real_reads,
     real_remote,
+    real_spawn,
     real_squash,
     real_worktrees,
     real_write,
@@ -159,7 +160,8 @@ class RealRepo:
             raise GitUnavailable(msg, hint="install git")
         pin_env = self._checkout_pin(cwd) if pin or self.pins is not None else {}
         extra = {**self.extra_env, **pin_env, **(env or {})}
-        if self.read_timeout is not None and timeout is None and real_reads.is_read(args):
+        reading = self.read_timeout is not None and timeout is None and real_reads.is_read(args)
+        if reading:
             timeout = self.read_timeout
             extra["GIT_OPTIONAL_LOCKS"] = "0"
         child = real_env.base(extra) if self._ambient is None else {**self._ambient, **extra}
@@ -174,13 +176,12 @@ class RealRepo:
                     # Git resolves hooksPath, includes and environment overrides itself. Its child_start
                     # event proves an executable hook actually ran, even when that hook printed nothing.
                     child["GIT_TRACE2_EVENT"] = str(trace)
-                done = subprocess.run(
+                done = real_spawn.run(
                     [*real_env.argv_prefix(cwd, pin_env), *args],
-                    check=False,
-                    capture_output=True,
                     env=child,
                     timeout=timeout,
-                    input=None if stdin is None else stdin.encode("utf-8", "surrogateescape"),
+                    stdin=None if stdin is None else stdin.encode("utf-8", "surrogateescape"),
+                    group=reading,
                 )
                 hooks, hook_exits = _trace_hooks(trace) if trace is not None else ((), ())
         except subprocess.TimeoutExpired as exc:
