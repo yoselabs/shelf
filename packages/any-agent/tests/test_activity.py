@@ -91,3 +91,32 @@ class TestCodec:
             '{"k":"message","s":"finished","at":true,"t":""}',
         ):
             assert decode(line) is None
+
+
+class TestHostileLines:
+    def test_a_time_that_is_not_finite_is_not_a_record(self):
+        for at in ("NaN", "Infinity", "-Infinity", "1e999", "1" + "0" * 400):
+            assert decode(f'{{"k":"message","s":"finished","at":{at},"t":"x"}}') is None
+
+    def test_counts_are_whole_non_negative_and_bounded(self):
+        a = decode('{"k":"command","s":"finished","at":1,"t":"x","w":2.6,"d":-5,"x":1}')
+        assert (a.waited_ms, a.duration_ms, a.exit_code) == (3, 0, 1)
+        b = decode('{"k":"command","s":"finished","at":1,"t":"x","w":NaN,"d":1e30}')
+        assert (b.waited_ms, b.duration_ms) == (None, 10**12)
+        assert decode('{"k":"command","s":"finished","at":1,"t":"x","d":"7"}').duration_ms is None
+
+    def test_an_id_and_a_name_are_capped_on_both_sides(self):
+        a = Activity(kind="tool", state="running", at=1.0, text="t", id="i" * 500, name="n" * 500)
+        back = decode(encode(a))
+        assert (len(back.id), len(back.name)) == (200, 200)
+        assert len(decode(f'{{"k":"tool","s":"running","at":1,"t":"x","id":"{"j" * 900}"}}').id) == 200
+
+
+class TestScope:
+    def test_two_runs_that_restart_ids_do_not_share_one(self):
+        first, second = Timeline("a:"), Timeline("b:")
+        one = first.add(ev.Cmd(id="item_1", text="ls"), 1.0)[0]
+        two = second.add(ev.Cmd(id="item_1", text="pwd"), 2.0)[0]
+        assert one.id == "a:item_1" and two.id == "b:item_1"
+        (done,) = second.add(ev.CmdEnd(id="item_1", text="pwd", exit=0), 3.0)
+        assert done.id == "b:item_1" and done.duration_ms == 1000
