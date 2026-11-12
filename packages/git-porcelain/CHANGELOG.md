@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.18.0
+
+- `RealRepo(read_timeout=seconds)`: every read-only command (`status`, `diff`, `ls-files`, `ls-tree`, `rev-parse`, `rev-list`, `merge-base`, `cat-file`, `log`, `cherry`, `grep`, `for-each-ref`, `check-ignore`, `worktree list`; `real_reads.is_read`) is killed after that many seconds and raises `GitTimeout` ("git status timed out after 2s"), so a read that blocks (a FIFO at `$GIT_DIR/info/exclude`) no longer hangs the caller. Those commands also run with `GIT_OPTIONAL_LOCKS=0`. Writes (commit, checkout, add, update-ref, ...) are never bounded: killed midway they leave `index.lock`. Default `None`: no bound, nothing changes. A command Git cannot be killed out of (a dead NFS mount) still waits.
+
 ## 0.17.0
 
 - `Repo.remote_urls(remote, *, push=False) -> tuple[str, ...]`: every URL, as `git remote get-url --all [--push]`, each rewritten as `remote_url` rewrites one. A fetch reads only the first `url`, but a push goes to every `pushurl` (else to every `url`): a caller that must know where a push goes requires exactly one. FakeRepo lists a second value set with the new `FakeRepo.add_config(key, value)` (`git config --add`).
