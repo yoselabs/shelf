@@ -12,13 +12,13 @@ from typing import Literal
 from any_agent import events as ev
 from any_agent._json import Json, opt_int, opt_str, record
 
-Kind = Literal["command", "tool", "message", "error", "waiting"]
+Kind = Literal["command", "tool", "message", "think", "error", "waiting"]
 State = Literal["running", "finished"]
-KINDS: tuple[Kind, ...] = ("command", "tool", "message", "error", "waiting")
+KINDS: tuple[Kind, ...] = ("command", "tool", "message", "think", "error", "waiting")
 STATES: tuple[State, ...] = ("running", "finished")
 ID_CAP = 200  # characters of an `id` or a tool `name`
 MS_MAX = 10**12  # a duration or wait bigger than this (31 years) is not one
-CAPS: dict[str, int] = {"command": 600, "tool": 300, "message": 2000, "error": 500, "waiting": 200}
+CAPS: dict[str, int] = {"command": 600, "tool": 300, "message": 2000, "think": 2000, "error": 500, "waiting": 200}
 
 
 @record
@@ -111,6 +111,8 @@ class Timeline:
                 found = self._finish("tool", event.id, now, event.arg, event.secs, event.name)
             case ev.Msg() if event.text.strip():
                 found = self._once("message", now, event.text)
+            case ev.Think() if event.text.strip():  # only the words the harness gave; an empty or redacted block is no line
+                found = self._once("think", now, event.text)
             case ev.HarnessError():
                 found = self._once("error", now, event.text)
             case ev.Reconnecting() | ev.WaitingForNetwork():

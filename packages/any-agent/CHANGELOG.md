@@ -30,3 +30,5 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 - 0.6.0: new `any_agent.activity`: `Activity(kind command|tool|message|error|waiting, state running|finished, at, text, id, name, waited_ms, duration_ms, exit_code)`, `Timeline().add(event, now) -> list[Activity]` (folds `HarnessEvent`s and the caller's wall-clock time; a command or tool is a `running` then a `finished` record of one `id`), `encode(a) -> str` / `decode(line) -> Activity | None` (one JSON line); no change to the harnesses or the events
 
 - 0.6.1: `Timeline(scope="")` prefixes every id (a resumed run restarts the vendor's ids); `decode` refuses a non-finite or overflowing `at`, reads `w`/`d` as whole counts clamped to 0..10**12, caps `id` and `name` at 200 characters (`encode` too)
+
+- 0.7.0: `Activity.kind` and `KINDS` gain `think` (`ev.Think` with non-blank text -> one finished record, text capped at 2000); a blank `Think` yields none
