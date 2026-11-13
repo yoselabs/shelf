@@ -5,7 +5,15 @@ A harness builds the launch and parses the CLI's stream into typed events once; 
 vendor said into one reason. Callers inject what they own: the live sink, the lane-gone check, the secret policy, the network probe.
 """
 
-from any_agent import activity, events, vendors
+from any_agent import access, activity, events, vendors
+from any_agent.access import (
+    AccessPolicy,
+    ClaudeAccess,
+    ClaudePermissionMode,
+    CodexAccess,
+    CodexApproval,
+    CodexSandbox,
+)
 from any_agent.answer import Answer, DecodedAnswer, InvalidAnswer, MissingAnswer, decode_answer
 from any_agent.classify import Outcome, classify
 from any_agent.harnesses.claude import ClaudeHarness
@@ -16,9 +24,15 @@ from any_agent.supervisor import LiveSink, LogWatcher, NullSink, RunHooks, RunOu
 from any_agent.watch import Limits
 
 __all__ = [
+    "AccessPolicy",
     "Answer",
+    "ClaudeAccess",
     "ClaudeHarness",
+    "ClaudePermissionMode",
+    "CodexAccess",
+    "CodexApproval",
     "CodexHarness",
+    "CodexSandbox",
     "DecodedAnswer",
     "Evidence",
     "Harness",
@@ -38,6 +52,7 @@ __all__ = [
     "Stop",
     "Summary",
     "Supervisor",
+    "access",
     "activity",
     "classify",
     "decode_answer",

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, override
 from any_agent import events as ev
 from any_agent import procs
 from any_agent._json import Json, obj, objs, opt_int, opt_str, text
+from any_agent.access import CodexAccess, refuse
 from any_agent.protocol import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from any_agent.sealed import SealedDir
 from any_agent.watch import Limits
@@ -102,14 +103,18 @@ class CodexHarness(Quiet):
             msg = "Codex resume must name an explicit session"
             raise ValueError(msg)
         self.out_file = i.out_file
+        access = i.access_policy
+        if access is not None and not isinstance(access, CodexAccess):
+            refuse("codex", access)
+        sandbox = str(access.sandbox) if access is not None else i.sandbox
         argv = [i.exe, "exec", *(["resume"] if i.resume is not None else [])]
         if i.model:
             argv += ["-m", i.model]
         if i.effort:
             argv += ["-c", "model_reasoning_effort=" + json.dumps(i.effort)]
-        if i.sandbox:
-            argv += ["-c", "sandbox_mode=" + json.dumps(i.sandbox)] if i.resume is not None else ["-s", i.sandbox]
-        argv += i.access + i.isolation + ["--json"]
+        if sandbox:
+            argv += ["-c", "sandbox_mode=" + json.dumps(sandbox)] if i.resume is not None else ["-s", sandbox]
+        argv += (access.config() if access is not None else []) + i.access + i.isolation + ["--json"]
         if i.out_file:
             argv += ["-o", i.out_file]
         if i.schema:

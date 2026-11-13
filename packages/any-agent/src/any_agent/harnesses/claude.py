@@ -11,6 +11,7 @@ from typing import override
 from any_agent import drops, procs
 from any_agent import events as ev
 from any_agent._json import Json, container, num, obj, objs, opt_int, opt_str, text
+from any_agent.access import ClaudeAccess, refuse
 from any_agent.protocol import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from any_agent.sealed import SealedDir
 from any_agent.watch import Limits
@@ -135,6 +136,9 @@ def launch_env(env: dict[str, str], auth: str = "subscription") -> dict[str, str
 def launch_argv(i: LaunchInputs) -> list[str]:
     """The argv of one run. Raises ValueError for a flag the harness never passes (the caller's `exe` is never inspected)."""
     tools = ["Read", "Glob", "Grep"] + (["Edit", "Write"] if i.write else []) + ["Bash"]  # read-only steps: Bash limited by the guard
+    access = i.access_policy if i.access_policy is not None else ClaudeAccess()
+    if not isinstance(access, ClaudeAccess):
+        refuse("claude", access)
     argv = [i.exe, "-p", "--output-format", "stream-json", "--verbose", "--model", i.model, "--effort", i.effort]
     argv += ["--resume", i.resume] if i.resume else ["--session-id", i.session]
     argv += [
@@ -145,11 +149,11 @@ def launch_argv(i: LaunchInputs) -> list[str]:
         ",".join(tools),
         "--strict-mcp-config",
         "--permission-mode",
-        "auto",
+        str(access.permission_mode),
         "--permission-prompts",
         "none",
         "--settings",
-        i.settings,
+        access.settings or i.settings,
     ]
     argv += ["--json-schema", Path(i.schema).read_text(encoding="utf-8")] if i.schema else []
     bad = [f for f in FORBIDDEN_FLAGS if f in argv]
