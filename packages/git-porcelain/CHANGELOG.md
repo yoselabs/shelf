@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.19.0
+
+Three operations a caller needs to preserve a checkout's work as a commit on a branch without touching that checkout, with real and fake under one contract:
+
+- `Worktree.capture() -> TreeId`: the tree of the checkout's final working state, made through a private copy of the index (`GIT_INDEX_FILE`), so the real index, HEAD, refs and working files are untouched. It starts from the paths already indexed (an indexed path stays in even when an ignore rule now matches it), `add -A` lets every working file win over its staged version and records deletions, and untracked files that no ignore rule hides come in; ignored untracked files stay out and on disk. Unresolved merge entries raise the new `UnmergedPaths(paths)`, and a repository nested in the checkout (a gitlink git would record instead of its files) the new `EmbeddedRepositories(paths)`; nothing is half-made. Filters configured for the repository still run, as for `record`.
+- `Repo.commit_tree(tree, parents, message, *, when=None) -> Sha`: a commit of a tree id with exactly the given parents, in order (none: a root commit), in Git objects only (`git commit-tree --no-gpg-sign`: no ref, index, checkout or hook), with the repository's identity. With `when` (seconds since the epoch, UTC) both dates are fixed, so the same tree, parents, message and `when` give the same commit id and a caller that crashed before recording it gets it back. A missing tree or parent raises `MissingRevision`.
+- `Repo.update_ref(ref, new, *, expected) -> RefUpdated(sha) | RefMoved(actual)`: compare and swap in one `git update-ref` call; `expected=None` means the ref must not exist, and `RefMoved.actual` is what the ref names now (None: nothing). Nothing changes on `RefMoved`. A checkout that has the branch out keeps its old index until `Worktree.reset(new)` (mixed) brings it up, with no working file touched.
+
 ## 0.18.1
 
 - A bounded read (`read_timeout`) runs as the leader of its own process group (`real_spawn.run`) and its timeout kills the whole group, so a Git child (the fsmonitor program, a filter, a per-submodule `git`) blocked on the same file no longer outlives the timeout holding the pipes. Writes and remote calls keep `subprocess.run`. The residual changes: a process in another group or session, or one stuck in an uninterruptible file-system call (a dead NFS mount), still waits.

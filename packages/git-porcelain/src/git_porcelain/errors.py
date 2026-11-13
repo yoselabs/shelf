@@ -111,6 +111,23 @@ class BranchPinned(GitUnavailable):
         self.holder = holder
 
 
+class UnmergedPaths(GitUnavailable):
+    """The index holds unresolved merge entries; ``paths`` names them."""
+
+    def __init__(self, message: str, paths: tuple[str, ...], *, output: str | None = None) -> None:
+        super().__init__(message, output=output)
+        self.paths = paths
+
+
+class EmbeddedRepositories(GitUnavailable):
+    """The work holds a repository nested in the checkout, which git would record only as a gitlink (not its files);
+    ``paths`` names them."""
+
+    def __init__(self, message: str, paths: tuple[str, ...], *, output: str | None = None) -> None:
+        super().__init__(message, output=output)
+        self.paths = paths
+
+
 _INDEX_LOCK = re.compile(r"index\.lock")
 _REF_STALE = re.compile(r"incorrect old value|is at \S+ but expected \S+")
 # git 2.53 words a fetch that loses the race to create a ref this way instead of naming the lock.
@@ -171,6 +188,7 @@ __all__ = [
     "BranchExists",
     "BranchPinned",
     "DirtyTree",
+    "EmbeddedRepositories",
     "GitError",
     "GitReadFailure",
     "GitTimeout",
@@ -182,6 +200,7 @@ __all__ = [
     "NotFastForward",
     "RefRace",
     "TagExists",
+    "UnmergedPaths",
     "WorktreeRemoveRefused",
     "failure",
     "some",

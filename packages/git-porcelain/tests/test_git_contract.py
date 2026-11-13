@@ -608,6 +608,7 @@ def _nested_repository(world: World, name: str, rel: str, files: str) -> None:
     assert not isinstance(wt, FakeWorktree), "FakeRepo holds no nested repositories"
     (wt.path / rel).mkdir(parents=True)
     run(wt.path / rel, "init", "-q")
+    run(wt.path / rel, "-c", "user.name=n", "-c", "user.email=n@x.invalid", "commit", "-q", "--allow-empty", "-m", "n")
     for path, text in _files(files):
         world.rig.write(wt, f"{rel}/{path}", text)
 
@@ -661,12 +662,12 @@ def _stage_rename(world: World, name: str, old: str, new: str) -> None:
         run(wt.path, "mv", "--", old, new)
 
 
-@given(parsers.re(r'"(?P<name>\w+)" remembers (?P<expr>\w+\(.*\)\.[\w.]+) as "(?P<label>[^"]+)"'))
-@when(parsers.re(r'"(?P<name>\w+)" remembers (?P<expr>\w+\(.*\)\.[\w.]+) as "(?P<label>[^"]+)"'))
+@given(parsers.re(r'"(?P<name>\w+)" remembers (?:the result of )?(?P<expr>\w+\(.*\)(?:\.[\w.]+)?) as "(?P<label>[^"]+)"'))
+@when(parsers.re(r'"(?P<name>\w+)" remembers (?:the result of )?(?P<expr>\w+\(.*\)(?:\.[\w.]+)?) as "(?P<label>[^"]+)"'))
 def _remember(world: World, name: str, expr: str, label: str) -> None:
-    call, _, attr = expr.rpartition(").")
-    value = _call(world, name, call + ")")
-    world.memory[label] = _plain(_dig(value, attr))
+    call, dot, attr = expr.rpartition(").")
+    value = _call(world, name, call + ")" if dot else expr)
+    world.memory[label] = _plain(_dig(value, attr) if dot else value)
 
 
 @given(parsers.parse('"{name}" calls {call}'))

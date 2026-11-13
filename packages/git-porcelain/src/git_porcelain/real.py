@@ -20,6 +20,7 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
 from git_porcelain import (
+    real_capture,
     real_checkout,
     real_commands,
     real_env,
@@ -52,6 +53,7 @@ if TYPE_CHECKING:
         RebaseResult,
         RecordResult,
         RefEntry,
+        RefUpdate,
         Relation,
         Released,
         RemoteRefs,
@@ -63,6 +65,7 @@ if TYPE_CHECKING:
         SyncResult,
         TakeResult,
         Tree,
+        TreeId,
         WorktreeInfo,
     )
     from git_porcelain.history import Identity
@@ -259,6 +262,12 @@ class RealRepo:
     def squash(self, onto: str, head: str, message: str) -> SquashResult:
         return real_squash.squash(self, onto, head, message)
 
+    def commit_tree(self, tree: str, parents: Sequence[str], message: str, *, when: int | None = None) -> Sha:
+        return real_capture.commit_tree(self, tree, tuple(parents), message, when=when)
+
+    def update_ref(self, ref: str, new: str, *, expected: str | None) -> RefUpdate:
+        return real_capture.update_ref(self, ref, new, expected)
+
     def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> CommandResult:
         return real_remote.fetch(self, remote, refspecs, timeout)
 
@@ -360,6 +369,9 @@ class RealWorktree:
 
     def snapshot(self, base: str, *, inputs: Sequence[str] = ()) -> Snapshot:
         return real_read.snapshot(self, base, inputs=inputs)
+
+    def capture(self) -> TreeId:
+        return real_capture.capture(self)
 
     def diff(self, a: str, b: str, *, exclude: Sequence[str] = (), cap: int | None = None) -> Diff:
         return real_read.diff(self, a, b, exclude=tuple(exclude), cap=cap)

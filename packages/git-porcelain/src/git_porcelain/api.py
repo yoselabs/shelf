@@ -46,8 +46,11 @@ from git_porcelain.api_results import (
     RecordResult,
     Ref,
     RefEntry,
+    RefMoved,
     RefRejected,
     Refs,
+    RefUpdate,
+    RefUpdated,
     Rejected,
     Relation,
     Released,
@@ -101,7 +104,10 @@ __all__ = [
     "Recorded",
     "Ref",
     "RefEntry",
+    "RefMoved",
     "RefRejected",
+    "RefUpdate",
+    "RefUpdated",
     "Refs",
     "Rejected",
     "Relation",
@@ -183,6 +189,21 @@ class Repo(Protocol):
         base as the base), made in Git objects only: no checkout, index, ref or hook is touched and nothing is signed.
         ``Conflicted`` with the conflicted paths when the merge does not resolve. Author and committer are the
         repository's identity. Missing revisions raise MissingRevision, unrelated histories GitUnavailable."""
+        ...
+
+    def commit_tree(self, tree: str, parents: Sequence[str], message: str, *, when: int | None = None) -> Sha:
+        """A commit of ``tree`` (a tree id, as ``Worktree.capture`` returns) with exactly these ``parents`` (revisions;
+        none makes a root commit), in that order, made in Git objects only: no checkout, index, ref or hook is touched
+        and nothing is signed. Author and committer are the repository's identity. With ``when`` (seconds since the epoch,
+        UTC) both dates are fixed, so the same tree, parents, message and ``when`` give the same commit: a caller that
+        crashed before recording the id makes it again and gets it back. Missing revisions raise MissingRevision."""
+        ...
+
+    def update_ref(self, ref: str, new: str, *, expected: str | None) -> RefUpdate:
+        """Point the full ref name ``ref`` at the commit ``new`` only if it still names ``expected`` (``None``: only if
+        it does not exist): ``RefUpdated``, or ``RefMoved`` with what the ref names now (``None``: nothing) and no change.
+        Compare and swap in one git call, so a concurrent writer is never overwritten. A checkout that has the branch
+        out keeps its old index and HEAD content: ``Worktree.reset`` brings it to the new commit."""
         ...
 
     def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> CommandResult:
@@ -325,6 +346,14 @@ class Worktree(Protocol):
     def snapshot(self, base: str, *, inputs: Sequence[str] = ()) -> Snapshot:
         """The work as git would commit it, plus head, branch and base. ``inputs`` are literal
         paths (files or directories) included even when ignored; the real index is untouched."""
+        ...
+
+    def capture(self) -> TreeId:
+        """The tree of this checkout's final working state: what is indexed (a path stays in even when an ignore rule
+        now matches it), with every working file winning over its staged version, deletions included, and the untracked
+        files that no ignore rule hides. Ignored untracked files stay out and on disk. Made in Git objects through a
+        private copy of the index: the real index, HEAD, refs and working files are untouched. Unresolved merge entries
+        raise UnmergedPaths and a nested repository EmbeddedRepositories; nothing is left half-made."""
         ...
 
     def diff(self, a: str, b: str, *, exclude: Sequence[str] = (), cap: int | None = None) -> Diff:

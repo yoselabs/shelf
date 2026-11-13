@@ -24,8 +24,8 @@ from __future__ import annotations
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Literal, Self
 
+from git_porcelain import fake_capture, fake_commands, fake_operations, fake_remote, fake_squash
 from git_porcelain import fake_checkout as checkout_ops
-from git_porcelain import fake_commands, fake_operations, fake_remote, fake_squash
 from git_porcelain import fake_flow as flow
 from git_porcelain import fake_read as read
 from git_porcelain import fake_write as write
@@ -52,6 +52,7 @@ if TYPE_CHECKING:
         RebaseResult,
         RecordResult,
         RefEntry,
+        RefUpdate,
         Relation,
         Released,
         RemoteRefs,
@@ -62,6 +63,7 @@ if TYPE_CHECKING:
         SyncResult,
         TakeResult,
         Tree,
+        TreeId,
         WorktreeInfo,
     )
 
@@ -208,6 +210,12 @@ class FakeRepo:
 
     def squash(self, onto: str, head: str, message: str) -> SquashResult:
         return fake_squash.squash(self._state, self._anchor(), onto, head, message)
+
+    def commit_tree(self, tree: str, parents: Sequence[str], message: str, *, when: int | None = None) -> Sha:
+        return fake_capture.commit_tree(self._state, self._anchor(), tree, tuple(parents), message, when=when)
+
+    def update_ref(self, ref: str, new: str, *, expected: str | None) -> RefUpdate:
+        return fake_capture.update_ref(self._state, self._anchor(), ref, new, expected)
 
     def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> CommandResult:
         _ = timeout  # In-memory operations have no elapsed process time.
@@ -378,6 +386,9 @@ class FakeWorktree:
 
     def snapshot(self, base: str, *, inputs: Sequence[str] = ()) -> Snapshot:
         return read.snapshot(self._repo, self.state(), base, inputs=inputs)
+
+    def capture(self) -> TreeId:
+        return fake_capture.capture(self._repo, self.state())
 
     def diff(self, a: str, b: str, *, exclude: Sequence[str] = (), cap: int | None = None) -> Diff:
         return read.diff(self._repo, self.state(), a, b, exclude=tuple(exclude), cap=cap)
