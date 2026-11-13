@@ -114,7 +114,7 @@ class CodexHarness(Quiet):
             argv += ["-c", "model_reasoning_effort=" + json.dumps(i.effort)]
         if sandbox:
             argv += ["-c", "sandbox_mode=" + json.dumps(sandbox)] if i.resume is not None else ["-s", sandbox]
-        argv += (access.config() if access is not None else []) + i.access + i.isolation + ["--json"]
+        argv += (access.flags() + access.config() if access is not None else []) + i.access + i.isolation + ["--json"]
         if i.out_file:
             argv += ["-o", i.out_file]
         if i.schema:
