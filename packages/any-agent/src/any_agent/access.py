@@ -63,29 +63,58 @@ class CodexAccess:
     approval: CodexApproval | None = None  # None = codex's own default
     network: bool | None = None  # workspace-write network access; None = codex's own default
     writable_roots: tuple[str, ...] = ()  # workspace-write extra writable folders, absolute
+    exclude_slash_tmp: bool | None = None  # workspace-write: /tmp is not writable by default; None = codex's own default
+    exclude_tmpdir: bool | None = None  # workspace-write: $TMPDIR is not writable by default; None = codex's own default
+    tool_output_token_limit: int | None = None
+    ignore_user_config: bool = False  # `exec` only: the person's config.toml is not read
+    ignore_rules: bool = False  # `exec` only: the person's exec rules are not read
+    shell_env: tuple[tuple[str, str], ...] = ()  # variables only the agent's shell commands get (shell_environment_policy.set)
 
     def __post_init__(self) -> None:
         CodexSandbox(self.sandbox)  # a plain string must be one of the closed vocabulary
         if self.approval is not None:
             CodexApproval(self.approval)
-        if self.sandbox != CodexSandbox.WORKSPACE_WRITE and (self.network is not None or self.writable_roots):
-            msg = "codex network and writable_roots apply to the workspace-write sandbox only"
+        tuned = (self.network, self.exclude_slash_tmp, self.exclude_tmpdir)
+        if self.sandbox != CodexSandbox.WORKSPACE_WRITE and (any(t is not None for t in tuned) or self.writable_roots):
+            msg = "codex network, writable_roots and the temp-folder exclusions apply to the workspace-write sandbox only"
+            raise ValueError(msg)
+        if self.tool_output_token_limit is not None and self.tool_output_token_limit <= 0:
+            msg = "codex tool_output_token_limit must be positive"
             raise ValueError(msg)
         bad = [r for r in self.writable_roots if not r.startswith("/")]
         if bad:
             msg = f"codex writable_roots must be absolute: {', '.join(bad)}"
             raise ValueError(msg)
 
+    def flags(self) -> list[str]:
+        """The `codex exec` options of this policy (`codex sandbox` takes none of them)."""
+        return [f for f, on in (("--ignore-user-config", self.ignore_user_config), ("--ignore-rules", self.ignore_rules)) if on]
+
     def config(self) -> list[str]:
-        """The `-c key=value` flags the choices beyond the sandbox itself need."""
-        out: list[str] = []
+        """The `-c key=value` flags the choices beyond the sandbox mode itself need; `exec` and `sandbox` both take them."""
+        pairs: list[tuple[str, object]] = []
         if self.approval is not None:
-            out += ["-c", "approval_policy=" + json.dumps(str(self.approval))]
-        if self.network is not None:
-            out += ["-c", "sandbox_workspace_write.network_access=" + json.dumps(self.network)]
-        if self.writable_roots:
-            out += ["-c", "sandbox_workspace_write.writable_roots=" + json.dumps(list(self.writable_roots))]
-        return out
+            pairs.append(("approval_policy", str(self.approval)))
+        pairs += [("sandbox_workspace_write." + k, v) for k, v in self._write_keys()]
+        if self.tool_output_token_limit is not None:
+            pairs.append(("tool_output_token_limit", self.tool_output_token_limit))
+        pairs += [("shell_environment_policy.set." + k, v) for k, v in self.shell_env]
+        return [part for k, v in pairs for part in ("-c", f"{k}={json.dumps(v)}")]
+
+    def _write_keys(self) -> list[tuple[str, object]]:
+        keys: list[tuple[str, object]] = [
+            ("network_access", self.network),
+            ("exclude_slash_tmp", self.exclude_slash_tmp),
+            ("exclude_tmpdir_env_var", self.exclude_tmpdir),
+        ]
+        keys = [(k, v) for k, v in keys if v is not None]
+        return keys + ([("writable_roots", list(self.writable_roots))] if self.writable_roots else [])
+
+    def sandbox_argv(self, exe: str, command: list[str]) -> list[str]:
+        """`codex sandbox` running `command` under this policy: the mode as a config key, then `config()`. The person's Codex config is
+        read beneath these keys, as `codex sandbox` has no `--ignore-user-config`; the use of this to prove the host can enforce the
+        policy before a launch is the caller's."""
+        return [exe, "sandbox", "-c", "sandbox_mode=" + json.dumps(str(self.sandbox)), *self.config(), "--", *command]
 
 
 type AccessPolicy = ClaudeAccess | CodexAccess

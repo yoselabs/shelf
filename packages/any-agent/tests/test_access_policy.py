@@ -85,3 +85,37 @@ def test_codex_refuses_choices_its_sandbox_cannot_honour():
         CodexAccess(writable_roots=("rel",))
     with pytest.raises(ValueError, match="not a valid CodexSandbox"):
         CodexAccess(sandbox="yolo")  # type: ignore[arg-type]
+
+
+def test_codex_policy_covers_the_factorys_restrictive_access_and_its_sandbox_probe():
+    policy = CodexAccess(
+        approval=CodexApproval.NEVER,
+        network=False,
+        writable_roots=("/t", "/c"),
+        exclude_slash_tmp=True,
+        exclude_tmpdir=True,
+        tool_output_token_limit=3000,
+        ignore_user_config=True,
+        ignore_rules=True,
+        shell_env=(("TMPDIR", "/t"),),
+    )
+    argv = CodexHarness().launch_spec(make(access_policy=policy)).argv
+    assert {"--ignore-user-config", "--ignore-rules"} <= set(argv)
+    for key in (
+        "sandbox_workspace_write.exclude_slash_tmp=true",
+        "sandbox_workspace_write.exclude_tmpdir_env_var=true",
+        "tool_output_token_limit=3000",
+        'shell_environment_policy.set.TMPDIR="/t"',
+    ):
+        assert key in argv
+    probe = policy.sandbox_argv("/bin/codex", ["/bin/sh", "-c", "true"])
+    assert probe[:4] == ["/bin/codex", "sandbox", "-c", 'sandbox_mode="workspace-write"']
+    assert probe[-4:] == ["--", "/bin/sh", "-c", "true"]
+    assert not {"--ignore-user-config", "--ignore-rules"} & set(probe)  # `codex sandbox` takes neither
+
+
+def test_codex_refuses_a_temp_exclusion_outside_workspace_write_and_a_bad_limit():
+    with pytest.raises(ValueError, match="workspace-write sandbox only"):
+        CodexAccess(sandbox=CodexSandbox.READ_ONLY, exclude_slash_tmp=True)
+    with pytest.raises(ValueError, match="must be positive"):
+        CodexAccess(tool_output_token_limit=0)
