@@ -2581,3 +2581,140 @@ Feature: One Repo and Worktree, real or fake
     When "r" config "url.expanded/.insteadOf" becomes "<root>/"
     And "r" calls remote_url("origin", push=True)
     Then the result is "expanded/elsewhere.git"
+
+  # -- capture, commit_tree, update_ref: preserving a checkout's work without touching it -------------
+  Scenario: Capture names the final working state and leaves the checkout alone
+    Given a repository "r"
+    And "r" commits "root" with .gitignore="*.cache\n", a.txt="1\n", b.txt="b\n", c.txt="c\n"
+    And "r" writes a.txt="staged\n"
+    And "r" stages ["a.txt"]
+    And "r" writes a.txt="final\n", new.txt="new\n", junk.cache="junk\n"
+    And "r" removes "b.txt"
+    And "r" remembers its refs, head and status
+    When "r" remembers the result of capture() as "t"
+    Then the refs, head and status of "r" are unchanged
+    And the index of "r" reads "a.txt" as "staged\n"
+    And the file "junk.cache" of "r" holds "junk\n"
+    When "r" calls tree("<mem:t>")
+    Then the tree lists [".gitignore", "a.txt", "c.txt", "new.txt"]
+    And the tree reads "a.txt" as "final\n"
+    And the tree reads "new.txt" as "new\n"
+
+  Scenario: An indexed path stays captured when an ignore rule now matches it
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    And "r" writes late.cache="late\n"
+    And "r" stages ["late.cache"]
+    And "r" writes .gitignore="*.cache\n", other.cache="other\n"
+    When "r" remembers the result of capture() as "t"
+    And "r" calls tree("<mem:t>")
+    Then the tree lists [".gitignore", "a.txt", "late.cache"]
+
+  Scenario: A clean checkout captures its own commit's tree
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    When "r" remembers snapshot("HEAD").head_tree as "head_tree"
+    And "r" calls capture()
+    Then the result is "<mem:head_tree>"
+
+  Scenario: Capture refuses unresolved merge entries
+    Given an origin "o"
+    And the origin "o" holds a.txt="1\n"
+    And "r" is a clone of the origin "o"
+    And "r" commits "mine" with a.txt="mine\n"
+    And the origin "o" advances "main" with a.txt="theirs\n"
+    And "r" calls sync()
+    And "r" calls rebase_onto("origin/main")
+    When "r" tries capture()
+    Then the call raises UnmergedPaths
+
+  @real_only
+  Scenario: Capture refuses a repository nested in the checkout
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    When "r" makes a nested repository "dep" holding f.txt="f\n"
+    And "r" tries capture()
+    Then the call raises EmbeddedRepositories
+
+  Scenario: A commit of a captured tree takes exactly the parents given, and names no ref
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    And "r" remembers its head as "root"
+    And "r" calls checkout_new("side")
+    And "r" commits "side" with s.txt="s\n"
+    And "r" remembers its head as "side"
+    And "r" calls checkout("main")
+    And "r" writes w.txt="w\n"
+    And "r" remembers the result of capture() as "t"
+    And "r" remembers its refs, head and status
+    When "r" remembers the result of commit_tree("<mem:t>", ["<mem:root>", "<mem:side>"], "wip\n\nbody\n") as "wip"
+    Then the refs, head and status of "r" are unchanged
+    When "r" calls is_ancestor("<mem:side>", "<mem:wip>")
+    Then the result is True
+    When "r" calls is_ancestor("<mem:root>", "<mem:wip>")
+    Then the result is True
+    When "r" calls history(["<mem:wip>^"], limit=1)
+    Then the subject of each result entry is ["root"]
+    When "r" calls tree("<mem:wip>")
+    Then the tree lists ["a.txt", "w.txt"]
+
+  Scenario: The same tree, parents, message and time make the same commit
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    And "r" remembers its head as "root"
+    And "r" writes w.txt="w\n"
+    And "r" remembers the result of capture() as "t"
+    When "r" remembers the result of commit_tree("<mem:t>", ["<mem:root>"], "wip", when=1700000000) as "one"
+    And "r" calls commit_tree("<mem:t>", ["<mem:root>"], "wip", when=1700000000)
+    Then the result is "<mem:one>"
+    When "r" remembers the result of commit_tree("<mem:t>", [], "root-less", when=1700000000) as "free"
+    And "r" calls history(["<mem:free>"], limit=2)
+    Then the subject of each result entry is ["root-less"]
+
+  Scenario: A commit of a missing tree or parent is refused
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    When "r" tries commit_tree("0123456789012345678901234567890123456789", [], "x")
+    Then the call raises MissingRevision
+
+  Scenario: A ref moves only from its expected value
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    And "r" remembers its head as "root"
+    And "r" commits "next" with a.txt="2\n"
+    And "r" remembers its head as "next"
+    When "r" calls update_ref("refs/heads/wip", "<mem:root>", expected=None)
+    Then the result is a RefUpdated
+    And the result's sha is "<mem:root>"
+    When "r" calls update_ref("refs/heads/wip", "<mem:next>", expected=None)
+    Then the result is a RefMoved
+    And the result's actual is "<mem:root>"
+    When "r" calls update_ref("refs/heads/wip", "<mem:next>", expected="<mem:next>")
+    Then the result is a RefMoved
+    And the result's actual is "<mem:root>"
+    When "r" calls update_ref("refs/heads/wip", "<mem:next>", expected="<mem:root>")
+    Then the result is a RefUpdated
+    When "r" calls refs(["refs/heads/wip"])
+    Then the result's 0.sha is "<mem:next>"
+
+  Scenario: A ref that is missing is a move away from an expected value
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n"
+    When "r" calls update_ref("refs/heads/gone", "HEAD", expected="HEAD")
+    Then the result is a RefMoved
+    And the result's actual is None
+
+  Scenario: A checkout on the branch catches up to a moved ref without losing its files
+    Given a repository "r"
+    And "r" commits "root" with .gitignore="*.cache\n", a.txt="1\n"
+    And "r" writes a.txt="work\n", new.txt="new\n", junk.cache="junk\n"
+    And "r" remembers its head as "root"
+    And "r" remembers the result of capture() as "t"
+    And "r" remembers the result of commit_tree("<mem:t>", ["<mem:root>"], "wip") as "wip"
+    When "r" calls update_ref("refs/heads/main", "<mem:wip>", expected="<mem:root>")
+    And "r" calls reset("<mem:wip>")
+    And "r" calls dirty()
+    Then the result's tracked is []
+    And the result's untracked is []
+    And the file "a.txt" of "r" holds "work\n"
+    And the file "junk.cache" of "r" holds "junk\n"

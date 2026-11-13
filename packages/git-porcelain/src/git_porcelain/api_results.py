@@ -36,7 +36,10 @@ __all__ = [
     "Recorded",
     "Ref",
     "RefEntry",
+    "RefMoved",
     "RefRejected",
+    "RefUpdate",
+    "RefUpdated",
     "Refs",
     "Rejected",
     "Relation",
@@ -414,6 +417,23 @@ FinishResult = Rebased | Conflict | Aborted
 PushResult = Pushed | Rejected | Transient | HookRejected | RemoteRejected
 SyncResult = Synced | Offline
 SquashResult = Squashed | Conflicted
+
+
+@dataclass(frozen=True)
+class RefUpdated:
+    """``Repo.update_ref`` moved (or created) the ref: it now names ``sha``."""
+
+    sha: Sha
+
+
+@dataclass(frozen=True)
+class RefMoved:
+    """``Repo.update_ref`` found the ref at ``actual`` (None: it does not exist), not at the expected value. Nothing changed."""
+
+    actual: Sha | None
+
+
+RefUpdate = RefUpdated | RefMoved
 
 
 @dataclass(frozen=True)
