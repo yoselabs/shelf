@@ -10,6 +10,7 @@ from typing import Protocol
 
 from any_agent import events as ev
 from any_agent._json import Json, mutable, record
+from any_agent.access import AccessPolicy
 from any_agent.events import HarnessEvent
 from any_agent.watch import Limits
 
@@ -39,6 +40,7 @@ class LaunchInputs:
     )
     sealed: bool = False  # claude, codex: a pure completion: only `system` and `prompt` reach the model; see any_agent.sealed
     read_roots: tuple[str, ...] = ()  # opencode: folders outside cwd a write step may read
+    access_policy: AccessPolicy | None = None  # claude: ClaudeAccess, codex: CodexAccess; None = defaults, see access.py
     engine_only: tuple[str, ...] = ()  # opencode: recipes only the caller runs, denied in the bash permission rules of a write step
 
 
