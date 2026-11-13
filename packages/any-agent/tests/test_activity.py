@@ -35,9 +35,10 @@ class TestCodex:
         message = next(a for a in found if a.kind == "message")
         assert message.text == "done" and message.state == "finished" and message.waited_ms is not None
 
-    def test_reasoning_tokens_and_unknown_lines_make_no_activity(self):
-        texts = [a.text for a in replay(CodexHarness(), "codex_session.jsonl")]
-        assert "plan the change" not in texts and "secret" not in " ".join(texts)
+    def test_reasoning_text_is_a_think_line_and_unknown_lines_make_no_activity(self):
+        found = replay(CodexHarness(), "codex_session.jsonl")
+        assert [a.text for a in found if a.kind == "think"] == ["plan the change"]
+        assert "secret" not in " ".join(a.text for a in found)
 
     def test_a_retry_and_a_failure_are_waiting_and_error(self):
         kinds = {a.kind for a in replay(CodexHarness(), "codex_reconnecting.jsonl")}
@@ -69,6 +70,12 @@ class TestTimeline:
     def test_a_shell_wrapper_is_not_shown(self):
         wrapped = ("/run/bin/bash -lc 'ls -la'", "sh -c \"echo 'a b'\"", "bash -lc", "ls -la")
         assert [Timeline().add(ev.Cmd(id="a", text=t), 1.0)[0].text for t in wrapped] == ["ls -la", "echo 'a b'", "bash -lc", "ls -la"]
+
+    def test_thinking_is_a_line_only_when_the_harness_gave_words(self):
+        timeline = Timeline()
+        (found,) = timeline.add(ev.Think(text="check the schema first"), 5.0)
+        assert (found.kind, found.state, found.text) == ("think", "finished", "check the schema first")
+        assert timeline.add(ev.Think(text="  "), 6.0) == []  # a redacted or empty block invents no line
 
     def test_text_is_cut_to_its_cap(self):
         (found,) = Timeline().add(ev.Msg(text="x" * 5000), 1.0)
