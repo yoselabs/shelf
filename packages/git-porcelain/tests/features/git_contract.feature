@@ -2711,6 +2711,46 @@ Feature: One Repo and Worktree, real or fake
     And "r" tries capture()
     Then the call raises EmbeddedRepositories
 
+  Scenario: Saved work is committed, the index follows it, and the checkout parks clean with its ignored files
+    Given a repository "r"
+    And "r" commits "base" with a.txt="1\n", b.txt="b\n"
+    And "r" remembers its head as "base"
+    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" writes a.txt="staged\n"
+    And "r" stages ["a.txt"]
+    And "r" writes a.txt="final\n", new.txt="n\n", keep.log="log\n"
+    And "r" removes "b.txt"
+    And "r" writes .gitignore="*.log\n"
+    And "r" remembers the result of capture() as "t"
+    And "r" remembers the result of commit_tree("<mem:t>", ["HEAD"], "wip", when=1700000000) as "wip"
+    And "r" calls update_ref("refs/heads/task/x", "<mem:wip>", expected="HEAD")
+    When "r" calls reset("<mem:wip>")
+    And "r" calls park("<mem:base>", keep_ignored=True)
+    And "r" calls dirty()
+    Then the result's tracked is []
+    And the result's untracked is []
+    And the file "a.txt" of "r" holds "1\n"
+    And the file "keep.log" of "r" holds "log\n"
+    When "r" calls tree("task/x")
+    Then the tree reads "a.txt" as "final\n"
+
+  Scenario: A detached checkout parks clean after the same save
+    Given a repository "r"
+    And "r" commits "base" with a.txt="1\n"
+    And "r" remembers its head as "base"
+    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls park("<mem:base>")
+    And "r" writes a.txt="mine\n", new.txt="n\n"
+    And "r" remembers the result of capture() as "t"
+    And "r" remembers the result of commit_tree("<mem:t>", ["task/x"], "wip", when=1700000000) as "wip"
+    And "r" calls update_ref("refs/heads/task/x", "<mem:wip>", expected="task/x")
+    When "r" calls reset("<mem:wip>")
+    And "r" calls park("<mem:base>", keep_ignored=True)
+    And "r" calls dirty()
+    Then the result's tracked is []
+    And the result's untracked is []
+    And the file "a.txt" of "r" holds "1\n"
+
   Scenario: A commit of a captured tree takes exactly the parents given, and names no ref
     Given a repository "r"
     And "r" commits "root" with a.txt="1\n"
