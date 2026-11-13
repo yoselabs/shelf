@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.0
+
+Ignore rules that belong to one checkout, and a park that keeps what is ignored there (so a slot saved with `capture` and parked at its base stays clean to plain `git status`, with its ignored files untouched, even when the saved work had changed the ignore rules):
+
+- `Worktree.exclude(patterns)`: append the missing patterns to this checkout's own ignore rules. The repository's `info/exclude` and every other checkout stay as they are; `dirty`, `capture`, `record`, `clean` and a plain `git status` in this checkout honor them. Real: a `worktree-exclude` file in the checkout's git directory, named by `core.excludesFile` in its `config.worktree` (this sets `extensions.worktreeConfig` on the repository, and the file replaces the user's global excludes file for that checkout). FakeRepo keeps the list per checkout, under `.gitignore` and `info/exclude`.
+- `Worktree.park(base, *, keep_ignored=False)`: with `keep_ignored`, the ignored untracked files of now (a wholly ignored folder is one entry) are added to the checkout's own excludes as exact-path rules before the checkout, so they stay ignored and on disk at `base` whatever its `.gitignore` says. When `base` tracks a file among them (the checkout would overwrite it) it raises the new `IgnoredFilesWouldBeOverwritten(paths)` and nothing changes.
+- `ignore_rules.literal_pattern(path)`: the rule that matches exactly one path (glob characters, leading `!`/`#` and trailing spaces escaped). FakeGit's matcher now reads `\x` as one literal character.
+
 ## 0.19.0
 
 Three operations a caller needs to preserve a checkout's work as a commit on a branch without touching that checkout, with real and fake under one contract:

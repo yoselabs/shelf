@@ -1,7 +1,7 @@
 """A gitignore matcher for FakeGit: the common subset (globs, ``**``, anchoring, folder-only, negation).
 
-Not covered: a ``.gitignore`` below the root, ``.git/info/exclude``, character classes beyond ``[...]``
-passed through, escapes. The contract suite pins what is covered.
+Not covered: a ``.gitignore`` below the root, character classes beyond ``[...]`` passed through, any escape but
+``\\x`` (one literal character). The contract suite pins what is covered.
 """
 
 from __future__ import annotations
@@ -25,6 +25,9 @@ def _glob(pattern: str) -> str:
         elif pattern.startswith("/**", i) and i + 3 == len(pattern):
             out.append("/.*")
             i += 3
+        elif pattern[i] == "\\" and i + 1 < len(pattern):
+            out.append(re.escape(pattern[i + 1]))
+            i += 2
         elif pattern[i] == "*":
             out.append("[^/]*")
             i += 1
@@ -55,7 +58,7 @@ class Ignore:
     """Rules in order of precedence: the last one that matches decides."""
 
     def __init__(self, lines: Iterable[str]) -> None:
-        stripped = (line.rstrip() for line in lines)
+        stripped = (re.sub(r"(?<!\\) +$", "", line) for line in lines)
         self._rules = [_Rule(line) for line in stripped if line and not line.startswith("#")]
 
     def _verdict(self, path: str, *, is_folder: bool) -> bool:

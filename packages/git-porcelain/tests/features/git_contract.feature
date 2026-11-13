@@ -2582,6 +2582,81 @@ Feature: One Repo and Worktree, real or fake
     And "r" calls remote_url("origin", push=True)
     Then the result is "expanded/elsewhere.git"
 
+  # -- exclude: ignore rules of one checkout, and park(keep_ignored) ---------------------------------
+  Scenario: A checkout's own excludes hide files from that checkout alone
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" adds a worktree "w" at "HEAD" as "w"
+    When "w" calls exclude(["/cache/", "*.tmp"])
+    And "w" calls exclude(["*.tmp"])
+    And "w" writes cache/x="x\n", y.tmp="y\n", z.txt="z\n"
+    And "r" writes cache/x="x\n", y.tmp="y\n"
+    And "w" calls dirty()
+    Then the result's untracked is ["z.txt"]
+    When "r" calls dirty()
+    Then the result's untracked is ["cache/x", "y.tmp"]
+
+  Scenario: Capture leaves out what the checkout's own excludes hide
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    And "r" calls exclude(["/cache/"])
+    And "r" writes cache/x="x\n", new.txt="n\n"
+    When "r" remembers the result of capture() as "t"
+    And "r" calls tree("<mem:t>")
+    Then the tree lists ["a.txt", "new.txt"]
+
+  Scenario: Parking keeps the ignored files, ignored, when the base has other ignore rules
+    Given a repository "r"
+    And "r" commits "base" with a.txt="1\n"
+    And "r" remembers its head as "base"
+    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" commits "rules" with .gitignore="*.cache\n", b.txt="2\n"
+    And "r" writes junk.cache="junk\n", weird[1]*.out="w\n"
+    When "r" calls park("<mem:base>", keep_ignored=True)
+    Then the result is "<mem:base>"
+    And the file "junk.cache" of "r" holds "junk\n"
+    When "r" calls dirty()
+    Then the result's untracked is ["weird[1]*.out"]
+    And the result's tracked is []
+
+  Scenario: Parking with keep_ignored hides the ignored files the base's rules would show
+    Given a repository "r"
+    And "r" commits "base" with a.txt="1\n"
+    And "r" remembers its head as "base"
+    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" commits "rules" with .gitignore="*.cache\n", b.txt="2\n"
+    And "r" writes junk.cache="junk\n"
+    When "r" calls park("<mem:base>", keep_ignored=True)
+    And "r" calls dirty()
+    Then the result's untracked is []
+    And the result's tracked is []
+    And the file "junk.cache" of "r" holds "junk\n"
+
+  Scenario: Pinned ignored files match literally, not as globs
+    Given a repository "r"
+    And "r" commits "base" with a.txt="1\n"
+    And "r" remembers its head as "base"
+    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" commits "rules" with .gitignore="*.cache\n"
+    And "r" writes we*ird.cache="a\n"
+    When "r" calls park("<mem:base>", keep_ignored=True)
+    And "r" writes weXird.cache="b\n"
+    And "r" calls dirty()
+    Then the result's untracked is ["weXird.cache"]
+
+  Scenario: Parking refuses when the base tracks a file that is ignored here
+    Given a repository "r"
+    And "r" commits "base" with a.txt="1\n", keep.cache="tracked\n"
+    And "r" remembers its head as "base"
+    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" commits "rules" with .gitignore="*.cache\n"
+    And "r" removes "keep.cache"
+    And "r" stages ["keep.cache"]
+    And "r" writes keep.cache="mine\n"
+    When "r" tries park("<mem:base>", keep_ignored=True)
+    Then the call raises IgnoredFilesWouldBeOverwritten
+    And the file "keep.cache" of "r" holds "mine\n"
+
   # -- capture, commit_tree, update_ref: preserving a checkout's work without touching it -------------
   Scenario: Capture names the final working state and leaves the checkout alone
     Given a repository "r"

@@ -30,8 +30,8 @@ __all__ = [
 
 
 def ignore_of(repo: RepoState, wt: CheckoutState, extra: Sequence[str] = ()) -> Ignore:
-    """The root ``.gitignore`` over ``info/exclude`` over ``extra`` rules (each overrides those before it)."""
-    return Ignore([*extra, *repo.info_exclude, *wt.files.get(".gitignore", b"").decode("utf-8", "replace").splitlines()])
+    """The root ``.gitignore`` over ``info/exclude`` over the checkout's own excludes over ``extra`` (each overrides the ones before)."""
+    return Ignore([*extra, *wt.exclude, *repo.info_exclude, *wt.files.get(".gitignore", b"").decode("utf-8", "replace").splitlines()])
 
 
 def require_index(wt: CheckoutState) -> None:
@@ -144,7 +144,7 @@ def clean(repo: RepoState, wt: CheckoutState, keep: Sequence[str], *, ignored: b
     """Remove untracked files except keep patterns; optionally include ignored files. The model holds no nested
     repositories, so ``nested`` changes nothing here."""
     del nested
-    lines = [] if ignored else [*repo.info_exclude, *wt.files.get(".gitignore", b"").decode("utf-8", "replace").splitlines()]
+    lines = [] if ignored else [*wt.exclude, *repo.info_exclude, *wt.files.get(".gitignore", b"").decode("utf-8", "replace").splitlines()]
     ignore = Ignore([*lines, *keep])
     for path in [p for p in wt.files if p not in wt.index and not ignore.ignores(p)]:
         del wt.files[path]

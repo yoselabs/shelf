@@ -128,6 +128,15 @@ class EmbeddedRepositories(GitUnavailable):
         self.paths = paths
 
 
+class IgnoredFilesWouldBeOverwritten(GitUnavailable):
+    """Parking would replace ignored files on disk with files the base tracks; ``paths`` names the ignored ones
+    (a folder ends with ``/``). Nothing was changed."""
+
+    def __init__(self, message: str, paths: tuple[str, ...], *, output: str | None = None) -> None:
+        super().__init__(message, output=output)
+        self.paths = paths
+
+
 _INDEX_LOCK = re.compile(r"index\.lock")
 _REF_STALE = re.compile(r"incorrect old value|is at \S+ but expected \S+")
 # git 2.53 words a fetch that loses the race to create a ref this way instead of naming the lock.
@@ -193,6 +202,7 @@ __all__ = [
     "GitReadFailure",
     "GitTimeout",
     "GitUnavailable",
+    "IgnoredFilesWouldBeOverwritten",
     "IndexLocked",
     "MissingRemote",
     "MissingRevision",
