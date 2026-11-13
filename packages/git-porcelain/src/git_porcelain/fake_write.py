@@ -20,10 +20,22 @@ from git_porcelain.api import (
     UpToDate,
     WorktreeInfo,
 )
-from git_porcelain.errors import GitUnavailable, some
-from git_porcelain.fake_ops import branch_ref, clean, hard_to, is_clean, make_commit, require_index, stage, switch_tree, tracked_dirty
+from git_porcelain.errors import GitUnavailable, IgnoredFilesWouldBeOverwritten, some
+from git_porcelain.fake_ops import (
+    branch_ref,
+    clean,
+    hard_to,
+    ignore_of,
+    is_clean,
+    make_commit,
+    require_index,
+    stage,
+    switch_tree,
+    tracked_dirty,
+)
 from git_porcelain.fake_read import dirty, relate, resolve_commit
 from git_porcelain.fake_store import ancestors
+from git_porcelain.ignore_rules import literal_pattern
 from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
@@ -207,9 +219,21 @@ def release_branch(repo: RepoState, wt: CheckoutState, holder: Path) -> Released
     return Released(holder, "detached")
 
 
-def park(repo: RepoState, wt: CheckoutState, base: str, clean_keep: Sequence[str] | None) -> Sha:
+def _pin_ignored(repo: RepoState, wt: CheckoutState, sha: str) -> None:
+    rules = ignore_of(repo, wt)
+    ignored = sorted(p for p in wt.files if p not in wt.index and rules.ignores(p))
+    clash = tuple(p for p in ignored if p in repo.store.commits[sha].files)
+    if clash:
+        msg = f"{sha} tracks files that are ignored here and would be overwritten: {', '.join(clash)}"
+        raise IgnoredFilesWouldBeOverwritten(msg, clash)
+    wt.exclude += [q for q in dict.fromkeys(literal_pattern(p) for p in ignored) if q not in wt.exclude]
+
+
+def park(repo: RepoState, wt: CheckoutState, base: str, clean_keep: Sequence[str] | None, *, keep_ignored: bool = False) -> Sha:
     require_index(wt)
     sha = resolve_commit(repo, wt, base)
+    if keep_ignored:
+        _pin_ignored(repo, wt, sha)
     _land(repo, wt, sha, None)
     if clean_keep is not None:
         clean(repo, wt, clean_keep)

@@ -348,6 +348,15 @@ class Worktree(Protocol):
         paths (files or directories) included even when ignored; the real index is untouched."""
         ...
 
+    def exclude(self, patterns: Sequence[str]) -> None:
+        """Append the missing ``patterns`` (ignore-file syntax) to the ignore rules of this checkout alone: git, in
+        this checkout, then treats matching untracked files as ignored (``dirty``, ``capture``, ``record``, ``clean``
+        and a plain ``git status`` alike). The repository's ``info/exclude`` and every other checkout stay as they
+        are. Real: a ``worktree-exclude`` file in this checkout's git directory, named by ``core.excludesFile`` in its
+        ``config.worktree`` (this turns on ``extensions.worktreeConfig``); it replaces the user's global excludes file
+        for this checkout."""
+        ...
+
     def capture(self) -> TreeId:
         """The tree of this checkout's final working state: what is indexed (a path stays in even when an ignore rule
         now matches it), with every working file winning over its staged version, deletions included, and the untracked
@@ -406,8 +415,11 @@ class Worktree(Protocol):
         """Free the branch ``holder`` holds: remove a clean linked worktree, else detach it there."""
         ...
 
-    def park(self, base: str, *, clean_keep: Sequence[str] | None = None) -> Sha:
-        """Detach HEAD at ``base`` (the branch stays); ``clean_keep`` as in :meth:`take_branch`."""
+    def park(self, base: str, *, clean_keep: Sequence[str] | None = None, keep_ignored: bool = False) -> Sha:
+        """Detach HEAD at ``base`` (the branch stays); ``clean_keep`` as in :meth:`take_branch`. With ``keep_ignored``
+        the ignored untracked files of now (a folder as one entry) are added to this checkout's own excludes first
+        (:meth:`exclude`), so they stay ignored and on disk at ``base`` whatever its ignore rules say; when ``base``
+        tracks a file among them, ``IgnoredFilesWouldBeOverwritten`` is raised and nothing changes."""
         ...
 
     def rebase_onto(

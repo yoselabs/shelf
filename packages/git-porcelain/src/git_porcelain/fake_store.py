@@ -129,6 +129,7 @@ class CheckoutState:
     missing: bool = False
     toplevel: Path | None = None
     index_locked: bool = False
+    exclude: list[str] = field(default_factory=list)
 
 
 @dataclass

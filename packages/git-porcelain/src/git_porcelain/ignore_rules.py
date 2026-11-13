@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-__all__ = ["flatten", "is_ignore_file"]
+__all__ = ["flatten", "is_ignore_file", "literal_pattern"]
 
 
 def is_ignore_file(path: str) -> bool:
@@ -41,3 +41,18 @@ def _prefixed(line: str, folder: str) -> str:
     rooted = f"/{folder}/{inner.removeprefix('/')}" if "/" in inner else f"/{folder}/**/{inner}"
     tail = "/" if body.endswith("/") else ""
     return ("!" if negated else "") + rooted + tail
+
+
+def literal_pattern(path: str) -> str:
+    """The ignore rule that matches exactly ``path`` from the root (a trailing ``/`` makes it a folder rule) and
+    nothing else: the glob characters, a leading ``!`` or ``#`` and trailing spaces are escaped."""
+    body = path.removeprefix("/")
+    folder = body.endswith("/")
+    body = body.rstrip("/")
+    escaped = "".join(f"\\{c}" if c in "\\*?[" else c for c in body)
+    if escaped[:1] in {"!", "#"}:
+        escaped = "\\" + escaped
+    trailing = len(escaped) - len(escaped.rstrip(" "))
+    if trailing:
+        escaped = escaped.rstrip(" ") + "\\ " * trailing
+    return f"/{escaped}{'/' if folder else ''}"

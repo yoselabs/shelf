@@ -370,6 +370,9 @@ class RealWorktree:
     def snapshot(self, base: str, *, inputs: Sequence[str] = ()) -> Snapshot:
         return real_read.snapshot(self, base, inputs=inputs)
 
+    def exclude(self, patterns: Sequence[str]) -> None:
+        real_write.exclude_worktree(self, patterns)
+
     def capture(self) -> TreeId:
         return real_capture.capture(self)
 
@@ -408,8 +411,8 @@ class RealWorktree:
     def release_branch(self, holder: Path) -> Released | StillHeld:
         return real_write.release_branch(self, holder)
 
-    def park(self, base: str, *, clean_keep: Sequence[str] | None = None) -> Sha:
-        return real_write.park(self, base, clean_keep)
+    def park(self, base: str, *, clean_keep: Sequence[str] | None = None, keep_ignored: bool = False) -> Sha:
+        return real_write.park(self, base, clean_keep, keep_ignored=keep_ignored)
 
     def rebase_onto(
         self,

@@ -387,6 +387,10 @@ class FakeWorktree:
     def snapshot(self, base: str, *, inputs: Sequence[str] = ()) -> Snapshot:
         return read.snapshot(self._repo, self.state(), base, inputs=inputs)
 
+    def exclude(self, patterns: Sequence[str]) -> None:
+        wt = self.state()
+        wt.exclude += [p for p in dict.fromkeys(patterns) if p not in wt.exclude]
+
     def capture(self) -> TreeId:
         return fake_capture.capture(self._repo, self.state())
 
@@ -427,8 +431,8 @@ class FakeWorktree:
     def release_branch(self, holder: Path) -> Released | StillHeld:
         return write.release_branch(self._repo, self.state(), holder)
 
-    def park(self, base: str, *, clean_keep: Sequence[str] | None = None) -> Sha:
-        return write.park(self._repo, self.state(), base, clean_keep)
+    def park(self, base: str, *, clean_keep: Sequence[str] | None = None, keep_ignored: bool = False) -> Sha:
+        return write.park(self._repo, self.state(), base, clean_keep, keep_ignored=keep_ignored)
 
     def rebase_onto(
         self,

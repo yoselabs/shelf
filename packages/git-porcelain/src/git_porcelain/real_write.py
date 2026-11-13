@@ -24,7 +24,8 @@ from git_porcelain.api import (
     Synced,
     UpToDate,
 )
-from git_porcelain.errors import some
+from git_porcelain.errors import IgnoredFilesWouldBeOverwritten, some
+from git_porcelain.ignore_rules import literal_pattern
 from git_porcelain.real_done import unavailable
 from git_porcelain.remote_validation import validate_remote
 from git_porcelain.revision_validation import validate_revisions
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "exclude_locally",
+    "exclude_worktree",
     "finish_rebase",
     "park",
     "push",
@@ -95,6 +97,22 @@ def exclude_locally(repo: RealRepo, patterns: Sequence[str]) -> None:
     keep = "\n" if have and not target.read_text(encoding="utf-8").endswith("\n") else ""
     with target.open("a", encoding="utf-8") as handle:
         handle.write(keep + "\n".join(missing) + "\n")
+
+
+def exclude_worktree(wt: RealWorktree, patterns: Sequence[str]) -> None:
+    target = real_read.git_dir_of(wt) / "worktree-exclude"
+    text = target.read_text(encoding="utf-8") if target.exists() else ""
+    have = text.splitlines()
+    missing = [p for p in dict.fromkeys(patterns) if p not in have]
+    if missing:
+        keep = "\n" if text and not text.endswith("\n") else ""
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write(keep + "\n".join(missing) + "\n")
+    try:
+        wt.run("config", "extensions.worktreeConfig", "true")
+        wt.run("config", "--worktree", "core.excludesFile", str(target))
+    finally:
+        wt.repo.invalidate()
 
 
 # -- Worktree ---------------------------------------------------------------------------------------------
@@ -268,8 +286,23 @@ def release_branch(wt: RealWorktree, holder: Path) -> Released | StillHeld:
         wt.repo.invalidate()
 
 
-def park(wt: RealWorktree, base: str, clean_keep: Sequence[str] | None) -> Sha:
+def _keep_ignored(wt: RealWorktree, base: str) -> None:
+    listed = wt.run("ls-files", "-z", "-o", "-i", "--exclude-standard", "--directory").out
+    ignored = sorted(p for p in listed.split("\0") if p)
+    if not ignored:
+        return
+    tracked = [p for p in wt.run("ls-tree", "-r", "-z", "--name-only", "--end-of-options", base).out.split("\0") if p]
+    clash = tuple(i for i in ignored if any(t == i or (i.endswith("/") and t.startswith(i)) for t in tracked))
+    if clash:
+        msg = f"{base} tracks files that are ignored here and would be overwritten: {', '.join(clash)}"
+        raise IgnoredFilesWouldBeOverwritten(msg, clash)
+    exclude_worktree(wt, [literal_pattern(p) for p in ignored])
+
+
+def park(wt: RealWorktree, base: str, clean_keep: Sequence[str] | None, *, keep_ignored: bool = False) -> Sha:
     try:
+        if keep_ignored:
+            _keep_ignored(wt, real_checkout.resolve_commit(wt, base))
         wt.run("checkout", "-q", "--detach", base)
         _clean(wt, clean_keep)
     finally:
