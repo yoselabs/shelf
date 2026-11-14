@@ -5,6 +5,7 @@ import os
 import signal
 import subprocess
 import threading
+import time
 from typing import Any
 
 import pytest
@@ -143,6 +144,19 @@ def test_a_stop_asked_for_twice_is_made_once(tmp_path):
     sup._halt(p, "timeout")
     sup._halt(p, "caller")
     assert (told, [s.reason for s in hooks.stops]) == (["timeout"], ["timeout"])
+
+
+def test_the_call_timeout_is_measured_on_the_injected_clock_not_the_wall_clock(tmp_path):
+    frozen = run(ClaudeHarness(), spec(tmp_path, "sleep 1.2"), 1, limits=Limits(first_event_s=60, silence_s=60), clock=lambda: 0.0)
+    assert not frozen.timed_out and frozen.rc == 0  # the budget never ran out: only the injected clock counts
+    fast = run(
+        ClaudeHarness(),
+        spec(tmp_path, "sleep 30"),
+        5,
+        limits=Limits(first_event_s=1e9, silence_s=1e9),
+        clock=lambda: time.monotonic() * 1000,
+    )
+    assert fast.timed_out
 
 
 def test_the_timeout_stops_the_tree(tmp_path):
