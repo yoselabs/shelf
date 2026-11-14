@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import threading
 import time
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,10 @@ if TYPE_CHECKING:
 
 TESTED_FROM = (1, 3, 1)
 TESTED_BELOW = (1, 4, 0)
+
+
+_LOCKS_GUARD = threading.Lock()
+_LOCKS: dict[tuple[str, str, str], threading.Lock] = {}  # one per (checkout, bead, key) ever asked: a handful per run
 
 
 @dataclass(frozen=True)
@@ -260,6 +265,48 @@ class Bd:
 
     def comment(self, bead: str, text: str) -> None:
         self._must("comments", "add", bead, text)
+
+    def comment_once(self, bead: str, key: str, text: str) -> Comment:
+        """Post `text` on `bead` at most once per `key`, and return THE comment carrying that key, posted now or found.
+
+        The key is a caller-chosen stable id (the timed-out attempt's id, say), written into the comment as a last line
+        ``[comment-key: <key>]`` (also what a human sees). Before posting, the bead's comments are read: a comment with that
+        marker is returned and nothing is posted. When the post itself fails or its answer is lost (an ambiguous delivery),
+        the comments are read back: the marker found means the post landed and that comment is returned; not found means
+        nothing was written and the original error is raised (a retry is safe). Calls with one key in this process are serialized,
+        so concurrent callers share one post. Across processes it is read-then-post: two processes racing the same key can
+        both post (bd has no atomic keyed insert); the read-back before every post makes that window the time between one
+        read and one write."""
+        if not key.strip() or any(c in key for c in "[]\n"):
+            msg = "a comment key must be a non-empty single line without brackets"
+            raise ValueError(msg)
+        marker = f"[comment-key: {key}]"
+        with self._comment_lock(bead, key):
+            found = self._comment_with(bead, marker)
+            if found is not None:
+                return found
+            try:
+                self._must("comments", "add", bead, f"{text.rstrip()}\n\n{marker}")
+            except BdError as first:
+                try:
+                    landed = self._comment_with(bead, marker)  # the answer was lost, or the write failed: only the tracker knows
+                except BdError:
+                    raise first from None  # the tracker cannot be read either: say what the post said, the outcome is unknown
+                if landed is None:
+                    raise
+                return landed
+            posted = self._comment_with(bead, marker)
+            if posted is None:
+                msg = f"bd accepted the comment on {bead!r} but it is not among its comments"
+                raise malformed(msg)
+            return posted
+
+    def _comment_with(self, bead: str, marker: str) -> Comment | None:
+        return next((c for c in self.comments(bead) if marker in c.text), None)
+
+    def _comment_lock(self, bead: str, key: str) -> threading.Lock:
+        with _LOCKS_GUARD:
+            return _LOCKS.setdefault((self.cwd or "", bead, key), threading.Lock())
 
     def add_label(self, bead: str, label: str, *, if_assignee: str | None = None) -> None:
         if if_assignee is not None:

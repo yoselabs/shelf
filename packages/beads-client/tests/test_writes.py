@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -263,3 +264,46 @@ def test_real_lock_strings_are_retried(script: Script, words: str) -> None:
     script.say(err=words, code=1).say(fixture("create.json"))
     assert bd.create(NewBead("T")) == "zz-6q8"
     assert len(script.calls) == 2
+
+
+def comments_json(*texts: str) -> str:
+    rows = [
+        {"id": f"c{i}", "issue_id": "a-1", "author": "tester", "text": t, "created_at": f"2026-11-14T10:00:0{i}Z"}
+        for i, t in enumerate(texts)
+    ]
+    return json.dumps(rows)
+
+
+def posted(script: Script) -> list[list[str]]:
+    return [argv(script, i) for i in range(len(script.calls)) if argv(script, i)[:2] == ["comments", "add"]]
+
+
+def test_comment_once_posts_with_a_marker_and_returns_the_comment(bd: Bd, script: Script) -> None:
+    script.say(comments_json()).say("").say(comments_json("timed out\n\n[comment-key: attempt-9]"))
+    got = bd.comment_once("a-1", "attempt-9", "timed out")
+    assert got.text == "timed out\n\n[comment-key: attempt-9]"
+    assert posted(script) == [["comments", "add", "a-1", "timed out\n\n[comment-key: attempt-9]"]]
+
+
+def test_comment_once_returns_the_existing_comment_and_posts_nothing(bd: Bd, script: Script) -> None:
+    script.say(comments_json("other", "timed out\n\n[comment-key: attempt-9]"))
+    assert bd.comment_once("a-1", "attempt-9", "timed out").text.endswith("[comment-key: attempt-9]")
+    assert posted(script) == []
+
+
+def test_comment_once_after_a_lost_answer_reads_back_instead_of_posting_twice(bd: Bd, script: Script) -> None:
+    script.say(comments_json()).say("", "connection reset", code=1).say(comments_json("timed out\n\n[comment-key: attempt-9]"))
+    assert bd.comment_once("a-1", "attempt-9", "timed out").author == "tester"
+    assert len(posted(script)) == 1  # the one post that was ambiguous; no second
+
+
+def test_comment_once_when_nothing_landed_raises_the_original_error_so_a_retry_is_safe(bd: Bd, script: Script) -> None:
+    script.say(comments_json()).say("", "connection reset", code=1).say(comments_json("unrelated"))
+    with pytest.raises(BdError):
+        bd.comment_once("a-1", "attempt-9", "timed out")
+
+
+def test_comment_once_rejects_a_key_that_cannot_be_a_marker(bd: Bd) -> None:
+    for key in ("", "  ", "a]b", "a\nb"):
+        with pytest.raises(ValueError, match="comment key"):
+            bd.comment_once("a-1", key, "x")
