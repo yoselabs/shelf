@@ -24,6 +24,7 @@ from git_porcelain import (
     real_checkout,
     real_commands,
     real_env,
+    real_merge,
     real_observe,
     real_operations,
     real_read,
@@ -48,6 +49,7 @@ if TYPE_CHECKING:
         FinishResult,
         Health,
         LogEntry,
+        MergeStarted,
         Pick,
         PushResult,
         RebaseResult,
@@ -66,6 +68,7 @@ if TYPE_CHECKING:
         TakeResult,
         Tree,
         TreeId,
+        UpToDate,
         WorktreeInfo,
     )
     from git_porcelain.history import Identity
@@ -426,6 +429,18 @@ class RealWorktree:
 
     def rebase(self, base: str, *, update_refs: bool | None = None) -> CommandResult:
         return real_commands.rebase(self, base, update_refs=update_refs)
+
+    def start_merge(self, rev: str) -> MergeStarted | UpToDate:
+        return real_merge.start_merge(self, rev)
+
+    def merging(self) -> bool:
+        return real_merge.merging(self)
+
+    def finish_merge(self, message: str) -> Sha:
+        return real_merge.finish_merge(self, message)
+
+    def abort_merge(self) -> None:
+        real_merge.abort_merge(self)
 
     def rebasing(self) -> bool:
         return real_observe.rebasing(self)

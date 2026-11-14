@@ -2657,6 +2657,88 @@ Feature: One Repo and Worktree, real or fake
     Then the call raises IgnoredFilesWouldBeOverwritten
     And the file "keep.cache" of "r" holds "mine\n"
 
+  # -- start_merge, finish_merge, abort_merge: a merge stopped before its commit ----------------------
+  Scenario: A clean merge stops before its commit and finishes as a two-parent commit, moving no ref
+    Given a repository "r"
+    And "r" commits "root" with a.txt="1\n", b.txt="b\n"
+    And "r" remembers its head as "root"
+    And "r" calls checkout_new("side")
+    And "r" commits "side" with s.txt="s\n"
+    And "r" remembers its head as "side"
+    And "r" calls checkout("main")
+    And "r" commits "main" with m.txt="m\n"
+    And "r" remembers its head as "main"
+    And "r" calls park("<mem:main>")
+    When "r" calls start_merge("<mem:side>")
+    Then the result is a MergeStarted
+    And the result's conflicts is []
+    And the result's merge_head is "<mem:side>"
+    When "r" calls snapshot("HEAD")
+    Then the result's head is "<mem:main>"
+    When "r" calls merging()
+    Then the result is True
+    When "r" remembers the result of finish_merge("merge side") as "merged"
+    And "r" calls merging()
+    Then the result is False
+    When "r" calls is_ancestor("<mem:side>", "<mem:merged>")
+    Then the result is True
+    When "r" calls history(["<mem:merged>^"], limit=1)
+    Then the subject of each result entry is ["main"]
+    When "r" calls tree("<mem:merged>")
+    Then the tree lists ["a.txt", "b.txt", "m.txt", "s.txt"]
+    When "r" calls branches("")
+    Then the first item of each result entry is ["main", "side"]
+
+  Scenario: A conflicting merge leaves markers and names the paths, finishing only once they are staged
+    Given a repository "r"
+    And "r" commits "root" with a.txt="one\ntwo\nthree\n", b.txt="b\n"
+    And "r" calls checkout_new("side")
+    And "r" commits "side" with a.txt="one\nSIDE\nthree\n"
+    And "r" remembers its head as "side"
+    And "r" calls checkout("main")
+    And "r" commits "main" with a.txt="one\nMAIN\nthree\n"
+    And "r" remembers its head as "main"
+    And "r" calls park("<mem:main>")
+    When "r" calls start_merge("<mem:side>")
+    Then the result is a MergeStarted
+    And the result's conflicts is ["a.txt"]
+    When "r" tries finish_merge("too early")
+    Then the call raises UnmergedPaths
+    When "r" writes a.txt="one\nBOTH\nthree\n"
+    And "r" stages ["a.txt"]
+    And "r" remembers the result of finish_merge("resolved") as "merged"
+    And "r" calls tree("<mem:merged>")
+    Then the tree reads "a.txt" as "one\nBOTH\nthree\n"
+    When "r" calls is_ancestor("<mem:side>", "<mem:merged>")
+    Then the result is True
+    When "r" calls is_ancestor("<mem:main>", "<mem:merged>")
+    Then the result is True
+
+  Scenario: Aborting a merge puts the checkout back, and a merge of history already in HEAD does nothing
+    Given a repository "r"
+    And "r" commits "root" with a.txt="one\n"
+    And "r" remembers its head as "root"
+    And "r" calls checkout_new("side")
+    And "r" commits "side" with a.txt="side\n"
+    And "r" remembers its head as "side"
+    And "r" calls checkout("main")
+    And "r" commits "main" with a.txt="main\n"
+    And "r" remembers its head as "main"
+    And "r" calls park("<mem:main>")
+    When "r" calls start_merge("<mem:side>")
+    And "r" calls abort_merge()
+    And "r" calls merging()
+    Then the result is False
+    When "r" calls dirty()
+    Then the result's tracked is []
+    And the file "a.txt" of "r" holds "main\n"
+    When "r" calls start_merge("<mem:root>")
+    Then the result is a UpToDate
+    When "r" calls merging()
+    Then the result is False
+    When "r" tries finish_merge("nothing")
+    Then the call raises ValueError
+
   # -- capture, commit_tree, update_ref: preserving a checkout's work without touching it -------------
   Scenario: Capture names the final working state and leaves the checkout alone
     Given a repository "r"

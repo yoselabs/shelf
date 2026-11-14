@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.0
+
+A merge of one commit into a checkout that stops before its commit, so a caller can resolve conflicts in the working files and finish it itself (the checked commit X merged with a newer main O: clean changes staged, conflicting files as markers). Real and fake under one contract; no operation writes a ref.
+
+- `Worktree.start_merge(rev) -> MergeStarted(merge_head, conflicts) | UpToDate`: `git merge --no-ff --no-commit --no-verify`. HEAD, the branch and every ref stay put; `conflicts` names the paths left with markers (empty: clean, waiting for `finish_merge`); `UpToDate` when `rev` is already in HEAD's history. `ValueError` on tracked changes, a paused rebase or a merge already under way; `MissingRevision` for an unknown `rev`.
+- `Worktree.merging() -> bool`: a stopped merge waits.
+- `Worktree.finish_merge(message) -> Sha`: one commit of the index with parents HEAD and the merged commit, the repository's identity, hooks skipped; HEAD moves only (a detached checkout moves, a branch checkout moves its branch). Paths the caller resolved must be staged with `stage`; `UnmergedPaths` while conflict entries remain, nothing committed. `ValueError` with no merge under way.
+- `Worktree.abort_merge()`: HEAD, index and files back to before `start_merge`; nothing to do when no merge is under way.
+- New result `MergeStarted`. FakeRepo merges with `fake_merge.merge_trees` (the text merge `squash` and `rebase_onto` use).
+
 ## 0.20.0
 
 Ignore rules that belong to one checkout, and a park that keeps what is ignored there (so a slot saved with `capture` and parked at its base stays clean to plain `git status`, with its ignored files untouched, even when the saved work had changed the ignore rules):
