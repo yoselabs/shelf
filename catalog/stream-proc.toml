@@ -2,7 +2,7 @@
 name = "stream-proc"
 kind = "primitive"
 tier = "T0"
-release = "stream-proc-v0.8.0"
+release = "stream-proc-v0.9.0"
 capability = "Stop caring how a child is run, watched and killed — one call runs it in a session of its own, streams its stdout and stderr lines to callbacks (no deadlock on large output, torn last line flushed) under a wall timeout, an idle timeout and a stop flag, and stops its whole tree (SIGTERM, grace, SIGKILL, a sweep of descendants that left the group, a proof it is dead), with pid-reuse-safe liveness from /proc or libproc and a SIGTERM landing during the spawn still stopping the child; capture() runs to the end with text output (exit 124 on timeout, optional heartbeat), capture_bytes() the same with exact bytes, stdin input and inherited stdio, and stop_pid(pid, start) stops a process it did not spawn only while its start token matches."
 implementation = "ours"
 status = "candidate"
