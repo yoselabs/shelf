@@ -122,6 +122,41 @@ def test_an_entry_sigterm_is_told_apart_from_the_signal_sent_to_the_agent(tmp_pa
     assert [s.reason for s in hooks.stops] == ["entry_signal"]
 
 
+def test_an_entry_sigterm_during_registration_cleans_the_child_up_and_restores_the_handlers(tmp_path):
+    seen: list[Worker] = []
+
+    def slow_registration(worker: Worker) -> None:
+        seen.append(worker)
+        time.sleep(3)  # the entry is registering the child: it has not been permitted to exec yet
+
+    before = (signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGHUP))
+    timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
+    timer.start()
+    try:
+        with pytest.raises(SystemExit) as info:
+            run(
+                ClaudeHarness(),
+                spec(tmp_path, "sleep 60"),
+                30,
+                RunHooks(started=slow_registration),
+                limits=Limits(first_event_s=60, silence_s=60),
+            )
+    finally:
+        timer.cancel()
+    assert info.value.code == 128 + signal.SIGTERM
+    assert len(seen) == 1
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:  # the child is gone: it never got to exec the target
+        try:
+            os.kill(seen[0].pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.05)
+    else:
+        pytest.fail("the registering child outlived the entry's SIGTERM")
+    assert (signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGHUP)) == before
+
+
 def test_after_stop_runs_on_an_exceptional_exit_too(tmp_path):
     seen: list[str] = []
     hooks = RunHooks(after_stop=lambda i, r: seen.append(f"{i.reason}:{r.term_delivered}"))

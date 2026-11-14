@@ -14,19 +14,16 @@ import signal
 import subprocess
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from dataclasses import field
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Literal, Protocol
+from typing import IO, Literal, Protocol
 
 from any_agent import events as ev
 from any_agent import procs, watch
 from any_agent._json import mutable, record
 from any_agent.protocol import Harness, LaunchSpec, Summary
 from any_agent.watch import Limits
-
-if TYPE_CHECKING:
-    from types import FrameType
 
 LANE_GONE_EVERY = 10  # seconds between looks at whether the lane was marked out by someone else
 NET_GRACE_S = 15  # how long a worker may say "waiting for network" before one probe decides whether to stop it
@@ -329,9 +326,32 @@ class Supervisor:
         self._halt(p, reason)
         p.wait()
 
-    def run(self, spec: LaunchSpec, timeout: float) -> RunOutcome:
-        """-> RunOutcome. Own process group; the timeout kills the group; stdin carries the prompt then closes; UTF-8, errors replaced."""
+    @contextlib.contextmanager
+    def _entry_signals(self) -> Generator[None]:
+        """SIGTERM and SIGHUP to this process become `EntrySignal` for the whole run, registration included: one taken while the child is
+        being registered makes the spawn clean the child up (stream_proc), one taken later stops the tree (`_halt`)."""
+        if (
+            threading.current_thread() is not threading.main_thread()
+        ):  # a library caller runs on any thread; only the main one takes signals
+            yield
+            return
 
+        def bye(signum: int, frame: object) -> None:  # noqa: ARG001 - the signal handler signature
+            raise EntrySignal(signum)
+
+        old = {g: signal.signal(g, bye) for g in (signal.SIGTERM, signal.SIGHUP)}
+        try:
+            yield
+        finally:
+            for g, h in old.items():
+                signal.signal(g, h)
+
+    def run(self, spec: LaunchSpec, timeout: float) -> RunOutcome:
+        """-> RunOutcome. Own process group; the timeout kills the group; stdin carries the prompt then closes."""
+        with self._entry_signals():
+            return self._run(spec, timeout)
+
+    def _run(self, spec: LaunchSpec, timeout: float) -> RunOutcome:
         def register(worker: procs.Worker) -> None:
             self.out.worker = worker
             if self.hooks.started:
@@ -340,73 +360,61 @@ class Supervisor:
 
         p, worker = procs.spawn(spec.argv, spec.cwd, spec.env, registered=register)
         self.out.worker = worker
-        out: list[str] = []
-        err: list[str] = []
-        killed: list[int] = []
+        try:  # a signal between the spawn's return and the wait is the caller leaving too: the tree is ours to stop
+            out: list[str] = []
+            err: list[str] = []
+            killed: list[int] = []
 
-        def feed_stdin() -> None:
-            with contextlib.suppress(OSError):
-                if p.stdin is None:
-                    return
-                p.stdin.write(spec.stdin.encode("utf-8"))
-                p.stdin.close()
+            def feed_stdin() -> None:
+                with contextlib.suppress(OSError):
+                    if p.stdin is None:
+                        return
+                    p.stdin.write(spec.stdin.encode("utf-8"))
+                    p.stdin.close()
 
-        threads = [
-            threading.Thread(target=self._pump, args=(p.stdout, out, self._on_out, p, killed, self.dog.touch), daemon=True),
-            threading.Thread(target=self._pump, args=(p.stderr, err, self._on_err, p, killed, self.dog.touch), daemon=True),
-            threading.Thread(target=feed_stdin, daemon=True),
-        ]
-        for th in threads:
-            th.start()
-        self._wait(p, killed, timeout)
-        for th in threads:
-            th.join(5)
-        for f in (p.stdin, p.stdout, p.stderr):
-            with contextlib.suppress(OSError):
-                f and f.close()
-        if self.refusal is not None:
-            raise self.refusal
-        return self.finish(p.returncode, "".join(out), "".join(err), bool(killed))
+            threads = [
+                threading.Thread(target=self._pump, args=(p.stdout, out, self._on_out, p, killed, self.dog.touch), daemon=True),
+                threading.Thread(target=self._pump, args=(p.stderr, err, self._on_err, p, killed, self.dog.touch), daemon=True),
+                threading.Thread(target=feed_stdin, daemon=True),
+            ]
+            for th in threads:
+                th.start()
+            self._wait(p, killed, timeout)
+            for th in threads:
+                th.join(5)
+            for f in (p.stdin, p.stdout, p.stderr):
+                with contextlib.suppress(OSError):
+                    f and f.close()
+            if self.refusal is not None:
+                raise self.refusal  # noqa: TRY301 - a stop callback refused: surfaced here, the worker is the caller's
+            return self.finish(p.returncode, "".join(out), "".join(err), bool(killed))
+        except BaseException as exc:
+            if self.refusal is None:
+                self._halt(p, *caller_cause(exc))
+                p.wait()
+            raise
 
     def _wait(self, p: subprocess.Popen[bytes], killed: list[int], timeout: float) -> None:
         ppid, end = os.getppid(), self.clock() + timeout if timeout else None
 
-        def bye(signum: int, frame: object) -> None:  # noqa: ARG001 - the signal handler signature
-            raise EntrySignal(signum)
-
-        mine = threading.current_thread() is threading.main_thread()  # a library caller runs on any thread; only the main one takes signals
-        old: dict[int, Callable[[int, FrameType | None], object] | int | None] = (
-            {g: signal.signal(g, bye) for g in (signal.SIGTERM, signal.SIGHUP)} if mine else {}
-        )
-        try:
-            while True:
-                try:
-                    p.wait(timeout=POLL_S if end is None else max(0.01, min(POLL_S, end - self.clock())))
+        while True:
+            try:
+                p.wait(timeout=POLL_S if end is None else max(0.01, min(POLL_S, end - self.clock())))
+                break
+            except subprocess.TimeoutExpired:
+                if end is not None and self.clock() >= end:
+                    self.out.timed_out = True
+                    self._stop(p, killed, "timeout")
                     break
-                except subprocess.TimeoutExpired:
-                    if end is not None and self.clock() >= end:
-                        self.out.timed_out = True
-                        self._stop(p, killed, "timeout")
-                        break
-                    if self.refusal is not None:
-                        raise self.refusal from None
-                    if self.poll():
-                        self._stop(p, killed, self._why())
-                        break
-                    if (
-                        self.hooks.unattended and os.getppid() != ppid
-                    ):  # SIGKILL on the engine cannot be caught: the parent changing is the only sign
-                        raise ParentGone from None
-        except (
-            BaseException
-        ) as exc:  # SIGTERM, SIGHUP, Ctrl-C, parent gone: the worker is in its own group, so stop it here or it keeps burning the plan
-            if self.refusal is None:  # a refused stop is never retried here under another name
-                self._halt(p, *caller_cause(exc))
-                p.wait()
-            raise
-        finally:
-            for g, h in old.items():
-                signal.signal(g, h)
+                if self.refusal is not None:
+                    raise self.refusal from None
+                if self.poll():
+                    self._stop(p, killed, self._why())
+                    break
+                if (
+                    self.hooks.unattended and os.getppid() != ppid
+                ):  # SIGKILL on the engine cannot be caught: the parent changing is the only sign
+                    raise ParentGone from None
 
     def finish(self, rc: int | None, out: str, err: str, killed: bool = False) -> RunOutcome:
         """The run is over: fold what the worker printed and how it ended into the outcome (the harness's summary), and close the live
