@@ -130,6 +130,7 @@ class CheckoutState:
     toplevel: Path | None = None
     index_locked: bool = False
     exclude: list[str] = field(default_factory=list)
+    merge_head: str | None = None
 
 
 @dataclass

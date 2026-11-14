@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from git_porcelain.api import PushResult, SyncResult
     from git_porcelain.fake_store import RepoState
 
-__all__ = ["continue_rebase", "fetch", "push", "rebase_abort", "start_rebase", "worktree_add", "worktree_remove"]
+__all__ = ["continue_rebase", "fetch", "push", "rebase_abort", "start_rebase", "stop", "worktree_add", "worktree_remove"]
 
 MARKERS: Final = re.compile(r"^(?:<<<<<<<|>>>>>>>)(?: |$)", re.MULTILINE)
 
@@ -48,7 +48,7 @@ def _replay(repo: RepoState, wt: CheckoutState, state: Rebase) -> Rebased | Conf
         merged, conflicts = merge_trees(repo, base, state.files, commit.files)
         if conflicts:
             state.pending = commit
-            _stop(repo, wt, merged, conflicts)
+            stop(repo, wt, merged, conflicts)
             return Conflict(
                 tuple(sorted(conflicts)), f"CONFLICT (content): Merge conflict in {', '.join(sorted(conflicts))}", Sha(state.orig_sha)
             )
@@ -66,7 +66,7 @@ def _replay(repo: RepoState, wt: CheckoutState, state: Rebase) -> Rebased | Conf
     return Rebased(Sha(state.orig_sha), Sha(new), squashed=False)
 
 
-def _stop(repo: RepoState, wt: CheckoutState, merged: dict[str, str], conflicts: dict[str, bytes]) -> None:
+def stop(repo: RepoState, wt: CheckoutState, merged: dict[str, str], conflicts: dict[str, bytes]) -> None:
     """Leave the checkout the way a conflicted rebase does: clean merges staged, conflicts as markers."""
     for path, sha in merged.items():
         wt.index[path] = sha

@@ -24,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Literal, Self
 
-from git_porcelain import fake_capture, fake_commands, fake_operations, fake_remote, fake_squash
+from git_porcelain import fake_capture, fake_commands, fake_merging, fake_operations, fake_remote, fake_squash
 from git_porcelain import fake_checkout as checkout_ops
 from git_porcelain import fake_flow as flow
 from git_porcelain import fake_read as read
@@ -47,6 +47,7 @@ if TYPE_CHECKING:
         FinishResult,
         Health,
         LogEntry,
+        MergeStarted,
         Pick,
         PushResult,
         RebaseResult,
@@ -64,6 +65,7 @@ if TYPE_CHECKING:
         TakeResult,
         Tree,
         TreeId,
+        UpToDate,
         WorktreeInfo,
     )
 
@@ -390,6 +392,18 @@ class FakeWorktree:
     def exclude(self, patterns: Sequence[str]) -> None:
         wt = self.state()
         wt.exclude += [p for p in dict.fromkeys(patterns) if p not in wt.exclude]
+
+    def start_merge(self, rev: str) -> MergeStarted | UpToDate:
+        return fake_merging.start_merge(self._repo, self.state(), rev)
+
+    def merging(self) -> bool:
+        return self.state().merge_head is not None
+
+    def finish_merge(self, message: str) -> Sha:
+        return fake_merging.finish_merge(self._repo, self.state(), message)
+
+    def abort_merge(self) -> None:
+        fake_merging.abort_merge(self._repo, self.state())
 
     def capture(self) -> TreeId:
         return fake_capture.capture(self._repo, self.state())

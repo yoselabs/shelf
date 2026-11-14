@@ -297,6 +297,16 @@ class UpToDate(_Output):
 
 
 @dataclass(frozen=True)
+class MergeStarted(_Output):
+    """A merge stopped before its commit: ``merge_head`` is the commit being merged in; ``conflicts`` names the paths
+    left with conflict markers (empty: the merge is clean and only waits for ``finish_merge``)."""
+
+    merge_head: Sha
+    conflicts: tuple[str, ...]
+    output: str = ""
+
+
+@dataclass(frozen=True)
 class Rebased(_Output):
     old_head: Sha
     new_head: Sha

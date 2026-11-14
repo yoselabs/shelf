@@ -35,6 +35,7 @@ from git_porcelain.api_results import (
     Health,
     HookRejected,
     LogEntry,
+    MergeStarted,
     NothingToRecord,
     Offline,
     Pick,
@@ -93,6 +94,7 @@ __all__ = [
     "Health",
     "HookRejected",
     "LogEntry",
+    "MergeStarted",
     "NothingToRecord",
     "Offline",
     "Pick",
@@ -448,6 +450,30 @@ class Worktree(Protocol):
 
     def abort_rebase(self, *, missing_ok: bool = True, restore_to: Sha | None = None) -> CommandResult:
         """Abort, optionally restoring HEAD; missing_ok permits no paused rebase, even unborn."""
+        ...
+
+    def start_merge(self, rev: str) -> MergeStarted | UpToDate:
+        """Merge commit ``rev`` into this checkout's HEAD (``--no-ff --no-commit``) and stop before the commit: clean
+        merges are staged, conflicting files hold conflict markers (``MergeStarted.conflicts``), and ``rev`` is recorded
+        as the merge's second parent. HEAD, the branch and every ref stay where they were. ``UpToDate`` when ``rev`` is
+        already in HEAD's history (nothing started). ``ValueError`` on tracked changes, a paused rebase or a merge
+        already under way; ``MissingRevision`` for an unknown ``rev``."""
+        ...
+
+    def merging(self) -> bool:
+        """Whether a merge stopped by ``start_merge`` waits to be finished or aborted."""
+        ...
+
+    def finish_merge(self, message: str) -> Sha:
+        """Commit the stopped merge as it is staged now: a commit with parents HEAD and the merged commit, the factory
+        identity, hooks skipped, moving HEAD only (a detached checkout moves, a branch checkout moves its branch).
+        Paths the caller resolved must be staged (``stage``); ``UnmergedPaths`` while the index still holds conflict
+        entries, nothing is committed. ``ValueError`` with no merge under way."""
+        ...
+
+    def abort_merge(self) -> None:
+        """Drop the stopped merge: HEAD, index and files return to what they were before ``start_merge``. Nothing to do
+        when no merge is under way."""
         ...
 
     def rebasing(self) -> bool:
