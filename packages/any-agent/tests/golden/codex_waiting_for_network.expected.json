@@ -19,6 +19,8 @@
   "tokens": null,
   "cumulative": null,
   "turns": 0,
+  "requests": 0,
+  "last_total": [],
   "work": false,
   "error": "",
   "transient": "Reconnecting... waiting for network (Connection failed: error sending request)",

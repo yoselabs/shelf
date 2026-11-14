@@ -257,6 +257,7 @@ class OpenCodeHarness(Quiet):
         }
         e.steps.append({"tokens": u, "cost": part.get("cost")})
         e.turns += 1
+        e.requests += 1
         e.context_k = round(whole / 1000, 1)
         t = ev.Tokens(in_=int(whole), cached=int(num(c.get("read"))), out=int(num(u.get("output")) + num(u.get("reasoning"))))
         return [ev.TurnDone(usage=t)] if part.get("reason") in FINAL_REASONS else [t]
@@ -345,6 +346,7 @@ class OpenCodeHarness(Quiet):
             "ref": e.ref,
             "tokens": e.tokens,
             "turns": e.turns or None,
+            "requests": e.requests or None,
             "context_k": e.context_k,
             "started": bool(e.ref),
             "partial": e.work,

@@ -39,6 +39,8 @@
   "tokens": null,
   "cumulative": null,
   "turns": 0,
+  "requests": 0,
+  "last_total": [],
   "work": true,
   "error": "",
   "transient": "Reconnecting... 2/5 (stream disconnected before completion: idle timeout waiting for websocket)",

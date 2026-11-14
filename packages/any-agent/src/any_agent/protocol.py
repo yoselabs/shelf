@@ -61,6 +61,10 @@ class Evidence:
     tokens: dict[str, Json] | None = None
     cumulative: dict[str, Json] | None = None  # the thread's running total on a resume
     turns: int = 0
+    requests: int = 0  # model requests (one request, its reply): one usage record each, counted apart from the turn/completion tracking
+    last_total: list[int] = field(
+        default_factory=list
+    )  # codex: the running total of the last usage record, so a repeated record is not a new request
     work: bool = False  # a command, edit, tool call or message finished
     error: str = ""  # the harness's own failure text
     transient: str = ""  # a retry in progress ("Reconnecting... 2/5", "waiting for network")
