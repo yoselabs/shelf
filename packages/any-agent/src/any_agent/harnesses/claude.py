@@ -317,6 +317,7 @@ class ClaudeHarness(Quiet):
             "acct": acct_of(u, j.get("total_cost_usd")),
             "turns": j.get("num_turns"),
             "requests": e.requests or None,
+            "usage_incomplete": not e.final,  # no result event: the request in flight when the run ended is not in the usage
             "context_k": e.context_k,
             "started": e.work,
             "partial": e.work,
