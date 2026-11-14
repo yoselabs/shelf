@@ -2,7 +2,8 @@
 
 - :func:`run` — one child in a session of its own; stdout/stderr lines to callbacks, wall and idle
   timeouts, a stop flag; a typed :class:`Result`.
-- :func:`stop_tree` — SIGTERM, grace, SIGKILL, a sweep of descendants that left the group, a proof.
+- :func:`stop_tree` — SIGTERM, grace, SIGKILL, a sweep of descendants that left the group, a proof;
+  :func:`stop_tree_report` — the same, with a :class:`StopReport` of the signals the kernel took.
 - :func:`alive`, :func:`proc_start` — pid-reuse-safe liveness (``/proc`` on Linux, libproc on macOS);
   :func:`table`, :func:`descendants` — the process table; :func:`group_alive` — is any process in a group.
 - :func:`capture` — :func:`run` to the end, output as text, exit 124 on a timeout, optional heartbeat ``tick``.
@@ -24,7 +25,7 @@ from stream_proc.procfs import Proc
 from stream_proc.proctable import alive, descendants, group_alive, proc_start, table
 from stream_proc.registered import RegisteredStartUncertainError, popen_registered
 from stream_proc.runner import Kind, Result, run, run_registered
-from stream_proc.tree import stop_tree
+from stream_proc.tree import StopReport, stop_tree, stop_tree_report
 
 __all__ = [
     "Captured",
@@ -37,6 +38,7 @@ __all__ = [
     "ProcessObservation",
     "RegisteredStartUncertainError",
     "Result",
+    "StopReport",
     "TermHold",
     "alive",
     "capture",
@@ -52,5 +54,6 @@ __all__ = [
     "run_registered",
     "stop_pid",
     "stop_tree",
+    "stop_tree_report",
     "table",
 ]
