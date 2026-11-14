@@ -1,6 +1,6 @@
 [project]
 name = "stream-proc"
-version = "0.8.0"
+version = "0.9.0"
 description = "Run a child in its own session and stream its stdout and stderr lines to callbacks, under a wall timeout, an idle timeout and a stop flag; stop its whole tree (SIGTERM, grace, SIGKILL, sweep of descendants that left the group) and prove it dead; pid-reuse-safe liveness and a process table on Linux (/proc) and macOS (libproc via ctypes); group_alive(pgid); capture() to the end with text output, exit 124 on timeout; capture_bytes() the same with exact bytes, stdin input and inherited stdio; stop_pid(pid, start) stops a process we did not spawn only while its start token matches; popen_registered/run_registered execute a command only after a callback durably registered its identity (run_registered: stdin /dev/null, stderr merged into one log, exec failure after registration as a Result); a SIGTERM or SIGINT (Ctrl-C) that lands during the spawn still stops the child."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
