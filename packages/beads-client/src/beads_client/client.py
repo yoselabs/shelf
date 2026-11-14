@@ -266,43 +266,47 @@ class Bd:
     def comment(self, bead: str, text: str) -> None:
         self._must("comments", "add", bead, text)
 
-    def comment_once(self, bead: str, key: str, text: str) -> Comment:
-        """Post `text` on `bead` at most once per `key`, and return THE comment carrying that key, posted now or found.
+    def comment_once(self, bead: str, text: str, *, key: str | None = None) -> Comment:
+        """Post `text` on `bead` at most once, and return THE comment that carries it, posted now or already there.
 
-        The key is a caller-chosen stable id (the timed-out attempt's id, say), written into the comment as a last line
-        ``[comment-key: <key>]`` (also what a human sees). Before posting, the bead's comments are read: a comment with that
-        marker is returned and nothing is posted. When the post itself fails or its answer is lost (an ambiguous delivery),
-        the comments are read back: the marker found means the post landed and that comment is returned; not found means
-        nothing was written and the original error is raised (a retry is safe). Calls with one key in this process are serialized,
-        so concurrent callers share one post. Across processes it is read-then-post: two processes racing the same key can
-        both post (bd has no atomic keyed insert); the read-back before every post makes that window the time between one
-        read and one write."""
-        if not key.strip() or any(c in key for c in "[]\n"):
+        A comment is the same one when its text equals `text` (surrounding whitespace aside): the body is posted as given, with
+        nothing added to it. Put what makes the comment yours into the text (the timed-out attempt's id, say). Before posting, the bead's
+        comments are read and a match is returned. When the post fails or its answer is lost (an ambiguous delivery), they are read
+        back: a match means it landed and is returned, no match means nothing was written and the original error is raised (a retry
+        is safe). Calls for one (bead, text) in this process are serialized, so concurrent callers share one post.
+
+        `key` is for a body that cannot be identical between attempts: it is appended as a last line ``[comment-key: <key>]`` and a
+        comment with that line counts as the one, whatever else its text says. bd comments have no metadata field, so a key
+        has to live in the body.
+
+        Across processes it is read-then-post: two racing the same comment can both post (bd has no atomic keyed insert)."""
+        if key is not None and (not key.strip() or any(c in key for c in "[]\n")):
             msg = "a comment key must be a non-empty single line without brackets"
             raise ValueError(msg)
-        marker = f"[comment-key: {key}]"
-        with self._comment_lock(bead, key):
-            found = self._comment_with(bead, marker)
+        marker = f"[comment-key: {key}]" if key is not None else ""
+        body = f"{text.rstrip()}\n\n{marker}" if marker else text
+        with self._comment_lock(bead, marker or text.strip()):
+            found = self._comment_with(bead, marker, text)
             if found is not None:
                 return found
             try:
-                self._must("comments", "add", bead, f"{text.rstrip()}\n\n{marker}")
+                self._must("comments", "add", bead, body)
             except BdError as first:
                 try:
-                    landed = self._comment_with(bead, marker)  # the answer was lost, or the write failed: only the tracker knows
+                    landed = self._comment_with(bead, marker, text)  # the answer was lost, or the write failed: only the tracker knows
                 except BdError:
                     raise first from None  # the tracker cannot be read either: say what the post said, the outcome is unknown
                 if landed is None:
                     raise
                 return landed
-            posted = self._comment_with(bead, marker)
+            posted = self._comment_with(bead, marker, text)
             if posted is None:
                 msg = f"bd accepted the comment on {bead!r} but it is not among its comments"
                 raise malformed(msg)
             return posted
 
-    def _comment_with(self, bead: str, marker: str) -> Comment | None:
-        return next((c for c in self.comments(bead) if marker in c.text), None)
+    def _comment_with(self, bead: str, marker: str, text: str) -> Comment | None:
+        return next((c for c in self.comments(bead) if (marker in c.text if marker else c.text.strip() == text.strip())), None)
 
     def _comment_lock(self, bead: str, key: str) -> threading.Lock:
         with _LOCKS_GUARD:
