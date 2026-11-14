@@ -131,18 +131,24 @@ def _file_diff(path: str, old: str | None, new: str | None, store: Store) -> str
     return "\n".join([*head, *hunks]) + "\n"
 
 
-def _kept(path: str, exclude: Sequence[str]) -> bool:
-    return not any(path == e or path.startswith(e.rstrip("/") + "/") for e in exclude)
+def _under(path: str, base: str) -> bool:
+    return path == base or path.startswith(base.rstrip("/") + "/")
 
 
-def diff_text(a: Mapping[str, str], b: Mapping[str, str], store: Store, exclude: Sequence[str] = ()) -> str:
-    paths = sorted(p for p in set(a) | set(b) if a.get(p) != b.get(p) and _kept(p, exclude))
+def _kept(path: str, exclude: Sequence[str], include: Sequence[str] = ()) -> bool:
+    return (not include or any(_under(path, i) for i in include)) and not any(_under(path, e) for e in exclude)
+
+
+def diff_text(a: Mapping[str, str], b: Mapping[str, str], store: Store, exclude: Sequence[str] = (), include: Sequence[str] = ()) -> str:
+    paths = sorted(p for p in set(a) | set(b) if a.get(p) != b.get(p) and _kept(p, exclude, include))
     return "".join(_file_diff(p, a.get(p), b.get(p), store) for p in paths)
 
 
-def diff_stat(a: Mapping[str, str], b: Mapping[str, str], store: Store, exclude: Sequence[str] = ()) -> list[Stat]:
+def diff_stat(
+    a: Mapping[str, str], b: Mapping[str, str], store: Store, exclude: Sequence[str] = (), include: Sequence[str] = ()
+) -> list[Stat]:
     stats: list[Stat] = []
-    for path in sorted(p for p in set(a) | set(b) if a.get(p) != b.get(p) and _kept(p, exclude)):
+    for path in sorted(p for p in set(a) | set(b) if a.get(p) != b.get(p) and _kept(p, exclude, include)):
         before = store.blobs[a[path]] if path in a else b""
         after = store.blobs[b[path]] if path in b else b""
         if b"\0" in before + after:
