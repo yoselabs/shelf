@@ -38,6 +38,9 @@ class StopReport:
 
     term_sent: bool = True
     kill_sent: bool = False
+    term_delivered: bool = False  # a SIGTERM call reached something (ESRCH/EPERM only: False)
+    kill_delivered: bool = False  # likewise for SIGKILL
+    reason: str = ""  # who asked for the stop: "timeout", "secret", "answer", "limit", "hung:<kind>", "network", "caller", ...
     waited_s: float = 0.0
     survivors: list[Survivor] = field(default_factory=list)
     error: bool = False
@@ -69,13 +72,14 @@ def stop(p: subprocess.Popen[bytes], grace: float) -> StopReport:
     t0 = time.monotonic()
     rep = StopReport()
     try:
-        left = stream_proc.stop_tree(p, grace=grace)
+        res = stream_proc.stop_tree_report(p, grace=grace)
     except Exception:  # noqa: BLE001 - a stop that raised is reported, never allowed to hide the run's own outcome
         rep.error = True
         return rep
     rep.waited_s = round(time.monotonic() - t0, 2)
-    rep.kill_sent = bool(left) or rep.waited_s >= grace
-    rep.survivors = [Survivor(pid=c, start=proc_start(c)) for c in left]
+    rep.kill_sent = res.kill_sent or bool(res.survivors) or rep.waited_s >= grace
+    rep.term_delivered, rep.kill_delivered = res.term_delivered, res.kill_delivered
+    rep.survivors = [Survivor(pid=c, start=proc_start(c)) for c in res.survivors]
     return rep
 
 

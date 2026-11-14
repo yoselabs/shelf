@@ -84,6 +84,7 @@ class RunHooks:
     idle_s: float | None = None  # seconds of silence before the worker is hung (None = the harness's limit)
     unattended: bool = False  # the caller is an engine: stop when it dies
     stops: list[procs.StopReport] = field(default_factory=list)  # one report per tree stop made for this run
+    before_stop: Callable[[str], None] | None = None  # told the reason just before a tree stop (a raise is ignored)
 
 
 @mutable
@@ -246,11 +247,27 @@ class Supervisor:
                 tick()
             if cb(line):  # the policy asks to stop the worker now
                 killed.append(1)
-                self.hooks.stops.append(procs.kill_tree(p))
+                self._halt(p, "secret")
 
-    def _stop(self, p: subprocess.Popen[bytes], killed: list[int]) -> None:
+    def _halt(self, p: subprocess.Popen[bytes], reason: str) -> None:
+        """Tell the caller why (`before_stop`), then stop the tree and keep the report with that reason."""
+        if self.hooks.before_stop:
+            with contextlib.suppress(Exception):
+                self.hooks.before_stop(reason)
+        rep = procs.kill_tree(p)
+        rep.reason = reason
+        self.hooks.stops.append(rep)
+
+    def _why(self) -> str:
+        """Who made `poll()` say stop: the lane, the log, a deadline, the answer grace, the network."""
+        n = self.now
+        if n.why == "hung":
+            return f"hung:{n.kind}"
+        return n.why or self.turn.stop or ("network" if self.out.net else "watchdog")
+
+    def _stop(self, p: subprocess.Popen[bytes], killed: list[int], reason: str) -> None:
         killed.append(1)
-        self.hooks.stops.append(procs.kill_tree(p))
+        self._halt(p, reason)
         p.wait()
 
     def run(self, spec: LaunchSpec, timeout: float) -> RunOutcome:
@@ -308,10 +325,10 @@ class Supervisor:
                 except subprocess.TimeoutExpired:
                     if end is not None and time.time() >= end:
                         self.out.timed_out = True
-                        self._stop(p, killed)
+                        self._stop(p, killed, "timeout")
                         break
                     if self.poll():
-                        self._stop(p, killed)
+                        self._stop(p, killed, self._why())
                         break
                     if (
                         self.hooks.unattended and os.getppid() != ppid
@@ -320,7 +337,7 @@ class Supervisor:
         except (
             BaseException
         ):  # SIGTERM, SIGHUP, Ctrl-C, parent gone: the worker is in its own group, so stop it here or it keeps burning the plan
-            self.hooks.stops.append(procs.kill_tree(p))
+            self._halt(p, "caller")
             p.wait()
             raise
         finally:
