@@ -195,7 +195,8 @@ class CodexHarness(Quiet):
                 return []
             return [ev.ToolEnd(id=ident, name=name, arg=arg) if done else ev.Tool(id=ident, name=name, arg=arg)]
         if ity == "agent_message":
-            return [ev.Msg(text=text(item.get("text")))] if done else []
+            # exec --json marks no phase: only the turn end (TurnDone) says the answer is over, so no message is final by itself
+            return [ev.Msg(text=text(item.get("text")), final=False)] if done else []
         if ity == "reasoning":
             return [ev.Think(text=text(item.get("text")))] if done else []
         return [ev.Unknown(type=kind)]

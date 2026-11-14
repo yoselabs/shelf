@@ -8,6 +8,7 @@ import stat
 import sys
 import tempfile
 from pathlib import Path
+from typing import ClassVar
 from unittest import mock
 
 import pytest
@@ -15,6 +16,7 @@ import pytest
 from any_agent import events as ev
 from any_agent.harnesses.codex import CodexHarness
 from any_agent.protocol import LaunchInputs
+from any_agent.watch import Turn, Watchdog
 
 HERE = Path(__file__).resolve().parent
 
@@ -209,3 +211,25 @@ def test_codex_effort_is_one_literal_toml_string(resume: str | None) -> None:
     spec = CodexHarness().launch_spec(inputs)
     assert "model_reasoning_effort=" + json.dumps(effort) in spec.argv
     assert "--skip-git-repo-check" not in spec.argv
+
+
+class TestCodexMessageIsNotTheAnswerUntilTheTurnEnds:
+    COMMENTARY: ClassVar[dict[str, object]] = {
+        "type": "item.completed",
+        "item": {"id": "item_0", "type": "agent_message", "text": "I\u2019ll read the plan and trace the termination paths first."},
+    }
+
+    def test_a_message_alone_does_not_start_the_answer_timer(self):
+        clock = [0.0]
+        h, turn = CodexHarness(), Turn(grace_s=120, clock=lambda: clock[0])
+        turn.apply(h.parse_line(json.dumps(self.COMMENTARY)))
+        clock[0] = 121.0
+        assert (turn.verdict(Watchdog(600, 600, clock=lambda: clock[0])), h.evidence.last.startswith("I\u2019ll read")) == (None, True)
+
+    def test_the_turn_end_after_a_message_does_start_it(self):
+        clock = [0.0]
+        h, turn = CodexHarness(), Turn(grace_s=120, clock=lambda: clock[0])
+        for raw in (self.COMMENTARY, {"type": "turn.completed", "usage": {"input_tokens": 1, "output_tokens": 1}}):
+            turn.apply(h.parse_line(json.dumps(raw)))
+        clock[0] = 121.0
+        assert turn.verdict(Watchdog(600, 600, clock=lambda: clock[0])) == "answer"
