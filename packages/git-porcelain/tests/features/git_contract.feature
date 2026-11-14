@@ -1107,6 +1107,16 @@ Feature: One Repo and Worktree, real or fake
     Then the file "a" of "r" holds "two"
     And the file "unchanged" of "r" holds "local"
 
+  Scenario: An anchored keep protects one folder at the root through an ignored clean, a same-named folder below it goes
+    Given a repository "r"
+    And "r" commits "root" with .gitignore=".venv/\n" tracked="one"
+    And "r" writes .venv/lib="env", sub/.venv/lib="nested", stray="stray"
+    When "r" calls clean(["/.venv"], ignored=True)
+    Then the file ".venv/lib" of "r" holds "env"
+    And the file "sub/.venv/lib" of "r" is absent
+    And the file "stray" of "r" is absent
+    And the file "tracked" of "r" holds "one"
+
   Scenario: Clean respects keep patterns and optionally removes ignored files without moving HEAD
     Given a repository "r"
     And "r" commits "root" with .gitignore="*.cache\n" tracked="one"

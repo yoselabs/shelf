@@ -324,8 +324,11 @@ class Worktree(Protocol):
         ...
 
     def clean(self, keep: Sequence[str] = (), *, ignored: bool = False, nested: bool = False) -> None:
-        """Remove untracked files except keep patterns; optionally remove ignored files too. ``nested`` also removes
-        nested repositories (directories holding their own ``.git``; ``git clean -ff``), which git skips otherwise."""
+        """Remove untracked files except keep patterns; optionally remove ignored files too (``ignored=True`` with
+        ``keep=["/.venv"]`` is the reset that preserves a folder: a leading ``/`` anchors a pattern to the checkout root,
+        without it a same-named folder anywhere below is kept too). ``nested`` also removes nested repositories
+        (directories holding their own ``.git``; ``git clean -ff``), which git skips otherwise. A symlink is removed
+        as a link, never followed: nothing outside the checkout is touched, and a kept folder is left whole."""
         ...
 
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
