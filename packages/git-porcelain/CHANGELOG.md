@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.1
+
+No behavior change. `Worktree.clean(keep=["/.venv"], ignored=True)` is the reset that keeps a named folder: a leading `/` anchors to the checkout root (a bare `.venv` keeps same-named folders below too); a symlink is removed as a link and never followed out of the checkout, a kept folder holding one is left whole. Locked by a shared contract scenario (real and FakeRepo) and real-git tests; documented on `clean`.
+
 ## 0.22.0
 
 A diff limited to chosen paths, for "did any file I care about change between two commits" with no model call and no patch.
