@@ -72,6 +72,25 @@ def test_a_worker_that_answers_and_lingers_is_stopped_after_the_grace(tmp_path):
     assert len(hooks.stops) == 1 and hooks.stops[0].term_sent and hooks.stops[0].survivors == []
 
 
+def test_before_stop_hears_why_and_the_report_keeps_it(tmp_path):
+    told: list[str] = []
+    hooks = RunHooks(before_stop=told.append)
+    out = run(ClaudeHarness(), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT, then="sleep 60")), 30, hooks, limits=SHORT_GRACE)
+    assert out.stop == "answer"
+    stop = hooks.stops[0]
+    assert (told, stop.reason, stop.term_delivered, stop.kill_delivered) == (["answer"], "answer", True, False)
+
+
+def test_a_raising_before_stop_does_not_keep_the_tree_alive(tmp_path):
+    def boom(_why: str) -> None:
+        msg = "callback bug"
+        raise RuntimeError(msg)
+
+    hooks = RunHooks(before_stop=boom)
+    out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 1, hooks, limits=Limits(first_event_s=60, silence_s=60))
+    assert out.timed_out and [s.reason for s in hooks.stops] == ["timeout"]
+
+
 def test_the_timeout_stops_the_tree(tmp_path):
     hooks = RunHooks()
     out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 1, hooks, limits=Limits(first_event_s=60, silence_s=60))
