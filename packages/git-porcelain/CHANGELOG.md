@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.22.0
+
+A diff limited to chosen paths, for "did any file I care about change between two commits" with no model call and no patch.
+
+- `Worktree.diff(a, b, *, include=(), exclude=(), cap=None)`: `include` (literal paths, a folder standing for everything below it; empty = everything) narrows `changes` and `patch` to those paths before `exclude` leaves some out. `diff(base, "HEAD", include=cited, cap=0).changes` is the cheap changed-files read (real: `git diff --raw --numstat -- :(literal)<path>...`; FakeRepo the same). Additive.
+
 ## 0.21.0
 
 A merge of one commit into a checkout that stops before its commit, so a caller can resolve conflicts in the working files and finish it itself (the checked commit X merged with a newer main O: clean changes staged, conflicting files as markers). Real and fake under one contract; no operation writes a ref.

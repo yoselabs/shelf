@@ -113,16 +113,16 @@ def _letter(path: str, left: Mapping[str, object], right: Mapping[str, object]) 
     return "D" if path not in right else "M"
 
 
-def diff(repo: RepoState, wt: CheckoutState, a: str, b: str, *, exclude: Sequence[str], cap: int | None) -> Diff:
+def diff(repo: RepoState, wt: CheckoutState, a: str, b: str, *, include: Sequence[str], exclude: Sequence[str], cap: int | None) -> Diff:
     validate_revisions(a, b)
     left, right = repo.tree_named(a, wt), repo.tree_named(b, wt)
-    stats = diff_stat(left, right, repo.store, exclude)
+    stats = diff_stat(left, right, repo.store, exclude, include)
     if not stats:
         return Diff((), "", truncated=False)
     changes = tuple(Change(s.path, _letter(s.path, left, right), s.added, s.deleted) for s in stats)
     if cap == 0:
         return Diff(changes, "", truncated=True)
-    patch = diff_text(left, right, repo.store, exclude)
+    patch = diff_text(left, right, repo.store, exclude, include)
     return Diff(changes, patch[:cap], truncated=True) if cap is not None and len(patch) > cap else Diff(changes, patch, truncated=False)
 
 

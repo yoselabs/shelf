@@ -1507,6 +1507,19 @@ Feature: One Repo and Worktree, real or fake
     Then the result's changes are ["a.txt M +2 -1"]
     And the result's patch is "diff --git a/a.txt b/a.txt\nindex <blob:one\ntwo\nthree\n>..<blob:one\n2\nthree\nfour\n> 100644\n--- a/a.txt\n+++ b/a.txt\n@@ -1,3 +1,4 @@\n one\n-two\n+2\n three\n+four\n"
 
+  Scenario: A diff can be limited to the paths asked for, a folder standing for what is below it
+    Given a repository "r"
+    And "r" commits "base" with src/a.py="1\n", src/deep/b.py="1\n", docs/c.md="1\n"
+    And "r" remembers its head as "base"
+    And "r" commits "change" with src/a.py="2\n", src/deep/b.py="2\n", docs/c.md="2\n"
+    When "r" calls diff("<mem:base>", "HEAD", include=["src"], cap=0)
+    Then the result's changes are ["src/a.py M +1 -1", "src/deep/b.py M +1 -1"]
+    And the result's truncated is True
+    When "r" calls diff("<mem:base>", "HEAD", include=["docs/c.md", "src/a.py"], exclude=["src/a.py"])
+    Then the result's changes are ["docs/c.md M +1 -1"]
+    When "r" calls diff("<mem:base>", "HEAD", include=["elsewhere"])
+    Then the result's changes are []
+
   Scenario: A diff names the function a hunk sits in, and marks new and deleted files
     Given a repository "r"
     And "r" commits "base" with code.py="def f():\n    a = 1\n    b = 2\n    c = 3\n    d = 4\n    e = 5\n    return a\n", gone.txt="bye\n"

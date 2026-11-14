@@ -237,11 +237,15 @@ def _write_tree(wt: RealWorktree, *, has_head: bool, inputs: Sequence[str]) -> T
         return TreeId(wt.run("write-tree", env=env).out.strip())
 
 
-def diff(wt: RealWorktree, a: str, b: str, *, exclude: tuple[str, ...], cap: int | None) -> Diff:
+def diff(wt: RealWorktree, a: str, b: str, *, include: tuple[str, ...], exclude: tuple[str, ...], cap: int | None) -> Diff:
     validate_revisions(a, b)
 
     def compute() -> Diff:
-        scope = ["--", ".", *(f":(exclude,literal){p}" for p in exclude)] if exclude else []
+        scope = (
+            ["--", *([f":(literal){p}" for p in include] or ["."]), *(f":(exclude,literal){p}" for p in exclude)]
+            if include or exclude
+            else []
+        )
         common = ("--no-color", "--no-ext-diff", "--no-renames", a, b)
         changes = real_parse.parse_diff(wt.run("diff", "--raw", "--numstat", "-z", *common, *scope).out)
         if not changes:
@@ -253,7 +257,7 @@ def diff(wt: RealWorktree, a: str, b: str, *, exclude: tuple[str, ...], cap: int
             return Diff(changes, patch[:cap], truncated=True)
         return Diff(changes, patch, truncated=False)
 
-    return _rev_memo(wt.repo, ("diff", a, b, exclude, cap), (a, b), compute)
+    return _rev_memo(wt.repo, ("diff", a, b, include, exclude, cap), (a, b), compute)
 
 
 def dirty(wt: RealWorktree, base: str | None, ignored_under: tuple[str, ...]) -> Dirty:

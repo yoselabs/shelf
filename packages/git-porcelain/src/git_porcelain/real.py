@@ -379,8 +379,8 @@ class RealWorktree:
     def capture(self) -> TreeId:
         return real_capture.capture(self)
 
-    def diff(self, a: str, b: str, *, exclude: Sequence[str] = (), cap: int | None = None) -> Diff:
-        return real_read.diff(self, a, b, exclude=tuple(exclude), cap=cap)
+    def diff(self, a: str, b: str, *, include: Sequence[str] = (), exclude: Sequence[str] = (), cap: int | None = None) -> Diff:
+        return real_read.diff(self, a, b, include=tuple(include), exclude=tuple(exclude), cap=cap)
 
     def dirty(self, base: str | None = None, *, ignored_under: Sequence[str] = ()) -> Dirty:
         return real_read.dirty(self, base=base, ignored_under=tuple(ignored_under))

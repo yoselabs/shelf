@@ -367,9 +367,11 @@ class Worktree(Protocol):
         raise UnmergedPaths and a nested repository EmbeddedRepositories; nothing is left half-made."""
         ...
 
-    def diff(self, a: str, b: str, *, exclude: Sequence[str] = (), cap: int | None = None) -> Diff:
-        """Changes and patch from tree-ish ``a`` to ``b``; ``exclude`` lists literal paths left out; a patch longer
-        than ``cap`` characters is cut and ``truncated`` set."""
+    def diff(self, a: str, b: str, *, include: Sequence[str] = (), exclude: Sequence[str] = (), cap: int | None = None) -> Diff:
+        """Changes and patch from tree-ish ``a`` to ``b``; ``include`` (when not empty) limits it to those literal paths, a
+        folder standing for everything below it; ``exclude`` lists literal paths left out; a patch longer
+        than ``cap`` characters is cut and ``truncated`` set. ``include`` with ``cap=0`` is the cheap "did any of these
+        change" read: ``.changes`` is the answer."""
         ...
 
     def dirty(self, base: str | None = None, *, ignored_under: Sequence[str] = ()) -> Dirty:
