@@ -369,7 +369,7 @@ class Supervisor:
         return self.finish(p.returncode, "".join(out), "".join(err), bool(killed))
 
     def _wait(self, p: subprocess.Popen[bytes], killed: list[int], timeout: float) -> None:
-        ppid, end = os.getppid(), time.time() + timeout if timeout else None
+        ppid, end = os.getppid(), self.clock() + timeout if timeout else None
 
         def bye(signum: int, frame: object) -> None:  # noqa: ARG001 - the signal handler signature
             raise EntrySignal(signum)
@@ -381,10 +381,10 @@ class Supervisor:
         try:
             while True:
                 try:
-                    p.wait(timeout=POLL_S if end is None else max(0.01, min(POLL_S, end - time.time())))
+                    p.wait(timeout=POLL_S if end is None else max(0.01, min(POLL_S, end - self.clock())))
                     break
                 except subprocess.TimeoutExpired:
-                    if end is not None and time.time() >= end:
+                    if end is not None and self.clock() >= end:
                         self.out.timed_out = True
                         self._stop(p, killed, "timeout")
                         break
