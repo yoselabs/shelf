@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, override
 
 from any_agent import events as ev
 from any_agent import procs
-from any_agent._json import Json, obj, objs, opt_int, opt_str, text
+from any_agent._json import Json, num, obj, objs, opt_int, opt_str, text
 from any_agent.access import CodexAccess, refuse
 from any_agent.protocol import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from any_agent.sealed import SealedDir
@@ -143,7 +143,8 @@ class CodexHarness(Quiet):
             return []
         if not isinstance(raw, dict):
             return []
-        events = self._events(raw)
+        usage = self._request_usage(raw)
+        events: list[ev.HarnessEvent] = [usage] if usage else self._events(raw)
         self._note(raw, events)
         return events
 
@@ -185,6 +186,22 @@ class CodexHarness(Quiet):
             out.append(ev.Denied(tool="Bash", input={"command": item.get("command")}, reason="the reviewer declined the escalation"))
         return out
 
+    def _request_usage(self, raw: dict[str, Json]) -> ev.Tokens | None:
+        """A `token_count` record (top level, or the payload of an `event_msg`): one model request's usage. The same running total
+        repeated is the same request."""
+        rec = obj(raw.get("payload")) if raw.get("type") == "event_msg" else raw
+        if text(rec.get("type")) != "token_count":
+            return None
+        info = obj(rec.get("info"))
+        total, last = obj(info.get("total_token_usage")), obj(info.get("last_token_usage"))
+        key = [int(num(total.get(k))) for k in ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens")]
+        if not last or key == self.evidence.last_total:
+            return None
+        self.evidence.last_total = key
+        return ev.Tokens(
+            in_=opt_int(last.get("input_tokens")), cached=opt_int(last.get("cached_input_tokens")), out=opt_int(last.get("output_tokens"))
+        )
+
     def _item(self, kind: str, item: dict[str, Json]) -> list[ev.HarnessEvent]:
         ity, ident, done = item["type"], opt_str(item.get("id")), kind == "item.completed"
         if ity == SHELL_ITEM:
@@ -224,6 +241,8 @@ class CodexHarness(Quiet):
                 e.tokens = {"in": x.usage.in_, "cached": x.usage.cached, "out": x.usage.out}
                 e.cumulative = dict(e.tokens)
                 e.turns += 1
+            elif isinstance(x, ev.Tokens):
+                e.requests += 1
             elif isinstance(x, ev.Msg):
                 e.last = x.text
             elif isinstance(x, ev.Denied):
@@ -252,6 +271,7 @@ class CodexHarness(Quiet):
             "ref": e.ref,
             "tokens": e.tokens,
             "turns": e.turns or None,
+            "requests": e.requests or e.turns or None,  # no per-request record in the stream: one per completion, a lower bound
             "started": bool(e.ref),
             "partial": e.work,
             "answered": final,

@@ -245,6 +245,7 @@ class ClaudeHarness(Quiet):
             if opt_str(msg.get("id")) not in self.seen_usage:
                 self.seen_usage.add(opt_str(msg.get("id")))
                 self.evidence.steps.append(u)
+                self.evidence.requests += 1
                 cached = opt_int(u.get("cache_read_input_tokens")) or 0
                 out.append(
                     ev.Tokens(
@@ -315,6 +316,7 @@ class ClaudeHarness(Quiet):
             "tokens": tokens_of(u),
             "acct": acct_of(u, j.get("total_cost_usd")),
             "turns": j.get("num_turns"),
+            "requests": e.requests or None,
             "context_k": e.context_k,
             "started": e.work,
             "partial": e.work,
