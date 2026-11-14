@@ -86,7 +86,7 @@
    {
     "event": "Msg",
     "text": "done",
-    "final": true
+    "final": false
    }
   ],
   [
