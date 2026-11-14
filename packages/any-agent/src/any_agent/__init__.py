@@ -20,7 +20,7 @@ from any_agent.harnesses.claude import ClaudeHarness
 from any_agent.harnesses.codex import CodexHarness
 from any_agent.harnesses.opencode import OpenCodeHarness, Profile
 from any_agent.protocol import Evidence, Harness, LaunchInputs, LaunchSpec, Summary
-from any_agent.supervisor import LiveSink, LogWatcher, NullSink, RunHooks, RunOutcome, Stop, Supervisor, run
+from any_agent.supervisor import LiveSink, LogWatcher, NullSink, RunHooks, RunOutcome, Stop, StopIntent, Supervisor, run
 from any_agent.watch import Limits
 
 __all__ = [
@@ -50,6 +50,7 @@ __all__ = [
     "RunHooks",
     "RunOutcome",
     "Stop",
+    "StopIntent",
     "Summary",
     "Supervisor",
     "access",

@@ -2,7 +2,7 @@
 name = "any-agent"
 kind = "any-lib"
 tier = "T1"
-release = "any-agent-v0.10.0"
+release = "any-agent-v0.11.0"
 capability = "Stop writing a supervisor per agent CLI: claude -p, codex exec --json and opencode run behind one Harness protocol (launch spec, each stream line parsed once into typed events and evidence, summary, transcript, login probe), a run() that spawns the worker in a session of its own, watches silence, first event, answer grace, stall, the CLI's own log, a lane marked out and the network, stops the whole tree, and one outcome ladder from what the vendor said to a reason."
 implementation = "ours"
 status = "candidate"
