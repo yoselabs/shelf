@@ -17,6 +17,7 @@ from any_agent import events as ev
 from any_agent import procs
 from any_agent._json import Json, num, obj, objs, opt_int, opt_str, text
 from any_agent.access import CodexAccess, refuse
+from any_agent.harnesses import codex_rollout as rollout
 from any_agent.protocol import Evidence, LaunchInputs, LaunchSpec, Quiet, Summary
 from any_agent.sealed import SealedDir
 from any_agent.watch import Limits
@@ -81,6 +82,8 @@ class CodexHarness(Quiet):
         self.out_file = ""
         self.overlay: CodexOverlay | None = None
         self.sealed_dir: SealedDir | None = None
+        self.sessions: Path | None = None  # where this run's rollout lives (CODEX_HOME of the launch, else the process's)
+        self.began = 0.0  # epoch seconds: a resumed thread's earlier requests are not this run's
 
     @override
     def cleanup(self) -> None:
@@ -103,6 +106,8 @@ class CodexHarness(Quiet):
             msg = "Codex resume must name an explicit session"
             raise ValueError(msg)
         self.out_file = i.out_file
+        self.sessions = Path(i.env.get("CODEX_HOME") or os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "sessions"
+        self.began = time.time() if i.resume is not None else 0.0
         access = i.access_policy
         if access is not None and not isinstance(access, CodexAccess):
             refuse("codex", access)
@@ -266,16 +271,18 @@ class CodexHarness(Quiet):
                 p.unlink()
         final = bool(text) or bool(e.last and (e.turns or stop == "answer"))  # the turn finished: codex writes -o only at its end
         text = text or e.last
+        used = rollout.read(self.sessions or sessions_root(), e.ref or "", self.began) if e.ref else None
         res: dict[str, Json] = {
             "text": text,
             "ref": e.ref,
-            "tokens": e.tokens,
+            "tokens": e.tokens or (used.tokens() if used and used.requests else None),  # a turn that never ended: the rollout has it
             "turns": e.turns or None,
-            "requests": e.requests or e.turns or None,  # no per-request record in the stream: one per completion, a lower bound
+            "requests": used.requests if used else e.requests or e.turns or None,  # rollout: one record per request
+            "usage_incomplete": not e.turns,  # no turn.completed: the request in flight when the run ended is not in the usage
             "started": bool(e.ref),
             "partial": e.work,
             "answered": final,
-            "cumulative": e.cumulative,
+            "cumulative": e.cumulative or (used.tokens() if used and used.requests else None),
         }
         return Summary(
             text=text, rc=rc, res=res, vendor=self.vendor_error(rc), stderr=err, work=e.work, stands=final and not e.error, tail=err or text
