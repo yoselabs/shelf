@@ -2,12 +2,17 @@
 
 import json
 import os
+import signal
+import subprocess
+import threading
+from typing import Any
 
 import pytest
 
 from any_agent import ClaudeHarness, CodexHarness, LaunchSpec, Limits, LogWatcher, NullSink, RunHooks, run
 from any_agent import events as ev
-from any_agent.supervisor import end_status
+from any_agent.procs import Worker
+from any_agent.supervisor import StopIntent, Supervisor, end_status
 
 pytestmark = pytest.mark.skipif(os.name == "nt", reason="fake CLIs are shell scripts")
 
@@ -72,23 +77,72 @@ def test_a_worker_that_answers_and_lingers_is_stopped_after_the_grace(tmp_path):
     assert len(hooks.stops) == 1 and hooks.stops[0].term_sent and hooks.stops[0].survivors == []
 
 
-def test_before_stop_hears_why_and_the_report_keeps_it(tmp_path):
-    told: list[str] = []
-    hooks = RunHooks(before_stop=told.append)
+def test_before_stop_hears_the_intent_and_after_stop_the_report(tmp_path):
+    told: list[tuple[Any, ...]] = []
+    hooks = RunHooks(before_stop=lambda i: told.append(("before", i)), after_stop=lambda i, r: told.append(("after", i, r)))
     out = run(ClaudeHarness(), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT, then="sleep 60")), 30, hooks, limits=SHORT_GRACE)
-    assert out.stop == "answer"
-    stop = hooks.stops[0]
-    assert (told, stop.reason, stop.term_delivered, stop.kill_delivered) == (["answer"], "answer", True, False)
+    assert out.stop == "answer" and out.worker is not None
+    (kind1, intent), (kind2, intent2, rep) = told
+    assert (kind1, kind2, intent2) == ("before", "after", intent)
+    assert (intent.reason, intent.worker, intent.first_signal, intent.trigger_signal) == ("answer", out.worker, signal.SIGTERM, None)
+    assert rep is hooks.stops[0]
+    assert (rep.reason, rep.term_sent, rep.term_delivered, rep.kill_sent, rep.kill_delivered) == ("answer", True, True, False, False)
 
 
-def test_a_raising_before_stop_does_not_keep_the_tree_alive(tmp_path):
-    def boom(_why: str) -> None:
-        msg = "callback bug"
+def test_a_refused_intent_stops_nothing_and_propagates_without_a_cleanup_stop(tmp_path):
+    def refuse(_intent: StopIntent) -> None:
+        msg = "store is busy"
         raise RuntimeError(msg)
 
-    hooks = RunHooks(before_stop=boom)
-    out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 1, hooks, limits=Limits(first_event_s=60, silence_s=60))
-    assert out.timed_out and [s.reason for s in hooks.stops] == ["timeout"]
+    pidfile = tmp_path / "pid"
+    hooks = RunHooks(before_stop=refuse)
+    with pytest.raises(RuntimeError, match="store is busy"):
+        run(ClaudeHarness(), spec(tmp_path, f"echo $$ > {pidfile}; exec sleep 60"), 1, hooks, limits=Limits(first_event_s=60, silence_s=60))
+    pid = int(pidfile.read_text())
+    try:
+        assert hooks.stops == []  # no stop of any name was issued
+        os.kill(pid, 0)  # the worker is still up: custody is the caller's
+    finally:
+        os.kill(pid, signal.SIGKILL)
+
+
+def test_an_entry_sigterm_is_told_apart_from_the_signal_sent_to_the_agent(tmp_path):
+    told: list[StopIntent] = []
+    hooks = RunHooks(before_stop=told.append)
+    timer = threading.Timer(1.0, lambda: os.kill(os.getpid(), signal.SIGTERM))
+    timer.start()
+    try:
+        with pytest.raises(SystemExit) as info:
+            run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, hooks, limits=Limits(first_event_s=60, silence_s=60))
+    finally:
+        timer.cancel()
+    assert info.value.code == 128 + signal.SIGTERM
+    assert [(i.reason, i.trigger_signal, i.first_signal) for i in told] == [("entry_signal", signal.SIGTERM, signal.SIGTERM)]
+    assert [s.reason for s in hooks.stops] == ["entry_signal"]
+
+
+def test_after_stop_runs_on_an_exceptional_exit_too(tmp_path):
+    seen: list[str] = []
+    hooks = RunHooks(after_stop=lambda i, r: seen.append(f"{i.reason}:{r.term_delivered}"))
+    timer = threading.Timer(1.0, lambda: os.kill(os.getpid(), signal.SIGHUP))
+    timer.start()
+    try:
+        with pytest.raises(SystemExit):
+            run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, hooks, limits=Limits(first_event_s=60, silence_s=60))
+    finally:
+        timer.cancel()
+    assert seen == ["entry_signal:True"]
+
+
+def test_a_stop_asked_for_twice_is_made_once(tmp_path):
+    told: list[str] = []
+    hooks = RunHooks(before_stop=lambda i: told.append(i.reason))
+    sup = Supervisor(ClaudeHarness(), hooks, limits=FAST)
+    p = subprocess.Popen(["sleep", "60"], start_new_session=True)
+    sup.out.worker = Worker(pid=p.pid, pgid=p.pid, start="s", boot="b")
+    sup._halt(p, "timeout")
+    sup._halt(p, "caller")
+    assert (told, [s.reason for s in hooks.stops]) == (["timeout"], ["timeout"])
 
 
 def test_the_timeout_stops_the_tree(tmp_path):

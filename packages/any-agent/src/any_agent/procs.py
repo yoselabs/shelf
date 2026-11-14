@@ -34,16 +34,18 @@ class Survivor:
 
 @mutable
 class StopReport:
-    """One tree stop: SIGTERM always went first, SIGKILL once the grace ran out, `survivors` outlived both, `error` = stream_proc raised."""
+    """One tree stop, as the signal calls themselves went (stream_proc's facts, never inferred from time or survivors): `term_sent` /
+    `kill_sent` a SIGTERM / SIGKILL call was made, `term_delivered` / `kill_delivered` one returned without error (ESRCH, EPERM: no),
+    `survivors` outlived both, `error` the stop raised (the flags then hold what went out before), `reason` who asked for it."""
 
-    term_sent: bool = True
+    term_sent: bool = False
+    term_delivered: bool = False
     kill_sent: bool = False
-    term_delivered: bool = False  # a SIGTERM call reached something (ESRCH/EPERM only: False)
-    kill_delivered: bool = False  # likewise for SIGKILL
-    reason: str = ""  # who asked for the stop: "timeout", "secret", "answer", "limit", "hung:<kind>", "network", "caller", ...
+    kill_delivered: bool = False
     waited_s: float = 0.0
     survivors: list[Survivor] = field(default_factory=list)
     error: bool = False
+    reason: str = ""
 
 
 def spawn(
@@ -68,7 +70,7 @@ def spawn(
 
 
 def stop(p: subprocess.Popen[bytes], grace: float) -> StopReport:
-    """Stop `p` and its whole tree (stream_proc.stop_tree). -> the report."""
+    """Stop `p` and its whole tree (stream_proc.stop_tree_report). -> the report."""
     t0 = time.monotonic()
     rep = StopReport()
     try:
@@ -77,8 +79,9 @@ def stop(p: subprocess.Popen[bytes], grace: float) -> StopReport:
         rep.error = True
         return rep
     rep.waited_s = round(time.monotonic() - t0, 2)
-    rep.kill_sent = res.kill_sent or bool(res.survivors) or rep.waited_s >= grace
-    rep.term_delivered, rep.kill_delivered = res.term_delivered, res.kill_delivered
+    rep.term_sent, rep.term_delivered = res.term_sent, res.term_delivered
+    rep.kill_sent, rep.kill_delivered = res.kill_sent, res.kill_delivered
+    rep.error = res.error
     rep.survivors = [Survivor(pid=c, start=proc_start(c)) for c in res.survivors]
     return rep
 

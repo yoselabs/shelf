@@ -21,7 +21,7 @@ from typing import IO, TYPE_CHECKING, Literal, Protocol
 
 from any_agent import events as ev
 from any_agent import procs, watch
-from any_agent._json import mutable
+from any_agent._json import mutable, record
 from any_agent.protocol import Harness, LaunchSpec, Summary
 from any_agent.watch import Limits
 
@@ -74,6 +74,19 @@ def end_status(timed_out: bool, hung: str | None, stop: str | None, rc: int | No
     return "done" if stop == "answer" or rc == 0 else "error"
 
 
+@record
+class StopIntent:
+    """What the supervisor is about to do to a worker's tree: `worker` the exact process (pid, group, start, boot), `reason` the
+    initiating condition ("timeout", "secret", "answer", "limit", "credit", "logged_out", "hung:<kind>", "network", or for the caller's
+    own exit "entry_signal", "interrupt", "parent_gone", "caller"), `first_signal` the first signal requested (SIGKILL follows when
+    the grace runs out), `trigger_signal` the signal the supervising process itself took (SIGTERM, SIGHUP, SIGINT), when that is why."""
+
+    worker: procs.Worker
+    reason: str
+    first_signal: int = signal.SIGTERM
+    trigger_signal: int | None = None
+
+
 @mutable
 class RunHooks:
     """What the caller of a run wants to hear, for this run only."""
@@ -84,7 +97,34 @@ class RunHooks:
     idle_s: float | None = None  # seconds of silence before the worker is hung (None = the harness's limit)
     unattended: bool = False  # the caller is an engine: stop when it dies
     stops: list[procs.StopReport] = field(default_factory=list)  # one report per tree stop made for this run
-    before_stop: Callable[[str], None] | None = None  # told the reason just before a tree stop (a raise is ignored)
+    before_stop: Callable[[StopIntent], None] | None = None  # the intent, durably, BEFORE any signal; a raise forbids the stop (see run())
+    after_stop: Callable[[StopIntent, procs.StopReport], None] | None = None  # what the signal calls did; a raise propagates from run()
+
+
+class EntrySignal(SystemExit):
+    """The supervising process took a signal (SIGTERM or SIGHUP); exits with 128 + `signum`."""
+
+    def __init__(self, signum: int) -> None:
+        super().__init__(128 + signum)
+        self.signum = signum
+
+
+class ParentGone(SystemExit):
+    """An unattended run whose parent changed: the engine died, so the worker is stopped."""
+
+    def __init__(self) -> None:
+        super().__init__(1)
+
+
+def caller_cause(exc: BaseException) -> tuple[str, int | None]:
+    """Why the supervising process is leaving: (reason, the signal it took itself)."""
+    if isinstance(exc, EntrySignal):
+        return "entry_signal", exc.signum
+    if isinstance(exc, KeyboardInterrupt):
+        return "interrupt", signal.SIGINT
+    if isinstance(exc, ParentGone):
+        return "parent_gone", None
+    return "caller", None
 
 
 @mutable
@@ -176,6 +216,9 @@ class Supervisor:
         self.log, self.lock, self.out = log, threading.RLock(), RunOutcome()
         self.now = Stop()
         self.asked = False
+        self.stop_lock = threading.Lock()  # one stop initiator at a time: the first cause is the stored one
+        self.stopped: procs.StopReport | None = None
+        self.refusal: BaseException | None = None  # a stop callback raised: surfaced by run(), no further stop is made
 
     # -- the lines of the worker ----------------------------------------------------------------------------------------------------------
     def feed(self, events: list[ev.HarnessEvent]) -> bool:
@@ -247,16 +290,32 @@ class Supervisor:
                 tick()
             if cb(line):  # the policy asks to stop the worker now
                 killed.append(1)
-                self._halt(p, "secret")
+                with contextlib.suppress(Exception):  # a refusal is kept in self.refusal and raised by the waiting thread
+                    self._halt(p, "secret")
 
-    def _halt(self, p: subprocess.Popen[bytes], reason: str) -> None:
-        """Tell the caller why (`before_stop`), then stop the tree and keep the report with that reason."""
-        if self.hooks.before_stop:
-            with contextlib.suppress(Exception):
-                self.hooks.before_stop(reason)
-        rep = procs.kill_tree(p)
-        rep.reason = reason
-        self.hooks.stops.append(rep)
+    def _halt(self, p: subprocess.Popen[bytes], reason: str, trigger_signal: int | None = None) -> None:
+        """Stop the tree once. The first initiator wins (later ones, or a repeated cleanup, do nothing). `before_stop` gets the intent
+        before any signal; if it raises, nothing is signalled, no cleanup stop follows and the error propagates (the worker stays up and
+        is the caller's to resolve). `after_stop` gets the report of what the signal calls did; a raise propagates."""
+        with self.stop_lock:
+            if self.stopped is not None or self.refusal is not None:
+                return
+            if self.out.worker is None:
+                msg = "no worker to stop"
+                raise RuntimeError(msg)
+            intent = StopIntent(worker=self.out.worker, reason=reason, trigger_signal=trigger_signal)
+            try:
+                if self.hooks.before_stop:
+                    self.hooks.before_stop(intent)
+                rep = procs.kill_tree(p)
+                rep.reason = reason
+                self.hooks.stops.append(rep)
+                self.stopped = rep
+                if self.hooks.after_stop:
+                    self.hooks.after_stop(intent, rep)
+            except BaseException as e:
+                self.refusal = e
+                raise
 
     def _why(self) -> str:
         """Who made `poll()` say stop: the lane, the log, a deadline, the answer grace, the network."""
@@ -305,13 +364,15 @@ class Supervisor:
         for f in (p.stdin, p.stdout, p.stderr):
             with contextlib.suppress(OSError):
                 f and f.close()
+        if self.refusal is not None:
+            raise self.refusal
         return self.finish(p.returncode, "".join(out), "".join(err), bool(killed))
 
     def _wait(self, p: subprocess.Popen[bytes], killed: list[int], timeout: float) -> None:
         ppid, end = os.getppid(), time.time() + timeout if timeout else None
 
         def bye(signum: int, frame: object) -> None:  # noqa: ARG001 - the signal handler signature
-            raise SystemExit(128 + signum)
+            raise EntrySignal(signum)
 
         mine = threading.current_thread() is threading.main_thread()  # a library caller runs on any thread; only the main one takes signals
         old: dict[int, Callable[[int, FrameType | None], object] | int | None] = (
@@ -327,18 +388,21 @@ class Supervisor:
                         self.out.timed_out = True
                         self._stop(p, killed, "timeout")
                         break
+                    if self.refusal is not None:
+                        raise self.refusal from None
                     if self.poll():
                         self._stop(p, killed, self._why())
                         break
                     if (
                         self.hooks.unattended and os.getppid() != ppid
                     ):  # SIGKILL on the engine cannot be caught: the parent changing is the only sign
-                        raise SystemExit(1) from None
+                        raise ParentGone from None
         except (
             BaseException
-        ):  # SIGTERM, SIGHUP, Ctrl-C, parent gone: the worker is in its own group, so stop it here or it keeps burning the plan
-            self._halt(p, "caller")
-            p.wait()
+        ) as exc:  # SIGTERM, SIGHUP, Ctrl-C, parent gone: the worker is in its own group, so stop it here or it keeps burning the plan
+            if self.refusal is None:  # a refused stop is never retried here under another name
+                self._halt(p, *caller_cause(exc))
+                p.wait()
             raise
         finally:
             for g, h in old.items():
