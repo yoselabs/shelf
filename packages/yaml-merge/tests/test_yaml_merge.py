@@ -122,3 +122,27 @@ def test_the_payload_is_never_mutated() -> None:
     merge_into(_YAML.load("projection:\n  source_role: source\n"), payload)
 
     assert payload == {"projection": {"source_role": "raw"}}
+
+
+def test_a_top_level_sequence_keeps_its_entry_comments() -> None:
+    """A file whose document is a list of entries merges as a nested list does: by identity."""
+    document = "# the release log\n-   id: a\n    # first cut\n    note: old\n"
+
+    out = _roundtrip_list(document, [{"id": "b", "note": "new"}, {"id": "a", "note": "changed"}])
+
+    lines = [line.strip() for line in out.splitlines()]
+    assert lines[0] == "# the release log"
+    assert lines.index("- id: b") < lines.index("- id: a") < lines.index("# first cut") < lines.index("note: changed")
+
+
+@pytest.mark.parametrize("existing", [None, "a scalar", {"name": "note"}])
+def test_a_list_payload_without_a_sequence_to_merge_into_is_returned_as_is(existing: object) -> None:
+    payload = [{"id": "a"}]
+
+    assert merge_into(existing, payload) is payload
+
+
+def _roundtrip_list(document: str, payload: list[object]) -> str:
+    buf = io.StringIO()
+    _YAML.dump(merge_into(_YAML.load(document), payload), buf)
+    return buf.getvalue()
