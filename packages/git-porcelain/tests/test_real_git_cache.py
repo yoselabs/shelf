@@ -550,6 +550,24 @@ def test_a_tree_lists_and_reads_once(rig: Rig) -> None:
     assert rig.count("cat-file") == 1
 
 
+def test_a_tree_reads_many_files_as_exact_bytes_in_one_batch(rig: Rig) -> None:
+    raw = {"kb/crlf.md": b"one\r\ntwo\r\n", "kb/bad.md": b"\xff\xfe not utf-8\n", "kb/empty.md": b"", "kb/line\nname.md": b"x"}
+    for rel, data in raw.items():
+        (rig.path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (rig.path / rel).write_bytes(data)
+    run(rig.path, "add", "-A")
+    run(rig.path, "commit", "-q", "-m", "kb")
+    found = rig.repo.tree("HEAD:kb")
+    assert found is not None
+    assert found.sha == run(rig.path, "rev-parse", "HEAD:kb").strip()
+    names = [rel.removeprefix("kb/") for rel in raw]
+    assert found.read_many([*names, "gone"]) == {**{n: raw[f"kb/{n}"] for n in names}, "gone": None}
+    assert found.read_many(names) == {n: raw[f"kb/{n}"] for n in names}
+    assert found.read("crlf.md") == raw["kb/crlf.md"]
+    assert rig.count("cat-file", "--batch") == 1
+    assert rig.count("cat-file") == 3  # and a --batch-check resolving HEAD:kb, a blob for the name the batch cannot carry
+
+
 def test_a_repository_on_the_reftable_backend_is_never_memoized(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     apply_hermetic_env(monkeypatch, identity=_ME, home=tmp_path / "home")
     path = tmp_path / "t"

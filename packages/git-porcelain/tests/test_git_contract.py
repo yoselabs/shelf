@@ -1008,7 +1008,7 @@ def _tree_lists(world: World, expected: str) -> None:
 
 @then(parsers.re(r'the tree reads "(?P<rel>[^"]+)" as (?P<expected>.+)'))
 def _tree_reads(world: World, rel: str, expected: str) -> None:
-    got = world.result.read(rel)  # type: ignore[attr-defined]
+    got = world.result.read_many([rel])[rel]  # type: ignore[attr-defined]
     assert got == (None if expected == "nothing" else _text(ast.literal_eval(expected)).encode())
 
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from git_porcelain import GitUnavailable
-from git_porcelain.real_parse import parse_worktrees
+from git_porcelain.real_parse import parse_cat_file_batch, parse_worktrees
 
 _HEAD = "a" * 40
 
@@ -49,3 +49,17 @@ def test_worktree_records_preserve_paths(record: str, expected: list[tuple[Path,
 def test_incomplete_or_malformed_worktree_records_raise(record: str) -> None:
     with pytest.raises(GitUnavailable, match="worktree list"):
         parse_worktrees(record)
+
+
+@pytest.mark.parametrize(
+    ("raw", "count", "expected"),
+    [
+        (b"", 0, []),
+        (b"a1 blob 3\nx\ny\n", 1, [b"x\ny"]),
+        (b"HEAD:my file missing\na1 blob 0\n\n", 2, [None, b""]),
+        (b"a1 tree 5\n12345\nb2 blob 2\n\xff\n\n", 2, [None, b"\xff\n"]),
+        (b"abc ambiguous\n", 1, [None]),
+    ],
+)
+def test_cat_file_batch_records_keep_exact_bytes(raw: bytes, count: int, expected: list[bytes | None]) -> None:
+    assert parse_cat_file_batch(raw, count) == expected

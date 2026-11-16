@@ -30,6 +30,7 @@ __all__ = [
     "history",
     "identity",
     "landed",
+    "read_objects",
     "relate",
     "snapshot",
     "tree",
@@ -129,6 +130,12 @@ def tree(repo: RealRepo, rev: str) -> Tree | None:
     validate_revisions(rev)
 
     def resolve() -> Sha | None:
+        if ":" in rev:  # ``rev:folder``: a suffix such as ``^{tree}`` would be read as part of the path
+            if "\n" in rev:
+                return None
+            done = repo.run(repo.path, "cat-file", "--batch-check", stdin=f"{rev}\n")
+            oid, _, kind = done.out.partition(" ")
+            return Sha(oid) if kind.startswith("tree ") else None
         for kind in ("commit", "tree"):
             done = repo.run(repo.path, "rev-parse", "--verify", "-q", "--end-of-options", f"{rev}^{{{kind}}}", check=False)
             if done.rc == 0 and done.out.strip():
@@ -147,9 +154,25 @@ def tree(repo: RealRepo, rev: str) -> Tree | None:
             done = repo.run(repo.path, "cat-file", "blob", f"{sha}:{path}", check=False)
             return done.raw if done.rc == 0 else None
 
-        return Tree(sha, lister, reader)
+        return Tree(sha, lister, reader, batch=lambda paths: read_objects(repo, [f"{sha}:{p}" for p in paths]))
 
     return repo.memo(("tree", sha), build)
+
+
+def read_objects(repo: RealRepo, names: Sequence[str]) -> list[bytes | None]:
+    """Each blob ``names`` names (an id or ``rev:path``), in one ``cat-file --batch``; None for a missing or non-blob object.
+    A name holding a newline, which the batch cannot carry (``-Z`` needs git 2.43), is read on its own."""
+    plain = [n for n in names if "\n" not in n]
+    found: dict[str, bytes | None] = {}
+    if plain:
+        done = repo.run(repo.path, "cat-file", "--batch", stdin="".join(f"{n}\n" for n in plain))
+        found = dict(zip(plain, real_parse.parse_cat_file_batch(done.raw, len(plain)), strict=True))
+    return [found[n] if n in found else _blob(repo, n) for n in names]
+
+
+def _blob(repo: RealRepo, name: str) -> bytes | None:
+    done = repo.run(repo.path, "cat-file", "blob", name, check=False)
+    return done.raw if done.rc == 0 else None
 
 
 def worktrees(repo: RealRepo, *, with_dirty: bool) -> tuple[WorktreeInfo, ...]:

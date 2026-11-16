@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.23.0
+
+Many files of a commit read as exact bytes in one git process, for a reader that loads a whole folder (a knowledge base) from the object store instead of opening each file.
+
+- `Tree.read_many(paths) -> dict[str, bytes | None]`: each path's bytes, None when absent or not a file; the paths not read yet come in one `git cat-file --batch` (real), CRLF and invalid UTF-8 kept as they are. Shares `read`'s cache. `Tree(..., batch=)` is the optional batch reader; without it `read_many` reads one by one.
+- `Repo.tree("rev:folder")`: the tree below a folder, `files` relative to it and `sha` that folder's tree id; None when the folder is absent or a file (real: one `cat-file --batch-check`). FakeRepo the same.
+
 ## 0.22.1
 
 No behavior change. `Worktree.clean(keep=["/.venv"], ignored=True)` is the reset that keeps a named folder: a leading `/` anchors to the checkout root (a bare `.venv` keeps same-named folders below too); a symlink is removed as a link and never followed out of the checkout, a kept folder holding one is left whole. Locked by a shared contract scenario (real and FakeRepo) and real-git tests; documented on `clean`.
