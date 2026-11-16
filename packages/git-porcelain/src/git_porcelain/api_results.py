@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal, NewType, Self
 from git_porcelain.diagnostic_output import redact_output
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Mapping
+    from collections.abc import Callable, Iterable, Mapping, Sequence
     from pathlib import Path
 
 __all__ = [
@@ -223,10 +223,13 @@ class Tree:
         sha: Sha,
         lister: Callable[[], Mapping[str, tuple[str, Sha]]],
         reader: Callable[[str], bytes | None],
+        *,
+        batch: Callable[[Sequence[str]], Sequence[bytes | None]] | None = None,
     ) -> None:
         self.sha = sha
         self._lister = lister
         self._reader = reader
+        self._batch = batch
         self._files: Mapping[str, tuple[str, Sha]] | None = None
         self._blobs: dict[str, bytes | None] = {}
 
@@ -242,6 +245,15 @@ class Tree:
         if path not in self._blobs:
             self._blobs[path] = self._reader(path)
         return self._blobs[path]
+
+    def read_many(self, paths: Iterable[str]) -> dict[str, bytes | None]:
+        """The bytes of each of ``paths`` here, None when absent or not a file; the ones not read yet come in one batch."""
+        wanted = list(dict.fromkeys(paths))
+        unread = [p for p in wanted if p not in self._blobs]
+        if unread:
+            found = self._batch(unread) if self._batch is not None else [self._reader(p) for p in unread]
+            self._blobs.update(zip(unread, found, strict=True))
+        return {p: self._blobs[p] for p in wanted}
 
 
 # -- results of the write operations ----------------------------------------------------------------------

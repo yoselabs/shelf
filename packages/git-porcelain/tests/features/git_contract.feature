@@ -22,6 +22,18 @@ Feature: One Repo and Worktree, real or fake
     Then the tree lists ["[literal]", "keep"]
     And the tree reads "keep" as "edited"
 
+  Scenario: A tree below a folder lists and reads its files
+    Given a repository "r"
+    And "r" commits "root" with "kb/a.md"="one", "kb/sub/b.md"="two", top="x"
+    When "r" calls tree("HEAD:kb")
+    Then the tree lists ["a.md", "sub/b.md"]
+    And the tree reads "a.md" as "one"
+    And the tree reads "sub/b.md" as "two"
+    And the tree reads "gone" as nothing
+    And the tree reads "sub" as nothing
+    When "r" calls tree("HEAD:gone")
+    Then the result is None
+
   Scenario: Staging a missing path reports failure
     Given a repository "r"
     When "r" tries stage(["missing"])

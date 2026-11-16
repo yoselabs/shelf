@@ -14,6 +14,7 @@ from git_porcelain.errors import GitUnavailable
 __all__ = [
     "PushLine",
     "StatusV2",
+    "parse_cat_file_batch",
     "parse_config_origin",
     "parse_diff",
     "parse_log",
@@ -136,6 +137,23 @@ def parse_ls_tree(text: str) -> dict[str, tuple[str, Sha]]:
             mode, _, sha = meta.split(" ")
             files[path] = (mode, Sha(sha))
     return files
+
+
+def parse_cat_file_batch(raw: bytes, count: int) -> list[bytes | None]:
+    """``cat-file --batch``: per name ``<oid> <type> <size>\\n<content>\\n`` or ``<name> missing\\n``; only blobs are kept."""
+    found: list[bytes | None] = []
+    at = 0
+    for _ in range(count):
+        end = raw.index(b"\n", at)
+        header = raw[at:end].rsplit(b" ", 2)
+        at = end + 1
+        if len(header) != 3 or not header[2].isdigit():  # "<name> missing" or "<name> ambiguous"
+            found.append(None)
+            continue
+        size = int(header[2])
+        found.append(raw[at : at + size] if header[1] == b"blob" else None)
+        at += size + 1
+    return found
 
 
 @dataclass(frozen=True)

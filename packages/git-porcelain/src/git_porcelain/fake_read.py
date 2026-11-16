@@ -11,7 +11,7 @@ from git_porcelain.errors import GitUnavailable, MissingRevision
 from git_porcelain.fake_diff import diff_stat, diff_text, grep_files, status_entries
 from git_porcelain.fake_ignore import Ignore
 from git_porcelain.fake_ops import ignore_of, is_clean
-from git_porcelain.fake_store import ancestors
+from git_porcelain.fake_store import ancestors, tree_sha
 from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
@@ -228,11 +228,18 @@ def branches(repo: RepoState, prefix: str) -> tuple[tuple[str, Sha], ...]:
 
 def tree(repo: RepoState, wt: CheckoutState, rev: str) -> Tree | None:
     validate_revisions(rev)
+    rev, colon, folder = rev.partition(":")
     sha = repo.commit_named(rev, wt)
     files: Mapping[str, str] | None = repo.store.commits[sha].files if sha else repo.store.trees.get(rev)
     if files is None:
         return None
     named = Sha(sha or rev)
+    if colon:  # ``rev:folder``: the tree below that folder, its paths relative to it
+        prefix = f"{folder.strip('/')}/" if folder.strip("/") else ""
+        files = {p.removeprefix(prefix): b for p, b in files.items() if p.startswith(prefix)}
+        if not files:
+            return None
+        named = Sha(tree_sha(files))
     return Tree(
         named,
         lambda: {p: ("100644", Sha(b)) for p, b in files.items()},

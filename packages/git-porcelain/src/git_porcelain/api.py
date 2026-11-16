@@ -259,7 +259,8 @@ class Repo(Protocol):
         ...
 
     def tree(self, rev: str) -> Tree | None:
-        """The tree of a commit-ish or tree id; None when ``rev`` names nothing."""
+        """The tree of a commit-ish or tree id, or of ``rev:folder`` (paths relative to that folder); None when ``rev``
+        names nothing."""
         ...
 
     def worktrees(self, *, with_dirty: bool = False) -> tuple[WorktreeInfo, ...]:
