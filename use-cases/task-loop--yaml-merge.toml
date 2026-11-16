@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "task-loop"
+software = "yaml-merge"
+why = "ogy, the requirements knowledge base kept as YAML in Git inside task-loop, writes model data back into files people annotate, and resolves knowledge-base merge conflicts by structure. Without the package it wraps a list document under a dummy key to merge it, and carries its own three-way merge."
+needs = "merge_into over a top-level sequence of entries (a knowledge-base file is a list); merge3(base, ours, theirs) pairing entries by id, keeping ours' comments and raising a conflict that names the path; usable behind a Git merge driver."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active" # active | retired

@@ -26,14 +26,36 @@ authoritative about **everything else**.
 | blank lines and the author's key order | a key the payload added (appended at the end) |
 | quoting style, anchors ruamel understands | a key the payload no longer has (removed, with its comment) |
 
-`merge_into(existing, payload)` never mutates `payload`. An `existing` that is not
-a mapping — the file was absent, empty, or held something else — has no document
-worth preserving, so the payload is returned as it is.
+`merge_into(existing, payload)` never mutates `payload`. The payload is a mapping
+or a list; an `existing` of another shape — the file was absent, empty, or held
+something else — has no document worth preserving, so the payload is returned as
+it is. A top-level list merges as a nested one does.
 
 **List entries are paired by identity, then by position.** The first of `name`,
 `id`, `key` that is present on *every* entry of both lists is used to match them;
 otherwise entries are matched by index. Inserting an entry at the top of a list
 would otherwise shift every comment down one.
+
+## Merging two edits: `merge3`
+
+```python
+from yaml_merge import MergeConflictError, merge3
+
+merged = merge3(yaml.load(base), yaml.load(ours), yaml.load(theirs))   # rt nodes
+yaml.dump(merged, out)                                                 # ours' comments kept
+```
+
+Git merges YAML by line, so two branches appending to one list conflict. `merge3`
+merges by structure: a value only one side changed takes the change, mappings merge
+key by key, and list entries pair by the same identity keys as above (each value
+distinct on each side). A list without identity that both sides changed is a
+conflict: position does not say which entry is which. Where both sides changed one
+value differently it raises `MergeConflictError`, whose `path` names it from the root
+(mapping keys, and an entry's identity value). `None` is an absent or empty file.
+
+The merged values are carried into `ours` with `merge_into`, so its comments,
+blank lines and key order survive; `base` and `theirs` are never mutated. This is
+the core of a Git merge driver for YAML files whose entries carry an identity.
 
 ## What this is not for
 
