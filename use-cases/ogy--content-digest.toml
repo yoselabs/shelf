@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "ogy"
+software = "content-digest"
+why = "ogy, the requirements knowledge base, fingerprints snapshots of model data and hashes evidence text to detect change. It carries two hand-written copies of the sha256-first-12-hex convention, one of which stringifies unknown types."
+needs = "digest(value, length=12) over canonical JSON that refuses non-JSON types; digest_text(text, length=12)."
+sponsor = "yoselabs"
+requester = "ogy"
+status = "active" # active | retired

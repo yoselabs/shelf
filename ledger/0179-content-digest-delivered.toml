@@ -1,0 +1,10 @@
+seq = 179
+date = "2026-11-17"
+event = "delivery"
+software = "content-digest"
+release = "content-digest-v0.1.0"
+actor = "iorlas-task-loop"
+consumer = "ogy"
+verdict = "pass"
+cost = ""
+note = "Promoted from ogy's snapshot and evidence hashes (ogy shelf audit T12, T13): digest(value, length=12) over canonical JSON and digest_text(text, length=12), stdlib only. Unlike the origin it refuses non-JSON types and non-string keys instead of default=str. Candidate; the ogy, any-frontmatter and blueprint repoints are separate changes, so no adoption verdict yet."
