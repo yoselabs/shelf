@@ -1,0 +1,7 @@
+consumer = "ogy"
+software = "verb-cli"
+why = "ogy's CLI parser is hand-written argparse beside the ops functions it calls, so the argparse tree is the source of truth; the same verb list must later feed MCP."
+needs = "VerbCli({name: fn}, shared=Target).parser() / parse(argv) -> Invocation: subcommands, POSITIONAL parameters (address, before, after, words*), Literal as argparse choices, and Target (--repo --kb --rev --ontology) folded into every verb; specs(name) for the MCP surface."
+sponsor = "yoselabs"
+requester = "ogy"
+status = "active"          # active | retired
