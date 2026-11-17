@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -28,6 +28,11 @@ if TYPE_CHECKING:
 ATX_HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$")
 """One ATX heading line, without its newline: group 1 the ``#`` run, group 2 the text."""
 
+Anchors = Literal["default", "github"]
+"""How section ids are made: ``"default"`` (:func:`slug`, deduped ``-2``) or ``"github"`` (:func:`github_slug`, deduped ``-1``)."""
+
+_LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
+_MARKS = re.compile(r"[`*~]|(?<![^\W_])_|_(?![^\W_])")
 _FENCE = re.compile(r"^[ \t]{0,3}(```|~~~)")
 #: ``lines:A-B``, or ``lines:N:A-B`` — characters ``A`` to ``B`` (0-based, ``B`` excluded) of line ``N``.
 _LINES_ID = re.compile(r"^lines:(\d+)(?:-(\d+)|:(\d+)-(\d+))$")
@@ -55,8 +60,25 @@ def slug(text: str) -> str:
     return out or "section"
 
 
-def outline(text: str) -> list[Section]:
-    """Every heading section of ``text``, in document order, ids deduped."""
+def github_slug(text: str) -> str:
+    """The anchor GitHub renders for a heading: its text as displayed, lower case, punctuation dropped, spaces to hyphens.
+
+    Link and image syntax keeps only its label; ```` ` ````, ``*``, ``~`` and emphasis underscores
+    (those not between word characters) are marks, not text. Unlike :func:`slug` it may be empty.
+    """
+    shown = _MARKS.sub("", _LINK.sub(r"\1", text)).strip().lower()
+    return re.sub(r"[^\w\- ]", "", shown).replace(" ", "-")
+
+
+def outline(text: str, *, anchors: Anchors = "default") -> list[Section]:
+    """Every heading section of ``text``, in document order, ids deduped.
+
+    ``anchors="github"`` makes the ids GitHub's (:func:`github_slug`, repeats ``-1``, ``-2``), so
+    ``#fragment`` links written for GitHub resolve; the default ids are unchanged.
+    """
+    if anchors not in ("default", "github"):
+        msg = f"anchors must be 'default' or 'github', not {anchors!r}"
+        raise ValueError(msg)
     heads: list[tuple[int, int, str]] = []  # (offset, level, heading)
     offset = 0
     fenced = False
@@ -70,8 +92,12 @@ def outline(text: str) -> list[Section]:
     rows: list[Section] = []
     for i, (start, level, heading) in enumerate(heads):
         end = next((s for s, lvl, _ in heads[i + 1 :] if lvl <= level), len(text))
-        base = candidate = slug(heading)
-        n = 1
+        if anchors == "github":
+            base = candidate = github_slug(heading)
+            n = 0
+        else:
+            base = candidate = slug(heading)
+            n = 1
         while candidate in used:
             n += 1
             candidate = f"{base}-{n}"
@@ -80,14 +106,14 @@ def outline(text: str) -> list[Section]:
     return rows
 
 
-def find(text: str, id_: str, *, rows: Sequence[Section] | None = None) -> Section | None:
-    """Section ``id_`` of ``text`` — a heading slug or a ``lines:`` id — or ``None`` if there is none.
+def find(text: str, id_: str, *, rows: Sequence[Section] | None = None, anchors: Anchors = "default") -> Section | None:
+    """Section ``id_`` of ``text`` — a heading anchor or a ``lines:`` id — or ``None`` if there is none.
 
-    ``rows`` is ``text``'s :func:`outline` when the caller already holds it.
+    ``rows`` is ``text``'s :func:`outline` (made with the same ``anchors``) when the caller already holds it.
     """
     if id_.startswith("lines:"):
         return _lines(text, id_)
-    return next((row for row in (outline(text) if rows is None else rows) if row.id == id_), None)
+    return next((row for row in (outline(text, anchors=anchors) if rows is None else rows) if row.id == id_), None)
 
 
 def line_parts(text: str, budget: int, *, measure: Callable[[str], int] = len, base_line: int = 1) -> list[Section]:
@@ -195,4 +221,4 @@ def _lines(text: str, id_: str) -> Section | None:
     return Section(id=id_, heading=id_, level=0, chars=chars, start=start, end=start + chars)
 
 
-__all__ = ["ATX_HEADING_RE", "Section", "clip", "find", "line_parts", "outline", "slug"]
+__all__ = ["ATX_HEADING_RE", "Anchors", "Section", "clip", "find", "github_slug", "line_parts", "outline", "slug"]

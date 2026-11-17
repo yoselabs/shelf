@@ -151,3 +151,37 @@ def test_clip_cuts_after_a_line_else_a_word() -> None:
 
 def test_clip_of_one_word_over_the_budget_is_never_empty() -> None:
     assert clip("x" * 100, 8) == "xx"
+
+
+# --- GitHub anchors (opt-in; the default ids above never move) -----------------------
+
+
+def _github(text: str) -> list[str]:
+    return [s.id for s in Markdown(text).outline(anchors="github")]
+
+
+def test_github_anchors_dedupe_with_dash_one_dash_two() -> None:
+    assert _github("# Plan\n\n## Notes\n\n## Notes\n\n## Notes\n") == ["plan", "notes", "notes-1", "notes-2"]
+    assert _ids("# Plan\n\n## Notes\n\n## Notes\n\n## Notes\n") == ["plan", "notes", "notes-2", "notes-3"]
+
+
+def test_github_anchor_slugs_the_rendered_text() -> None:
+    body = "# See [the *docs*](http://x/y) and ![img](a.png) `code` ~~old~~ snake_case _em_\n"
+    assert _github(body) == ["see-the-docs-and-img-code-old-snake_case-em"]
+
+
+def test_github_anchor_of_an_empty_slug_is_empty_then_numbered() -> None:
+    assert _github("## ???\n\n## ???\n") == ["", "-1"]
+
+
+def test_github_anchors_skip_fenced_headings() -> None:
+    assert _github("# A\n\n```\n# A\n```\n\n# A\n") == ["a", "a-1"]
+
+
+def test_a_section_is_found_by_its_github_anchor() -> None:
+    body = "# T\n\n## Same\n\none\n\n## Same\n\ntwo\n"
+    found = Markdown(body).section("same-1", anchors="github")
+    assert found is not None
+    assert body[found.start : found.end].strip() == "## Same\n\ntwo"
+    assert Markdown(body).section("same-1") is None
+    assert Markdown(body).section("lines:1-2", anchors="github") is not None

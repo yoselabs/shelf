@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "ogy"
+software = "any-markdown"
+why = "ogy's `doc:<path>#<anchor>` evidence points at a heading by the anchor GitHub gives it, so the link also works when read on GitHub, and hashes that section; ogy hand-wrote the heading scan, the slug and the section span (evidence.py)."
+needs = "outline(text, anchors=\"github\") / Markdown.section(anchor, anchors=\"github\"): sections of a document by GitHub's anchor of the rendered heading (link, image, code and emphasis marks dropped; repeats numbered -1, -2), headings inside fences excluded, with the section's span as offsets. The default ids (-2, -3) stay for a2kay."
+sponsor = "yoselabs"
+requester = "ogy"
+status = "active"          # active | retired

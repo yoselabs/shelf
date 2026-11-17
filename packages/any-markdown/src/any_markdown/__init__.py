@@ -42,7 +42,7 @@ from markdown_it import MarkdownIt
 from any_markdown._lines import line_starts
 from any_markdown.budget import Budget, View
 from any_markdown.chunks import Chunk, chunk
-from any_markdown.sections import ATX_HEADING_RE, Section, clip, find, line_parts, outline, slug
+from any_markdown.sections import ATX_HEADING_RE, Anchors, Section, clip, find, github_slug, line_parts, outline, slug
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -215,11 +215,16 @@ class Markdown:
         """
         return tuple(outline(self.text))
 
-    def section(self, id_: str) -> Section | None:
-        """Section ``id_`` — a heading slug from :attr:`sections`, or ``lines:A-B`` (1-based,
+    def outline(self, *, anchors: Anchors = "default") -> Sequence[Section]:
+        """:attr:`sections` with the ids of ``anchors``: ``"default"`` is :attr:`sections`;
+        ``"github"`` is GitHub's own anchors (repeats ``-1``, ``-2``), for ``#fragment`` links."""
+        return self.sections if anchors == "default" else tuple(outline(self.text, anchors=anchors))
+
+    def section(self, id_: str, *, anchors: Anchors = "default") -> Section | None:
+        """Section ``id_`` — a heading anchor from :meth:`outline` (``anchors`` picks the rule), or ``lines:A-B`` (1-based,
         inclusive) or ``lines:N:A-B`` (characters ``A`` to ``B`` of line ``N``) — or ``None``
         when the document has no such section. Its text is ``text[start:end]``."""
-        return find(self.text, id_, rows=self.sections)
+        return find(self.text, id_, rows=self.outline(anchors=anchors), anchors=anchors)
 
     def chunks(self, *, size: int = 1100, overlap: int = 150, part: int | None = None, measure: Callable[[str], int] = len) -> list[Chunk]:
         """Heading-aware retrieval windows of ``size`` characters, ``overlap`` shared, each
@@ -245,6 +250,7 @@ def _walk(tokens: list[Any]) -> list[Any]:
 __all__ = [
     "ATX_HEADING_RE",
     "WIKILINK_RE",
+    "Anchors",
     "Budget",
     "Chunk",
     "Markdown",
@@ -253,6 +259,7 @@ __all__ = [
     "WikiLink",
     "anchor_of",
     "clip",
+    "github_slug",
     "line_parts",
     "parse_one",
     "slug",
