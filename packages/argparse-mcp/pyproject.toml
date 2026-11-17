@@ -1,0 +1,19 @@
+[project]
+name = "argparse-mcp"
+version = "0.1.0"
+description = "An argparse parser with subcommands as FastMCP tools: one tool per subcommand, the schema from its options, positionals and choices, shared global options in every tool, the call runs your own run(argv) in this process, and argparse's SystemExit comes back as a usage result."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "fastmcp>=3.4,<4",
+    "pydantic>=2,<3",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/argparse_mcp"]
