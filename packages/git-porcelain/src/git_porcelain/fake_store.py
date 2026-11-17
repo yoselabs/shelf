@@ -36,25 +36,31 @@ def blob_sha(data: bytes) -> str:
     return _sha("blob", data)
 
 
-def tree_sha(files: Mapping[str, str]) -> str:
-    """The id git gives the tree holding ``files`` (path to blob sha), nested folders included."""
-    return _sha("tree", _tree_body(files))
+def tree_sha(files: Mapping[str, str], modes: Mapping[str, str] | None = None) -> str:
+    """The id git gives the tree holding ``files`` (path to blob sha), nested folders included. ``modes`` names the
+    path's file mode where it is not the regular ``100644``."""
+    return _sha("tree", _tree_body(files, modes or {}))
 
 
-def _tree_body(files: Mapping[str, str]) -> bytes:
+def _tree_body(files: Mapping[str, str], modes: Mapping[str, str]) -> bytes:
     here: dict[str, str] = {}
     below: dict[str, dict[str, str]] = {}
+    below_modes: dict[str, dict[str, str]] = {}
     for path, sha in files.items():
         head, sep, rest = path.partition("/")
         if sep:
             below.setdefault(head, {})[rest] = sha
+            if path in modes:
+                below_modes.setdefault(head, {})[rest] = modes[path]
         else:
             here[head] = sha
     entries: list[tuple[bytes, bytes]] = []
     for name, sha in here.items():
-        entries.append((name.encode(), b"100644 " + name.encode() + b"\0" + bytes.fromhex(sha)))
+        mode = modes.get(name, "100644").encode()
+        entries.append((name.encode(), mode + b" " + name.encode() + b"\0" + bytes.fromhex(sha)))
     for name, sub in below.items():
-        entries.append((name.encode() + b"/", b"40000 " + name.encode() + b"\0" + bytes.fromhex(tree_sha(sub))))
+        sub_id = tree_sha(sub, below_modes.get(name))
+        entries.append((name.encode() + b"/", b"40000 " + name.encode() + b"\0" + bytes.fromhex(sub_id)))
     return b"".join(body for _, body in sorted(entries))
 
 

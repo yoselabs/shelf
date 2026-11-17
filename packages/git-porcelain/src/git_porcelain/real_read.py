@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Final
 
 from git_porcelain import ignore_rules, real_cache, real_env, real_parse
 from git_porcelain.api import Diff, Dirty, Health, LogEntry, Relation, RepoIdentity, Sha, Snapshot, Tree, TreeId, WorktreeInfo
-from git_porcelain.errors import MissingRemote
+from git_porcelain.errors import MissingRemote, MissingRevision
 from git_porcelain.real_done import unavailable
 from git_porcelain.revision_validation import validate_revisions
 
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "branches",
+    "commit",
     "diff",
     "dirty",
     "git_dir_of",
@@ -124,6 +125,18 @@ def branches(repo: RealRepo, prefix: str) -> tuple[tuple[str, Sha], ...]:
     return tuple(
         row for row in real_cache.validated(repo, ("branches",), real_cache.heads_files(repo), compute) if row[0].startswith(prefix)
     )
+
+
+def commit(repo: RealRepo, rev: str) -> Sha:
+    """The commit ``rev`` names; ``MissingRevision`` when it names none."""
+    validate_revisions(rev)
+    done = repo.run(repo.path, "rev-parse", "--verify", "--end-of-options", f"{rev}^{{commit}}", check=False)
+    if done.rc:
+        error = unavailable(("rev-parse",), done)
+        if "Needed a single revision" in done.err or "expected commit type" in done.err:
+            raise MissingRevision(str(error))
+        raise error
+    return Sha(done.out.strip())
 
 
 def tree(repo: RealRepo, rev: str) -> Tree | None:

@@ -1,0 +1,10 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII).
+consumer = "ogy"
+software = "git-porcelain"
+why = "ogy checks a knowledge base kept in a Git repository, from a commit or from the files on disk, and must not hold Git plumbing (raw rev-parse, a hand-made blob hash, a folder walk) next to its business rules."
+needs = "Repo.commit(rev) to pin a revision, Repo.tree('rev:folder') with Tree.files/read_many to read a commit's knowledge base in one batch, worktree_tree(root, folder) and blob_sha to read the files on disk through the same Tree shape, and head/merge_base/history for the change walk."
+sponsor = "yoselabs"
+requester = "ogy"
+status = "active"          # active | retired

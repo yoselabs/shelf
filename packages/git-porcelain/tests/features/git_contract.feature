@@ -22,6 +22,19 @@ Feature: One Repo and Worktree, real or fake
     Then the tree lists ["[literal]", "keep"]
     And the tree reads "keep" as "edited"
 
+  Scenario: A revision resolves to its commit id, and a name that is no commit is missing
+    Given a repository "r"
+    And "r" commits "root" with a="one"
+    And "r" remembers its head as "root"
+    When "r" calls commit("HEAD")
+    Then the result is "<mem:root>"
+    When "r" calls commit("main")
+    Then the result is "<mem:root>"
+    When "r" tries commit("absent")
+    Then the call raises MissingRevision
+    When "r" tries commit("HEAD:a")
+    Then the call raises MissingRevision
+
   Scenario: A tree below a folder lists and reads its files
     Given a repository "r"
     And "r" commits "root" with "kb/a.md"="one", "kb/sub/b.md"="two", top="x"

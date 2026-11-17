@@ -258,6 +258,10 @@ class Repo(Protocol):
         """Delete only at ``expected``; checked out raises ``BranchPinned``, stale tip non-retryable ``RefRace``."""
         ...
 
+    def commit(self, rev: str) -> Sha:
+        """The commit ``rev`` names, as its full id (``<rev>^{commit}``); ``MissingRevision`` when it names no commit."""
+        ...
+
     def tree(self, rev: str) -> Tree | None:
         """The tree of a commit-ish or tree id, or of ``rev:folder`` (paths relative to that folder); None when ``rev``
         names nothing."""

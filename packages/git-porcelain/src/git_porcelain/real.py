@@ -305,6 +305,9 @@ class RealRepo:
     def delete_branch(self, branch: str, *, expected: Sha) -> None:
         real_checkout.delete_branch(self, branch, expected=expected)
 
+    def commit(self, rev: str) -> Sha:
+        return real_read.commit(self, rev)
+
     def tree(self, rev: str) -> Tree | None:
         return real_read.tree(self, rev)
 

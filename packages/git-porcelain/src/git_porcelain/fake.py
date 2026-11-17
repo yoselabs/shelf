@@ -269,6 +269,9 @@ class FakeRepo:
         self._anchor()
         checkout_ops.delete_branch(self._state, branch, expected=expected)
 
+    def commit(self, rev: str) -> Sha:
+        return Sha(read.resolve_commit(self._state, self._anchor(), rev))
+
     def tree(self, rev: str) -> Tree | None:
         return read.tree(self._state, self._anchor(), rev)
 
