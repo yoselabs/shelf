@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.24.0
+
+A knowledge-base reader (ogy) opens a commit or the folder on disk through one interface, with no raw `git rev-parse` and no hand-made blob hash. Additive.
+
+- `Repo.commit(rev) -> Sha`: the full id of the commit `rev` names (`rev-parse --verify <rev>^{commit}`); `MissingRevision` when it names no commit (a blob or an unknown name). FakeRepo the same, under the shared contract.
+- `blob_sha(data) -> Sha`: the id Git gives a file holding `data`, so a file on disk compares with a `Tree.files` entry. Public now (it was `fake_store`'s).
+- `worktree_tree(root, folder="") -> Tree | None`: the regular files on disk below `root/folder` as a `Tree` (`files`, `read`, `read_many`, `sha` as for `Repo.tree`; `sha` is the tree id Git would give those files, modes included, so equal content gives an equal id). Uncommitted and ignored files count; `.git`, symlinks and empty folders do not. `read` stays inside the folder. None when the folder is absent or a file.
 ## 0.23.0
 
 Many files of a commit read as exact bytes in one git process, for a reader that loads a whole folder (a knowledge base) from the object store instead of opening each file.

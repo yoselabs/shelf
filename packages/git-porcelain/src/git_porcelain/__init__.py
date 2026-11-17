@@ -125,6 +125,7 @@ from git_porcelain.real_config import config_entries, config_get
 from git_porcelain.real_files import check_ignore, ls_files
 from git_porcelain.real_integrate import merge_ff, pull_rebase
 from git_porcelain.real_refs import branches, delete_ref_at, ls_remote, symbolic_ref
+from git_porcelain.worktree_tree import blob_sha, worktree_tree
 
 __all__ = [
     "Aborted",
@@ -200,6 +201,7 @@ __all__ = [
     "Worktree",
     "WorktreeInfo",
     "WorktreeRemoveRefused",
+    "blob_sha",
     "branches",
     "check_ignore",
     "classify_remote_failure",
@@ -240,4 +242,5 @@ __all__ = [
     "sync_status",
     "unmerged_paths",
     "upstream",
+    "worktree_tree",
 ]

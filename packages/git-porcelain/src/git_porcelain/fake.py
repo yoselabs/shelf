@@ -192,15 +192,13 @@ class FakeRepo:
         return read.is_ancestor(self._state, self._read_anchor(), a, b)
 
     def merge_base(self, a: str, b: str) -> Sha | None:
-        wt = self._read_anchor()
         try:
-            return read.relate(self._state, wt, a, b).merge_base
+            return read.relate(self._state, self._read_anchor(), a, b).merge_base
         except MissingRevision:
             return None
 
     def cherry(self, upstream: str, head: str) -> tuple[Pick, ...]:
-        wt = self._anchor()
-        return read.cherry(self._state, wt, upstream, head)
+        return read.cherry(self._state, self._anchor(), upstream, head)
 
     def remote_url(self, remote: str, *, push: bool = False) -> str:
         self._read_anchor()
@@ -268,6 +266,9 @@ class FakeRepo:
     def delete_branch(self, branch: str, *, expected: Sha) -> None:
         self._anchor()
         checkout_ops.delete_branch(self._state, branch, expected=expected)
+
+    def commit(self, rev: str) -> Sha:
+        return Sha(read.resolve_commit(self._state, self._anchor(), rev))
 
     def tree(self, rev: str) -> Tree | None:
         return read.tree(self._state, self._anchor(), rev)
