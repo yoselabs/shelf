@@ -39,6 +39,8 @@ any-agent = { workspace = true }
 any-mailbox = { workspace = true }
 any-recorded-fixture = { workspace = true }
 task-spec = { workspace = true }
+# test-reach composes py-symbols.
+py-symbols = { workspace = true }
 shelf-vendor = { workspace = true }
 any-contract = { workspace = true }
 # The dev group installs `anyembed[llamacpp,transformers]` so both backends' imports resolve.
@@ -287,6 +289,8 @@ testpaths = [
     "packages/process-lock/tests",
     "packages/any-lease/tests",
     "packages/any-yaml/tests",
+    "packages/py-symbols/tests",
+    "packages/test-reach/tests",
     "packages/any-agent/tests",
     "packages/any-mailbox/tests",
     "packages/any-recorded-fixture/tests",
@@ -384,6 +388,8 @@ root_packages = [
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
+    "py_symbols",
+    "test_reach",
     "any_lease",
     "any_yaml",
     "any_mailbox",
@@ -471,6 +477,8 @@ source_modules = [
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
+    "py_symbols",
+    "test_reach",
     "any_lease",
     "any_yaml",
     "any_mailbox",
@@ -560,6 +568,8 @@ modules = [
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
+    "py_symbols",
+    "test_reach",
     "any_lease",
     "any_yaml",
     "any_mailbox",
@@ -599,6 +609,7 @@ ignore_imports = [
     "jsonl_log -> process_lock",
     "any_mailbox -> atomic_io",
     "any_mailbox -> process_lock",
+    "test_reach.reach -> py_symbols",
 ]
 
 # ── ty — type checking ─────────────────────────────────────────────────────

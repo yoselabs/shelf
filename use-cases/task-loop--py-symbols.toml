@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "task-loop"
+software = "py-symbols"
+why = "ogy, the requirements knowledge base inside task-loop, links an entry to code as code:<path>#<symbol> and receipts it with a hash of that symbol's source, and maps executed lines to the function that holds them. It carries its own ast walkers for both."
+needs = "find(source, 'Class.member') -> Span | None; functions(source) qualified, outer first; innermost(spans, line); symbol_hash(source, symbol) stable under edits elsewhere in the file."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active" # active | retired

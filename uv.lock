@@ -77,6 +77,7 @@ members = [
     "path-pattern",
     "plugin-surface",
     "process-lock",
+    "py-symbols",
     "record-mine",
     "settings-base",
     "shelf-vendor",
@@ -86,6 +87,7 @@ members = [
     "static-page-check",
     "stream-proc",
     "task-spec",
+    "test-reach",
     "timefmt",
     "verb-cli",
     "yaml-merge",
@@ -3251,6 +3253,11 @@ memory = [
 ]
 
 [[package]]
+name = "py-symbols"
+version = "0.1.0"
+source = { editable = "packages/py-symbols" }
+
+[[package]]
 name = "pycparser"
 version = "3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4279,6 +4286,23 @@ wheels = [
 name = "task-spec"
 version = "0.1.0"
 source = { editable = "packages/task-spec" }
+
+[[package]]
+name = "test-reach"
+version = "0.1.0"
+source = { editable = "packages/test-reach" }
+dependencies = [
+    { name = "coverage" },
+    { name = "py-symbols" },
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "coverage", specifier = ">=7.6,<8" },
+    { name = "py-symbols", editable = "packages/py-symbols" },
+    { name = "pytest", specifier = ">=8,<10" },
+]
 
 [[package]]
 name = "timefmt"
