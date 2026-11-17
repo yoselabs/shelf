@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
+name = "content-digest"
+kind = "primitive"
+tier = "T0"
+release = "content-digest-v0.1.0"
+capability = "Stop caring how to hash a value so the same data always gets the same id — digest(value, length=12) over canonical JSON (sorted keys, compact, UTF-8) and digest_text(text, length=12), sha256 cut to hex; a value JSON cannot say (datetime, set, bytes, NaN, a non-string key) is refused, never stringified."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from ogy (snapshot.py content hash, evidence.py text hash), where the convention was json.dumps(sort_keys, default=str) + sha256 + first 12 hex; default=str made a datetime and its string hash alike, so 0.1.0 refuses instead. Other hand copies: any-frontmatter version.py (sha256 of a canonical text) and blueprint runner.py (sha256[:12] of sorted ids), not yet repointed. Stdlib only. Born candidate."
