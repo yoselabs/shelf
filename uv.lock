@@ -31,6 +31,7 @@ members = [
     "any-proc",
     "any-recorded-fixture",
     "any-shell-policy",
+    "any-yaml",
     "anyembed",
     "anyllm",
     "app-dirs",
@@ -362,6 +363,23 @@ source = { editable = "packages/any-recorded-fixture" }
 name = "any-shell-policy"
 version = "0.1.0"
 source = { editable = "packages/any-shell-policy" }
+
+[[package]]
+name = "any-yaml"
+version = "0.1.0"
+source = { editable = "packages/any-yaml" }
+dependencies = [
+    { name = "atomic-io" },
+    { name = "ruamel-yaml" },
+    { name = "yaml-merge" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "ruamel-yaml", specifier = ">=0.18,<1" },
+    { name = "yaml-merge", editable = "packages/yaml-merge" },
+]
 
 [[package]]
 name = "anyascii"

@@ -30,6 +30,9 @@ any-frontmatter = { workspace = true }
 page-tsv = { workspace = true }
 # any-lease composes process-lock.
 process-lock = { workspace = true }
+# any-yaml composes yaml-merge and atomic-io.
+any-yaml = { workspace = true }
+atomic-io = { workspace = true }
 # any-agent composes stream-proc.
 stream-proc = { workspace = true }
 any-agent = { workspace = true }
@@ -283,6 +286,7 @@ testpaths = [
     "packages/plugin-surface/tests",
     "packages/process-lock/tests",
     "packages/any-lease/tests",
+    "packages/any-yaml/tests",
     "packages/any-agent/tests",
     "packages/any-mailbox/tests",
     "packages/any-recorded-fixture/tests",
@@ -381,6 +385,7 @@ root_packages = [
     "plugin_surface",
     "process_lock",
     "any_lease",
+    "any_yaml",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -467,6 +472,7 @@ source_modules = [
     "plugin_surface",
     "process_lock",
     "any_lease",
+    "any_yaml",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -555,6 +561,7 @@ modules = [
     "plugin_surface",
     "process_lock",
     "any_lease",
+    "any_yaml",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -583,6 +590,10 @@ ignore_imports = [
     "page_tsv.page -> lean_wire",
     "page_tsv.render -> lean_wire",
     "any_lease.leases -> process_lock",
+    "any_yaml -> yaml_merge",
+    "any_yaml.write -> yaml_merge",
+    "any_yaml.write -> atomic_io",
+    "any_yaml.append -> atomic_io",
     "any_agent.procs -> stream_proc",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",

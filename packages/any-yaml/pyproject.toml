@@ -1,0 +1,20 @@
+[project]
+name = "any-yaml"
+version = "0.1.0"
+description = "Stop caring how ruamel is configured to read, write and append YAML that people and Git merge — a safe YAML 1.2 load, a cached read-only read, a comment- and order-keeping write through yaml-merge, compact flow-style lines with correct quoting, and an append to a list that leaves earlier items byte for byte."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "ruamel.yaml>=0.18,<1",
+    "yaml-merge>=0.2,<1",
+    "atomic-io>=0.2,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/any_yaml"]
