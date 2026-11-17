@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-yaml"
+kind = "any-lib"
+tier = "T1"
+release = "any-yaml-v0.1.0"
+capability = "Stop caring how ruamel is configured to read, write and append YAML that people and Git merge — a safe YAML 1.2 load, a cached read-only read, a write that keeps the author's comments and key order through yaml-merge, compact flow-style lines for small mappings with quoting by ruamel, and an append to a top-level list that leaves earlier text byte for byte; file writes are atomic."
+implementation = "ruamel.yaml"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from ogy (yamlio.py, the flow renderer in built.py, the append in removed.py; the ogy shelf audit). Fixes the audit's bug: built._scalar wrapped text in quotes without escaping a quote or backslash. Composes yaml-merge and atomic-io. Born candidate; no release tag created by this change."

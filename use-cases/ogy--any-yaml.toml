@@ -1,0 +1,9 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it.
+consumer = "ogy"
+software = "any-yaml"
+why = "ogy keeps its knowledge base in YAML that people edit and Git merges: yamlio.py configures ruamel for reads and comment-keeping writes, built.py hand-renders one flow-style line per address (and wrote invalid YAML for a value holding a quote or backslash), and removed.py appends items to an append-only ledger by text. Not yet adopted: the repoint deletes those three copies."
+needs = "load(text) safe YAML 1.2; read(text) cached and read-only; dump(data); merge_text(existing, data); merge3_text(base, ours, theirs); flow_lines(mapping) one sorted flow line per key with correct quoting; append_item(text, key, item) and append_item_file leaving earlier text untouched; atomic write(path, data); YAMLError and MergeConflictError."
+sponsor = "yoselabs"
+requester = "ogy"
+status = "active"
