@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "task-loop"
+software = "test-reach"
+why = "ogy locates the code a requirement's proof tests exercise by running them and recording the repository functions each executes. Without the package pytest and coverage are ogy's own runtime dependencies and it carries the per-call measuring plugin."
+needs = "run(root, node_ids, import_roots=('src',), exclude=('tests/',)) -> {node_id: Reach(files, functions, passed)}, a missing test reported as not passed without stopping the session; union(reaches)."
+sponsor = "yoselabs"
+requester = "task-loop"
+status = "active" # active | retired

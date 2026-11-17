@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "test-reach"
+kind = "composite"
+tier = "T2"
+release = "test-reach-v0.1.0"
+capability = "Stop guessing which code a test proves: run named pytest tests in one in-process session and report the functions each executed, measured per test call only so collection imports never count."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from ogy's locate module. Depends on pytest, coverage and py-symbols. Candidate contract: packages/test-reach/CONTRACT.md. No release tag created by this change."
