@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "ogy"
+software = "argparse-mcp"
+why = "ogy-mcp exposes every ogy subcommand as an MCP tool; the tools must come from the argparse tree and call the same cli.run the CLI uses, so a new subcommand needs no MCP edit."
+needs = "tools_from_parser(parser, run) : one tool per subcommand, global options (--repo --kb --rev --ontology) in every tool, choices as enums, argv rebuilt in order, run called in process, SystemExit returned as exit code 2 with argparse's message."
+sponsor = "yoselabs"
+requester = "ogy"
+status = "active"          # active | retired

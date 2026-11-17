@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
+name = "argparse-mcp"
+kind = "any-*"
+tier = "T2"
+release = "argparse-mcp-v0.1.0"
+capability = "Stop caring how an argparse CLI becomes MCP tools — one FastMCP tool per subcommand, the schema from its options, positionals and choices, the parser's global options folded into every tool, the call runs the consumer's own run(argv) -> (exit code, lines) in this process, and argparse's SystemExit comes back as a usage result."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from ogy's mcp_server.py (ogy shelf audit T17), on FastMCP 3 (mcp<2) so it composes with mcp-arg-errors and mcp-result-wire; ogy moves to that stack. Interim: verb-mcp registering verb-cli's typed functions (after verb-cli 0.2) supersedes it, with no argv round trip. Born candidate."

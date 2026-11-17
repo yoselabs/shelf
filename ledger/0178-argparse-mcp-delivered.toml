@@ -1,0 +1,10 @@
+seq = 178
+date = "2026-11-17"
+event = "delivery"
+software = "argparse-mcp"
+release = "argparse-mcp-v0.1.0"
+actor = "ogy"
+consumer = "ogy"
+verdict = "pass"
+cost = ""
+note = """New package, promoted from ogy's `mcp_server.py` (shelf audit item T17). `tools_from_parser(parser, run, usage=2)`. FastMCP 3 instead of ogy's `mcp==2.3.0` MCPServer, so ogy can also take mcp-arg-errors and mcp-result-wire. One change from the original: an `append` option repeats its flag per item (`--tag x --tag y`), where the original wrote `--tag x y`. Interim until verb-mcp (after verb-cli 0.2)."""

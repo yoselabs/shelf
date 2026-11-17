@@ -34,6 +34,7 @@ members = [
     "anyembed",
     "anyllm",
     "app-dirs",
+    "argparse-mcp",
     "asgi-token-gate",
     "async-scope",
     "atomic-io",
@@ -443,6 +444,21 @@ provides-extras = ["agent", "anthropic", "openai", "claude-code-sdk"]
 name = "app-dirs"
 version = "0.1.0"
 source = { editable = "packages/app-dirs" }
+
+[[package]]
+name = "argparse-mcp"
+version = "0.1.0"
+source = { editable = "packages/argparse-mcp" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=3.4,<4" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
 
 [[package]]
 name = "asgi-token-gate"
