@@ -42,3 +42,32 @@ pydantic optional.
 (exit 0, a description between usage and arguments, no option or positional without help, every
 subcommand listed with text). A subparser added with `help=None` is left out of argparse's listing,
 so give `add_parser` both `help=` and `description=` (ADR 0025). Stdlib only.
+
+## Verbs: subcommands, positionals, choices, shared parameters (0.2)
+
+```python
+from dataclasses import dataclass
+from typing import Annotated, Literal
+import verb_cli as vc
+
+@dataclass(frozen=True)
+class Target:
+    repo: str = "."
+    kb: str | None = None
+
+def show(target: Target, address: Annotated[str, vc.POSITIONAL], *, mode: Literal["short", "full"] = "short"):
+    """Show one thing."""
+
+cli = vc.VerbCli({"show": show}, shared=Target)
+parser = cli.parser(prog="ogy")      # ogy show ADDRESS [--mode {short,full}] [--repo R] [--kb K]
+cli.parse(argv).call()               # Invocation(name, fn, args, kwargs, shared)
+cli.specs("show")                    # the verb's own FlagSpecs, for another surface (MCP)
+```
+
+- `Annotated[T, POSITIONAL]` is a positional argument; with a default it is optional (`nargs="?"`);
+  on `*args` it is `nargs="*"`. Positional-only parameters are called by position.
+- `flags_of(fn, choices=True)` maps `Literal[...]` and an `Enum` of one value type (by value) to argparse
+  `choices`; off by default, so a Literal stays one JSON flag for existing callers. `VerbCli` turns it on.
+- `shared` is a class whose signature names the shared parameters (dataclass or model); they become flags on
+  every verb, and a verb parameter annotated with that class receives the built instance. A clash raises
+  `VerbCliError`. The subparser help is the docstring's first line.
