@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
+
+- `find(name, env, extra_dirs=())` returns an `Exe(path, how)` or raises `NotFound(name, searched)`: the one binary
+  lookup. PATH is the injected `env`'s (never the process's), then `extra_dirs`; a miss never hands back the bare name.
+- `build_env(env, *, allow=(), extra=None)` and `DEFAULT_INHERIT`: an allowlist child env; secrets never pass unless
+  named exactly.
 
 - `without_venv(env)`, `VENV_NAMES` and `scrub(..., strip_venv=True)` (also `scrub_current`): strip an active Python
   virtualenv (`VIRTUAL_ENV`, `VIRTUAL_ENV_PROMPT`, `PYTHONHOME`, `__PYVENV_LAUNCHER__`, `PYTHONEXECUTABLE`, and the

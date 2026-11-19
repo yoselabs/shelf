@@ -1,7 +1,7 @@
 [project]
 name = "child-env"
-version = "0.1.0"
-description = "The environment a child agent process should get: the caller's own minus what an agent session exports (CLAUDE_*, ANTHROPIC_*, DELEGATE_*, MCP_*, OTEL_*) and credential-looking variables, with keep and drop overrides."
+version = "0.2.0"
+description = "The environment a child agent process should get: the caller's own minus what an agent session exports (CLAUDE_*, ANTHROPIC_*, DELEGATE_*, MCP_*, OTEL_*) and credential-looking variables, with keep and drop overrides; an allowlist builder for a child's env; and find(), the one binary lookup (PATH from the injected env, a typed NotFound on a miss)."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"

@@ -22,6 +22,22 @@ subprocess.Popen(argv, env=env)
 - The defaults are exported as tuples: `APP_PREFIXES`, `APP_NAMES`, `CREDENTIAL_PREFIXES`, `CREDENTIAL_NAMES`,
   `CREDENTIAL_MARKERS`.
 
+## Find the program, build the env (allowlist form)
+
+```python
+from child_env import NotFound, build_env, find
+
+env = build_env(os.environ, allow=["GIT_*", "OPENAI_API_KEY"], extra={"DELEGATE_DEPTH": "1"})
+exe = find("claude", env, extra_dirs=[Path.home() / ".claude" / "local"])   # Exe(path, how="path" | "extra_dir")
+subprocess.run([str(exe.path), "--version"], env=env)                       # find raises NotFound, never returns "claude"
+```
+
+- `build_env`: only `DEFAULT_INHERIT` (`PATH`, `HOME`, `USER`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `TZ`, `XDG_*`, ...)
+  and `allow` names pass; the secret rules of `scrub` still drop a name under an allowed prefix, only an exact `allow`
+  name rescues one. `extra` is set last.
+- `find`: searches `env["PATH"]` then `extra_dirs`; `NotFound.searched` lists every folder tried. Never reads
+  `os.environ`. `tests/test_arch_exe_env.py` bans `shutil.which` and `env=os.environ` outside this package.
+
 ## What is removed by default
 
 Agent-session variables (a standalone `claude` or `codex` started with them misbehaves):

@@ -198,6 +198,8 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 # Its validated private payload is explicit caller argv, never shell text (shelf-4426).
 # S606 flags the required exec primitive itself; keep it enabled everywhere else.
 "packages/stream-proc/src/stream_proc/_exec_gate.py" = ["S606"]
+# The bead names the type `NotFound` (a lookup miss, the stdlib's own LookupError family); an Error suffix would only rename it.
+"packages/child-env/src/child_env/exe.py" = ["N818"]
 # One relaxation list, shared with every consumer (a2kay carries the same one under its
 # own `tests/**`). A test asserts, uses magic numbers and fake tokens, binds a boolean
 # positionally, reaches into the private of the thing it tests, and prints its report —
