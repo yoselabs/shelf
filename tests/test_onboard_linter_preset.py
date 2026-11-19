@@ -132,7 +132,7 @@ def test_creates_a_justfile_from_scratch_when_absent(repo: Path) -> None:
     ):
         assert target in just_text
     assert "check: gate-start beads-lint (steps" in just_text
-    assert (repo / "tools" / "gate_state.py").is_file(), "check, test and the pre-push hook call it"
+    assert "any-gate" in (repo / "pyproject.toml").read_text(), "check, test and the pre-push hook call it"
 
 
 # ── shelf-4mz: the copied gate must RUN, not merely exist ─────────────────────

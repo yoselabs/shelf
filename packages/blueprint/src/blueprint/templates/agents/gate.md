@@ -48,19 +48,20 @@ Makefile fails `gate.runner`. Three rules keep the file readable by blueprint, w
 ## One box, many gates
 
 Several agents share one machine, and each test run takes every core: on 2026-10-20 four gates at once on a 6-CPU box
-took 11-14 min each instead of 2, and a push was killed. `blueprint recipe gate-state > tools/gate_state.py` copies the
-script that prevents both halves of that (stdlib only; `--help` documents it):
+took 11-14 min each instead of 2, and a push was killed. The shelf's `any-gate` package (a dev dependency, pinned by git
+tag; `python -m any_gate --help` documents it) prevents both halves of that:
 
 | piece | in the justfile | does |
 |---|---|---|
-| the test lock | the test command runs as `python3 -I tools/gate_state.py lock -- <command>` | one test run per box at a time; a second gate waits and says who holds it. |
-| the green record | `check` takes a first dependency running `gate_state.py start`, and its body runs `gate_state.py passed --gate check` | records the tree a green `check` saw, if no file changed during the run |
-| the pre-push skip | the hook's entry is `python3 -I tools/gate_state.py pre-push --gate check -- uv run just check` | no second run when the working tree is clean and HEAD's tree is recorded; any doubt runs it |
+| the test slot | the test command runs as `python -m any_lease run --root <dir> tests 1 <label> -- <command>`, or through `python -m any_gate test` | one test run per box at a time; a second gate waits and says who holds the slot. |
+| the green record | `check` takes a first dependency running `python -m any_gate start`, and its body runs `python -m any_gate passed --gate check` | records the tree a green `check` saw, if no file changed during the run |
+| the pre-push skip | the hook's entry is `uv run python -m any_gate pre-push --gate check -- uv run just check` | no second run when the working tree is clean and HEAD's tree is recorded; any doubt runs it |
 
-Only the expensive step takes the lock, so the gate's parallel steps never wait on one another. `steps` points
+Only the expensive step takes the slot, so the gate's parallel steps never wait on one another. `steps` points
 `GATE_NOTICE_FD` at its terminal (`exec 3>&2; export GATE_NOTICE_FD=3`), so the "waiting" line shows while the step's
-own output goes to its log. The record keys on the tree and the upstream merge-base: a rebase changes the tree, and the
-gate runs again.
+own output goes to its log. The record keys on the tree and the upstream merge-base, and lives in the git directory every
+worktree of the checkout shares: a rebase changes the key, and the gate runs again. A repo with no python runs `just check`
+from the hook directly, with no skip.
 
 ## Never bypass
 

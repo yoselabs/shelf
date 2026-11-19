@@ -8,7 +8,7 @@ Implements `docs/linting.md`'s own copy list, mechanically:
    with the attributes and comments that sit directly above each (ADR 0023: the gate runner is just);
    `check` is the plain gate (the shelf's own also runs the affected-only tests), and `deps` is rewritten
    for a single-package repo, since the shelf's own loops over `packages/*`. `check` and `test` call
-   `tools/gate_state.py` (the blueprint's gate-state recipe), copied when absent.
+   the `any-gate` dev dependency (the gate's tree record and pre-push skip), pinned by git tag, added when absent.
 3. The `dev` dependency-group.
 4. A `[tool.pyrefly]` and a `[tool.pytest.ini_options]` built for a consumer: the shelf's strict
    preset and error severities (the axis `just preset` compares), its lighter bar for tests, and
@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .hooks import ensure_gate_state
+from .hooks import ensure_gate_dependency
 from .operations import Outcome, Result
 
 _SHELF_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -76,12 +76,12 @@ _RECIPES = (
 
 _GENERATED_PREFIXES = ("tool.pyrefly", "tool.pytest")
 _SHELF_TESTS_SUBCONFIG = "packages/*/tests/**"
-# A consumer's `test`: plain pytest under the gate-state lock it is given (tools/gate_state.py). The shelf's own `test` queues through
-# any-lease and runs with the shelf's xdist variable; a consumer gets those when it moves onto the gate packages
-# (docs/missions/gate-kit-package).
+# A consumer's `test`: plain pytest in one test slot (any-lease, installed with the any-gate dev dependency). The shelf's own `test` also
+# runs with the shelf's xdist variable.
 _CONSUMER_TEST = """[group('gate')]
 test:
-    python3 -I tools/gate_state.py lock -- uv run pytest --cov --cov-report=term-missing --cov-fail-under=65
+    uv run python -m any_lease run --root "${GATE_LEASE_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/gate-leases}" tests 1 check-all -- \\
+        uv run pytest --cov --cov-report=term-missing --cov-fail-under=65
 
 """
 _CONSUMER_DEPS = """# dependency hygiene: the lockfile matches pyproject, then unused, missing and transitive (deptry).
@@ -93,10 +93,10 @@ deps:
 """
 # The shelf's `check` runs recipes a consumer is not given (test-affected); a consumer gets the plain gate.
 _CONSUMER_CHECK = """# The gate: every step at once (`steps`), one timing line, a warning for a step over its budget.
-# A green run records the tree it checked (tools/gate_state.py), so the pre-push hook does not run it again on that tree.
+# A green run records the tree it checked (any-gate), so the pre-push hook does not run it again on that tree.
 [group('gate')]
 check: gate-start beads-lint (steps "guard" "preset" "blueprint" "lint" "typecheck" "spell" "deps" "test")
-    python3 -I tools/gate_state.py passed --gate check
+    uv run python -m any_gate passed --gate check
 
 """
 # A new justfile starts with the shelf's shell setting: plain recipe lines fail fast and on unset pipes.
@@ -262,8 +262,8 @@ class LinterPresetOperation:
             head = existing.rstrip("\n") + "\n\n" if existing else _JUSTFILE_HEADER
             justfile.write_text(head + "".join(shelf_recipes[name] for name in to_copy))
             applied.append(f"{justfile.name} recipes")
-        if ensure_gate_state(self.repo):
-            applied.append("tools/gate_state.py")
+        if ensure_gate_dependency(self.repo):
+            applied.append("pyproject.toml any-gate dev dependency")
 
         return _verify(self.repo, applied, to_copy, justfile)
 
