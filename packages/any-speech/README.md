@@ -3,10 +3,18 @@
 ```python
 from any_speech import transcribe, transcribe_with_speakers
 
-transcript = await transcribe(Path("talk.m4a"))        # words with times; stored in talk.m4a.speech.json; returned too
+transcript = await transcribe(Path("talk.m4a"))        # words with times; stored in talk.speech.json; returned too
 transcript = await transcribe_with_speakers(Path("talk.m4a"))  # the same, each word labelled S1, S2, ... by voice
-print(transcript.to_text())                            # [00:00] S1: ну да ...   (a readable view of the same data)
+print(transcript.to_markdown())                        # header + [00:00] S1: ну да ...   (the default view of the same data)
+print(transcript.to_text())                            # just the turn lines
 ```
+
+**The value** is one complete `Transcript`: words with times, segments, speakers and provenance, stored as one compact JSON file. **The default view**
+is `to_markdown()` (also `any-speech text talk.speech.json`, no flags): a YAML header in Reco's transcript v3 field names (`transcript_version`, `kind`,
+`status`, `audio.duration_sec`, `speakers`, `diarizer`, `transcribed_at`, `transcriber`, `transcriber_runtime`), then one `[MM:SS] S1: text` turn per paragraph.
+It is a pure function of the stored value, never a different stored shape. Words-only transcripts say `diarizer: not_run` and `speakers: {}`, and their turn
+lines carry no label; a failed diarizer says `diarizer: failed` (`status` stays `ok`: the words are fine). **Opt-ins**: `--diarize` / `transcribe_with_speakers` for
+speakers, `--engine` to name another engine, `out` to move the file.
 
 That is the whole simple path: one file stored beside the audio, the same data returned as a `Transcript` (words, segments, provenance) for code
 that wants a structure. A current file is reused, not redone. **Speakers are opt-in**: most uses do not need them and they cost a second model, so
@@ -37,7 +45,8 @@ await Drain(scan=lambda: jobs, speech=speech, workers=4).run()       # a folder:
 
 ```bash
 any-speech setup fluidaudio                    # once: builds FluidAudio at the pinned commit (needs Xcode's Swift, about 3 min) and installs it
-any-speech transcribe talk.m4a                 # words only, stored in talk.m4a.speech.json; add --diarize for speakers
+any-speech transcribe talk.m4a                 # words only, stored in talk.speech.json; add --diarize for speakers
+any-speech text talk.speech.json               # the markdown view on stdout
 any-speech drain ~/.local/share/channel-research --pattern 'youtube/*/videos/*/audio.m4a' --out-name transcript.speech.json
 any-speech embed host.wav --out host.voice.json --voice-model 3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx
 any-speech match clip.wav --voice host.voice.json --voice-model 3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx
@@ -56,9 +65,9 @@ The binary is found, in order, from `ANY_SPEECH_FLUIDAUDIO_BIN`, the folder `any
 
 ## Contract
 
-- **Format v2** (`Transcript.to_json`): `version`, `words[]` (`text`, `start`, `end`, `probability`, `speaker`), `segments[]`, `speakers` (`{"S1": {"name": "voice 1", "seconds": 912.4, "words": 2310}}`: seconds are the sum of the voice's word durations, so a 3 s music sample is told from the host at a glance), `provenance`
+- **Format v2, compact** (`Transcript.to_json`; the file is one line, no indent): `version`, `words[]` (`text`, `start`, `end`, `probability`, `speaker`), `segments[]`, `speakers` (`{"S1": {"name": "voice 1", "seconds": 912.4, "words": 2310}}`: seconds are the sum of the voice's word durations, so a 3 s music sample is told from the host at a glance), `provenance`
   (`engine`, `model`, `runtime`, `settings`, `audio_sha256`, `audio_seconds`, `seconds`, `peak_memory_gb`, `diarizer`, `made_at`, `source` = `local` or `captions`, derived `key`).
-  A reader loads v1 (its `speakers` was label to name only; the amounts are worked out from the words) and v2, and refuses any other `version` (`UnknownVersionError`). Text is verbatim: nothing cleans fillers.
+  Word and segment **times are rounded to milliseconds** on write (`round(t, 3)`): a loaded transcript equals the original up to that rounding, and a file read then written again is byte-identical. `segments` keep their text: the 4% it costs is the price of not making the segmenter's parameters part of reading (a stored cut is what it was, whatever the cutter later becomes). `provenance.key` is computed from the same inputs as before, so a transcript made before 0.5.0 is still current. The default file name is `<stem>.speech.json` (`talk.m4a` and `talk.wav` share one; pass `out` to keep both). A reader loads v1 (its `speakers` was label to name only; the amounts are worked out from the words) and v2, and refuses any other `version` (`UnknownVersionError`). Text is verbatim: nothing cleans fillers.
 - **Everything is asyncio** (0.4.0, on [any-pipeline](../any-pipeline/README.md)): `await transcribe(path)`, `await speech.transcribe(...)`, `await Drain(...).run()`. A sync script writes `asyncio.run(transcribe(path))`; the CLI does it for you. The engines stay plain blocking code (they are child processes), run off the loop with `blocking`.
 - **`Pipeline.run(audio)`** is `gather(hear, diarize) >> assemble`: transcribes (and, when asked, diarizes at the same time), labels each word with the diarizer turn it overlaps most, cuts segments at a speaker change, a pause of 0.5 s or 15 s, and records provenance.
   A diarizer failure never fails the transcript (words keep `speaker = None`, `provenance.diarizer` says why). A peak over `budget_gb` (4) raises `MemoryBudgetError`.

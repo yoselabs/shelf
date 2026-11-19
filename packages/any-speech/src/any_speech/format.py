@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -108,8 +109,34 @@ class Transcript:
             lines.append(f"[{clock}] {who}{seg.text}\n")
         return "".join(lines)
 
+    def to_markdown(self) -> str:
+        """The readable view: a YAML header (Reco's transcript v3 field names), then one `[MM:SS] S1: text` turn per paragraph.
+
+        `status` is `ok` whenever there is a transcript; `diarizer` is the model that labelled the voices, or `not_run` / `failed`
+        when no word has a speaker (the stored JSON keeps the model and the reason).
+        """
+        p, d = self.provenance, self.provenance.diarizer
+        voices = "".join(f"  {_scalar(label)}: {_scalar(v.name)}\n" for label, v in self.speakers.items())
+        header = (
+            "---\n"
+            "transcript_version: 3\n"
+            "kind: speech\n"
+            "status: ok\n"
+            f"audio:\n  duration_sec: {_scalar(round(p.audio_seconds, 1))}\n"
+            f"speakers:{chr(10) + voices if voices else ' {}' + chr(10)}"
+            f"diarizer: {_scalar(d['model'] if d.get('status') == 'ok' else d.get('status', 'not_run'))}\n"
+            f"transcribed_at: {_scalar(p.made_at)}\n"
+            f"transcriber: {_scalar(p.model)}\n"
+            f"transcriber_runtime: {_scalar(p.runtime)}\n"
+            "---\n"
+        )
+        return header + "".join(f"\n{line}\n" for line in self.to_text().splitlines())
+
     def to_json(self) -> dict[str, Any]:
+        """The one complete value. Word and segment times are rounded to milliseconds (`round(t, 3)`); nothing else is lossy."""
         body = asdict(self)
+        for item in (*body["words"], *body["segments"]):
+            item["start"], item["end"] = round(item["start"], 3), round(item["end"], 3)
         body["provenance"]["key"] = self.provenance.key
         return {"version": FORMAT_VERSION, **body}
 
@@ -144,7 +171,7 @@ class Transcript:
         )
 
     def save(self, path: Path) -> None:
-        atomic_write_json(path, self.to_json(), indent=1)
+        atomic_write_json(path, self.to_json())
 
     @classmethod
     def load(cls, path: Path) -> Transcript:
@@ -155,3 +182,16 @@ def _read_speakers(raw: Mapping[str, Any], words: tuple[Word, ...]) -> dict[str,
     if raw["version"] == 1:
         return speakers_of(words, dict(raw["speakers"]))
     return {label: Speaker(v["name"], v["seconds"], v["words"]) for label, v in raw["speakers"].items()}
+
+
+_PLAIN = re.compile(r"[A-Za-z][A-Za-z0-9._/+-]*(?: [A-Za-z0-9._/+-]+)*")
+_RESERVED = {"true", "false", "null", "yes", "no", "on", "off", "y", "n", "~"}
+
+
+def _scalar(value: object) -> str:
+    """A YAML scalar: numbers and plain words as they are, any other text single-quoted (a double-quoted JSON string if it holds `'`)."""
+    if not isinstance(value, str):
+        return str(value)
+    if _PLAIN.fullmatch(value) and value.lower() not in _RESERVED:
+        return value
+    return json.dumps(value, ensure_ascii=False) if "'" in value or "\n" in value else f"'{value}'"
