@@ -9,6 +9,10 @@ dict without those; ``keep`` rescues names, ``drop`` removes more.
 ``without_venv(env)`` (or ``scrub(..., strip_venv=True)``) also strips an active Python virtualenv: the
 interpreter variables it sets, and its ``bin`` folder in ``PATH``. Nothing else is touched.
 
+``build_env(env, allow=, extra=)`` is the allowlist form: only ``DEFAULT_INHERIT`` and ``allow`` names pass, secrets
+never do unless named exactly. ``find(name, env, extra_dirs)`` finds the program the child runs (see ``exe``): its
+PATH is the injected ``env``'s, and a miss raises ``NotFound`` instead of returning the bare name.
+
 Pure: the input mapping is never mutated and ``os.environ`` is read only by ``scrub_current``.
 
 An entry in ``keep`` / ``drop`` is an exact variable name, or a prefix when it ends with ``*``
@@ -19,6 +23,8 @@ from __future__ import annotations
 
 import os
 from typing import TYPE_CHECKING
+
+from child_env.exe import Exe, NotFound, find
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -61,6 +67,8 @@ VENV_NAMES: tuple[str, ...] = (
     "__PYVENV_LAUNCHER__",
     "PYTHONEXECUTABLE",
 )
+#: What a child inherits from ``build_env`` by default: the user's place and locale, nothing of the app's own.
+DEFAULT_INHERIT: tuple[str, ...] = ("PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_*", "TERM", "TMPDIR", "TZ", "XDG_*")
 
 
 def _matches(name: str, patterns: Iterable[str]) -> bool:
@@ -113,6 +121,24 @@ def scrub(
     return _strip_venv(out, env.get("VIRTUAL_ENV")) if strip_venv else out
 
 
+def build_env(
+    env: Mapping[str, str],
+    *,
+    allow: Iterable[str] = (),
+    extra: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """A new dict holding only the ``DEFAULT_INHERIT`` names and ``allow`` names (exact, or ``PREFIX*``) of ``env``, then ``extra``.
+
+    The allowlist is the door: nothing else of ``env`` reaches the child, so a whole ``os.environ`` is never passed.
+    Secrets (the same rules as ``scrub``) are dropped even under an allowed prefix; one passes only when its exact
+    name is in ``allow``. ``extra`` is set last and wins.
+    """
+    allow_ = tuple(allow)
+    exact = {a for a in allow_ if not a.endswith("*")}
+    out = {k: v for k, v in env.items() if k in exact or (_matches(k, (*DEFAULT_INHERIT, *allow_)) and not _default_drop(k))}
+    return {**out, **(extra or {})}
+
+
 def scrub_current(*, keep: Iterable[str] = (), drop: Iterable[str] = (), strip_venv: bool = False) -> dict[str, str]:
     """``scrub(os.environ, ...)``: the only place this package reads the process environment."""
     return scrub(os.environ, keep=keep, drop=drop, strip_venv=strip_venv)
@@ -124,7 +150,12 @@ __all__ = [
     "CREDENTIAL_MARKERS",
     "CREDENTIAL_NAMES",
     "CREDENTIAL_PREFIXES",
+    "DEFAULT_INHERIT",
     "VENV_NAMES",
+    "Exe",
+    "NotFound",
+    "build_env",
+    "find",
     "scrub",
     "scrub_current",
     "without_venv",
