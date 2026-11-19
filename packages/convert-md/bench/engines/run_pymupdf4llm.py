@@ -25,7 +25,7 @@ def main() -> None:
         raise TypeError(msg)
     elapsed = time.monotonic() - t0
 
-    Path(dst).write_text(md)
+    Path(dst).write_text(md, encoding="utf-8")
     print(f"elapsed_s={elapsed:.2f} chars={len(md)}", file=sys.stderr)
 
 

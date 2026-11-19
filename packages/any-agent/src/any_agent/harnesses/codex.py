@@ -268,7 +268,9 @@ class CodexHarness(Quiet):
         if self.out_file:
             p = Path(self.out_file)
             with contextlib.suppress(OSError):
-                text = p.read_text(encoding="utf-8", errors="replace").strip()
+                text = p.read_text(
+                    encoding="utf-8", errors="replace"
+                ).strip()  # lossy-ok: display: the worker's answer text, returned not hashed
                 p.unlink()
         final = bool(text) or bool(e.last and (e.turns or stop == "answer"))  # the turn finished: codex writes -o only at its end
         text = text or e.last

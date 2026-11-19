@@ -181,7 +181,9 @@ class TrafilaturaEngine:
         except ImportError as exc:  # pragma: no cover
             msg = f"trafilatura unavailable: {exc}"
             raise ConversionError(msg) from exc
-        html = path.read_text(encoding="utf-8", errors="replace")
+        html = path.read_text(
+            encoding="utf-8", errors="replace"
+        )  # lossy-ok: input: a non-UTF-8 page converts with U+FFFD, graded by fidelity
         markdown = trafilatura.extract(html, output_format="markdown", include_tables=True)
         if not markdown:
             msg = f"trafilatura extracted nothing from {path.name}"
@@ -203,7 +205,9 @@ class Html2TextEngine:
         except ImportError as exc:  # pragma: no cover
             msg = f"html2text unavailable: {exc}"
             raise ConversionError(msg) from exc
-        html = path.read_text(encoding="utf-8", errors="replace")
+        html = path.read_text(
+            encoding="utf-8", errors="replace"
+        )  # lossy-ok: input: a non-UTF-8 page converts with U+FFFD, graded by fidelity
         converter = html2text.HTML2Text()
         converter.body_width = 0
         markdown = converter.handle(html)

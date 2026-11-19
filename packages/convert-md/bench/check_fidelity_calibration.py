@@ -24,7 +24,7 @@ for out_path in sorted(OUTPUTS_DIR.glob("*.md")):
     pdf_path = CORPUS_DIR / f"{stem}.pdf"
     if not pdf_path.exists():
         continue
-    markdown = out_path.read_text(encoding="utf-8", errors="replace")
+    markdown = out_path.read_text(encoding="utf-8", errors="replace")  # lossy-ok: bench: scores a probe output, not stored
     source_size = pdf_path.stat().st_size
     fidelity, lost, warnings = grade(markdown=markdown, source_size=source_size, check_yield=False)
     rows.append(

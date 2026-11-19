@@ -67,7 +67,9 @@ def rev_files(gd: Path, common: Path, revs: Iterable[str]) -> list[Path] | None:
         if rev == "HEAD":
             files.append(gd / "HEAD")
             try:
-                head = (gd / "HEAD").read_text(encoding="utf-8", errors="replace").strip()
+                head = (
+                    (gd / "HEAD").read_text(encoding="utf-8", errors="replace").strip()
+                )  # lossy-ok: parse: HEAD ref name for a memo, never stored
             except OSError:
                 return None
             if head.startswith("ref:"):

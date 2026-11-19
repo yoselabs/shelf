@@ -168,7 +168,7 @@ def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
     if isinstance(info, str):
         return info
     state = "Z" if info.pbi_status == SZOMB else "R"
-    cmd = (info.pbi_comm or info.pbi_name).decode("utf-8", errors="replace")
+    cmd = (info.pbi_comm or info.pbi_name).decode("utf-8", errors="replace")  # lossy-ok: display: a process name for a row
     cpu_s, rss = _task(pid)
     return Proc(pid, info.pbi_ppid, info.pbi_pgid, 0, _token(info), state, cpu_s, cmd, info.pbi_uid, rss)
 

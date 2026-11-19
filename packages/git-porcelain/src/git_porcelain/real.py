@@ -83,7 +83,7 @@ def _trace_hooks(trace: Path) -> tuple[tuple[str, ...], tuple[tuple[str, int], .
     hooks: list[str] = []
     children: dict[tuple[str, int], str] = {}
     exits: list[tuple[str, int]] = []
-    for line in trace.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in trace.read_text(encoding="utf-8", errors="replace").splitlines():  # lossy-ok: parse: JSON trace lines, bad lines skipped
         try:
             event = json.loads(line)
         except ValueError:

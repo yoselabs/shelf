@@ -47,7 +47,7 @@ def read(sessions: Path, ref: str, since: float = 0.0) -> RolloutUsage | None:
     zero = dict.fromkeys(KEYS, 0)
     before, total, requests = dict(zero), dict(zero), 0
     try:
-        with path.open(encoding="utf-8", errors="replace") as f:
+        with path.open(encoding="utf-8", errors="replace") as f:  # lossy-ok: parse: token counts from JSON lines, bad lines skipped
             for line in f:
                 try:
                     raw = json.loads(line)
