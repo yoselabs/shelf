@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "py-symbols"
+software = "content-digest"
+why = "py-symbols hand-rolled hashlib.sha256 for symbol_hash: a sha256 prefix of one symbol's source text, stored by consumers as evidence. The hash is stored or pinned, so the bytes must stay identical to plain sha256 hex."
+needs = "digest_text(text, length=12) returning exactly what hashlib.sha256(...).hexdigest() returned (cut to length)."
+sponsor = "yoselabs"
+requester = "py-symbols"
+status = "active" # active | retired

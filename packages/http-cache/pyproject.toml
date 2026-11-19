@@ -9,11 +9,13 @@ license = "Apache-2.0"
 dependencies = [
     "sqlite-resource",
     "any-ttl-cache",
+    "content-digest>=0.2,<1",
 ]
 
 [tool.uv.sources]
 sqlite-resource = { workspace = true }
 any-ttl-cache = { workspace = true }
+content-digest = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

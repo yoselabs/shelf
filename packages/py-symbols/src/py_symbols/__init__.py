@@ -1,10 +1,11 @@
 """Name Python code by symbol: spans, enclosing functions and source hashes, from the stdlib `ast`."""
 
 import ast
-import hashlib
 import re
 import textwrap
 from dataclasses import dataclass
+
+from content_digest import digest_text
 
 _Def = ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
 _LINES = re.compile(r"\r\n|\r|\n")
@@ -104,4 +105,4 @@ def innermost(spans: list[Span], line: int) -> str | None:
 def symbol_hash(source: str, symbol: str, *, length: int = 12) -> str | None:
     """sha256 hex prefix of the symbol's source text; None when `find` finds nothing."""
     span = find(source, symbol)
-    return None if span is None else hashlib.sha256(span.text.encode()).hexdigest()[:length]
+    return None if span is None else digest_text(span.text, length=length)

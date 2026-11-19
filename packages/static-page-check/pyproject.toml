@@ -1,11 +1,12 @@
 [project]
 name = "static-page-check"
-version = "0.1.0"
+version = "0.2.0"
 description = "Checks for a no-build static web page (plain ES modules, CSS, HTML, vendored files): imports resolve and export what is named, relative asset URLs, sha256 pins, colours only in the tokens file, a gzip budget. Each returns a list of problems."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
+dependencies = ["content-digest>=0.2,<1"]
 
 [build-system]
 requires = ["hatchling"]

@@ -8,7 +8,6 @@ value). ``load`` raises ``ValueError`` for a bad shape and :class:`ForeignVersio
 
 from __future__ import annotations
 
-import hashlib
 import json
 import threading
 from dataclasses import dataclass
@@ -16,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from atomic_io import atomic_write_json
+from content_digest import digest_bytes
 from process_lock import ProcessLock
 
 if TYPE_CHECKING:
@@ -142,7 +142,7 @@ class Doc[T]:
             return Absent(), ""
         except (OSError, ValueError) as err:
             return Torn(self.path, str(err)), ""
-        return self._decode(raw), hashlib.sha256(raw).hexdigest()
+        return self._decode(raw), digest_bytes(raw, length=64)
 
     def _decode(self, raw: bytes) -> Read[T]:
         try:

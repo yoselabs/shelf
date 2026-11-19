@@ -21,12 +21,12 @@ lifecycle, so it can share one sqlite file with other tables.
 
 from __future__ import annotations
 
-import hashlib
 import time
 from typing import TYPE_CHECKING
 
 from any_ttl_cache import TtlTable
 from anyllm import Completion
+from content_digest import digest_text
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -52,7 +52,7 @@ _INDEX = "CREATE INDEX IF NOT EXISTS llm_cache_expires ON llm_cache(expires_at);
 
 def hash_text(text: str) -> str:
     """Return the stable sha256 hex digest of ``text``'s UTF-8 bytes."""
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return digest_text(text, length=64)
 
 
 def make_key(*parts: str) -> str:

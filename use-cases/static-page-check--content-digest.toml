@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "static-page-check"
+software = "content-digest"
+why = "static-page-check hand-rolled hashlib.sha256 for pin_problems: the sha256 of a vendored file compared with its pin. The hash is stored or pinned, so the bytes must stay identical to plain sha256 hex."
+needs = "digest_file(path, length=64) returning exactly what hashlib.sha256(...).hexdigest() returned (cut to length)."
+sponsor = "yoselabs"
+requester = "static-page-check"
+status = "active" # active | retired
