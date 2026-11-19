@@ -1,4 +1,8 @@
-"""`python -m any_gate`: `test`, and the gate's state verbs `start`, `passed` and `pre-push`.
+"""`python -m any_gate`: `test`, `changed`, and the gate's state verbs `start`, `passed` and `pre-push`.
+
+`changed [--scope all] [--config FILE]... [--not GLOB]... GLOB...` prints the files a per-file linter must check, NUL-separated
+(`xargs -0`): those changed against the upstream merge-base matching a glob, or every matching file when `--scope all`, a `--config` file
+changed, or there is no base (see `any_gate.changed`).
 
 `start`, `passed --gate NAME` and `pre-push --gate NAME -- CMD...` keep a record of the trees a gate passed (see `any_gate.state`), so a
 push does not run the gate again on the exact content that just passed it. `pre-push` skips CMD only when the tree is clean, HEAD is what
@@ -25,6 +29,7 @@ from typing import TYPE_CHECKING, TextIO
 
 from any_lease import Leases
 
+from any_gate import changed as changed_files
 from any_gate.receipts import Receipts
 from any_gate.run import Outcome, run_tests
 from any_gate.state import GateState, common_dir
@@ -139,6 +144,12 @@ def _test(args: argparse.Namespace, stdin: TextIO) -> int:
     return 0
 
 
+def _changed(args: argparse.Namespace) -> int:
+    files = changed_files.select(Path(args.repo).resolve(), args.patterns, args.config, skip=args.skip, scope=args.scope)
+    sys.stdout.write("".join(f"{path}\0" for path in files))
+    return 0
+
+
 def _exec(cmd: Sequence[str]) -> int:
     sys.stdout.flush()
     sys.stderr.flush()
@@ -197,7 +208,15 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
             sp.add_argument("--gate", default="check", help="the gate (default: check)")
         if verb == "pre-push":
             sp.add_argument("cmd", nargs=argparse.REMAINDER, metavar="-- CMD")
+    ch = sub.add_parser("changed", help="print the files a per-file linter must check, NUL-separated")
+    ch.add_argument("--repo", default=".", help="the repo (default: here)")
+    ch.add_argument("--scope", choices=("changed", "all"), default="changed", help="`all` prints every matching file")
+    ch.add_argument("--config", action="append", default=[], help="a file (or glob) whose change selects everything")
+    ch.add_argument("--not", dest="skip", action="append", default=[], metavar="GLOB", help="never select a path matching this")
+    ch.add_argument("patterns", nargs="+", metavar="GLOB")
     args = parser.parse_args(argv)
+    if args.command == "changed":
+        return _changed(args)
     if args.command != "test":
         return _state(args)
     args.pytest_args = args.pytest_args[1:] if args.pytest_args[:1] == ["--"] else args.pytest_args

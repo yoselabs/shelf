@@ -35,7 +35,7 @@ sizes include the definition, decorators and nested definitions; repeated qualif
 names use their maximum size. Data files (YAML, XML, JSON, generated output) are outside.
 
 `tests/test_size_caps.py` enforces Python files in `packages/*/src`, `tools`, root
-`tests` and package tests selected against the upstream merge-base by `tools/changed.py`
+`tests` and package tests selected against the upstream merge-base by `any-gate changed`
 (including staged, unstaged and untracked files). With no base it checks everything.
 Existing oversized files must comply when changed; there is no exceptions list or
 ratchet file. This changed-file scope also applies when the test runs in `check-all`.
@@ -124,7 +124,7 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
    `bootstrap-verify` is the same call under a name that signals intent (checking, not setting up)
    — neither is a `check` prerequisite, since they assert this working copy's environment, not
    the repo's committed content.
-   For gate speed, copy the changed-file selector (`blueprint recipe changed > tools/changed.py`) and add
+   For gate speed, use the changed-file selector (`python -m any_gate changed`, from the `any-gate` dev dependency) and add
    `lint-changed` and `spell-changed` twins of `lint` and `spell`, as the pattern in `docs/agents/gate.md` shows; the
    preset treats them as shelf-only recipes, neither owed nor extra.
 3. The `dev` dependency-group (pytest, pytest-cov, ruff, pyrefly, codespell, deptry).

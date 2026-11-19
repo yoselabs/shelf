@@ -5,7 +5,7 @@ Beads with acceptance criteria; tests first; Done = `just check` green over the 
 - [x] 1. Owner decided the own core (2026-11-19); ADR 0021 rewritten (0004, 0023, 0027 stay).
 - [~] 2. First slice built as one package, `any-gate` 0.1.0 (receipts, worker plan, staged pytest runs), on `stream-proc`, `atomic-io`, `content-digest`; the Python adapter
       (graph, `uv export`, selection) is still `tools/affected.py`. Names `any-gate` and `any-gate-python` stay provisional; split decided when the adapter moves.
-- [ ] 3. Core: parallel step runner with budgets and timing (from the `steps` recipe), changed-files listing (from `changed.py`), drift check (from `preset_drift.py`).
+- [~] 3. Core: `changed` is in `any-gate` as `any_gate.changed` and the verb `python -m any_gate changed` (shelf-3pcn.2, 2026-11-20; `tools/changed.py`, its recipe copy and tests deleted). Still open: parallel step runner with budgets and timing (from the `steps` recipe), changed-files listing (from `changed.py`), drift check (from `preset_drift.py`).
 - [x] 4. Core: `GateState` and the verbs `start`, `passed`, `pre-push` in `any-gate` replace `gate_state.py` (shelf-3pcn.1). The shelf calls them; `tools/gate_state.py` and the blueprint `gate-state` recipe
       are deleted (the cross-package duplication rule forbids two copies). Consumers get `any-gate` as a dev dependency pinned by git tag `any-gate-v0.1.0` through onboarding; THE TAG MUST EXIST
       before a consumer is onboarded or re-onboarded. A repo with no python runs the gate hook plainly.

@@ -16,7 +16,7 @@ deleted one. A linter with nothing to look at is skipped and says so in one line
 config runs it over everything. A check that reads across files (types, architecture, dependencies) always
 covers the whole repo, and so does the gate in CI (`just check-all`). No base found means everything runs.
 
-`blueprint recipe changed > tools/changed.py` copies the selector (stdlib only; `--help` documents it). It prints the
+`python -m any_gate changed` is the selector (`any-gate`, a dev dependency pinned by git tag; `--help` documents it). It prints the
 changed files matching its globs, NUL-separated, or everything on `--scope all`, when a `--config` file changed, or with
 no base. A repo adds a `-changed` twin of each per-file recipe and `check` calls the twins:
 
@@ -25,7 +25,7 @@ lint-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --config pyproject.toml --config ruff.toml 'src/*.py' 'tests/*.py' > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config ruff.toml 'src/*.py' 'tests/*.py' > "$list"
     [ -s "$list" ] || { echo "skipped lint: no Python file changed"; exit 0; }
     xargs -0 uv run ruff check --force-exclude < "$list"
     xargs -0 uv run ruff format --check --force-exclude < "$list"

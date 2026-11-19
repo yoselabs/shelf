@@ -32,6 +32,16 @@ Exit 0: green or nothing to run; 1: a test failed or a stage hit a limit; 2: usa
 selects its lane through a pytest plugin (`any_gate.lanes_plugin`), not `-m`, so the repo's own `-m` default stays in force; the plugin
 needs `any-gate[pytest]` in the environment of the tests.
 
+### Changed files for per-file linters
+
+```bash
+python -m any_gate changed --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' | xargs -0 ruff check
+```
+
+Prints, NUL-separated, the files that differ from the upstream merge-base (committed, staged, unstaged, untracked and not ignored; a deleted
+file never counts) and match a glob. Everything matching is printed instead on `--scope all`, when a `--config` file changed, or with no base
+(not a repo, no upstream): run too much rather than too little. `--not GLOB` drops a match. `any_gate.changed.select(...)` is the same in Python.
+
 ### The gate's tree record
 
 ```bash

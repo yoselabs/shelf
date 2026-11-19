@@ -21,7 +21,7 @@ lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACH
 # touches (`test-affected`); `check-all` runs every test with the coverage floor.
 #
 # The per-file linters (scripts, lint-changed, spell-changed) check only the files changed against the base
-# in `check` (tools/changed.py; a changed config file, or no base, selects everything). `check-all` runs them on every
+# in `check` (`any-gate changed`; a changed config file, or no base, selects everything). `check-all` runs them on every
 # file (`scripts "all"`, `lint`, `spell`). The cross-file checks (typecheck, arch, deps, blueprint)
 # always cover the whole repo. A linter with nothing changed prints "skipped <linter>: ..." and the gate
 # repeats that line.
@@ -67,7 +67,7 @@ scripts scope="changed":
     set -euo pipefail
     command -v shellcheck >/dev/null || { echo "scripts: shellcheck is not installed -- run just tools" >&2; exit 2; }
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
+    uv run python -m any_gate changed --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
     [ -s "$list" ] || { echo "skipped scripts: no shell script changed"; exit 0; }
     xargs -0 shellcheck < "$list"
 
@@ -191,13 +191,13 @@ lint:
     uv run ruff check packages tests tools conftest.py
     uv run ruff format --check packages tests tools conftest.py
 
-# `lint` over the files changed against the base (tools/changed.py), for `check`. Shelf-only: consumers copy `lint`.
+# `lint` over the files changed against the base (`any-gate changed`), for `check`. Shelf-only: consumers copy `lint`.
 [group('gate')]
 lint-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' 'tools/*.py' conftest.py > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' 'tools/*.py' conftest.py > "$list"
     [ -s "$list" ] || { echo "skipped lint: no Python file changed"; exit 0; }
     xargs -0 uv run ruff check --force-exclude < "$list"
     xargs -0 uv run ruff format --check --force-exclude < "$list"
@@ -228,7 +228,7 @@ spell-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md CLAUDE.md conftest.py > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md CLAUDE.md conftest.py > "$list"
     [ -s "$list" ] || { echo "skipped spell: no file changed"; exit 0; }
     xargs -0 uv run codespell < "$list"
 

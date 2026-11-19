@@ -1,26 +1,22 @@
-#!/usr/bin/env python3
 """The files a per-file linter must look at: those changed against the base, matching its globs.
 
-Prints repo-relative paths, NUL-separated (`xargs -0`, `mapfile -d ''`). A file counts when it differs from the
-upstream merge-base (the base `tools/affected.py` uses): committed on the branch, staged, unstaged, or untracked
-and not ignored. A deleted file never counts (only existing files are printed); a renamed one counts by its new path.
+A file counts when it differs from the upstream merge-base (the base the test selector diffs against): committed on the branch, staged,
+unstaged, or untracked and not ignored. A deleted file never counts (only existing files are returned); a renamed one counts by its
+new path.
 
-Everything (every tracked or untracked-not-ignored file matching the globs) is printed instead when:
-- `--scope all` (what `just check-all`, which CI runs, passes), or
-- a `--config` file changed (a linter's rules moved, so files that were clean may not be), or
+Everything (every tracked or untracked-not-ignored file matching the globs) is returned instead when:
+- `scope="all"` (what `just check-all` passes), or
+- a `configs` file changed (a linter's rules moved, so files that were clean may not be), or
 - there is no base: not a git repo, no upstream, or git fails. Run too much rather than too little.
 
 Globs are fnmatch patterns on the whole path, where `*` crosses `/`: `packages/*.py` is every .py under packages.
-Stdlib only, so it runs as bare `python3`.
 """
 
 from __future__ import annotations
 
-import argparse
 import fnmatch
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -37,7 +33,7 @@ def _git(repo: Path, *args: str) -> list[str] | None:
 
 
 def base(repo: Path) -> str | None:
-    """The upstream merge-base, the same base `tools/affected.py` diffs against; None when there is none."""
+    """The upstream merge-base, the same base the test selector diffs against; None when there is none."""
     found = _git(repo, "merge-base", "HEAD", "@{upstream}")
     return found[0].strip() if found and found[0].strip() else None
 
@@ -80,20 +76,3 @@ def select(repo: Path, patterns: list[str], configs: Sequence[str] = (), *, skip
         )
 
     return [p for p in pool if wanted(p)]
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--repo", default=".", help="the repo (default: cwd)")
-    parser.add_argument("--scope", choices=("changed", "all"), default="changed")
-    parser.add_argument("--config", action="append", default=[], help="a file (or glob) whose change selects everything")
-    parser.add_argument("--not", dest="skip", action="append", default=[], metavar="GLOB", help="never select a path matching this")
-    parser.add_argument("patterns", nargs="+", metavar="GLOB")
-    args = parser.parse_args(argv)
-    files = select(Path(args.repo).resolve(), args.patterns, args.config, skip=args.skip, scope=args.scope)
-    sys.stdout.write("".join(f"{p}\0" for p in files))
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
