@@ -56,7 +56,7 @@ class CodexCliAdapter:
         if exe is None:
             msg = "codex CLI not found on PATH"
             raise AnyLLMError(msg, retryable=False, hint="install Codex or pick another provider")
-        harness = any_agent.CodexHarness()
+        harness = any_agent.CodexHarness(env=self._env)
         prompt = "\n\n".join(p for p in (flat_system(parts, system), flat_user(parts, user)) if p)
         inputs = any_agent.LaunchInputs(
             exe=str(exe),

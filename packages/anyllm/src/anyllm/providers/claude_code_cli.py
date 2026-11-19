@@ -56,7 +56,7 @@ class ClaudeCodeCliAdapter:
         if exe is None:
             msg = "claude CLI not found on PATH"
             raise AnyLLMError(msg, retryable=False, hint="install Claude Code or pick another provider")
-        harness = any_agent.ClaudeHarness()
+        harness = any_agent.ClaudeHarness(env=self._env)
         inputs = any_agent.LaunchInputs(
             exe=str(exe),
             cwd=str(Path.cwd()),
