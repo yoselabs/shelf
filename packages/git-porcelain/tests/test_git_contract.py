@@ -298,12 +298,7 @@ def implementation(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture
-def world(
-    implementation: str,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    git_process: Callable[..., None],
-) -> World:
+def world(implementation: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, git_process: Callable[..., None]) -> World:
     apply_hermetic_env(monkeypatch, identity=_ME, home=tmp_path / "home")
     rig: Rig = RealRig(tmp_path, monkeypatch) if implementation == "real" else FakeRig(tmp_path)
     return World(rig, implementation, monkeypatch, git_process)

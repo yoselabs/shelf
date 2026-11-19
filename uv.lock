@@ -2884,14 +2884,12 @@ version = "0.3.0"
 source = { editable = "packages/mcp-result-wire" }
 dependencies = [
     { name = "fastmcp" },
-    { name = "mcp" },
     { name = "page-tsv" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
-    { name = "mcp", specifier = ">=1.28,<2" },
     { name = "page-tsv", editable = "packages/page-tsv" },
 ]
 

@@ -10,7 +10,6 @@ dependencies = [
     "page-tsv",
     # >=3.4: `ToolResult(is_error=True)` raises TypeError on 3.3.x (see README, sharp edges).
     "fastmcp>=3.4,<4",
-    "mcp>=1.28,<2",
 ]
 
 [build-system]
