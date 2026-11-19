@@ -5,7 +5,8 @@
 - :func:`stop_tree` — SIGTERM, grace, SIGKILL, a sweep of descendants that left the group, a proof;
   :func:`stop_tree_report` — the same, with a :class:`StopReport` of the signals the kernel took.
 - :func:`alive`, :func:`proc_start` — pid-reuse-safe liveness (``/proc`` on Linux, libproc on macOS);
-  :func:`table`, :func:`descendants` — the process table; :func:`group_alive` — is any process in a group.
+  :func:`table`, :func:`descendants` — the process table (pid, ppid, pgid, uid, rss bytes, start token);
+  :func:`group_alive` — is any process in a group; :func:`group_rss` — resident bytes of a group.
 - :func:`capture` — :func:`run` to the end, output as text, exit 124 on a timeout, optional heartbeat ``tick``.
 - :func:`capture_bytes` — the same, output as exact bytes, optional ``input`` on stdin, stdin devnull or inherited,
   or ``capture=False`` to inherit stdout/stderr.
@@ -22,7 +23,7 @@ from stream_proc.hold import TermHold, popen_held
 from stream_proc.owned import IdentityUnavailableError, OwnedProcess, ProcessObservation, inspect_process, observe_owned
 from stream_proc.pid import PidHandle, stop_pid
 from stream_proc.procfs import Proc
-from stream_proc.proctable import alive, descendants, group_alive, proc_start, table
+from stream_proc.proctable import alive, descendants, group_alive, group_rss, proc_start, table
 from stream_proc.registered import RegisteredStartUncertainError, popen_registered
 from stream_proc.runner import Kind, Result, run, run_registered
 from stream_proc.tree import StopReport, stop_tree, stop_tree_report
@@ -45,6 +46,7 @@ __all__ = [
     "capture_bytes",
     "descendants",
     "group_alive",
+    "group_rss",
     "inspect_process",
     "observe_owned",
     "popen_held",

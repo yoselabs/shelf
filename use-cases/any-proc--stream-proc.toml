@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-proc"
+software = "stream-proc"
+why = "any-proc's user_task_count() counted a user's processes on macOS by parsing `ps -U uid -o pid=` text, a second process-table reader beside stream-proc's libproc table (constitution Article III, one implementation per behaviour; shelf-tyld.1)."
+needs = "table() rows with the owner uid on both OSes (Proc.uid)."
+sponsor = "yoselabs"
+requester = "any-proc"
+status = "active" # active | retired

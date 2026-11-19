@@ -74,3 +74,8 @@ def group_alive(pgid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+def group_rss(pgid: int, rows: dict[int, Proc] | None = None) -> int:
+    """Resident bytes of every process in group ``pgid``: from ``rows`` when given, else the table read now. 0 for no such group."""
+    return sum(row.rss for row in (table() if rows is None else rows).values() if row.pgid == pgid)

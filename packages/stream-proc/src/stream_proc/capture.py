@@ -91,7 +91,7 @@ def capture_bytes(
     *,
     cwd: str | os.PathLike[str] | None = None,
     env: Mapping[str, str] | None = None,
-    timeout: float | None = None,
+    timeout: float,
     input: bytes | None = None,  # noqa: A002 - subprocess.run's name
     stdin: int | IO[Any] | None = subprocess.DEVNULL,
     capture: bool = True,
@@ -168,7 +168,7 @@ def capture(
     *,
     cwd: str | os.PathLike[str] | None = None,
     env: Mapping[str, str] | None = None,
-    timeout: float | None = None,
+    timeout: float,
     tick: Callable[[], None] | None = None,
     poll_s: float = 0.2,
     grace: float = 5.0,
