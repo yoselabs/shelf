@@ -19,14 +19,14 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import re
+import shutil
 import subprocess
 import tarfile
+import tempfile
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from pathlib import Path
 
 __all__ = ["Vendor", "dir_files", "newer_tags", "tag_files", "tree_hash"]
 
@@ -97,6 +97,44 @@ def newer_tags(shelf: Path, name: str, tag: str) -> list[str]:
     return out
 
 
+def _install(dest: Path, files: dict[str, bytes]) -> None:
+    """Replace ``dest`` by ``files``: build the new tree in a sibling directory, then rename it into place.
+
+    A failure while building leaves ``dest`` as it was. Two renames swap the trees (the old one is parked first), so a
+    crash between them leaves ``dest`` absent and the old tree beside it as ``.<name>.old-*``, never a half-copied tree.
+    Standard library only, so this is not atomic-io (this package vendors itself and must stay copyable alone).
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix=f".{dest.name}.new-", dir=dest.parent))
+    parked = stage.with_name(stage.name.replace(".new-", ".old-", 1))
+    try:
+        for rel, data in files.items():
+            target = stage / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            _ = target.write_bytes(data)
+        if dest.is_dir():
+            dest.rename(parked)
+        stage.rename(dest)
+    except BaseException:
+        shutil.rmtree(stage, ignore_errors=True)
+        if parked.is_dir() and not dest.exists():
+            parked.rename(dest)
+        raise
+    shutil.rmtree(parked, ignore_errors=True)
+
+
+def _write_text_atomic(path: Path, text: str) -> None:
+    """Write ``text`` (UTF-8) beside ``path`` under a private name, then rename it over ``path``."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        _ = tmp.write_text(text, encoding="utf-8")
+        tmp.replace(path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 @dataclass(frozen=True)
 class Vendor:
     """One consumer: where the copies go (``vendor_dir``) and the manifest that records them (``manifest_path``)."""
@@ -121,20 +159,11 @@ class Vendor:
             raise ValueError(msg)
         commit = _git(shelf, "rev-parse", tag + "^{commit}").decode().strip()
         files = tag_files(shelf, name, tag)
-        dest = self.vendor_dir / name
-        for p in sorted(dest.rglob("*"), reverse=True) if dest.is_dir() else []:
-            p.rmdir() if p.is_dir() else p.unlink()
-        if dest.is_dir():
-            dest.rmdir()
-        for rel, data in files.items():
-            target = dest / rel
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
+        _install(self.vendor_dir / name, files)
         entry = {"name": name, "shelf_tag": tag, "shelf_commit": commit, "tree_hash": tree_hash(files)}
         kept = [e for e in entries if e["name"] != name]
-        self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
         text = json.dumps(sorted([*kept, entry], key=lambda e: e["name"]), indent=2) + "\n"
-        self.manifest_path.write_text(text, encoding="utf-8")
+        _write_text_atomic(self.manifest_path, text)
         return entry
 
     def check(self, shelf: Path | None = None) -> tuple[list[str], list[str]]:

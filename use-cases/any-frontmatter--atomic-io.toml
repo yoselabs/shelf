@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-frontmatter"
+software = "atomic-io"
+why = "any-frontmatter.write hand-rolled mkstemp + fsync + replace; a torn markdown file would lose a human's note."
+needs = "atomic_write_text: same-directory temp file, fsync, os.replace, parents created, old file kept on failure; bytes are exactly the UTF-8 of the text."
+sponsor = "yoselabs"
+requester = "any-frontmatter"
+status = "active" # active | retired

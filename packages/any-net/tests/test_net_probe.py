@@ -8,6 +8,8 @@ from any_net import Probe, View, cached, last, probe, record, view
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
 VENDOR = "api.vendor.test:443"
 
 
@@ -126,4 +128,28 @@ def test_record_creates_the_parent_directory(tmp_path: Path) -> None:
 def test_a_failed_write_leaves_no_temp_file(tmp_path: Path) -> None:
     (tmp_path / "net.json").mkdir()  # replace() onto a directory fails
     assert record(tmp_path / "net.json", Probe(True, True, "ok", {}, 1.0)).up is True
+    assert [p.name for p in tmp_path.iterdir()] == ["net.json"]
+
+
+def test_stored_bytes_are_compact_ascii_json_without_a_newline(tmp_path: Path) -> None:
+    path = tmp_path / "net.json"
+    record(path, Probe(True, True, "ok", {"h\u00e9:443": "ok"}, 100.0, 7))
+    assert path.read_bytes() == (
+        b'{"v": 1, "up": true, "ip_up": true, "why": "ok", "hosts": {"h\\u00e9:443": "ok"}, "at": 100.0, "ms": 7, "since": 100.0}'
+    )
+
+
+def test_a_crash_before_the_swap_keeps_the_old_record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "net.json"
+    record(path, Probe(True, True, "ok", {}, 1.0))
+    before = path.read_bytes()
+
+    def crash(self: Path, target: object) -> Path:
+        msg = "power cut"
+        raise OSError(msg)
+
+    monkeypatch.setattr(type(path), "replace", crash)
+    assert record(path, Probe(False, False, "offline", {}, 2.0)).up is False
+    monkeypatch.undo()
+    assert path.read_bytes() == before
     assert [p.name for p in tmp_path.iterdir()] == ["net.json"]

@@ -12,15 +12,16 @@ itself.
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import io
-import os
-import tempfile
-from pathlib import Path
+from typing import TYPE_CHECKING
 
+from atomic_io import atomic_write_text
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 __all__ = ["TrustStore", "TrustStoreError", "folder_hash"]
 
@@ -102,24 +103,6 @@ class TrustStore:
         buf = io.StringIO()
         _yaml.dump(data, buf)
         try:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            _write_atomic(self._path, buf.getvalue())
+            atomic_write_text(self._path, buf.getvalue())
         except OSError as exc:
             raise TrustStoreError(self._path, str(exc)) from exc
-
-
-def _write_atomic(path: Path, text: str) -> None:
-    """Temp file beside ``path``, fsync, rename over it. Not atomic-io: a sibling
-    dependency would put a workspace source in front of every git consumer's own pin."""
-    fd, name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-    tmp = Path(name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-            fh.flush()
-            os.fsync(fh.fileno())
-        tmp.replace(path)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            tmp.unlink()
-        raise

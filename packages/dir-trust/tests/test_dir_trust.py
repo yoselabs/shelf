@@ -163,3 +163,33 @@ def test_an_unwritable_store_raises(tmp_path: Path) -> None:
     store = TrustStore(blocker / "trust.yml")
     with pytest.raises(TrustStoreError):
         store.grant(tmp_path, tmp_path)
+
+
+def test_store_bytes_are_the_yaml_dump_of_the_grants(tmp_path: Path) -> None:
+    store_path = tmp_path / "config" / "trust.yml"
+    key = tmp_path / "vault"
+    folder = key / "jobs"
+    _file(folder, "a.py", "x\n")
+    TrustStore(store_path).grant(key, folder)
+    assert store_path.read_bytes() == f"{{{key.resolve()}: {folder_hash(folder)}}}\n".encode()
+
+
+def test_a_crash_before_the_swap_keeps_the_old_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store_path = tmp_path / "config" / "trust.yml"
+    key = tmp_path / "vault"
+    folder = key / "jobs"
+    _file(folder, "a.py", "x\n")
+    store = TrustStore(store_path)
+    store.grant(key, folder)
+    before = store_path.read_bytes()
+
+    def crash(self: Path, target: object) -> Path:
+        msg = "power cut"
+        raise OSError(msg)
+
+    monkeypatch.setattr(type(key), "replace", crash)
+    with pytest.raises(TrustStoreError):
+        store.revoke(key)
+    monkeypatch.undo()
+    assert store_path.read_bytes() == before
+    assert [p.name for p in store_path.parent.iterdir()] == ["trust.yml"]

@@ -269,9 +269,10 @@ requires-dist = [{ name = "anyascii", specifier = ">=0.3.2,<1" }]
 
 [[package]]
 name = "any-frontmatter"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-frontmatter" }
 dependencies = [
+    { name = "atomic-io" },
     { name = "ruamel-yaml" },
 ]
 
@@ -282,6 +283,7 @@ merge = [
 
 [package.metadata]
 requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "ruamel-yaml", specifier = ">=0.18,<1" },
     { name = "yaml-merge", marker = "extra == 'merge'", editable = "packages/yaml-merge" },
 ]
@@ -341,8 +343,14 @@ requires-dist = [{ name = "markdown-it-py", specifier = ">=3,<5" }]
 
 [[package]]
 name = "any-net"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-net" }
+dependencies = [
+    { name = "atomic-io" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "atomic-io", editable = "packages/atomic-io" }]
 
 [[package]]
 name = "any-path-glob"
@@ -1346,14 +1354,18 @@ wheels = [
 
 [[package]]
 name = "dir-trust"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/dir-trust" }
 dependencies = [
+    { name = "atomic-io" },
     { name = "ruamel-yaml" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ruamel-yaml", specifier = ">=0.18,<1" }]
+requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "ruamel-yaml", specifier = ">=0.18,<1" },
+]
 
 [[package]]
 name = "diskcache"
@@ -4676,7 +4688,7 @@ wheels = [
 
 [[package]]
 name = "shelf-vendor"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/shelf-vendor" }
 
 [[package]]

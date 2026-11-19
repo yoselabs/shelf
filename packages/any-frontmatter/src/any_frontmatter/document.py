@@ -25,18 +25,17 @@ What a hand-rolled ``yaml.safe_load`` gets wrong, each kept here:
 from __future__ import annotations
 
 import io
-import os
-import tempfile
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from atomic_io import atomic_write_text
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.representer import RoundTripRepresenter
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from pathlib import Path
 
 FENCE = "---"
 
@@ -144,20 +143,4 @@ def dump(doc: Document) -> str:
 
 def write(path: Path, doc: Document) -> None:
     """Write ``doc`` to ``path`` atomically, creating missing parent folders."""
-    _write_atomic(path, dump(doc))
-
-
-def _write_atomic(path: Path, text: str) -> None:
-    """Temp file beside ``path``, fsync, rename over it. Inline, not atomic-io: a sibling
-    dependency needs a workspace source, which collides with a consumer's own pin."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(text)
-            fh.flush()
-            os.fsync(fh.fileno())
-        Path(name).replace(path)
-    except BaseException:
-        Path(name).unlink(missing_ok=True)
-        raise
+    atomic_write_text(path, dump(doc))

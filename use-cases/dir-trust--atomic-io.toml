@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "dir-trust"
+software = "atomic-io"
+why = "dir-trust's grant store hand-rolled mkstemp + fsync + replace; a torn store makes every granted folder look untrusted."
+needs = "atomic_write_text: same-directory temp file, fsync, os.replace, parents created, old store kept on failure."
+sponsor = "yoselabs"
+requester = "dir-trust"
+status = "active" # active | retired

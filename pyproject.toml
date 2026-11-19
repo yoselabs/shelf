@@ -30,6 +30,7 @@ any-frontmatter = { workspace = true }
 page-tsv = { workspace = true }
 # any-lease composes process-lock.
 process-lock = { workspace = true }
+# any-frontmatter, dir-trust and any-net compose atomic-io.
 # any-yaml composes yaml-merge and atomic-io.
 any-yaml = { workspace = true }
 # any-speech composes any-pipeline, any-lease, process-lock, atomic-io, content-digest, app-dirs and verb-cli.
@@ -622,6 +623,9 @@ modules = [
 ]
 ignore_imports = [
     "any_frontmatter.document -> yaml_merge",
+    "any_frontmatter.document -> atomic_io",
+    "dir_trust -> atomic_io",
+    "any_net.probe -> atomic_io",
     "any_json_doc -> atomic_io",
     "any_json_doc -> process_lock",
     "content_extract -> convert_md",
