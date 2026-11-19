@@ -13,8 +13,18 @@ back out.
 
 from __future__ import annotations
 
-from .fetch import conditional_headers, fetch_bytes
+from .fetch import DEFAULT_MAX_BODY_BYTES, conditional_headers, fetch_bytes
 from .links import LinkChecker, LinkReply, LinkResult, LinkState
 from .models import FetchOutcome, FetchVerdict
 
-__all__ = ("FetchOutcome", "FetchVerdict", "LinkChecker", "LinkReply", "LinkResult", "LinkState", "conditional_headers", "fetch_bytes")
+__all__ = (
+    "DEFAULT_MAX_BODY_BYTES",
+    "FetchOutcome",
+    "FetchVerdict",
+    "LinkChecker",
+    "LinkReply",
+    "LinkResult",
+    "LinkState",
+    "conditional_headers",
+    "fetch_bytes",
+)

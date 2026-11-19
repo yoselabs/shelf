@@ -46,8 +46,13 @@ async def post_feedback_logs(
         ]
     }
     try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
-            await client.post(endpoint, json=payload, headers={"X-Api-Key": api_key})
+        # Redirects are refused (a redirect would carry the API key to another host) and the reply is
+        # never read: `stream` returns at the headers, so an unbounded body is never pulled into memory.
+        async with (
+            httpx.AsyncClient(timeout=_TIMEOUT_SECONDS, follow_redirects=False) as client,
+            client.stream("POST", endpoint, json=payload, headers={"X-Api-Key": api_key}),
+        ):
+            pass
     except (httpx.HTTPError, OSError) as exc:  # best-effort — never break the caller
         _log.warning("mcp_feedback_report_failed", extra={"error": str(exc)})
     return True

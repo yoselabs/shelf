@@ -4,7 +4,7 @@ FastMCP result middleware for token-lean, projected tool output. Two middlewares
 both driven by **explicit per-tool registries** (never sniffed from framework tool
 metadata), composing [`page-tsv`](../page-tsv) for the encoding.
 
-## `FormatRoutingMiddleware(plans, consumer, ...)`
+## `FormatRoutingMiddleware(plans, consumer)`
 
 Re-derives a tool's `content` channel from its `EncodingPlan` (TSV / page-tsv /
 envelope) for the `llm` consumer, leaving `structured_content` canonical. `code` /
@@ -20,9 +20,8 @@ server.add_middleware(FormatRoutingMiddleware(
 ))
 ```
 
-`compact` (drop `structuredContent` for non-conformant clients) and
-`structured_output` (keep structured, replace `content` with a marker) are optional
-wire modes.
+One behaviour, no wire-mode switches: `structured_content` is always the complete value. Hosts that need
+another wire shape get another middleware, not a flag on this one.
 
 ## `ListViewMiddleware(settings)`
 

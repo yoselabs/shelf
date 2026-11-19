@@ -175,3 +175,45 @@ async def test_not_configured_sends_nothing(monkeypatch: pytest.MonkeyPatch) -> 
     res = await _call(server, {"subject": "s", "note": "n"})
 
     assert res.structured_content["sent"] is False
+
+
+async def test_client_has_explicit_timeout_and_never_follows_redirects(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+    transport = _RecordingTransport(httpx.Response(200, json={}))
+    real_client_cls = httpx.AsyncClient
+
+    def spy(**kw: Any) -> httpx.AsyncClient:
+        seen.update(kw)
+        return real_client_cls(**kw, transport=transport)
+
+    monkeypatch.setattr(httpx, "AsyncClient", spy)
+    server = FastMCP("t")
+    register_feedback_tool(server, endpoint="http://x/v1/logs", api_key="k")
+    await _call(server, {"subject": "s", "note": "n"})
+    assert seen["timeout"] == 5.0
+    assert seen["follow_redirects"] is False
+    assert len(transport.requests) == 1
+
+
+async def test_response_body_is_never_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The reply is ignored, so an unbounded body is never pulled into memory."""
+
+    class _Body(httpx.AsyncByteStream):
+        read = False
+
+        @override
+        async def __aiter__(self):  # type: ignore[override]
+            _Body.read = True
+            yield b"x" * 10
+
+    class _T(httpx.AsyncBaseTransport):
+        @override
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, stream=_Body())
+
+    real_client_cls = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real_client_cls(**kw, transport=_T()))
+    server = FastMCP("t")
+    register_feedback_tool(server, endpoint="http://x/v1/logs", api_key="k")
+    await _call(server, {"subject": "s", "note": "n"})
+    assert _Body.read is False

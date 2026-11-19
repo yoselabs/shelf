@@ -1,6 +1,6 @@
 [project]
 name = "mcp-result-wire"
-version = "0.2.0"
+version = "0.3.0"
 description = "FastMCP result middleware — re-derive a tool's content channel from an encoding plan (token-lean TSV/page-tsv) and project/paginate list results, driven by per-tool registries not framework metadata."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

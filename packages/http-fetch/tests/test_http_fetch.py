@@ -5,11 +5,15 @@ A fake AsyncSession is injected at the package's curl_cffi import path.
 
 from __future__ import annotations
 
-from typing import Any, Self, override
+from typing import TYPE_CHECKING, Any, Self, override
 
+import pytest
 from curl_cffi.requests import exceptions as ce
-from http_fetch import FetchOutcome, FetchVerdict, conditional_headers, fetch_bytes
-from http_fetch.fetch import _is_proxy_error, _status_to_verdict
+from http_fetch import DEFAULT_MAX_BODY_BYTES, FetchOutcome, FetchVerdict, conditional_headers, fetch_bytes
+from http_fetch.fetch import _BREAKER_TRIPPING, _is_proxy_error, _status_to_verdict
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 
 class TestConditionalHeaders:
@@ -74,11 +78,21 @@ class _FakeResponse:
         content: bytes = b"<html>ok</html>",
         content_type: str = "text/html",
         url: str = "https://example.com/",
+        extra_headers: dict[str, str] | None = None,
     ) -> None:
         self.status_code = status_code
         self.content = content
         self.url = url
-        self.headers = {"content-type": content_type}
+        self.headers = {"content-type": content_type, **(extra_headers or {})}
+        self.closed = False
+
+    async def aiter_content(self, chunk_size: int | None = None) -> AsyncIterator[bytes]:
+        step = chunk_size or 4
+        for i in range(0, len(self.content), step):
+            yield self.content[i : i + step]
+
+    async def aclose(self) -> None:
+        self.closed = True
 
 
 class _FakeSession:
@@ -353,3 +367,37 @@ async def test_cookies_not_in_outcome_diagnostic_repr(monkeypatch: Any) -> None:
     _patch_session(monkeypatch, _FakeResponse())
     result = await fetch_bytes("https://example.com/", cookies={"sid": "supersecret"})
     assert "supersecret" not in repr(result)
+
+
+class TestBodyCap:
+    async def test_oversize_body_is_too_large_and_not_returned(self, monkeypatch: Any) -> None:
+        response = _FakeResponse(content=b"x" * 100)
+        _patch_session(monkeypatch, response)
+        out = await fetch_bytes("https://example.com/", max_body_bytes=10)
+        assert out.verdict is FetchVerdict.too_large
+        assert out.body == b""
+        assert response.closed
+
+    async def test_declared_length_over_cap_is_refused_before_reading(self, monkeypatch: Any) -> None:
+        response = _FakeResponse(content=b"x" * 5, extra_headers={"content-length": "999999"})
+        _patch_session(monkeypatch, response)
+        out = await fetch_bytes("https://example.com/", max_body_bytes=10)
+        assert out.verdict is FetchVerdict.too_large
+
+    async def test_body_exactly_at_cap_passes(self, monkeypatch: Any) -> None:
+        _patch_session(monkeypatch, _FakeResponse(content=b"x" * 10))
+        out = await fetch_bytes("https://example.com/", max_body_bytes=10)
+        assert out.verdict is FetchVerdict.ok
+        assert out.body == b"x" * 10
+
+    async def test_default_cap_is_documented_and_generous(self, monkeypatch: Any) -> None:
+        assert DEFAULT_MAX_BODY_BYTES == 64 * 1024 * 1024
+        _patch_session(monkeypatch, _FakeResponse(content=b"x" * 1000))
+        assert (await fetch_bytes("https://example.com/")).verdict is FetchVerdict.ok
+
+    async def test_too_large_does_not_trip_the_breaker(self) -> None:
+        assert FetchVerdict.too_large not in _BREAKER_TRIPPING
+
+    async def test_nonpositive_cap_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match="max_body_bytes"):
+            await fetch_bytes("https://example.com/", max_body_bytes=0)

@@ -124,8 +124,6 @@ _ALLOWED: dict[str, str] = {
     ),
     **_rows(
         "mode: a feature toggle on one operation (render, include, strip, create, offline); consumer wave splits or defaults it",
-        "mcp-result-wire:__init__:compact",
-        "mcp-result-wire:__init__:structured_output",
         "git-porcelain:unavailable:full_output",
         "launchd-agent:render_plist:keep_alive",
         "launchd-agent:render_plist:run_at_load",

@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING, Any, override
 
 from fastmcp.server.middleware import Middleware
-from mcp.types import TextContent
 from page_tsv import render_plain
 
 if TYPE_CHECKING:
@@ -27,6 +26,10 @@ class FormatRoutingMiddleware(Middleware):
     ``plans`` maps a registered tool name to its static ``EncodingPlan``; ``consumer``
     (``"llm"`` / ``"code"`` / ``"machine"``) is a caller parameter — only the ``llm``
     tier compresses. Both are passed in, never sniffed from framework metadata.
+
+    One behaviour: ``content`` is re-derived, ``structured_content`` stays the complete value.
+    A different wire shape (no structured channel, marker-only content) is a different
+    middleware, not a switch here (constitution Article IX).
     """
 
     def __init__(
@@ -34,19 +37,12 @@ class FormatRoutingMiddleware(Middleware):
         *,
         plans: dict[str, EncodingPlan],
         consumer: Consumer,
-        compact: bool = False,
-        structured_output: bool = False,
     ) -> None:
         self._plans = plans
         self._consumer: Consumer = consumer
-        self._compact = compact
-        # When True, the success-path wire keeps ``structured_content`` (full payload)
-        # and replaces ``content[].text`` with a short marker — saves duplicate JSON on
-        # hosts that forward structuredContent to the model.
-        self._structured_output = structured_output
 
     @override
-    async def on_call_tool(  # noqa: PLR0911 -- three mutually exclusive wire modes (dual / compact / strict) + early-exit guards
+    async def on_call_tool(
         self,
         context: MiddlewareContext[Any],
         call_next: Any,
@@ -75,27 +71,6 @@ class FormatRoutingMiddleware(Middleware):
                 else:  # page-tsv / envelope — the BaseModel envelope itself
                     new_content = render_plain(structured, plan)
 
-            if self._compact:
-                # Drop ``structuredContent`` entirely for non-conformant MCP clients
-                # that mishandle dual channels.
-                content = new_content if new_content is not None else result.content
-                return type(result)(
-                    content=content,
-                    structured_content=None,
-                    meta=getattr(result, "meta", None),
-                )
-
-            if self._structured_output and structured is not None:
-                # Strict mode: keep structured_content; replace content[].text with a
-                # short marker. Saves ~50% success tokens on hosts that forward
-                # structuredContent; degrades hosts that don't.
-                marker = _short_marker(structured)
-                return type(result)(
-                    content=[TextContent(type="text", text=marker)],
-                    structured_content=structured,
-                    meta=getattr(result, "meta", None),
-                )
-
             if new_content is None:
                 # Nothing tabular to recompress — both channels already fine.
                 return result
@@ -114,24 +89,6 @@ class FormatRoutingMiddleware(Middleware):
                     exc,
                 )
             return result
-
-
-def _short_marker(structured: Any) -> str:
-    """Return a short type-identifying marker for strict structured-output mode.
-
-    For ``{"result": [...]}`` shapes (lists), report the item count. For
-    ``{"result": {...}}`` shapes (single model), report the ``_type`` discriminator if
-    present, else ``"structured"``. Otherwise emit a static placeholder.
-    """
-    if isinstance(structured, dict):
-        inner = structured.get("result", structured)
-        if isinstance(inner, list):
-            return f"[{len(inner)} item(s)]"
-        if isinstance(inner, dict):
-            type_hint = inner.get("_type") or inner.get("type")
-            if isinstance(type_hint, str) and type_hint:
-                return f"<{type_hint}>"
-    return "(see structuredContent)"
 
 
 __all__ = ["FormatRoutingMiddleware"]
