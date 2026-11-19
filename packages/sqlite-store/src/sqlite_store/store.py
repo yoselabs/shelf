@@ -10,12 +10,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeAlias
 
+from sqlite_sidecar import is_busy, transaction
+
 from sqlite_store.cas import cas_update
 from sqlite_store.connections import SharedConnections
 from sqlite_store.filesystem import filesystem_allowed
 from sqlite_store.migrate import SchemaError, upgrade
 from sqlite_store.quarantine import quarantine_if_needed
-from sqlite_store.transaction import begin_immediate
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -55,7 +56,7 @@ def _journal_mode(con: sqlite3.Connection, *, readonly: bool) -> str:
             if not readonly and row and str(row[0]).lower() != "wal":
                 row = con.execute("PRAGMA journal_mode=WAL").fetchone()
         except sqlite3.OperationalError as error:
-            if "locked" not in str(error) or time.monotonic() >= deadline:
+            if not is_busy(error) or time.monotonic() >= deadline:
                 raise
             time.sleep(0.01)
         else:
@@ -82,7 +83,7 @@ def _validate_version(version: int, schema: Schema, *, readonly: bool) -> None:
 def _schema_ready(con: sqlite3.Connection, schema: Schema, version: int, *, readonly: bool) -> bool:
     created = False
     if version == 0 and not readonly:
-        with begin_immediate(con):
+        with transaction(con):
             version = int(con.execute("PRAGMA user_version").fetchone()[0])
             empty = con.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone() is None
             if version == 0 and empty:
@@ -209,7 +210,7 @@ class Store:
     def begin_immediate(self, con: sqlite3.Connection) -> Generator[None]:
         """Commit or roll back; evict a cached writer on any SQLite DatabaseError."""
         try:
-            with begin_immediate(con):
+            with transaction(con):
                 yield
         except sqlite3.DatabaseError:
             self._shared.discard(con)

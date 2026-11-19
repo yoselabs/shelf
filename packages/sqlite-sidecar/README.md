@@ -90,8 +90,9 @@ one connection.
 - `connect(target, *, extensions=None, read_only=False, timeout=10.0) -> sqlite3.Connection`
 - `transaction(conn, *, lock=None)` — context manager
 - `to_text(datetime) -> str`, `from_text(str, *, aware=False) -> datetime`
-- `is_corruption(exc) -> bool`, `unreadable(path) -> bool`, `integrity_ok(path, *, extra=None) -> bool`
-- `set_aside(path, *, at=None) -> list[Path]`
+- `is_corruption(exc) -> bool`, `is_busy(exc) -> bool` (result code, never message text), `unreadable(path) -> bool`
+- `integrity_ok(path, *, extra=None, timeout=5.0) -> bool`: `False` is damage; a busy, absent or unreadable file raises
+- `set_aside(path, *, at=None) -> list[Path]`, `move_aside(path, destination) -> list[Path]` (sidecars first, file last)
 - `ExtensionUnavailableError(extension, cause)` — `.extension` names the loader
 
 ## Boundary

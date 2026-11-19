@@ -4824,13 +4824,19 @@ requires-dist = [{ name = "aiosqlite", specifier = ">=0.20,<1" }]
 
 [[package]]
 name = "sqlite-sidecar"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/sqlite-sidecar" }
 
 [[package]]
 name = "sqlite-store"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/sqlite-store" }
+dependencies = [
+    { name = "sqlite-sidecar" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "sqlite-sidecar", editable = "packages/sqlite-sidecar" }]
 
 [[package]]
 name = "sse-starlette"

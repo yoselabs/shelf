@@ -56,9 +56,10 @@ Guarantees:
   Each shared-writer request closes cached connections belonging to dead threads.
   Process exit closes remaining writers through one module-level atexit callback;
   closing the last connection lets SQLite checkpoint and remove WAL/SHM sidecars.
-- `begin_immediate(con)` commits on success and rolls back on any `BaseException`.
-  `Store.begin_immediate` also discards shared writers after `sqlite3.DatabaseError`,
-  including failures to begin or commit. Transactions do not nest.
+- The one transaction helper is `sqlite_sidecar.transaction` (store depends on sqlite-sidecar):
+  commits on success, rolls back on any `BaseException` including a failed commit.
+  `Store.begin_immediate` wraps it and also discards shared writers after `sqlite3.DatabaseError`,
+  including failures to begin or commit.
 - Creation splits DDL on `;` and executes each statement inside one writer transaction.
   **DDL must contain no triggers or embedded semicolons.** It sets `user_version`
   only after all statements succeed. A nonempty unversioned database is refused.

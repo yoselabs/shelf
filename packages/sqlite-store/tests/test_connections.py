@@ -8,7 +8,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event, Thread
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 from unittest.mock import Mock
 
 import pytest
@@ -77,21 +77,23 @@ def test_stale_writer_is_replaced(tmp_path: Path, store: Store, state: str) -> N
 
 @pytest.mark.parametrize("stage", ["begin", "body", "commit"])
 def test_database_error_discards_shared_writer(tmp_path: Path, store: Store, stage: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    class BrokenCommit(sqlite3.Connection):
+    class Broken(sqlite3.Connection):
         @override
-        def commit(self) -> None:
-            message = "commit failed"
-            raise sqlite3.DatabaseError(message)
+        def execute(self, sql: str, *args: Any) -> sqlite3.Cursor:
+            if sql == {"begin": "BEGIN IMMEDIATE", "commit": "COMMIT"}.get(stage):
+                message = f"{stage} failed"
+                raise sqlite3.DatabaseError(message)
+            return super().execute(sql, *args)
 
     path = tmp_path / "journal.db"
     initial = store.open_rw(path)
     assert initial is not None
     initial.close()
-    if stage == "commit":
+    if stage in {"begin", "commit"}:
         connect = sqlite3.connect
 
         def broken(target: Path) -> sqlite3.Connection:
-            return connect(target, isolation_level=None, check_same_thread=False, factory=BrokenCommit)
+            return connect(target, isolation_level=None, check_same_thread=False, factory=Broken)
 
         # Shared opens deliberately use their own cross-thread-close connection factory.
         def open_broken(_path: str | os.PathLike[str], *, readonly: bool, shared: bool = False) -> sqlite3.Connection:
@@ -100,8 +102,6 @@ def test_database_error_discards_shared_writer(tmp_path: Path, store: Store, sta
         monkeypatch.setattr(store, "_open", open_broken)
     con = store.shared_rw(path)
     assert con is not None
-    if stage == "begin":
-        con.execute("BEGIN IMMEDIATE")
     with pytest.raises(sqlite3.DatabaseError), store.begin_immediate(con):
         con.execute("INSERT INTO item VALUES ('lost', 'value', 0)")
         if stage == "body":

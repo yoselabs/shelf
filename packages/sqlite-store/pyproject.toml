@@ -1,12 +1,14 @@
 [project]
 name = "sqlite-store"
-version = "0.1.0"
+version = "0.2.0"
 description = "Conservative SQLite-on-disk opens, shared writers, atomic upgrades and revision-guarded updates."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = []
+dependencies = [
+    "sqlite-sidecar>=0.3,<1",
+]
 
 [build-system]
 requires = ["hatchling"]

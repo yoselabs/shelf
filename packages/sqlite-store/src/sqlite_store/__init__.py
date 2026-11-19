@@ -6,7 +6,7 @@ from sqlite_store.filesystem import clear_filesystem_cache, filesystem_allowed
 from sqlite_store.migrate import SchemaError, Step, upgrade
 from sqlite_store.quarantine import quarantine
 from sqlite_store.store import Schema, Store, open_ro, open_rw
-from sqlite_store.transaction import begin_immediate, change_counter
+from sqlite_store.transaction import change_counter
 
 __all__ = [
     "Schema",
@@ -15,7 +15,6 @@ __all__ = [
     "SqlValue",
     "Step",
     "Store",
-    "begin_immediate",
     "cas_update",
     "change_counter",
     "clear_filesystem_cache",

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0
+
+- Breaking: `begin_immediate` is gone from `sqlite_store`; the one transaction helper is `sqlite_sidecar.transaction`
+  (new dependency `sqlite-sidecar>=0.3`). `Store.begin_immediate` stays and wraps it.
+- `quarantine` moves the `-wal`/`-shm` sidecars before the database through sqlite-sidecar's `move_aside`; names unchanged.
+- The journal-mode retry reads the SQLite busy/locked result code, not the words "locked" in the message.
+
 ## Unreleased
 
 - `Schema.read_from` (default None = `version`): the oldest version a read-only open accepts; it never upgrades, below it still raises `SchemaError` (writer has not upgraded).

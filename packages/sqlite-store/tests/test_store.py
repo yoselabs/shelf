@@ -186,7 +186,7 @@ def test_failed_extra_check_is_not_cached_and_readers_skip_it(tmp_path: Path, sc
 
 def test_concurrent_creation(tmp_path: Path, schema: Schema, monkeypatch: pytest.MonkeyPatch) -> None:
     ready = Barrier(2, timeout=10)
-    begin = store_module.begin_immediate
+    begin = store_module.transaction
 
     @contextmanager
     def synchronized(con: sqlite3.Connection) -> Generator[None]:
@@ -194,7 +194,7 @@ def test_concurrent_creation(tmp_path: Path, schema: Schema, monkeypatch: pytest
         with begin(con):
             yield
 
-    monkeypatch.setattr(store_module, "begin_immediate", synchronized)
+    monkeypatch.setattr(store_module, "transaction", synchronized)
 
     def opener() -> int:
         con = open_rw(tmp_path / "journal.db", schema)
@@ -220,7 +220,7 @@ def test_readonly_open_of_an_uninitialised_file_is_none_not_a_schema_error(tmp_p
 
 def test_reader_during_first_creation_sees_not_there_yet(tmp_path: Path, schema: Schema, monkeypatch: pytest.MonkeyPatch) -> None:
     inside, release = Event(), Event()
-    begin = store_module.begin_immediate
+    begin = store_module.transaction
 
     @contextmanager
     def paused(con: sqlite3.Connection) -> Generator[None]:
@@ -229,7 +229,7 @@ def test_reader_during_first_creation_sees_not_there_yet(tmp_path: Path, schema:
         with begin(con):
             yield
 
-    monkeypatch.setattr(store_module, "begin_immediate", paused)
+    monkeypatch.setattr(store_module, "transaction", paused)
 
     def create() -> int:
         con = open_rw(tmp_path / "journal.db", schema)
@@ -306,18 +306,36 @@ def test_bad_quick_check_is_rejected_without_caching(tmp_path: Path, schema: Sch
     assert con.execute.call_count == 2
 
 
+def _coded(code: int, message: str) -> sqlite3.OperationalError:
+    error = sqlite3.OperationalError(message)
+    error.sqlite_errorcode = code
+    return error
+
+
+def test_journal_mode_retries_on_the_busy_code_not_on_the_words(monkeypatch: pytest.MonkeyPatch) -> None:
+    con = Mock(spec=sqlite3.Connection)
+    mode = Mock()
+    mode.fetchone.return_value = ("wal",)
+    monkeypatch.setattr(store_module.time, "sleep", Mock())
+    con.execute.side_effect = [_coded(sqlite3.SQLITE_BUSY, "occupied"), mode]
+    assert store_module._journal_mode(con, readonly=True) == "wal"
+    con.execute.side_effect = _coded(sqlite3.SQLITE_CORRUPT, "database is locked")
+    with pytest.raises(sqlite3.OperationalError):
+        store_module._journal_mode(con, readonly=True)
+
+
 def test_journal_mode_retry_window(monkeypatch: pytest.MonkeyPatch) -> None:
     con = Mock(spec=sqlite3.Connection)
     old_mode, new_mode = Mock(), Mock()
     old_mode.fetchone.return_value = ("delete",)
     new_mode.fetchone.return_value = ("wal",)
-    con.execute.side_effect = [sqlite3.OperationalError("database is locked"), old_mode, new_mode]
+    con.execute.side_effect = [_coded(sqlite3.SQLITE_BUSY, "database is locked"), old_mode, new_mode]
     monkeypatch.setattr(store_module.time, "monotonic", Mock(side_effect=[0.0, 1.0]))
     pause = Mock()
     monkeypatch.setattr(store_module.time, "sleep", pause)
     assert store_module._journal_mode(con, readonly=False) == "wal"
     pause.assert_called_once_with(0.01)
-    con.execute.side_effect = sqlite3.OperationalError("database is locked")
+    con.execute.side_effect = _coded(sqlite3.SQLITE_BUSY, "database is locked")
     monkeypatch.setattr(store_module.time, "monotonic", Mock(side_effect=[0.0, 5.0]))
     with pytest.raises(sqlite3.OperationalError, match="locked"):
         store_module._journal_mode(con, readonly=False)

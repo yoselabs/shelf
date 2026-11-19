@@ -40,6 +40,8 @@ content-digest = { workspace = true }
 app-dirs = { workspace = true }
 verb-cli = { workspace = true }
 atomic-io = { workspace = true }
+# sqlite-store composes sqlite-sidecar.
+sqlite-sidecar = { workspace = true }
 # any-agent composes stream-proc.
 stream-proc = { workspace = true }
 any-agent = { workspace = true }
@@ -640,6 +642,7 @@ ignore_imports = [
     "any_agent.procs -> stream_proc",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",
+    "sqlite_store.* -> sqlite_sidecar",
     "any_mailbox -> atomic_io",
     "any_mailbox -> process_lock",
     "test_reach.reach -> py_symbols",
