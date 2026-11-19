@@ -20,6 +20,7 @@ class FetchVerdict(StrEnum):
     dns_error = "dns_error"
     timeout = "timeout"
     proxy_unavailable = "proxy_unavailable"
+    too_large = "too_large"
 
 
 @dataclass(slots=True, frozen=True)

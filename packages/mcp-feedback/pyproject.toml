@@ -1,6 +1,6 @@
 [project]
 name = "mcp-feedback"
-version = "0.3.0"
+version = "0.3.1"
 description = "A fixed-schema, agent-invoked feedback tool for any FastMCP server — report_feedback(subject, note, request, response, wanted), OTLP/HTTP-logs transport, two consumer knobs only."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
 #: The protocol version this client asks for; the server's answer is the one used after.
+_MAX_REDIRECTS = 3
 PROTOCOL_VERSION = "2025-06-18"
 _SESSION_HEADER = "mcp-session-id"
 _VERSION_HEADER = "mcp-protocol-version"
@@ -107,8 +108,9 @@ class McpEndpoint:
         return self._server
 
     def __enter__(self) -> Self:
-        # A server may move the endpoint (`/mcp/` to `/mcp`) with a 307, which keeps the method and body.
-        self._http = httpx.Client(timeout=self._timeout, follow_redirects=True)
+        # A server may move the endpoint (`/mcp/` to `/mcp`) with a 307, which keeps the method and body:
+        # follow it, but only a few hops.
+        self._http = httpx.Client(timeout=self._timeout, follow_redirects=True, max_redirects=_MAX_REDIRECTS)
         try:
             result = self._request("initialize", {"protocolVersion": PROTOCOL_VERSION, "capabilities": {}, "clientInfo": self._client_info})
             info = result.get("serverInfo") or {}

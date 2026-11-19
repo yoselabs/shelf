@@ -110,12 +110,7 @@ def shape_flags(root: Path) -> dict[str, str]:
     return hits
 
 
-_KNOWN: dict[str, str] = {
-    "mcp-result-wire:__init__:compact": (
-        "REAL violation: the middleware's `compact` bool picks between a compressed and a full wire result in on_call_tool; "
-        "consumer wave splits it into two middleware types (or one value plus a view)"
-    ),
-}
+_KNOWN: dict[str, str] = {}
 
 
 def _plant(tmp_path: Path, source: str) -> dict[str, str]:

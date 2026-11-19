@@ -7,7 +7,9 @@ import asyncio
 import socket
 import subprocess
 import sys
+from typing import Any
 
+import httpx
 import pytest
 from async_scope.asgi import serve_asgi
 from fastmcp import FastMCP
@@ -132,3 +134,20 @@ def test_importing_it_loads_neither_the_mcp_sdk_nor_fastmcp() -> None:
     probe = "import sys, mcp_call; print(sorted(m for m in ('mcp', 'fastmcp') if m in sys.modules))"
     out = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True, check=True).stdout.strip()
     assert out == "[]"
+
+
+def test_the_client_states_its_timeout_and_redirect_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 307 from `/mcp/` to `/mcp` must be followed, but boundedly, and the timeout is the caller's."""
+    seen: dict[str, object] = {}
+    real = httpx.Client
+
+    def spy(**kwargs: Any) -> httpx.Client:
+        seen.update(kwargs)
+        return real(**kwargs)
+
+    monkeypatch.setattr(httpx, "Client", spy)
+    with pytest.raises(EndpointRefused), McpEndpoint(f"http://127.0.0.1:{_free_port()}/mcp/", timeout=7.0):
+        pass
+    assert seen["timeout"] == 7.0
+    assert seen["follow_redirects"] is True
+    assert seen["max_redirects"] == 3

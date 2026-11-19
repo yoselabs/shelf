@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from typing import Any
 
@@ -103,3 +104,21 @@ async def test_format_routing_after_list_view_derives_from_projected() -> None:
     res = await _call(server, "rows", {})
     # TSV content built from the PROJECTED rows (only the id column).
     assert res.content[0].text == "id\n1\n2\n"
+
+
+async def test_format_routing_has_one_wire_behaviour() -> None:
+    """Article IX: no constructor switch picks a different wire result; the middleware has one behaviour."""
+    assert set(inspect.signature(FormatRoutingMiddleware).parameters) == {"plans", "consumer"}
+
+
+async def test_llm_result_keeps_both_channels() -> None:
+    server = FastMCP("t")
+
+    @server.tool
+    def rows() -> list[dict]:
+        return [{"a": 1}]
+
+    server.add_middleware(FormatRoutingMiddleware(plans={"rows": EncodingPlan("tsv")}, consumer="llm"))
+    result = await _call(server, "rows", {})
+    assert result.structured_content == {"result": [{"a": 1}]}
+    assert result.content

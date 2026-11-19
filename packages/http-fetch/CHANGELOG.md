@@ -2,6 +2,10 @@
 
 Arrow-notation, AI-facing: `old shape ⇒ new shape`. One line per contract-shape change.
 
+## http-fetch-v0.5.0
+
+- Unbounded body ⇒ `fetch_bytes(url, max_body_bytes=DEFAULT_MAX_BODY_BYTES)` (64 MiB, keyword, defaulted). The response is now streamed; a declared `Content-Length` over the cap, or a body that grows past it, returns `FetchVerdict.too_large` (new member) with an empty body, never raising (the never-raises contract holds). `too_large` does not count against the breaker (the server answered). Migration: consumers matching verdicts exhaustively add `too_large`; a body above 64 MiB that used to come back now reports `too_large`; pass a larger `max_body_bytes` to keep it. `max_body_bytes < 1` raises `ValueError`.
+
 ## http-fetch-v0.4.0
 
 - No link checker ⇒ `LinkChecker.check` and `check_all` return closed alive/dead/unknown results, with public-IP pinning, guarded redirects, HEAD/GET fallback, request timeout and cancellable bounded batches. No result cache; consumer URL extraction and credential/placeholder policy remain local.

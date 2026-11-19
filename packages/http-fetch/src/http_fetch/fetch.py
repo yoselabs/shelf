@@ -27,12 +27,15 @@ class _RequestOptions(TypedDict):
     headers: dict[str, str]
     timeout: float
     allow_redirects: bool
+    stream: bool
     proxies: NotRequired[ProxySpec]
     cookies: NotRequired[dict[str, str]]
 
 
 _DEFAULT_IMPERSONATE = "chrome120"
 _DEFAULT_TIMEOUT_S = 10.0
+#: Default cap on a response body: 64 MiB. Generous for pages, feeds and PDFs; an unbounded body is what it stops.
+DEFAULT_MAX_BODY_BYTES = 64 * 1024 * 1024
 
 
 def conditional_headers(extras: dict[str, str] | None) -> dict[str, str]:
@@ -135,6 +138,41 @@ async def _through_breaker(
     return outcome
 
 
+async def _outcome(response: Any, max_body_bytes: int) -> FetchOutcome:
+    """Read the streamed response under the body cap and map it to an outcome."""
+    url = str(response.url)
+    content_type = response.headers.get("content-type", "")
+    response_headers = dict(response.headers)
+    if response.status_code == 304:
+        return FetchOutcome(
+            body=b"",
+            content_type=content_type,
+            status_code=304,
+            final_url=url,
+            headers=response_headers,
+            verdict=FetchVerdict.ok,
+            conditional_hit=True,
+        )
+    declared = response.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > max_body_bytes:
+        return _failure(url, FetchVerdict.too_large)
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in response.aiter_content():
+        size += len(chunk)
+        if size > max_body_bytes:
+            return _failure(url, FetchVerdict.too_large)
+        chunks.append(chunk)
+    return FetchOutcome(
+        body=b"".join(chunks),
+        content_type=content_type,
+        status_code=response.status_code,
+        final_url=url,
+        headers=response_headers,
+        verdict=_status_to_verdict(response.status_code),
+    )
+
+
 async def fetch_bytes(
     url: str,
     *,
@@ -145,6 +183,7 @@ async def fetch_bytes(
     conditional_extras: dict[str, str] | None = None,
     impersonate: str = _DEFAULT_IMPERSONATE,
     breaker: AbstractAsyncContextManager[object] | None = None,
+    max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
 ) -> FetchOutcome:
     """Issue one HTTP GET via curl_cffi with browser TLS impersonation.
 
@@ -165,7 +204,14 @@ async def fetch_bytes(
         impersonate: curl_cffi impersonation profile (browser TLS fingerprint).
         breaker: Optional async context manager (a circuit breaker); a raise on entry
             maps to ``connection_error``.
+        max_body_bytes: Cap on the response body. A declared ``Content-Length`` above it, or a
+            body that grows past it while streaming, ends the read and returns
+            ``FetchVerdict.too_large`` with an empty body (the server answered, so it does
+            not count against the breaker). Must be positive.
     """
+    if max_body_bytes < 1:
+        msg = "max_body_bytes must be positive"
+        raise ValueError(msg)
     request_headers: dict[str, str] = dict(headers or {})
     request_headers.update(conditional_headers(conditional_extras))
 
@@ -174,6 +220,7 @@ async def fetch_bytes(
             "headers": request_headers,
             "timeout": timeout_s,
             "allow_redirects": True,
+            "stream": True,
         }
         if proxy_url:
             request_kwargs["proxies"] = {"http": proxy_url, "https": proxy_url}
@@ -185,6 +232,10 @@ async def fetch_bytes(
         async with cr.AsyncSession(**session_kwargs) as session:
             try:
                 response = await session.get(url, **request_kwargs)
+                try:
+                    return await _outcome(response, max_body_bytes)
+                finally:
+                    await response.aclose()
             except ce.Timeout:
                 return _failure(url, FetchVerdict.timeout)
             except ce.DNSError:
@@ -201,27 +252,6 @@ async def fetch_bytes(
                 if proxy_url and _is_proxy_error(exc):
                     return _failure(url, FetchVerdict.proxy_unavailable)
                 return _failure(url, FetchVerdict.connection_error)
-
-        content_type = response.headers.get("content-type", "")
-        response_headers = dict(response.headers)
-        if response.status_code == 304:
-            return FetchOutcome(
-                body=b"",
-                content_type=content_type,
-                status_code=304,
-                final_url=str(response.url),
-                headers=response_headers,
-                verdict=FetchVerdict.ok,
-                conditional_hit=True,
-            )
-        return FetchOutcome(
-            body=response.content,
-            content_type=content_type,
-            status_code=response.status_code,
-            final_url=str(response.url),
-            headers=response_headers,
-            verdict=_status_to_verdict(response.status_code),
-        )
 
     if breaker is None:
         return await _do()
