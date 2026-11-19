@@ -12,8 +12,6 @@ _PACKAGES = _ROOT / "packages"
 
 _HASHLIB_IMPORTERS = {
     "any-failure-fp/src/any_failure_fp/fingerprint.py": "legitimate: sha1 suffix of a cut fingerprint is a key; sha256 would change it",
-    "any-frontmatter/src/any_frontmatter/version.py": "consumer wave: sha256 of one canonical string (digest_text, length=64)",
-    "any-json-doc/src/any_json_doc/__init__.py": "consumer wave: sha256 of raw bytes (digest_bytes, length=64)",
     "any-speech/src/any_speech/defaults.py": "consumer wave: sha256 of a binary file (digest_file)",
     "any-speech/src/any_speech/pipeline.py": "consumer wave: streamed sha256 of the audio, stored (digest_file, length=64)",
     "anyembed/src/anyembed/cache.py": "consumer wave: raw sha256 bytes as cache key (bytes.fromhex(digest_text(length=64)))",
@@ -24,11 +22,7 @@ _HASHLIB_IMPORTERS = {
     "git-porcelain/src/git_porcelain/fake_store.py": "legitimate: git's own blob and tree object id is sha1",
     "git-porcelain/src/git_porcelain/real_cache.py": "legitimate: sha1 change detector of working-tree content, not an identity",
     "git-porcelain/src/git_porcelain/real_read.py": "legitimate: sha1 of the common dir is a stored local key",
-    "http-cache/src/http_cache/__init__.py": "consumer wave: sha256 of a body (digest_bytes, length=64)",
-    "llm-cache/src/llm_cache/__init__.py": "consumer wave: sha256 of a text (digest_text, length=64)",
-    "py-symbols/src/py_symbols/__init__.py": "consumer wave: sha256 prefix of a text (digest_text)",
     "shelf-vendor/src/shelf_vendor/__init__.py": "legitimate: tree hash framed by path and length; no content-digest door",
-    "static-page-check/src/static_page_check/__init__.py": "consumer wave: sha256 of a file, vs a pin (digest_file, length=64)",
 }
 _WEAK = {"md5", "sha1"}
 _WEAK_ALLOWED = {

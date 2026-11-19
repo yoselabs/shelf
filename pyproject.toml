@@ -624,6 +624,12 @@ modules = [
 ignore_imports = [
     "any_frontmatter.document -> yaml_merge",
     "any_frontmatter.document -> atomic_io",
+    "any_frontmatter.version -> content_digest",
+    "any_json_doc -> content_digest",
+    "http_cache -> content_digest",
+    "llm_cache -> content_digest",
+    "py_symbols -> content_digest",
+    "static_page_check -> content_digest",
     "dir_trust -> atomic_io",
     "any_net.probe -> atomic_io",
     "any_json_doc -> atomic_io",

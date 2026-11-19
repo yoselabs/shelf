@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = ["ruamel.yaml>=0.18,<1", "atomic-io>=0.2,<1"]
+dependencies = ["ruamel.yaml>=0.18,<1", "atomic-io>=0.2,<1", "content-digest>=0.2,<1"]
 
 [project.optional-dependencies]
 # Document.with_frontmatter's comment-keeping merge. An extra, not a dependency: a

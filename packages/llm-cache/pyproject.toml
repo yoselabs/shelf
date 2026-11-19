@@ -10,10 +10,12 @@ dependencies = [
     "aiosqlite>=0.20,<1",
     "anyllm>=0.5,<1",
     "any-ttl-cache",
+    "content-digest>=0.2,<1",
 ]
 
 [tool.uv.sources]
 any-ttl-cache = { workspace = true }
+content-digest = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

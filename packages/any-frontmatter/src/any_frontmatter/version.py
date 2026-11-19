@@ -11,10 +11,11 @@ slipped in between is retried rather than overwritten.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+from content_digest import digest_text
 
 from any_frontmatter.document import Document, read, write
 
@@ -51,7 +52,7 @@ def canonicalize(doc: Document) -> str:
 
 def version_of(frontmatter: Mapping[str, Any], body: str) -> str:
     """The version of a frontmatter mapping plus a body, with no file or document needed."""
-    return hashlib.sha256(_canonical(frontmatter, body).encode("utf-8")).hexdigest()
+    return digest_text(_canonical(frontmatter, body), length=64)
 
 
 def compute_version(doc: Document) -> str:

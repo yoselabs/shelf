@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-json-doc"
+software = "content-digest"
+why = "any-json-doc hand-rolled hashlib.sha256 for the revision of a document file: sha256 of its raw bytes, compared by Doc.update for optimistic concurrency. The hash is stored or pinned, so the bytes must stay identical to plain sha256 hex."
+needs = "digest_bytes(data, length=64) returning exactly what hashlib.sha256(...).hexdigest() returned (cut to length)."
+sponsor = "yoselabs"
+requester = "any-json-doc"
+status = "active" # active | retired

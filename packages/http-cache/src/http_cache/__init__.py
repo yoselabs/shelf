@@ -14,12 +14,12 @@ caches uniformly. Conditional-GET request headers are produced by
 from __future__ import annotations
 
 import gzip
-import hashlib
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
 from any_ttl_cache import TtlTable
+from content_digest import digest_bytes
 from sqlite_resource import SqliteResource
 
 if TYPE_CHECKING:
@@ -128,7 +128,7 @@ async def cache_put(
     await _table(clock).put(
         conn,
         (url, variant),
-        (etag, last_modified, status_code, content_type, hashlib.sha256(body).hexdigest(), gzip.compress(body)),
+        (etag, last_modified, status_code, content_type, digest_bytes(body, length=64), gzip.compress(body)),
         ttl_s=ttl_s,
     )
 

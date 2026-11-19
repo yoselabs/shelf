@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import gzip
-import hashlib
 import re
 from typing import TYPE_CHECKING
+
+from content_digest import digest_file
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -100,7 +101,7 @@ def pin_problems(static_dir: Path, pins: Mapping[str | Path, str]) -> list[str]:
         path = _within(static_dir, name)
         if not path.is_file():
             problems.append(f"{name}: pinned file is missing")
-        elif (got := hashlib.sha256(path.read_bytes()).hexdigest()) != sha256.lower():
+        elif (got := digest_file(path, length=64)) != sha256.lower():
             problems.append(f"{name}: sha256 {got} is not the pinned {sha256}; replace the file with a new pin, never edit it")
     return problems
 

@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "http-cache"
+software = "content-digest"
+why = "http-cache hand-rolled hashlib.sha256 for the content_hash column: sha256 of the cached response body. The hash is stored or pinned, so the bytes must stay identical to plain sha256 hex."
+needs = "digest_bytes(data, length=64) returning exactly what hashlib.sha256(...).hexdigest() returned (cut to length)."
+sponsor = "yoselabs"
+requester = "http-cache"
+status = "active" # active | retired

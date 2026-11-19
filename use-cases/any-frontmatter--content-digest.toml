@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-frontmatter"
+software = "content-digest"
+why = "any-frontmatter hand-rolled hashlib.sha256 for a content-hash version of a document: sha256 of its canonical text, stored as the version a checked write compares. The hash is stored or pinned, so the bytes must stay identical to plain sha256 hex."
+needs = "digest_text(text, length=64) returning exactly what hashlib.sha256(...).hexdigest() returned (cut to length)."
+sponsor = "yoselabs"
+requester = "any-frontmatter"
+status = "active" # active | retired

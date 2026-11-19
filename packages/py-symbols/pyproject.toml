@@ -1,11 +1,12 @@
 [project]
 name = "py-symbols"
-version = "0.1.0"
+version = "0.2.0"
 description = "Stop walking ast by hand to name Python code: a symbol's source span by dotted name (Class.member), the functions of a module qualified, the function enclosing a line, and a stable hash of one symbol's source."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
+dependencies = ["content-digest>=0.2,<1"]
 
 [build-system]
 requires = ["hatchling"]

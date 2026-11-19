@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "llm-cache"
+software = "content-digest"
+why = "llm-cache hand-rolled hashlib.sha256 for hash_text and make_key: sha256 of a prompt part, the stored cache key. The hash is stored or pinned, so the bytes must stay identical to plain sha256 hex."
+needs = "digest_text(text, length=64) returning exactly what hashlib.sha256(...).hexdigest() returned (cut to length)."
+sponsor = "yoselabs"
+requester = "llm-cache"
+status = "active" # active | retired
