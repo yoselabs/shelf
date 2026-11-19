@@ -3,11 +3,13 @@
 **Stop caring how to hash a value so the same data always gets the same id.** Standard library only.
 
 ```python
-from content_digest import digest, digest_text
+from content_digest import digest, digest_bytes, digest_file, digest_text
 
 digest({"b": 1, "a": [1, 2]})   # same as the keys the other way round; 12 hex characters
 digest(value, length=64)        # the full sha256
 digest_text("any text")         # sha256 of the UTF-8 bytes, 12 hex characters
+digest_bytes(b"raw")             # sha256 of the bytes as given
+digest_file(path, length=64)    # sha256 of the file, streamed in 1 MiB chunks; equals hashlib's hexdigest()
 ```
 
 ## Rules

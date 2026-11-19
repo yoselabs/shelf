@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import pytest
-from content_digest import digest, digest_text
+from content_digest import digest, digest_bytes, digest_file, digest_text
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_key_order_does_not_matter() -> None:
@@ -62,3 +66,34 @@ def test_refuses_a_length_outside_one_to_sixty_four(length: int) -> None:
         digest({}, length=length)
     with pytest.raises(ValueError, match="length"):
         digest_text("", length=length)
+
+
+def test_digest_file_matches_hashlib_on_a_file_larger_than_one_chunk(tmp_path: Path) -> None:
+    audio = tmp_path / "audio.wav"
+    audio.write_bytes(bytes(range(256)) * 20_000)  # 5 MB: several chunks
+    golden = hashlib.sha256(audio.read_bytes()).hexdigest()
+    assert digest_file(audio, length=64) == golden  # the full sha256 any-speech stores as audio_sha256
+    assert digest_file(audio) == golden[:12]
+
+
+def test_digest_file_of_an_empty_file_is_the_sha256_of_nothing(tmp_path: Path) -> None:
+    empty = tmp_path / "empty"
+    empty.write_bytes(b"")
+    assert digest_file(empty, length=64) == hashlib.sha256(b"").hexdigest()
+
+
+def test_digest_file_refuses_a_bad_length(tmp_path: Path) -> None:
+    (tmp_path / "f").write_bytes(b"x")
+    with pytest.raises(ValueError, match="length"):
+        digest_file(tmp_path / "f", length=65)
+
+
+def test_digest_file_of_a_missing_file_raises(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        digest_file(tmp_path / "nope")
+
+
+def test_digest_bytes_is_sha256_of_the_bytes_as_given() -> None:
+    data = b"\x00\xff raw"
+    assert digest_bytes(data, length=64) == hashlib.sha256(data).hexdigest()
+    assert digest_bytes("é".encode()) == digest_text("é")
