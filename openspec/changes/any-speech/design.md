@@ -53,6 +53,9 @@ The front door is `Speech(pipeline, leases_root, Slots(transcribe=2, diarize=1))
 - No separate queue package (`AnyQ`): the queue is "wait for a unit" (any-lease) plus "scan for pending work" (Drain); a third piece would be a second copy of either.
 - The model loads per call in the FluidAudio adapter (a subprocess per file, CoreML compile cached by the OS); in-process MLX adapters load once per adapter instance.
 
+### D10 — The simple path and the model cards (added after the owner's brief)
+`any_speech.transcribe(path, out=None, **overrides)` is the whole simple API: default models (FluidAudio Parakeet v3, Nemotron 3 diarisation, found via `ANY_SPEECH_FLUIDAUDIO_BIN`, PATH or `~/.local/bin`), default slots (2, 1, 3), leases under the state dir. Each part is replaced by naming it: `transcriber=`, `diarizer=` (or `NO_DIARIZER`), `slots=`, `leases_root=`. A missing default engine raises `EngineMissingError` with the build command; it never falls back, because a fallback that quietly changes the model changes the transcripts. `any_speech.models.CARDS` is the selection trace: one `ModelCard` per model with status (default, available, refused, untested), the reason, the evidence (Reco's OpenSpec changes and `measurement.md`) and `revisit`, what would reopen the verdict. Tests tie each adapter identity to a card, so a model cannot change without its card.
+
 ### D6 — Failure ledger
 `<output>.failed.json` beside the output: `{error, audio_size, audio_mtime_ns, at, engine, model}`. A job whose audio still has that size and mtime is skipped; a changed file retries; deleting the record retries. Written with `atomic-io`.
 

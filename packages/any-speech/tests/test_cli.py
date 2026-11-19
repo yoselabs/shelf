@@ -74,9 +74,3 @@ def test_help_answers_and_changes_nothing(tmp_path: Path) -> None:
 
 def test_an_unknown_flag_exits_2() -> None:
     assert _script("transcribe", "a.wav", "--engine", "fluidaudio", "--no-such-flag").returncode == 2
-
-
-def test_the_engine_must_be_named(tmp_path: Path) -> None:
-    audio = tmp_path / "a.m4a"
-    audio.write_bytes(b"x")
-    assert _script("transcribe", str(audio)).returncode == 2

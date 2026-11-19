@@ -18,7 +18,7 @@ For the session that owns `iorlas-wip`; this change edits nothing there. Read `e
 ```python
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["any-speech @ git+https://github.com/yoselabs/shelf@any-speech-v0.1.0#subdirectory=packages/any-speech"]
+# dependencies = ["any-speech @ git+https://github.com/yoselabs/shelf@any-speech-v0.2.0#subdirectory=packages/any-speech"]
 # ///
 fa = Path(os.environ["FLUIDAUDIO_BIN"])
 pipeline = lambda: Pipeline(FluidAudioCli(fa, runtime=RUNTIME), FluidAudioDiarizer(fa, runtime=RUNTIME))

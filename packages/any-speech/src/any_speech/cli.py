@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 import app_dirs
 from verb_cli import POSITIONAL, VerbCli
 
+from any_speech.defaults import default_diarizer, default_transcriber
 from any_speech.drain import Drain, Job
 from any_speech.guard import DEFAULT_BUDGET_GB
 from any_speech.pipeline import Pipeline
@@ -34,7 +35,7 @@ APP = "any-speech"
 class Settings:
     """Shared by every verb."""
 
-    engine: EngineName  # no default: the script owner names the engine; nothing falls back to another
+    engine: EngineName = "fluidaudio"  # the default model; another engine is only used when named, never as a fallback
     diarize: bool = False
     model_version: Literal["v3", "ultra"] = "v3"
     fluidaudio_bin: Path | None = None
@@ -50,7 +51,9 @@ def make_transcriber(s: Settings) -> Transcriber:
     if s.engine == "fluidaudio":
         from any_speech.adapters import FluidAudioCli  # noqa: PLC0415  only the chosen engine is imported
 
-        return FluidAudioCli(_binary(s), runtime="fluidaudiocli", model_version=s.model_version)
+        if s.fluidaudio_bin is None and s.model_version == "v3":
+            return default_transcriber()
+        return FluidAudioCli(_fluidaudio_bin(s), runtime="fluidaudiocli", model_version=s.model_version)
     from any_speech.adapters import ParakeetMlx  # noqa: PLC0415
 
     return ParakeetMlx(runtime=f"parakeet-mlx-{version('parakeet-mlx')}")
@@ -61,7 +64,7 @@ def make_diarizer(s: Settings) -> Diarizer | None:
         return None
     from any_speech.adapters import FluidAudioDiarizer  # noqa: PLC0415
 
-    return FluidAudioDiarizer(_binary(s), runtime="fluidaudiocli")
+    return default_diarizer() if s.fluidaudio_bin is None else FluidAudioDiarizer(_fluidaudio_bin(s), runtime="fluidaudiocli")
 
 
 def make_embedder(s: Settings) -> Embedder:
@@ -73,7 +76,7 @@ def make_embedder(s: Settings) -> Embedder:
     return SherpaEmbedder(s.voice_model, runtime=f"sherpa-onnx-{version('sherpa-onnx')}")
 
 
-def _binary(s: Settings) -> Path:
+def _fluidaudio_bin(s: Settings) -> Path:
     if s.fluidaudio_bin is None:
         message = "--fluidaudio-bin is needed: the path of a built fluidaudiocli"
         raise SystemExit(message)
