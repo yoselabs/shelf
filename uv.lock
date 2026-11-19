@@ -508,7 +508,7 @@ provides-extras = ["agent", "anthropic", "openai", "claude-code-sdk"]
 
 [[package]]
 name = "app-dirs"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/app-dirs" }
 
 [[package]]
@@ -4620,7 +4620,7 @@ wheels = [
 
 [[package]]
 name = "settings-base"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/settings-base" }
 dependencies = [
     { name = "pydantic-settings" },

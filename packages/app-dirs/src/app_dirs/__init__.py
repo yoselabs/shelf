@@ -1,8 +1,9 @@
 """app-dirs — where an app keeps its config, state and cache, decided once.
 
 **Stop copying the XDG lookup.** ``config_dir("task-loop")`` is ``$XDG_CONFIG_HOME/task-loop``
-or ``~/.config/task-loop``; ``state_dir`` and ``cache_dir`` are the same for state
-(``~/.local/state``) and cache (``~/.cache``). POSIX only: macOS uses the same XDG layout as
+or ``~/.config/task-loop``; ``state_dir``, ``cache_dir`` and ``data_dir`` are the same for state
+(``~/.local/state``), cache (``~/.cache``) and data (``~/.local/share``). ``tool_home`` finds another tool's dot-folder
+(``$CODEX_HOME`` or ``~/.codex``). POSIX only: macOS uses the same XDG layout as
 Linux, because the tools this serves already keep their files under ``~/.config`` there.
 
 Per the XDG spec, an unset, empty or *relative* variable is ignored. With ``plugin_data=True``
@@ -30,6 +31,7 @@ _KINDS = {
     "config": ("XDG_CONFIG_HOME", ".config"),
     "state": ("XDG_STATE_HOME", ".local/state"),
     "cache": ("XDG_CACHE_HOME", ".cache"),
+    "data": ("XDG_DATA_HOME", ".local/share"),
 }
 
 
@@ -52,6 +54,29 @@ def cache_dir(
 ) -> Path:
     """The folder for ``app``'s disposable cache: ``$XDG_CACHE_HOME/<app>``, else ``~/.cache/<app>``."""
     return _resolve("cache", app, plugin_data=plugin_data, create=create, env=env, home=home)
+
+
+def data_dir(
+    app: str, *, plugin_data: bool = False, create: bool = False, env: Mapping[str, str] | None = None, home: Path | None = None
+) -> Path:
+    """The folder for ``app``'s data (what it keeps, not config): ``$XDG_DATA_HOME/<app>``, else ``~/.local/share/<app>``.
+
+    Also how to find a *foreign* tool's data folder (opencode keeps its logs and ``auth.json`` there).
+    """
+    return _resolve("data", app, plugin_data=plugin_data, create=create, env=env, home=home)
+
+
+def tool_home(tool: str, env_var: str | None = None, *, env: Mapping[str, str] | None = None, home: Path | None = None) -> Path:
+    """Another tool's own dot-folder: ``$<env_var>`` when it is set and non-empty, else ``~/.<tool>``.
+
+    ``tool_home("codex", "CODEX_HOME")`` is ``$CODEX_HOME`` or ``~/.codex``; ``tool_home("claude")`` is ``~/.claude``
+    (no variable consulted). Unlike the XDG lookups the variable is taken as given, relative or not: that is what the
+    tool itself does. Never created.
+    """
+    _check_app(tool, "tool")
+    values = os.environ if env is None else env
+    named = values.get(env_var) if env_var else None
+    return Path(named) if named else (Path.home() if home is None else home) / f".{tool}"
 
 
 def plugin_data_dir(env: Mapping[str, str] | None = None) -> Path | None:
@@ -81,10 +106,10 @@ def _absolute(value: str | None) -> Path | None:
     return None
 
 
-def _check_app(app: str) -> None:
+def _check_app(app: str, what: str = "app") -> None:
     if not app or app in {".", ".."} or "/" in app or "\0" in app:
-        msg = f"app must be a single folder name, got {app!r}"
+        msg = f"{what} must be a single folder name, got {app!r}"
         raise ValueError(msg)
 
 
-__all__ = ["PLUGIN_DATA_ENV", "cache_dir", "config_dir", "plugin_data_dir", "state_dir"]
+__all__ = ["PLUGIN_DATA_ENV", "cache_dir", "config_dir", "data_dir", "plugin_data_dir", "state_dir", "tool_home"]

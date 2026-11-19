@@ -33,12 +33,14 @@ class Settings(BaseSettings):
 - **`resolve_env_refs`** — expand `${VAR}` inside a loaded string, leaving the literal
   in place on a miss.
 - **`resolve_config_path`** — resolve an optional config file from an env override or a
-  default path; `None` unless the file actually exists.
+  default path; `None` when nothing is set and the default is missing. A *set* override that is not
+  a file raises `ConfigOverrideError` (a `ValueError`); it never silently disables config.
 - **`SecretStrippingYamlSource`** — drop caller-named secret fields from the YAML so
   they must come from the environment.
 
 ## Surface
 
-- `resolve_env_refs(value: str) -> str`
-- `resolve_config_path(env_var: str, default: Path) -> Path | None`
+- `resolve_env_refs(value: str, *, env: Mapping | None = None) -> str`
+- `resolve_config_path(env_var: str, default: Path, *, env: Mapping | None = None) -> Path | None`
+- `ConfigOverrideError(ValueError)`
 - `SecretStrippingYamlSource(settings_cls, *, exclude, yaml_file)`

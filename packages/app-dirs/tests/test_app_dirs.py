@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from app_dirs import cache_dir, config_dir, plugin_data_dir, state_dir
+from app_dirs import cache_dir, config_dir, data_dir, plugin_data_dir, state_dir, tool_home
 
 _HOME = Path("/home/me")
 
@@ -39,3 +39,35 @@ def test_plugin_data_splits_by_kind() -> None:
 def test_app_must_be_one_folder_name(app: str) -> None:
     with pytest.raises(ValueError, match="single folder name"):
         config_dir(app, env={}, home=_HOME)
+
+
+def test_data_dir_follows_xdg_data_home() -> None:
+    # What any-agent hand-rolled for opencode: $XDG_DATA_HOME/opencode, else ~/.local/share/opencode.
+    assert data_dir("opencode", env={"XDG_DATA_HOME": "/d"}, home=_HOME) == Path("/d/opencode")
+    assert data_dir("opencode", env={}, home=_HOME) == _HOME / ".local" / "share" / "opencode"
+    assert data_dir("opencode", env={"XDG_DATA_HOME": "rel"}, home=_HOME) == _HOME / ".local" / "share" / "opencode"
+
+
+def test_tool_home_is_the_tools_variable_else_its_dotfolder() -> None:
+    # What any-agent hand-rolled for codex: $CODEX_HOME, else ~/.codex.
+    assert tool_home("codex", "CODEX_HOME", env={"CODEX_HOME": "/c"}, home=_HOME) == Path("/c")
+    assert tool_home("codex", "CODEX_HOME", env={"CODEX_HOME": ""}, home=_HOME) == _HOME / ".codex"
+    assert tool_home("codex", "CODEX_HOME", env={}, home=_HOME) == _HOME / ".codex"
+
+
+def test_tool_home_without_a_variable_is_the_dotfolder() -> None:
+    # claude: ~/.claude, no variable consulted.
+    assert tool_home("claude", env={"CLAUDE_HOME": "/x"}, home=_HOME) == _HOME / ".claude"
+
+
+def test_tool_home_reads_the_process_environment_and_home(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CODEX_HOME", "/c")
+    assert tool_home("codex", "CODEX_HOME") == Path("/c")
+    monkeypatch.delenv("CODEX_HOME")
+    assert tool_home("codex", "CODEX_HOME") == Path.home() / ".codex"
+
+
+@pytest.mark.parametrize("tool", ["", ".", "..", "a/b", "a\0b"])
+def test_tool_must_be_one_folder_name(tool: str) -> None:
+    with pytest.raises(ValueError, match="single folder name"):
+        tool_home(tool, env={}, home=_HOME)

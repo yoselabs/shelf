@@ -1,6 +1,6 @@
 [project]
 name = "app-dirs"
-version = "0.1.0"
+version = "0.2.0"
 description = "Where an app keeps its config, state and cache on POSIX: XDG_CONFIG_HOME / XDG_STATE_HOME / XDG_CACHE_HOME with the spec's fallbacks, or the folder Claude Code hands a plugin in CLAUDE_PLUGIN_DATA."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
