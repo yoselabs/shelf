@@ -2582,11 +2582,19 @@ dependencies = [
     { name = "httpx" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "async-scope", extra = ["asgi"] },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "httpx", specifier = ">=0.28,<1" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" }]
 
 [[package]]
 name = "mcp-call"
@@ -2596,8 +2604,16 @@ dependencies = [
     { name = "httpx" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "async-scope", extra = ["asgi"] },
+]
+
 [package.metadata]
 requires-dist = [{ name = "httpx", specifier = ">=0.28,<1" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" }]
 
 [[package]]
 name = "mcp-clients"
