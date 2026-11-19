@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-speech"
+software = "any-clock"
+why = "any-speech wrote the stored UTC stamp '%Y-%m-%dT%H:%M:%SZ' by hand in two places (the failure record and the provenance time); one owner keeps the stored shape from drifting."
+needs = "utc_stamp(now) for a stored instant and parse_stamp(text) to read it back; whole seconds, always UTC, naive datetimes refused."
+sponsor = "yoselabs"
+requester = "any-speech"
+status = "active" # active | retired

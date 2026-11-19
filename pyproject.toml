@@ -34,8 +34,9 @@ child-env = { workspace = true }
 # any-frontmatter, dir-trust and any-net compose atomic-io.
 # any-yaml composes yaml-merge and atomic-io.
 any-yaml = { workspace = true }
-# any-speech composes any-pipeline, any-lease, process-lock, atomic-io, content-digest, app-dirs and verb-cli.
+# any-speech composes any-clock, any-pipeline, any-lease, process-lock, atomic-io, content-digest, app-dirs and verb-cli.
 any-speech = { workspace = true }
+any-clock = { workspace = true }
 any-pipeline = { workspace = true }
 any-lease = { workspace = true }
 content-digest = { workspace = true }
@@ -659,6 +660,8 @@ ignore_imports = [
     "any_speech.format -> content_digest",
     "any_speech.format -> atomic_io",
     "any_speech.failures -> atomic_io",
+    "any_speech.failures -> any_clock",
+    "any_speech.pipeline -> any_clock",
     "any_speech.drain -> process_lock",
     "any_speech.speech -> process_lock",
     "any_speech.speech -> any_lease",

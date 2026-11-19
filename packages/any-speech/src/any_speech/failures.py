@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from any_clock import utc_stamp
 from atomic_io import atomic_write_json
 
 if TYPE_CHECKING:
@@ -27,7 +28,7 @@ def record_path(out: Path) -> Path:
 
 def record(out: Path, audio: Path, error: Exception) -> None:
     stat = audio.stat()
-    at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    at = utc_stamp(datetime.now(UTC))
     failure = Failure(repr(error)[:500], stat.st_size, stat.st_mtime_ns, at)
     atomic_write_json(record_path(out), asdict(failure), indent=1)
 
