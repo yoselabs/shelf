@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO
 
+import stream_proc
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
@@ -107,12 +109,8 @@ def user_task_count() -> int | None:
             except OSError:
                 continue
         return count
-    try:
-        # Absolute path: a launchd job's PATH does not reach /bin tools reliably.
-        out = subprocess.run(["/bin/ps", "-U", str(uid), "-o", "pid="], capture_output=True, text=True, check=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return len(out.stdout.split())
+    rows = stream_proc.table()  # libproc rows: no `ps` text to parse
+    return sum(1 for row in rows.values() if row.uid == uid) if rows else None
 
 
 def _set_limit(res: int, want: int) -> None:

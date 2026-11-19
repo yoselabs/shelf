@@ -145,17 +145,17 @@ def _bsdinfo(pid: int) -> ProcBsdInfo | None:
     return info if isinstance(info, ProcBsdInfo) else None
 
 
-def _cpu_s(pid: int) -> float:
-    """User + system CPU seconds so far; 0.0 where macOS refuses the task info (another user's process)."""
+def _task(pid: int) -> tuple[float, int]:
+    """(user + system CPU seconds so far, resident bytes); zeros where macOS refuses the task info (another user's process)."""
     lib = _lib()
     if lib is None:
-        return 0.0
+        return 0.0, 0
     task = ProcTaskInfo()
     if lib.proc_pidinfo(pid, PROC_PIDTASKINFO, 0, ctypes.byref(task), ctypes.sizeof(task)) != ctypes.sizeof(task):
-        return 0.0
+        return 0.0, 0
     mul, div = _timebase()
     ticks: int = task.pti_total_user + task.pti_total_system
-    return ticks * mul / div / 1e9
+    return ticks * mul / div / 1e9, int(task.pti_resident_size)
 
 
 def _token(info: ProcBsdInfo) -> str:
@@ -169,7 +169,8 @@ def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
         return info
     state = "Z" if info.pbi_status == SZOMB else "R"
     cmd = (info.pbi_comm or info.pbi_name).decode("utf-8", errors="replace")
-    return Proc(pid, info.pbi_ppid, info.pbi_pgid, 0, _token(info), state, _cpu_s(pid), cmd)
+    cpu_s, rss = _task(pid)
+    return Proc(pid, info.pbi_ppid, info.pbi_pgid, 0, _token(info), state, cpu_s, cmd, info.pbi_uid, rss)
 
 
 def read(pid: int) -> Proc | None:

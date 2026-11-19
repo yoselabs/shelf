@@ -109,6 +109,17 @@ def test_the_child_observes_its_limits() -> None:
     assert out.result["nproc"] > 64  # headroom over what the user already runs, not a total of 64
 
 
+def test_the_user_task_count_reads_no_ps_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    def no_spawn(*_a: object, **_k: object) -> None:
+        msg = "user_task_count must read the process table, not spawn `ps`"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr("any_proc.run.subprocess.run", no_spawn)
+    count = user_task_count()
+    assert count is not None
+    assert count >= 1  # at least this test process
+
+
 def test_a_child_writing_past_its_file_size_cap_fails_and_the_parent_survives(tmp_path: Path) -> None:
     target = tmp_path / "big.bin"
     code = f"open({str(target)!r}, 'wb').write(b'x' * 8388608)\nfrom any_proc.run import emit\nemit({{'reached': True}})\n"

@@ -24,13 +24,13 @@ def py(code: str) -> list[str]:
 def test_non_utf8_and_crlf_round_trip_exactly() -> None:
     payload = b"a\xff\xfe\r\nb\rc\n\x00"
     code = "import sys; sys.stdout.buffer.write(sys.stdin.buffer.read()); sys.stderr.buffer.write(b'e\\xff\\r\\n')"
-    got = capture_bytes(py(code), input=payload)
+    got = capture_bytes(py(code), input=payload, timeout=30)
     assert (got.exit, got.out, got.err, got.timed_out) == (0, payload, b"e\xff\r\n", False)
 
 
 def test_exit_code_and_signal_death() -> None:
-    assert capture_bytes(py("import sys; sys.exit(3)")).exit == 3
-    assert capture_bytes(py("import os,signal; os.kill(os.getpid(), signal.SIGKILL)")).exit == -9
+    assert capture_bytes(py("import sys; sys.exit(3)"), timeout=30).exit == 3
+    assert capture_bytes(py("import os,signal; os.kill(os.getpid(), signal.SIGKILL)"), timeout=30).exit == -9
 
 
 def test_large_input_with_large_output_does_not_deadlock() -> None:
@@ -76,6 +76,17 @@ def test_a_timed_out_setsid_grandchild_is_dead() -> None:
     assert not alive(int(got.out.split()[0]))
 
 
+def test_timeout_kills_a_grandchild_that_stayed_in_the_group() -> None:
+    code = (
+        "import subprocess,sys,time\n"
+        "k = subprocess.Popen(['sleep', '60'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
+        "print(k.pid, flush=True); time.sleep(60)"
+    )
+    got = capture_bytes(py(code), timeout=1.5, grace=1)
+    assert (got.exit, got.timed_out, got.survivors) == (124, True, ())
+    assert not alive(int(got.out.split()[0]))
+
+
 def test_a_normal_exit_with_a_pipe_holder_is_not_a_timeout() -> None:
     # sh exits 0 at once; its background sleep keeps the pipe open. The result waits `drain`, not 30 s, and is not a timeout.
     t0 = time.monotonic()
@@ -103,7 +114,7 @@ def test_an_early_exit_child_with_large_unwritten_input_is_not_an_error() -> Non
 
 def test_input_and_stdin_together_are_refused() -> None:
     with pytest.raises(ValueError, match="not both"):
-        capture_bytes(py("pass"), input=b"x", stdin=None)
+        capture_bytes(py("pass"), input=b"x", stdin=None, timeout=30)
 
 
 def test_capture_false_inherits_stdout_and_returns_empty() -> None:
@@ -113,7 +124,7 @@ def test_capture_false_inherits_stdout_and_returns_empty() -> None:
             "-c",
             (
                 "from stream_proc import capture_bytes\n"
-                "g = capture_bytes(['sh', '-c', 'echo loud; echo quiet >&2'], capture=False)\n"
+                "g = capture_bytes(['sh', '-c', 'echo loud; echo quiet >&2'], capture=False, timeout=30)\n"
                 "print(g.exit, g.out, g.err)"
             ),
         ],
@@ -127,14 +138,14 @@ def test_capture_false_inherits_stdout_and_returns_empty() -> None:
 
 def test_stdin_devnull_reads_eof_but_inherit_reads_ours() -> None:
     code = "import sys; print(len(sys.stdin.buffer.read()))"
-    assert capture_bytes(py(code)).out == b"0\n"
+    assert capture_bytes(py(code), timeout=30).out == b"0\n"
     host = subprocess.run(
         [
             PY,
             "-c",
             (
                 "from stream_proc import capture_bytes; import sys\n"
-                f"print(capture_bytes([sys.executable, '-c', {code!r}], stdin=None).out.decode())"
+                f"print(capture_bytes([sys.executable, '-c', {code!r}], stdin=None, timeout=30).out.decode())"
             ),
         ],
         input=b"abcde",
@@ -176,6 +187,6 @@ def test_raising_sigterm_handler_during_spawn_propagates_and_child_is_gone(
     sigterm_during_spawn: list[int], run: Callable[..., Any]
 ) -> None:
     with pytest.raises(BoomError):
-        run(["sleep", "60"])
+        run(["sleep", "60"], timeout=30)
     assert len(sigterm_during_spawn) == 1
     assert not alive(sigterm_during_spawn[0])

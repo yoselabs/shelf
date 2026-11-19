@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Literal
 
 PROC = Path("/proc")
+PAGE = os.sysconf("SC_PAGE_SIZE") if hasattr(os, "sysconf") and "SC_PAGE_SIZE" in os.sysconf_names else 4096
 CLK_TCK = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") and "SC_CLK_TCK" in os.sysconf_names else 100
 
 
@@ -32,6 +33,8 @@ class Proc:
     state: str
     cpu_s: float = 0.0
     cmd: str = ""
+    uid: int = -1
+    rss: int = 0  # resident memory, bytes
 
 
 def has_proc() -> bool:
@@ -47,8 +50,18 @@ def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
         cpu = (int(rest[11]) + int(rest[12])) / CLK_TCK
         if int(prefix.strip()) != pid:
             return "unknown"
+        uid = (PROC / str(pid)).stat().st_uid
         return Proc(
-            pid, int(rest[1]), int(rest[2]), int(rest[3]), str(int(rest[19])), rest[0], cpu, command.decode("utf-8", errors="replace")
+            pid,
+            int(rest[1]),
+            int(rest[2]),
+            int(rest[3]),
+            str(int(rest[19])),
+            rest[0],
+            cpu,
+            command.decode("utf-8", errors="replace"),
+            uid,
+            int(rest[21]) * PAGE,
         )
     except (FileNotFoundError, ProcessLookupError):
         return "gone"
