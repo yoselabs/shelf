@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "iorlas-perform"
+software = "any-speech"
+why = "iorlas-perform scripts/heard.py checks that generated Russian speech says what it was asked, by running mlx-whisper large-v3-turbo on the audio. It loads its own Whisper beside channel-research's, with no machine-wide lock. Not yet adopted: the repoint is a change in iorlas-perform; loss on adoption: Whisper itself (refused in the measurement note), so the comparison text comes from Parakeet; the generated audio is an in-memory array today, so heard.py writes it to a temporary wav first."
+needs = "Speech(...).transcribe(wav).text, waiting in the same slot pool as channel-research; Transcript.text and words with times to find a line read twice."
+sponsor = "yoselabs"
+requester = "iorlas-perform"
+status = "active" # active | retired

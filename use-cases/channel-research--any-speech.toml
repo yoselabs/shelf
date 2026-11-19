@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "channel-research"
+software = "any-speech"
+why = "channel-research (iorlas-wip plugin) transcribes Russian YouTube videos of 15 to 75 minutes into verbatim text with word times: scripts/transcribe.py holds a machine-wide flock (one transcription at a time), a drain loop, a size-keyed error file and an MLX cache cap, all of which any-speech now owns. It also has no diarisation, so a podcast guest is not told apart from the host, and no way to tell which voice is the host across videos. Not yet adopted: the repoint is a change in iorlas-wip (migration note in openspec/changes/any-speech/migration-channel-research.md); loss on adoption: Whisper, whose 57 minute run broke the 4 GB budget, so word timestamps come from Parakeet and the old transcript.local.json files are read by the migration, not rewritten."
+needs = "Speech(Pipeline(FluidAudioCli, FluidAudioDiarizer), leases_root, Slots).transcribe(path, out) and Drain(scan, speech, workers) over Job(audio, out), writing a Transcript (words with start, end, probability, speaker; provenance with key, peak_memory_gb); Voice similarity from SherpaEmbedder to match the host across videos; the any-speech CLI verbs drain and match."
+sponsor = "yoselabs"
+requester = "channel-research"
+status = "active" # active | retired

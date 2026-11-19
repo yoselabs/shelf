@@ -32,6 +32,12 @@ page-tsv = { workspace = true }
 process-lock = { workspace = true }
 # any-yaml composes yaml-merge and atomic-io.
 any-yaml = { workspace = true }
+# any-speech composes any-lease, process-lock, atomic-io, content-digest, app-dirs and verb-cli.
+any-speech = { workspace = true }
+any-lease = { workspace = true }
+content-digest = { workspace = true }
+app-dirs = { workspace = true }
+verb-cli = { workspace = true }
 atomic-io = { workspace = true }
 # any-agent composes stream-proc.
 stream-proc = { workspace = true }
@@ -208,6 +214,10 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 # import lazily by design), full D (docstrings not policed in throwaway code, as
 # in tests), and SLF (the docx fixture generator does low-level oxml surgery).
 "packages/*/bench/**" = ["T201", "INP001", "PLC0415", "SLF"]
+# any-speech: verb-cli reads the verbs' and Settings' annotations at runtime (typing.get_type_hints), so Path stays a
+# real import in the CLI module; the engine lane imports each optional engine inside its test, skipping when it is not installed.
+"packages/any-speech/src/any_speech/cli.py" = ["TC003"]
+"packages/any-speech/tests/engines/**" = ["PLC0415"]
 # any-browser's two engine adapters are DEFINED by "render never raises for a
 # routine failure" (the base.py BrowserBackend contract): every driver / CDP /
 # telemetry quirk is caught and turned into a RenderOutcome or a best-effort
@@ -289,6 +299,7 @@ testpaths = [
     "packages/process-lock/tests",
     "packages/any-lease/tests",
     "packages/any-yaml/tests",
+    "packages/any-speech/tests",
     "packages/py-symbols/tests",
     "packages/test-reach/tests",
     "packages/any-agent/tests",
@@ -312,8 +323,9 @@ testpaths = [
 # ordinary gate launches a real engine (that needs a Chromium binary). The
 # `just test-browser` lane re-includes it via `-m browser`, and CI runs that
 # lane with SHELF_REQUIRE_BROWSER=1 where a non-launching engine is a hard fail.
-addopts = '-ra --strict-markers -m "not browser"'
+addopts = '-ra --strict-markers -m "not browser and not engines"'
 markers = [
+    "engines: runs a real speech engine (any-speech: FluidAudio, parakeet-mlx) on a real clip named by ANY_SPEECH_CLIP; needs GB of model weights, so it is opt-in and excluded from the default run; `-m engines` runs it and each test skips when its engine or input is missing.",
     "contract: a scenario of a package's contract suite that runs the same steps against the real implementation and its in-memory fake (git-porcelain's RealRepo and FakeRepo), so the fake cannot drift. Runs in the default gate and in `just check`; `-m contract` runs just this lane.",
     "real_only: a contract scenario that only the real implementation can run: it names a fidelity gap of the in-memory fake (git-porcelain's FakeRepo), which the suite leaves out of the fake run.",
     "browser: real-browser test that launches a headless engine (any-browser); opt-in, excluded from the default run and `just check`; `just test-browser` runs it, and CI runs it with SHELF_REQUIRE_BROWSER=1 where a missing engine FAILS instead of skipping",
@@ -392,6 +404,7 @@ root_packages = [
     "test_reach",
     "any_lease",
     "any_yaml",
+    "any_speech",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -481,6 +494,7 @@ source_modules = [
     "test_reach",
     "any_lease",
     "any_yaml",
+    "any_speech",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -572,6 +586,7 @@ modules = [
     "test_reach",
     "any_lease",
     "any_yaml",
+    "any_speech",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -604,6 +619,14 @@ ignore_imports = [
     "any_yaml.write -> yaml_merge",
     "any_yaml.write -> atomic_io",
     "any_yaml.append -> atomic_io",
+    "any_speech.format -> content_digest",
+    "any_speech.format -> atomic_io",
+    "any_speech.failures -> atomic_io",
+    "any_speech.drain -> process_lock",
+    "any_speech.speech -> process_lock",
+    "any_speech.speech -> any_lease",
+    "any_speech.cli -> app_dirs",
+    "any_speech.cli -> verb_cli",
     "any_agent.procs -> stream_proc",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",
@@ -682,6 +705,14 @@ unused-call-result = false
 # without `[patchright]` and resolvable with it. Silencing the check is the only
 # spelling that is correct in both states; an inline suppression reads as unused in
 # one of them.
+# any-speech's adapters import their engines (mlx, parakeet-mlx, sherpa-onnx) lazily; the engines are
+# optional extras, not installed in the shared venv, so their imports cannot resolve here.
+[[tool.pyrefly.sub-config]]
+matches = "packages/any-speech/src/any_speech/adapters/*.py"
+
+[tool.pyrefly.sub-config.errors]
+missing-import = false
+
 [[tool.pyrefly.sub-config]]
 matches = "packages/any-browser/src/any_browser/patchright.py"
 

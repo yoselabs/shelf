@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "personal-brand"
+software = "any-speech"
+why = "personal-brand research waves (codex/wave3/transcribe_missing.py) fall back to local speech-to-text for YouTube videos without captions, using faster-whisper tiny on the CPU and labelling the result 'imperfect machine evidence'. Not yet adopted: the repoint is a change in personal-brand. It gains Parakeet quality at 61 to 297 times real time and a provenance record in place of a hand-written label; loss on adoption: none known beyond needing the FluidAudio binary or parakeet-mlx installed."
+needs = "Pipeline(...).run(audio) -> Transcript with provenance.engine, model and audio_sha256; source = captions for the videos that have captions, so one format holds both."
+sponsor = "yoselabs"
+requester = "personal-brand"
+status = "active" # active | retired

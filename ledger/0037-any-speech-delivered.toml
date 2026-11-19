@@ -1,0 +1,10 @@
+seq = 37
+date = "2026-11-19"
+event = "delivery"
+software = "any-speech"
+release = "any-speech-v0.1.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "openspec/changes/any-speech/measurement.md"
+note = "PROMOTE: speech-to-text with speakers, extracted once from channel-research's transcribe.py and Reco 2's engine decisions. Delivered with measured verdicts instead of assumed ones: FluidAudio (Parakeet v3, Nemotron 3 diarisation) and parakeet-mlx built; mlx-whisper, sherpa-onnx ASR and diarisation refused; pyannote, faster-whisper, captions, mixed-language latch and the e-e filler claim untested (no reference text, no permission to use call audio). Not adopted by any consumer yet; the three use-cases are published demand."
