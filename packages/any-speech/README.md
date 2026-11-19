@@ -3,8 +3,8 @@
 ```python
 from any_speech import transcribe, transcribe_with_speakers
 
-transcript = transcribe(Path("talk.m4a"))              # words with times; stored in talk.m4a.speech.json; returned too
-transcript = transcribe_with_speakers(Path("talk.m4a"))  # the same, each word labelled S1, S2, ... by voice
+transcript = await transcribe(Path("talk.m4a"))        # words with times; stored in talk.m4a.speech.json; returned too
+transcript = await transcribe_with_speakers(Path("talk.m4a"))  # the same, each word labelled S1, S2, ... by voice
 print(transcript.to_text())                            # [00:00] S1: ну да ...   (a readable view of the same data)
 ```
 
@@ -31,8 +31,8 @@ from any_speech.adapters import FluidAudioCli, FluidAudioDiarizer
 fa = Path("~/bin/fluidaudiocli").expanduser()
 pipeline = Pipeline(FluidAudioCli(fa, runtime="my-build"), FluidAudioDiarizer(fa, runtime="my-build"), budget_gb=4)
 speech = Speech(pipeline, Path("~/.local/state/any-speech/leases").expanduser(), Slots(transcribe=2, diarize=1, total=3))
-transcript = speech.transcribe(Path("talk.m4a"))                     # waits for a free slot; stored beside the audio
-Drain(scan=lambda: jobs, speech=speech, workers=4).run()             # a folder: 4 workers, at most 2 transcribing at once
+transcript = await speech.transcribe(Path("talk.m4a"))               # waits for a free slot; stored beside the audio
+await Drain(scan=lambda: jobs, speech=speech, workers=4).run()       # a folder: 4 workers, at most 2 transcribing at once
 ```
 
 ```bash
@@ -59,11 +59,12 @@ The binary is found, in order, from `ANY_SPEECH_FLUIDAUDIO_BIN`, the folder `any
 - **Format v2** (`Transcript.to_json`): `version`, `words[]` (`text`, `start`, `end`, `probability`, `speaker`), `segments[]`, `speakers` (`{"S1": {"name": "voice 1", "seconds": 912.4, "words": 2310}}`: seconds are the sum of the voice's word durations, so a 3 s music sample is told from the host at a glance), `provenance`
   (`engine`, `model`, `runtime`, `settings`, `audio_sha256`, `audio_seconds`, `seconds`, `peak_memory_gb`, `diarizer`, `made_at`, `source` = `local` or `captions`, derived `key`).
   A reader loads v1 (its `speakers` was label to name only; the amounts are worked out from the words) and v2, and refuses any other `version` (`UnknownVersionError`). Text is verbatim: nothing cleans fillers.
-- **`Pipeline.run(audio)`** transcribes, labels each word with the diarizer turn it overlaps most, cuts segments at a speaker change, a pause of 0.5 s or 15 s, and records provenance.
+- **Everything is asyncio** (0.4.0, on [any-pipeline](../any-pipeline/README.md)): `await transcribe(path)`, `await speech.transcribe(...)`, `await Drain(...).run()`. A sync script writes `asyncio.run(transcribe(path))`; the CLI does it for you. The engines stay plain blocking code (they are child processes), run off the loop with `blocking`.
+- **`Pipeline.run(audio)`** is `gather(hear, diarize) >> assemble`: transcribes (and, when asked, diarizes at the same time), labels each word with the diarizer turn it overlaps most, cuts segments at a speaker change, a pause of 0.5 s or 15 s, and records provenance.
   A diarizer failure never fails the transcript (words keep `speaker = None`, `provenance.diarizer` says why). A peak over `budget_gb` (4) raises `MemoryBudgetError`.
   **The FluidAudio engines are guarded live**: each runs in its own process group whose resident memory is read every 0.5 s, and a group over the budget is killed (`MemoryBudgetError`; the drain records the failure and moves on). `ParakeetMlx` runs in-process, so its guard is after the fact and reads MLX's own figure (3.44 GB at 57 min while the process footprint was 4.09 GB); it also serialises its calls with a lock, because one MLX model is not known to be thread-safe.
 - **`Speech`** runs each model call in a slot: `Slots(transcribe, diarize)` units of an `any-lease` resource, shared by every process on the machine, freed by the kernel if the holder dies. A caller waits for a free unit. `transcribe(path, out)` reuses a current `out` and runs one job once however many callers ask.
-- **`Drain`** takes `workers` threads; each claims one pending job (a lock beside its output) and rescans until none is left. A job is pending when its output is missing or its `provenance.key` (audio hash, engine, model, settings) differs. A failed file gets `<out>.failed.json` keyed to its size and mtime and is skipped until it changes. A transcript whose **diarizer** failed (words kept, `diarizer.status = failed`) is not current: the next drain redoes it, up to 3 tries (`diarizer.tries`), then keeps `speaker = None`. A job runs once per drain. Each audio file is hashed once per process (path, size, mtime).
+- **`Drain`** takes `workers` tasks; each claims one pending job (a lock beside its output) and rescans until none is left. A job is pending when its output is missing or its `provenance.key` (audio hash, engine, model, settings) differs. A failed file gets `<out>.failed.json` keyed to its size and mtime and is skipped until it changes. A transcript whose **diarizer** failed (words kept, `diarizer.status = failed`) is not current: the next drain redoes it, up to 3 tries (`diarizer.tries`), then keeps `speaker = None`. A job runs once per drain. Each audio file is hashed once per process (path, size, mtime).
 - **Engines are optional.** `pip install any-speech[parakeet]` or `[embed]`; the FluidAudio adapter needs a built binary. Nothing is imported until its adapter runs.
 - Measured numbers, the verdict per engine, and what is untested: [measurement note](../../openspec/changes/any-speech/measurement.md).
 

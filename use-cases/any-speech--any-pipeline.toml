@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-speech"
+software = "any-pipeline"
+why = "any-speech's Pipeline hand-writes the shape any-pipeline extracts: transcribe in a slot while diarizing in another, then label the words; a diarizer failure must not fail the transcript; one bad file must not stop the queue; a peak over budget is a failure. It does it with a ThreadPoolExecutor and try/except; the same shape recurs in channel-research and perform. Not yet adopted: the re-expression is any-speech 0.4.0, which makes transcribe(path) async (breaking)."
+needs = "Stage with an async function and a Limit, gather(hear, diar) >> label, run(...) returning a Report with Failed per item and a StageRecord per stage run, blocking() for the sync adapters, Persistent for the stored transcript."
+sponsor = "yoselabs"
+requester = "any-speech"
+status = "active" # active | retired

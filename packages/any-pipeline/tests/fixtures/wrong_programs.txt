@@ -1,0 +1,65 @@
+# Each line ending in `# ERROR <code>` must be rejected by pyrefly with exactly that code; every other line must be accepted.
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import assert_never
+
+from any_pipeline import Failed, Limit, Ok, Outcome, Stage, gather
+
+L = Limit(calls=1, seconds=1.0, tries=1)
+
+
+@dataclass(frozen=True, slots=True)
+class Audio:
+    path: str
+
+
+@dataclass(frozen=True, slots=True)
+class Words:
+    n: int
+
+
+@dataclass(frozen=True, slots=True)
+class Turns:
+    k: int
+
+
+async def hear(a: Audio) -> Words:
+    return Words(1)
+
+
+async def diar(a: Audio) -> Turns:
+    return Turns(1)
+
+
+async def label(p: tuple[Words, Turns]) -> int:
+    return p[0].n
+
+
+async def count(w: Words) -> int:
+    return w.n
+
+
+def not_async(a: Audio) -> Words:
+    return Words(1)
+
+
+H, D, T, C = Stage("hear", hear, L), Stage("diar", diar, L), Stage("label", label, L), Stage("count", count, L)
+
+fine = gather(H, D) >> T
+wrong_edge = H >> T  # ERROR unsupported-operation
+mixed_inputs = gather(H, C)  # ERROR bad-argument-type
+no_limit = Stage("x", hear)  # ERROR missing-argument
+sync_function = Stage("y", not_async, L)  # ERROR bad-argument-type
+
+
+def handle(o: Outcome[int]) -> int:
+    match o:
+        case Ok(_, value):
+            return value
+        case _:
+            assert_never(o)  # ERROR bad-argument-type
+
+
+def edit(a: Audio) -> None:
+    a.path = "other"  # ERROR read-only

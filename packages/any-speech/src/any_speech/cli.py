@@ -5,6 +5,7 @@ Verbs: ``transcribe`` one file, ``drain`` a folder with N workers inside the mac
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
@@ -100,7 +101,7 @@ def _verbs(
 ) -> dict[str, Callable[..., int]]:
     def transcribe(audio: Annotated[Path, POSITIONAL], settings: Settings, out: Path | None = None) -> int:
         """Transcribe one audio file into one JSON file (default: beside the audio, `<name>.speech.json`); --diarize adds speakers."""
-        _speech(build, leases_root, settings).transcribe(audio, out)
+        asyncio.run(_speech(build, leases_root, settings).transcribe(audio, out))
         sys.stdout.write(f"{out or default_out(audio)}\n")
         return 0
 
@@ -110,7 +111,7 @@ def _verbs(
         def scan() -> list[Job]:
             return [Job(a, a.with_name(out_name)) for a in sorted(root.glob(pattern)) if a.is_file()]
 
-        report = Drain(scan=scan, speech=_speech(build, leases_root, settings), workers=settings.workers).run()
+        report = asyncio.run(Drain(scan=scan, speech=_speech(build, leases_root, settings), workers=settings.workers).run())
         sys.stdout.write(json.dumps({"done": len(report.done), "failed": len(report.failed), "skipped": len(report.skipped)}) + "\n")
         return 1 if report.failed else 0
 

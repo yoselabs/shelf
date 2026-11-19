@@ -71,41 +71,41 @@ def test_a_missing_binary_says_how_to_build_it_and_names_the_explicit_alternativ
     assert "ParakeetMlx" in text  # named, never used on its own
 
 
-def test_transcribe_is_words_only_and_stores_one_file_beside_the_audio(tmp_path: Path) -> None:
+async def test_transcribe_is_words_only_and_stores_one_file_beside_the_audio(tmp_path: Path) -> None:
     audio = _wav(tmp_path / "talk.wav")
-    result = transcribe(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "leases")
+    result = await transcribe(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "leases")
     stored = tmp_path / "talk.wav.speech.json"
     assert Transcript.load(stored) == result
     assert (result.provenance.diarizer, [w.speaker for w in result.words]) == ({"status": "not_run"}, [None])
 
 
-def test_transcribe_with_speakers_labels_the_words(tmp_path: Path) -> None:
+async def test_transcribe_with_speakers_labels_the_words(tmp_path: Path) -> None:
     audio = _wav(tmp_path / "talk.wav")
-    result = transcribe_with_speakers(
+    result = await transcribe_with_speakers(
         audio, transcriber=FakeTranscriber(_WORDS), diarizer=FakeDiarizer([Turn(0.0, 1.0, "S1")]), leases_root=tmp_path / "l"
     )
     assert [w.speaker for w in result.words] == ["S1"]
     assert Transcript.load(tmp_path / "talk.wav.speech.json").speakers == {"S1": Speaker("voice 1", 0.5, 1)}
 
 
-def test_transcribe_with_speakers_needs_the_default_diarizer_and_says_how_to_get_it(tmp_path: Path) -> None:
+async def test_transcribe_with_speakers_needs_the_default_diarizer_and_says_how_to_get_it(tmp_path: Path) -> None:
     audio = _wav(tmp_path / "a.wav")
     with pytest.raises(EngineMissingError, match="fluidaudiocli"):
-        transcribe_with_speakers(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l", env={}, home=tmp_path)
+        await transcribe_with_speakers(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l", env={}, home=tmp_path)
 
 
-def test_a_words_only_file_is_not_reused_for_a_speakers_request(tmp_path: Path) -> None:
+async def test_a_words_only_file_is_not_reused_for_a_speakers_request(tmp_path: Path) -> None:
     audio = _wav(tmp_path / "a.wav")
-    transcribe(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l")
-    again = transcribe_with_speakers(
+    await transcribe(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l")
+    again = await transcribe_with_speakers(
         audio, transcriber=FakeTranscriber(_WORDS), diarizer=FakeDiarizer([Turn(0.0, 1.0, "S1")]), leases_root=tmp_path / "l"
     )
     assert [w.speaker for w in again.words] == ["S1"]
 
 
-def test_out_moves_the_stored_file(tmp_path: Path) -> None:
+async def test_out_moves_the_stored_file(tmp_path: Path) -> None:
     audio, out = _wav(tmp_path / "a.wav"), tmp_path / "elsewhere" / "t.json"
-    transcribe(audio, out, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l")
+    await transcribe(audio, out, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l")
     assert out.exists()
     assert not (tmp_path / "a.wav.speech.json").exists()
 

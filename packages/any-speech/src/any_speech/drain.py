@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
+import asyncio
 from dataclasses import dataclass, field
-from threading import Lock
 from typing import TYPE_CHECKING
 
 from process_lock import LockHeldError, ProcessLock
@@ -41,45 +40,43 @@ class Drain:
         self._speech = speech
         self._workers = workers
         self._report = DrainReport()
-        self._report_lock = Lock()
         self._taken: set[Path] = set()  # a job is run once per drain: a retry of a failed diarizer waits for the next one
 
-    def run(self) -> DrainReport:
-        with ThreadPoolExecutor(max_workers=self._workers) as pool:
-            for future in [pool.submit(self._work) for _ in range(self._workers)]:
-                future.result()
+    async def run(self) -> DrainReport:
+        async with asyncio.TaskGroup() as group:
+            for _ in range(self._workers):
+                group.create_task(self._work())
         return self._report
 
-    def _work(self) -> None:
-        while (claimed := self._claim()) is not None:
+    async def _work(self) -> None:
+        while (claimed := await self._claim()) is not None:
             job, lock = claimed
             try:
-                self._run_one(job)
+                await self._run_one(job)
             finally:
                 lock.release()
 
-    def _claim(self) -> tuple[Job, ProcessLock] | None:
-        for job in self._scan():
+    async def _claim(self) -> tuple[Job, ProcessLock] | None:
+        for job in await asyncio.to_thread(self._scan):
             if job.out in self._taken:
                 continue
             if is_known_failure(job.out, job.audio):
                 self._note(self._report.skipped, job.out, unless=self._report.failed)
-            elif not is_current(job.out, self._speech.pipeline, job.audio):
+            elif not await is_current(job.out, self._speech.pipeline, job.audio):
                 try:
                     lock = ProcessLock.acquire(claim_path(job.out), timeout=0, reentrant=False)
                 except LockHeldError:
                     continue  # another worker has it
-                if is_current(job.out, self._speech.pipeline, job.audio):  # finished while we asked
+                if await is_current(job.out, self._speech.pipeline, job.audio):  # finished while we asked
                     lock.release()
                     continue
-                with self._report_lock:
-                    self._taken.add(job.out)
+                self._taken.add(job.out)  # the claim lock kept every other worker out until now
                 return job, lock
         return None
 
-    def _run_one(self, job: Job) -> None:
+    async def _run_one(self, job: Job) -> None:
         try:
-            self._speech.fulfil(job.audio, job.out)
+            await self._speech.fulfil(job.audio, job.out)
         except Exception as error:  # noqa: BLE001  one bad file must not stop the queue for every run
             record(job.out, job.audio, error)
             self._note(self._report.failed, job.out)
@@ -87,6 +84,5 @@ class Drain:
             self._note(self._report.done, job.out)
 
     def _note(self, target: list[Path], path: Path, *, unless: list[Path] | None = None) -> None:
-        with self._report_lock:
-            if path not in target and path not in (unless or []):
-                target.append(path)
+        if path not in target and path not in (unless or []):
+            target.append(path)

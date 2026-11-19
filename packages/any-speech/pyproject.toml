@@ -1,6 +1,6 @@
 [project]
 name = "any-speech"
-version = "0.3.0"
+version = "0.4.0"
 description = "Stop caring which engine turns speech into words, turns and voices — one Transcript (word times, speakers, provenance) from swappable engines behind small ports, with one model per machine (a flock, a draining queue), a failure record that never stalls a batch, a peak-memory guard and a voice embedding for matching a host across files."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
@@ -13,6 +13,7 @@ dependencies = [
     "content-digest>=0.1,<1",
     "app-dirs>=0.1,<1",
     "verb-cli>=0.2,<1",
+    "any-pipeline>=0.1,<1",
 ]
 
 [project.optional-dependencies]

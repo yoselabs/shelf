@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- **Breaking: asyncio-native.** `transcribe`, `transcribe_with_speakers`, `Speech.run/transcribe/fulfil`, `Pipeline.run`, `Drain.run` and `is_current` are `async def`; the CLI is unchanged. Sync scripts: `asyncio.run(...)`.
+- `Pipeline` is built on any-pipeline: `gather(hear, diarize) >> assemble`, a diarizer failure is a value (`Voices` with the reason), a memory-budget failure keeps its `MemoryBudgetError` type.
+- A stored diarizer failure's `detail` now starts with the exception type (`RuntimeError: model missing`).
+
 ## 0.3.0
 
 - `transcribe(path)` stores one file beside the audio (`<name>.speech.json`) and returns the `Transcript`; words only. `transcribe_with_speakers(path)` is the opt-in speaker version. `NO_DIARIZER` is gone (breaking).

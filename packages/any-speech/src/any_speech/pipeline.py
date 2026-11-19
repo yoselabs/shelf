@@ -5,9 +5,11 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import subprocess
-from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+
+from any_pipeline import Limit, Stage, blocking, gather, run_one
 
 from any_speech.format import Provenance, Transcript, job_key, speakers_of
 from any_speech.guard import DEFAULT_BUDGET_GB, check_peak
@@ -18,10 +20,31 @@ if TYPE_CHECKING:
     from contextlib import AbstractContextManager
     from pathlib import Path
 
+    from any_pipeline import Flow
+
     from any_speech.format import Word
-    from any_speech.ports import Diarized, Diarizer, Transcriber
+    from any_speech.ports import Diarizer, Heard, Transcriber
+    from any_speech.words import Turn
 
 _CHUNK = 1 << 20
+ENGINE_LIMIT = Limit(calls=4, seconds=3600.0, tries=1)  # the machine-wide cap is the leases'; this one only bounds a single run
+ASSEMBLE_LIMIT = Limit(calls=4, seconds=600.0, tries=1)
+
+
+@dataclass(frozen=True, slots=True)
+class Hearing:
+    """The path travels with what was heard: assembly needs the audio's hash and length."""
+
+    audio: Path
+    heard: Heard
+
+
+@dataclass(frozen=True, slots=True)
+class Voices:
+    """Turns, or the reason there are none: a diarizer failure is a value here, never an exception."""
+
+    turns: tuple[Turn, ...]
+    error: str | None
 
 
 def _no_slot(kind: str) -> AbstractContextManager[object]:  # noqa: ARG001  every kind is free
@@ -86,6 +109,7 @@ class Pipeline:
         self._now = now
         self._slot = slot
         self._hash = AudioHasher() if hasher is None else hasher
+        self._flow = self._build()
 
     def gated(self, slot: Callable[[str], AbstractContextManager[object]]) -> Pipeline:
         """The same engines, each model call run inside `slot(kind)` (kind: transcribe or diarize)."""
@@ -96,24 +120,50 @@ class Pipeline:
         ident = self.transcriber.identity
         return job_key(self._hash(audio), ident.engine, ident.model, self._settings())
 
-    def run(self, audio: Path) -> Transcript:
-        digest = self._hash(audio)
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            diarizing = pool.submit(self._diarize, audio) if self.diarizer is not None else None  # overlaps the transcription
-            with self._slot("transcribe"):
-                heard = self.transcriber.transcribe(audio)
-            check_peak(heard.peak_memory_gb, self.budget_gb)
-            words, diarizer = heard.words, {"status": "not_run"}
-            if diarizing is not None:
-                words, diarizer = self._label(heard.words, diarizing.result())
-        ident = self.transcriber.identity
+    async def run(self, audio: Path) -> Transcript:
+        """Hear (and diarize, at the same time), then assemble. A failure is raised as the engine's own exception."""
+        return await run_one(self._flow, audio, key=str(audio))
+
+    def _build(self) -> Flow[Path, Transcript]:
+        hear = Stage("hear", blocking(self._hear), ENGINE_LIMIT)
+        if self.diarizer is None:
+            return hear >> Stage("assemble", blocking(self._assemble_words), ASSEMBLE_LIMIT)
+        # a diarizer failure becomes a Voices with no turns and the reason; it never fails the transcript
+        diarize = Stage("diarize", blocking(self._diarize), ENGINE_LIMIT).otherwise(lambda why: Voices((), why))
+        return gather(hear, diarize) >> Stage("assemble", blocking(self._assemble), ASSEMBLE_LIMIT)
+
+    def _hear(self, audio: Path) -> Hearing:
+        with self._slot("transcribe"):
+            heard = self.transcriber.transcribe(audio)
+        check_peak(heard.peak_memory_gb, self.budget_gb)
+        return Hearing(audio, heard)
+
+    def _diarize(self, audio: Path) -> Voices:
+        assert self.diarizer is not None  # noqa: S101  only built with a diarizer
+        with self._slot("diarize"):
+            return Voices(self.diarizer.diarize(audio).turns, None)
+
+    def _assemble_words(self, hearing: Hearing) -> Transcript:
+        return self._transcript(hearing, hearing.heard.words, {"status": "not_run"})
+
+    def _assemble(self, both: tuple[Hearing, Voices]) -> Transcript:
+        hearing, voices = both
+        assert self.diarizer is not None  # noqa: S101  only built with a diarizer
+        model = self.diarizer.identity.model
+        if voices.error is not None:
+            return self._transcript(hearing, hearing.heard.words, {"model": model, "status": "failed", "detail": voices.error[:300]})
+        words = assign_speakers(hearing.heard.words, voices.turns)
+        return self._transcript(hearing, words, {"model": model, "status": "ok"})
+
+    def _transcript(self, hearing: Hearing, words: tuple[Word, ...], diarizer: dict[str, str]) -> Transcript:
+        ident, heard = self.transcriber.identity, hearing.heard
         provenance = Provenance(
             engine=ident.engine,
             model=ident.model,
             runtime=ident.runtime,
             settings=self._settings(),
-            audio_sha256=digest,
-            audio_seconds=self._probe(audio),
+            audio_sha256=self._hash(hearing.audio),
+            audio_seconds=self._probe(hearing.audio),
             seconds=heard.seconds,
             peak_memory_gb=heard.peak_memory_gb,
             diarizer=diarizer,
@@ -132,21 +182,6 @@ class Pipeline:
         if self.diarizer is not None:
             settings["diarizer"] = self.diarizer.identity.model
         return settings
-
-    def _diarize(self, audio: Path) -> Diarized | Exception:
-        assert self.diarizer is not None  # noqa: S101  only submitted with a diarizer
-        try:
-            with self._slot("diarize"):
-                return self.diarizer.diarize(audio)
-        except Exception as error:  # noqa: BLE001  a diarizer failure must not fail the transcript
-            return error
-
-    def _label(self, words: tuple[Word, ...], result: Diarized | Exception) -> tuple[tuple[Word, ...], dict[str, str]]:
-        assert self.diarizer is not None  # noqa: S101  narrowed by the caller
-        model = self.diarizer.identity.model
-        if isinstance(result, Exception):
-            return words, {"model": model, "status": "failed", "detail": str(result)[:300]}
-        return assign_speakers(words, result.turns), {"model": model, "status": "ok"}
 
 
 def _first_seen(words: tuple[Word, ...]) -> Callable[[str], float]:

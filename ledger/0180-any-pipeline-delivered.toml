@@ -1,0 +1,10 @@
+seq = 180
+date = "2026-11-19"
+event = "delivery"
+software = "any-pipeline"
+release = "any-pipeline-v0.1.0"
+actor = "shelf"
+consumer = ""
+verdict = ""
+cost = "openspec/changes/any-pipeline/design.md"
+note = "PROMOTE: the pipeline shape, extracted from any-speech before any second consumer, on Denis's instruction to make the common pipeline mistakes unwritable. The type-level claims were measured with pyrefly (a wrong edge, a missing limit, a sync function, an unhandled failure case and an edit of a frozen item are each rejected, and a test keeps them rejected); what no tool can guarantee is listed in the README. Not adopted yet; any-speech 0.4.0 is the first consumer."

@@ -27,6 +27,7 @@ members = [
     "any-markdown",
     "any-net",
     "any-path-glob",
+    "any-pipeline",
     "any-plugin-cache",
     "any-proc",
     "any-recorded-fixture",
@@ -348,6 +349,11 @@ version = "0.1.0"
 source = { editable = "packages/any-path-glob" }
 
 [[package]]
+name = "any-pipeline"
+version = "0.1.0"
+source = { editable = "packages/any-pipeline" }
+
+[[package]]
 name = "any-plugin-cache"
 version = "0.1.0"
 source = { editable = "packages/any-plugin-cache" }
@@ -369,10 +375,11 @@ source = { editable = "packages/any-shell-policy" }
 
 [[package]]
 name = "any-speech"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/any-speech" }
 dependencies = [
     { name = "any-lease" },
+    { name = "any-pipeline" },
     { name = "app-dirs" },
     { name = "atomic-io" },
     { name = "content-digest" },
@@ -392,6 +399,7 @@ parakeet = [
 [package.metadata]
 requires-dist = [
     { name = "any-lease", editable = "packages/any-lease" },
+    { name = "any-pipeline", editable = "packages/any-pipeline" },
     { name = "app-dirs", editable = "packages/app-dirs" },
     { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "content-digest", editable = "packages/content-digest" },

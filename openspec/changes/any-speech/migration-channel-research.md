@@ -18,13 +18,13 @@ For the session that owns `iorlas-wip`; this change edits nothing there. Read `e
 ```python
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["any-speech @ git+https://github.com/yoselabs/shelf@any-speech-v0.3.0#subdirectory=packages/any-speech"]
+# dependencies = ["any-speech @ git+https://github.com/yoselabs/shelf@any-speech-v0.4.0#subdirectory=packages/any-speech"]
 # ///
 from any_speech import Drain, Job, Slots, Speech, default_transcriber, Pipeline
 
 scan = lambda: [Job(a, a.with_name("transcript.speech.json")) for a in sorted(ROOT.glob("youtube/*/videos/*/audio.*"))]
 speech = Speech(Pipeline(default_transcriber()), LEASES, Slots.auto())
-Drain(scan=scan, speech=speech, workers=2).run()
+asyncio.run(Drain(scan=scan, speech=speech, workers=2).run())
 ```
 
 Transcription only is what channel-research needs (its traits come from the host's words): no diarizer, no `--diarize`, no binary flag after `any-speech setup fluidaudio`:

@@ -86,7 +86,7 @@ def default_speech(
     return Speech(Pipeline(chosen, diarizer), root, slots if slots is not None else Slots.auto())
 
 
-def transcribe(
+async def transcribe(
     audio: Path,
     out: Path | None = None,
     *,
@@ -101,10 +101,10 @@ def transcribe(
     No speakers: most uses do not need them, and they cost a second model. See :func:`transcribe_with_speakers`.
     """
     speech = default_speech(transcriber=transcriber, slots=slots, leases_root=leases_root, env=env, home=home)
-    return speech.transcribe(audio, out)
+    return await speech.transcribe(audio, out)
 
 
-def transcribe_with_speakers(
+async def transcribe_with_speakers(
     audio: Path,
     out: Path | None = None,
     *,
@@ -118,4 +118,4 @@ def transcribe_with_speakers(
     """As :func:`transcribe`, with each word labelled S1, S2, ... by the voice that said it."""
     voices = diarizer if diarizer is not None else default_diarizer(env=env, home=home)
     speech = default_speech(transcriber=transcriber, diarizer=voices, slots=slots, leases_root=leases_root, env=env, home=home)
-    return speech.transcribe(audio, out)
+    return await speech.transcribe(audio, out)

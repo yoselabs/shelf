@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
@@ -51,10 +52,10 @@ def claim_path(out: Path) -> Path:
 MAX_DIARIZER_TRIES = 3  # a transient diarizer failure is retried; a permanent one stops here and leaves speaker None
 
 
-def is_current(out: Path, pipeline: Pipeline, audio: Path) -> bool:
+async def is_current(out: Path, pipeline: Pipeline, audio: Path) -> bool:
     try:
-        stored = Transcript.load(out)
-        if stored.provenance.key != pipeline.key_for(audio):
+        stored = await asyncio.to_thread(Transcript.load, out)
+        if stored.provenance.key != await asyncio.to_thread(pipeline.key_for, audio):
             return False
     except (OSError, ValueError, KeyError):
         return False
@@ -89,33 +90,37 @@ class Speech:
         wants = {f"any-speech-{kind}": pools[f"any-speech-{kind}"], "any-speech-total": pools["any-speech-total"]}
         return self._leases.acquire_all(wants, label=f"any-speech {kind}")
 
-    def run(self, audio: Path) -> Transcript:
+    async def run(self, audio: Path) -> Transcript:
         """The transcript of `audio` as a value, nothing stored."""
-        return self.pipeline.run(audio)
+        return await self.pipeline.run(audio)
 
-    def transcribe(self, audio: Path, out: Path | None = None) -> Transcript:
+    async def transcribe(self, audio: Path, out: Path | None = None) -> Transcript:
         """The transcript of `audio`, stored in one file (default: beside the audio, `<name>.speech.json`).
 
         A current file there is returned as is. Two callers for the same file run it once: the second waits, then finds it done.
         """
         target = out if out is not None else default_out(audio)
-        with ProcessLock.acquire(claim_path(target), timeout=None, reentrant=False):
-            return self.fulfil(audio, target)
+        lock = await asyncio.to_thread(ProcessLock.acquire, claim_path(target), timeout=None, reentrant=False)
+        try:
+            return await self.fulfil(audio, target)
+        finally:
+            lock.release()
 
-    def fulfil(self, audio: Path, out: Path) -> Transcript:
+    async def fulfil(self, audio: Path, out: Path) -> Transcript:
         """As `transcribe(audio, out)` for a caller that already holds the claim on `out`."""
-        if is_current(out, self.pipeline, audio):
-            return Transcript.load(out)
-        transcript = self._counted(self.pipeline.run(audio), self._tries_so_far(out, audio))
-        transcript.save(out)
+        if await is_current(out, self.pipeline, audio):
+            return await asyncio.to_thread(Transcript.load, out)
+        transcript = self._counted(await self.pipeline.run(audio), await self._tries_so_far(out, audio))
+        await asyncio.to_thread(transcript.save, out)
         return transcript
 
-    def _tries_so_far(self, out: Path, audio: Path) -> int:
+    async def _tries_so_far(self, out: Path, audio: Path) -> int:
         try:
-            stored = Transcript.load(out)
-            return _failed_tries(stored) if stored.provenance.key == self.pipeline.key_for(audio) else 0
+            stored = await asyncio.to_thread(Transcript.load, out)
+            same = stored.provenance.key == await asyncio.to_thread(self.pipeline.key_for, audio)
         except (OSError, ValueError, KeyError):
             return 0
+        return _failed_tries(stored) if same else 0
 
     @staticmethod
     def _counted(transcript: Transcript, before: int) -> Transcript:
