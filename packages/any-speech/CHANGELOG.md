@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+
+- `# Any: <reason>` on the public signature that names `Any`; no behaviour or stored byte changes (shelf public-any rule, tests/test_arch_public_any.py)
+
 ## 0.5.0
 
 - **Breaking: the default file is `<stem>.speech.json`** (`talk.m4a` -> `talk.speech.json`, was `talk.m4a.speech.json`). Existing `<name>.speech.json` files are not found by the default name and are redone; pass `out` to keep one. `talk.m4a` and `talk.wav` now share a name.

@@ -59,7 +59,7 @@ class LlamaCppEmbedder:
         max_tokens: int = 512,
         gpu: bool = True,
         offline: bool = True,
-        loader: Callable[..., Any] | None = None,
+        loader: Callable[..., Any] | None = None,  # Any: llama_cpp.Llama's untyped constructor, injected by tests
     ) -> None:
         """``path`` names the GGUF file; or ``repo_id`` + ``filename`` find it in the Hugging Face cache.
 

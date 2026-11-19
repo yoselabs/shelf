@@ -132,7 +132,7 @@ class Transcript:
         )
         return header + "".join(f"\n{line}\n" for line in self.to_text().splitlines())
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:  # Any: the JSON document as stored
         """The one complete value. Word and segment times are rounded to milliseconds (`round(t, 3)`); nothing else is lossy."""
         body = asdict(self)
         for item in (*body["words"], *body["segments"]):

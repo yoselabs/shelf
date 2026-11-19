@@ -39,7 +39,7 @@ class ParakeetMlx:
         runtime: str,
         chunk_seconds: float = 120.0,
         overlap_seconds: float = 15.0,
-        loader: Callable[[str], Any] = _load,
+        loader: Callable[[str], Any] = _load,  # Any: parakeet_mlx's untyped model object, injected by tests
         memory: Callable[[], Memory] = MlxMemory,
     ) -> None:
         self.identity = Identity("parakeet-mlx", model, runtime, {"chunk_seconds": chunk_seconds, "overlap_seconds": overlap_seconds})

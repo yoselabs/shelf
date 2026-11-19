@@ -115,7 +115,7 @@ class SecretStrippingYamlSource(YamlConfigSettingsSource):
         self._exclude = frozenset(exclude)
         super().__init__(settings_cls, yaml_file=yaml_file)
 
-    def __call__(self) -> dict[str, Any]:
+    def __call__(self) -> dict[str, Any]:  # Any: pydantic-settings' PydanticBaseSettingsSource.__call__ signature
         """Load the YAML document and remove every excluded (secret) field."""
         data = super().__call__()
         for key in self._exclude:

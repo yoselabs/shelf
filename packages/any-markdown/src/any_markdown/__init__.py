@@ -148,7 +148,7 @@ class Markdown:
         return self._text
 
     @cached_property
-    def tokens(self) -> list[Any]:
+    def tokens(self) -> list[Any]:  # Any: markdown-it's Token is an untyped third-party class
         """The markdown-it token stream — the escape hatch, for questions this type has
         no method for yet. Held, never inherited from."""
         return MarkdownIt("commonmark").parse(self.text)

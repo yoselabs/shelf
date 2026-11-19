@@ -1,6 +1,6 @@
 [project]
 name = "settings-base"
-version = "0.2.0"
+version = "0.3.0"
 description = "Generic env/YAML machinery for pydantic-settings config — ${VAR} interpolation, optional-config-path resolution, and a secret-stripping YAML source."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

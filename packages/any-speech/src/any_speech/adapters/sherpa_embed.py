@@ -47,7 +47,7 @@ class SherpaEmbedder:
         model: Path,
         *,
         runtime: str,
-        extractor: Callable[[Path], Any] = _extractor,
+        extractor: Callable[[Path], Any] = _extractor,  # Any: sherpa_onnx's untyped extractor, injected by tests
         decode: Callable[[Path, float | None, float | None], list[float]] = decode_f32,
     ) -> None:
         self.identity = Identity("sherpa-onnx", model.stem, runtime)
