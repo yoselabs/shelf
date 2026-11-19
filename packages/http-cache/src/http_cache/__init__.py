@@ -19,9 +19,11 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
+from any_ttl_cache import TtlTable
 from sqlite_resource import SqliteResource
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     import aiosqlite
@@ -45,6 +47,17 @@ CREATE TABLE IF NOT EXISTS cache (
 _INDEX = "CREATE INDEX IF NOT EXISTS cache_content_hash ON cache(content_hash);"
 
 
+def _table(clock: Callable[[], float]) -> TtlTable:
+    return TtlTable(
+        name="cache",
+        keys=("url", "variant"),
+        values=("etag", "last_modified", "status_code", "content_type", "content_hash", "body"),
+        stamped="fetched_at",
+        schema=_SCHEMA + _INDEX,
+        clock=clock,
+    )
+
+
 @dataclass(slots=True, frozen=True)
 class CacheRow:
     """One cached HTTP response. ``body`` is the decompressed payload."""
@@ -63,8 +76,7 @@ class CacheRow:
 
 async def apply_schema(conn: aiosqlite.Connection) -> None:
     """Create the cache table + index if absent — an :class:`SqliteResource` ``on_open`` hook."""
-    await conn.execute(_SCHEMA)
-    await conn.execute(_INDEX)
+    await _table(time.time).ensure(conn)
 
 
 def conditional_headers(row: CacheRow | None) -> dict[str, str]:
@@ -79,28 +91,23 @@ def conditional_headers(row: CacheRow | None) -> dict[str, str]:
     return out
 
 
-async def cache_get(conn: aiosqlite.Connection, url: str, variant: str = "") -> CacheRow | None:
+async def cache_get(conn: aiosqlite.Connection, url: str, variant: str = "", *, clock: Callable[[], float] = time.time) -> CacheRow | None:
     """Return a non-expired row for ``(url, variant)``, or ``None``."""
-    async with conn.execute(
-        "SELECT url, variant, etag, last_modified, fetched_at, expires_at, "
-        "status_code, content_type, content_hash, body FROM cache "
-        "WHERE url = ? AND variant = ? AND expires_at > ?",
-        (url, variant, int(time.time())),
-    ) as cursor:
-        row = await cursor.fetchone()
-    if row is None:
+    entry = await _table(clock).get(conn, (url, variant))
+    if entry is None:
         return None
+    etag, last_modified, status_code, content_type, content_hash, body = entry.values
     return CacheRow(
-        url=row[0],
-        variant=row[1],
-        etag=row[2],
-        last_modified=row[3],
-        fetched_at=row[4],
-        expires_at=row[5],
-        status_code=row[6],
-        content_type=row[7],
-        content_hash=row[8],
-        body=gzip.decompress(row[9]),
+        url=url,
+        variant=variant,
+        etag=etag,
+        last_modified=last_modified,
+        fetched_at=entry.stamped,
+        expires_at=entry.expires_at,
+        status_code=status_code,
+        content_type=content_type,
+        content_hash=content_hash,
+        body=gzip.decompress(body),
     )
 
 
@@ -115,19 +122,15 @@ async def cache_put(
     content_type: str | None,
     body: bytes,
     ttl_s: int,
+    clock: Callable[[], float] = time.time,
 ) -> None:
     """Insert or replace one row. The caller decides *whether* to cache (gate first)."""
-    now = int(time.time())
-    content_hash = hashlib.sha256(body).hexdigest()
-    compressed = gzip.compress(body)
-    await conn.execute(
-        "INSERT OR REPLACE INTO cache "
-        "(url, variant, etag, last_modified, fetched_at, expires_at, "
-        "status_code, content_type, content_hash, body) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (url, variant, etag, last_modified, now, now + ttl_s, status_code, content_type, content_hash, compressed),
+    await _table(clock).put(
+        conn,
+        (url, variant),
+        (etag, last_modified, status_code, content_type, hashlib.sha256(body).hexdigest(), gzip.compress(body)),
+        ttl_s=ttl_s,
     )
-    await conn.commit()
 
 
 class HttpCache:
@@ -138,14 +141,15 @@ class HttpCache:
     lifecycle and applies the cache schema on open.
     """
 
-    def __init__(self, db_path: Path) -> None:
-        """Bind the cache to ``db_path`` (opened lazily on first use)."""
+    def __init__(self, db_path: Path, *, clock: Callable[[], float] = time.time) -> None:
+        """Bind the cache to ``db_path`` (opened lazily on first use); ``clock`` is seconds since the epoch."""
         self._res = SqliteResource(db_path, on_open=apply_schema)
+        self._clock = clock
 
     async def get(self, url: str, variant: str = "") -> CacheRow | None:
         """Return the non-expired cached response for ``(url, variant)``, or ``None``."""
         conn = await self._res.ensure()
-        return await cache_get(conn, url, variant)
+        return await cache_get(conn, url, variant, clock=self._clock)
 
     async def put(
         self,
@@ -171,6 +175,7 @@ class HttpCache:
             content_type=content_type,
             body=body,
             ttl_s=ttl_s,
+            clock=self._clock,
         )
 
     async def close(self) -> None:

@@ -1,6 +1,6 @@
 [project]
 name = "llm-cache"
-version = "0.1.2"
+version = "0.2.0"
 description = "A sqlite-backed TTL cache for LLM completions, keyed on (key, model) and speaking anyllm.Completion."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
@@ -9,7 +9,11 @@ license = "Apache-2.0"
 dependencies = [
     "aiosqlite>=0.20,<1",
     "anyllm>=0.5,<1",
+    "any-ttl-cache",
 ]
+
+[tool.uv.sources]
+any-ttl-cache = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -231,6 +231,8 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 "packages/any-browser/src/any_browser/zendriver.py" = ["BLE001"]
 # CAS interpolates only quoted identifiers; all data values remain bound parameters.
 "packages/sqlite-store/src/sqlite_store/cas.py" = ["S608"]
+# TtlTable splices only identifiers it validated against a plain-identifier pattern; every value is a bound parameter.
+"packages/any-ttl-cache/src/any_ttl_cache/__init__.py" = ["S608"]
 
 [tool.pytest.ini_options]
 # testpaths lists the shelf's own fitness tests + every package's tests.
@@ -304,6 +306,7 @@ testpaths = [
     "packages/any-yaml/tests",
     "packages/any-speech/tests",
     "packages/any-pipeline/tests",
+    "packages/any-ttl-cache/tests",
     "packages/py-symbols/tests",
     "packages/test-reach/tests",
     "packages/any-agent/tests",
@@ -401,6 +404,7 @@ root_packages = [
     "any_shell_policy",
     "any_net",
     "any_clock",
+    "any_ttl_cache",
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
@@ -492,6 +496,7 @@ source_modules = [
     "any_shell_policy",
     "any_net",
     "any_clock",
+    "any_ttl_cache",
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
@@ -585,6 +590,7 @@ modules = [
     "any_shell_policy",
     "any_net",
     "any_clock",
+    "any_ttl_cache",
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
@@ -616,6 +622,8 @@ ignore_imports = [
     "any_json_doc -> process_lock",
     "content_extract -> convert_md",
     "http_cache -> sqlite_resource",
+    "http_cache -> any_ttl_cache",
+    "llm_cache -> any_ttl_cache",
     "llm_cache -> anyllm",
     "anyllm.providers.* -> any_agent",
     "mcp_result_wire._format_routing -> page_tsv",

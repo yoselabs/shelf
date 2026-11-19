@@ -33,6 +33,7 @@ members = [
     "any-recorded-fixture",
     "any-shell-policy",
     "any-speech",
+    "any-ttl-cache",
     "any-yaml",
     "anyembed",
     "anyllm",
@@ -410,6 +411,17 @@ requires-dist = [
     { name = "verb-cli", editable = "packages/verb-cli" },
 ]
 provides-extras = ["parakeet", "embed"]
+
+[[package]]
+name = "any-ttl-cache"
+version = "0.1.0"
+source = { editable = "packages/any-ttl-cache" }
+dependencies = [
+    { name = "aiosqlite" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "aiosqlite", specifier = ">=0.20,<1" }]
 
 [[package]]
 name = "any-yaml"
@@ -1841,14 +1853,18 @@ wheels = [
 
 [[package]]
 name = "http-cache"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/http-cache" }
 dependencies = [
+    { name = "any-ttl-cache" },
     { name = "sqlite-resource" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "sqlite-resource", editable = "packages/sqlite-resource" }]
+requires-dist = [
+    { name = "any-ttl-cache", editable = "packages/any-ttl-cache" },
+    { name = "sqlite-resource", editable = "packages/sqlite-resource" },
+]
 
 [[package]]
 name = "http-fetch"
@@ -2337,16 +2353,18 @@ sdist = { url = "https://files.pythonhosted.org/packages/ec/e9/e7de2b0463ea3ffbf
 
 [[package]]
 name = "llm-cache"
-version = "0.1.2"
+version = "0.2.0"
 source = { editable = "packages/llm-cache" }
 dependencies = [
     { name = "aiosqlite" },
+    { name = "any-ttl-cache" },
     { name = "anyllm" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.20,<1" },
+    { name = "any-ttl-cache", editable = "packages/any-ttl-cache" },
     { name = "anyllm", editable = "packages/anyllm" },
 ]
 

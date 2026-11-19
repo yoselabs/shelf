@@ -1,0 +1,5 @@
+# Changelog
+
+## 0.1.0
+
+- `TtlTable`, `Entry`: the sqlite TTL table with expiry, lazy eviction on read and an injected clock, extracted from llm-cache 0.1.2 and http-cache 0.1.0 (the same store written twice). The caller owns the schema text, so existing databases keep their bytes.

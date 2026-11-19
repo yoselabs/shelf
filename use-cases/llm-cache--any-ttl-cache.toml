@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "llm-cache"
+software = "any-ttl-cache"
+why = "llm-cache's sqlite table with expires_at, expiry-filtered read, lazy eviction and a wall-clock stamp was the same store http-cache wrote a second time; its tests slept 1.1 seconds to pass expiry. The TTL mechanics are generic; the (key, model) keying and the Completion shape stay in llm-cache."
+needs = "TtlTable over llm-cache's own schema text: get/put/evict_expired/count against the injected aiosqlite connection, with a clock it can step in tests, and the stored table byte-compatible with databases written by llm-cache 0.1.2."
+sponsor = "yoselabs"
+requester = "llm-cache"
+status = "active" # active | retired

@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "http-cache"
+software = "any-ttl-cache"
+why = "http-cache's sqlite table with expires_at, an expiry-filtered read and a wall-clock stamp was the same store llm-cache wrote first; its property test read the real clock and flaked under load (shelf-855). The TTL mechanics are generic; the (url, variant) key, the gzip body, the content hash and the conditional-GET headers stay in http-cache."
+needs = "TtlTable over http-cache's own schema text: get returning the stored and expiry seconds beside the values, put with a negative ttl born expired, a clock injected through HttpCache and the free functions, and the stored table byte-compatible with databases written by http-cache 0.1.0."
+sponsor = "yoselabs"
+requester = "http-cache"
+status = "active" # active | retired
