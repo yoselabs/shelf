@@ -17,8 +17,12 @@ def _shelf(explicit: str | None) -> Path | None:
     return None
 
 
-def _say(text: str, *, err: bool = False) -> None:
-    (sys.stderr if err else sys.stdout).write(text + "\n")
+def _out(text: str) -> None:
+    sys.stdout.write(text + "\n")
+
+
+def _err(text: str) -> None:
+    sys.stderr.write(text + "\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,19 +40,19 @@ def main(argv: list[str] | None = None) -> int:
     shelf = _shelf(args.shelf)
     if args.cmd == "sync":
         if shelf is None:
-            _say("vendor: no shelf checkout (set SHELF_HOME or pass --shelf)", err=True)
+            _err("vendor: no shelf checkout (set SHELF_HOME or pass --shelf)")
             return 2
         e = vendor.sync(args.name, args.tag, shelf=shelf)
-        _say(f"vendor: {e['name']} synced from {e['shelf_tag']} ({e['shelf_commit'][:12]}) tree_hash {e['tree_hash'][:12]}")
+        _out(f"vendor: {e['name']} synced from {e['shelf_tag']} ({e['shelf_commit'][:12]}) tree_hash {e['tree_hash'][:12]}")
         return 0
     drift, warnings = vendor.check(shelf)
     for line in warnings:
-        _say(f"vendor: NEWER {line}", err=True)
+        _err(f"vendor: NEWER {line}")
     for line in drift:
-        _say(f"vendor: DRIFT {line}", err=True)
+        _err(f"vendor: DRIFT {line}")
     if not drift:
         n = len(vendor.load())
-        _say(f"vendor: ok ({n} package{'' if n == 1 else 's'}{', checked against the shelf tag' if shelf else ''})")
+        _out(f"vendor: ok ({n} package{'' if n == 1 else 's'}{', checked against the shelf tag' if shelf else ''})")
     return 1 if drift else 0
 
 

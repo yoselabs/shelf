@@ -26,37 +26,37 @@ def _strict(repo: Repo) -> tuple[Verdict, str]:
 
 
 def test_two_scripts_make_a_shell_stack(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/b.sh", _STRICT, executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/b.sh", _STRICT)
     rows = _rows(repo)
     assert "tools/a.sh" in rows["stack.shell.profile"][1]
     assert rows["stack.shell.linter"][0] is Verdict.NOT_SET_UP
 
 
 def test_one_short_wrapper_is_not_a_shell_stack(repo: Repo) -> None:
-    repo.write("run.sh", '#!/bin/sh\nexec python -m app "$@"\n', executable=True)
+    repo.write_executable("run.sh", '#!/bin/sh\nexec python -m app "$@"\n')
     assert "stack.shell.profile" not in _rows(repo)
 
 
 def test_one_long_script_is_a_shell_stack(repo: Repo) -> None:
-    repo.write("build.sh", _LONG, executable=True)
+    repo.write_executable("build.sh", _LONG)
     assert "stack.shell.profile" in _rows(repo)
 
 
 def test_bds_hook_shims_are_not_the_repos_scripts(repo: Repo) -> None:
-    repo.write(".beads/hooks/pre-commit.sh", _LONG, executable=True)
+    repo.write_executable(".beads/hooks/pre-commit.sh", _LONG)
     assert "stack.shell.profile" not in _rows(repo)
 
 
 def test_strict_scripts_pass(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/b.sh", "#!/bin/sh\nset -eu\necho hi\n", executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/b.sh", "#!/bin/sh\nset -eu\necho hi\n")
     assert _strict(repo)[0] is Verdict.PASSING
 
 
 def test_a_bash_script_without_pipefail_fails_and_is_named(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/loose.sh", "#!/usr/bin/env bash\nset -e\necho hi\n", executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/loose.sh", "#!/usr/bin/env bash\nset -e\necho hi\n")
     verdict, evidence = _strict(repo)
     assert verdict is Verdict.FAILING
     assert "tools/loose.sh" in evidence
@@ -64,8 +64,8 @@ def test_a_bash_script_without_pipefail_fails_and_is_named(repo: Repo) -> None:
 
 
 def test_long_option_names_count(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/b.sh", "#!/bin/bash\nset -o errexit\nset -o nounset -o pipefail\n", executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/b.sh", "#!/bin/bash\nset -o errexit\nset -o nounset -o pipefail\n")
     assert _strict(repo)[0] is Verdict.PASSING
 
 
@@ -80,8 +80,8 @@ def _strict_override(repo: Repo, scope: str, fields: str = "expires = 2099-01-01
 
 
 def test_a_probe_may_drop_errexit_with_a_scoped_override(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/probe.sh", _PROBE, executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/probe.sh", _PROBE)
     _strict_override(repo, "tools/probe.sh")
     verdict, evidence = _strict(repo)
     assert verdict is Verdict.PASSING
@@ -89,9 +89,9 @@ def test_a_probe_may_drop_errexit_with_a_scoped_override(repo: Repo) -> None:
 
 
 def test_an_override_for_one_script_excuses_no_other(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/probe.sh", _PROBE, executable=True)
-    repo.write("tools/other.sh", _PROBE, executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/probe.sh", _PROBE)
+    repo.write_executable("tools/other.sh", _PROBE)
     _strict_override(repo, "tools/probe.sh")
     verdict, evidence = _strict(repo)
     assert verdict is Verdict.FAILING
@@ -100,15 +100,15 @@ def test_an_override_for_one_script_excuses_no_other(repo: Repo) -> None:
 
 
 def test_an_unjustified_strict_override_excuses_nothing(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/probe.sh", _PROBE, executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/probe.sh", _PROBE)
     _strict_override(repo, "tools/probe.sh", fields="")
     assert _strict(repo)[0] is Verdict.FAILING
 
 
 def test_a_strict_marker_is_still_honoured_and_notices_the_override_to_write(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/probe.sh", "#!/usr/bin/env bash\n# strict: no -e, reports every failing host\nset -uo pipefail\n", executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/probe.sh", "#!/usr/bin/env bash\n# strict: no -e, reports every failing host\nset -uo pipefail\n")
     assert _strict(repo)[0] is Verdict.PASSING
     (notice,) = run(repo.root, concern="stack", env=repo.env).notices
     assert "move this to an [[override]] in docs/blueprint/blueprint.toml" in notice
@@ -118,15 +118,15 @@ def test_a_strict_marker_is_still_honoured_and_notices_the_override_to_write(rep
 
 
 def test_a_strict_marker_still_needs_u_and_pipefail(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/probe.sh", "#!/usr/bin/env bash\n# strict: no -e, probe\nset -u\n", executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/probe.sh", "#!/usr/bin/env bash\n# strict: no -e, probe\nset -u\n")
     verdict, evidence = _strict(repo)
     assert verdict is Verdict.FAILING
     assert "tools/probe.sh (no pipefail)" in evidence
 
 
 def test_a_sourced_library_is_not_judged(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
     repo.write("tools/lib.sh", '# sourced by a.sh\nlog() { echo "$1"; }\n')
     assert _strict(repo)[0] is Verdict.PASSING
 
@@ -151,7 +151,7 @@ def test_hadolint_in_the_gate_with_its_config_passes(repo: Repo) -> None:
 def test_one_script_in_a_python_repo_is_the_shell_stack_with_its_conventions_file(repo: Repo) -> None:
     repo.write("pyproject.toml", '[project]\nname = "x"\n')
     repo.write("uv.lock", "")
-    repo.write("packaging/macos/build_app.sh", _LONG.replace("set -euo pipefail\n", "set -e\n"), executable=True)
+    repo.write_executable("packaging/macos/build_app.sh", _LONG.replace("set -euo pipefail\n", "set -e\n"))
     rows = _rows(repo)
     assert "packaging/macos/build_app.sh" in rows["stack.shell.profile"][1]
     assert rows["stack.shell.strict-mode"][0] is Verdict.FAILING
@@ -211,8 +211,8 @@ def test_a_matrix_ci_job_builds_each_image_its_template_matches(repo: Repo) -> N
 
 
 def test_bats_tests_run_by_the_gate_pass_the_shell_tests_row(repo: Repo) -> None:
-    repo.write("tools/a.sh", _STRICT, executable=True)
-    repo.write("tools/b.sh", _STRICT, executable=True)
+    repo.write_executable("tools/a.sh", _STRICT)
+    repo.write_executable("tools/b.sh", _STRICT)
     assert _rows(repo)["stack.shell.tests"][0] is Verdict.NOT_SET_UP
     repo.write("tests/shell/a.bats", "@test 'a' { true; }\n")
     repo.write("mise.toml", '[tools]\nbats = "1.14.0"\n')
@@ -266,7 +266,7 @@ def test_one_compose_file_in_a_python_repo_is_the_full_compose_stack(repo: Repo)
 
 def test_an_ignored_script_is_not_a_shell_stack(repo: Repo) -> None:
     # a2kay 2026-10-12: two macOS-only, hand-run scripts; an ignore naming a file (not a folder) must hold.
-    repo.write("packaging/macos/build_app.sh", _LONG, executable=True)
+    repo.write_executable("packaging/macos/build_app.sh", _LONG)
     reason = 'reason = "macOS-only tool the owner runs by hand"\nexpires = 2099-01-01\n'
     repo.write("docs/blueprint/blueprint.toml", f'[[profile.ignore]]\npath = "packaging/macos/build_app.sh"\n{reason}')
     assert "stack.shell.profile" not in _rows(repo)

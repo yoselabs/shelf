@@ -150,14 +150,14 @@ def test_write_removes_the_report_of_a_concern_that_no_longer_applies(repo: Repo
     )
     own = repo.root / "docs/blueprint/notes.md"
     own.write_text("# Notes the owner keeps here\n")
-    report.write(result, repo.root, date(2026, 10, 10))
+    report.prune_stale(repo.root, report.write(result, repo.root, date(2026, 10, 10)))
     assert not stale.exists()
     assert own.exists()
 
 
 def test_a_run_of_one_concern_keeps_the_other_reports(repo: Repo) -> None:
     report.write(run(repo.root, env=repo.env), repo.root, date(2026, 10, 10))
-    report.write(run(repo.root, concern="gate", env=repo.env), repo.root, date(2026, 10, 10), prune=False)
+    report.write(run(repo.root, concern="gate", env=repo.env), repo.root, date(2026, 10, 10))
     assert (repo.root / "docs/blueprint/knowledge.md").exists()
 
 
@@ -395,7 +395,7 @@ def test_an_unjustified_detection_override_skips_nothing(repo: Repo, fields: str
 
 def test_a_detection_override_naming_one_file_keeps_that_file_out_of_the_stack(repo: Repo) -> None:
     for name in ("tools/a.sh", "scripts/b.sh"):
-        repo.write(name, "#!/usr/bin/env bash\nset -euo pipefail\n" + "echo x\n" * 12, executable=True)
+        repo.write_executable(name, "#!/usr/bin/env bash\nset -euo pipefail\n" + "echo x\n" * 12)
     repo.write(
         "docs/blueprint/blueprint.toml",
         '[[profile.ignore]]\npath = "tools/a.sh"\nreason = "r"\nexpires = 2099-01-01\n'
