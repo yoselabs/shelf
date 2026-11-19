@@ -1,7 +1,7 @@
 [project]
 name = "content-digest"
-version = "0.1.0"
-description = "One canonical hash for a JSON value or a text — sorted keys, UTF-8, sha256 cut to 12 hex characters — that refuses what JSON cannot say instead of stringifying it."
+version = "0.2.0"
+description = "One canonical hash for a JSON value, a text, bytes or a file — sorted keys, UTF-8, sha256 cut to 12 hex characters — that refuses what JSON cannot say instead of stringifying it."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
