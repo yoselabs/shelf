@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "fts-query"
+software = "sqlite-sidecar"
+why = "Tokens ran FTS5 in a private in-memory database opened with a raw sqlite3.connect; sqlite-sidecar owns the open."
+needs = 'connect(":memory:"), an autocommit connection.'
+sponsor = "yoselabs"
+requester = "fts-query"
+status = "active" # active | retired

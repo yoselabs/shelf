@@ -12,11 +12,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 _OWNERS = ("sqlite-sidecar", "sqlite-store")
 
-# consumer wave empties this: each entry is a caller to repoint at sqlite-sidecar's `connect`.
-_ALLOWED = {
-    "packages/anyembed/src/anyembed/cache.py",
-    "packages/fts-query/src/fts_query/__init__.py",
-}
+_ALLOWED: set[str] = set()
 
 
 def _connect_calls(tree: ast.AST) -> list[int]:

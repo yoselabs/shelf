@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import hashlib
+import shutil
+import sqlite3
+from pathlib import Path
 
 import pytest
 from anyembed import EmbeddingCache
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class _Clock:
@@ -97,3 +97,28 @@ def test_prune_of_one_model_leaves_the_others() -> None:
 def test_put_refuses_a_length_mismatch() -> None:
     with pytest.raises(ValueError, match="texts"):
         EmbeddingCache(":memory:").put("m", ["a"], [])
+
+
+_FIXTURE = Path(__file__).parent / "fixtures" / "old_cache.sqlite"
+
+
+def test_a_database_made_by_the_old_code_reads_back_and_keeps_its_layout(tmp_path: Path) -> None:
+    # old_cache.sqlite was written by the pre-sidecar cache: raw sha256 digests as keys, this schema.
+    path = tmp_path / "old.sqlite"
+    shutil.copy(_FIXTURE, path)
+    cache = EmbeddingCache(path)
+    assert cache.get("model-a", ["hello", "héllo ☃", "absent"]) == [[1.0, 2.5], [0.25, -1.0], None]
+    cache.put("model-a", ["new"], [[3.0, 4.0]])
+    cache.close()
+    con = sqlite3.connect(path)
+    keys = {bytes(r[0]) for r in con.execute("SELECT text_hash FROM embedding_cache")}
+    schema = [r[0] for r in con.execute("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name")]
+    con.close()
+    assert keys == {hashlib.sha256(t.encode()).digest() for t in ("hello", "héllo ☃", "new")}
+    assert schema == [
+        (
+            "CREATE TABLE embedding_cache(model_id TEXT NOT NULL, text_hash BLOB NOT NULL, "
+            "dim INTEGER NOT NULL, vector BLOB NOT NULL, last_used REAL NOT NULL, PRIMARY KEY (model_id, text_hash)) WITHOUT ROWID"
+        ),
+        "CREATE INDEX embedding_cache_lru ON embedding_cache(last_used)",
+    ]

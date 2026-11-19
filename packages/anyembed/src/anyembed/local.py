@@ -46,11 +46,6 @@ class LocalEmbedder:
         """Lazily load the tokenizer + model once. Fail loud if unavailable."""
         if self._model is not None:
             return
-        if self._offline:
-            import os  # noqa: PLC0415 — set offline env before transformers loads
-
-            os.environ.setdefault("HF_HUB_OFFLINE", "1")
-            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
         try:
             import torch  # noqa: F401, PLC0415 — heavy, lazy; _encode uses it
             from transformers import AutoModel, AutoTokenizer  # noqa: PLC0415 — heavy, lazy
@@ -58,8 +53,8 @@ class LocalEmbedder:
             msg = f"LocalEmbedder needs torch and transformers, which are not installed: install anyembed[transformers] ({exc})"
             raise AnyEmbedError(msg) from exc
         try:
-            self._tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-            self._model = AutoModel.from_pretrained(self.model_id)
+            self._tokenizer = AutoTokenizer.from_pretrained(self.model_id, local_files_only=self._offline)
+            self._model = AutoModel.from_pretrained(self.model_id, local_files_only=self._offline)
             self._model.eval()
         except Exception as exc:
             msg = f"embedding model {self.model_id!r} could not be loaded (offline={self._offline}): {exc}"

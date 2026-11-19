@@ -10,18 +10,19 @@ a model swap or a changed prefix is a miss, never a stale hit. Bounded two ways:
 cap evicts the least recently used rows on write, and :meth:`EmbeddingCache.prune` drops
 the rows a full pass did not use (``unused_since`` = the pass's start).
 
-Stdlib ``sqlite3`` only; safe to share between threads (one connection behind a lock).
+Opened through ``sqlite-sidecar``; safe to share between threads (one connection behind a lock).
 """
 
 from __future__ import annotations
 
-import hashlib
-import sqlite3
 import struct
 import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
+
+from content_digest import digest_text
+from sqlite_sidecar import connect, transaction
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -39,7 +40,7 @@ MAX_ROWS = 500_000
 
 
 def _hash(text: str) -> bytes:
-    return hashlib.sha256(text.encode("utf-8")).digest()
+    return bytes.fromhex(digest_text(text, length=64))
 
 
 def _pack(vector: Sequence[float]) -> bytes:
@@ -54,11 +55,7 @@ class EmbeddingCache:
     """Vectors by ``(model_id, sha256(text))``, LRU-bounded, in one SQLite file."""
 
     def __init__(self, path: str | Path, *, max_rows: int = MAX_ROWS, clock: Callable[[], float] = time.time) -> None:
-        if str(path) != ":memory:":
-            Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
+        self._conn = connect(path)
         for ddl in _SCHEMA:
             self._conn.execute(ddl)
         self._lock = threading.Lock()
@@ -107,21 +104,15 @@ class EmbeddingCache:
             return
         now = self._clock()
         rows = [(model_id, _hash(t), len(v), _pack(v), now) for t, v in zip(texts, vectors, strict=True)]
-        with self._lock:
-            self._conn.execute("BEGIN")
-            try:
-                self._conn.executemany("INSERT OR REPLACE INTO embedding_cache VALUES (?, ?, ?, ?, ?)", rows)
-                over = self._count() - self._max_rows
-                if over > 0:
-                    self._conn.execute(
-                        "DELETE FROM embedding_cache WHERE (model_id, text_hash) IN "
-                        "(SELECT model_id, text_hash FROM embedding_cache ORDER BY last_used LIMIT ?)",
-                        (over,),
-                    )
-                self._conn.execute("COMMIT")
-            except BaseException:
-                self._conn.execute("ROLLBACK")
-                raise
+        with self._lock, transaction(self._conn):
+            self._conn.executemany("INSERT OR REPLACE INTO embedding_cache VALUES (?, ?, ?, ?, ?)", rows)
+            over = self._count() - self._max_rows
+            if over > 0:
+                self._conn.execute(
+                    "DELETE FROM embedding_cache WHERE (model_id, text_hash) IN "
+                    "(SELECT model_id, text_hash FROM embedding_cache ORDER BY last_used LIMIT ?)",
+                    (over,),
+                )
 
     def embed(self, model_id: str, texts: Sequence[str], compute: Callable[[list[str]], list[list[float]]]) -> list[list[float]]:
         """Each text's vector: cached where it is, ``compute``d (and stored) where it is not."""

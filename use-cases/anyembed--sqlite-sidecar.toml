@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "anyembed"
+software = "sqlite-sidecar"
+why = "the embedding cache opened its own SQLite file with a raw connect, WAL pragmas and a hand-written transaction; sqlite-sidecar owns that open and the transaction."
+needs = 'connect(path) (parent dir, WAL, autocommit) and transaction(conn).'
+sponsor = "yoselabs"
+requester = "anyembed"
+status = "active" # active | retired
