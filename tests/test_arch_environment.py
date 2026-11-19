@@ -22,7 +22,6 @@ _ALLOWLIST = {
     "any-agent/src/any_agent/harnesses/opencode_sandbox.py": "reads home and XDG_CONFIG_HOME for the sandbox deny list",
     "any-browser/src/any_browser/zendriver.py": "reads the executable and Playwright path variables to find the browser",
     "any-recorded-fixture/src/any_recorded_fixture/__init__.py": "default argument env=os.environ for update_requested",
-    "anyembed/src/anyembed/local.py": "MUTATES os.environ (setdefault HF_HUB_OFFLINE, TRANSFORMERS_OFFLINE)",
     "blueprint/src/blueprint/concerns/gate_clone.py": "~/.config/mise path from Path.home()",
     "blueprint/src/blueprint/model.py": "Context.env defaults to dict(os.environ)",
     "blueprint/src/blueprint/recipes/gate_state.py": "standalone copied recipe: GATE_LOCK_FILE, XDG_CACHE_HOME, child env",

@@ -21,11 +21,12 @@ caller can skip any fuzzy or semantic tier for it.
 from __future__ import annotations
 
 import re
-import sqlite3
 import threading
 from dataclasses import dataclass
 from functools import cache
 from typing import TYPE_CHECKING
+
+from sqlite_sidecar import connect
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping, Sequence
@@ -163,7 +164,7 @@ class Tokens:
     """
 
     def __init__(self, tokenize: str) -> None:
-        self._conn = sqlite3.connect(":memory:", check_same_thread=False, isolation_level=None)
+        self._conn = connect(":memory:")
         self._conn.execute(f"CREATE VIRTUAL TABLE tok USING fts5(body, tokenize='{tokenize}')")
         self._conn.execute("CREATE VIRTUAL TABLE tok_vocab USING fts5vocab(tok, instance)")
         self._lock = threading.Lock()

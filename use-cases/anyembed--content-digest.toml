@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "anyembed"
+software = "content-digest"
+why = "the embedding cache keyed rows by hand-hashed sha256 bytes; content-digest owns the text digest, and digest_text(length=64) hex-decoded is the same 32 bytes."
+needs = 'digest_text(text, length=64) returning the full sha256 hex.'
+sponsor = "yoselabs"
+requester = "anyembed"
+status = "active" # active | retired

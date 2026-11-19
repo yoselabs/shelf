@@ -1,11 +1,14 @@
 [project]
 name = "fts-query"
-version = "0.1.0"
+version = "0.2.0"
 description = "What a search query asks of a SQLite FTS5 index: stemmed words, grep -w exact terms, identifier-only routing, and the index tokenizer's own terms, with an injected letter fold on both sides."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
+dependencies = [
+    "sqlite-sidecar>=0.3,<1",
+]
 
 [build-system]
 requires = ["hatchling"]

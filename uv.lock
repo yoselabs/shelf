@@ -475,10 +475,12 @@ wheels = [
 
 [[package]]
 name = "anyembed"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "packages/anyembed" }
 dependencies = [
+    { name = "content-digest" },
     { name = "numpy" },
+    { name = "sqlite-sidecar" },
 ]
 
 [package.optional-dependencies]
@@ -493,9 +495,11 @@ transformers = [
 
 [package.metadata]
 requires-dist = [
+    { name = "content-digest", editable = "packages/content-digest" },
     { name = "huggingface-hub", marker = "extra == 'llamacpp'", specifier = ">=0.24,<2" },
     { name = "llama-cpp-python", marker = "extra == 'llamacpp'", specifier = ">=0.3.36,<0.4" },
     { name = "numpy", specifier = ">=1.24,<3" },
+    { name = "sqlite-sidecar", editable = "packages/sqlite-sidecar" },
     { name = "torch", marker = "extra == 'transformers'", specifier = ">=2.4,<3" },
     { name = "transformers", marker = "extra == 'transformers'", specifier = ">=4.40,<6" },
 ]
@@ -1627,8 +1631,14 @@ wheels = [
 
 [[package]]
 name = "fts-query"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/fts-query" }
+dependencies = [
+    { name = "sqlite-sidecar" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "sqlite-sidecar", editable = "packages/sqlite-sidecar" }]
 
 [[package]]
 name = "gherkin-official"
