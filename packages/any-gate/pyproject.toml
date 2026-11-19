@@ -7,12 +7,18 @@ authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
+    "any-lease>=0.1,<1",
     "atomic-io>=0.2,<1",
     "content-digest>=0.1,<1",
     "stream-proc>=0.6,<1",
 ]
 
+[project.optional-dependencies]
+# The stages load `any_gate.lanes_plugin` into the pytest of the project under test.
+pytest = ["pytest>=8"]
+
 [tool.uv.sources]
+any-lease = { workspace = true }
 atomic-io = { workspace = true }
 content-digest = { workspace = true }
 stream-proc = { workspace = true }

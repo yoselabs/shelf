@@ -87,26 +87,6 @@ def test_a_change_selects_its_packages_and_their_dependents(repo: Path, changed:
     assert _pkgs(affected.affected(repo, changed)) == expected
 
 
-def _no_uv(_repo: Path, _packages: list[str]) -> dict[str, str]:
-    message = "uv is not available here"
-    raise affected.ExportError(message)
-
-
-def test_a_suite_that_passed_is_skipped_until_it_or_a_dependency_changes(repo: Path) -> None:
-    (repo / "packages/base/src.py").write_text("x = 1\n")
-    paths = ["tests", "packages/base/tests", "packages/middle/tests", "packages/leaf/tests"]
-    affected.record(repo, paths, exporter=_no_uv)
-    assert affected.skip_passed(repo, paths, exporter=_no_uv) == ["tests"]
-    assert affected.skip_passed(repo, ["tests/test_arch.py"], exporter=_no_uv) == ["tests/test_arch.py"]
-
-    (repo / "packages/base/src.py").write_text("x = 2\n")
-    assert affected.skip_passed(repo, paths, exporter=_no_uv) == ["tests", "packages/base/tests", "packages/middle/tests"]
-
-    # Without uv's per-package answer the lock's bytes are the only evidence, so any change to it invalidates every suite.
-    (repo / "uv.lock").write_text("changed\n")
-    assert affected.skip_passed(repo, paths, exporter=_no_uv) == paths
-
-
 # --- the lock, read per package (ADR 0021, shelf-wctp): a release edits uv.lock, and that must not select every package ---
 
 PINS = {"base": "1", "middle": "1", "top": "1", "leaf": "1", "plug": "1"}
@@ -195,16 +175,51 @@ def test_a_package_the_base_did_not_have_counts_as_changed(committed: Path) -> N
     assert _selected(committed, ["uv.lock"]) == {"fresh"}
 
 
-def test_a_package_keeps_its_cached_pass_when_only_another_packages_resolved_set_changes(committed: Path) -> None:
+def _plan(repo: Path, paths: list[str]) -> dict[str, str]:
+    return dict(affected.plan(repo, paths, pins_exporter))
+
+
+def _no_uv(_repo: Path, _packages: list[str]) -> dict[str, str]:
+    message = "uv is not available here"
+    raise affected.ExportError(message)
+
+
+def test_the_plan_gives_each_package_suite_a_key_and_the_fitness_tests_none(committed: Path) -> None:
+    plan = _plan(committed, ["tests/test_arch.py", "packages/base/tests", "packages/leaf/tests"])
+    assert plan["tests/test_arch.py"] == ""
+    assert plan["packages/base/tests"] != plan["packages/leaf/tests"]
+    assert all(plan[p] for p in ("packages/base/tests", "packages/leaf/tests"))
+
+
+def test_a_suites_key_changes_with_its_files_and_its_dependencies_files(committed: Path) -> None:
+    before = _plan(committed, ["packages/base/tests", "packages/middle/tests", "packages/leaf/tests"])
+    (committed / "packages/base/src.py").write_text("x = 2\n")
+    after = _plan(committed, ["packages/base/tests", "packages/middle/tests", "packages/leaf/tests"])
+    assert [before[p] != after[p] for p in before] == [True, True, False]
+
+
+def test_a_suites_key_keeps_when_only_another_packages_resolved_set_changes(committed: Path) -> None:
     paths = ["packages/base/tests", "packages/leaf/tests"]
-    affected.record(committed, paths, exporter=pins_exporter)
-    assert affected.skip_passed(committed, paths, exporter=pins_exporter) == []
+    before = _plan(committed, paths)
     _write_pins(committed, {**PINS, "leaf": "2"})
-    assert affected.skip_passed(committed, paths, exporter=pins_exporter) == ["packages/leaf/tests"]
+    after = _plan(committed, paths)
+    assert (before["packages/base/tests"], before["packages/leaf/tests"] != after["packages/leaf/tests"]) == (
+        after["packages/base/tests"],
+        True,
+    )
 
 
-def test_a_package_reruns_when_a_dependencys_resolved_set_changes(committed: Path) -> None:
+def test_a_suites_key_changes_when_a_dependencys_resolved_set_changes(committed: Path) -> None:
     paths = ["packages/middle/tests", "packages/top/tests", "packages/leaf/tests"]
-    affected.record(committed, paths, exporter=pins_exporter)
+    before = _plan(committed, paths)
     _write_pins(committed, {**PINS, "base": "2"})
-    assert affected.skip_passed(committed, paths, exporter=pins_exporter) == ["packages/middle/tests", "packages/top/tests"]
+    after = _plan(committed, paths)
+    assert [before[p] != after[p] for p in paths] == [True, True, False]
+
+
+def test_without_uv_the_lock_and_root_pyproject_stand_in_for_every_suites_key(committed: Path) -> None:
+    paths = ["packages/base/tests", "packages/leaf/tests"]
+    before = dict(affected.plan(committed, paths, _no_uv))
+    (committed / "uv.lock").write_text("changed\n")
+    after = dict(affected.plan(committed, paths, _no_uv))
+    assert all(before[p] != after[p] for p in paths)

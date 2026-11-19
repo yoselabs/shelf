@@ -318,6 +318,8 @@ markers = [
     "contract: a scenario of a package's contract suite that runs the same steps against the real implementation and its in-memory fake (git-porcelain's RealRepo and FakeRepo), so the fake cannot drift. Runs in the default gate and in `just check`; `-m contract` runs just this lane.",
     "real_only: a contract scenario that only the real implementation can run: it names a fidelity gap of the in-memory fake (git-porcelain's FakeRepo), which the suite leaves out of the fake run.",
     "browser: real-browser test that launches a headless engine (any-browser); opt-in, excluded from the default run and `just check`; `just test-browser` runs it, and CI runs it with SHELF_REQUIRE_BROWSER=1 where a missing engine FAILS instead of skipping",
+    "serial: must not share the box with other tests (it takes a whole core, a global lock or a fixed port). `any-gate test` runs these after the parallel stage, one process, no workers.",
+    "quarantine: a test known to fail sometimes (name the bead in its reason). It runs apart, is reported when it fails, and never blocks the gate; fix it or delete it.",
     "net: binds a real loopback TCP port and serves HTTP over it (async-scope's asgi lane). Names the slice, does NOT carve one out: it runs in the default gate and in `just check`, because the behaviours it covers are invisible without a real socket and a promotion that ships them unverified ships a blind spot to every consumer. `-m net` runs just this lane.",
 ]
 asyncio_mode = "auto"
@@ -609,6 +611,7 @@ ignore_imports = [
     "any_yaml.write -> atomic_io",
     "any_yaml.append -> atomic_io",
     "any_agent.procs -> stream_proc",
+    "any_gate.cli -> any_lease",
     "any_gate.receipts -> atomic_io",
     "any_gate.receipts -> content_digest",
     "any_gate.run -> stream_proc",

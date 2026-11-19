@@ -14,6 +14,9 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 # pytest runs one worker per core (pytest-xdist).
 pytest_par := "-n auto"
 
+# Where whole test runs queue (any-gate test, and check-all's pytest below): one slot, so gates started at once wait instead of thrashing.
+lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACHE_HOME", env_var("HOME") + "/.cache") + "/gate-leases")
+
 # The gate. Fast, deterministic tools first; tests last. Tests cover only what the change
 # touches (`test-affected`); `check-all` runs every test with the coverage floor.
 #
@@ -251,18 +254,18 @@ deps:
 # so the floor is a rot-guard, not a vanity number. Raise it as coverage climbs.
 [group('gate')]
 test:
-    python3 -I tools/gate_state.py lock -- uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
+    uv run python -m any_lease run --root {{ lease_root }} tests 1 check-all -- uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
 
-# Only the tests a change can reach: the changed packages, every package depending on them,
-# and the fitness tests (tools/affected.py). A package whose inputs are unchanged since its suite
-# last passed is skipped (the result cache, .cache/affected-passed.json). No coverage floor: it is
+# Only the tests a change can reach: the changed packages, every package depending on them, and the fitness tests
+# (tools/affected.py prints the plan, `path<TAB>key` per suite). `any-gate test` skips a suite whose key already passed (the receipts file in the
+# git common dir, shared by every worktree), runs the rest in stages under a lease, and records them when green. No coverage floor: it is
 # measured over the whole repo, so a partial run cannot meet it.
 [group('gate')]
 test-affected:
     #!/usr/bin/env bash
     set -euo pipefail
-    paths="$(python3 tools/affected.py --explain --skip-passed)"
-    python3 -I tools/gate_state.py lock -- uv run pytest {{ pytest_par }} -p no:cov $paths && python3 tools/affected.py --record $paths
+    receipts="$(git rev-parse --path-format=absolute --git-common-dir)/gate-receipts.json"
+    python3 tools/affected.py --explain --plan | uv run python -m any_gate test --receipts "$receipts" --lease-root {{ lease_root }} -- -p no:cov
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. CI runs

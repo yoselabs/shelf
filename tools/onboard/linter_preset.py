@@ -76,6 +76,14 @@ _RECIPES = (
 
 _GENERATED_PREFIXES = ("tool.pyrefly", "tool.pytest")
 _SHELF_TESTS_SUBCONFIG = "packages/*/tests/**"
+# A consumer's `test`: plain pytest under the gate-state lock it is given (tools/gate_state.py). The shelf's own `test` queues through
+# any-lease and runs with the shelf's xdist variable; a consumer gets those when it moves onto the gate packages
+# (openspec/changes/gate-kit-package).
+_CONSUMER_TEST = """[group('gate')]
+test:
+    python3 -I tools/gate_state.py lock -- uv run pytest --cov --cov-report=term-missing --cov-fail-under=65
+
+"""
 _CONSUMER_DEPS = """# dependency hygiene: the lockfile matches pyproject, then unused, missing and transitive (deptry).
 [group('gate')]
 deps:
@@ -248,8 +256,7 @@ class LinterPresetOperation:
         if to_copy:
             shelf_recipes = dict(_split_just_recipes(_SHELF_JUSTFILE.read_text()))
             shelf_recipes["check"] = _CONSUMER_CHECK
-            # The shelf's xdist worker count is a variable of its own justfile; a consumer's `test` runs plain.
-            shelf_recipes["test"] = shelf_recipes["test"].replace("{{ pytest_par }} ", "")
+            shelf_recipes["test"] = _CONSUMER_TEST
             if not (self.repo / "packages").is_dir():
                 shelf_recipes["deps"] = _CONSUMER_DEPS
             head = existing.rstrip("\n") + "\n\n" if existing else _JUSTFILE_HEADER

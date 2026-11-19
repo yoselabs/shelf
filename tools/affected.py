@@ -18,11 +18,9 @@ is selected: never a silent pass.
 The change is the diff from the upstream merge-base (HEAD when there is no upstream) to the
 working tree, plus untracked files. `just check-all` runs everything regardless.
 
-Result cache (`--skip-passed`, `--record`): a package's fingerprint hashes its files, the files of
-every package it depends on, and the root files every test run reads (uv.lock, pyproject.toml,
-conftest.py). After a green run `--record` stores the fingerprints; `--skip-passed` then drops each
-package whose current fingerprint is stored, so an unchanged package never re-runs. `tests/` is never
-cached: the fitness tests read the whole repo.
+`--plan` prints `path<TAB>key` per suite for `any-gate test`: a package suite's key is its fingerprint (its files, its dependencies' files
+and resolved sets, the root inputs every test run reads), and `any-gate`'s receipts skip a suite whose key already passed. Fitness tests
+carry no key and always run: they read the whole repo.
 Stdlib only, so it runs as bare `python3`.
 """
 
@@ -261,10 +259,6 @@ def affected(repo: Path, changed: list[str], lock: Callable[[], set[str] | None]
     return [*_fitness(repo, changed), *(f"packages/{d}/tests" for d in sorted(seen) if (repo / "packages" / d / "tests").is_dir())]
 
 
-CACHE = Path(".cache/affected-passed.json")
-_KEEP = 20  # fingerprints remembered per package
-
-
 def _closure(graph: dict[str, set[str]], start: str) -> set[str]:
     seen, queue = {start}, [start]
     while queue:
@@ -310,38 +304,11 @@ def fingerprint(repo: Path, graph: dict[str, set[str]], package: str, exports: d
     return digest.hexdigest()
 
 
-def _load_cache(repo: Path) -> dict[str, list[str]]:
-    try:
-        data = json.loads((repo / CACHE).read_text())
-    except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def skip_passed(repo: Path, paths: list[str], exporter: Exporter = package_exports) -> list[str]:
-    """`paths` without the package suites whose current fingerprint already passed."""
+def plan(repo: Path, paths: list[str], exporter: Exporter = package_exports) -> list[tuple[str, str]]:
+    """`(path, key)` for each of `paths`: a package suite's key is its fingerprint; any other path has none and always runs."""
     graph, _ = workspace(repo)
-    cache = _load_cache(repo)
     exports = _exports(repo, graph, exporter)
-    return [
-        p
-        for p in paths
-        if not p.startswith("packages/") or fingerprint(repo, graph, p.split("/")[1], exports) not in cache.get(p.split("/")[1], [])
-    ]
-
-
-def record(repo: Path, paths: list[str], exporter: Exporter = package_exports) -> None:
-    """Store the current fingerprint of every package suite in `paths` as passed."""
-    graph, _ = workspace(repo)
-    cache = _load_cache(repo)
-    exports = _exports(repo, graph, exporter)
-    for p in paths:
-        if p.startswith("packages/"):
-            name = p.split("/")[1]
-            current = fingerprint(repo, graph, name, exports)
-            cache[name] = [current, *[f for f in cache.get(name, []) if f != current]][:_KEEP]
-    (repo / CACHE).parent.mkdir(parents=True, exist_ok=True)
-    (repo / CACHE).write_text(json.dumps(cache, indent=1, sort_keys=True))
+    return [(p, fingerprint(repo, graph, p.split("/")[1], exports) if p.startswith("packages/") else "") for p in paths]
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -365,8 +332,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", default=".", help="the repo (default: cwd)")
     parser.add_argument("--explain", action="store_true", help="also print the changed files to stderr")
-    parser.add_argument("--skip-passed", action="store_true", help="drop package suites whose fingerprint already passed")
-    parser.add_argument("--record", nargs="*", metavar="PATH", help="store these suites' fingerprints as passed, then exit")
+    parser.add_argument("--plan", action="store_true", help="print `path<TAB>key` per suite (the input of `any-gate test`)")
     parser.add_argument(
         "--reach", type=int, metavar="N", help="print how many package suites each of the last N commits reaches, then exit"
     )
@@ -380,19 +346,11 @@ def main() -> int:
         total = len(workspace(repo)[0])
         print(f"commits={len(rows)} median={sizes[len(sizes) // 2] if sizes else 0} max={sizes[-1] if sizes else 0} of {total} packages")
         return 0
-    if args.record is not None:
-        record(repo, args.record)
-        return 0
     changed = changed_files(repo)
     paths = affected(repo, changed, lambda: lock_touched(repo, merge_base(repo)))
-    if args.skip_passed:
-        kept = skip_passed(repo, paths)
-        if args.explain:
-            print(f"affected: {len(paths) - len(kept)} suite(s) skipped, unchanged since they passed", file=sys.stderr)
-        paths = kept
     if args.explain:
         print(f"affected: {len(changed)} changed file(s): {' '.join(changed) or '-'}", file=sys.stderr)
-    print("\n".join(paths))
+    print("\n".join(f"{path}\t{key}" for path, key in plan(repo, paths)) if args.plan else "\n".join(paths))
     return 0
 
 
