@@ -8,13 +8,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
 from pydantic_settings import BaseSettings
-from settings_base import SecretStrippingYamlSource, resolve_config_path, resolve_env_refs
+from settings_base import ConfigOverrideError, SecretStrippingYamlSource, resolve_config_path, resolve_env_refs
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
 
 # ── resolve_env_refs ──────────────────────────────────────────────────────────
@@ -52,12 +51,35 @@ def test_config_path_env_set_and_exists(tmp_path: Path, monkeypatch: pytest.Monk
     assert resolve_config_path("SB_CONFIG", default) == cfg
 
 
-def test_config_path_env_set_but_missing_returns_none(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SB_CONFIG", str(tmp_path / "does-not-exist.yaml"))
+def test_config_path_env_set_but_missing_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    missing = tmp_path / "does-not-exist.yaml"
+    monkeypatch.setenv("SB_CONFIG", str(missing))
     default = tmp_path / "default.yaml"
     default.write_text("k: v", encoding="utf-8")
-    # Env override is set but points at a missing file: None, never the default.
-    assert resolve_config_path("SB_CONFIG", default) is None
+    # A typo in the override must not turn the config off (nor fall back to the default): it is an error.
+    with pytest.raises(ConfigOverrideError, match="SB_CONFIG") as caught:
+        resolve_config_path("SB_CONFIG", default)
+    assert str(missing) in str(caught.value)
+
+
+def test_config_path_env_points_at_a_folder_raises(tmp_path: Path) -> None:
+    with pytest.raises(ConfigOverrideError):
+        resolve_config_path("SB_CONFIG", tmp_path / "default.yaml", env={"SB_CONFIG": str(tmp_path)})
+
+
+def test_config_path_takes_the_environment_as_an_argument(tmp_path: Path) -> None:
+    cfg = tmp_path / "c.yaml"
+    cfg.write_text("k: v", encoding="utf-8")
+    assert resolve_config_path("SB_CONFIG", tmp_path / "d.yaml", env={"SB_CONFIG": str(cfg)}) == cfg
+    assert resolve_config_path("SB_CONFIG", tmp_path / "d.yaml", env={}) is None
+
+
+def test_env_ref_takes_the_environment_as_an_argument() -> None:
+    assert resolve_env_refs("a=${SB_X}", env={"SB_X": "1"}) == "a=1"
+
+
+def test_config_path_override_error_is_a_value_error() -> None:
+    assert issubclass(ConfigOverrideError, ValueError)
 
 
 def test_config_path_env_unset_default_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

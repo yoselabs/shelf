@@ -10,6 +10,8 @@ Feature: An app's folders are decided once
       | config | XDG_CONFIG_HOME | /cfg     | /cfg/task-loop         |
       | state  | XDG_STATE_HOME  | /st      | /st/task-loop          |
       | cache  | XDG_CACHE_HOME  | /ca      | /ca/task-loop          |
+      | data   | XDG_DATA_HOME   | /da      | /da/task-loop          |
+      | data   | XDG_CONFIG_HOME | /cfg     | /home/me/.local/share/task-loop |
       | state  | XDG_CONFIG_HOME | /cfg     | /home/me/.local/state/task-loop |
       | cache  | XDG_CACHE_HOME  | relative | /home/me/.cache/task-loop |
 

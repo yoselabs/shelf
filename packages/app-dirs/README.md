@@ -5,11 +5,14 @@ POSIX only; macOS uses the same XDG layout as Linux.
 
 ```python
 from pathlib import Path
-from app_dirs import cache_dir, config_dir, plugin_data_dir, state_dir
+from app_dirs import cache_dir, config_dir, data_dir, plugin_data_dir, state_dir, tool_home
 
 config_dir("task-loop")                    # $XDG_CONFIG_HOME/task-loop, else ~/.config/task-loop
 state_dir("task-loop")                     # $XDG_STATE_HOME/task-loop,  else ~/.local/state/task-loop
 cache_dir("task-loop", create=True)        # $XDG_CACHE_HOME/task-loop,  else ~/.cache/task-loop; mkdir -p
+data_dir("opencode")                     # $XDG_DATA_HOME/opencode,   else ~/.local/share/opencode (a foreign tool's data)
+tool_home("codex", "CODEX_HOME")         # $CODEX_HOME when set and non-empty, else ~/.codex
+tool_home("claude")                      # ~/.claude (no variable)
 config_dir("task-loop", plugin_data=True)  # $CLAUDE_PLUGIN_DATA/config when that is set, else as above
 config_dir("x", env={"XDG_CONFIG_HOME": "/cfg"}, home=Path("/h"))  # no os.environ patching in tests
 plugin_data_dir()                          # the CLAUDE_PLUGIN_DATA folder, or None

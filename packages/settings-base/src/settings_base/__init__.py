@@ -29,48 +29,64 @@ from typing import TYPE_CHECKING, Any
 from pydantic_settings import YamlConfigSettingsSource
 
 if TYPE_CHECKING:
-    from collections.abc import Collection
+    from collections.abc import Collection, Mapping
 
     from pydantic_settings import BaseSettings
 
-__all__ = ("SecretStrippingYamlSource", "resolve_config_path", "resolve_env_refs")
+__all__ = ("ConfigOverrideError", "SecretStrippingYamlSource", "resolve_config_path", "resolve_env_refs")
 
 _ENV_REF_RE = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
 
 
-def resolve_env_refs(value: str) -> str:
-    """Replace ``${VAR}`` with ``os.environ[VAR]``; leave the literal on a miss.
+class ConfigOverrideError(ValueError):
+    """An environment override names a config file that is not there (a typo must not switch the config off)."""
+
+
+def resolve_env_refs(value: str, *, env: Mapping[str, str] | None = None) -> str:
+    """Replace ``${VAR}`` with ``env[VAR]`` (default ``os.environ``); leave the literal on a miss.
 
     Args:
         value: A string that may contain one or more ``${VAR}`` references.
+        env: The environment to read; the process environment when omitted.
 
     Returns:
         ``value`` with every resolvable reference expanded; unresolved
         references are left verbatim.
     """
 
+    values = os.environ if env is None else env
+
     def _sub(match: re.Match[str]) -> str:
-        return os.environ.get(match.group(1), match.group(0))
+        return values.get(match.group(1), match.group(0))
 
     return _ENV_REF_RE.sub(_sub, value)
 
 
-def resolve_config_path(env_var: str, default: Path) -> Path | None:
+def resolve_config_path(env_var: str, default: Path, *, env: Mapping[str, str] | None = None) -> Path | None:
     """Resolve an optional config file from an env override or a default path.
 
     Args:
         env_var: Name of the environment variable that, when set, overrides the
             config location (``~`` is expanded).
         default: The fallback path consulted when ``env_var`` is unset.
+        env: The environment to read; the process environment when omitted.
 
     Returns:
-        The resolved path if the chosen candidate is an existing file, else
-        ``None``.
+        The override when it is set and an existing file; else, when it is
+        unset, ``default`` if that is an existing file, else ``None``.
+
+    Raises:
+        ConfigOverrideError: ``env_var`` is set but is not an existing file. An
+            override is a statement of intent: it never falls back to
+            ``default`` and never quietly turns the config off.
     """
-    override = os.environ.get(env_var)
+    override = (os.environ if env is None else env).get(env_var)
     if override:
         path = Path(override).expanduser()
-        return path if path.is_file() else None
+        if not path.is_file():
+            msg = f"{env_var}={override!r} is not an existing config file"
+            raise ConfigOverrideError(msg)
+        return path
     return default if default.is_file() else None
 
 

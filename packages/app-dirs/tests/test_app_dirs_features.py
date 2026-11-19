@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-from app_dirs import cache_dir, config_dir, state_dir
+from app_dirs import cache_dir, config_dir, data_dir, state_dir
 from pytest_bdd import given, parsers, scenarios, then, when
 
 if TYPE_CHECKING:
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 scenarios("features")
 
-_KINDS: dict[str, Callable[..., Path]] = {"config": config_dir, "state": state_dir, "cache": cache_dir}
+_KINDS: dict[str, Callable[..., Path]] = {"config": config_dir, "state": state_dir, "cache": cache_dir, "data": data_dir}
 
 
 @dataclass
