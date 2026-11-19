@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import threading
 import time
 from dataclasses import dataclass, replace
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
+
+from child_env import find
 
 from beads_client.classify import LOCKED, PUSH_REJECTED, error_of, loads
 from beads_client.errors import BdError, malformed, version_mismatch
@@ -18,6 +20,7 @@ from beads_client.runner import BdRun, Runner, subprocess_runner
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
+_NO_ENV: Mapping[str, str] = MappingProxyType({})
 TESTED_FROM = (1, 3, 1)
 TESTED_BELOW = (1, 4, 0)
 
@@ -50,18 +53,29 @@ class Bd:
         cwd: str | None = None,
         *,
         exe: str = "",
+        env: Mapping[str, str] = _NO_ENV,
         timeout: float | None = None,
         run: Runner | None = None,
         lock_retries: int = 3,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.actor, self.cwd, self.timeout = actor, cwd, timeout
-        self.exe = exe or shutil.which("bd") or "bd"
+        self._env = env
+        self.exe = exe or str(find("bd", env).path)  # raises child_env.NotFound: a bare "bd" would search the ambient PATH
         self._run: Runner = run or (lambda argv, where: subprocess_runner(argv, where, timeout))
         self._lock_retries, self._sleep = lock_retries, sleep
 
     def at(self, cwd: str) -> Bd:
-        return Bd(self.actor, cwd, exe=self.exe, timeout=self.timeout, run=self._run, lock_retries=self._lock_retries, sleep=self._sleep)
+        return Bd(
+            self.actor,
+            cwd,
+            exe=self.exe,
+            env=self._env,
+            timeout=self.timeout,
+            run=self._run,
+            lock_retries=self._lock_retries,
+            sleep=self._sleep,
+        )
 
     # ---- process -----------------------------------------------------------------------------------------------------
 

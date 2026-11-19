@@ -28,8 +28,9 @@ lean-wire = { workspace = true }
 yaml-merge = { workspace = true }
 any-frontmatter = { workspace = true }
 page-tsv = { workspace = true }
-# any-lease composes process-lock.
+# any-lease composes process-lock and child-env.
 process-lock = { workspace = true }
+child-env = { workspace = true }
 # any-frontmatter, dir-trust and any-net compose atomic-io.
 # any-yaml composes yaml-merge and atomic-io.
 any-yaml = { workspace = true }
@@ -37,7 +38,6 @@ any-yaml = { workspace = true }
 any-speech = { workspace = true }
 any-pipeline = { workspace = true }
 any-lease = { workspace = true }
-child-env = { workspace = true }
 content-digest = { workspace = true }
 app-dirs = { workspace = true }
 verb-cli = { workspace = true }
@@ -646,6 +646,12 @@ ignore_imports = [
     "page_tsv.page -> lean_wire",
     "page_tsv.render -> lean_wire",
     "any_lease.leases -> process_lock",
+    "process_lock -> stream_proc",
+    "any_lease.__main__ -> child_env",
+    "launchd_agent -> child_env",
+    "mcp_clients -> child_env",
+    "beads_client.client -> child_env",
+    "convert_md.dispatch -> child_env",
     "any_yaml -> yaml_merge",
     "any_yaml.write -> yaml_merge",
     "any_yaml.write -> atomic_io",

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from difflib import unified_diff
 from typing import TYPE_CHECKING, cast
@@ -112,7 +111,7 @@ def golden(path: Path, actual: str, *, update: bool) -> None:
         raise GoldenMismatchError(message)
 
 
-def update_requested(env: Mapping[str, str] = os.environ, name: str = "UPDATE_GOLDEN") -> bool:
+def update_requested(env: Mapping[str, str], name: str = "UPDATE_GOLDEN") -> bool:
     """Request an update when the named variable is set and neither empty nor zero."""
     return env.get(name, "") not in ("", "0")
 

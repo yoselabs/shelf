@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -9,6 +10,20 @@ from beads_client.errors import malformed
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+
+class BeadStatus(enum.StrEnum):
+    """The stored statuses bd names (``bd list --status``); members are the wire strings, so they compare with ``Bead.status``."""
+
+    OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    BLOCKED = "blocked"
+    DEFERRED = "deferred"
+    CLOSED = "closed"
+
+
+#: bd's dependency type for "cannot start until the other closes" (``bd dep add --type``; its default).
+DEP_BLOCKS = "blocks"
 
 
 @dataclass(frozen=True)

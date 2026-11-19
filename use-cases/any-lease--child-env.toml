@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-lease"
+software = "child-env"
+why = "`python -m any_lease run` handed its wrapped command a whole copy of the process environment ({**os.environ}); a child gets a built environment, not the launcher's credentials (constitution Article III, one implementation per behaviour; shelf-tyld.5)."
+needs = "build_env(env, allow=, extra=): the env for the wrapped command, secrets dropped."
+sponsor = "yoselabs"
+requester = "any-lease"
+status = "active" # active | retired

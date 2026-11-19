@@ -12,3 +12,8 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 - 0.2.0: a held lock is never broken; timeout while the recorded pid is dead ⇒ `LockHeldError` text "held by an inherited descriptor; recorded holder pid N is gone" (`.path/.pid/.holder` kept); no subprocess, no /proc
 
 - 0.2.1: failed acquire could retain an unregistered descriptor/kernel lock after metadata or holder-read failure ⇒ the acquisition owns and closes its descriptor until registry adoption; no public API change
+
+- 0.3.0: lock-file record `{pid, created, label, meta}`  ⇒  `{pid, created, label, meta, start}`; `start` is the holder's process start token (stream-proc `proc_start`), appended last, omitted where the OS has no process table; records without it (older files, bare pid) still parse
+- 0.3.0: `Holder(pid, created, label, meta)`  ⇒  `Holder(pid, created, label, meta, start=None)`
+- 0.3.0: the "inherited descriptor; recorded holder pid N is gone" test was `os.kill(pid, 0)` (a reused pid looked alive)  ⇒  `stream_proc.alive(pid, start)`; a record with no `start` keeps the pid-only answer
+- 0.3.0: new dependency `stream-proc>=0.10.0,<1` (stdlib-only, imports no sibling: no cycle)

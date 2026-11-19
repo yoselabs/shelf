@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "mcp-clients"
+software = "child-env"
+why = "client_statuses() found each client's program with shutil.which on the process PATH; binary discovery has one owner whose PATH is the injected env (constitution Article III; shelf-tyld.5)."
+needs = "find(name, env) -> Exe, NotFound."
+sponsor = "yoselabs"
+requester = "mcp-clients"
+status = "active" # active | retired

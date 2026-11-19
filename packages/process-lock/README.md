@@ -24,7 +24,7 @@ pl.ProcessLock.acquire(
     on_wait=lambda w: print(f"waiting {w.elapsed:.0f}s for {w.holder}"),
 )
 
-pl.holder(path)             # Holder(pid, start, created, label, meta) -- no lock taken
+pl.holder(path)             # Holder(pid, created, label, meta, start) -- no lock taken
 ```
 
 ## Rules
@@ -33,7 +33,8 @@ pl.holder(path)             # Holder(pid, start, created, label, meta) -- no loc
   carrying `path`, `holder` and the holder's `pid` when readable (`None` otherwise).
   `timeout=N` waits up to N seconds (`None`: forever), polling and calling
   `on_wait(Waiting(path, elapsed, holder))` each time, then raises.
-- **Holder record.** The lock file holds JSON: `pid`, `created`, free-form `label` and `meta`.
+- **Holder record.** The lock file holds JSON: `pid`, `created`, free-form `label` and `meta`, and `start` (the holder's process start token,
+  so a reused pid is not mistaken for the holder; absent in records older versions wrote).
   `holder(path)` reads it without the lock; no host name. Informational only.
 - **Never broken.** A lock the kernel says is held is never taken over. If a wait times out
   and the recorded pid is gone, a forked child kept the descriptor (Python's own descriptors

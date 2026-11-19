@@ -1,6 +1,6 @@
 """Opinionated document→Markdown conversion (ADR 0021 / R142).
 
-``convert(path)`` runs the per-format dispatch table + fallback chain and always
+``convert(path, env=...)`` runs the per-format dispatch table + fallback chain and always
 returns a :class:`ConversionResult` (never raises). Engine choice is a code-level
 default, not a config file. The result carries a model-free fidelity grade.
 

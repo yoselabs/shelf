@@ -229,7 +229,7 @@ source = { editable = "packages/any-breaker" }
 
 [[package]]
 name = "any-browser"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-browser" }
 
 [package.optional-dependencies]
@@ -316,14 +316,18 @@ requires-dist = [
 
 [[package]]
 name = "any-lease"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-lease" }
 dependencies = [
+    { name = "child-env" },
     { name = "process-lock" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "process-lock", editable = "packages/process-lock" }]
+requires-dist = [
+    { name = "child-env", editable = "packages/child-env" },
+    { name = "process-lock", editable = "packages/process-lock" },
+]
 
 [[package]]
 name = "any-mailbox"
@@ -390,7 +394,7 @@ requires-dist = [{ name = "stream-proc", editable = "packages/stream-proc" }]
 
 [[package]]
 name = "any-recorded-fixture"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-recorded-fixture" }
 
 [[package]]
@@ -655,8 +659,14 @@ requires-dist = [
 
 [[package]]
 name = "beads-client"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "packages/beads-client" }
+dependencies = [
+    { name = "child-env" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "child-env", editable = "packages/child-env" }]
 
 [[package]]
 name = "beartype"
@@ -1006,9 +1016,10 @@ requires-dist = [
 
 [[package]]
 name = "convert-md"
-version = "0.10.0"
+version = "0.11.0"
 source = { editable = "packages/convert-md" }
 dependencies = [
+    { name = "child-env" },
     { name = "html2text" },
     { name = "trafilatura" },
 ]
@@ -1027,6 +1038,7 @@ pdf = [
 
 [package.metadata]
 requires-dist = [
+    { name = "child-env", editable = "packages/child-env" },
     { name = "html2text", specifier = ">=2025.4.15" },
     { name = "mammoth", marker = "extra == 'documents'", specifier = ">=1.9,<2" },
     { name = "markitdown", extras = ["docx"], marker = "extra == 'documents'", specifier = ">=0.0.2,<1" },
@@ -2339,8 +2351,14 @@ wheels = [
 
 [[package]]
 name = "launchd-agent"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/launchd-agent" }
+dependencies = [
+    { name = "child-env" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "child-env", editable = "packages/child-env" }]
 
 [[package]]
 name = "lazy-loader"
@@ -2822,8 +2840,14 @@ requires-dist = [{ name = "httpx", specifier = ">=0.28,<1" }]
 
 [[package]]
 name = "mcp-clients"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/mcp-clients" }
+dependencies = [
+    { name = "child-env" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "child-env", editable = "packages/child-env" }]
 
 [[package]]
 name = "mcp-feedback"
@@ -3651,8 +3675,14 @@ wheels = [
 
 [[package]]
 name = "process-lock"
-version = "0.2.1"
+version = "0.3.0"
 source = { editable = "packages/process-lock" }
+dependencies = [
+    { name = "stream-proc" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "stream-proc", editable = "packages/stream-proc" }]
 
 [[package]]
 name = "protobuf"

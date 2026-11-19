@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "beads-client"
+software = "child-env"
+why = "Bd() found bd with shutil.which and fell back to the bare name 'bd', which a subprocess then searched on the ambient PATH; binary discovery has one owner that raises a typed NotFound on a miss (constitution Article III; shelf-tyld.5)."
+needs = "find(name, env) -> Exe, NotFound."
+sponsor = "yoselabs"
+requester = "beads-client"
+status = "active" # active | retired

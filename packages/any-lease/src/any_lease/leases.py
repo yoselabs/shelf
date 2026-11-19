@@ -137,10 +137,7 @@ class Leases:
             if on_wait is not None:
                 on_wait(Waiting(name, limit, elapsed, occupants))
             pause = poll if timeout is None else max(0.0, min(poll, timeout - elapsed))
-            if cancel is None:
-                time.sleep(pause)
-            else:
-                cancel.wait(pause)
+            (threading.Event() if cancel is None else cancel).wait(pause)  # flock has no timed wait: poll, and wake early on cancel
 
     def acquire_all(
         self,

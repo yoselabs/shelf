@@ -3,6 +3,7 @@
 Record real model-call exchanges per case and replay them against a text golden. Standard library only; Python 3.12+.
 
 ```python
+import os
 from pathlib import Path
 from any_recorded_fixture import cases, golden, record, scrub, update_requested
 
@@ -10,7 +11,7 @@ root = Path("fixtures")
 record(root, "chat", "hello", {"request.json": {"prompt": "hello"}}, {"model": "example"},
        text={"input.txt": "hello\n"})
 for case in cases(root):
-    golden(case.dir / "input.txt", scrub("hello\n", wt="/tmp/work"), update=update_requested())
+    golden(case.dir / "input.txt", scrub("hello\n", wt="/tmp/work"), update=update_requested(os.environ))
 ```
 
 ## Rules
@@ -22,5 +23,5 @@ for case in cases(root):
   Existing named files are replaced; other files remain. Callers own filenames and concurrency.
 - `golden` compares exact text and raises `GoldenMismatchError(AssertionError)` with a unified diff on a mismatch
   or missing file. `update=True` writes the actual text instead; its parent directory must exist.
-- `update_requested` reads `UPDATE_GOLDEN` by default: unset, empty and `0` are false; every other value is true.
+- `update_requested(env)` reads `UPDATE_GOLDEN` from the `env` you pass: unset, empty and `0` are false; every other value is true.
 - `scrub(text, **placeholders)` replaces nonempty values longest first with `<KEY>` tokens.

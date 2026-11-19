@@ -20,8 +20,6 @@ _OS_NAMES = frozenset({"environ", "getenv", "putenv", "unsetenv"})
 # path (relative to packages/) -> reason. Consumer wave empties this (shelf-tyld.6, feeds shelf-ufmg).
 _ALLOWLIST = {
     "any-agent/src/any_agent/harnesses/opencode_sandbox.py": "reads home and XDG_CONFIG_HOME for the sandbox deny list",
-    "any-browser/src/any_browser/zendriver.py": "reads the executable and Playwright path variables to find the browser",
-    "any-recorded-fixture/src/any_recorded_fixture/__init__.py": "default argument env=os.environ for update_requested",
     "blueprint/src/blueprint/concerns/gate_clone.py": "~/.config/mise path from Path.home()",
     "blueprint/src/blueprint/model.py": "Context.env defaults to dict(os.environ)",
     "blueprint/src/blueprint/recipes/gate_state.py": "standalone copied recipe: GATE_LOCK_FILE, XDG_CACHE_HOME, child env",
@@ -29,7 +27,6 @@ _ALLOWLIST = {
     "blueprint/src/blueprint/testing.py": "test double builds PATH from os.environ",
     "git-porcelain/src/git_porcelain/porcelain.py": "filters os.environ for git children and reads GIT_DIR",
     "git-porcelain/src/git_porcelain/real_env.py": "default source for the git child environment is os.environ",
-    "launchd-agent/src/launchd_agent/__init__.py": "LaunchAgents folder under Path.home()",
     "stream-proc/src/stream_proc/registered.py": "falls back to os.environ for the child environment",
     "child-env/src/child_env/__init__.py": "scrub_current() reads os.environ (callers should pass the mapping to scrub)",
 }

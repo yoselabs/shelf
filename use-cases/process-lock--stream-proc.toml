@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "process-lock"
+software = "stream-proc"
+why = "process-lock's error for a timed-out acquire says whether the recorded holder pid is gone, and answered it with os.kill(pid, 0): a reused pid looked alive. Liveness with a start token is stream-proc's (constitution Article III, one implementation per behaviour; shelf-tyld.1)."
+needs = "alive(pid, start) and proc_start(pid): pid-reuse-safe liveness and the token to record in the lock file."
+sponsor = "yoselabs"
+requester = "process-lock"
+status = "active" # active | retired

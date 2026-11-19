@@ -1,6 +1,6 @@
 [project]
 name = "any-recorded-fixture"
-version = "0.1.0"
+version = "0.2.0"
 description = "Record model-call cases and compare replayed text with goldens."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

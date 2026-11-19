@@ -117,7 +117,7 @@ def test_at_asks_another_tracker(script: Script) -> None:
         seen.append(cwd)
         return script(argv, cwd)
 
-    Bd("t", run=run).at("/x").ready()
+    Bd("t", exe="bd", run=run).at("/x").ready()
     assert seen == ["/x"]
 
 

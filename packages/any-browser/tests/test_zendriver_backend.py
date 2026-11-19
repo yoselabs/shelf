@@ -235,7 +235,7 @@ def test_fake_config_matches_real_add_argument(arg: str) -> None:
 @pytest.mark.asyncio
 async def test_render_ok_returns_html(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_zendriver(monkeypatch, tab=_FakeTab("<html><body>" + ("ok " * 100) + "</body></html>"))
-    backend = ZendriverBackend()
+    backend = ZendriverBackend(env={})
     page = await backend.render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.ok
     assert page.js_executed is True
@@ -264,7 +264,7 @@ async def test_render_counts_challenged_subresources(monkeypatch: pytest.MonkeyP
         ],
     )
     _install_fake_zendriver(monkeypatch, tab=tab)
-    page = await ZendriverBackend().render("https://shop.example/search?q=x", cookies=[], budget_s=5.0, js_heavy=False)
+    page = await ZendriverBackend(env={}).render("https://shop.example/search?q=x", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.ok
     assert page.subresource_blocks == 2  # only the challenged XHR + fetch count
 
@@ -277,7 +277,7 @@ async def test_render_clean_page_reports_zero_blocks(monkeypatch: pytest.MonkeyP
         responses=[_FakeResponseEvent("XHR", 200), _FakeResponseEvent("DOCUMENT", 200)],
     )
     _install_fake_zendriver(monkeypatch, tab=tab)
-    page = await ZendriverBackend().render("https://shop.example/search?q=x", cookies=[], budget_s=5.0, js_heavy=False)
+    page = await ZendriverBackend(env={}).render("https://shop.example/search?q=x", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.ok
     assert page.subresource_blocks == 0
 
@@ -295,7 +295,7 @@ def test_is_challenged_cdp_response_matches_playwright_semantics() -> None:
 @pytest.mark.asyncio
 async def test_render_seeds_cookies_before_navigation(monkeypatch: pytest.MonkeyPatch) -> None:
     holder = _install_fake_zendriver(monkeypatch, tab=_FakeTab("<html>x</html>"))
-    backend = ZendriverBackend()
+    backend = ZendriverBackend(env={})
     cookies = [
         BackendCookie(name="t", value="1", domain="example.com", path="/", expires=None, secure=True, http_only=False, samesite="lax"),
     ]
@@ -309,7 +309,7 @@ async def test_render_seeds_cookies_before_navigation(monkeypatch: pytest.Monkey
 async def test_render_error_detail_is_single_line(monkeypatch: pytest.MonkeyPatch) -> None:
     exc = RuntimeError("CDP error: target crashed\n  at Connection.send\n  at Tab.get_content")
     _install_fake_zendriver(monkeypatch, tab=_FakeTab("", content_exc=exc))
-    backend = ZendriverBackend()
+    backend = ZendriverBackend(env={})
     page = await backend.render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.error
     assert "\n" not in page.detail
@@ -320,7 +320,7 @@ async def test_render_error_detail_is_single_line(monkeypatch: pytest.MonkeyPatc
 @pytest.mark.asyncio
 async def test_render_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_zendriver(monkeypatch, tab=_FakeTab("<html>x</html>", content_sleep=10.0))
-    backend = ZendriverBackend()
+    backend = ZendriverBackend(env={})
     page = await backend.render("https://slow.example/", cookies=[], budget_s=0.2, js_heavy=False)
     assert page.outcome is RenderOutcome.timeout
     assert page.js_executed is True
@@ -329,7 +329,7 @@ async def test_render_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.asyncio
 async def test_render_unavailable_on_launch_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_zendriver(monkeypatch, start_exc=Exception("Failed to connect to browser"))
-    backend = ZendriverBackend()
+    backend = ZendriverBackend(env={})
     page = await backend.render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.unavailable
     assert "launch failed" in page.detail
@@ -338,7 +338,7 @@ async def test_render_unavailable_on_launch_failure(monkeypatch: pytest.MonkeyPa
 @pytest.mark.asyncio
 async def test_render_unavailable_when_zendriver_absent(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_zendriver(monkeypatch, import_error=True)
-    backend = ZendriverBackend()
+    backend = ZendriverBackend(env={})
     page = await backend.render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.unavailable
     assert "not installed" in page.detail
@@ -347,7 +347,7 @@ async def test_render_unavailable_when_zendriver_absent(monkeypatch: pytest.Monk
 @pytest.mark.asyncio
 async def test_browser_stopped_after_render(monkeypatch: pytest.MonkeyPatch) -> None:
     holder = _install_fake_zendriver(monkeypatch, tab=_FakeTab("<html>x</html>"))
-    backend = ZendriverBackend()
+    backend = ZendriverBackend(env={})
     await backend.render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
     assert holder["browser"].stopped is True
 
@@ -362,54 +362,47 @@ async def test_browser_stopped_after_render(monkeypatch: pytest.MonkeyPatch) -> 
 # --------------------------------------------------------------------- #
 
 
-def _clear_browser_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for var in ("ANY_BROWSER_EXECUTABLE_PATH", "PLAYWRIGHT_BROWSERS_PATH"):
-        monkeypatch.delenv(var, raising=False)
-
-
-def test_resolve_executable_none_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_executable_none_without_env() -> None:
     """No hints → None, i.e. defer to zendriver's own discovery (dev machines)."""
-    _clear_browser_env(monkeypatch)
-    assert _resolve_executable() is None
+    assert _resolve_executable({}) is None
 
 
-def test_resolve_executable_prefers_explicit_override(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    _clear_browser_env(monkeypatch)
-    monkeypatch.setenv("ANY_BROWSER_EXECUTABLE_PATH", "/custom/chrome")
-    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
-    assert _resolve_executable() == "/custom/chrome"
+def test_resolve_executable_ignores_the_process_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANY_BROWSER_EXECUTABLE_PATH", "/from/process")
+    assert _resolve_executable({}) is None
 
 
-def test_resolve_executable_finds_playwright_chromium(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_resolve_executable_prefers_explicit_override(tmp_path) -> None:
+    env = {"ANY_BROWSER_EXECUTABLE_PATH": "/custom/chrome", "PLAYWRIGHT_BROWSERS_PATH": str(tmp_path)}
+    assert _resolve_executable(env) == "/custom/chrome"
+
+
+def test_resolve_executable_finds_playwright_chromium(tmp_path) -> None:
     """The published-image layout: <root>/chromium-<build>/chrome-linux64/chrome."""
-    _clear_browser_env(monkeypatch)
     binary = tmp_path / "chromium-1223" / "chrome-linux64" / "chrome"
     binary.parent.mkdir(parents=True)
     binary.write_text("#!/bin/sh\n")
     binary.chmod(0o755)
-    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
-    assert _resolve_executable() == str(binary)
+    assert _resolve_executable({"PLAYWRIGHT_BROWSERS_PATH": str(tmp_path)}) == str(binary)
 
 
-def test_resolve_executable_picks_highest_build(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_resolve_executable_picks_highest_build(tmp_path) -> None:
     """Two installs in one image → the newer build wins."""
-    _clear_browser_env(monkeypatch)
     for build in ("chromium-1100", "chromium-1223"):
         binary = tmp_path / build / "chrome-linux64" / "chrome"
         binary.parent.mkdir(parents=True)
         binary.write_text("#!/bin/sh\n")
         binary.chmod(0o755)
-    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
-    assert _resolve_executable() == str(tmp_path / "chromium-1223" / "chrome-linux64" / "chrome")
+    assert _resolve_executable({"PLAYWRIGHT_BROWSERS_PATH": str(tmp_path)}) == str(tmp_path / "chromium-1223" / "chrome-linux64" / "chrome")
 
 
 @pytest.mark.asyncio
 async def test_render_passes_resolved_binary_and_container_flags(monkeypatch: pytest.MonkeyPatch) -> None:
     """The resolved path and the container startup flags reach zd.Config."""
-    _clear_browser_env(monkeypatch)
-    monkeypatch.setenv("ANY_BROWSER_EXECUTABLE_PATH", "/opt/browsers/chrome")
     holder = _install_fake_zendriver(monkeypatch, tab=_FakeTab("<html>" + ("x " * 200) + "</html>"))
-    await ZendriverBackend().render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
+    await ZendriverBackend(env={"ANY_BROWSER_EXECUTABLE_PATH": "/opt/browsers/chrome"}).render(
+        "https://example.com/", cookies=[], budget_s=5.0, js_heavy=False
+    )
     config = holder["config"]
     assert config.browser_executable_path == "/opt/browsers/chrome"
     # Sandbox is disabled via the attribute — passing "--no-sandbox" to
@@ -423,9 +416,8 @@ async def test_render_passes_resolved_binary_and_container_flags(monkeypatch: py
 @pytest.mark.asyncio
 async def test_launch_failure_reports_no_binary_resolved(monkeypatch: pytest.MonkeyPatch) -> None:
     """With nothing resolvable, the detail names the fix — not a connect timeout."""
-    _clear_browser_env(monkeypatch)
     _install_fake_zendriver(monkeypatch, start_exc=RuntimeError("Failed to connect to browser"))
-    page = await ZendriverBackend().render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
+    page = await ZendriverBackend(env={}).render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.unavailable
     assert "no Chromium resolved" in page.detail
     assert "ANY_BROWSER_EXECUTABLE_PATH" in page.detail
@@ -434,11 +426,11 @@ async def test_launch_failure_reports_no_binary_resolved(monkeypatch: pytest.Mon
 @pytest.mark.asyncio
 async def test_launch_failure_reports_missing_resolved_binary(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """A resolved-but-absent binary is named explicitly."""
-    _clear_browser_env(monkeypatch)
     missing = tmp_path / "ghost-chrome"
-    monkeypatch.setenv("ANY_BROWSER_EXECUTABLE_PATH", str(missing))
     _install_fake_zendriver(monkeypatch, start_exc=RuntimeError("Failed to connect to browser"))
-    page = await ZendriverBackend().render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
+    page = await ZendriverBackend(env={"ANY_BROWSER_EXECUTABLE_PATH": str(missing)}).render(
+        "https://example.com/", cookies=[], budget_s=5.0, js_heavy=False
+    )
     assert page.outcome is RenderOutcome.unavailable
     assert "does not exist" in page.detail
     assert str(missing) in page.detail
@@ -449,9 +441,8 @@ async def test_launch_failure_distinguishes_healthy_binary(monkeypatch: pytest.M
     """A binary that runs fine → the failure is the CDP handshake, and the
     detail says so. This is the discrimination that was missing: 'no binary' and
     'binary present, handshake failed' need opposite operator actions."""
-    _clear_browser_env(monkeypatch)
-    monkeypatch.setenv("ANY_BROWSER_EXECUTABLE_PATH", shutil.which("echo") or "/bin/echo")  # exits 0
+    env = {"ANY_BROWSER_EXECUTABLE_PATH": shutil.which("echo") or "/bin/echo"}  # exits 0
     _install_fake_zendriver(monkeypatch, start_exc=RuntimeError("Failed to connect to browser"))
-    page = await ZendriverBackend().render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
+    page = await ZendriverBackend(env=env).render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.unavailable
     assert "CDP handshake" in page.detail

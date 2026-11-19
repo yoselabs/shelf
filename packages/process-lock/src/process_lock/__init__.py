@@ -4,7 +4,7 @@
   (:class:`LockHeldError`), or waits up to ``timeout`` seconds, calling ``on_wait`` as it does.
 - **Released by the kernel.** A ``flock`` dies with its holder, ``kill -9`` included.
 - **A structured holder record.** The lock file holds one JSON record (pid, created timestamp, free-form ``label``
-  and ``meta``), readable by
+  and ``meta``, and the holder's process start token), readable by
   :func:`holder` without taking the lock. Informational only; no host name.
 - **Never broken.** A lock the kernel says is held is never taken over. If the recorded pid is
   gone, a forked child kept the descriptor; the error says so and the caller decides.
@@ -25,6 +25,8 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Self
 
+from stream_proc import alive, proc_start
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
     from pathlib import Path
@@ -41,6 +43,7 @@ class Holder:
     created: float = 0.0
     label: str | None = None
     meta: dict[str, object] = field(default_factory=dict[str, object])
+    start: str | None = None  # the holder's process start token; None in a record an older version wrote
 
 
 @dataclass(frozen=True)
@@ -59,7 +62,7 @@ class LockHeldError(Exception):
         self.path = path
         self.pid = pid
         self.holder = holder
-        if pid is not None and holder is not None and not _alive(pid):
+        if pid is not None and holder is not None and not alive(pid, holder.start):
             super().__init__(f"{path} is locked: held by an inherited descriptor; recorded holder pid {pid} is gone")
             return
         who = f"pid {pid}" if pid is not None else "an unknown process"
@@ -192,6 +195,8 @@ def _try(key: Path, record: dict[str, object], *, reentrant: bool) -> _Refused |
 
 def _write(fd: int, record: dict[str, object]) -> None:
     body = {"pid": os.getpid(), "created": time.time(), **record}
+    if (token := proc_start(os.getpid())) is not None:
+        body["start"] = token  # last, so every older key keeps its place; absent where the OS has no process table
     data = json.dumps(body).encode()
     os.pwrite(fd, data, 0)
     os.ftruncate(fd, len(data))
@@ -209,23 +214,14 @@ def _parse(raw: bytes) -> Holder | None:
         return None
     if not isinstance(data, dict) or not isinstance(data.get("pid"), int):
         return None
-    created, label, meta = data.get("created"), data.get("label"), data.get("meta")
+    created, label, meta, start = data.get("created"), data.get("label"), data.get("meta"), data.get("start")
     return Holder(
         pid=data["pid"],
         created=float(created) if isinstance(created, int | float) else 0.0,
         label=label if isinstance(label, str) else None,
         meta={str(k): v for k, v in meta.items()} if isinstance(meta, dict) else {},
+        start=start if isinstance(start, str) else None,
     )
-
-
-def _alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
 
 
 __all__ = ["Holder", "LockHeldError", "ProcessLock", "Waiting", "held", "holder"]

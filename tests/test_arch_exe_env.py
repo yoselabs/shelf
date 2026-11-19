@@ -27,23 +27,17 @@ _OWNER = "packages/child-env/src/child_env/exe.py"
 
 # CURRENT callers of shutil.which. The consumer wave empties this.
 _WHICH_ALLOWED = {
-    "packages/beads-client/src/beads_client/client.py",
     "packages/blueprint/src/blueprint/concerns/stack.py",
     "packages/blueprint/src/blueprint/model.py",
-    "packages/convert-md/src/convert_md/dispatch.py",
     "packages/git-porcelain/src/git_porcelain/lfs.py",
     "packages/git-porcelain/src/git_porcelain/porcelain.py",
     "packages/git-porcelain/src/git_porcelain/real.py",
-    "packages/launchd-agent/src/launchd_agent/__init__.py",
-    "packages/mcp-clients/src/mcp_clients/__init__.py",
 }
 
 # CURRENT callers that pass a whole os.environ as a child's env. The consumer wave empties this. Only a literal
 # env=<whole environ> keyword is seen: blueprint's gate_state.py and testing.py build the dict in a variable first
 # (the consumer wave routes those through build_env too; this test does not follow data flow).
-_WHOLE_ENV_ALLOWED = {
-    "packages/any-lease/src/any_lease/__main__.py",
-}
+_WHOLE_ENV_ALLOWED = {}
 
 
 def _rel(path: Path) -> str:

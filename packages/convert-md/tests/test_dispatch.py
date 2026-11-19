@@ -39,7 +39,7 @@ def test_fallback_chains() -> None:
 
 
 def test_unsupported_format_returns_failed() -> None:
-    result = convert(Path("/nonexistent/archive.zip"))
+    result = convert(Path("/nonexistent/archive.zip"), env={})
     assert result.fidelity == "failed"
     assert any("unsupported_format" in w for w in result.warnings)
 
@@ -56,7 +56,7 @@ def test_docx_round_trips_via_mammoth(tmp_path: Path) -> None:
     docx = tmp_path / "doc.docx"
     doc.save(str(docx))
 
-    result = convert(docx)
+    result = convert(docx, env={})
     assert result.engine.startswith("mammoth@")  # mammoth front-end, then the render engine
     assert result.fidelity == "high"
     assert "Title" in result.body_markdown
@@ -74,7 +74,7 @@ def test_xlsx_converts_with_sheet_content(tmp_path: Path) -> None:
     xlsx = tmp_path / "sheet.xlsx"
     wb.save(xlsx)
 
-    result = convert(xlsx)
+    result = convert(xlsx, env={})
     assert result.engine.startswith(("markitdown@", "openpyxl@"))
     assert "alpha" in result.body_markdown or "42" in result.body_markdown
 
@@ -86,7 +86,7 @@ def test_html_converts_via_trafilatura_or_fallback(tmp_path: Path) -> None:
         "<p>" + ("This is a substantial paragraph of article content. " * 8) + "</p>" + "</article></body></html>",
         encoding="utf-8",
     )
-    result = convert(html)
+    result = convert(html, env={})
     assert result.engine.startswith(("trafilatura@", "html2text@"))
     assert result.body_markdown.strip()
 
@@ -96,7 +96,7 @@ def test_corrupt_docx_walks_to_fallback_engine(tmp_path: Path) -> None:
     # fallback rather than failing outright (chain-walk-on-failure).
     bad = tmp_path / "broken.docx"
     bad.write_bytes(b"this is not a real docx zip but has readable text")
-    result = convert(bad)
+    result = convert(bad, env={})
     assert result.engine.startswith("markitdown@")  # primary (mammoth) was skipped
 
 
@@ -178,7 +178,7 @@ def test_pdf_round_trip_via_pymupdf4llm(tmp_path: Path) -> None:
     """pymupdf4llm (the only `.pdf` engine as of v0.5.0) converts a real PDF through the real dispatch chain."""
     pdf = tmp_path / "hello.pdf"
     pdf.write_bytes(_minimal_pdf())
-    result = convert(pdf)
+    result = convert(pdf, env={})
     assert result.engine.startswith("pymupdf4llm@")
     assert result.fidelity == "high"
     assert "Hello docling two" in result.body_markdown
@@ -195,7 +195,7 @@ def test_pdf_dispatch_requests_markdown_and_refuses_page_chunks(tmp_path: Path, 
         return [{"text": "page"}] if chunks else "# A document\n\nDocument text."
 
     monkeypatch.setitem(sys.modules, "pymupdf4llm", SimpleNamespace(to_markdown=to_markdown))
-    result = convert(path)
+    result = convert(path, env={})
     if chunks:
         assert result.fidelity == "failed"
         assert "page chunks" in result.warnings[0]
@@ -210,4 +210,4 @@ def test_pptx_notes_without_a_text_frame_keep_the_converted_body(tmp_path: Path,
     monkeypatch.setitem(sys.modules, "pptx", SimpleNamespace(Presentation=lambda _source: SimpleNamespace(slides=[slide])))
     converter = SimpleNamespace(convert=lambda _source: SimpleNamespace(text_content="# Slides"))
     monkeypatch.setitem(sys.modules, "markitdown", SimpleNamespace(MarkItDown=lambda: converter))
-    assert convert(path).body_markdown == "# Slides"
+    assert convert(path, env={}).body_markdown == "# Slides"
