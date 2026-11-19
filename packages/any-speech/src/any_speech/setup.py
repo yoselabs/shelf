@@ -26,7 +26,7 @@ class SetupError(RuntimeError):
     """The build could not be made; the message says what to fix."""
 
 
-class Run(Protocol):
+class StepRunner(Protocol):
     def __call__(self, args: Sequence[str | Path], *, cwd: Path | None = None) -> None: ...
 
 
@@ -46,7 +46,7 @@ def install_fluidaudio(
     env: Mapping[str, str],
     home: Path,
     *,
-    run: Run = _run,
+    run: StepRunner = _run,
     work: Path | None = None,
 ) -> Path:
     try:

@@ -27,7 +27,7 @@ from any_speech.format import FORMAT_VERSION, Provenance, Segment, Speaker, Tran
 from any_speech.guard import DEFAULT_BUDGET_GB, MemoryBudgetError
 from any_speech.models import CARDS, ModelCard, card_for, default_card
 from any_speech.pipeline import AudioHasher, Pipeline
-from any_speech.ports import Diarized, Diarizer, Embedder, Heard, Identity, Transcriber, Voice
+from any_speech.ports import Diarized, Diarizer, Heard, Identity, Transcriber, Voice, VoiceEmbedder
 from any_speech.speech import Slots, Speech
 from any_speech.words import Piece, Turn, assign_speakers, segments_from_words, words_from_pieces
 
@@ -40,7 +40,6 @@ __all__ = [
     "Diarizer",
     "Drain",
     "DrainReport",
-    "Embedder",
     "EngineMissingError",
     "Heard",
     "Identity",
@@ -59,6 +58,7 @@ __all__ = [
     "Turn",
     "UnknownVersionError",
     "Voice",
+    "VoiceEmbedder",
     "Word",
     "assign_speakers",
     "card_for",
