@@ -2,7 +2,7 @@
 name = "mcp-clients"
 kind = "primitive"
 tier = "T0"
-release = "mcp-clients-v0.1.0"
+release = "mcp-clients-v0.2.0"
 capability = "Stop caring where each MCP client keeps its server list — Claude Code, Claude Desktop and OpenCode found by program, installer folder or app bundle, and each one's own config read for whether it names your server; a bad config reads as not connected, never as an error."
 implementation = "ours"
 status = "candidate"

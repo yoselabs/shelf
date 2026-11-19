@@ -2,7 +2,7 @@
 name = "sqlite-sidecar"
 kind = "primitive"
 tier = "T0"
-release = "sqlite-sidecar-v0.2.0"
+release = "sqlite-sidecar-v0.3.0"
 capability = "Stop caring how to open a SQLite sidecar file, and stop rediscovering what SQLite does not warn you about — the WAL/autocommit/extension open, an immediate transaction that nests as a savepoint, busy is not corruption, an integrity check needs a fresh connection, -wal/-shm travel with a file set aside, a time column that sorts as time, and a derived store marked while serving, set aside at the next start and emptied on a schema change."
 implementation = "ours"
 status = "candidate"

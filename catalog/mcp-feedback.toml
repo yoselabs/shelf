@@ -2,7 +2,7 @@
 name = "mcp-feedback"
 kind = "any-*"
 tier = "T2"
-release = "mcp-feedback-v0.3.0"
+release = "mcp-feedback-v0.3.1"
 capability = "Stop caring how to mount an agent-invoked feedback tool on a FastMCP server — a fixed-schema, self-contained report_feedback(subject, note, request, response, wanted) tool, OTLP/HTTP-logs transport, exactly two consumer knobs (endpoint/api_key config, one appended line of tool-description guidance)."
 implementation = "ours"
 status = "candidate"

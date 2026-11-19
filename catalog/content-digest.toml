@@ -2,7 +2,7 @@
 name = "content-digest"
 kind = "primitive"
 tier = "T0"
-release = "content-digest-v0.1.0"
+release = "content-digest-v0.2.0"
 capability = "Stop caring how to hash a value so the same data always gets the same id — digest(value, length=12) over canonical JSON (sorted keys, compact, UTF-8) and digest_text(text, length=12), sha256 cut to hex; a value JSON cannot say (datetime, set, bytes, NaN, a non-string key) is refused, never stringified."
 implementation = "ours"
 status = "candidate"

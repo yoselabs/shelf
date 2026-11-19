@@ -2,7 +2,7 @@
 name = "beads-client"
 kind = "any-lib"
 tier = "T1"
-release = "beads-client-v0.4.0"
+release = "beads-client-v0.5.0"
 capability = "Stop hand-rolling bd subprocess calls: typed Bd verbs (show, find, ready, create, update, claim, unclaim, reclaim, heartbeat, close, comment, label, provenance, sync) with --if-assignee/--if-status fences, classified errors and loud failure on malformed replies."
 implementation = "ours"
 status = "candidate"

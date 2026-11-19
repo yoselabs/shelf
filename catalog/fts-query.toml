@@ -2,7 +2,7 @@
 name = "fts-query"
 kind = "primitive"
 tier = "T0"
-release = "fts-query-v0.1.0"
+release = "fts-query-v0.2.0"
 capability = "Stop caring how a search box's text becomes an FTS5 query — stemmed words versus grep -w exact terms (identifiers, quoted phrases) in any script, identifier-only routing, the query's terms cut by the index's own FTS5 tokenizer, and one injected letter fold that holds on the index side and the query side alike."
 implementation = "ours"
 status = "candidate"

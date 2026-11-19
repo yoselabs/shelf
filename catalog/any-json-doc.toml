@@ -2,7 +2,7 @@
 name = "any-json-doc"
 kind = "any-lib"
 tier = "T1"
-release = "any-json-doc-v0.2.0"
+release = "any-json-doc-v0.3.0"
 capability = "Stop re-writing the one-JSON-file store: a document replaced atomically and read as Present, Absent, Torn (half written, bad JSON, wrong shape) or ForeignVersion (another install's schema), with a lossy get, a strict need, a keyed set and locked optimistic updates."
 implementation = "ours"
 status = "candidate"

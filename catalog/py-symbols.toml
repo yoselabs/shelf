@@ -2,7 +2,7 @@
 name = "py-symbols"
 kind = "primitive"
 tier = "T0"
-release = "py-symbols-v0.1.0"
+release = "py-symbols-v0.2.0"
 capability = "Stop walking ast by hand to name Python code: a symbol's source span by dotted name (Class.member), a module's functions qualified, the function enclosing a line, and a stable hash of one symbol's source."
 implementation = "ours"
 status = "candidate"

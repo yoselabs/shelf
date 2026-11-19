@@ -2,7 +2,7 @@
 name = "mcp-call"
 kind = "primitive"
 tier = "T0"
-release = "mcp-call-v0.1.0"
+release = "mcp-call-v0.2.0"
 capability = "Stop paying a second of imports to make one MCP call — a session with a Streamable HTTP MCP server over httpx alone (initialize, tools/list, tools/call), reading JSON or SSE replies, sending the session header back, a refused connection as its own exception and a tool's failure as a result."
 implementation = "ours"
 status = "candidate"

@@ -2,7 +2,7 @@
 name = "sqlite-store"
 kind = "primitive"
 tier = "T0"
-release = "sqlite-store-v0.1.0"
+release = "sqlite-store-v0.2.0"
 capability = "Stop copying SQLite-on-disk lifecycle glue: conservative WAL opens, per-thread/process/file shared writers, immediate transactions, atomic ordered schema upgrades, filesystem refusal, integrity-check caching, explicit quarantine and revision-guarded updates. Applications own all schema and domain SQL."
 implementation = "ours"
 status = "candidate"
