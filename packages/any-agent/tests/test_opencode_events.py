@@ -4,16 +4,17 @@ its login probe.
 No real ZAI call is made here: the goldens are recorded shapes not a live check."""
 
 import json
-import subprocess
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 from unittest import mock
 
 import pytest
+import stream_proc
+from child_env import NotFound
+from stream_proc import Captured
 
 from any_agent import events as ev
-from any_agent import procs
 from any_agent._json import obj
 from any_agent.harnesses import opencode_sandbox as box
 from any_agent.harnesses.opencode import OpenCodeHarness, Profile
@@ -47,7 +48,7 @@ def replay(h, tick=None):
 
 class TestStream:
     def test_permission_lines_start_provisional_rows(self):
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         got, _ = replay(h)
         assert [(type(e).__name__, e.id, e.prov) for e in got] == [("Cmd", "oc:1", True), ("Cmd", "oc:2", True), ("Tool", "oc:3", True)]
         assert (got[0].text, got[1].text, got[2].name, got[2].arg) == (
@@ -58,7 +59,7 @@ class TestStream:
         )  # external_directory is not a tool
 
     def test_the_completed_call_closes_every_subcommand_row_and_gives_the_full_text(self):
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         _, per_line = replay(h)
         bash = per_line[1]
         assert names(bash) == ["CmdEnd", "CmdEnd"]
@@ -69,13 +70,13 @@ class TestStream:
         assert h.prov == []
 
     def test_a_call_with_no_permission_line_is_reported_whole(self):
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         evs = [h.parse_line(x) for x in lines("opencode_session.jsonl")][1]
         end = only(evs, ev.CmdEnd)
         assert (names(evs), end.id, end.secs) == (["CmdEnd"], "o1", 6.0)
 
     def test_denials_are_typed_and_come_from_the_tool_output(self):
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         per_line = [h.parse_line(x) for x in lines("opencode_session.jsonl")]
         assert names(per_line[3]) == ["CmdEnd", "Denied"]
         assert names(per_line[4]) == ["ToolEnd", "Denied"]
@@ -84,7 +85,7 @@ class TestStream:
         assert only(per_line[3], ev.CmdEnd).exit == 1
 
     def test_steps_and_text_are_the_evidence(self):
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         per_line = [h.parse_line(x) for x in lines("opencode_session.jsonl")]
         assert names(per_line[0]) == ["Started"]
         assert names(per_line[5]) == ["Tokens"]
@@ -100,7 +101,7 @@ class TestStream:
         )
 
     def test_the_summary_folds_steps_into_the_accounting_record(self):
-        h = OpenCodeHarness(Profile(price="catalog"))
+        h = OpenCodeHarness(Profile(price="catalog"), env={})
         for x in lines("opencode_session.jsonl"):
             h.parse_line(x)
         s = h.summary(0, "", "stderr noise", "answer", False)
@@ -124,30 +125,30 @@ class TestStream:
         )
         assert s.res["cost"] == 0.03
         for price, want in (("free", (0.0, "free")), ("unknown", (None, "unknown"))):
-            h2 = OpenCodeHarness(Profile(price=price))
+            h2 = OpenCodeHarness(Profile(price=price), env={})
             for x in lines("opencode_session.jsonl"):
                 h2.parse_line(x)
             a2 = obj(h2.summary(0, "", "", None, False).res["acct"])
             assert (a2["cost_usd"], a2["cost_source"]) == want
 
     def test_an_error_event_is_the_vendors_words_and_stderr_after_our_own_kill_is_not(self):
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         for x in lines("opencode_error.jsonl"):
             assert names(h.parse_line(x)) == ["Started", "HarnessError"]
         assert h.summary(1, "", "shell: killed", None, False).vendor == "Rate limit reached for requests, try again later"
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         assert h.summary(-9, "", "shell: killed", "answer", False).vendor == ""
         assert h.summary(1, "", "shell: killed", None, False).vendor == "shell: killed"
 
     def test_a_log_line_that_quotes_a_limit_phrase_is_a_tool_not_a_throttle(self):
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         line = 'INFO  2026-10-26T21:32:01 +3ms service=permission evaluated permission=bash pattern="cat <<EOF\\ntry again later\\nEOF"'
         got = h.parse_log_line(line + " action=allow")
         assert (names(got), only(got, ev.Cmd).text) == (["Cmd"], "cat <<EOF\ntry again later\nEOF")
         assert h.parse_log_line("ERROR service=llm error=Rate limit reached") == []
 
     def test_a_line_that_is_not_json_or_an_object_yields_nothing(self):
-        assert [OpenCodeHarness().parse_line(x) for x in ("", "oops", "[1]")] == ([[]] * 3)
+        assert [OpenCodeHarness(env={}).parse_line(x) for x in ("", "oops", "[1]")] == ([[]] * 3)
 
 
 class TestWorld:
@@ -156,7 +157,7 @@ class TestWorld:
         self.tmp = tmp_path
 
     def spec(self, profile=None, **kw):
-        h = OpenCodeHarness(profile, self.tmp)
+        h = OpenCodeHarness(profile, self.tmp, env={})
         with mock.patch.object(box, "write_shell") as shell:
             s = h.launch_spec(
                 LaunchInputs(
@@ -214,9 +215,9 @@ class TestWorld:
         assert h.evidence.ref == "ses_9"
 
     def free(self, out, model="opencode/deepseek-v4.1-flash-free"):
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         h.exe = "opencode"
-        with mock.patch.object(procs, "run_capture", return_value=subprocess.CompletedProcess([], 0, out, "")):
+        with mock.patch.object(stream_proc, "capture", return_value=Captured(0, out, "", 0.1, False)):
             return h.free_model_ok(model, {})
 
     def test_the_free_model_is_accepted_only_exact_and_zero_priced(self):
@@ -244,19 +245,19 @@ class TestWorld:
             cat(cost={"input": False, "output": 0, "cache": {"read": 0, "write": 0}}),
         ):
             assert not self.free(out), out
-        h = OpenCodeHarness()
-        with mock.patch.object(procs, "run_capture", side_effect=subprocess.TimeoutExpired("opencode", 30)):
+        h = OpenCodeHarness(env={})
+        with mock.patch.object(stream_proc, "capture", return_value=Captured(124, "", "", 30.0, True)):
             assert not h.free_model_ok("opencode/deepseek-v4.1-flash-free", {})
 
     def test_the_login_probe_reads_the_auth_file(self):
         with (
             tempfile.TemporaryDirectory() as d,
-            mock.patch.dict("os.environ", {"XDG_DATA_HOME": d}),
             mock.patch.object(OpenCodeHarness, "find_exe", return_value="oc"),
         ):
+            env = {"XDG_DATA_HOME": d}
             p = Path(d) / "opencode" / "auth.json"
             p.parent.mkdir()
-            zai = OpenCodeHarness(Profile(auth_key="zai-coding-plan", need_key=True))
+            zai = OpenCodeHarness(Profile(auth_key="zai-coding-plan", need_key=True), env=env)
             for auth, want in (
                 ({"zai": {"type": "api", "key": "k"}}, False),
                 ({"zai-coding-plan": {}}, False),
@@ -264,8 +265,8 @@ class TestWorld:
             ):
                 p.write_text(json.dumps(auth))
                 assert zai.login_probe(5)[0] == want
-            assert OpenCodeHarness(Profile()).login_probe(5)[0] is True  # free access needs no login
-            with mock.patch.object(OpenCodeHarness, "find_exe", return_value=None):
+            assert OpenCodeHarness(Profile(), env=env).login_probe(5)[0] is True  # free access needs no login
+            with mock.patch.object(OpenCodeHarness, "find_exe", side_effect=NotFound("opencode", ())):
                 assert zai.login_probe(5)[0] is None
 
     def test_the_sandbox_shell_is_offline_and_a_refused_network_is_not_a_denial(self):
@@ -290,6 +291,6 @@ class TestReadRoots:
         assert self.outside(False, ("/data/shots",)) == self.outside(False)
 
     def test_a_denial_from_the_stream_carries_the_tools_words(self):
-        h = OpenCodeHarness()
+        h = OpenCodeHarness(env={})
         events = h._denials("bash", {"command": "x"}, "Operation not permitted: /etc/x")
         assert [e.reason for e in events if isinstance(e, ev.Denied)] == ["Operation not permitted: /etc/x"]

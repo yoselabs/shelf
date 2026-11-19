@@ -51,7 +51,7 @@ def test_no_rollout_is_none_not_an_error(tmp_path):
 
 
 def test_a_killed_codex_run_reports_the_rollouts_requests_and_tokens_and_says_the_usage_is_incomplete(tmp_path):
-    h = CodexHarness()
+    h = CodexHarness(env={})
     h.sessions = rollout(tmp_path, [count("2026-11-14T10:00:01.000Z", 100), count("2026-11-14T10:00:02.000Z", 300)])
     h.parse_line(json.dumps({"type": "thread.started", "thread_id": REF}))
     res = h.summary(-15, "", "", None, True).res  # no turn.completed ever came
@@ -59,7 +59,7 @@ def test_a_killed_codex_run_reports_the_rollouts_requests_and_tokens_and_says_th
 
 
 def test_a_finished_codex_run_keeps_the_stream_tokens_and_is_complete(tmp_path):
-    h = CodexHarness()
+    h = CodexHarness(env={})
     h.sessions = rollout(
         tmp_path, [count("2026-11-14T10:00:01.000Z", 100), count("2026-11-14T10:00:02.000Z", 300), count("2026-11-14T10:00:03.000Z", 500)]
     )

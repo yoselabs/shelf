@@ -178,7 +178,7 @@ class LogWatcher:
 
     def poll(self) -> Stop | None:
         with contextlib.suppress(OSError):
-            for f in self.dir.glob("*.log"):
+            for f in sorted(self.dir.glob("*.log")):
                 size, off = f.stat().st_size, self.offs.get(f, 0)
                 if size > off:
                     with f.open("rb") as fh:

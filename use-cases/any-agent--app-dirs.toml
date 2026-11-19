@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-agent"
+software = "app-dirs"
+why = "The harnesses located codex's CODEX_HOME sessions, claude's ~/.claude/projects and opencode's XDG data folder (log, auth.json) by reading os.environ and Path.home() themselves. app_dirs.tool_home and data_dir own that lookup and take the env as an argument."
+needs = "tool_home(tool, env_var, env=) and data_dir(app, env=)."
+sponsor = "yoselabs"
+requester = "any-agent"
+status = "active" # active | retired

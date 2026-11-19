@@ -39,7 +39,7 @@ def test_claude_without_a_policy_keeps_auto_and_the_callers_settings():
 
 def test_claude_takes_the_chosen_mode_and_settings():
     policy = ClaudeAccess(permission_mode=ClaudePermissionMode.ACCEPT_EDITS, settings='{"b": 2}')
-    argv = ClaudeHarness().launch_spec(make(access_policy=policy)).argv
+    argv = ClaudeHarness(env={}).launch_spec(make(access_policy=policy)).argv
     assert after(argv, "--permission-mode") == "acceptEdits"
     assert after(argv, "--settings") == '{"b": 2}'
 
@@ -57,23 +57,23 @@ def test_a_harness_refuses_another_harnesss_policy():
     with pytest.raises(ValueError, match="claude cannot take a CodexAccess"):
         launch_argv(make(access_policy=CodexAccess()))
     with pytest.raises(ValueError, match="codex cannot take a ClaudeAccess"):
-        CodexHarness().launch_spec(make(access_policy=ClaudeAccess()))
+        CodexHarness(env={}).launch_spec(make(access_policy=ClaudeAccess()))
 
 
 def test_codex_without_a_policy_is_unchanged():
-    spec = CodexHarness().launch_spec(make(sandbox="workspace-write", access=["-c", "x=1"]))
+    spec = CodexHarness(env={}).launch_spec(make(sandbox="workspace-write", access=["-c", "x=1"]))
     head = ["/bin/x", "exec", "-m", "m", "-c", 'model_reasoning_effort="high"']
     assert spec.argv == [*head, "-s", "workspace-write", "-c", "x=1", "--json", "-"]
 
 
 def test_codex_policy_translates_sandbox_approval_network_and_roots():
     policy = CodexAccess(sandbox=CodexSandbox.WORKSPACE_WRITE, approval=CodexApproval.NEVER, network=False, writable_roots=("/t",))
-    argv = CodexHarness().launch_spec(make(access_policy=policy)).argv
+    argv = CodexHarness(env={}).launch_spec(make(access_policy=policy)).argv
     assert after(argv, "-s") == "workspace-write"
     assert 'approval_policy="never"' in argv
     assert "sandbox_workspace_write.network_access=false" in argv
     assert 'sandbox_workspace_write.writable_roots=["/t"]' in argv
-    resumed = CodexHarness().launch_spec(make(access_policy=policy, resume="r1")).argv
+    resumed = CodexHarness(env={}).launch_spec(make(access_policy=policy, resume="r1")).argv
     assert 'sandbox_mode="workspace-write"' in resumed
     assert "-s" not in resumed
 
@@ -99,7 +99,7 @@ def test_codex_policy_covers_the_factorys_restrictive_access_and_its_sandbox_pro
         ignore_rules=True,
         shell_env=(("TMPDIR", "/t"),),
     )
-    argv = CodexHarness().launch_spec(make(access_policy=policy)).argv
+    argv = CodexHarness(env={}).launch_spec(make(access_policy=policy)).argv
     assert {"--ignore-user-config", "--ignore-rules"} <= set(argv)
     for key in (
         "sandbox_workspace_write.exclude_slash_tmp=true",

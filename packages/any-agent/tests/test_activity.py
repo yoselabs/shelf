@@ -22,7 +22,7 @@ def replay(harness, name, step=2.0):
 
 class TestCodex:
     def test_a_command_is_written_running_then_finished_with_its_duration_and_the_wait_before_it(self):
-        found = [a for a in replay(CodexHarness(), "codex_session.jsonl") if a.kind == "command"]
+        found = [a for a in replay(CodexHarness(env={}), "codex_session.jsonl") if a.kind == "command"]
         assert [(a.state, a.text, a.id) for a in found] == [("running", "ls", "c1"), ("finished", "ls", "c1")]
         running, finished = found
         assert running.waited_ms is None
@@ -31,24 +31,24 @@ class TestCodex:
         assert finished.exit_code == 0
 
     def test_a_message_follows_the_end_of_the_previous_action(self):
-        found = replay(CodexHarness(), "codex_session.jsonl")
+        found = replay(CodexHarness(env={}), "codex_session.jsonl")
         message = next(a for a in found if a.kind == "message")
         assert message.text == "done" and message.state == "finished" and message.waited_ms is not None
 
     def test_reasoning_text_is_a_think_line_and_unknown_lines_make_no_activity(self):
-        found = replay(CodexHarness(), "codex_session.jsonl")
+        found = replay(CodexHarness(env={}), "codex_session.jsonl")
         assert [a.text for a in found if a.kind == "think"] == ["plan the change"]
         assert "secret" not in " ".join(a.text for a in found)
 
     def test_a_retry_and_a_failure_are_waiting_and_error(self):
-        kinds = {a.kind for a in replay(CodexHarness(), "codex_reconnecting.jsonl")}
+        kinds = {a.kind for a in replay(CodexHarness(env={}), "codex_reconnecting.jsonl")}
         assert "waiting" in kinds
-        assert {a.kind for a in replay(CodexHarness(), "codex_bad_request.jsonl")} >= {"error"}
+        assert {a.kind for a in replay(CodexHarness(env={}), "codex_bad_request.jsonl")} >= {"error"}
 
 
 class TestClaude:
     def test_bash_is_a_command_and_other_tools_are_tools_and_an_error_result_has_an_exit_code(self):
-        found = replay(ClaudeHarness(), "claude_session.jsonl")
+        found = replay(ClaudeHarness(env={}), "claude_session.jsonl")
         commands = [a for a in found if a.kind == "command" and a.state == "finished"]
         assert [(a.text, a.exit_code) for a in commands] == [("ls", None), ("git push", 1)]
         tool = next(a for a in found if a.kind == "tool" and a.state == "finished")

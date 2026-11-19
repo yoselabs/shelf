@@ -2,7 +2,6 @@
 stream_proc, the shelf's one place that signals a process. What lives here is what stream_proc does not know: the `Worker` record, the
 `StopReport` of one tree stop and the stdin-piped spawn (the brief goes in on stdin). POSIX only."""
 
-import os
 import subprocess
 import time
 from collections.abc import Callable, Mapping
@@ -13,7 +12,7 @@ from stream_proc import proc_start
 
 from any_agent._json import mutable, record
 
-GRACE_S = float(os.environ.get("ANY_AGENT_STOP_GRACE") or 5)  # SIGTERM to SIGKILL
+GRACE_S = 5.0  # SIGTERM to SIGKILL
 
 
 @record
@@ -54,18 +53,17 @@ def spawn(
     env: Mapping[str, str] | None = None,
     *,
     stderr: int = subprocess.PIPE,
-    session: bool = True,
     registered: Callable[[Worker], None] | None = None,
 ) -> tuple[subprocess.Popen[bytes], Worker]:
-    """Start the worker as its own session leader (`session`) with piped stdin and stdout; `stderr` is a pipe unless the caller discards it.
-    -> (the Popen, the worker's record)."""
+    """Start the worker as its own session leader (stream_proc's default) with piped stdin and stdout; `stderr` is a pipe unless the
+    caller discards it. -> (the Popen, the worker's record)."""
 
     def register(identity: stream_proc.OwnedProcess) -> None:
         worker = Worker(pid=identity.pid, pgid=identity.pgid, start=identity.start, boot=identity.boot)
         if registered is not None:
             registered(worker)
 
-    p, identity = stream_proc.popen_registered(argv, registered=register, cwd=cwd, env=env, stderr=stderr, start_new_session=session)
+    p, identity = stream_proc.popen_registered(argv, registered=register, cwd=cwd, env=env, stderr=stderr)
     return p, Worker(pid=identity.pid, pgid=identity.pgid, start=identity.start, boot=identity.boot)
 
 
@@ -89,18 +87,3 @@ def stop(p: subprocess.Popen[bytes], grace: float) -> StopReport:
 def kill_tree(p: subprocess.Popen[bytes], grace: float | None = None) -> StopReport:
     """Stop the worker `p` and its whole tree. -> the report; the caller keeps it."""
     return stop(p, GRACE_S if grace is None else grace)
-
-
-def run_capture(
-    argv: list[str], timeout: float, *, env: Mapping[str, str] | None = None, cwd: str | None = None
-) -> subprocess.CompletedProcess[str]:
-    """Run to the end with captured text output and no stdin (stream_proc.run: a session of its own; a timeout kills the whole tree).
-    -> CompletedProcess; TimeoutExpired on timeout."""
-    out: list[str] = []
-    err: list[str] = []
-    res = stream_proc.run(argv, env=env, cwd=cwd, on_stdout=out.append, on_stderr=err.append, timeout=timeout, grace=GRACE_S)
-    if res.timed_out:
-        raise subprocess.TimeoutExpired(argv, timeout, "".join(out), "".join(err))
-    return subprocess.CompletedProcess(
-        argv, -res.signal if res.signal else -1 if res.returncode is None else res.returncode, "".join(out), "".join(err)
-    )

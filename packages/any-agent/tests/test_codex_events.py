@@ -3,7 +3,6 @@ Regenerate a golden with `uv run python packages/any-agent/tests/test_codex_even
 
 import dataclasses
 import json
-import os
 import stat
 import sys
 import tempfile
@@ -29,7 +28,7 @@ def lines_of(name):
 
 
 def parse(name):
-    h = CodexHarness(clock=lambda: 5.0)
+    h = CodexHarness(clock=lambda: 5.0, env={})
     return h, [h.parse_line(line) for line in lines_of(name)]
 
 
@@ -70,7 +69,7 @@ class TestFacts:
         assert [e.http_status for evs in parse("http_429")[1] for e in evs] == [429]
 
     def test_a_permission_line_that_says_rate_limit_is_not_a_retry(self):
-        h = CodexHarness()
+        h = CodexHarness(env={})
         line = json.dumps(
             {"type": "item.completed", "item": {"id": "m", "type": "agent_message", "text": "the batch is behind a rate limit"}}
         )
@@ -88,7 +87,7 @@ class TestFacts:
         assert (e.ref, e.last, e.turns, e.work, e.tokens) == ("th-1", "done", 1, True, {"in": 100, "cached": 40, "out": 7})
 
     def test_a_line_that_is_not_json_or_not_an_object_yields_nothing(self):
-        h = CodexHarness()
+        h = CodexHarness(env={})
         assert [h.parse_line(x) for x in ("", "oops", "[1]", "3")] == ([[]] * 4)
 
 
@@ -108,7 +107,7 @@ INPUTS = LaunchInputs(
 
 class TestWorld:
     def test_a_fresh_launch(self):
-        s = CodexHarness().launch_spec(dataclasses.replace(INPUTS, schema="s.json"))
+        s = CodexHarness(env={}).launch_spec(dataclasses.replace(INPUTS, schema="s.json"))
         assert s.argv == [
             "/bin/codex",
             "exec",
@@ -131,7 +130,7 @@ class TestWorld:
         assert (s.cwd, s.stdin, s.env) == ("/w", "rules\n\nbrief", {"A": "1"})
 
     def test_a_resume_launch(self):
-        s = CodexHarness("th-9").launch_spec(dataclasses.replace(INPUTS, resume="th-9", schema="s.json"))
+        s = CodexHarness("th-9", env={}).launch_spec(dataclasses.replace(INPUTS, resume="th-9", schema="s.json"))
         assert s.argv == [
             "/bin/codex",
             "exec",
@@ -155,7 +154,7 @@ class TestWorld:
         ]
 
     def test_the_transcript_is_the_rollout_file_of_the_thread(self):
-        h = CodexHarness()
+        h = CodexHarness(env={})
         day = Path.home() / ".codex" / "sessions" / "2026" / "10" / "21"
         day.mkdir(parents=True)
         (day / "rollout-2026-10-21T19-45-28-th-7.jsonl").write_text("{}\n")
@@ -169,12 +168,9 @@ class TestWorld:
             exe = Path(d) / "codex"
             exe.write_text('#!/bin/sh\n[ "$FAKE_LOGIN" = out ] && { echo "Not logged in" >&2; exit 1; }\necho "Logged in using ChatGPT"\n')
             exe.chmod(exe.stat().st_mode | stat.S_IXUSR)
-            with mock.patch.dict(os.environ, {"PATH": d}):
-                assert CodexHarness().login_probe(5) == (True, "Logged in using ChatGPT")
-                with mock.patch.dict(os.environ, {"FAKE_LOGIN": "out"}):
-                    assert CodexHarness().login_probe(5) == (False, "Not logged in")
-            with mock.patch.dict(os.environ, {"PATH": "/nonexistent"}):
-                assert CodexHarness().login_probe(5)[0] is None
+            assert CodexHarness(env={"PATH": d}).login_probe(5) == (True, "Logged in using ChatGPT")
+            assert CodexHarness(env={"PATH": d, "FAKE_LOGIN": "out"}).login_probe(5) == (False, "Not logged in")
+            assert CodexHarness(env={"PATH": "/nonexistent"}).login_probe(5)[0] is None
 
 
 if __name__ == "__main__" and "--regen" in sys.argv:
@@ -186,7 +182,7 @@ if __name__ == "__main__" and "--regen" in sys.argv:
 @pytest.mark.parametrize("resume", [None, "session"])
 def test_empty_optional_codex_choices_are_omitted(resume: str | None) -> None:
     inputs = dataclasses.replace(INPUTS, model="", effort="", sandbox="", out_file="", schema="", access=[], isolation=[], resume=resume)
-    spec = CodexHarness().launch_spec(inputs)
+    spec = CodexHarness(env={}).launch_spec(inputs)
     assert spec.argv == ["/bin/codex", "exec", *(["resume"] if resume else []), "--json", *([resume] if resume else []), "-"]
     assert (spec.cwd, spec.env, spec.stdin) == (inputs.cwd, inputs.env, inputs.prompt)
 
@@ -201,14 +197,14 @@ def test_empty_optional_codex_choices_are_omitted(resume: str | None) -> None:
 )
 def test_nonsealed_codex_requires_executable_directory_and_explicit_session(inputs: LaunchInputs, field: str) -> None:
     with pytest.raises(ValueError, match=field):
-        CodexHarness().launch_spec(inputs)
+        CodexHarness(env={}).launch_spec(inputs)
 
 
 @pytest.mark.parametrize("resume", [None, "session"])
 def test_codex_effort_is_one_literal_toml_string(resume: str | None) -> None:
     effort = 'high"\nother="value'
     inputs = dataclasses.replace(INPUTS, effort=effort, resume=resume)
-    spec = CodexHarness().launch_spec(inputs)
+    spec = CodexHarness(env={}).launch_spec(inputs)
     assert "model_reasoning_effort=" + json.dumps(effort) in spec.argv
     assert "--skip-git-repo-check" not in spec.argv
 
@@ -221,14 +217,14 @@ class TestCodexMessageIsNotTheAnswerUntilTheTurnEnds:
 
     def test_a_message_alone_does_not_start_the_answer_timer(self):
         clock = [0.0]
-        h, turn = CodexHarness(), Turn(grace_s=120, clock=lambda: clock[0])
+        h, turn = CodexHarness(env={}), Turn(grace_s=120, clock=lambda: clock[0])
         turn.apply(h.parse_line(json.dumps(self.COMMENTARY)))
         clock[0] = 121.0
         assert (turn.verdict(Watchdog(600, 600, clock=lambda: clock[0])), h.evidence.last.startswith("I\u2019ll read")) == (None, True)
 
     def test_the_turn_end_after_a_message_does_start_it(self):
         clock = [0.0]
-        h, turn = CodexHarness(), Turn(grace_s=120, clock=lambda: clock[0])
+        h, turn = CodexHarness(env={}), Turn(grace_s=120, clock=lambda: clock[0])
         for raw in (self.COMMENTARY, {"type": "turn.completed", "usage": {"input_tokens": 1, "output_tokens": 1}}):
             turn.apply(h.parse_line(json.dumps(raw)))
         clock[0] = 121.0

@@ -207,14 +207,20 @@ wheels = [
 
 [[package]]
 name = "any-agent"
-version = "0.15.0"
+version = "0.16.0"
 source = { editable = "packages/any-agent" }
 dependencies = [
+    { name = "app-dirs" },
+    { name = "child-env" },
     { name = "stream-proc" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "stream-proc", editable = "packages/stream-proc" }]
+requires-dist = [
+    { name = "app-dirs", editable = "packages/app-dirs" },
+    { name = "child-env", editable = "packages/child-env" },
+    { name = "stream-proc", editable = "packages/stream-proc" },
+]
 
 [[package]]
 name = "any-breaker"

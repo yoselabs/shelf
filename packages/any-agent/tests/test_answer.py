@@ -155,7 +155,7 @@ def test_same_consumer_decodes_one_execution(
     rc: int,
     refs: tuple[str, ...],
 ) -> None:
-    harness = CodexHarness()
+    harness = CodexHarness(env={})
     spec = spec_for(tmp_path, answer, rc, refs)
     fake = FakeRun(fake_outcome(answer, rc, refs), refs=refs)
     observed: list[str] = []
@@ -213,7 +213,7 @@ def test_registration_refusal_has_no_ref_or_terminal_answer(
 
     execute = run if implementation == "native" else fake
     with pytest.raises(failure, match="registration refused"):
-        execute(CodexHarness(), spec, 10, RunHooks(started=refuse, ref=refs.append))
+        execute(CodexHarness(env={}), spec, 10, RunHooks(started=refuse, ref=refs.append))
     assert not marker.exists()
     assert refs == []
 
@@ -225,13 +225,13 @@ def test_fake_is_consumed_once_and_preserves_answer_grace_facts(tmp_path: Path) 
     fake = FakeRun(raw, refs=("ref", "ref"))
     spec = spec_for(tmp_path, "unused", 0, ())
     refs: list[str] = []
-    result = fake(CodexHarness(), spec, 10, RunHooks(ref=refs.append))
+    result = fake(CodexHarness(env={}), spec, 10, RunHooks(ref=refs.append))
     assert result is raw
     assert result.rc == -15 and result.stop == "answer" and result.summary.stands
     assert decode_answer(result.summary.text, decode_plan) == DecodedAnswer(Plan("next"))
     assert refs == ["ref", "ref"]
     with pytest.raises(RuntimeError, match="consumed"):
-        fake(CodexHarness(), spec, 10)
+        fake(CodexHarness(env={}), spec, 10)
     assert len(fake.calls) == 1
 
 
@@ -263,5 +263,5 @@ def test_fake_accepts_matching_or_unspecified_terminal_ref(tmp_path: Path, *, re
         del raw.summary.res["ref"]
     fake = FakeRun(raw, refs=("older-session", "observed-session"))
     refs: list[str] = []
-    assert fake(CodexHarness(), spec_for(tmp_path, "unused", 0, ()), 10, RunHooks(ref=refs.append)) is raw
+    assert fake(CodexHarness(env={}), spec_for(tmp_path, "unused", 0, ()), 10, RunHooks(ref=refs.append)) is raw
     assert refs == ["older-session", "observed-session"]
