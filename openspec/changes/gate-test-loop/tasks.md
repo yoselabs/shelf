@@ -10,8 +10,10 @@ Each task is a bead with acceptance criteria (`bd lint` runs in the gate). Tests
       Released both leases; `packages/any-lease/tests/conftest.py` now fails any test that leaks a lease. 28 parallel mixed runs and 6 full parallel runs: 0 failures.
 - [ ] 3b. `any-lease::test_sigterm_reaches_the_command_and_the_exit_code_says_so` failed once in 3 full parallel runs and not in 300 stress runs (28 at once),
       nor in 6 later full runs. Cause unknown; do not patch on a guess: when it recurs, keep the failing output (`-rf`, `--durations`), and put it in `quarantine` meanwhile.
-- [ ] 4. Per-package fingerprint = files + `uv export` hash; replace the "lock or root pyproject changed, select all" rule; keep select-all for
-      unknown paths, `requires-python`, `.python-version`, uv/python versions. Replay the last 50 commits as a test fixture asserting median <= 5.
+- [x] 4. Per-package fingerprint = files + `uv export` hash; "lock changed" no longer selects all (2026-11-19). The root pyproject is read as: dependency tables via
+      the exports, pytest and coverage settings as a change to every suite, everything else (ruff, pyrefly, import-linter, `tool.uv`, test paths) as no suite's
+      concern; select-all stays for unknown paths, `.python-version` and when uv or the base tree cannot answer. `tools/affected.py --reach N` replays the last N
+      commits: 50 commits give median 1, max 5 of 79 packages (before: median 79). A history replay is not a test (50 s, tied to this repo's past).
 - [ ] 5. Second hub mutation (any hub other than `atomic-io`); record selected vs failing suites in the change's research folder.
 - [ ] 6. Receipt key and ledger (repo-local, git-ignored); pre-push and manual `just check` share it; replaces `gate_state.py`'s tree skip.
 - [ ] 7. Run guard: worker cap, single process for small selections, wall and idle kill, `serial`/`quarantine` markers and their list file,
