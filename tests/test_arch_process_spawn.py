@@ -35,6 +35,7 @@ _KILL_ALLOWLIST = {
 
 # to be emptied by the consumer wave: files outside the spawners that run a subprocess with no timeout=
 _UNBOUNDED_ALLOWLIST = {
+    "packages/any-lease/src/any_lease/__main__.py",  # kept: the run wrapper waits on an arbitrary user command, a deadline would kill it
     "packages/blueprint/src/blueprint/recipes/changed.py",
     "packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py",
     "packages/blueprint/src/blueprint/recipes/gate_state.py",

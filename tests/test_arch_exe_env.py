@@ -37,7 +37,7 @@ _WHICH_ALLOWED = {
 # CURRENT callers that pass a whole os.environ as a child's env. The consumer wave empties this. Only a literal
 # env=<whole environ> keyword is seen: blueprint's gate_state.py and testing.py build the dict in a variable first
 # (the consumer wave routes those through build_env too; this test does not follow data flow).
-_WHOLE_ENV_ALLOWED = {}
+_WHOLE_ENV_ALLOWED: set[str] = set()
 
 
 def _rel(path: Path) -> str:
