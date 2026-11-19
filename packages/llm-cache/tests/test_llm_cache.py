@@ -6,8 +6,6 @@ TTL lazy eviction, and the manual evict/size accounting.
 
 from __future__ import annotations
 
-import asyncio
-
 import aiosqlite
 import pytest
 from anyllm import Completion
@@ -73,20 +71,30 @@ async def test_make_key_is_order_sensitive_and_distinct() -> None:
     assert make_key("a", "b") == f"{hash_text('a')}:{hash_text('b')}"
 
 
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1_000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
 async def test_expired_row_is_evicted_on_read(conn) -> None:
-    """ttl_s=0 → every put is born expired; the next get evicts it."""
-    cache = LlmCache(conn, ttl_s=0)
+    """A put whose ttl has passed is a miss; the get evicts it."""
+    clock = _Clock()
+    cache = LlmCache(conn, ttl_s=10, clock=clock)
     await cache.put(key="k", model="m", completion=_completion("stale"))
-    await asyncio.sleep(1.1)  # push the clock past expires_at
+    clock.now += 10  # the stored expires_at is now due
     assert await cache.get(key="k", model="m") is None
     assert await cache.size() == 0
 
 
 async def test_evict_expired_returns_count(conn) -> None:
-    cache = LlmCache(conn, ttl_s=0)
+    clock = _Clock()
+    cache = LlmCache(conn, ttl_s=10, clock=clock)
     for i in range(3):
         await cache.put(key=f"k{i}", model="m", completion=_completion(str(i)))
-    await asyncio.sleep(1.1)
+    clock.now += 10
     assert await cache.evict_expired() == 3
     assert await cache.size() == 0
 

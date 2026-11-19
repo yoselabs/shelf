@@ -22,6 +22,11 @@ _IO_SETTINGS = settings(max_examples=40, deadline=None, suppress_health_check=[H
 
 _VARIANT = st.text(alphabet=st.characters(categories=["L", "N"]), min_size=1, max_size=8)
 _BODY = st.binary(max_size=200)
+_NOW = 1_700_000_000.0  # a fixed clock: a slow run can no longer expire an entry mid-test (shelf-855)
+
+
+def _frozen() -> float:
+    return _NOW
 
 
 async def _store(cache: HttpCache, url: str, variant: str, body: bytes, ttl_s: int) -> None:
@@ -46,7 +51,7 @@ def test_property_variants_of_the_same_url_never_cross_contaminate(variant_bodie
 
     async def run() -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            async with HttpCache(Path(tmp) / "c.sqlite") as cache:
+            async with HttpCache(Path(tmp) / "c.sqlite", clock=_frozen) as cache:
                 for variant, body in variant_bodies.items():
                     await _store(cache, "https://x/", variant, body, ttl_s=900)
                 for variant, body in variant_bodies.items():
@@ -66,7 +71,7 @@ def test_property_content_hash_is_independently_verifiable(body: bytes) -> None:
 
     async def run() -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            async with HttpCache(Path(tmp) / "c.sqlite") as cache:
+            async with HttpCache(Path(tmp) / "c.sqlite", clock=_frozen) as cache:
                 await _store(cache, "https://x/", "", body, ttl_s=900)
                 row = await cache.get("https://x/")
                 assert row is not None
@@ -84,7 +89,7 @@ def test_property_non_positive_ttl_is_never_retrievable(ttl_s: int) -> None:
 
     async def run() -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            async with HttpCache(Path(tmp) / "c.sqlite") as cache:
+            async with HttpCache(Path(tmp) / "c.sqlite", clock=_frozen) as cache:
                 await _store(cache, "https://x/", "", b"body", ttl_s=ttl_s)
                 assert await cache.get("https://x/") is None
 
@@ -98,7 +103,7 @@ def test_property_positive_ttl_is_retrievable_immediately(ttl_s: int) -> None:
 
     async def run() -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            async with HttpCache(Path(tmp) / "c.sqlite") as cache:
+            async with HttpCache(Path(tmp) / "c.sqlite", clock=_frozen) as cache:
                 await _store(cache, "https://x/", "", b"body", ttl_s=ttl_s)
                 assert await cache.get("https://x/") is not None
 

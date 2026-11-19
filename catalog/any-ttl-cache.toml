@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-ttl-cache"
+kind = "any-lib"
+tier = "T1"
+release = "any-ttl-cache-v0.1.0"
+capability = "Stop re-writing the sqlite TTL table: put stamps the expiry, get returns a fresh row or None and deletes expired rows on the read that finds one, and time comes from an injected clock so a test steps time instead of sleeping. The caller keeps its keying, value encoding and schema text, so an existing database keeps its bytes."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from llm-cache and http-cache, which had hand-written the same store twice (expires_at column, expiry filter, lazy eviction, wall clock). Takes an injected aiosqlite connection per call and never owns its lifecycle (sqlite-resource does). Not here: LRU caches with no expiry (anyembed's EmbeddingCache is sync sqlite3 and row-count bounded, a different thing), keys, value encoding, ETag validators. tests/test_arch_ttl_cache.py keeps SQL on an expiry column inside this package. Born candidate; llm-cache and http-cache 0.2.0 are its first consumers."
