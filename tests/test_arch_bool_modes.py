@@ -142,6 +142,8 @@ _ALLOWED: dict[str, str] = {
         "blueprint:check_each:audit_only",
         "blueprint:run:audit",
         "blueprint:not_checked:blueprint_gap",
+        "app-dirs:data_dir:create",
+        "app-dirs:data_dir:plugin_data",
         "app-dirs:cache_dir:create",
         "app-dirs:config_dir:create",
         "app-dirs:state_dir:create",
