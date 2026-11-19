@@ -57,9 +57,10 @@ tag; `python -m any_gate --help` documents it) prevents both halves of that:
 | the green record | `check` takes a first dependency running `python -m any_gate start`, and its body runs `python -m any_gate passed --gate check` | records the tree a green `check` saw, if no file changed during the run |
 | the pre-push skip | the hook's entry is `uv run python -m any_gate pre-push --gate check -- uv run just check` | no second run when the working tree is clean and HEAD's tree is recorded; any doubt runs it |
 
-Only the expensive step takes the slot, so the gate's parallel steps never wait on one another. `steps` points
-`GATE_NOTICE_FD` at its terminal (`exec 3>&2; export GATE_NOTICE_FD=3`), so the "waiting" line shows while the step's
-own output goes to its log. The record keys on the tree and the upstream merge-base, and lives in the git directory every
+Only the expensive step takes the slot, so the gate's parallel steps never wait on one another. `any-gate steps` (the `steps` recipe
+runs it: `python -m any_gate steps --runner <just> <step>...`) points `GATE_NOTICE_FD` at its terminal, so the "waiting" line shows while the
+step's own output goes to its log; it prints one timing line, marks a step over `GATE_STEP_BUDGET` (default 60 s) and the gate over
+`GATE_BUDGET` (default 180 s), and prints the log of each failed step. The record keys on the tree and the upstream merge-base, and lives in the git directory every
 worktree of the checkout shares: a rebase changes the key, and the gate runs again. A repo with no python runs `just check`
 from the hook directly, with no skip.
 

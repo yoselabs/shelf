@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from any_gate import run as run_module
 from any_gate import run_tests
 
 if TYPE_CHECKING:
@@ -92,12 +93,21 @@ def test_the_outcome_counts_the_tests_it_collected(project: Callable[..., Path])
     assert _run(root).tests == 2
 
 
-def test_workers_left_to_the_box_run_a_small_selection_in_one_process(project: Callable[..., Path]) -> None:
+def test_workers_left_to_the_box_run_a_small_selection_in_one_process(
+    project: Callable[..., Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
     root = project(a="def test_a():\n    assert True\n")
-    lines: list[str] = []
-    outcome = _run(root, workers=None, on_output=lines.append, extra=("-v",))
-    assert outcome.ok
-    assert not any("gw0" in line for line in lines)  # no worker pool for one test
+    commands: list[list[str]] = []
+    real = run_module.run_process
+
+    def spy(cmd: list[str], **kw: Any) -> Any:
+        commands.append(list(cmd))
+        return real(cmd, **kw)
+
+    monkeypatch.setattr(run_module, "run_process", spy)
+    assert _run(root, workers=None).ok
+    assert commands
+    assert all("-n" not in cmd for cmd in commands)  # no worker pool for one test
 
 
 def test_the_repos_own_marker_default_still_holds_in_every_stage(project: Callable[..., Path]) -> None:

@@ -1,4 +1,7 @@
-"""`python -m any_gate`: `test`, `changed`, and the gate's state verbs `start`, `passed` and `pre-push`.
+"""`python -m any_gate`: `test`, `changed`, `steps`, and the gate's state verbs `start`, `passed` and `pre-push`.
+
+`steps [--runner just] STEP...` runs the gate's steps at once, each into its own log, then prints one timing line and the log of every step
+that failed (see `any_gate.steps`); exit 1 when one failed. `$GATE_STEP_BUDGET` (default 60) and `$GATE_BUDGET` (default 180) are seconds.
 
 `changed [--scope all] [--config FILE]... [--not GLOB]... GLOB...` prints the files a per-file linter must check, NUL-separated
 (`xargs -0`): those changed against the upstream merge-base matching a glob, or every matching file when `--scope all`, a `--config` file
@@ -33,6 +36,7 @@ from any_gate import changed as changed_files
 from any_gate.receipts import Receipts
 from any_gate.run import Outcome, run_tests
 from any_gate.state import GateState, common_dir
+from any_gate.steps import GATE_BUDGET, STEP_BUDGET, run_and_report
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -150,6 +154,15 @@ def _changed(args: argparse.Namespace) -> int:
     return 0
 
 
+def _say(line: str) -> None:
+    sys.stderr.write(f"{line}\n")
+    sys.stderr.flush()
+
+
+def _steps(args: argparse.Namespace) -> int:
+    return run_and_report(args.names, runner=args.runner, step_budget=args.step_budget, gate_budget=args.gate_budget, say=_say)
+
+
 def _exec(cmd: Sequence[str]) -> int:
     sys.stdout.flush()
     sys.stderr.flush()
@@ -214,7 +227,18 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
     ch.add_argument("--config", action="append", default=[], help="a file (or glob) whose change selects everything")
     ch.add_argument("--not", dest="skip", action="append", default=[], metavar="GLOB", help="never select a path matching this")
     ch.add_argument("patterns", nargs="+", metavar="GLOB")
+    st = sub.add_parser("steps", help="run the gate's steps (recipes) at once, with one timing line and the log of each failure")
+    st.add_argument("--runner", default="just", help="the command run as `RUNNER NAME` for each step (default: just)")
+    st.add_argument(
+        "--step-budget", type=float, default=float(os.environ.get("GATE_STEP_BUDGET") or STEP_BUDGET), help="seconds a step may take"
+    )
+    st.add_argument(
+        "--gate-budget", type=float, default=float(os.environ.get("GATE_BUDGET") or GATE_BUDGET), help="seconds the gate may take"
+    )
+    st.add_argument("names", nargs="+", metavar="STEP")
     args = parser.parse_args(argv)
+    if args.command == "steps":
+        return _steps(args)
     if args.command == "changed":
         return _changed(args)
     if args.command != "test":
