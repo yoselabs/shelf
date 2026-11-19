@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import contextlib
 import os
-import signal
 import subprocess
 import tempfile
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
+
+from stream_proc import group_rss, popen_held, stop_tree
 
 from any_speech.guard import MemoryBudgetError
 
@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 
 _GB = 1e9
 _TAIL = 400
-_WATCH_EVERY = 0.5  # seconds between reads of the group's memory; a `ps` call costs about 10 ms
-_KB = 1024.0
+_WATCH_EVERY = 0.5  # seconds between reads of the group's memory
+_GRACE = 1.0  # seconds a stopped engine gets after SIGTERM before SIGKILL
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,19 +39,25 @@ class Runner(Protocol):
 def run_child(args: Sequence[str | Path], *, timeout: float | None, budget_gb: float | None = None) -> ChildResult:
     """Wait on this one child with wait4, so the memory figure is its own, not the largest of every child so far.
 
-    The child runs in its own process group. With a budget, the group's resident memory is read every half second and
-    the group is killed the moment it is over, so a runaway engine is stopped, not just reported afterwards.
+    The child runs in its own process group. With a budget, the group's resident memory is read every half second
+    (stream-proc's process table) and the tree is stopped the moment it is over, so a runaway engine is stopped, not
+    just reported afterwards.
+
+    This is the one spawn that stays outside `stream_proc.capture`: only `os.wait4` returns the child's own peak
+    (`ru_maxrss`), and `capture` reaps the child itself and discards it. So the spawn (own session, output to temp
+    files), the wait4 loop and the mid-run budget check live here; the stop is stream-proc's `stop_tree`.
+    Runs on a worker thread (`any_pipeline.blocking`), so its short `time.sleep` poll never blocks an event loop.
     """
-    # ru_maxrss is bytes on macOS, kilobytes elsewhere
+    # ru_maxrss is bytes on macOS, kilobytes elsewhere: the one platform read the peak figure needs
     unit = 1.0 if os.uname().sysname == "Darwin" else 1024.0
     started = time.monotonic()
     with tempfile.TemporaryFile() as err, tempfile.TemporaryFile() as out:
-        process = subprocess.Popen([str(a) for a in args], stdout=out, stderr=err, start_new_session=True)
+        process, hold = popen_held([str(a) for a in args], stdout=out, stderr=err, start_new_session=True)
         try:
+            hold.replay()
             _, status, usage = _wait4(process, timeout, budget_gb)
-        except (subprocess.TimeoutExpired, MemoryBudgetError):
-            _kill_group(process.pid)
-            process.wait()
+        except BaseException:
+            stop_tree(process, grace=_GRACE)
             raise
         err.seek(0)
         tail = err.read()[-_TAIL:].decode("utf-8", "replace")
@@ -77,17 +83,6 @@ def _wait4(process: subprocess.Popen[bytes], timeout: float | None, budget_gb: f
         time.sleep(0.02)
 
 
-def _kill_group(pgid: int) -> None:
-    with contextlib.suppress(ProcessLookupError):
-        os.killpg(pgid, signal.SIGKILL)
-
-
 def _group_gb(pgid: int) -> float:
-    """Resident memory of every process in the group, from `ps` (the same call on macOS and Linux)."""
-    listing = subprocess.run(["ps", "-A", "-o", "pgid=,rss="], capture_output=True, text=True, check=False).stdout
-    total_kb = 0
-    for line in listing.splitlines():
-        parts = line.split()
-        if len(parts) == 2 and parts[0] == str(pgid):
-            total_kb += int(parts[1])
-    return total_kb * _KB / 1e9
+    """Resident memory of every process in the group, from stream-proc's process table (the same on macOS and Linux)."""
+    return group_rss(pgid) / _GB

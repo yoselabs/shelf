@@ -14,8 +14,6 @@ _HASHLIB_IMPORTERS = {
     "any-failure-fp/src/any_failure_fp/fingerprint.py": "legitimate: sha1 suffix of a cut fingerprint is a key; sha256 would change it",
     "any-frontmatter/src/any_frontmatter/version.py": "consumer wave: sha256 of one canonical string (digest_text, length=64)",
     "any-json-doc/src/any_json_doc/__init__.py": "consumer wave: sha256 of raw bytes (digest_bytes, length=64)",
-    "any-speech/src/any_speech/defaults.py": "consumer wave: sha256 of a binary file (digest_file)",
-    "any-speech/src/any_speech/pipeline.py": "consumer wave: streamed sha256 of the audio, stored (digest_file, length=64)",
     "anyembed/src/anyembed/cache.py": "consumer wave: raw sha256 bytes as cache key (bytes.fromhex(digest_text(length=64)))",
     "anyembed/src/anyembed/testing.py": "legitimate: raw digest bytes seed a fake vector, not an identity",
     "blueprint/src/blueprint/runner.py": "consumer wave: sha256 of one joined string (digest_text)",

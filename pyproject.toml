@@ -37,6 +37,7 @@ any-yaml = { workspace = true }
 any-speech = { workspace = true }
 any-pipeline = { workspace = true }
 any-lease = { workspace = true }
+child-env = { workspace = true }
 content-digest = { workspace = true }
 app-dirs = { workspace = true }
 verb-cli = { workspace = true }
@@ -652,6 +653,14 @@ ignore_imports = [
     "any_speech.defaults -> app_dirs",
     "any_speech.setup -> app_dirs",
     "any_speech.pipeline -> any_pipeline",
+    "any_speech.pipeline -> content_digest",
+    "any_speech.pipeline -> stream_proc.capture",
+    "any_speech.defaults -> content_digest",
+    "any_speech.defaults -> child_env",
+    "any_speech.setup -> child_env",
+    "any_speech.setup -> stream_proc",
+    "any_speech.adapters._child -> stream_proc",
+    "any_speech.adapters.sherpa_embed -> stream_proc",
     "any_speech.cli -> verb_cli",
     "any_agent.procs -> stream_proc",
     "any_proc.run -> stream_proc",

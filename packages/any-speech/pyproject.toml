@@ -10,10 +10,12 @@ dependencies = [
     "process-lock>=0.2,<1",
     "any-lease>=0.1,<1",
     "atomic-io>=0.2,<1",
-    "content-digest>=0.1,<1",
+    "content-digest>=0.2,<1",
     "app-dirs>=0.1,<1",
     "verb-cli>=0.2,<1",
     "any-pipeline>=0.1,<1",
+    "stream-proc>=0.10,<1",
+    "child-env>=0.2,<1",
 ]
 
 [project.optional-dependencies]

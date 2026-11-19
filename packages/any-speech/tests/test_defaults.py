@@ -73,7 +73,7 @@ def test_a_missing_binary_says_how_to_build_it_and_names_the_explicit_alternativ
 
 async def test_transcribe_is_words_only_and_stores_one_file_beside_the_audio(tmp_path: Path) -> None:
     audio = _wav(tmp_path / "talk.wav")
-    result = await transcribe(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "leases")
+    result = await transcribe(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "leases", env={}, home=tmp_path)
     stored = tmp_path / "talk.speech.json"
     assert Transcript.load(stored) == result
     assert (result.provenance.diarizer, [w.speaker for w in result.words]) == ({"status": "not_run"}, [None])
@@ -82,7 +82,12 @@ async def test_transcribe_is_words_only_and_stores_one_file_beside_the_audio(tmp
 async def test_transcribe_with_speakers_labels_the_words(tmp_path: Path) -> None:
     audio = _wav(tmp_path / "talk.wav")
     result = await transcribe_with_speakers(
-        audio, transcriber=FakeTranscriber(_WORDS), diarizer=FakeDiarizer([Turn(0.0, 1.0, "S1")]), leases_root=tmp_path / "l"
+        audio,
+        transcriber=FakeTranscriber(_WORDS),
+        diarizer=FakeDiarizer([Turn(0.0, 1.0, "S1")]),
+        leases_root=tmp_path / "l",
+        env={},
+        home=tmp_path,
     )
     assert [w.speaker for w in result.words] == ["S1"]
     assert Transcript.load(tmp_path / "talk.speech.json").speakers == {"S1": Speaker("voice 1", 0.5, 1)}
@@ -96,16 +101,21 @@ async def test_transcribe_with_speakers_needs_the_default_diarizer_and_says_how_
 
 async def test_a_words_only_file_is_not_reused_for_a_speakers_request(tmp_path: Path) -> None:
     audio = _wav(tmp_path / "a.wav")
-    await transcribe(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l")
+    await transcribe(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l", env={}, home=tmp_path)
     again = await transcribe_with_speakers(
-        audio, transcriber=FakeTranscriber(_WORDS), diarizer=FakeDiarizer([Turn(0.0, 1.0, "S1")]), leases_root=tmp_path / "l"
+        audio,
+        transcriber=FakeTranscriber(_WORDS),
+        diarizer=FakeDiarizer([Turn(0.0, 1.0, "S1")]),
+        leases_root=tmp_path / "l",
+        env={},
+        home=tmp_path,
     )
     assert [w.speaker for w in again.words] == ["S1"]
 
 
 async def test_out_moves_the_stored_file(tmp_path: Path) -> None:
     audio, out = _wav(tmp_path / "a.wav"), tmp_path / "elsewhere" / "t.json"
-    await transcribe(audio, out, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l")
+    await transcribe(audio, out, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l", env={}, home=tmp_path)
     assert out.exists()
     assert not (tmp_path / "a.speech.json").exists()
 
@@ -119,11 +129,11 @@ def test_auto_slots_follow_the_machines_memory(ram_gb: int, expected: Slots) -> 
 
 
 def test_default_slots_are_the_auto_slots(tmp_path: Path) -> None:
-    speech = default_speech(transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l")
+    speech = default_speech(transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l", env={}, home=tmp_path)
     assert speech.slots == Slots.auto()
 
 
 def test_the_leases_folder_defaults_under_the_state_dir(tmp_path: Path) -> None:
     env = {"XDG_STATE_HOME": str(tmp_path / "state")}
-    default_speech(transcriber=FakeTranscriber(_WORDS), env=env)
+    default_speech(transcriber=FakeTranscriber(_WORDS), env=env, home=tmp_path)
     assert (tmp_path / "state" / "any-speech" / "leases").is_dir()

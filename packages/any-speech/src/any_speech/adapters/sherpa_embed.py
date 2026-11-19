@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import math
-import subprocess
 from array import array
 from typing import TYPE_CHECKING, Any
+
+from stream_proc import capture_bytes
 
 from any_speech.ports import Identity, Voice
 
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 _RATE = 16000
+_DECODE_TIMEOUT = 3600.0
 
 
 def decode_f32(audio: Path, start: float | None, end: float | None) -> list[float]:
@@ -21,13 +23,14 @@ def decode_f32(audio: Path, start: float | None, end: float | None) -> list[floa
     span = [] if start is None else ["-ss", str(start)]
     if end is not None:
         span += ["-t", str(end - (start or 0.0))]
-    raw = subprocess.run(
-        ["ffmpeg", "-v", "error", *span, "-i", str(audio), "-f", "f32le", "-ac", "1", "-ar", str(_RATE), "-"],
-        capture_output=True,
-        check=True,
-    ).stdout
+    done = capture_bytes(
+        ["ffmpeg", "-v", "error", *span, "-i", str(audio), "-f", "f32le", "-ac", "1", "-ar", str(_RATE), "-"], timeout=_DECODE_TIMEOUT
+    )
+    if done.exit != 0:
+        message = f"ffmpeg failed on {audio} (exit {done.exit}): {done.err.decode('utf-8', 'replace').strip()[-300:]}"
+        raise RuntimeError(message)
     samples = array("f")
-    samples.frombytes(raw)
+    samples.frombytes(done.out)
     return list(samples)
 
 

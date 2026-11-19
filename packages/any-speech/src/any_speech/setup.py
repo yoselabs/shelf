@@ -7,9 +7,11 @@ import subprocess
 from typing import TYPE_CHECKING, Protocol
 
 import app_dirs
+from child_env import NotFound, find
+from stream_proc import capture_bytes
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
 APP = "any-speech"
@@ -17,6 +19,7 @@ FLUIDAUDIO_REPO = "https://github.com/FluidInference/FluidAudio"
 FLUIDAUDIO_COMMIT = "0b1f46289fe27d95b5e66ad8be46e64f5ee02ae7"  # the checkout Reco builds and our measurements used
 BINARY = "fluidaudiocli"
 COMMIT_SUFFIX = ".commit"
+_STEP_TIMEOUT = 3600.0  # one git or swift step; a release build of FluidAudio is the long one
 
 
 class SetupError(RuntimeError):
@@ -33,7 +36,10 @@ def installed_binary(env: Mapping[str, str], home: Path) -> Path:
 
 
 def _run(args: Sequence[str | Path], *, cwd: Path | None = None) -> None:
-    subprocess.run([str(a) for a in args], cwd=cwd, check=True)
+    argv = [str(a) for a in args]
+    done = capture_bytes(argv, cwd=cwd, timeout=_STEP_TIMEOUT, capture=False)  # output goes to the terminal: a build is watched
+    if done.exit != 0:
+        raise subprocess.CalledProcessError(done.exit, argv)
 
 
 def install_fluidaudio(
@@ -41,19 +47,20 @@ def install_fluidaudio(
     home: Path,
     *,
     run: Run = _run,
-    which: Callable[[str], str | None] = shutil.which,
     work: Path | None = None,
 ) -> Path:
-    if which("swift") is None:
-        message = "`swift` was not found: install Xcode (or its command line tools) and run `any-speech setup fluidaudio` again"
-        raise SetupError(message)
+    try:
+        swift, git = find("swift", env).path, find("git", env).path
+    except NotFound as error:
+        message = f"`{error.name}` was not found: install Xcode (or its command line tools) and run `any-speech setup fluidaudio` again"
+        raise SetupError(message) from error
     checkout = work or app_dirs.cache_dir(APP, env=env, home=home) / "fluidaudio-src"
     try:
         if not (checkout / ".git").exists():
-            run(["git", "clone", FLUIDAUDIO_REPO, checkout])
-        run(["git", "fetch", "origin", FLUIDAUDIO_COMMIT], cwd=checkout)
-        run(["git", "checkout", "--detach", FLUIDAUDIO_COMMIT], cwd=checkout)
-        run(["swift", "build", "-c", "release", "--product", BINARY], cwd=checkout)
+            run([git, "clone", FLUIDAUDIO_REPO, checkout])
+        run([git, "fetch", "origin", FLUIDAUDIO_COMMIT], cwd=checkout)
+        run([git, "checkout", "--detach", FLUIDAUDIO_COMMIT], cwd=checkout)
+        run([swift, "build", "-c", "release", "--product", BINARY], cwd=checkout)
     except (subprocess.CalledProcessError, OSError) as error:
         message = f"building FluidAudio failed: {error}"
         raise SetupError(message) from error

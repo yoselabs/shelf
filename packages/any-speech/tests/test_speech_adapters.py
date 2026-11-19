@@ -98,6 +98,24 @@ def test_run_child_kills_a_child_that_grows_past_the_budget_before_it_finishes()
     assert time.monotonic() - started < 10
 
 
+def test_run_child_leaves_no_process_behind_after_a_budget_kill(tmp_path: Path) -> None:
+    from stream_proc import group_alive  # noqa: PLC0415
+
+    inner = "import time; x = bytearray(400_000_000); x[::4096] = b'1' * len(x[::4096]); time.sleep(30)"
+    mark = tmp_path / "pgid"
+    code = (
+        f"import os, subprocess, sys, time; open({str(mark)!r}, 'w').write(str(os.getpgrp())); "
+        f"subprocess.Popen([sys.executable, '-c', {inner!r}]); time.sleep(30)"
+    )
+    with pytest.raises(MemoryBudgetError):
+        run_child(["python3", "-c", code], timeout=60, budget_gb=0.2)
+    pgid = int(mark.read_text())
+    deadline = time.monotonic() + 3  # a killed member is a zombie until init reaps it
+    while group_alive(pgid) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not group_alive(pgid)
+
+
 def test_run_child_counts_the_children_of_the_child() -> None:
     inner = "import time; x = bytearray(400_000_000); x[::4096] = b'1' * len(x[::4096]); time.sleep(30)"
     code = f"import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', {inner!r}]); time.sleep(30)"

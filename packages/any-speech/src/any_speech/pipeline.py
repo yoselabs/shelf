@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import contextlib
-import hashlib
-import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from any_pipeline import Limit, Stage, blocking, gather, run_one
+from content_digest import digest_file
+from stream_proc import capture
 
 from any_speech.format import Provenance, Transcript, job_key, speakers_of
 from any_speech.guard import DEFAULT_BUDGET_GB, check_peak
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from any_speech.ports import Diarizer, Heard, Transcriber
     from any_speech.words import Turn
 
-_CHUNK = 1 << 20
+_PROBE_TIMEOUT = 120.0
 ENGINE_LIMIT = Limit(calls=4, seconds=3600.0, tries=1)  # the machine-wide cap is the leases'; this one only bounds a single run
 ASSEMBLE_LIMIT = Limit(calls=4, seconds=600.0, tries=1)
 
@@ -52,21 +52,15 @@ def _no_slot(kind: str) -> AbstractContextManager[object]:  # noqa: ARG001  ever
 
 
 def audio_sha256(audio: Path) -> str:
-    h = hashlib.sha256()
-    with audio.open("rb") as f:
-        while chunk := f.read(_CHUNK):
-            h.update(chunk)
-    return h.hexdigest()
+    return digest_file(audio, length=64)
 
 
 def probe_seconds(audio: Path) -> float:
-    out = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(audio)],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return float(out.stdout.strip())
+    out = capture(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(audio)], timeout=_PROBE_TIMEOUT)
+    if out.exit != 0:
+        message = f"ffprobe failed on {audio} (exit {out.exit}): {out.err.strip()[-300:]}"
+        raise RuntimeError(message)
+    return float(out.out.strip())
 
 
 def _utc_now() -> str:

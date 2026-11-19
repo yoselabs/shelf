@@ -26,7 +26,6 @@ _ALLOWLIST = {
     "any-agent/src/any_agent/harnesses/opencode_sandbox.py": "reads home and XDG_CONFIG_HOME for the sandbox deny list",
     "any-browser/src/any_browser/zendriver.py": "reads the executable and Playwright path variables to find the browser",
     "any-recorded-fixture/src/any_recorded_fixture/__init__.py": "default argument env=os.environ for update_requested",
-    "any-speech/src/any_speech/defaults.py": "falls back to os.environ and Path.home() when env/home are not passed",
     "anyembed/src/anyembed/local.py": "MUTATES os.environ (setdefault HF_HUB_OFFLINE, TRANSFORMERS_OFFLINE)",
     "anyllm/src/anyllm/providers/claude_code_cli.py": "passes dict(os.environ) to the child process",
     "anyllm/src/anyllm/providers/anthropic_api.py": "reads the API key variable at call time",

@@ -29,7 +29,7 @@ _SPAWN_CALLS = {"run", "Popen", "call", "check_call", "check_output"}
 
 # to be emptied by the consumer wave: files that kill, signal-0 probe or session-spawn themselves today
 _KILL_ALLOWLIST = {
-    "packages/any-speech/src/any_speech/adapters/_child.py",  # Popen(start_new_session=True) + os.killpg
+    "packages/any-speech/src/any_speech/adapters/_child.py",  # session spawn only: wait4 alone gives ru_maxrss
     "packages/git-porcelain/src/git_porcelain/real_spawn.py",  # Popen(start_new_session=True) + os.killpg
     "packages/process-lock/src/process_lock/__init__.py",  # os.kill(pid, 0), no start token
 }
@@ -37,10 +37,6 @@ _KILL_ALLOWLIST = {
 # to be emptied by the consumer wave: files outside the spawners that run a subprocess with no timeout=
 _UNBOUNDED_ALLOWLIST = {
     "packages/any-lease/src/any_lease/__main__.py",
-    "packages/any-speech/src/any_speech/adapters/_child.py",
-    "packages/any-speech/src/any_speech/adapters/sherpa_embed.py",
-    "packages/any-speech/src/any_speech/pipeline.py",
-    "packages/any-speech/src/any_speech/setup.py",
     "packages/blueprint/src/blueprint/recipes/changed.py",
     "packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py",
     "packages/blueprint/src/blueprint/recipes/gate_state.py",

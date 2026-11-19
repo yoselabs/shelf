@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
-import os
-import shutil
+import contextlib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import app_dirs
+from child_env import NotFound, find
+from content_digest import digest_file
 
 from any_speech.adapters import FluidAudioCli, FluidAudioDiarizer
 from any_speech.pipeline import Pipeline
@@ -33,8 +33,8 @@ def find_fluidaudio(env: Mapping[str, str], home: Path) -> Path:
     named = env.get(FLUIDAUDIO_ENV)
     candidates = [Path(named)] if named else []
     candidates.append(installed_binary(env, home))
-    on_path = shutil.which(BINARY, path=env.get("PATH", ""))
-    candidates += [Path(on_path)] if on_path else []
+    with contextlib.suppress(NotFound):
+        candidates.append(find(BINARY, env).path)
     candidates.append(home / ".local" / "bin" / BINARY)
     for path in candidates:
         if path.is_file():
@@ -53,20 +53,16 @@ def runtime_of(binary: Path) -> str:
     when `setup` wrote it beside the binary, because a binary from anywhere else could be any commit."""
     marker = binary.with_name(binary.name + COMMIT_SUFFIX)
     commit = marker.read_text(encoding="utf-8").strip()[:8] if marker.is_file() else "unknown"
-    return f"fluidaudio-{commit}+{hashlib.sha256(binary.read_bytes()).hexdigest()[:12]}"
+    return f"fluidaudio-{commit}+{digest_file(binary, length=12)}"
 
 
-def _binary(env: Mapping[str, str] | None, home: Path | None) -> Path:
-    return find_fluidaudio(os.environ if env is None else env, Path.home() if home is None else home)
-
-
-def default_transcriber(*, env: Mapping[str, str] | None = None, home: Path | None = None) -> Transcriber:
-    binary = _binary(env, home)
+def default_transcriber(*, env: Mapping[str, str], home: Path) -> Transcriber:
+    binary = find_fluidaudio(env, home)
     return FluidAudioCli(binary, runtime=runtime_of(binary))
 
 
-def default_diarizer(*, env: Mapping[str, str] | None = None, home: Path | None = None) -> Diarizer:
-    binary = _binary(env, home)
+def default_diarizer(*, env: Mapping[str, str], home: Path) -> Diarizer:
+    binary = find_fluidaudio(env, home)
     return FluidAudioDiarizer(binary, runtime=runtime_of(binary))
 
 
@@ -76,12 +72,12 @@ def default_speech(
     diarizer: Diarizer | None = None,
     slots: Slots | None = None,
     leases_root: Path | None = None,
-    env: Mapping[str, str] | None = None,
-    home: Path | None = None,
+    env: Mapping[str, str],
+    home: Path,
 ) -> Speech:
     """The default model and slots (sized from the machine); each argument replaces one part. No diarizer unless given."""
     chosen = transcriber if transcriber is not None else default_transcriber(env=env, home=home)
-    root = leases_root if leases_root is not None else app_dirs.state_dir(APP, env=env) / "leases"
+    root = leases_root if leases_root is not None else app_dirs.state_dir(APP, env=env, home=home) / "leases"
     root.mkdir(parents=True, exist_ok=True)
     return Speech(Pipeline(chosen, diarizer), root, slots if slots is not None else Slots.auto())
 
@@ -93,8 +89,8 @@ async def transcribe(
     transcriber: Transcriber | None = None,
     slots: Slots | None = None,
     leases_root: Path | None = None,
-    env: Mapping[str, str] | None = None,
-    home: Path | None = None,
+    env: Mapping[str, str],
+    home: Path,
 ) -> Transcript:
     """The words of `audio`, stored in one file beside it (`<stem>.speech.json`, or `out`) and returned.
 
@@ -112,8 +108,8 @@ async def transcribe_with_speakers(
     diarizer: Diarizer | None = None,
     slots: Slots | None = None,
     leases_root: Path | None = None,
-    env: Mapping[str, str] | None = None,
-    home: Path | None = None,
+    env: Mapping[str, str],
+    home: Path,
 ) -> Transcript:
     """As :func:`transcribe`, with each word labelled S1, S2, ... by the voice that said it."""
     voices = diarizer if diarizer is not None else default_diarizer(env=env, home=home)

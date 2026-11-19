@@ -397,8 +397,10 @@ dependencies = [
     { name = "any-pipeline" },
     { name = "app-dirs" },
     { name = "atomic-io" },
+    { name = "child-env" },
     { name = "content-digest" },
     { name = "process-lock" },
+    { name = "stream-proc" },
     { name = "verb-cli" },
 ]
 
@@ -417,11 +419,13 @@ requires-dist = [
     { name = "any-pipeline", editable = "packages/any-pipeline" },
     { name = "app-dirs", editable = "packages/app-dirs" },
     { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "child-env", editable = "packages/child-env" },
     { name = "content-digest", editable = "packages/content-digest" },
     { name = "mlx", marker = "extra == 'parakeet'", specifier = ">=0.22" },
     { name = "parakeet-mlx", marker = "extra == 'parakeet'", specifier = ">=0.3" },
     { name = "process-lock", editable = "packages/process-lock" },
     { name = "sherpa-onnx", marker = "extra == 'embed'", specifier = ">=1.10" },
+    { name = "stream-proc", editable = "packages/stream-proc" },
     { name = "verb-cli", editable = "packages/verb-cli" },
 ]
 provides-extras = ["parakeet", "embed"]

@@ -30,8 +30,6 @@ _WHICH_ALLOWED = {
     "packages/any-agent/src/any_agent/harnesses/claude.py",
     "packages/any-agent/src/any_agent/harnesses/codex.py",
     "packages/any-agent/src/any_agent/harnesses/opencode.py",
-    "packages/any-speech/src/any_speech/defaults.py",
-    "packages/any-speech/src/any_speech/setup.py",
     "packages/anyllm/src/anyllm/providers/claude_code_cli.py",
     "packages/anyllm/src/anyllm/providers/claude_code_sdk.py",
     "packages/anyllm/src/anyllm/providers/codex_cli.py",

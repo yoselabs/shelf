@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-speech"
+software = "child-env"
+why = "any-speech located fluidaudiocli, swift and git with shutil.which, a second binary lookup beside child-env's find (constitution Article III; shelf-tyld.5)."
+needs = "find(name, env, extra_dirs) over the injected env, and its typed NotFound."
+sponsor = "yoselabs"
+requester = "any-speech"
+status = "active" # active | retired
