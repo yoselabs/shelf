@@ -1,6 +1,6 @@
 # The shelf constitution
 
-Small on purpose. A constitution that grows long is already failing. Eight articles.
+Small on purpose. A constitution that grows long is already failing. Nine articles.
 
 Seeded from a2kay's AGENTS.md (whole-codebase Definition of Done, no carve-outs), its glossary
 discipline (one canonical name per concept), the primitive-shelf rule-of-three, and R154's factory
@@ -91,3 +91,18 @@ kitchen-sink, **delete** the unused, **demote back** to its one consumer (no cop
 it). This is where "was that the right abstraction?" is answered. Deletion is a virtue; a smaller shelf is
 a healthier one. Neglect reconciliation and aggressive promotion rots the catalog — it is the load-bearing
 other half, not optional garnish.
+
+### IX. One complete value, compact views; the easy path is the right path.
+**⚠️ Founding rule. No exceptions, no "just this once".** The philosophy is in [doctrine.md](doctrine.md); this is
+its law.
+- **One value, one file.** A package returns and stores one lossless value holding everything it knows. Never
+  split one result across files by concern (a transcript file plus a diarization file), and never ship a summary
+  in place of the data.
+- **Views are pure functions on the value**, not flags that change what is computed (Article III). The default
+  view serves the most common reader; narrower and wider views are other functions.
+- **Cost makes it opt-in, nothing else does.** A capability that needs a second model or an external call is
+  asked for; free data is always kept.
+- **The pit of success.** The default is safe and correct; misuse fails loud; a missing dependency raises, never
+  silently falls back.
+Check: the package's README names its value, its default view and its opt-ins; a review rejects a flag that
+selects an output shape. State: task to be filed as a check beside the table in Article III.

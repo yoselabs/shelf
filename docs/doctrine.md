@@ -24,6 +24,35 @@ relax **extracted, never invented** — a standard library that fills with specu
 junk drawer with ambition. Breadth of subject and richness of surface are licensed; guessing that a
 need exists is not.
 
+## The philosophy of use: how every shelf package is shaped
+
+> **⚠️ THIS IS THE SHELF'S FOUNDING PHILOSOPHY. NO MATTER WHAT, FOLLOW IT.**
+> **⚠️ A package that breaks these five points is defective, however well it works.**
+> **⚠️ Owner's words: "It's like a Bible of how shelf works." (Denis, 2026-11-20)**
+
+Most people use a package through its defaults, and most of them in the same way. So the default must be the best
+thing for that common use, and everything else must stay reachable by calling something, never by switching a mode.
+
+1. **Simple things simple, complex things possible** (Alan Kay). The common call is one line with no setup. A rare
+   need costs more code, but it is never impossible and never a rewrite.
+2. **Data first: one complete, lossless value** (Rich Hickey). A package returns and stores ONE value that carries
+   everything it knows, in ONE file. Not one file for the text and another for the speakers; not a summary now and
+   the raw data later. Anything a consumer might need is in the value, because only a complete value lets every
+   consumer be satisfied. What costs real work to produce (a second model, a network call) is opt-in; what is free
+   to keep is kept.
+3. **Views are functions, not modes** (progressive disclosure). What a reader sees comes from small pure
+   functions on the value (a *projection*: `to_markdown()`, `.words`, `to_srt()`). The default view serves the
+   most common reader; a narrower or wider view is another function the caller reaches for. A flag that changes
+   *what is computed* is forbidden (Article III); a function that shows *part of what is there* is the pattern.
+4. **The pit of success.** The easiest path is the correct path. Wrong use is hard to type and fails loud: the
+   default is safe, a missing setup raises instead of falling back, a dangerous capability asks to be named.
+5. **The default serves the common reader; the value serves every reader.** Today the common reader is an AI
+   (tokens are money), so the default view is compact. The stored value stays complete. These two never trade off,
+   because they live in different layers: value below, view above.
+
+*Worked example:* any-speech stores one `<name>.speech.json` holding words, times, probabilities, speakers and
+provenance. `to_markdown()` and `any-speech text` give the compact, token-cheap turn lines an AI should read.
+
 ## The load-bearing ideas
 
 1. **The contract is the unit of selection, not the code.** Code is a regenerable phenotype; the
@@ -76,7 +105,7 @@ need exists is not.
 
 ```
 doctrine.md      the why (this file)
-constitution.md  the operating rules that follow from it (the 8 articles)
+constitution.md  the operating rules that follow from it (the 9 articles)
 CONTEXT.md      the vocabulary (root file) — TYPES only, never instances
 adr/             living decisions (ADRs), one per topic; adr/INDEX.md is the list
 missions/        scoped future objectives (e.g. onboarding runbook + skill)
