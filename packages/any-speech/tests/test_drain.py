@@ -6,7 +6,8 @@ from typing import override
 
 import pytest
 from any_lease import Leases
-from any_speech import Diarized, Drain, Heard, Identity, Job, Pipeline, Slots, Speech, Transcript, Turn, Word
+from any_speech import AudioHasher, Diarized, Drain, Heard, Identity, Job, Pipeline, Slots, Speech, Transcript, Turn, Word
+from any_speech.pipeline import audio_sha256
 from any_speech.testing import FakeDiarizer, FakeTranscriber
 
 _NOW = "2026-11-19T10:00:00Z"
@@ -16,7 +17,7 @@ def _pipeline(transcriber: object | None = None, **kw: object) -> Pipeline:
     return Pipeline(transcriber or FakeTranscriber((Word("да", 0.0, 0.5),), **kw), None, probe=lambda _p: 1.0, now=lambda: _NOW)  # type: ignore[arg-type]  # fakes
 
 
-def _speech(tmp_path: Path, pipeline: Pipeline | None = None, slots: Slots = Slots(2, 1)) -> Speech:  # noqa: B008
+def _speech(tmp_path: Path, pipeline: Pipeline | None = None, slots: Slots = Slots(2, 1, 3)) -> Speech:  # noqa: B008
     return Speech(pipeline or _pipeline(), tmp_path / "leases", slots)
 
 
@@ -51,6 +52,31 @@ def test_transcribe_with_out_stores_it_and_reuses_it(tmp_path: Path) -> None:
     again = _speech(tmp_path, _pipeline(Counting((Word("да", 0.0, 0.5),))))
     assert again.transcribe(job.audio, job.out) == first
     assert calls == []
+
+
+def test_each_audio_file_is_hashed_once_over_scans_and_runs(tmp_path: Path) -> None:
+    hashed: list[Path] = []
+
+    def count(audio: Path) -> str:
+        hashed.append(audio)
+        return audio_sha256(audio)
+
+    pipeline = Pipeline(FakeTranscriber((Word("да", 0.0, 0.5),)), None, probe=lambda _p: 1.0, now=lambda: _NOW, hasher=AudioHasher(count))
+    jobs = [_job(tmp_path, n) for n in "abc"]
+    _drain(jobs, _speech(tmp_path, pipeline), workers=2).run()
+    _drain(jobs, _speech(tmp_path, pipeline)).run()
+    assert sorted(p.name for p in hashed) == ["a.m4a", "b.m4a", "c.m4a"]
+
+
+def test_a_changed_file_is_hashed_again(tmp_path: Path) -> None:
+    hashed: list[Path] = []
+    hasher = AudioHasher(lambda p: hashed.append(p) or "x")
+    audio = _job(tmp_path, "a").audio
+    hasher(audio)
+    hasher(audio)
+    audio.write_bytes(b"different and longer")
+    hasher(audio)
+    assert len(hashed) == 2
 
 
 def test_drain_writes_every_pending_transcript(tmp_path: Path) -> None:
@@ -118,7 +144,7 @@ class _Probe:
 def test_the_slot_count_is_the_most_transcriptions_running_at_once(tmp_path: Path, slots: int, workers: int, expected_peak: int) -> None:
     probe = _Probe()
     jobs = [_job(tmp_path, f"f{i}", f"audio {i}".encode()) for i in range(6)]
-    speech = _speech(tmp_path, _pipeline(probe), Slots(slots, 1))
+    speech = _speech(tmp_path, _pipeline(probe), Slots(slots, 1, 4))
     report = _drain(jobs, speech, workers=workers).run()
     assert len(report.done) == 6
     assert probe.peak == expected_peak
@@ -126,7 +152,7 @@ def test_the_slot_count_is_the_most_transcriptions_running_at_once(tmp_path: Pat
 
 def test_a_caller_waits_for_a_busy_slot_and_gets_in_when_it_frees(tmp_path: Path) -> None:
     leases = Leases(tmp_path / "leases")
-    speech = _speech(tmp_path, slots=Slots(1, 1))
+    speech = _speech(tmp_path, slots=Slots(1, 1, 2))
     held = leases.acquire("any-speech-transcribe", 1, timeout=0)
     result: list[Transcript] = []
     worker = threading.Thread(target=lambda: result.append(speech.transcribe(_job(tmp_path, "a").audio)))
@@ -141,7 +167,7 @@ def test_a_caller_waits_for_a_busy_slot_and_gets_in_when_it_frees(tmp_path: Path
 def test_two_callers_for_one_output_run_it_once(tmp_path: Path) -> None:
     probe = _Probe()
     job = _job(tmp_path, "a")
-    speech = _speech(tmp_path, _pipeline(probe), Slots(2, 1))
+    speech = _speech(tmp_path, _pipeline(probe), Slots(2, 1, 3))
     threads = [threading.Thread(target=speech.transcribe, args=(job.audio, job.out)) for _ in range(2)]
     for t in threads:
         t.start()
@@ -210,3 +236,46 @@ def test_the_shared_bottleneck_caps_both_queues_together(tmp_path: Path) -> None
     jobs = [_job(tmp_path, f"f{i}", f"audio {i}".encode()) for i in range(4)]
     _drain(jobs, _two_queue_speech(tmp_path, busy, Slots(2, 2, 1)), workers=4).run()
     assert busy.peak == 1
+
+
+class _Flaky(FakeDiarizer):
+    """A diarizer that fails its first `failures` calls, then answers."""
+
+    def __init__(self, failures: int) -> None:
+        super().__init__([Turn(0.0, 1.0, "S1")])
+        self.failures, self.calls = failures, 0
+
+    @override
+    def diarize(self, audio: Path) -> Diarized:
+        self.calls += 1
+        if self.calls <= self.failures:
+            message = "model busy"
+            raise RuntimeError(message)
+        return super().diarize(audio)
+
+
+def _with_diarizer(diarizer: FakeDiarizer) -> Pipeline:
+    return Pipeline(FakeTranscriber((Word("да", 0.0, 0.5),)), diarizer, probe=lambda _p: 1.0, now=lambda: _NOW)
+
+
+def test_a_transcript_whose_diarizer_failed_is_redone_and_ends_ok(tmp_path: Path) -> None:
+    job = _job(tmp_path, "a")
+    diarizer = _Flaky(failures=1)
+    speech = _speech(tmp_path, _with_diarizer(diarizer))
+    assert _drain([job], speech).run().done == [job.out]
+    assert Transcript.load(job.out).provenance.diarizer["status"] == "failed"
+    assert _drain([job], speech).run().done == [job.out]
+    stored = Transcript.load(job.out)
+    assert (stored.provenance.diarizer["status"], stored.words[0].speaker) == ("ok", "S1")
+    assert _drain([job], speech).run().done == []
+
+
+def test_an_always_failing_diarizer_is_tried_three_times_then_left_with_no_speakers(tmp_path: Path) -> None:
+    job = _job(tmp_path, "a")
+    diarizer = _Flaky(failures=99)
+    speech = _speech(tmp_path, _with_diarizer(diarizer))
+    for _ in range(6):
+        _drain([job], speech).run()
+    stored = Transcript.load(job.out)
+    assert diarizer.calls == 3
+    assert (stored.provenance.diarizer["status"], stored.provenance.diarizer["tries"], stored.words[0].speaker) == ("failed", "3", None)

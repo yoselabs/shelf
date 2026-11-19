@@ -8,6 +8,7 @@ from any_speech import (
     FORMAT_VERSION,
     Provenance,
     Segment,
+    Speaker,
     Transcript,
     UnknownVersionError,
     Word,
@@ -39,7 +40,7 @@ def _transcript() -> Transcript:
     return Transcript(
         words=(Word("ну", 0.0, 0.2, 0.9, "S1"), Word("да", 0.3, 0.5, None, None)),
         segments=(Segment(0.0, 0.5, "ну да", "S1"),),
-        speakers={"S1": "voice 1"},
+        speakers={"S1": Speaker("voice 1", 0.2, 1)},
         provenance=_provenance(),
     )
 
@@ -66,6 +67,19 @@ def test_a_reader_refuses_a_version_it_does_not_know(tmp_path: Path) -> None:
         Transcript.load(path)
 
 
+def test_a_v1_file_still_loads_with_talk_time_worked_out_from_its_words() -> None:
+    raw = _transcript().to_json()
+    raw["version"] = 1
+    raw["speakers"] = {"S1": "voice 1"}
+    loaded = Transcript.from_json(raw)
+    assert loaded.speakers == {"S1": Speaker("voice 1", 0.2, 1)}
+
+
+def test_the_contract_shows_each_voice_with_its_talk_time() -> None:
+    assert _transcript().to_json()["speakers"] == {"S1": {"name": "voice 1", "seconds": 0.2, "words": 1}}
+    assert FORMAT_VERSION == 2
+
+
 def test_captions_are_a_source_kind() -> None:
     caption = _transcript().to_json()
     caption["provenance"]["source"] = "captions"
@@ -77,6 +91,18 @@ def test_a_source_other_than_local_or_captions_is_refused() -> None:
     broken["provenance"]["source"] = "guess"
     with pytest.raises(ValueError, match="source"):
         Transcript.from_json(broken)
+
+
+def test_to_text_is_one_readable_line_per_segment_with_clock_and_speaker() -> None:
+    t = _transcript()
+    assert t.to_text() == "[00:00] S1: ну да\n"
+    late = Transcript(
+        words=(Word("да", 3700.0, 3700.5, None, None),),
+        segments=(Segment(3700.0, 3700.5, "да", None),),
+        speakers={},
+        provenance=_provenance(),
+    )
+    assert late.to_text() == "[01:01:40] да\n"
 
 
 def test_text_joins_the_words() -> None:

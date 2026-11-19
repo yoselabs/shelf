@@ -6,6 +6,7 @@ Verbs: ``transcribe`` one file, ``drain`` a folder with N workers inside the mac
 from __future__ import annotations
 
 import json
+import os
 import sys
 from dataclasses import dataclass
 from importlib.metadata import version
@@ -15,12 +16,13 @@ from typing import TYPE_CHECKING, Annotated, Literal
 import app_dirs
 from verb_cli import POSITIONAL, VerbCli
 
-from any_speech.defaults import default_diarizer, default_transcriber
+from any_speech.defaults import find_fluidaudio, runtime_of
 from any_speech.drain import Drain, Job
 from any_speech.guard import DEFAULT_BUDGET_GB
 from any_speech.pipeline import Pipeline
 from any_speech.ports import Voice
-from any_speech.speech import Slots, Speech
+from any_speech.setup import SetupError, install_fluidaudio
+from any_speech.speech import Slots, Speech, default_out
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -41,9 +43,9 @@ class Settings:
     fluidaudio_bin: Path | None = None
     voice_model: Path | None = None
     budget_gb: float = DEFAULT_BUDGET_GB
-    transcribe_slots: int = 2
-    diarize_slots: int = 1
-    total_slots: int = 3
+    transcribe_slots: int | None = None  # the slot counts are sized from the machine unless given
+    diarize_slots: int | None = None
+    total_slots: int | None = None
     workers: int = 2
 
 
@@ -51,9 +53,8 @@ def make_transcriber(s: Settings) -> Transcriber:
     if s.engine == "fluidaudio":
         from any_speech.adapters import FluidAudioCli  # noqa: PLC0415  only the chosen engine is imported
 
-        if s.fluidaudio_bin is None and s.model_version == "v3":
-            return default_transcriber()
-        return FluidAudioCli(_fluidaudio_bin(s), runtime="fluidaudiocli", model_version=s.model_version)
+        binary = _fluidaudio_bin(s)
+        return FluidAudioCli(binary, runtime=runtime_of(binary), model_version=s.model_version, budget_gb=s.budget_gb)
     from any_speech.adapters import ParakeetMlx  # noqa: PLC0415
 
     return ParakeetMlx(runtime=f"parakeet-mlx-{version('parakeet-mlx')}")
@@ -64,7 +65,8 @@ def make_diarizer(s: Settings) -> Diarizer | None:
         return None
     from any_speech.adapters import FluidAudioDiarizer  # noqa: PLC0415
 
-    return default_diarizer() if s.fluidaudio_bin is None else FluidAudioDiarizer(_fluidaudio_bin(s), runtime="fluidaudiocli")
+    binary = _fluidaudio_bin(s)
+    return FluidAudioDiarizer(binary, runtime=runtime_of(binary), budget_gb=s.budget_gb)
 
 
 def make_embedder(s: Settings) -> Embedder:
@@ -77,28 +79,29 @@ def make_embedder(s: Settings) -> Embedder:
 
 
 def _fluidaudio_bin(s: Settings) -> Path:
-    if s.fluidaudio_bin is None:
-        message = "--fluidaudio-bin is needed: the path of a built fluidaudiocli"
-        raise SystemExit(message)
-    return s.fluidaudio_bin
+    return s.fluidaudio_bin or find_fluidaudio(os.environ, Path.home())
 
 
 def make_pipeline(s: Settings) -> Pipeline:
     return Pipeline(make_transcriber(s), make_diarizer(s), budget_gb=s.budget_gb)
 
 
+def _slots(s: Settings) -> Slots:
+    auto = Slots.auto()
+    return Slots(s.transcribe_slots or auto.transcribe, s.diarize_slots or auto.diarize, s.total_slots or auto.total)
+
+
 def _speech(build: Callable[[Settings], Pipeline], leases_root: Callable[[], Path], s: Settings) -> Speech:
-    return Speech(build(s), leases_root(), Slots(s.transcribe_slots, s.diarize_slots, s.total_slots))
+    return Speech(build(s), leases_root(), _slots(s))
 
 
 def _verbs(
     build: Callable[[Settings], Pipeline], embedder: Callable[[Settings], Embedder], leases_root: Callable[[], Path]
 ) -> dict[str, Callable[..., int]]:
     def transcribe(audio: Annotated[Path, POSITIONAL], settings: Settings, out: Path | None = None) -> int:
-        """Transcribe one audio file to a transcript JSON (default: beside the audio, `.speech.json`)."""
-        target = out or audio.with_name(audio.name + ".speech.json")
-        _speech(build, leases_root, settings).transcribe(audio, target)
-        sys.stdout.write(f"{target}\n")
+        """Transcribe one audio file into one JSON file (default: beside the audio, `<name>.speech.json`); --diarize adds speakers."""
+        _speech(build, leases_root, settings).transcribe(audio, out)
+        sys.stdout.write(f"{out or default_out(audio)}\n")
         return 0
 
     def drain(root: Annotated[Path, POSITIONAL], settings: Settings, pattern: str = "**/audio.*", out_name: str = "speech.json") -> int:
@@ -128,7 +131,17 @@ def _verbs(
         sys.stdout.write(f"{embedder(settings).embed(audio, start=start, end=end).similarity(known):.4f}\n")
         return 0
 
-    return {"transcribe": transcribe, "drain": drain, "embed": embed, "match": match}
+    def setup(what: Annotated[Literal["fluidaudio"], POSITIONAL]) -> int:
+        """Build FluidAudio's command line at the pinned commit and install it, so no path flag is ever needed."""
+        try:
+            target = install_fluidaudio(os.environ, Path.home())
+        except SetupError as error:
+            sys.stderr.write(f"{error}\n")
+            return 1
+        sys.stdout.write(f"{what}: {target}\n")
+        return 0
+
+    return {"setup": setup, "transcribe": transcribe, "drain": drain, "embed": embed, "match": match}
 
 
 def main(

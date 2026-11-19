@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from any_speech import Piece, Voice
+from any_speech import MemoryBudgetError, Piece, Voice
 from any_speech.adapters import FluidAudioCli, FluidAudioDiarizer, ParakeetMlx, SherpaEmbedder
 from any_speech.adapters._child import ChildResult, run_child
 from any_speech.adapters.fluidaudio import FluidAudioError, parse_rttm
@@ -33,7 +35,7 @@ SPEAKER Th2O-5min 1 90.960 63.120 <NA> <NA> speaker_0 <NA> <NA>
 def _runner(write: dict[str, str], *, code: int = 0, peak: float = 0.5) -> Any:
     seen: list[list[str]] = []
 
-    def run(args: Any, *, timeout: float | None) -> ChildResult:
+    def run(args: Any, *, timeout: float | None, budget_gb: float | None = None) -> ChildResult:
         argv = [str(a) for a in args]
         seen.append(argv)
         for flag, body in write.items():
@@ -88,6 +90,34 @@ def test_run_child_kills_a_child_past_its_timeout() -> None:
         run_child(["python3", "-c", "import time; time.sleep(30)"], timeout=0.3)
 
 
+def test_run_child_kills_a_child_that_grows_past_the_budget_before_it_finishes() -> None:
+    code = "import time; x = bytearray(400_000_000); x[::4096] = b'1' * len(x[::4096]); time.sleep(30)"
+    started = time.monotonic()
+    with pytest.raises(MemoryBudgetError, match="budget"):
+        run_child(["python3", "-c", code], timeout=60, budget_gb=0.2)
+    assert time.monotonic() - started < 10
+
+
+def test_run_child_counts_the_children_of_the_child() -> None:
+    inner = "import time; x = bytearray(400_000_000); x[::4096] = b'1' * len(x[::4096]); time.sleep(30)"
+    code = f"import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', {inner!r}]); time.sleep(30)"
+    with pytest.raises(MemoryBudgetError):
+        run_child(["python3", "-c", code], timeout=60, budget_gb=0.2)
+
+
+def test_fluidaudio_passes_its_budget_to_the_runner(tmp_path: Path) -> None:
+    seen: list[float | None] = []
+
+    def spy(args: Any, *, timeout: float | None, budget_gb: float | None) -> ChildResult:
+        seen.append(budget_gb)
+        argv = [str(a) for a in args]
+        Path(argv[argv.index("--output-json") + 1]).write_text(json.dumps(_FLUID_JSON), encoding="utf-8")
+        return ChildResult(0, 1.0, 0.1, "")
+
+    FluidAudioCli(Path("fa"), runtime="r", budget_gb=1.5, run=spy).transcribe(tmp_path / "a.wav")
+    assert seen == [1.5]
+
+
 class _Mem:
     def __init__(self) -> None:
         self.calls: list[str] = []
@@ -123,6 +153,25 @@ def test_parakeet_joins_subword_tokens_chunks_and_caps_the_cache(tmp_path: Path)
     assert [w.text for w in heard.words] == ["Просто.", "Да"]
     assert asked == {"chunk_duration": 120.0, "overlap_duration": 15.0}
     assert (heard.peak_memory_gb, mem.calls[:3], len(loads)) == (3.2, ["cap 512", "reset", "clear"], 1)
+
+
+def test_parakeet_never_runs_two_calls_at_once_on_its_shared_model(tmp_path: Path) -> None:
+    inside = 0
+    most = 0
+
+    class Model:
+        def transcribe(self, path: str, **kw: float) -> Any:
+            nonlocal inside, most
+            inside += 1
+            most = max(most, inside)
+            time.sleep(0.05)
+            inside -= 1
+            return SimpleNamespace(sentences=[])
+
+    adapter = ParakeetMlx(runtime="r", loader=lambda _m: Model(), memory=_Mem)
+    with ThreadPoolExecutor(4) as pool:
+        list(pool.map(lambda _: adapter.transcribe(tmp_path / "a.wav"), range(4)))
+    assert most == 1
 
 
 def test_embedder_returns_a_unit_vector_named_for_its_model(tmp_path: Path) -> None:

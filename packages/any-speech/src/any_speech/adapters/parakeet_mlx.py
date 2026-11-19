@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -23,7 +24,13 @@ def _load(model: str) -> Any:
 
 
 class ParakeetMlx:
-    """Unchunked, an 8.7 minute file peaked at 14.5 GB; chunking at 120 s with 15 s overlap holds about 3.3 GB."""
+    """Unchunked, an 8.7 minute file peaked at 14.5 GB; chunking at 120 s with 15 s overlap holds about 3.3 GB.
+
+    One model, one call at a time: MLX thread safety is unverified and the peak counter is process-wide, so concurrent
+    calls would cross their figures. Its memory guard is after the fact (the peak is read when the call returns) and
+    reads MLX's figure, which at 57 minutes was 3.44 GB while the process footprint was 4.09 GB. For a live guard run
+    the FluidAudio engine, which is a child process.
+    """
 
     def __init__(
         self,
@@ -40,8 +47,13 @@ class ParakeetMlx:
         self._loader, self._memory_factory = loader, memory
         self._model: Any = None
         self._memory: Memory | None = None
+        self._lock = threading.Lock()
 
     def transcribe(self, audio: Path) -> Heard:
+        with self._lock:
+            return self._transcribe(audio)
+
+    def _transcribe(self, audio: Path) -> Heard:
         if self._model is None:
             self._memory = self._memory_factory()
             self._memory.cap(CACHE_MB)

@@ -42,6 +42,7 @@ class Drain:
         self._workers = workers
         self._report = DrainReport()
         self._report_lock = Lock()
+        self._taken: set[Path] = set()  # a job is run once per drain: a retry of a failed diarizer waits for the next one
 
     def run(self) -> DrainReport:
         with ThreadPoolExecutor(max_workers=self._workers) as pool:
@@ -59,6 +60,8 @@ class Drain:
 
     def _claim(self) -> tuple[Job, ProcessLock] | None:
         for job in self._scan():
+            if job.out in self._taken:
+                continue
             if is_known_failure(job.out, job.audio):
                 self._note(self._report.skipped, job.out, unless=self._report.failed)
             elif not is_current(job.out, self._speech.pipeline, job.audio):
@@ -69,6 +72,8 @@ class Drain:
                 if is_current(job.out, self._speech.pipeline, job.audio):  # finished while we asked
                     lock.release()
                     continue
+                with self._report_lock:
+                    self._taken.add(job.out)
                 return job, lock
         return None
 

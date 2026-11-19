@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0
+
+- `transcribe(path)` stores one file beside the audio (`<name>.speech.json`) and returns the `Transcript`; words only. `transcribe_with_speakers(path)` is the opt-in speaker version. `NO_DIARIZER` is gone (breaking).
+- `Transcript.to_text()`: `[MM:SS] S1: text`.
+- `Slots.auto()`: slot counts from the machine's memory; `Slots` has no defaults and the CLI slot flags are optional (breaking for `Slots()`).
+- `Speech.run(audio)` returns a transcript without storing; `Speech.transcribe(audio)` stores by default (breaking: it stored nothing without `out`).
+
+- Live memory guard: FluidAudio runs in its own process group, read every 0.5 s, killed over `budget_gb` with `MemoryBudgetError`; `ParakeetMlx` documents its after-the-fact guard and serialises calls with a lock.
+- `any-speech setup fluidaudio` builds the pinned commit (0b1f4628) and installs it; `find_fluidaudio` order: env, installed copy, PATH, `~/.local/bin`; `provenance.runtime` is `fluidaudio-<commit>+<sha256[:12]>`; `--fluidaudio-bin` optional.
+- `AudioHasher`: one hash per file per process; `Pipeline(hasher=...)`.
+- A failed diarizer is retried by the next drain, at most 3 times; a job runs once per drain.
+- Format v2: `speakers` maps a label to `{name, seconds, words}` (`Speaker`); v1 files still load (breaking for code that read `speakers` values as strings).
+
 ## 0.2.0
 
 - `transcribe(path, out=None, **overrides)`: the default models and slots, each part replaceable by name; `EngineMissingError` instead of any fallback.

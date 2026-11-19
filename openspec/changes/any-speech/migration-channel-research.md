@@ -18,16 +18,23 @@ For the session that owns `iorlas-wip`; this change edits nothing there. Read `e
 ```python
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["any-speech @ git+https://github.com/yoselabs/shelf@any-speech-v0.2.0#subdirectory=packages/any-speech"]
+# dependencies = ["any-speech @ git+https://github.com/yoselabs/shelf@any-speech-v0.3.0#subdirectory=packages/any-speech"]
 # ///
-fa = Path(os.environ["FLUIDAUDIO_BIN"])
-pipeline = lambda: Pipeline(FluidAudioCli(fa, runtime=RUNTIME), FluidAudioDiarizer(fa, runtime=RUNTIME))
-scan = lambda: [Job(a, a.with_name("transcript.local.json")) for a in sorted(ROOT.glob("youtube/*/videos/*/audio.*"))]
-speech = Speech(pipeline(), LEASES, Slots(transcribe=2, diarize=1))
+from any_speech import Drain, Job, Slots, Speech, default_transcriber, Pipeline
+
+scan = lambda: [Job(a, a.with_name("transcript.speech.json")) for a in sorted(ROOT.glob("youtube/*/videos/*/audio.*"))]
+speech = Speech(Pipeline(default_transcriber()), LEASES, Slots.auto())
 Drain(scan=scan, speech=speech, workers=2).run()
 ```
 
-(Or `any-speech drain ROOT --pattern 'youtube/*/videos/*/audio.*' --out-name transcript.local.json --diarize --fluidaudio-bin ...`; the first channel goes first by passing its glob first.)
+Transcription only is what channel-research needs (its traits come from the host's words): no diarizer, no `--diarize`, no binary flag after `any-speech setup fluidaudio`:
+
+```bash
+any-speech setup fluidaudio        # once
+any-speech drain ~/.local/share/channel-research --pattern 'youtube/*/videos/*/audio.m4a' --out-name transcript.speech.json
+```
+
+Measured on the 9 Solek files (297 min): 64 s, 0.4 GB.
 
 ## Changes the readers must absorb
 
@@ -38,7 +45,7 @@ Drain(scan=scan, speech=speech, workers=2).run()
 | `model`, `settings`, `made_at`, `secs`, `mlx_peak_gb` | top level | `provenance.model`, `.settings`, `.made_at`, `.seconds`, `.peak_memory_gb` |
 | `source: "local"` | top level | `provenance.source`; captions become `"captions"` with `probability = null` |
 
-Existing `transcript.local.json` files (Whisper, old shape) are not rewritten: a reader that sees no `version` key treats the file as the old shape. They are not "current" for the drain because their `provenance.key` is absent, so the drain would redo all 89 videos on first run (about 12 s per hour of audio on FluidAudio). Decide whether to keep both files side by side (use `--out-name transcript.speech.json`) or replace.
+Existing `transcript.local.json` files (Whisper, old shape) are not rewritten: a reader that sees no `version` key treats the file as the old shape. They are not "current" for the drain because their `provenance.key` is absent, so the drain would redo all 89 videos on first run (about 12 s per hour of audio on FluidAudio). **Write `transcript.speech.json` beside the existing Whisper file; do not replace it in place**, because the model-answer cache and the profile depend on the transcript's hash. Point readers at the new file when they are ready.
 
 ## Host identification (new)
 

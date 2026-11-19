@@ -43,6 +43,8 @@ def test_diarizer_labels_words_and_lists_speakers(tmp_path: Path) -> None:
     t = _pipeline(diarizer=diarizer).run(_audio(tmp_path))
     assert [w.speaker for w in t.words] == ["S1", "S1", "S2"]
     assert set(t.speakers) == {"S1", "S2"}
+    assert [(s.name, s.words) for s in t.speakers.values()] == [("voice 1", 2), ("voice 2", 1)]
+    assert (t.speakers["S1"].seconds, t.speakers["S2"].seconds) == (pytest.approx(0.9), pytest.approx(0.5))
     assert t.provenance.diarizer == {"model": "fake-diarizer", "status": "ok"}
 
 

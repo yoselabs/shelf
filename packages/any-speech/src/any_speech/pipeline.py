@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from any_speech.format import Provenance, Transcript, job_key
+from any_speech.format import Provenance, Transcript, job_key, speakers_of
 from any_speech.guard import DEFAULT_BUDGET_GB, check_peak
 from any_speech.words import assign_speakers, segments_from_words
 
@@ -50,6 +50,21 @@ def _utc_now() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+class AudioHasher:
+    """The audio's digest, remembered by (path, size, modified time): a drain scans the same files many times."""
+
+    def __init__(self, hash_file: Callable[[Path], str] = audio_sha256) -> None:
+        self._hash_file = hash_file
+        self._seen: dict[tuple[str, int, int], str] = {}
+
+    def __call__(self, audio: Path) -> str:
+        stat = audio.stat()
+        key = (str(audio.resolve()), stat.st_size, stat.st_mtime_ns)
+        if key not in self._seen:
+            self._seen[key] = self._hash_file(audio)
+        return self._seen[key]
+
+
 class Pipeline:
     """A transcriber, an optional diarizer, a memory budget; the injected edges are the probe and the clock."""
 
@@ -62,6 +77,7 @@ class Pipeline:
         probe: Callable[[Path], float] = probe_seconds,
         now: Callable[[], str] = _utc_now,
         slot: Callable[[str], AbstractContextManager[object]] = _no_slot,
+        hasher: Callable[[Path], str] | None = None,
     ) -> None:
         self.transcriber = transcriber
         self.diarizer = diarizer
@@ -69,17 +85,19 @@ class Pipeline:
         self._probe = probe
         self._now = now
         self._slot = slot
+        self._hash = AudioHasher() if hasher is None else hasher
 
     def gated(self, slot: Callable[[str], AbstractContextManager[object]]) -> Pipeline:
         """The same engines, each model call run inside `slot(kind)` (kind: transcribe or diarize)."""
-        return Pipeline(self.transcriber, self.diarizer, budget_gb=self.budget_gb, probe=self._probe, now=self._now, slot=slot)
+        engines = (self.transcriber, self.diarizer)
+        return Pipeline(*engines, budget_gb=self.budget_gb, probe=self._probe, now=self._now, slot=slot, hasher=self._hash)
 
     def key_for(self, audio: Path) -> str:
         ident = self.transcriber.identity
-        return job_key(audio_sha256(audio), ident.engine, ident.model, self._settings())
+        return job_key(self._hash(audio), ident.engine, ident.model, self._settings())
 
     def run(self, audio: Path) -> Transcript:
-        digest = audio_sha256(audio)
+        digest = self._hash(audio)
         with ThreadPoolExecutor(max_workers=1) as pool:
             diarizing = pool.submit(self._diarize, audio) if self.diarizer is not None else None  # overlaps the transcription
             with self._slot("transcribe"):
@@ -105,7 +123,7 @@ class Pipeline:
         return Transcript(
             words=words,
             segments=segments_from_words(words),
-            speakers={label: f"voice {i}" for i, label in enumerate(labels, 1)},
+            speakers=speakers_of(words, {label: f"voice {i}" for i, label in enumerate(labels, 1)}),
             provenance=provenance,
         )
 

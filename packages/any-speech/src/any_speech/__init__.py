@@ -1,11 +1,12 @@
 """Speech in, a Transcript out: words with times, speakers and provenance, from swappable engines.
 
-- :func:`transcribe`: ``transcribe(path)`` with the default models; every part is replaceable by name
-  (``transcriber=``, ``diarizer=`` or ``NO_DIARIZER``, ``slots=``). :data:`CARDS` says why each model is or is not the choice.
+- :func:`transcribe`: ``transcribe(path)``, the default model, words stored in one file beside the audio and returned;
+  :func:`transcribe_with_speakers` adds the voices. Every part is replaceable by name (``transcriber=``, ``diarizer=``, ``slots=``).
+  :data:`CARDS` says why each model is or is not the choice.
 - :class:`Transcript` (and :class:`Word`, :class:`Segment`, :class:`Provenance`): the versioned JSON format.
 - :class:`Pipeline`: one file through a :class:`Transcriber` and an optional :class:`Diarizer`; a peak over the
   memory budget raises :class:`MemoryBudgetError`; a diarizer failure never fails the transcript.
-- :class:`Speech`: ``Speech(pipeline, leases_root).transcribe(path)``. Model calls wait for a free slot from a counted
+- :class:`Speech`: ``Speech(pipeline, leases_root, slots).transcribe(path)``. Model calls wait for a free slot from a counted
   pool (:class:`Slots`: how many transcribe and diarize calls run at once, machine-wide).
 - :class:`Drain`: runs every pending :class:`Job` with N workers, rescanning until none is left; a failed file is
   recorded and skipped until it changes.
@@ -14,18 +15,18 @@
 """
 
 from any_speech.defaults import (
-    NO_DIARIZER,
     EngineMissingError,
     default_diarizer,
     default_speech,
     default_transcriber,
     transcribe,
+    transcribe_with_speakers,
 )
 from any_speech.drain import Drain, DrainReport, Job
-from any_speech.format import FORMAT_VERSION, Provenance, Segment, Transcript, UnknownVersionError, Word, job_key
+from any_speech.format import FORMAT_VERSION, Provenance, Segment, Speaker, Transcript, UnknownVersionError, Word, job_key
 from any_speech.guard import DEFAULT_BUDGET_GB, MemoryBudgetError
 from any_speech.models import CARDS, ModelCard, card_for, default_card
-from any_speech.pipeline import Pipeline
+from any_speech.pipeline import AudioHasher, Pipeline
 from any_speech.ports import Diarized, Diarizer, Embedder, Heard, Identity, Transcriber, Voice
 from any_speech.speech import Slots, Speech
 from any_speech.words import Piece, Turn, assign_speakers, segments_from_words, words_from_pieces
@@ -34,7 +35,7 @@ __all__ = [
     "CARDS",
     "DEFAULT_BUDGET_GB",
     "FORMAT_VERSION",
-    "NO_DIARIZER",
+    "AudioHasher",
     "Diarized",
     "Diarizer",
     "Drain",
@@ -51,6 +52,7 @@ __all__ = [
     "Provenance",
     "Segment",
     "Slots",
+    "Speaker",
     "Speech",
     "Transcriber",
     "Transcript",
@@ -67,5 +69,6 @@ __all__ = [
     "job_key",
     "segments_from_words",
     "transcribe",
+    "transcribe_with_speakers",
     "words_from_pieces",
 ]
