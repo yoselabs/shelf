@@ -21,6 +21,7 @@ members = [
     "any-failure-fp",
     "any-file",
     "any-frontmatter",
+    "any-gate",
     "any-json-doc",
     "any-lease",
     "any-mailbox",
@@ -283,6 +284,23 @@ requires-dist = [
     { name = "yaml-merge", marker = "extra == 'merge'", editable = "packages/yaml-merge" },
 ]
 provides-extras = ["merge"]
+
+[[package]]
+name = "any-gate"
+version = "0.1.0"
+source = { editable = "packages/any-gate" }
+dependencies = [
+    { name = "atomic-io" },
+    { name = "content-digest" },
+    { name = "stream-proc" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "content-digest", editable = "packages/content-digest" },
+    { name = "stream-proc", editable = "packages/stream-proc" },
+]
 
 [[package]]
 name = "any-json-doc"

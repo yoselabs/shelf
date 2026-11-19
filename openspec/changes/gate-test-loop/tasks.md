@@ -15,9 +15,11 @@ Each task is a bead with acceptance criteria (`bd lint` runs in the gate). Tests
       concern; select-all stays for unknown paths, `.python-version` and when uv or the base tree cannot answer. `tools/affected.py --reach N` replays the last N
       commits: 50 commits give median 1, max 5 of 79 packages (before: median 79). A history replay is not a test (50 s, tied to this repo's past).
 - [ ] 5. Second hub mutation (any hub other than `atomic-io`); record selected vs failing suites in the change's research folder.
-- [ ] 6. Receipt key and ledger (repo-local, git-ignored); pre-push and manual `just check` share it; replaces `gate_state.py`'s tree skip.
-- [ ] 7. Run guard: worker cap, single process for small selections, wall and idle kill, `serial`/`quarantine` markers and their list file,
-      selection-too-wide alarm, `nice`; `reach` report command.
+- [~] 6. Receipt key and ledger: `any-gate` 0.1.0 has `key` and `Receipts` (plain JSON, newest first, capped; 15 tests). NOT wired yet: `gate_state.py`'s tree skip and
+      `affected.py`'s `.cache/affected-passed.json` still run the gate; the ledger should live in the git common dir so worktrees share it.
+- [~] 7. Run guard: `any-gate` 0.1.0 has `workers` (cores, RAM at 2 GB, 150 tests each, cap 4; 1 = one process), `too_wide`, and `run_tests` (parallel, `serial`, `quarantine`
+      stages; wall and idle limits through `stream-proc`, which also stops the process tree; exit 5 is not a failure). NOT wired yet; the repo must declare the
+      `serial` and `quarantine` markers; `nice` and the `reach` report command (done in `affected.py --reach`) remain. The box lock becomes `any-lease` (counting slots), not wired.
 - [ ] 8. Declare each package's test dependencies in its own `pyproject.toml`; isolated per-package test run; investigate why `atomic-io` still
       fails collection in isolation; heavy-extra lanes.
 - [ ] 9. Measure the box-wide lock on a loaded box (several concurrent gates) with and without receipts; decide lock vs slots; record.
