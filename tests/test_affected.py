@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -85,15 +87,139 @@ def test_a_change_selects_its_packages_and_their_dependents(repo: Path, changed:
     assert _pkgs(affected.affected(repo, changed)) == expected
 
 
-def test_a_suite_that_passed_is_skipped_until_it_or_a_dependency_changes(repo: Path) -> None:
-    (repo / "packages/base/src.py").write_text("x = 1\n")
-    paths = ["tests", "packages/base/tests", "packages/middle/tests", "packages/leaf/tests"]
-    affected.record(repo, paths)
-    assert affected.skip_passed(repo, paths) == ["tests"]
-    assert affected.skip_passed(repo, ["tests/test_arch.py"]) == ["tests/test_arch.py"]
+# --- the lock, read per package (ADR 0021, shelf-wctp): a release edits uv.lock, and that must not select every package ---
 
-    (repo / "packages/base/src.py").write_text("x = 2\n")
-    assert affected.skip_passed(repo, paths) == ["tests", "packages/base/tests", "packages/middle/tests"]
+PINS = {"base": "1", "middle": "1", "top": "1", "leaf": "1", "plug": "1"}
+ROOT_PYPROJECT = (
+    '[tool.ruff]\nline-length = 100\n\n[dependency-groups]\ndev = ["pytest"]\n\n'
+    '[tool.pytest.ini_options]\naddopts = "-q"\ntestpaths = ["packages/base/tests"]\n'
+)
 
-    (repo / "uv.lock").write_text("changed\n")
-    assert affected.skip_passed(repo, paths) == paths
+
+def _write_pins(repo: Path, pins: dict[str, str]) -> None:
+    (repo / "uv.lock").write_text("".join(f"{name}={pin}\n" for name, pin in pins.items()))
+
+
+def pins_exporter(repo: Path, packages: list[str]) -> dict[str, str]:
+    """A stand-in for `uv export`: each package's answer is the pin its name has in this tree's uv.lock."""
+    pins = dict(line.split("=") for line in (repo / "uv.lock").read_text().split())
+    return {name: pins[name] for name in packages}
+
+
+def _git(repo: Path, *args: str) -> None:
+    env = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null", "PATH": os.environ["PATH"], "HOME": str(repo)}
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=repo, env=env, check=True, capture_output=True)
+
+
+@pytest.fixture
+def committed(repo: Path) -> Path:
+    """The workspace with a lock and a root pyproject, committed: the base a change is measured against."""
+    _write_pins(repo, PINS)
+    (repo / "pyproject.toml").write_text(ROOT_PYPROJECT)
+    _git(repo, "init", "-q")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    return repo
+
+
+def _selected(repo: Path, changed: list[str]) -> set[str]:
+    touched = lambda: affected.lock_touched(repo, "HEAD", pins_exporter)  # noqa: E731
+    return _pkgs(affected.affected(repo, changed, lock=touched))
+
+
+def test_a_lock_change_selects_only_the_packages_whose_resolved_set_changed_and_their_dependents(committed: Path) -> None:
+    _write_pins(committed, {**PINS, "middle": "2"})
+    assert _selected(committed, ["uv.lock"]) == {"middle", "top"}
+
+
+def test_a_lock_change_no_package_resolves_differently_selects_no_package(committed: Path) -> None:
+    # A release bumps a workspace member's own version in the lock; no package's installed third-party set changes.
+    _write_pins(committed, dict(reversed(PINS.items())))
+    assert _selected(committed, ["uv.lock"]) == set()
+
+
+def test_a_root_pyproject_change_in_the_dependency_tables_is_read_like_the_lock(committed: Path) -> None:
+    (committed / "pyproject.toml").write_text(ROOT_PYPROJECT.replace('"pytest"', '"pytest", "hypothesis"'))
+    _write_pins(committed, {**PINS, "leaf": "2"})
+    assert _selected(committed, ["pyproject.toml", "uv.lock"]) == {"leaf"}
+
+
+def test_a_root_pyproject_change_in_how_tests_run_selects_every_package(committed: Path) -> None:
+    # pytest options and coverage settings reach every suite; no export shows them.
+    (committed / "pyproject.toml").write_text(ROOT_PYPROJECT.replace('addopts = "-q"', 'addopts = "-q -m not slow"'))
+    assert _selected(committed, ["pyproject.toml"]) == set(PINS)
+
+
+def test_a_root_pyproject_change_no_test_can_see_selects_no_package(committed: Path) -> None:
+    # Lint, type and architecture settings, the list of test paths and the workspace edges: whole-repo gate steps read those, not a suite.
+    edited = ROOT_PYPROJECT.replace("100", "88").replace('["packages/base/tests"]', '["packages/base/tests", "packages/leaf/tests"]')
+    (committed / "pyproject.toml").write_text(
+        edited + '[tool.importlinter]\nroot_package = "x"\n[tool.uv.sources]\nleaf = { workspace = true }\n'
+    )
+    assert _selected(committed, ["pyproject.toml"]) == set()
+
+
+def test_a_lock_change_whose_export_cannot_be_read_selects_every_package(committed: Path) -> None:
+    def broken(_repo: Path, _packages: list[str]) -> dict[str, str]:
+        message = "uv failed"
+        raise affected.ExportError(message)
+
+    _write_pins(committed, {**PINS, "leaf": "2"})
+    touched = lambda: affected.lock_touched(committed, "HEAD", broken)  # noqa: E731
+    assert _pkgs(affected.affected(committed, ["uv.lock"], lock=touched)) == set(PINS)
+
+
+def test_a_package_the_base_did_not_have_counts_as_changed(committed: Path) -> None:
+    _member(committed, "fresh")
+    _write_pins(committed, {**PINS, "fresh": "1"})
+    assert _selected(committed, ["uv.lock"]) == {"fresh"}
+
+
+def _plan(repo: Path, paths: list[str]) -> dict[str, str]:
+    return dict(affected.plan(repo, paths, pins_exporter))
+
+
+def _no_uv(_repo: Path, _packages: list[str]) -> dict[str, str]:
+    message = "uv is not available here"
+    raise affected.ExportError(message)
+
+
+def test_the_plan_gives_each_package_suite_a_key_and_the_fitness_tests_none(committed: Path) -> None:
+    plan = _plan(committed, ["tests/test_arch.py", "packages/base/tests", "packages/leaf/tests"])
+    assert plan["tests/test_arch.py"] == ""
+    assert plan["packages/base/tests"] != plan["packages/leaf/tests"]
+    assert all(plan[p] for p in ("packages/base/tests", "packages/leaf/tests"))
+
+
+def test_a_suites_key_changes_with_its_files_and_its_dependencies_files(committed: Path) -> None:
+    before = _plan(committed, ["packages/base/tests", "packages/middle/tests", "packages/leaf/tests"])
+    (committed / "packages/base/src.py").write_text("x = 2\n")
+    after = _plan(committed, ["packages/base/tests", "packages/middle/tests", "packages/leaf/tests"])
+    assert [before[p] != after[p] for p in before] == [True, True, False]
+
+
+def test_a_suites_key_keeps_when_only_another_packages_resolved_set_changes(committed: Path) -> None:
+    paths = ["packages/base/tests", "packages/leaf/tests"]
+    before = _plan(committed, paths)
+    _write_pins(committed, {**PINS, "leaf": "2"})
+    after = _plan(committed, paths)
+    assert (before["packages/base/tests"], before["packages/leaf/tests"] != after["packages/leaf/tests"]) == (
+        after["packages/base/tests"],
+        True,
+    )
+
+
+def test_a_suites_key_changes_when_a_dependencys_resolved_set_changes(committed: Path) -> None:
+    paths = ["packages/middle/tests", "packages/top/tests", "packages/leaf/tests"]
+    before = _plan(committed, paths)
+    _write_pins(committed, {**PINS, "base": "2"})
+    after = _plan(committed, paths)
+    assert [before[p] != after[p] for p in paths] == [True, True, False]
+
+
+def test_without_uv_the_lock_and_root_pyproject_stand_in_for_every_suites_key(committed: Path) -> None:
+    paths = ["packages/base/tests", "packages/leaf/tests"]
+    before = dict(affected.plan(committed, paths, _no_uv))
+    (committed / "uv.lock").write_text("changed\n")
+    after = dict(affected.plan(committed, paths, _no_uv))
+    assert all(before[p] != after[p] for p in paths)

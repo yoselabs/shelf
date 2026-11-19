@@ -4,7 +4,7 @@
 installers may use. They are different facts, so the check is "pin inside range", and a range that
 reaches below the pin is a promise only a CI run on that lower version keeps. uv's own floor sits in
 `[tool.uv] required-version`, because a different uv rewrites the lockfile's revision.
-Research: openspec/changes/blueprint-skill/research/python-pin.md.
+Research: docs/research/blueprint-skill/research/python-pin.md.
 """
 
 from __future__ import annotations

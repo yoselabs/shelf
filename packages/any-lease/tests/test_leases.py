@@ -53,6 +53,7 @@ def test_release_frees_the_unit_and_is_idempotent(leases: Leases) -> None:
     held.release()
     again = leases.acquire("unity", 1, timeout=0)
     assert again.slot == 0
+    again.release()
 
 
 def test_context_manager_releases(leases: Leases) -> None:
@@ -72,6 +73,7 @@ def test_a_waiter_gets_a_unit_when_one_is_released_and_reports_the_wait(leases: 
         held.release()  # the holder lets go during the wait, not on a timer that load can reorder
 
     got = leases.acquire("unity", 1, timeout=10, poll=POLL, on_wait=on_wait)
+    got.release()
     assert got.waited >= 0.1
     assert len(seen) == 1
     assert (seen[0].name, seen[0].limit) == ("unity", 1)

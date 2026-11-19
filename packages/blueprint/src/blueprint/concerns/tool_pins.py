@@ -4,7 +4,7 @@ ADR 0024. Two machines sharing one Dolt remote ran bd 1.1.2 and 1.3.1, and the n
 under the older; just, prek and the Godot editor had no pin at all. mise pins them; the languages keep their
 own pin files (`.python-version` is uv's, `global.json` is the .NET SDK's), and just stays with uv where it is
 the `rust-just` dev dependency (ADR 0023), so nothing is pinned twice.
-Research: openspec/changes/blueprint-skill/research/toolchain-installer.md.
+Research: docs/research/blueprint-skill/research/toolchain-installer.md.
 """
 
 from __future__ import annotations

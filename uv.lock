@@ -21,6 +21,7 @@ members = [
     "any-failure-fp",
     "any-file",
     "any-frontmatter",
+    "any-gate",
     "any-json-doc",
     "any-lease",
     "any-mailbox",
@@ -285,6 +286,32 @@ requires-dist = [
     { name = "yaml-merge", marker = "extra == 'merge'", editable = "packages/yaml-merge" },
 ]
 provides-extras = ["merge"]
+
+[[package]]
+name = "any-gate"
+version = "0.1.0"
+source = { editable = "packages/any-gate" }
+dependencies = [
+    { name = "any-lease" },
+    { name = "atomic-io" },
+    { name = "content-digest" },
+    { name = "stream-proc" },
+]
+
+[package.optional-dependencies]
+pytest = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "any-lease", editable = "packages/any-lease" },
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "content-digest", editable = "packages/content-digest" },
+    { name = "pytest", marker = "extra == 'pytest'", specifier = ">=8" },
+    { name = "stream-proc", editable = "packages/stream-proc" },
+]
+provides-extras = ["pytest"]
 
 [[package]]
 name = "any-json-doc"
@@ -2735,11 +2762,19 @@ dependencies = [
     { name = "httpx" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "async-scope", extra = ["asgi"] },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "httpx", specifier = ">=0.28,<1" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" }]
 
 [[package]]
 name = "mcp-call"
@@ -2749,8 +2784,16 @@ dependencies = [
     { name = "httpx" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "async-scope", extra = ["asgi"] },
+]
+
 [package.metadata]
 requires-dist = [{ name = "httpx", specifier = ">=0.28,<1" }]
+
+[package.metadata.requires-dev]
+dev = [{ name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" }]
 
 [[package]]
 name = "mcp-clients"

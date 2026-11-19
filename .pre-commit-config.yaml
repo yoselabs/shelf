@@ -1,5 +1,5 @@
 # Git hooks, owned by prek (or pre-commit, which reads the same file). The blueprint recipe
-# (openspec/changes/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself
+# (docs/research/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself
 # (`bd init --skip-hooks`); its hooks run from here, first, so a failing check below still blocks the
 # commit and bd still runs. Install: `prek install` (installs every type in default_install_hook_types).
 default_install_hook_types: [pre-commit, post-merge, pre-push, post-checkout, prepare-commit-msg]
@@ -95,3 +95,13 @@ repos:
     always_run: true
     pass_filenames: false
     stages: [pre-push]
+  - id: gate-after-merge
+    name: just check on the merged tree
+    # A merge made elsewhere (a GitHub squash merge, pulled here) lands a tree no local gate saw: on 2026-11-19 main was red on a
+    # clean diff, stale generated READMEs. The hook cannot undo the merge, but it says so at once, where the pull happened.
+    # Skipped when this tree already passed (tools/gate_state.py), like the pre-push gate.
+    entry: python3 -I tools/gate_state.py pre-push --gate check -- uv run just check
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [post-merge]

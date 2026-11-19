@@ -27,4 +27,4 @@ commits (lefthook, husky, hand-written hooks).
 
 ## History
 
-- 2026-10-10: decided; research `openspec/changes/blueprint-skill/research/hooks-and-beads.md`.
+- 2026-10-10: decided; research `docs/research/blueprint-skill/research/hooks-and-beads.md`.

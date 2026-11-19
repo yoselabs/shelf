@@ -1,5 +1,5 @@
 # Stack profile (see python-uv.toml for the format). Nix flakes (NixOS hosts, dev shells), nixos-26.05 / Nix 2.34, late 2026.
-# Research: openspec/changes/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a flake.nix within three levels.
+# Research: docs/research/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a flake.nix within three levels.
 # Tested 2026-10-11 inside the nixos/nix Docker image (arm64 Linux on a Mac, no local Nix) against a scratch copy of homelab (hosts/bee, hosts/sol).
 stack = "nix"
 status = "provisional"

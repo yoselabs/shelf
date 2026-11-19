@@ -1,5 +1,5 @@
 # Git hooks, owned by prek (or pre-commit, which reads the same file). The blueprint recipe
-# (openspec/changes/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself
+# (docs/research/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself
 # (`bd init --skip-hooks`); its hooks run from here, first, so a failing check below still blocks the
 # commit and bd still runs. Install: `prek install` (installs every type in default_install_hook_types).
 default_install_hook_types: [pre-commit, post-merge, pre-push, post-checkout, prepare-commit-msg]

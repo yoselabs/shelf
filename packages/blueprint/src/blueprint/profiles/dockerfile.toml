@@ -1,5 +1,5 @@
 # Stack profile (see python-uv.toml for the format). Container images built from a Dockerfile / Containerfile, hadolint 2.15.1, late 2026.
-# Research: openspec/changes/blueprint-skill/research/hadolint-and-ci-uv.md (shelf-1y4.20). Detection: a Dockerfile, *.Dockerfile,
+# Research: docs/research/blueprint-skill/research/hadolint-and-ci-uv.md (shelf-1y4.20). Detection: a Dockerfile, *.Dockerfile,
 # Dockerfile.<suffix> or Containerfile within three levels (not *.dockerignore). A stack of its own, not a compose role: a repo
 # with images and no compose file (a2kay) is still linted.
 stack = "dockerfile"

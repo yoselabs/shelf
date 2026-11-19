@@ -1,0 +1,10 @@
+# One MicroSoftware INSTANCE (glossary spine; ADR 0003 — flat files).
+name = "any-gate"
+kind = "primitive"
+tier = "T1"
+release = "any-gate-v0.1.0"
+capability = "Stop re-running what already passed and stop a test run from hanging a box — Receipts remembers a green result under a key of exactly what it ran on (plain JSON, newest first, capped), key(**parts) builds that key, workers(tests, Resources) sizes a run to its work, and run_tests runs pytest in stages (parallel, serial, quarantine) under wall and idle limits that stop the whole process tree; a failing quarantined test is reported and never blocks."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from the shelf's own gate (tools/gate_state.py tree record, tools/affected.py pass cache) and task-loop's dev/runtests.py (worker cap, hang guards, serial and quarantine lanes, too-wide alarm), per ADR 0021 and docs/missions/gate-kit-package. Built on stream-proc (the limits), atomic-io and content-digest. Wiring into the gate follows; the shelf's tools still run the gate until then. Born candidate."

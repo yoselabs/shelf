@@ -2,7 +2,7 @@
 # standalone `fastmcp` package: every python-uv rule applies; the rows here add what is the MCP surface's.
 # `{root}` is the folder holding the pyproject.toml that declares fastmcp (usually "."). Paths may be globs (`tests/*.py`, no `**`).
 # Detection (profile.py FRAMEWORK_DEPENDENCIES): a `fastmcp` dependency in [project].dependencies AND a `FastMCP(` call in src.
-# Research: openspec/changes/blueprint-skill/research/mcp-profile.md
+# Research: docs/research/blueprint-skill/research/mcp-profile.md
 stack = "mcp"
 status = "provisional"
 source = "mcp-profile.md (2026-10-11): fastmcp 3.4.8 and 4.1.0 and mcp 2.3.0 run in scratch venvs (in-memory Client, list_tools, bad-argument call, stdio handshake, `fastmcp inspect`); MCP spec 2025-11-25 and 2026-07-28 read; a2kay (fastmcp 3.4.4, mcp 1.28.1) read, its contract tests are the pattern; a2kay is the only consumer"

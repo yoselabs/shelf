@@ -1,5 +1,5 @@
 # Stack profile (see python-uv.toml for the format). POSIX sh and bash scripts, late 2026.
-# Research: openspec/changes/blueprint-skill/research/shell-and-secrets.md (shelf-ij8). Detection: two or more *.sh within
+# Research: docs/research/blueprint-skill/research/shell-and-secrets.md (shelf-ij8). Detection: two or more *.sh within
 # three levels, or one of at least 10 lines (a lone exec wrapper is not a shell stack); bd's .beads/hooks shims are skipped.
 # Tested 2026-10-11: shellcheck 0.9.0, shfmt 3.14.1 on a scratch copy of homelab (18 scripts) and on planted files.
 stack = "shell"
