@@ -5,5 +5,6 @@ from __future__ import annotations
 from any_gate.plan import Resources, detect, too_wide, workers
 from any_gate.receipts import Receipts, key
 from any_gate.run import Outcome, Stage, run_tests
+from any_gate.state import GateState
 
-__all__ = ["Outcome", "Receipts", "Resources", "Stage", "detect", "key", "run_tests", "too_wide", "workers"]
+__all__ = ["GateState", "Outcome", "Receipts", "Resources", "Stage", "detect", "key", "run_tests", "too_wide", "workers"]

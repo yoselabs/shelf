@@ -26,12 +26,12 @@ lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACH
 # always cover the whole repo. A linter with nothing changed prints "skipped <linter>: ..." and the gate
 # repeats that line.
 #
-# A green `check` records the tree it checked (tools/gate_state.py, `blueprint recipe gate-state`): `gate-start` notes the
+# A green `check` records the tree it checked (`any-gate`, `python -m any_gate start|passed|pre-push`): `gate-start` notes the
 # working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
 # pre-push hook then skips the gate for that exact tree.
 [group('gate')]
 check: gate-start beads-lint scripts (steps "guard" "preset" "blueprint" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test-affected")
-    python3 -I tools/gate_state.py passed --gate check
+    uv run python -m any_gate passed --gate check
 
 [group('gate')]
 check-all: beads-lint (scripts "all") (steps "guard" "preset" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test")
@@ -39,7 +39,7 @@ check-all: beads-lint (scripts "all") (steps "guard" "preset" "blueprint" "lint"
 # Notes the working tree as the gate starts, for `check` to record when it passes.
 [private]
 gate-start:
-    python3 -I tools/gate_state.py start
+    uv run python -m any_gate start
 
 # Every bead still to be started (open or blocked) carries its acceptance criteria: criteria are what make a bead
 # ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. bd's database lives in this clone.
@@ -246,8 +246,8 @@ deps:
         'p={}; imp=$(ls "$p/src"); out=$(cd "$p" && uv run deptry . --known-first-party "$imp" 2>&1) || { printf -- "-- deptry %s\n%s\n" "$p" "$out"; exit 1; }'
     echo "deptry: every package clean"
 
-# The test runs take the box-wide test lock (tools/gate_state.py lock): each takes every core, so gates started at once
-# on one box queue for it instead of thrashing (2026-10-20: four at once took 11-14 min each).
+# The test runs queue for one slot (`any-lease`, `lease_root` above): each takes every core, so gates started at once
+# on one box wait instead of thrashing (2026-10-20: four at once took 11-14 min each).
 #
 # tests with coverage; the floor guards against REGRESSION (set just below current).
 # Substrate adapters (docling/torch/subprocess) are legitimately hard to unit-test,

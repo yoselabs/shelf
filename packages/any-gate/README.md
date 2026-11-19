@@ -32,5 +32,17 @@ Exit 0: green or nothing to run; 1: a test failed or a stage hit a limit; 2: usa
 selects its lane through a pytest plugin (`any_gate.lanes_plugin`), not `-m`, so the repo's own `-m` default stays in force; the plugin
 needs `any-gate[pytest]` in the environment of the tests.
 
+### The gate's tree record
+
+```bash
+python -m any_gate start                                              # first step of the gate: note the working tree
+python -m any_gate passed --gate check                                # last step: record it, if no file changed during the run
+python -m any_gate pre-push --gate check -- uv run just check         # the hook: skip the gate on a tree that passed it
+```
+
+The tree is what `git add -A` would commit; the key adds the upstream merge-base. `pre-push` skips only when the tree is clean, HEAD is what
+is pushed (`PRE_COMMIT_TO_REF`) and the key is recorded; anything else runs the command in place of the process. The record is a receipt named
+`gate-<gate>` in the same file, so every worktree of a checkout shares it. `GateState(repo, receipts)` is the same in Python.
+
 A failure is never recorded. A missing or damaged file remembers nothing and is repaired by the next `record`. Two writers at once
 may lose one record (the file is replaced whole, atomically): the cost is one rerun, never a false pass.

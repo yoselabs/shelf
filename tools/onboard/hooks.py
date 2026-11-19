@@ -15,9 +15,11 @@ must be unset, and no bd block may be injected in the hooks folder.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,7 +27,6 @@ from .operations import Outcome, Result
 
 _SHELF_ROOT = Path(__file__).resolve().parent.parent.parent
 _RECIPE = _SHELF_ROOT / "packages" / "blueprint" / "src" / "blueprint" / "recipes" / "pre-commit-config.yaml"
-_GATE_STATE = _SHELF_ROOT / "packages" / "blueprint" / "src" / "blueprint" / "recipes" / "gate_state.py"
 _CONFIG = ".pre-commit-config.yaml"
 _BEADS_MARKER = "BEGIN BEADS INTEGRATION"
 _GATE_BLOCK = "- repo: local\n  hooks:\n  - id: gate\n"
@@ -66,16 +67,55 @@ def config_text(*, beads: bool, python: bool) -> str:
     if not beads:
         head = head[: head.index("repos:")] + "repos:\n"
     shelf = _SHELF_HOOKS if python else _SHELF_HOOKS.split("  - id: ruff-check", 1)[0]
+    if not python:  # any-gate is a python package: a repo with none runs the gate plainly, with no skip of a tree that passed
+        gate = gate.replace(_GATE_ENTRY, "just check")
     return head + shelf + _GATE_BLOCK + gate
 
 
-def ensure_gate_state(repo: Path) -> bool:
-    """Copy the gate-state recipe to `tools/gate_state.py` when absent (the pre-push hook and `test` call it); True if written."""
-    target = repo / "tools" / "gate_state.py"
-    if target.exists():
+GATE_SPEC = '{ git = "https://github.com/yoselabs/shelf", subdirectory = "packages/any-gate", tag = "any-gate-v0.1.0" }'
+_GATE_ENTRY = "uv run python -m any_gate pre-push --gate check -- uv run just check"
+_DEV_GROUP = re.compile(r"^dev\s*=\s*\[", re.MULTILINE)
+
+
+def _into_dev_group(text: str) -> str:
+    """`text` with `"any-gate"` first in the `dev` list of `[dependency-groups]`, whether the list is on one line or several."""
+    opened = _DEV_GROUP.search(text)
+    if opened is None:
+        return text
+    rest_of_line = text[opened.end() :].split("\n", 1)[0]
+    entry = '"any-gate", ' if "]" in rest_of_line else '\n    "any-gate",'
+    return text[: opened.end()] + entry + text[opened.end() :]
+
+
+def ensure_gate_dependency(repo: Path) -> bool:
+    """Make `any-gate` (the gate's tree record, pre-push skip and test runner) a dev dependency of a python+uv repo, pinned by git tag.
+
+    True when pyproject.toml changed. The hook entry and the `check` and `test` recipes run `uv run python -m any_gate`, which needs it.
+    """
+    pyproject = repo / "pyproject.toml"
+    if not pyproject.is_file():
         return False
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(_GATE_STATE.read_text())
+    text = pyproject.read_text()
+    data = tomllib.loads(text)
+    group = [d for d in data.get("dependency-groups", {}).get("dev", []) if isinstance(d, str)]
+    wired = any(d.split("[")[0].split(">")[0].split("=")[0].strip() == "any-gate" for d in group)
+    sourced = "any-gate" in data.get("tool", {}).get("uv", {}).get("sources", {})
+    if wired and sourced:
+        return False
+    if not wired:
+        if "dependency-groups" not in data:
+            text = text.rstrip("\n") + '\n\n[dependency-groups]\ndev = ["any-gate"]\n'
+        elif "dev" not in data["dependency-groups"]:
+            text = text.replace("[dependency-groups]\n", '[dependency-groups]\ndev = ["any-gate"]\n', 1)
+        else:
+            text = _into_dev_group(text)
+    if not sourced:
+        if "[tool.uv.sources]" in text:
+            text = text.replace("[tool.uv.sources]\n", f"[tool.uv.sources]\nany-gate = {GATE_SPEC}\n", 1)
+        else:
+            text = text.rstrip("\n") + f"\n\n[tool.uv.sources]\nany-gate = {GATE_SPEC}\n"
+    tomllib.loads(text)  # never leave a pyproject that does not parse
+    pyproject.write_text(text)
     return True
 
 
@@ -140,7 +180,7 @@ class HooksOperation:
         kept = config.exists()
         if not kept:
             config.write_text(config_text(beads=self.beads, python=(self.repo / "pyproject.toml").exists()))
-            ensure_gate_state(self.repo)
+            ensure_gate_dependency(self.repo)
         if self.beads and shutil.which("bd"):
             subprocess.run(["bd", "hooks", "uninstall"], cwd=self.repo, capture_output=True, text=True, check=False)
         _git(self.repo, "config", "--local", "--unset", "core.hooksPath")
