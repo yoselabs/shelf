@@ -45,6 +45,16 @@ def default_out(audio: Path) -> Path:
     return audio.with_name(audio.name + ".speech.json")
 
 
+async def _claim(target: Path) -> ProcessLock:
+    """Take the claim on `target`. A waiter cancelled mid-wait still gets the thread's lock released once it lands."""
+    acquiring = asyncio.ensure_future(asyncio.to_thread(ProcessLock.acquire, claim_path(target), timeout=None, reentrant=False))
+    try:
+        return await asyncio.shield(acquiring)
+    except asyncio.CancelledError:
+        acquiring.add_done_callback(lambda done: done.cancelled() or done.exception() or done.result().release())
+        raise
+
+
 def claim_path(out: Path) -> Path:
     return out.with_name(out.name + ".claim")
 
@@ -100,7 +110,7 @@ class Speech:
         A current file there is returned as is. Two callers for the same file run it once: the second waits, then finds it done.
         """
         target = out if out is not None else default_out(audio)
-        lock = await asyncio.to_thread(ProcessLock.acquire, claim_path(target), timeout=None, reentrant=False)
+        lock = await _claim(target)
         try:
             return await self.fulfil(audio, target)
         finally:

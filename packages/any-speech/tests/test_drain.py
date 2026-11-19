@@ -9,7 +9,9 @@ import pytest
 from any_lease import Leases
 from any_speech import AudioHasher, Diarized, Drain, DrainReport, Heard, Identity, Job, Pipeline, Slots, Speech, Transcript, Turn, Word
 from any_speech.pipeline import audio_sha256
+from any_speech.speech import claim_path
 from any_speech.testing import FakeDiarizer, FakeTranscriber
+from process_lock import ProcessLock
 
 _NOW = "2026-11-19T10:00:00Z"
 
@@ -275,3 +277,18 @@ async def test_an_always_failing_diarizer_is_tried_three_times_then_left_with_no
     stored = Transcript.load(job.out)
     assert diarizer.calls == 3
     assert (stored.provenance.diarizer["status"], stored.provenance.diarizer["tries"], stored.words[0].speaker) == ("failed", "3", None)
+
+
+async def test_a_cancelled_waiter_does_not_leave_the_claim_held(tmp_path: Path) -> None:
+    speech = _speech(tmp_path)
+    job = _job(tmp_path, "c")
+    holder = ProcessLock.acquire(claim_path(job.out), timeout=None, reentrant=False)
+    waiter = asyncio.create_task(speech.transcribe(job.audio, job.out))
+    await asyncio.sleep(0.2)
+    waiter.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiter
+    holder.release()
+    await asyncio.sleep(0.5)
+    again = await asyncio.wait_for(speech.transcribe(job.audio, job.out), timeout=5)
+    assert again.text == "да"
