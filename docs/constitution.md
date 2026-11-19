@@ -43,6 +43,8 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 | No optionality | `tests/test_arch_bool_modes.py` bool-with-default parameters, keyword-only included, one reasoned allowlist row per current hit | blocking; extends task shelf-cypc |
 | One dispatch on the OS (III) | `tests/test_arch_platform_sites.py` platform reads only in allowlisted modules | blocking |
 | One value, no output-shape flags (IX) | `tests/test_arch_output_shape_flags.py` flag parameters that select the return shape | blocking |
+| Async hygiene (III) | ruff `ASYNC` repo-wide (blocking calls inside `async def`) and `tests/test_arch_threads.py` hand-made threads only in reasoned files | blocking |
+| One CLI home (III) | `tests/test_arch_cli_surfaces.py` `import argparse` only in verb-cli, argparse-mcp, `__main__` modules and reasoned files | blocking |
 | No backward compatibility | shim / legacy / compat ban | task shelf-au97 |
 | No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
 | Size limit (IV) | `tests/test_size_caps.py` file and function SLOC caps | blocking on changed files |
