@@ -24,7 +24,7 @@ def claude_request(mid, *, tool=False):
 
 
 def test_claude_counts_one_per_model_request_not_per_content_block_or_tool_result():
-    h = ClaudeHarness()
+    h = ClaudeHarness(env={})
     tool_result = {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t-m1", "content": "ok"}]}}
     feed(
         h,
@@ -41,7 +41,7 @@ def test_claude_counts_one_per_model_request_not_per_content_block_or_tool_resul
 
 
 def test_codex_counts_token_count_records_once_each_and_a_single_completion_does_not_add():
-    h = CodexHarness()
+    h = CodexHarness(env={})
 
     def record(total, last):
         usage = {"input_tokens": total, "cached_input_tokens": 0, "output_tokens": 1, "reasoning_output_tokens": 0}
@@ -61,13 +61,13 @@ def test_codex_counts_token_count_records_once_each_and_a_single_completion_does
 
 
 def test_codex_without_per_request_records_reports_one_per_completion():
-    h = CodexHarness()
+    h = CodexHarness(env={})
     feed(h, [{"type": "turn.completed", "usage": {"input_tokens": 5, "cached_input_tokens": 0, "output_tokens": 1}}])
     assert (h.evidence.requests, h.summary(0, "", "", None, False).res["requests"]) == (0, 1)
 
 
 def test_opencode_counts_each_step_finish_with_usage():
-    h = OpenCodeHarness()
+    h = OpenCodeHarness(env={})
     step = {
         "type": "step_finish",
         "part": {"reason": "tool-calls", "tokens": {"input": 5, "output": 2, "reasoning": 0, "cache": {"read": 0, "write": 0}}, "cost": 0},

@@ -3,12 +3,15 @@ Evidence), the usage arithmetic of its result, its transcript file and its login
 
 import json
 import re
-import shutil
-import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from typing import override
 
-from any_agent import drops, procs
+import stream_proc
+from app_dirs import tool_home
+from child_env import NotFound, find
+
+from any_agent import drops
 from any_agent import events as ev
 from any_agent._json import Json, container, num, obj, objs, opt_int, opt_str, text
 from any_agent.access import ClaudeAccess, refuse
@@ -183,7 +186,8 @@ class ClaudeHarness(Quiet):
     secret_event: type | None = None  # its PreToolUse hook blocks the call
     EXE = "claude"
 
-    def __init__(self) -> None:
+    def __init__(self, *, env: Mapping[str, str]) -> None:
+        self.env = env  # where the program is looked for (PATH) and the folders of the claude CLI are found; never the process's
         self.evidence = Evidence()
         self.open: dict[str | None, tuple[bool, str, str]] = {}  # tool_use id -> (shell, name, arg), until its tool_result
         self.seen_usage: set[str | None] = set()
@@ -347,20 +351,23 @@ class ClaudeHarness(Quiet):
         """The session file of `ref`, or None."""
         if not ref:
             return None
-        hits = sorted((Path.home() / ".claude" / "projects").glob("*/" + ref + ".jsonl"))
+        hits = sorted((tool_home("claude", env=self.env) / "projects").glob("*/" + ref + ".jsonl"))
         return str(hits[0]) if hits else None
 
     def login_probe(self, timeout: float) -> tuple[bool | None, str]:
         """(True | False | None, why) from `claude auth status`: no model call, no quota; None = could not tell."""
-        exe = shutil.which(self.EXE)
-        if not exe:
+        try:
+            exe = find(self.EXE, self.env)
+        except NotFound:
             return None, f"{self.EXE} CLI not installed"
         try:
-            r = procs.run_capture([exe, "auth", "status"], timeout)
-        except (OSError, subprocess.TimeoutExpired) as x:
+            r = stream_proc.capture([str(exe.path), "auth", "status"], env=self.env, timeout=timeout)
+        except OSError as x:
             return None, f"{self.EXE} login check failed: {type(x).__name__}"
+        if r.timed_out:
+            return None, f"{self.EXE} login check failed: timeout"
         try:
-            logged_in = json.loads(r.stdout).get("loggedIn")
+            logged_in = json.loads(r.out).get("loggedIn")
         except (ValueError, AttributeError):
             logged_in = None
-        return (logged_in if isinstance(logged_in, bool) else None), (r.stdout + r.stderr).strip()[:120]
+        return (logged_in if isinstance(logged_in, bool) else None), (r.out + r.err).strip()[:120]

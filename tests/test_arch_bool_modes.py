@@ -158,7 +158,6 @@ _ALLOWED: dict[str, str] = {
         "convert-md:grade:check_yield",
         "stream-proc:capture_bytes:capture",
         "stream-proc:popen_registered:start_new_session",
-        "any-agent:spawn:session",
         "anyllm:complete:thinking_disabled",
         "anyllm:resolve_provider:fallback",
     ),

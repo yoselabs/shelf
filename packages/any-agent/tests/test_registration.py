@@ -36,7 +36,7 @@ def test_target_waits_for_registration(tmp_path: Path) -> None:
 
     try:
         spec = LaunchSpec(argv=[sys.executable, "-c", code], env=dict(os.environ), cwd=str(tmp_path), stdin="")
-        result = run(ClaudeHarness(), spec, 10, RunHooks(started=registered))
+        result = run(ClaudeHarness(env={}), spec, 10, RunHooks(started=registered))
         assert result.rc == 0
         assert marker.read_text() == "executed"
     finally:
@@ -53,7 +53,7 @@ def test_registration_base_exception_never_executes_target(tmp_path: Path, failu
 
     spec = LaunchSpec(argv=[sys.executable, "-c", code], env=dict(os.environ), cwd=str(tmp_path), stdin="")
     with pytest.raises(failure):
-        run(ClaudeHarness(), spec, 10, RunHooks(started=registered))
+        run(ClaudeHarness(env={}), spec, 10, RunHooks(started=registered))
     assert not marker.exists()
 
 
@@ -68,7 +68,7 @@ def test_live_start_failure_is_still_behind_the_gate(tmp_path: Path) -> None:
 
     spec = LaunchSpec(argv=[sys.executable, "-c", code], env=dict(os.environ), cwd=str(tmp_path), stdin="")
     with pytest.raises(KeyboardInterrupt):
-        run(ClaudeHarness(), spec, 10, live=FailingSink())
+        run(ClaudeHarness(env={}), spec, 10, live=FailingSink())
     assert not marker.exists()
 
 
@@ -82,7 +82,7 @@ def test_postpermit_uncertainty_keeps_the_registered_worker(tmp_path: Path, monk
     monkeypatch.setattr(registered, "_exec_status", lost_status)
     spec = LaunchSpec(argv=[sys.executable, "-c", "pass"], env=dict(os.environ), cwd=str(tmp_path), stdin="")
     with pytest.raises(RegisteredStartUncertainError) as failure:
-        run(ClaudeHarness(), spec, 10, hooks)
+        run(ClaudeHarness(env={}), spec, 10, hooks)
     assert len(workers) == 1
     identity = failure.value.identity
     assert (identity.pid, identity.pgid, identity.start, identity.boot) == (

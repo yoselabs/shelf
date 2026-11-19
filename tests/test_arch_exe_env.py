@@ -27,9 +27,6 @@ _OWNER = "packages/child-env/src/child_env/exe.py"
 
 # CURRENT callers of shutil.which. The consumer wave empties this.
 _WHICH_ALLOWED = {
-    "packages/any-agent/src/any_agent/harnesses/claude.py",
-    "packages/any-agent/src/any_agent/harnesses/codex.py",
-    "packages/any-agent/src/any_agent/harnesses/opencode.py",
     "packages/any-speech/src/any_speech/defaults.py",
     "packages/any-speech/src/any_speech/setup.py",
     "packages/anyllm/src/anyllm/providers/claude_code_cli.py",

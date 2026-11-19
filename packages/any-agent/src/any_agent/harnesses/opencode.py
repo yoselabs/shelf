@@ -3,16 +3,17 @@ the permission lines of its log on stderr that start a tool call seconds before 
 transcript and its login status."""
 
 import json
-import os
 import re
-import shutil
-import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import override
 
+import stream_proc
+from app_dirs import data_dir, tool_home
+from child_env import NotFound, find
+
 from any_agent import events as ev
-from any_agent import procs
 from any_agent._json import Json, num, obj, opt_str, record, text
 from any_agent.harnesses import opencode_sandbox as box
 from any_agent.harnesses.opencode_sandbox import Sandbox
@@ -103,7 +104,10 @@ class OpenCodeHarness(Quiet):
     limits = LIMITS
     secret_event = ev.CmdEnd  # a declined or failed call still ran no further than its end row
 
-    def __init__(self, profile: Profile | None = None, root: Path | None = None, sandbox: Sandbox | None = None) -> None:
+    def __init__(
+        self, profile: Profile | None = None, root: Path | None = None, sandbox: Sandbox | None = None, *, env: Mapping[str, str]
+    ) -> None:
+        self.env = env  # where the program is looked for (PATH) and XDG_DATA_HOME is read; never the process's
         self.profile, self.root, self.sandbox = profile or Profile(), root, sandbox or Sandbox()
         self.evidence = Evidence()
         self.exe = ""
@@ -112,9 +116,9 @@ class OpenCodeHarness(Quiet):
         self.n = 0
 
     # -- launch ----------------------------------------------------------------------------------------------------------------------------
-    @staticmethod
-    def find_exe() -> str | None:
-        return shutil.which("opencode") or next((str(p) for p in [Path.home() / ".opencode" / "bin" / "opencode"] if p.is_file()), None)
+    def find_exe(self) -> str:
+        """The `opencode` program: on the injected PATH, else in its own installer's folder (~/.opencode/bin). NotFound on a miss."""
+        return str(find("opencode", self.env, [tool_home("opencode", env=self.env) / "bin"]).path)
 
     @staticmethod
     def supported() -> bool:
@@ -175,7 +179,7 @@ class OpenCodeHarness(Quiet):
     @property
     @override
     def log_dir(self) -> Path:
-        return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "log"
+        return data_dir("opencode", env=self.env) / "log"
 
     @override
     def echoes_input(self, line: str) -> bool:
@@ -193,11 +197,11 @@ class OpenCodeHarness(Quiet):
         if model != "opencode/deepseek-v4.1-flash-free":
             return False
         try:
-            x = procs.run_capture([self.exe, "models", "opencode", "--verbose"], 30, env=env)
+            x = stream_proc.capture([self.exe, "models", "opencode", "--verbose"], env=env, timeout=30)
             marker = model + "\n"
-            if x.returncode or marker not in x.stdout:
+            if x.exit or marker not in x.out:
                 return False
-            entry: dict[str, Json] = json.JSONDecoder().raw_decode(x.stdout.split(marker, 1)[1].lstrip())[0]
+            entry: dict[str, Json] = json.JSONDecoder().raw_decode(x.out.split(marker, 1)[1].lstrip())[0]
             cost = obj(entry.get("cost"))
             cache = obj(cost.get("cache"))
             return (
@@ -209,7 +213,7 @@ class OpenCodeHarness(Quiet):
                     for v in (cost.get("input"), cost.get("output"), cache.get("read"), cache.get("write"))
                 )
             )
-        except (OSError, ValueError, TypeError, AttributeError, subprocess.TimeoutExpired):
+        except (OSError, ValueError, TypeError, AttributeError):
             return False
 
     # -- the event stream, parsed once -----------------------------------------------------------------------------------------------------
@@ -385,23 +389,25 @@ class OpenCodeHarness(Quiet):
         if not ref or self.root is None:
             return
         try:
-            x = procs.run_capture([self.exe, "export", ref], 60, env=env)
-            if x.returncode == 0 and x.stdout.strip():
+            x = stream_proc.capture([self.exe, "export", ref], env=env, timeout=60)
+            if x.exit == 0 and x.out.strip():
                 f = self.root / "opencode-sessions" / f"{ref}.json"
                 f.parent.mkdir(parents=True, exist_ok=True)
-                f.write_text(x.stdout, encoding="utf-8")
+                f.write_text(x.out, encoding="utf-8")
                 f.chmod(0o600)
-        except (OSError, subprocess.TimeoutExpired):
+        except OSError:
             pass
 
     def login_probe(self, timeout: float) -> tuple[bool | None, str]:
         """(True | False | None, why) from OpenCode's auth file: no model call, no quota."""
-        if not self.find_exe():
+        try:
+            self.find_exe()
+        except NotFound:
             return None, "opencode CLI not installed"
         key = self.profile.auth_key
         if not key:
             return True, "free access needs no login"  # the zero-price check runs at launch
-        f = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "opencode" / "auth.json"
+        f = data_dir("opencode", env=self.env) / "auth.json"
         try:
             v = json.loads(f.read_text(encoding="utf-8")).get(key)
         except (OSError, ValueError, TypeError, AttributeError):

@@ -43,8 +43,9 @@ verb-cli = { workspace = true }
 atomic-io = { workspace = true }
 # sqlite-store composes sqlite-sidecar.
 sqlite-sidecar = { workspace = true }
-# any-agent composes stream-proc.
+# any-agent composes stream-proc, child-env and app-dirs.
 stream-proc = { workspace = true }
+child-env = { workspace = true }
 any-agent = { workspace = true }
 any-mailbox = { workspace = true }
 any-recorded-fixture = { workspace = true }
@@ -654,6 +655,15 @@ ignore_imports = [
     "any_speech.pipeline -> any_pipeline",
     "any_speech.cli -> verb_cli",
     "any_agent.procs -> stream_proc",
+    "any_agent.harnesses.claude -> child_env",
+    "any_agent.harnesses.claude -> app_dirs",
+    "any_agent.harnesses.codex -> child_env",
+    "any_agent.harnesses.codex -> app_dirs",
+    "any_agent.harnesses.opencode -> child_env",
+    "any_agent.harnesses.opencode -> app_dirs",
+    "any_agent.harnesses.claude -> stream_proc",
+    "any_agent.harnesses.codex -> stream_proc",
+    "any_agent.harnesses.opencode -> stream_proc",
     "any_proc.run -> stream_proc",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",

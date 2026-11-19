@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-agent"
+software = "child-env"
+why = "The harnesses found their CLI with shutil.which on the ambient PATH and fell back to the bare name. child_env.find searches the injected env's PATH plus the tool's own folder and raises on a miss."
+needs = "find(name, env, extra_dirs) returning the path or raising NotFound."
+sponsor = "yoselabs"
+requester = "any-agent"
+status = "active" # active | retired

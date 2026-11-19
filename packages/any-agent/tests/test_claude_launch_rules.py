@@ -27,7 +27,7 @@ def make(**kw: Any) -> LaunchInputs:
 
 def test_the_api_key_never_reaches_the_child():
     env = {"ANTHROPIC_API_KEY": "sk-x", "PATH": "/bin", "HOME": "/h"}
-    spec = ClaudeHarness().launch_spec(make(env=env))
+    spec = ClaudeHarness(env={}).launch_spec(make(env=env))
     assert spec.env == {"PATH": "/bin", "HOME": "/h"}
     assert env["ANTHROPIC_API_KEY"] == "sk-x"  # the caller's dict is not touched
     assert launch_env({"ANTHROPIC_API_KEY": "k"}) == {}
@@ -35,7 +35,7 @@ def test_the_api_key_never_reaches_the_child():
 
 def test_an_api_key_lane_keeps_its_key_and_needs_one():
     env = {"ANTHROPIC_API_KEY": "sk-x", "PATH": "/bin"}
-    assert ClaudeHarness().launch_spec(make(env=env, auth="api_key")).env == env
+    assert ClaudeHarness(env={}).launch_spec(make(env=env, auth="api_key")).env == env
     with pytest.raises(ValueError, match="needs ANTHROPIC_API_KEY"):
         launch_env({"PATH": "/bin"}, "api_key")
     with pytest.raises(ValueError, match="one of subscription, api_key"):
@@ -58,8 +58,8 @@ def test_an_ambient_bare_marker_never_reaches_a_subscription_child():
     """CLAUDE_CODE_SIMPLE=1 is what --bare sets: claude then reads an API key only and never the login."""
     env = {"CLAUDE_CODE_SIMPLE": "1", "PATH": "/bin"}
     assert launch_env(env) == {"PATH": "/bin"}
-    assert ClaudeHarness().launch_spec(make(env=env)).env == {"PATH": "/bin"}
-    sealed = ClaudeHarness()
+    assert ClaudeHarness(env={}).launch_spec(make(env=env)).env == {"PATH": "/bin"}
+    sealed = ClaudeHarness(env={})
     try:
         assert "CLAUDE_CODE_SIMPLE" not in sealed.launch_spec(make(env=env, sealed=True)).env
     finally:
@@ -70,7 +70,7 @@ def test_an_ambient_bare_marker_never_reaches_a_subscription_child():
 def test_a_variable_that_moves_the_lane_is_refused_not_ignored(name):
     with pytest.raises(ValueError, match=name):
         launch_env({name: "1", "PATH": "/bin"})
-    harness = ClaudeHarness()
+    harness = ClaudeHarness(env={})
     try:
         with pytest.raises(ValueError, match=name):
             harness.launch_spec(make(env={name: "1"}, sealed=True))

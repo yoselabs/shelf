@@ -58,7 +58,7 @@ SHORT_GRACE = Limits(first_event_s=30, silence_s=30, grace_s=0.4)
 def test_a_worker_that_exits_is_summarised_by_its_harness(tmp_path):
     seen: list = []
     hooks = RunHooks(started=seen.append)
-    out = run(ClaudeHarness(), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT)), 30, hooks, limits=FAST)
+    out = run(ClaudeHarness(env={}), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT)), 30, hooks, limits=FAST)
     assert (out.rc, out.timed_out, out.stop, out.watch.why) == (0, False, None, None)
     assert (out.summary.text, out.summary.rc, out.summary.cost) == ("claude answer", 0, 0.25)
     assert out.worker is not None and seen == [out.worker]
@@ -66,13 +66,13 @@ def test_a_worker_that_exits_is_summarised_by_its_harness(tmp_path):
 
 
 def test_the_prompt_goes_in_on_stdin(tmp_path):
-    out = run(ClaudeHarness(), spec(tmp_path, "cat", stdin="hello brief\n"), 30, limits=FAST)
+    out = run(ClaudeHarness(env={}), spec(tmp_path, "cat", stdin="hello brief\n"), 30, limits=FAST)
     assert out.out == "hello brief\n"
 
 
 def test_a_worker_that_answers_and_lingers_is_stopped_after_the_grace(tmp_path):
     hooks = RunHooks()
-    out = run(ClaudeHarness(), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT, then="sleep 60")), 30, hooks, limits=SHORT_GRACE)
+    out = run(ClaudeHarness(env={}), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT, then="sleep 60")), 30, hooks, limits=SHORT_GRACE)
     assert (out.stop, out.timed_out) == ("answer", False)
     assert out.summary.rc == 0 and out.summary.text == "claude answer"
     assert len(hooks.stops) == 1 and hooks.stops[0].term_sent and hooks.stops[0].survivors == []
@@ -81,7 +81,7 @@ def test_a_worker_that_answers_and_lingers_is_stopped_after_the_grace(tmp_path):
 def test_before_stop_hears_the_intent_and_after_stop_the_report(tmp_path):
     told: list[tuple[Any, ...]] = []
     hooks = RunHooks(before_stop=lambda i: told.append(("before", i)), after_stop=lambda i, r: told.append(("after", i, r)))
-    out = run(ClaudeHarness(), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT, then="sleep 60")), 30, hooks, limits=SHORT_GRACE)
+    out = run(ClaudeHarness(env={}), spec(tmp_path, printing(CLAUDE_FINAL, CLAUDE_RESULT, then="sleep 60")), 30, hooks, limits=SHORT_GRACE)
     assert out.stop == "answer" and out.worker is not None
     (kind1, intent), (kind2, intent2, rep) = told
     assert (kind1, kind2, intent2) == ("before", "after", intent)
@@ -98,7 +98,13 @@ def test_a_refused_intent_stops_nothing_and_propagates_without_a_cleanup_stop(tm
     pidfile = tmp_path / "pid"
     hooks = RunHooks(before_stop=refuse)
     with pytest.raises(RuntimeError, match="store is busy"):
-        run(ClaudeHarness(), spec(tmp_path, f"echo $$ > {pidfile}; exec sleep 60"), 1, hooks, limits=Limits(first_event_s=60, silence_s=60))
+        run(
+            ClaudeHarness(env={}),
+            spec(tmp_path, f"echo $$ > {pidfile}; exec sleep 60"),
+            1,
+            hooks,
+            limits=Limits(first_event_s=60, silence_s=60),
+        )
     pid = int(pidfile.read_text())
     try:
         assert hooks.stops == []  # no stop of any name was issued
@@ -114,7 +120,7 @@ def test_an_entry_sigterm_is_told_apart_from_the_signal_sent_to_the_agent(tmp_pa
     timer.start()
     try:
         with pytest.raises(SystemExit) as info:
-            run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, hooks, limits=Limits(first_event_s=60, silence_s=60))
+            run(ClaudeHarness(env={}), spec(tmp_path, "sleep 60"), 30, hooks, limits=Limits(first_event_s=60, silence_s=60))
     finally:
         timer.cancel()
     assert info.value.code == 128 + signal.SIGTERM
@@ -135,7 +141,7 @@ def test_an_entry_sigterm_during_registration_cleans_the_child_up_and_restores_t
     try:
         with pytest.raises(SystemExit) as info:
             run(
-                ClaudeHarness(),
+                ClaudeHarness(env={}),
                 spec(tmp_path, "sleep 60"),
                 30,
                 RunHooks(started=slow_registration),
@@ -164,7 +170,7 @@ def test_after_stop_runs_on_an_exceptional_exit_too(tmp_path):
     timer.start()
     try:
         with pytest.raises(SystemExit):
-            run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, hooks, limits=Limits(first_event_s=60, silence_s=60))
+            run(ClaudeHarness(env={}), spec(tmp_path, "sleep 60"), 30, hooks, limits=Limits(first_event_s=60, silence_s=60))
     finally:
         timer.cancel()
     assert seen == ["entry_signal:True"]
@@ -173,7 +179,7 @@ def test_after_stop_runs_on_an_exceptional_exit_too(tmp_path):
 def test_a_stop_asked_for_twice_is_made_once(tmp_path):
     told: list[str] = []
     hooks = RunHooks(before_stop=lambda i: told.append(i.reason))
-    sup = Supervisor(ClaudeHarness(), hooks, limits=FAST)
+    sup = Supervisor(ClaudeHarness(env={}), hooks, limits=FAST)
     p = subprocess.Popen(["sleep", "60"], start_new_session=True)
     sup.out.worker = Worker(pid=p.pid, pgid=p.pid, start="s", boot="b")
     sup._halt(p, "timeout")
@@ -182,10 +188,10 @@ def test_a_stop_asked_for_twice_is_made_once(tmp_path):
 
 
 def test_the_call_timeout_is_measured_on_the_injected_clock_not_the_wall_clock(tmp_path):
-    frozen = run(ClaudeHarness(), spec(tmp_path, "sleep 1.2"), 1, limits=Limits(first_event_s=60, silence_s=60), clock=lambda: 0.0)
+    frozen = run(ClaudeHarness(env={}), spec(tmp_path, "sleep 1.2"), 1, limits=Limits(first_event_s=60, silence_s=60), clock=lambda: 0.0)
     assert not frozen.timed_out and frozen.rc == 0  # the budget never ran out: only the injected clock counts
     fast = run(
-        ClaudeHarness(),
+        ClaudeHarness(env={}),
         spec(tmp_path, "sleep 30"),
         5,
         limits=Limits(first_event_s=1e9, silence_s=1e9),
@@ -196,14 +202,14 @@ def test_the_call_timeout_is_measured_on_the_injected_clock_not_the_wall_clock(t
 
 def test_the_timeout_stops_the_tree(tmp_path):
     hooks = RunHooks()
-    out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 1, hooks, limits=Limits(first_event_s=60, silence_s=60))
+    out = run(ClaudeHarness(env={}), spec(tmp_path, "sleep 60"), 1, hooks, limits=Limits(first_event_s=60, silence_s=60))
     assert out.timed_out and (out.rc or 0) < 0
     assert len(hooks.stops) == 1
     assert end_status(out.timed_out, None, None, out.rc) == "timeout"
 
 
 def test_a_silent_worker_is_hung_at_its_first_event_deadline(tmp_path):
-    out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, limits=Limits(first_event_s=1, silence_s=60))
+    out = run(ClaudeHarness(env={}), spec(tmp_path, "sleep 60"), 30, limits=Limits(first_event_s=1, silence_s=60))
     assert (out.watch.why, out.watch.kind) == ("hung", "first_event")
     assert "printed nothing within 1" in out.watch.words
 
@@ -215,7 +221,7 @@ def test_a_secret_path_in_a_command_stops_the_worker_before_it_goes_on(tmp_path)
         seen.append(e)
         return "~/.ssh/id_rsa" if isinstance(e, ev.Cmd) and ".ssh" in e.text else None
 
-    h = CodexHarness()
+    h = CodexHarness(env={})
     out = run(h, spec(tmp_path, printing(CODEX_CMD, then="sleep 60")), 30, policy=policy, limits=FAST)
     assert out.secret == "~/.ssh/id_rsa"
     assert h.evidence.denials == [
@@ -226,18 +232,18 @@ def test_a_secret_path_in_a_command_stops_the_worker_before_it_goes_on(tmp_path)
 
 def test_a_policy_is_not_asked_of_a_harness_that_blocks_it_itself(tmp_path):
     asked = []
-    run(ClaudeHarness(), spec(tmp_path, printing(CLAUDE_RESULT)), 30, policy=asked.append, limits=FAST)  # secret_event is None
+    run(ClaudeHarness(env={}), spec(tmp_path, printing(CLAUDE_RESULT)), 30, policy=asked.append, limits=FAST)  # secret_event is None
     assert asked == []
 
 
 def test_a_lane_marked_out_stops_the_worker(tmp_path):
-    out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, gone=lambda: ("limit", "usage limit reached"), limits=FAST)
+    out = run(ClaudeHarness(env={}), spec(tmp_path, "sleep 60"), 30, gone=lambda: ("limit", "usage limit reached"), limits=FAST)
     assert (out.watch.why, out.watch.msg) == ("limit", "usage limit reached")
 
 
 @pytest.mark.parametrize("why", ["credit", "logged_out"])
 def test_a_lane_mark_keeps_its_own_reason(tmp_path, why):
-    out = run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, gone=lambda: (why, "marked out"), limits=FAST)
+    out = run(ClaudeHarness(env={}), spec(tmp_path, "sleep 60"), 30, gone=lambda: (why, "marked out"), limits=FAST)
     assert (out.watch.why, out.watch.msg) == (why, "marked out")
 
 
@@ -247,7 +253,7 @@ def test_a_started_hook_that_raises_aborts_before_exec_and_reraises(tmp_path):
 
     hooks = RunHooks(started=boom)
     with pytest.raises(ZeroDivisionError):
-        run(ClaudeHarness(), spec(tmp_path, "sleep 60"), 30, hooks, limits=FAST)
+        run(ClaudeHarness(env={}), spec(tmp_path, "sleep 60"), 30, hooks, limits=FAST)
     assert hooks.stops == []  # No harness tree existed to stop: registration failed at the gate.
 
 
@@ -259,19 +265,19 @@ def test_a_limit_line_in_the_harness_log_stops_the_worker_unless_it_echoes_the_w
         f"sleep 1; echo 'service=permission pattern=\"rate limit\"' >> {log}/a.log; "
         f"sleep 1; echo 'ERROR rate limit reached' >> {log}/a.log; sleep 60"
     )
-    out = run(ClaudeHarness(), spec(tmp_path, cmd), 30, log=watcher, limits=FAST)
+    out = run(ClaudeHarness(env={}), spec(tmp_path, cmd), 30, log=watcher, limits=FAST)
     assert (out.watch.why, out.watch.msg) == ("limit", "ERROR rate limit reached")
 
 
 def test_a_worker_waiting_for_the_network_is_stopped_once_the_probe_says_it_is_down(tmp_path, monkeypatch):
     monkeypatch.setattr("any_agent.supervisor.NET_GRACE_S", 0.5)
     line = j(type="error", message="Reconnecting... waiting for network")
-    out = run(CodexHarness(), spec(tmp_path, printing(line, then="sleep 60")), 30, net_up=lambda: False, limits=FAST)
+    out = run(CodexHarness(env={}), spec(tmp_path, printing(line, then="sleep 60")), 30, net_up=lambda: False, limits=FAST)
     assert out.net is True
 
 
 def test_the_unattended_flag_and_the_null_sink_are_defaults_that_do_nothing(tmp_path):
-    out = run(ClaudeHarness(), spec(tmp_path, "true"), 30, live=NullSink(), limits=FAST)
+    out = run(ClaudeHarness(env={}), spec(tmp_path, "true"), 30, live=NullSink(), limits=FAST)
     assert out.rc == 0 and out.stop is None
 
 

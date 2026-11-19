@@ -5,16 +5,16 @@ from __future__ import annotations
 
 import contextlib
 import json
-import os
 import re
-import shutil
-import subprocess
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
+import stream_proc
+from app_dirs import tool_home
+from child_env import NotFound, find
+
 from any_agent import events as ev
-from any_agent import procs
 from any_agent._json import Json, num, obj, objs, opt_int, opt_str, text
 from any_agent.access import CodexAccess, refuse
 from any_agent.harnesses import codex_rollout as rollout
@@ -23,7 +23,7 @@ from any_agent.sealed import SealedDir
 from any_agent.watch import Limits
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
     from any_agent.harnesses.codex_overlay import CodexOverlay
 
@@ -41,10 +41,6 @@ LIMITS = Limits(first_event_s=120, silence_s=3600)  # `codex exec --json` is sil
 SHELL_ITEM = "command_execution"
 TOOL_ITEMS = ("mcp_tool_call", "file_change", "web_search", "collab_tool_call")
 WORK_ITEMS = (SHELL_ITEM, "file_change", "agent_message", "mcp_tool_call")  # a finished one of these: the worker did something
-
-
-def sessions_root() -> Path:
-    return Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "sessions"
 
 
 def http_status(text: str) -> int | None:
@@ -76,7 +72,8 @@ class CodexHarness(Quiet):
     secret_event = ev.Cmd  # no hook under `codex exec`: stop the worker before it can use what it read
     EXE = "codex"
 
-    def __init__(self, resume: str | None = None, clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(self, resume: str | None = None, clock: Callable[[], float] = time.monotonic, *, env: Mapping[str, str]) -> None:
+        self.env = env  # where the program is looked for (PATH) and CODEX_HOME is read; never the process's
         self.clock = clock
         self.evidence = Evidence(ref=resume)
         self.out_file = ""
@@ -84,6 +81,10 @@ class CodexHarness(Quiet):
         self.sealed_dir: SealedDir | None = None
         self.sessions: Path | None = None  # where this run's rollout lives (CODEX_HOME of the launch, else the process's)
         self.began = 0.0  # epoch seconds: a resumed thread's earlier requests are not this run's
+
+    @staticmethod
+    def _home(env: Mapping[str, str]) -> Path:
+        return tool_home("codex", "CODEX_HOME", env=env)
 
     @override
     def cleanup(self) -> None:
@@ -106,7 +107,7 @@ class CodexHarness(Quiet):
             msg = "Codex resume must name an explicit session"
             raise ValueError(msg)
         self.out_file = i.out_file
-        self.sessions = Path(i.env.get("CODEX_HOME") or os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "sessions"
+        self.sessions = self._home({**self.env, **i.env}) / "sessions"
         self.began = time.time() if i.resume is not None else 0.0
         access = i.access_policy
         if access is not None and not isinstance(access, CodexAccess):
@@ -271,7 +272,7 @@ class CodexHarness(Quiet):
                 p.unlink()
         final = bool(text) or bool(e.last and (e.turns or stop == "answer"))  # the turn finished: codex writes -o only at its end
         text = text or e.last
-        used = rollout.read(self.sessions or sessions_root(), e.ref or "", self.began) if e.ref else None
+        used = rollout.read(self.sessions or self._home(self.env) / "sessions", e.ref or "", self.began) if e.ref else None
         res: dict[str, Json] = {
             "text": text,
             "ref": e.ref,
@@ -299,20 +300,23 @@ class CodexHarness(Quiet):
         """The rollout file of thread `ref`, or None."""
         if not ref:
             return None
-        hits = sorted(sessions_root().rglob(f"*{ref}.jsonl"))
+        hits = sorted((self._home(self.env) / "sessions").rglob(f"*{ref}.jsonl"))
         return str(hits[0]) if hits else None
 
     def login_probe(self, timeout: float) -> tuple[bool | None, str]:
         """(True | False | None, why) from `codex login status`: no model call, no quota; None = could not tell."""
-        exe = shutil.which(self.EXE)
-        if not exe:
+        try:
+            exe = find(self.EXE, self.env)
+        except NotFound:
             return None, f"{self.EXE} CLI not installed"
         try:
-            r = procs.run_capture([exe, "login", "status"], timeout)
-        except (OSError, subprocess.TimeoutExpired) as e:
+            r = stream_proc.capture([str(exe.path), "login", "status"], env=self.env, timeout=timeout)
+        except OSError as e:
             return None, f"{self.EXE} login check failed: {type(e).__name__}"
-        text = r.stdout + r.stderr
-        return r.returncode == 0 and "not logged" not in text.lower(), text.strip()[:120]
+        if r.timed_out:
+            return None, f"{self.EXE} login check failed: timeout"
+        text = r.out + r.err
+        return r.exit == 0 and "not logged" not in text.lower(), text.strip()[:120]
 
     @staticmethod
     def device_login_prompt(text: str) -> tuple[str | None, str | None]:

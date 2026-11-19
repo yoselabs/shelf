@@ -56,7 +56,7 @@ def claude_inputs(project: Path, **kw: Any) -> LaunchInputs:
 
 def test_claude_sealed_argv_names_every_closed_door(tmp_path):
     _, project, _ = hostile(tmp_path)
-    harness = ClaudeHarness()
+    harness = ClaudeHarness(env={})
     try:
         spec = harness.launch_spec(claude_inputs(project, model="chosen"))
         argv = spec.argv
@@ -75,7 +75,7 @@ def test_claude_sealed_argv_names_every_closed_door(tmp_path):
 def test_claude_sealed_replaces_an_empty_system_too(tmp_path):
     """No system text still replaces the default coding prompt; it never falls back to it."""
     _, project, _ = hostile(tmp_path)
-    harness = ClaudeHarness()
+    harness = ClaudeHarness(env={})
     try:
         argv = harness.launch_spec(claude_inputs(project, system="")).argv
         assert argv[argv.index("--system-prompt") + 1] == ""
@@ -86,7 +86,7 @@ def test_claude_sealed_replaces_an_empty_system_too(tmp_path):
 
 def test_claude_sealed_runs_in_an_empty_directory_that_cleanup_removes(tmp_path):
     _, project, _ = hostile(tmp_path)
-    harness = ClaudeHarness()
+    harness = ClaudeHarness(env={})
     spec = harness.launch_spec(claude_inputs(project))
     sealed_cwd = Path(spec.cwd)
     assert sealed_cwd != project
@@ -98,7 +98,7 @@ def test_claude_sealed_runs_in_an_empty_directory_that_cleanup_removes(tmp_path)
 
 def test_claude_sealed_keeps_the_subscription_login(tmp_path):
     _, project, _ = hostile(tmp_path)
-    harness = ClaudeHarness()
+    harness = ClaudeHarness(env={})
     try:
         spec = harness.launch_spec(claude_inputs(project))
         assert "ANTHROPIC_API_KEY" not in spec.env
@@ -111,7 +111,7 @@ def test_claude_sealed_keeps_the_subscription_login(tmp_path):
 def test_claude_unsealed_launch_is_unchanged(tmp_path):
     _, project, _ = hostile(tmp_path)
     inputs = claude_inputs(project, sealed=False, session="rid", settings="{}")
-    spec = ClaudeHarness().launch_spec(inputs)
+    spec = ClaudeHarness(env={}).launch_spec(inputs)
     assert spec.cwd == str(project)
     assert "--safe-mode" not in spec.argv
     assert "--append-system-prompt" in spec.argv
@@ -132,7 +132,7 @@ def codex_inputs(project: Path, **kw: Any) -> LaunchInputs:
 
 def test_codex_sealed_argv_ignores_user_config_and_rules(tmp_path):
     _, project, _ = hostile(tmp_path)
-    harness = CodexHarness()
+    harness = CodexHarness(env={})
     try:
         spec = harness.launch_spec(codex_inputs(project, model="chosen"))
         argv = spec.argv
@@ -148,7 +148,7 @@ def test_codex_sealed_argv_ignores_user_config_and_rules(tmp_path):
 def test_codex_sealed_runs_in_an_empty_directory_that_cleanup_removes(tmp_path):
     """AGENTS.md of the project is never discovered, and the answer file is cleaned up with the directory."""
     _, project, _ = hostile(tmp_path)
-    harness = CodexHarness()
+    harness = CodexHarness(env={})
     spec = harness.launch_spec(codex_inputs(project))
     sealed_cwd = Path(spec.cwd)
     assert sealed_cwd != project
@@ -163,18 +163,18 @@ def test_codex_sealed_runs_in_an_empty_directory_that_cleanup_removes(tmp_path):
 def test_codex_unsealed_launch_keeps_project_configuration(tmp_path):
     _, project, _ = hostile(tmp_path)
     inputs = codex_inputs(project, sealed=False, sandbox="read-only", out_file="/o")
-    spec = CodexHarness().launch_spec(inputs)
+    spec = CodexHarness(env={}).launch_spec(inputs)
     assert spec.cwd == str(project)
     assert "--ignore-user-config" not in spec.argv
 
 
 @pytest.mark.parametrize("harness_type", [ClaudeHarness, CodexHarness])
 def test_cleanup_is_safe_without_a_sealed_launch(harness_type):
-    harness_type().cleanup()
+    harness_type(env={}).cleanup()
 
 
 def test_a_harness_without_a_sealed_launch_refuses_instead_of_ignoring_it(tmp_path):
     """A pure completion the harness cannot guarantee is an error, never a silently unsealed run."""
     inputs = LaunchInputs(exe="/bin/opencode", cwd=str(tmp_path), model="m", effort="low", prompt="p", env={}, sealed=True)
     with pytest.raises(ValueError, match="no sealed launch"):
-        OpenCodeHarness().launch_spec(inputs)
+        OpenCodeHarness(env={}).launch_spec(inputs)

@@ -2,12 +2,10 @@
 its argv and its login probe."""
 
 import json
-import os
 import stat
 import tempfile
 from pathlib import Path
 from typing import Any
-from unittest import mock
 
 from any_agent import events as ev
 from any_agent._json import obj
@@ -18,7 +16,7 @@ HERE = Path(__file__).resolve().parent
 
 
 def stream(name):
-    h = ClaudeHarness()
+    h = ClaudeHarness(env={})
     return h, [h.parse_line(x) for x in (HERE / "golden" / f"claude_{name}.jsonl").read_text().splitlines()]
 
 
@@ -84,12 +82,12 @@ class TestStream:
             {"is_error": True, "result": "I added rate limit handling; quota tests fail with 429"},
             {"is_error": False, "result": "API Error: shown by the task itself"},
         ):
-            h = ClaudeHarness()
+            h = ClaudeHarness(env={})
             h.parse_line(json.dumps(dict(j, type="result")))
             assert h.vendor_error(1) == ""
 
     def test_no_result_event_folds_the_requests_and_a_final_message_is_the_answer(self):
-        h = ClaudeHarness()
+        h = ClaudeHarness(env={})
         for line in (HERE / "golden" / "claude_session.jsonl").read_text().splitlines()[:5]:
             h.parse_line(line)
         s = h.summary(-9, "", "", "answer", False)
@@ -112,10 +110,10 @@ class TestStream:
         assert h.summary(1, "", "error sending request for url", None, False).warnings == ["net_after_answer"]
 
     def test_a_line_that_is_not_json_or_an_object_yields_nothing(self):
-        assert [ClaudeHarness().parse_line(x) for x in ("", "oops", "[1]")] == ([[]] * 3)
+        assert [ClaudeHarness(env={}).parse_line(x) for x in ("", "oops", "[1]")] == ([[]] * 3)
 
     def test_an_unknown_event_is_named_never_quoted(self):
-        assert ClaudeHarness().parse_line(json.dumps({"type": "weird", "payload": "secret"})) == [ev.Unknown(type="weird")]
+        assert ClaudeHarness(env={}).parse_line(json.dumps({"type": "weird", "payload": "secret"})) == [ev.Unknown(type="weird")]
 
 
 INPUTS: dict[str, Any] = {
@@ -133,7 +131,7 @@ INPUTS: dict[str, Any] = {
 
 class TestWorld:
     def test_a_fresh_read_only_launch(self):
-        s = ClaudeHarness().launch_spec(LaunchInputs(**INPUTS))
+        s = ClaudeHarness(env={}).launch_spec(LaunchInputs(**INPUTS))
         assert s.argv[:11] == [
             "/bin/claude",
             "-p",
@@ -153,7 +151,7 @@ class TestWorld:
     def test_a_resumed_write_launch_with_a_schema(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "s.json").write_text('{"type": "object"}')
-            h = ClaudeHarness()
+            h = ClaudeHarness(env={})
             s = h.launch_spec(LaunchInputs(**INPUTS, write=True, resume="old", schema=str(Path(d) / "s.json")))
         assert s.argv[s.argv.index("--resume") + 1] == "old"
         assert "--session-id" not in s.argv
@@ -168,7 +166,7 @@ class TestWorld:
         day = Path.home() / ".claude" / "projects" / "-w"
         day.mkdir(parents=True)
         (day / "sess-1.jsonl").write_text("{}\n")
-        h = ClaudeHarness()
+        h = ClaudeHarness(env={})
         assert (h.transcript("sess-1"), h.transcript("zzz"), h.transcript(None)) == (str(day / "sess-1.jsonl"), None, None)
 
     def test_the_login_probe_reads_auth_status(self):
@@ -176,9 +174,6 @@ class TestWorld:
             exe = Path(d) / "claude"
             exe.write_text("#!/bin/sh\necho '{\"loggedIn\": '$FAKE_IN'}'\n")
             exe.chmod(exe.stat().st_mode | stat.S_IXUSR)
-            with mock.patch.dict(os.environ, {"PATH": d, "FAKE_IN": "true"}):
-                assert ClaudeHarness().login_probe(5)[0]
-            with mock.patch.dict(os.environ, {"PATH": d, "FAKE_IN": "false"}):
-                assert not ClaudeHarness().login_probe(5)[0]
-            with mock.patch.dict(os.environ, {"PATH": "/nonexistent"}):
-                assert ClaudeHarness().login_probe(5)[0] is None
+            assert ClaudeHarness(env={"PATH": d, "FAKE_IN": "true"}).login_probe(5)[0]
+            assert not ClaudeHarness(env={"PATH": d, "FAKE_IN": "false"}).login_probe(5)[0]
+            assert ClaudeHarness(env={"PATH": "/nonexistent"}).login_probe(5)[0] is None

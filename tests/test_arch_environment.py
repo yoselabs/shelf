@@ -19,10 +19,6 @@ _OS_NAMES = frozenset({"environ", "getenv", "putenv", "unsetenv"})
 
 # path (relative to packages/) -> reason. Consumer wave empties this (shelf-tyld.6, feeds shelf-ufmg).
 _ALLOWLIST = {
-    "any-agent/src/any_agent/procs.py": "reads ANY_AGENT_STOP_GRACE at import time into GRACE_S",
-    "any-agent/src/any_agent/harnesses/codex.py": "CODEX_HOME / ~/.codex session folder (app-dirs.tool_home)",
-    "any-agent/src/any_agent/harnesses/claude.py": "~/.claude/projects transcript lookup (app-dirs.tool_home)",
-    "any-agent/src/any_agent/harnesses/opencode.py": "XDG_DATA_HOME / ~/.local/share log + auth.json, ~/.opencode/bin (app-dirs.data_dir)",
     "any-agent/src/any_agent/harnesses/opencode_sandbox.py": "reads home and XDG_CONFIG_HOME for the sandbox deny list",
     "any-browser/src/any_browser/zendriver.py": "reads the executable and Playwright path variables to find the browser",
     "any-recorded-fixture/src/any_recorded_fixture/__init__.py": "default argument env=os.environ for update_requested",
