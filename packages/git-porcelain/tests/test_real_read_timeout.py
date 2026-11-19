@@ -8,8 +8,9 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
+import stream_proc
 
-from git_porcelain import GitTimeout, RealRepo, real_spawn
+from git_porcelain import DEFAULT_TIMEOUT, GitTimeout, RealRepo
 from git_porcelain.real_reads import is_read
 from git_porcelain.testing import apply_hermetic_env, git
 
@@ -39,21 +40,38 @@ def test_a_bounded_read_times_out_instead_of_hanging(fifo_repo: Path) -> None:
         repo.run(fifo_repo, "status", "--porcelain")
 
 
-def test_a_write_is_not_bounded_and_a_read_takes_no_optional_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_every_call_is_bounded_and_a_read_takes_no_optional_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     apply_hermetic_env(monkeypatch)
     repo = RealRepo(tmp_path, read_timeout=5)
-    seen: list[tuple[float | None, str | None, bool]] = []
+    seen: list[tuple[float, str | None]] = []
 
-    def fake_run(
-        argv: list[str], *, env: dict[str, str], timeout: float | None, stdin: bytes | None, group: bool
-    ) -> subprocess.CompletedProcess[bytes]:
-        seen.append((timeout, env.get("GIT_OPTIONAL_LOCKS"), group))
-        return subprocess.CompletedProcess(argv, 0, b"", b"")
+    def fake_capture(argv: list[str], *, env: dict[str, str], timeout: float, **_: object) -> stream_proc.CapturedBytes:
+        seen.append((timeout, env.get("GIT_OPTIONAL_LOCKS")))
+        return stream_proc.CapturedBytes(0, b"", b"", 0.0, False)
 
-    monkeypatch.setattr(real_spawn, "run", fake_run)
+    monkeypatch.setattr(stream_proc, "capture_bytes", fake_capture)
     repo.run(tmp_path, "status", pin=False)
     repo.run(tmp_path, "commit", "-q", pin=False)
-    assert seen == [(5, "0", True), (None, None, False)]
+    repo.run(tmp_path, "commit", "-q", pin=False, timeout=7)
+    assert seen == [(5, "0"), (DEFAULT_TIMEOUT, None), (7, None)]
+
+
+def test_a_write_that_runs_over_its_timeout_is_stopped_with_its_children(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    apply_hermetic_env(monkeypatch, config={})
+    git(tmp_path, "init", "-q")
+    pidfile = tmp_path / "pid"
+    hook = tmp_path / ".git" / "hooks" / "pre-commit"
+    hook.write_text(f"#!/bin/sh\necho $$ > '{pidfile}'\nexec sleep 60\n")
+    hook.chmod(0o755)
+    (tmp_path / "f").write_text("x")
+    git(tmp_path, "add", "f")
+    with pytest.raises(GitTimeout, match=r"timed out after 2"):
+        RealRepo(tmp_path).run(tmp_path, "-c", "user.name=a", "-c", "user.email=a@b", "commit", "-q", "-m", "m", pin=False, timeout=2)
+    child = int(pidfile.read_text())
+    deadline = time.monotonic() + 5
+    while _running(child) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not _running(child)
 
 
 def _running(pid: int) -> bool:

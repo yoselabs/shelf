@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from git_porcelain import real_checkout, real_observe, real_write
-from git_porcelain.api import CommandResult
+from git_porcelain.api import DEFAULT_TIMEOUT, CommandResult
 from git_porcelain.errors import GitTimeout
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ def command(
     *,
     env: Mapping[str, str] | None = None,
     timeout: float | None = None,
-    lfs: bool = False,
+    timed_out: str | None = None,
 ) -> CommandResult:
     try:
         done = wt.repo.run(wt.path, *args, check=False, env=env, timeout=timeout)
@@ -29,8 +29,8 @@ def command(
     except GitTimeout as exc:
         if exc.output:
             return CommandResult(ok=False, output=exc.output)
-        if lfs and timeout == 3600:
-            return CommandResult(ok=False, output="git lfs timed out after 60 min")
+        if timed_out is not None and timeout == DEFAULT_TIMEOUT:
+            return CommandResult(ok=False, output=timed_out)
         return CommandResult(ok=False, output=str(exc))
     finally:
         wt.repo.invalidate()

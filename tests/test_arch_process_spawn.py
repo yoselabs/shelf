@@ -30,7 +30,6 @@ _SPAWN_CALLS = {"run", "Popen", "call", "check_call", "check_output"}
 # to be emptied by the consumer wave: files that kill, signal-0 probe or session-spawn themselves today
 _KILL_ALLOWLIST = {
     "packages/any-speech/src/any_speech/adapters/_child.py",  # session spawn only: wait4 alone gives ru_maxrss
-    "packages/git-porcelain/src/git_porcelain/real_spawn.py",  # Popen(start_new_session=True) + os.killpg
 }
 
 # to be emptied by the consumer wave: files outside the spawners that run a subprocess with no timeout=

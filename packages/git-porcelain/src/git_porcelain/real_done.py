@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Final
 
 from git_porcelain.diagnostic_output import redact_output
 from git_porcelain.errors import GitUnavailable, failure
+from git_porcelain.git_messages import IDENTITY_UNKNOWN, LOCKED
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -14,7 +15,6 @@ if TYPE_CHECKING:
 __all__ = ["Done", "unavailable"]
 
 _TAIL: Final = 600
-_LOCKED: Final = ("index.lock", "cannot lock ref", "unable to create '", ".lock'")
 
 
 @dataclass(frozen=True)
@@ -42,14 +42,13 @@ class Done:
 
 def unavailable(args: Sequence[str], done: Done, *, full_output: bool = False) -> GitUnavailable:
     """The infrastructure failure of a git child that exited non-zero."""
-    low = done.output.lower()
-    hint = "set user.name and user.email" if "tell me who you are" in low or "empty ident" in low else None
     output = done.output
+    hint = "set user.name and user.email" if IDENTITY_UNKNOWN.search(output) else None
     return failure(
         f"git {args[0] if args else ''} exited {done.rc}: {output if full_output else done.tail}",
         done.err or done.out,
         done.rc,
-        retryable=any(mark in low for mark in _LOCKED),
+        retryable=LOCKED.search(output) is not None,
         hint=hint,
         output=output,
     )

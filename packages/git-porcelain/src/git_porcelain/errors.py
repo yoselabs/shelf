@@ -9,9 +9,26 @@ already catching removal failures, and carries the expected refusal's diagnostic
 
 from __future__ import annotations
 
-import re
-
 from git_porcelain.diagnostic_output import redact_output
+from git_porcelain.git_messages import (
+    AMBIGUOUS_REVISION,
+    BRANCH_EXISTS,
+    CANNOT_CHANGE_DIR,
+    DIRTY_TREE,
+    INDEX_LOCK,
+    MERGE_NOT_MERGEABLE,
+    MISSING_REVISION,
+    NO_BRANCH_NAMED,
+    NOT_A_REPO_HERE,
+    NOT_A_REPO_MOUNT,
+    NOT_A_REPO_PATH,
+    NOT_FAST_FORWARD,
+    PINNED,
+    REF_LOCK,
+    REF_RACE,
+    REF_STALE,
+    TAG_EXISTS,
+)
 
 
 class GitError(Exception):
@@ -137,22 +154,11 @@ class IgnoredFilesWouldBeOverwritten(GitUnavailable):
         self.paths = paths
 
 
-_INDEX_LOCK = re.compile(r"index\.lock")
-_REF_STALE = re.compile(r"incorrect old value|is at \S+ but expected \S+")
-# git 2.53 words a fetch that loses the race to create a ref this way instead of naming the lock.
-_FETCH_REF_EXISTS = r"fetching ref \S+ failed: reference already exists"
-_REF_LOCK = re.compile(rf"(?:cannot lock ref[^\n]*\.lock|Unable to create '[^'\n]*\.lock')[^\n]*File exists|{_FETCH_REF_EXISTS}")
-_REF_RACE = re.compile(rf"cannot lock ref|unable to update local ref|Unable to create '[^']*\.lock'|{_FETCH_REF_EXISTS}")
-_PINNED = re.compile(r"already (?:checked out|used by worktree) at '?([^'\n]*)'?")
-_MISSING_REVISION = re.compile(r"fatal: (?:bad revision '.+'|Not a valid object name .+)")
-_AMBIGUOUS_REVISION = re.compile(r"fatal: ambiguous argument '.+': unknown revision or path not in the working tree\.")
-
-
 def operation_failure(stderr: str) -> type[GitUnavailable]:
     """Operation-specific refusals before the shared infrastructure classification."""
-    if re.search(r"tag '.+' already exists", stderr):
+    if TAG_EXISTS.search(stderr):
         return TagExists
-    if "Not possible to fast-forward" in stderr:
+    if NOT_FAST_FORWARD.search(stderr):
         return NotFastForward
     return GitUnavailable
 
@@ -164,31 +170,31 @@ def failure(
     lines = [line.strip() for line in stderr.splitlines() if line.strip()]
     tail = next((line for line in lines if line.startswith(("fatal:", "error:"))), lines[-1] if lines else "")
     kind = operation_failure(stderr)
-    if _INDEX_LOCK.search(stderr):
+    if INDEX_LOCK.search(stderr):
         kind, retryable = IndexLocked, True
-    elif match := _PINNED.search(stderr):
+    elif match := PINNED.search(stderr):
         return BranchPinned(message, match.group(1).strip(), hint=hint, output=output)
-    elif re.search(r"(?:local changes|untracked working tree files)[\s\S]*would be overwritten|would be overwritten by checkout", stderr):
+    elif DIRTY_TREE.search(stderr):
         kind = DirtyTree
-    elif re.search(r"(?:a branch named|a branch) '.+' already exists", stderr, re.IGNORECASE):
+    elif BRANCH_EXISTS.search(stderr):
         kind = BranchExists
-    elif re.search(r"fatal: no branch named '.+'\.?", stderr, re.IGNORECASE):
+    elif NO_BRANCH_NAMED.search(stderr):
         kind = MissingRevision
-    elif _REF_STALE.search(stderr) or _REF_RACE.search(stderr):
+    elif REF_STALE.search(stderr) or REF_RACE.search(stderr):
         kind = RefRace
-        retryable = _REF_LOCK.search(stderr) is not None and _REF_STALE.search(stderr) is None
+        retryable = REF_LOCK.search(stderr) is not None and REF_STALE.search(stderr) is None
     elif code == 128:
         if (
-            tail == "fatal: not a git repository (or any of the parent directories): .git"
-            or re.fullmatch(r"fatal: not a git repository \(or any parent up to mount point .+\)", tail)
-            or re.fullmatch(r"fatal: cannot change to '.+': No such file or directory", tail)
-            or tail.startswith("fatal: not a git repository:")
+            NOT_A_REPO_HERE.fullmatch(tail)
+            or NOT_A_REPO_MOUNT.fullmatch(tail)
+            or CANNOT_CHANGE_DIR.fullmatch(tail)
+            or NOT_A_REPO_PATH.match(tail)
         ):
             kind = NotARepo
-        elif _MISSING_REVISION.fullmatch(tail) or _AMBIGUOUS_REVISION.fullmatch(tail):
+        elif MISSING_REVISION.fullmatch(tail) or AMBIGUOUS_REVISION.fullmatch(tail):
             kind = MissingRevision
     # merge reports this separately from the revision-reader diagnostics above.
-    if re.search(r"merge: .+ - not something we can merge", stderr):
+    if MERGE_NOT_MERGEABLE.search(stderr):
         kind = MissingRevision
     return kind(message, retryable=retryable, hint=hint, output=output)
 

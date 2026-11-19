@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.25.0
+
+Consumer wave (shelf-tyld): git-porcelain now runs on the shelf's owners instead of its own copies. Behaviour change: **every git call is bounded**.
+
+- Depends on `stream-proc` (the child runs through `capture_bytes`: its own session, the whole tree stopped on a timeout, partial output kept) and `child-env` (`find` locates `git` and `git-lfs` on the PATH of the env the child gets). `real_spawn.py` and its hand-written `killpg` are deleted.
+- Writes used to run with no timeout; now a call that names none gets `DEFAULT_TIMEOUT` (3600 s, one constant in `git_porcelain.api`, also the `push_lease` and `lfs_push` default), and a read with `read_timeout` set keeps that bound. A timeout stops git with SIGTERM first (so it can drop `index.lock`), then SIGKILL, and raises `GitTimeout`. stdin of a call is now `/dev/null` unless `stdin=` is given.
+- `git_messages.py` holds every git diagnostic the package classifies on (lock contention, pinned branch, dirty tree, missing revision, not a repo, a commit failing for a non-hook reason); `errors.py`, `real_done.py` and `real_write.py` import them. No classification changed; `tests/test_git_messages.py` pins each pattern to a real git sample.
+- `real_commands.command(lfs=bool)` is `timed_out=<message>`.
+
 ## 0.24.0
 
 A knowledge-base reader (ogy) opens a commit or the folder on disk through one interface, with no raw `git rev-parse` and no hand-made blob hash. Additive.

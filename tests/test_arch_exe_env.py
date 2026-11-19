@@ -29,9 +29,6 @@ _OWNER = "packages/child-env/src/child_env/exe.py"
 _WHICH_ALLOWED = {
     "packages/blueprint/src/blueprint/concerns/stack.py",
     "packages/blueprint/src/blueprint/model.py",
-    "packages/git-porcelain/src/git_porcelain/lfs.py",
-    "packages/git-porcelain/src/git_porcelain/porcelain.py",
-    "packages/git-porcelain/src/git_porcelain/real.py",
 }
 
 # CURRENT callers that pass a whole os.environ as a child's env. The consumer wave empties this. Only a literal

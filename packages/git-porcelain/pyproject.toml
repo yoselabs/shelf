@@ -1,12 +1,15 @@
 [project]
 name = "git-porcelain"
-version = "0.24.0"
+version = "0.25.0"
 description = "A pure, fail-loud git surface over the git binary — preserving the user's credential/config fidelity."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = []
+dependencies = [
+    "stream-proc>=0.10.0,<1",
+    "child-env>=0.2.0,<1",
+]
 
 [build-system]
 requires = ["hatchling"]

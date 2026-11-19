@@ -19,7 +19,7 @@ layout stay inside the implementations. ``worktree_state`` deliberately exposes 
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Protocol
+from typing import TYPE_CHECKING, Final, Literal, Protocol
 
 from git_porcelain.api_results import (
     Aborted,
@@ -79,7 +79,11 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from pathlib import Path
 
+#: Seconds a git process may run when the caller names no timeout (pushes and LFS transfers pass it on). Every call is bounded.
+DEFAULT_TIMEOUT: Final = 3600.0
+
 __all__ = [
+    "DEFAULT_TIMEOUT",
     "Aborted",
     "BranchHeld",
     "BranchTaken",
@@ -521,11 +525,11 @@ class Worktree(Protocol):
         """Push explicit refs with opt ins for force/deletion; deletion-only success has an empty sha."""
         ...
 
-    def push_lease(self, remote: str, refspec: str, *, timeout: float = 3600) -> CommandResult:
+    def push_lease(self, remote: str, refspec: str, *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         """Push with plain force-with-lease and normal hooks, without changing upstream config."""
         ...
 
-    def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = 3600) -> CommandResult:
+    def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         """Upload all requested refs in one invocation without installing LFS or hooks."""
         ...
 

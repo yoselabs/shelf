@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "git-porcelain"
+software = "child-env"
+why = "git-porcelain found the git (and git-lfs) binary with shutil.which in three places, each against the process PATH instead of the environment the child gets (constitution Article III; shelf-tyld.5)."
+needs = "find(name, env) -> Exe: the first executable on the PATH of the env the child will run with, NotFound otherwise."
+sponsor = "yoselabs"
+requester = "git-porcelain"
+status = "active" # active | retired

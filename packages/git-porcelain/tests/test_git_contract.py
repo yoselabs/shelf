@@ -30,7 +30,7 @@ from git_porcelain.testing import QUIET, FakeRemote, FakeRepo, FakeWorktree, app
 from git_porcelain.testing import git as run
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
 scenarios("features/git_contract.feature")
 
@@ -284,6 +284,7 @@ class World:
     rig: Rig
     kind: str
     monkeypatch: pytest.MonkeyPatch
+    git_process: Callable[..., None]
     wts: dict[str, Worktree] = field(default_factory=dict)
     memory: dict[str, object] = field(default_factory=dict)
     result: object = None
@@ -297,10 +298,15 @@ def implementation(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture
-def world(implementation: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> World:
+def world(
+    implementation: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    git_process: Callable[..., None],
+) -> World:
     apply_hermetic_env(monkeypatch, identity=_ME, home=tmp_path / "home")
     rig: Rig = RealRig(tmp_path, monkeypatch) if implementation == "real" else FakeRig(tmp_path)
-    return World(rig, implementation, monkeypatch)
+    return World(rig, implementation, monkeypatch, git_process)
 
 
 def _text(raw: str) -> str:
@@ -762,7 +768,7 @@ def _passing_hook_transport_failure(world: World, name: str) -> None:
         Path(env["GIT_TRACE2_EVENT"]).write_text("\n".join(json.dumps(event) for event in events), encoding="utf-8")
         return subprocess.CompletedProcess(args, 128, b"", output.encode())
 
-    world.monkeypatch.setattr(subprocess, "run", process)
+    world.git_process(process)
 
 
 @given(parsers.parse('"{name}" encounters {count:d} ref races before fetching'))
@@ -778,7 +784,7 @@ def _fetch_races(world: World, name: str, count: int) -> None:
         count = max(0, count - 1)
         return subprocess.CompletedProcess(args, int(bool(error)), b"", error)
 
-    world.monkeypatch.setattr(subprocess, "run", process)
+    world.git_process(process)
 
 
 # -- checking ------------------------------------------------------------------------------------------

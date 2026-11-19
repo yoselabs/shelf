@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "git-porcelain"
+software = "stream-proc"
+why = "RealRepo hand-wrote a process-group spawn with killpg (real_spawn.py) for bounded reads and ran writes through subprocess.run with no bound at all: a second implementation of 'run a child, stop its whole tree on a timeout' (constitution Article III; shelf-tyld.1)."
+needs = "capture_bytes(argv, env=, timeout=, input=) -> CapturedBytes: exact bytes, the child as session leader, the whole tree stopped on timeout with the partial output kept, a required timeout."
+sponsor = "yoselabs"
+requester = "git-porcelain"
+status = "active" # active | retired
