@@ -4,7 +4,7 @@
 # `{root}` is the folder holding ProjectSettings/ (the Unity project); repo-level files (.gitignore, .gitattributes, justfile,
 # .github/workflows, Directory.Build.props, global.json, .editorconfig) stay at the repo root. Paths may be globs (no `**`).
 # Detection (profile.py FRAMEWORK_MARKERS): ProjectSettings/ProjectVersion.txt; the root is the folder above ProjectSettings/.
-# Research: openspec/changes/blueprint-skill/research/unity-profile.md. Every runtime claim was seen on 6000.7.0b4 (the beta),
+# Research: docs/research/blueprint-skill/research/unity-profile.md. Every runtime claim was seen on 6000.7.0b4 (the beta),
 # not on the 6000.3 LTS pin: re-run on 6000.3 before the status leaves provisional.
 stack = "unity"
 status = "provisional"

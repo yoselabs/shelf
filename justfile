@@ -166,7 +166,7 @@ tools:
 # resolver block, beads (opt-out), and this linter preset via the operations in
 # tools/onboard/ -- ordering and verification are enforced there (run_all()'s precondition
 # harness), never re-implemented here as a recipe dependency graph. See
-# openspec/changes/onboard-consumer-skill and openspec/changes/bootstrap-target-contract.
+# docs/research/onboard-consumer-skill and docs/research/bootstrap-target-contract.
 #
 # Consumers copy this recipe the same way as `guard` above. Run inside the shelf's OWN repo,
 # the underlying script refuses (there is nothing to onboard here -- this repo IS the shelf).

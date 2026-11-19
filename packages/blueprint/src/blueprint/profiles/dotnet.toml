@@ -1,6 +1,6 @@
 # Stack profile (see python-uv.toml for the format). .NET 10 SDK, C# 14, late 2026.
-# Research: openspec/changes/blueprint-skill/research/dotnet-godot-layering.md (tool, evidence URL + date, verdict per role).
-# Coverage: openspec/changes/blueprint-skill/research/dotnet-coverage.md (coverlet.MTP floor seen red and green on a copy of lifesim).
+# Research: docs/research/blueprint-skill/research/dotnet-godot-layering.md (tool, evidence URL + date, verdict per role).
+# Coverage: docs/research/blueprint-skill/research/dotnet-coverage.md (coverlet.MTP floor seen red and green on a copy of lifesim).
 # Every property below can sit in Directory.Build.props or Directory.Packages.props; the config entries accept either.
 stack = "dotnet"
 status = "provisional"

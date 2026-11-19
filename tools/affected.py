@@ -46,7 +46,6 @@ _NO_PACKAGE_EFFECT = (
     "tests/",
     "tools/",
     "docs/",
-    "openspec/",
     "catalog/",
     "use-cases/",
     "ledger/",

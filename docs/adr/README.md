@@ -3,7 +3,7 @@
 ```
 thoughts/     raw explorations (dated, unresolved, freely messy) — where thinking lands first
 tracks/       a durable line of work (e.g. "topology", "contract-governance")
-missions/     a scoped objective within a track — what OpenSpec changes attach to
+missions/     a scoped objective within a track — a folder of proposal, design and tasks when a plan is bigger than a bead
 adr/          decisions: living ADRs, one file per topic
 ```
 

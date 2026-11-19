@@ -2,7 +2,7 @@
 
 Raw thinking, unresolved. Orientation and measurement done on a Linux DevBox (14 cores, idle) on 2026-11-19; the
 owner's direction is "do it right, no backward compatibility, no shortcuts; if task-loop's design is better, extract it
-into a package and adopt it". Nothing here is decided. Each row is a candidate item for an OpenSpec change; the
+into a package and adopt it". Nothing here is decided. Each row is a candidate item for a mission (`docs/missions/`); the
 measured facts come first because the design rests on them.
 
 ## 1. Measured facts (shelf worktree on main, fad2bb8)
@@ -179,4 +179,4 @@ Extraction candidates, by certainty:
 
 ## 4. Process
 
-Two or three OpenSpec changes (test loop and gate; blueprint outcome contracts; scripts into packages plus `justfile` base), each with its ADRs and bd issues carrying acceptance criteria. No backward compatibility: consumers are migrated, not shimmed.
+Two or three missions (test loop and gate; blueprint outcome contracts; scripts into packages plus `justfile` base), each with its ADRs and bd issues carrying acceptance criteria. No backward compatibility: consumers are migrated, not shimmed.

@@ -2,7 +2,7 @@
 # dotnet.toml rule applies to the Godot csproj too (verified: strict props build it clean), the rows here add what is Godot's.
 # `{root}` is the folder holding project.godot (lifesim: src/Game.Godot); repo-level files (.gitignore,
 # .gitattributes, justfile, .github/workflows) stay at the repo root. Paths may be globs (`*.csproj`, no `**`).
-# Research: openspec/changes/blueprint-skill/research/dotnet-godot-layering.md
+# Research: docs/research/blueprint-skill/research/dotnet-godot-layering.md
 stack = "godot"
 status = "provisional"
 source = "dotnet-godot-layering.md (2026-10-10, one web pass + Godot 4.7.2 run headless on a scratch copy of lifesim; architecture re-checked 2026-10-11 with the extra-strict analyzer set built clean on a Godot.NET.Sdk 4.7.2 csproj); lifesim is the only consumer"

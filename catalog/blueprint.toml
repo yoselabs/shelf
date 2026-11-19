@@ -7,4 +7,4 @@ capability = "Stop judging a repository's setup by reading it — one command de
 implementation = "ours"
 status = "candidate"
 owner = "yoselabs"
-notes = "The engine behind the blueprint skill (openspec/changes/blueprint-skill). Stdlib only; runs as bare python3 from a shelf clone (PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint check). v0.1 carries the gate and backlog concerns. Born candidate."
+notes = "The engine behind the blueprint skill (docs/research/blueprint-skill). Stdlib only; runs as bare python3 from a shelf clone (PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint check). v0.1 carries the gate and backlog concerns. Born candidate."

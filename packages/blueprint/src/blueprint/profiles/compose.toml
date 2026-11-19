@@ -1,5 +1,5 @@
 # Stack profile (see python-uv.toml for the format). Docker Compose files (compose.y*ml / docker-compose.y*ml), Compose v5, late 2026.
-# Research: openspec/changes/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a compose file within three levels.
+# Research: docs/research/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a compose file within three levels.
 # A stack, not a framework: a repo with 19 compose files should get one table, and framework detection yields one table per marker folder.
 # Tested 2026-10-11 with Docker Compose v5.1.2 and dclint 3.1.0 on a scratch copy of homelab (19 stacks/*/compose.yml).
 stack = "compose"

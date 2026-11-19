@@ -82,8 +82,8 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
   double lives in the `testing` module of the package it fakes (no runtime dependency: pytest/pytest-bdd only
   behind a `testing` extra), or in a new package only where none is related.
 - Versions are **git tags**, namespaced per package (`anyllm-v0.2.0`). Never delete an old tag.
-- Changes go through **OpenSpec** (`openspec/changes/<name>/`): proposal → design → tasks → apply →
-  archive. Project context for the AI lives in [openspec/config.yaml](openspec/config.yaml).
+- A change is a bead with acceptance criteria (`bd`). A plan larger than a bead is a mission, `docs/missions/<name>/` (proposal, design, tasks),
+  written when it helps and never required; the decision it ends in is an ADR. There is no spec tool: tests are the contract (OpenSpec was removed 2026-11-19).
 
 ## How the repo is organized
 
@@ -99,7 +99,7 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
 ## Consuming & contributing
 
 - **Blueprint** (`skills/blueprint/`, engine `packages/blueprint/`; being built:
-  [openspec/changes/blueprint-skill](openspec/changes/blueprint-skill/design.md)) — the shelf's
+  [docs/research/blueprint-skill](docs/research/blueprint-skill/design.md)) — the shelf's
   standard for every software repo, this one included: start a new repo, or audit an existing one,
   by running `/blueprint` in it. The audit changes nothing; remediation follows the owner's yes.
 - **[docs/skill-authoring.md](docs/skill-authoring.md)** — how to build a skill: cost model, layout,

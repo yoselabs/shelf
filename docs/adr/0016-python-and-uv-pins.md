@@ -33,5 +33,5 @@ resolves and publishes against the range (tested with uv 0.10.12).
 ## History
 
 - 2026-10-11: decided after a2kay's audit (shelf-0ac); research in
-  `openspec/changes/blueprint-skill/research/python-pin.md`. The shelf's packages moved from `>=3.11`
+  `docs/research/blueprint-skill/research/python-pin.md`. The shelf's packages moved from `>=3.11`
   to `>=3.12`: no CI ran 3.11, so the claim was untested.

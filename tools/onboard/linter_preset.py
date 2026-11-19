@@ -78,7 +78,7 @@ _GENERATED_PREFIXES = ("tool.pyrefly", "tool.pytest")
 _SHELF_TESTS_SUBCONFIG = "packages/*/tests/**"
 # A consumer's `test`: plain pytest under the gate-state lock it is given (tools/gate_state.py). The shelf's own `test` queues through
 # any-lease and runs with the shelf's xdist variable; a consumer gets those when it moves onto the gate packages
-# (openspec/changes/gate-kit-package).
+# (docs/missions/gate-kit-package).
 _CONSUMER_TEST = """[group('gate')]
 test:
     python3 -I tools/gate_state.py lock -- uv run pytest --cov --cov-report=term-missing --cov-fail-under=65

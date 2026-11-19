@@ -70,7 +70,7 @@ is earned by evidence); authoring `shelf-c2s`'s catalog/onboard skill.
 
 - 2026-08-16: decided, forks A-D. Expires 2027-02-16 (re-justify at the half-year). Track: governance /
   catalog (see `docs/missions/onboarding-new-micro-software.md`).
-- 2026-10-10 amendment (blueprint, the first real skill; `openspec/changes/blueprint-skill/`, design
+- 2026-10-10 amendment (blueprint, the first real skill; `docs/research/blueprint-skill/`, design
   D14; measured on Claude Code 2.1.296 in a throwaway plugin):
   - Invocation mode became per skill. Dropped: fork D's tie of `Kind: skill` to push-based
     discovery. A user-invoked plugin skill is still catalogued and evaled, with zero standing cost,

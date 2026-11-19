@@ -24,6 +24,7 @@ Each task is a bead with acceptance criteria (`bd lint` runs in the gate). Tests
 - [ ] 8. Declare each package's test dependencies in its own `pyproject.toml`; isolated per-package test run; investigate why `atomic-io` still
       fails collection in isolation; heavy-extra lanes.
 - [ ] 9. Measure the box-wide lock on a loaded box (several concurrent gates) with and without receipts; decide lock vs slots; record.
-- [ ] 10. Hooks per design D6; blueprint checkpoint wording lives in `blueprint-multi-stack-contracts`.
-- [ ] 11. Post-merge or tag-time gate decision and the ADR amending 0021 and noting 0027.
+- [x] 10. Hooks per design D6 (2026-11-19): the commit hook already ran only bd hooks and linters on staged files (no tests); pre-push runs the gate through `gate_state.py`'s whole-tree
+      skip (kept for now: fitness tests carry no receipt, so the tree skip still saves the most; it moves into `any-gate` with the consumers' migration). Blueprint checkpoint wording lives in `blueprint-multi-stack-contracts`.
+- [x] 11. Post-merge gate (2026-11-19): `gate-after-merge` hook runs `just check` on a merged tree (skipped when that tree passed); ADR 0027 records it. Tested: `prek run --hook-stage post-merge` passes.
 - [ ] 12. `just check` green over the whole repo; `just check-all` once locally; archive.

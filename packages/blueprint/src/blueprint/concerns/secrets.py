@@ -1,7 +1,7 @@
 """Secrets: a sealed file really is sealed, and a sops rule covers it.
 
 A `.sops` name proves nothing: a plaintext file renamed in passes every reader, so the files are read for
-sops's own markers, which needs no key. Research: openspec/changes/blueprint-skill/research/shell-and-secrets.md.
+sops's own markers, which needs no key. Research: docs/research/blueprint-skill/research/shell-and-secrets.md.
 """
 
 from __future__ import annotations

@@ -7,4 +7,4 @@ capability = "Stop re-running what already passed and stop a test run from hangi
 implementation = "ours"
 status = "candidate"
 owner = "yoselabs"
-notes = "Extracted from the shelf's own gate (tools/gate_state.py tree record, tools/affected.py pass cache) and task-loop's dev/runtests.py (worker cap, hang guards, serial and quarantine lanes, too-wide alarm), per ADR 0021 and openspec/changes/gate-kit-package. Built on stream-proc (the limits), atomic-io and content-digest. Wiring into the gate follows; the shelf's tools still run the gate until then. Born candidate."
+notes = "Extracted from the shelf's own gate (tools/gate_state.py tree record, tools/affected.py pass cache) and task-loop's dev/runtests.py (worker cap, hang guards, serial and quarantine lanes, too-wide alarm), per ADR 0021 and docs/missions/gate-kit-package. Built on stream-proc (the limits), atomic-io and content-digest. Wiring into the gate follows; the shelf's tools still run the gate until then. Born candidate."

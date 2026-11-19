@@ -6,7 +6,7 @@ description: Onboard a project as a shelf (github.com/yoselabs/shelf) consumer â
 # Onboard a project as a shelf consumer
 
 Wires a repo to consume the shelf and (by default) beads, then proves each piece actually works â€”
-not just that a file landed. Read `<shelf>/openspec/changes/onboard-consumer-skill/design.md` (D1,
+not just that a file landed. Read `<shelf>/docs/research/onboard-consumer-skill/design.md` (D1,
 D4) if you want the full reasoning; the short version is below.
 
 ## The split this skill relies on

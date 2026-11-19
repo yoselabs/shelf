@@ -1,7 +1,7 @@
 """The `hooks` operation: prek owns the git hooks, configured from the blueprint recipe.
 
 Replaces the hand-written hook installer (tools/hooks/install.py, deleted 2026-10-11). The recipe
-(openspec/changes/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself; its
+(docs/research/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself; its
 five events run from `.pre-commit-config.yaml`, first, then the shelf's commit guard and ruff on staged
 files, then `just check`. A failing check blocks the commit and bd still runs; bd's own injection into
 another manager's hook file made a failing check stop blocking.
