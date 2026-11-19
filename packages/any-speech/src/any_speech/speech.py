@@ -42,7 +42,7 @@ class Slots:
 
 
 def default_out(audio: Path) -> Path:
-    return audio.with_name(audio.name + ".speech.json")
+    return audio.with_name(audio.stem + ".speech.json")
 
 
 async def _claim(target: Path) -> ProcessLock:
@@ -105,7 +105,7 @@ class Speech:
         return await self.pipeline.run(audio)
 
     async def transcribe(self, audio: Path, out: Path | None = None) -> Transcript:
-        """The transcript of `audio`, stored in one file (default: beside the audio, `<name>.speech.json`).
+        """The transcript of `audio`, stored in one file (default: beside the audio, `<stem>.speech.json`).
 
         A current file there is returned as is. Two callers for the same file run it once: the second waits, then finds it done.
         """

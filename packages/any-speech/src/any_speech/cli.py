@@ -1,6 +1,7 @@
 """The `any-speech` command: the composition root that turns flags into engines.
 
-Verbs: ``transcribe`` one file, ``drain`` a folder with N workers inside the machine's slots, ``embed`` a voice, ``match`` a clip to it.
+Verbs: ``transcribe`` one file, ``text`` print one as markdown, ``drain`` a folder (N workers, inside the machine slots),
+``embed`` a voice, ``match`` a clip to it.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from verb_cli import POSITIONAL, VerbCli
 
 from any_speech.defaults import find_fluidaudio, runtime_of
 from any_speech.drain import Drain, Job
+from any_speech.format import Transcript
 from any_speech.guard import DEFAULT_BUDGET_GB
 from any_speech.pipeline import Pipeline
 from any_speech.ports import Voice
@@ -100,7 +102,7 @@ def _verbs(
     build: Callable[[Settings], Pipeline], embedder: Callable[[Settings], Embedder], leases_root: Callable[[], Path]
 ) -> dict[str, Callable[..., int]]:
     def transcribe(audio: Annotated[Path, POSITIONAL], settings: Settings, out: Path | None = None) -> int:
-        """Transcribe one audio file into one JSON file (default: beside the audio, `<name>.speech.json`); --diarize adds speakers."""
+        """Transcribe one audio file into one JSON file (default: beside the audio, `<stem>.speech.json`); --diarize adds speakers."""
         asyncio.run(_speech(build, leases_root, settings).transcribe(audio, out))
         sys.stdout.write(f"{out or default_out(audio)}\n")
         return 0
@@ -132,6 +134,11 @@ def _verbs(
         sys.stdout.write(f"{embedder(settings).embed(audio, start=start, end=end).similarity(known):.4f}\n")
         return 0
 
+    def text(file: Annotated[Path, POSITIONAL]) -> int:
+        """Print a stored transcript as markdown: a header, then one `[MM:SS] S1: text` turn per paragraph."""
+        sys.stdout.write(Transcript.load(file).to_markdown())
+        return 0
+
     def setup(what: Annotated[Literal["fluidaudio"], POSITIONAL]) -> int:
         """Build FluidAudio's command line at the pinned commit and install it, so no path flag is ever needed."""
         try:
@@ -142,7 +149,7 @@ def _verbs(
         sys.stdout.write(f"{what}: {target}\n")
         return 0
 
-    return {"setup": setup, "transcribe": transcribe, "drain": drain, "embed": embed, "match": match}
+    return {"setup": setup, "transcribe": transcribe, "text": text, "drain": drain, "embed": embed, "match": match}
 
 
 def main(

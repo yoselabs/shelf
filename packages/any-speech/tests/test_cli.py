@@ -26,8 +26,8 @@ def test_transcribe_writes_the_json_beside_the_audio(tmp_path: Path, capsys: pyt
     audio = tmp_path / "a.m4a"
     audio.write_bytes(b"x")
     assert main(["transcribe", str(audio), "--engine", "fluidaudio"], build=_build, leases_root=_lock(tmp_path)) == 0
-    assert Transcript.load(tmp_path / "a.m4a.speech.json").text == "да"
-    assert capsys.readouterr().out.strip().endswith("a.m4a.speech.json")
+    assert Transcript.load(tmp_path / "a.speech.json").text == "да"
+    assert capsys.readouterr().out.strip().endswith("a.speech.json")
 
 
 def test_drain_transcribes_a_folder_and_reports_counts(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -74,3 +74,12 @@ def test_help_answers_and_changes_nothing(tmp_path: Path) -> None:
 
 def test_an_unknown_flag_exits_2() -> None:
     assert _script("transcribe", "a.wav", "--engine", "fluidaudio", "--no-such-flag").returncode == 2
+
+
+def test_text_prints_the_markdown_view_of_a_stored_transcript(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    audio = tmp_path / "a.m4a"
+    audio.write_bytes(b"x")
+    main(["transcribe", str(audio)], build=_build, leases_root=_lock(tmp_path))
+    capsys.readouterr()
+    assert main(["text", str(tmp_path / "a.speech.json")], build=_build, leases_root=_lock(tmp_path)) == 0
+    assert capsys.readouterr().out == Transcript.load(tmp_path / "a.speech.json").to_markdown()

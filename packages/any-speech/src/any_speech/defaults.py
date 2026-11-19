@@ -96,7 +96,7 @@ async def transcribe(
     env: Mapping[str, str] | None = None,
     home: Path | None = None,
 ) -> Transcript:
-    """The words of `audio`, stored in one file beside it (`<name>.speech.json`, or `out`) and returned.
+    """The words of `audio`, stored in one file beside it (`<stem>.speech.json`, or `out`) and returned.
 
     No speakers: most uses do not need them, and they cost a second model. See :func:`transcribe_with_speakers`.
     """

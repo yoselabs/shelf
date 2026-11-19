@@ -74,7 +74,7 @@ def test_a_missing_binary_says_how_to_build_it_and_names_the_explicit_alternativ
 async def test_transcribe_is_words_only_and_stores_one_file_beside_the_audio(tmp_path: Path) -> None:
     audio = _wav(tmp_path / "talk.wav")
     result = await transcribe(audio, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "leases")
-    stored = tmp_path / "talk.wav.speech.json"
+    stored = tmp_path / "talk.speech.json"
     assert Transcript.load(stored) == result
     assert (result.provenance.diarizer, [w.speaker for w in result.words]) == ({"status": "not_run"}, [None])
 
@@ -85,7 +85,7 @@ async def test_transcribe_with_speakers_labels_the_words(tmp_path: Path) -> None
         audio, transcriber=FakeTranscriber(_WORDS), diarizer=FakeDiarizer([Turn(0.0, 1.0, "S1")]), leases_root=tmp_path / "l"
     )
     assert [w.speaker for w in result.words] == ["S1"]
-    assert Transcript.load(tmp_path / "talk.wav.speech.json").speakers == {"S1": Speaker("voice 1", 0.5, 1)}
+    assert Transcript.load(tmp_path / "talk.speech.json").speakers == {"S1": Speaker("voice 1", 0.5, 1)}
 
 
 async def test_transcribe_with_speakers_needs_the_default_diarizer_and_says_how_to_get_it(tmp_path: Path) -> None:
@@ -107,7 +107,7 @@ async def test_out_moves_the_stored_file(tmp_path: Path) -> None:
     audio, out = _wav(tmp_path / "a.wav"), tmp_path / "elsewhere" / "t.json"
     await transcribe(audio, out, transcriber=FakeTranscriber(_WORDS), leases_root=tmp_path / "l")
     assert out.exists()
-    assert not (tmp_path / "a.wav.speech.json").exists()
+    assert not (tmp_path / "a.speech.json").exists()
 
 
 @pytest.mark.parametrize(

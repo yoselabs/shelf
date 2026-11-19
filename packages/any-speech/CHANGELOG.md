@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- **Breaking: the default file is `<stem>.speech.json`** (`talk.m4a` -> `talk.speech.json`, was `talk.m4a.speech.json`). Existing `<name>.speech.json` files are not found by the default name and are redone; pass `out` to keep one. `talk.m4a` and `talk.wav` now share a name.
+- **Breaking: stored JSON is compact** (one line, no indent) with word and segment times rounded to milliseconds. Old files (full precision, indented) still load; `provenance.key` is unchanged, so they stay current. Segment text is kept in the file (see the README).
+- `Transcript.to_markdown()`: the default view, a Reco transcript-v3 style YAML header plus `[MM:SS] S1: text` paragraphs. `any-speech text <file>` prints it.
+
 ## 0.4.0
 
 - **Breaking: asyncio-native.** `transcribe`, `transcribe_with_speakers`, `Speech.run/transcribe/fulfil`, `Pipeline.run`, `Drain.run` and `is_current` are `async def`; the CLI is unchanged. Sync scripts: `asyncio.run(...)`.
