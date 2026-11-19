@@ -25,6 +25,7 @@ from git_porcelain.api import (
     UpToDate,
 )
 from git_porcelain.errors import IgnoredFilesWouldBeOverwritten, some
+from git_porcelain.git_messages import NOT_A_HOOK
 from git_porcelain.ignore_rules import literal_pattern
 from git_porcelain.real_done import unavailable
 from git_porcelain.remote_validation import validate_remote
@@ -202,12 +203,7 @@ def record_failure(args: Sequence[str], done: Done, *, hooks: bool) -> RecordRes
 
 
 def _hook_rejection(output: str) -> bool:
-    if re.search(
-        r"gpg failed|unable to sign|failed to sign|identity unknown|tell me who you are|empty ident|index\.lock|cannot lock ref|"
-        r"unmerged files|unresolved conflict|nothing to amend|failed to write commit object",
-        output,
-        re.IGNORECASE,
-    ):
+    if NOT_A_HOOK.search(output):
         return False
     if re.search(r"\b(?:pre-commit|prepare-commit-msg|commit-msg|post-commit)\b", output, re.IGNORECASE):
         return True

@@ -15,13 +15,14 @@ Three rules shape this module:
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from child_env import NotFound, find
+
 from git_porcelain.errors import GitError
 from git_porcelain.history import _remote
-from git_porcelain.porcelain import git_returncode, run_git
+from git_porcelain.porcelain import git_env, git_returncode, run_git
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -38,7 +39,11 @@ _FILTER = {
 
 def lfs_available() -> bool:
     """True when ``git lfs`` runs here."""
-    if shutil.which("git") is None or shutil.which("git-lfs") is None:
+    env = git_env()
+    try:
+        find("git", env)
+        find("git-lfs", env)
+    except NotFound:
         return False
     try:
         return git_returncode(Path.cwd(), "lfs", "version") == 0

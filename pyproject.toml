@@ -45,6 +45,7 @@ atomic-io = { workspace = true }
 sqlite-sidecar = { workspace = true }
 # any-agent composes stream-proc.
 stream-proc = { workspace = true }
+child-env = { workspace = true }
 any-agent = { workspace = true }
 any-mailbox = { workspace = true }
 any-recorded-fixture = { workspace = true }
@@ -655,6 +656,10 @@ ignore_imports = [
     "any_speech.cli -> verb_cli",
     "any_agent.procs -> stream_proc",
     "any_proc.run -> stream_proc",
+    "git_porcelain.real -> stream_proc",
+    "git_porcelain.real -> child_env",
+    "git_porcelain.porcelain -> child_env",
+    "git_porcelain.lfs -> child_env",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",
     "sqlite_store.* -> sqlite_sidecar",

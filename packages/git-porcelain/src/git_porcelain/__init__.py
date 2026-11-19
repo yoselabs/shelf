@@ -18,6 +18,7 @@ into its own error type at the seam.
 from __future__ import annotations
 
 from git_porcelain.api import (
+    DEFAULT_TIMEOUT,
     Aborted,
     BranchHeld,
     BranchTaken,
@@ -128,6 +129,7 @@ from git_porcelain.real_refs import branches, delete_ref_at, ls_remote, symbolic
 from git_porcelain.worktree_tree import blob_sha, worktree_tree
 
 __all__ = [
+    "DEFAULT_TIMEOUT",
     "Aborted",
     "BranchExists",
     "BranchHeld",

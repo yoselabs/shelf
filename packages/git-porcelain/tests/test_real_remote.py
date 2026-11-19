@@ -11,13 +11,14 @@ from git_porcelain import GitReadFailure, GitUnavailable, RealRepo, RefRace
 from git_porcelain.testing import FakeRemote, FakeRepo, apply_hermetic_env, git
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 
 @pytest.mark.parametrize("operation", ["fetch", "sync"])
 @pytest.mark.parametrize("failures", [1, 4, 5])
 def test_fetch_retries_ref_races_with_a_five_attempt_limit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str, failures: int
+    tmp_path: Path, git_process: Callable[..., None], operation: str, failures: int
 ) -> None:
     calls: list[list[str]] = []
     rests: list[float] = []
@@ -27,7 +28,7 @@ def test_fetch_retries_ref_races_with_a_five_attempt_limit(
         err = b"error: cannot lock ref 'refs/remotes/origin/main': is at abc but expected def\n" if len(calls) <= failures else b""
         return subprocess.CompletedProcess(args, int(bool(err)), b"", err)
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     repo = RealRepo(tmp_path, sleep=rests.append)
     if operation == "fetch" and failures == 5:
         with pytest.raises(RefRace):
@@ -42,7 +43,7 @@ def test_fetch_retries_ref_races_with_a_five_attempt_limit(
 
 @pytest.mark.parametrize("operation", ["fetch", "sync"])
 @pytest.mark.parametrize("error", [b"fatal: remote end hung up\n", b"fatal: index.lock exists\n", b"error: unknown refusal\n"])
-def test_fetch_does_not_retry_other_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str, error: bytes) -> None:
+def test_fetch_does_not_retry_other_failures(tmp_path: Path, git_process: Callable[..., None], operation: str, error: bytes) -> None:
     calls: list[list[str]] = []
     rests: list[float] = []
 
@@ -50,7 +51,7 @@ def test_fetch_does_not_retry_other_failures(tmp_path: Path, monkeypatch: pytest
         calls.append(args)
         return subprocess.CompletedProcess(args, 128, b"", error)
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     repo = RealRepo(tmp_path, sleep=rests.append)
     if operation == "fetch":
         with pytest.raises(GitUnavailable):
@@ -65,7 +66,7 @@ def test_fetch_does_not_retry_other_failures(tmp_path: Path, monkeypatch: pytest
     ("rc", "stdout", "stderr"), [(128, b"", b"fatal: cannot read config\n"), (0, b"", b""), (1, b"partial", b"read failed")]
 )
 def test_identity_does_not_turn_origin_read_failure_into_absence(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, rc: int, stdout: bytes, stderr: bytes
+    tmp_path: Path, git_process: Callable[..., None], rc: int, stdout: bytes, stderr: bytes
 ) -> None:
     """shelf-7qsd: an observer must distinguish unknown origin from a missing origin."""
 
@@ -74,7 +75,7 @@ def test_identity_does_not_turn_origin_read_failure_into_absence(
             return subprocess.CompletedProcess(args, 0, str(tmp_path / ".git").encode(), b"")
         return subprocess.CompletedProcess(args, rc, stdout, stderr)
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     with pytest.raises(GitReadFailure):
         RealRepo(tmp_path, memoize=False).identity()
 

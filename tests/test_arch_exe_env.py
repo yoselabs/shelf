@@ -39,9 +39,6 @@ _WHICH_ALLOWED = {
     "packages/blueprint/src/blueprint/concerns/stack.py",
     "packages/blueprint/src/blueprint/model.py",
     "packages/convert-md/src/convert_md/dispatch.py",
-    "packages/git-porcelain/src/git_porcelain/lfs.py",
-    "packages/git-porcelain/src/git_porcelain/porcelain.py",
-    "packages/git-porcelain/src/git_porcelain/real.py",
     "packages/launchd-agent/src/launchd_agent/__init__.py",
     "packages/mcp-clients/src/mcp_clients/__init__.py",
 }

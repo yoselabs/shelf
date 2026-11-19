@@ -11,13 +11,14 @@ name refs are kept while the files they come from are unchanged (``real_cache``)
 from __future__ import annotations
 
 import json
-import shutil
-import subprocess
 import time
 from contextlib import nullcontext
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
+
+import stream_proc
+from child_env import NotFound, find
 
 from git_porcelain import (
     real_capture,
@@ -30,11 +31,11 @@ from git_porcelain import (
     real_read,
     real_reads,
     real_remote,
-    real_spawn,
     real_squash,
     real_worktrees,
     real_write,
 )
+from git_porcelain.api import DEFAULT_TIMEOUT
 from git_porcelain.errors import GitTimeout, GitUnavailable, NotARepo
 from git_porcelain.real_done import Done, unavailable
 
@@ -105,6 +106,13 @@ def _trace_hooks(trace: Path) -> tuple[tuple[str, ...], tuple[tuple[str, int], .
     return tuple(hooks), tuple(exits)
 
 
+def _find_git(env: Mapping[str, str]) -> Path | None:
+    try:
+        return find("git", env).path
+    except NotFound:
+        return None
+
+
 class RealRepo:
     """The git binary behind :class:`~git_porcelain.api.Repo`. ``path`` is any checkout of the repository.
 
@@ -138,7 +146,7 @@ class RealRepo:
         # A snapshot of the ambient environment, taken once: every call then skips the os.environ scan and the PATH
         # search. Without one, each call reads os.environ and PATH as they are at that moment.
         self._ambient = None if ambient is None else real_env.base(source=ambient)
-        self._git: str | bool | None = False if ambient is None else shutil.which("git", path=ambient.get("PATH"))
+        self._git = None if self._ambient is None else _find_git(self._ambient)
         self.memoize = memoize
         self.remote_timeout = remote_timeout
         self.read_timeout = read_timeout
@@ -161,16 +169,18 @@ class RealRepo:
         timeout: float | None = None,
     ) -> Done:
         """``git -C cwd args``. A failure raises :class:`GitUnavailable` when ``check``; otherwise the caller reads ``rc``."""
-        if (shutil.which("git") if self._git is False else self._git) is None:
-            msg = "git not found on PATH"
-            raise GitUnavailable(msg, hint="install git")
         pin_env = self._checkout_pin(cwd) if pin or self.pins is not None else {}
         extra = {**self.extra_env, **pin_env, **(env or {})}
         reading = self.read_timeout is not None and timeout is None and real_reads.is_read(args)
         if reading:
             timeout = self.read_timeout
             extra["GIT_OPTIONAL_LOCKS"] = "0"
+        limit = DEFAULT_TIMEOUT if timeout is None else timeout
         child = real_env.base(extra) if self._ambient is None else {**self._ambient, **extra}
+        exe = _find_git(child) if self._ambient is None else self._git
+        if exe is None:
+            msg = "git not found on PATH"
+            raise GitUnavailable(msg, hint="install git")
         if self.observer is not None:
             self.observer(args)
         try:
@@ -182,24 +192,21 @@ class RealRepo:
                     # Git resolves hooksPath, includes and environment overrides itself. Its child_start
                     # event proves an executable hook actually ran, even when that hook printed nothing.
                     child["GIT_TRACE2_EVENT"] = str(trace)
-                done = real_spawn.run(
-                    [*real_env.argv_prefix(cwd, pin_env), *args],
+                argv = [*real_env.argv_prefix(cwd, pin_env), *args]
+                done = stream_proc.capture_bytes(
+                    [str(exe), *argv[1:]],
                     env=child,
-                    timeout=timeout,
-                    stdin=None if stdin is None else stdin.encode("utf-8", "surrogateescape"),
-                    group=reading,
+                    timeout=limit,
+                    input=None if stdin is None else stdin.encode("utf-8", "surrogateescape"),
                 )
                 hooks, hook_exits = _trace_hooks(trace) if trace is not None else ((), ())
-        except subprocess.TimeoutExpired as exc:
-            msg = f"git {args[0] if args else ''} timed out after {timeout}s"
-            stdout = exc.stdout or b""
-            stderr = exc.stderr or b""
-            output = (stdout + stderr).decode("utf-8", "replace").strip()
-            raise GitTimeout(msg, retryable=True, output=output) from exc
         except OSError as exc:
             msg = f"failed to invoke git: {exc}"
             raise GitUnavailable(msg) from exc
-        result = Done(done.returncode, done.stdout, done.stderr.decode("utf-8", "replace"), hooks=hooks, hook_exits=hook_exits)
+        if done.timed_out:
+            msg = f"git {args[0] if args else ''} timed out after {limit}s"
+            raise GitTimeout(msg, retryable=True, output=(done.out + done.err).decode("utf-8", "replace").strip())
+        result = Done(done.exit, done.out, done.err.decode("utf-8", "replace"), hooks=hooks, hook_exits=hook_exits)
         if check and result.rc != 0:
             raise unavailable(args, result)
         return result
@@ -484,11 +491,11 @@ class RealWorktree:
     ) -> PushResult:
         return real_remote.push_refspecs(self, remote, refspecs, force=force, allow_delete=allow_delete, hook_env=hook_env, timeout=timeout)
 
-    def push_lease(self, remote: str, refspec: str, *, timeout: float = 3600) -> CommandResult:
+    def push_lease(self, remote: str, refspec: str, *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         return self.push_request(remote, [refspec], options=["--force-with-lease"], timeout=timeout)
 
-    def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = 3600) -> CommandResult:
-        return real_commands.command(self, ["lfs", "push", remote, *refs], timeout=timeout, lfs=True)
+    def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
+        return real_commands.command(self, ["lfs", "push", remote, *refs], timeout=timeout, timed_out="git lfs timed out after 60 min")
 
     def finish_rebase(self, action: Literal["continue", "abort"], *, restore_to: Sha | None = None) -> FinishResult:
         return real_write.finish_rebase(self, action, restore_to)

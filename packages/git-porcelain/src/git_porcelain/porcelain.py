@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import os
 import re
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from child_env import NotFound, find
 
 from git_porcelain.api import CommandResult
 from git_porcelain.errors import GitError, failure
@@ -29,13 +30,22 @@ _GIT = "git"
 _REDIRECTS = frozenset({"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_PREFIX"})
 
 
-def _git_env() -> dict[str, str]:
+def git_env() -> dict[str, str]:
     """Child env that fails loud instead of prompting for credentials, and acts on the repo it is pointed at."""
     env = {k: v for k, v in os.environ.items() if k not in _REDIRECTS}
     env["GIT_TERMINAL_PROMPT"] = "0"
     env["LC_ALL"] = "C"
     env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
     return env
+
+
+def git_installed(env: Mapping[str, str]) -> bool:
+    """Whether ``git`` is on ``env``'s PATH."""
+    try:
+        find(_GIT, env)
+    except NotFound:
+        return False
+    return True
 
 
 def _run(
@@ -45,7 +55,8 @@ def _run(
     timeout: float | None,
     stdin: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    if shutil.which(_GIT) is None:
+    child = {**git_env(), **(env or {})}
+    if not git_installed(child):
         msg = "git not found on PATH"
         raise GitError(msg, retryable=False, hint="install git")
     try:
@@ -56,7 +67,7 @@ def _run(
             text=True,
             encoding="utf-8",
             errors="replace",
-            env={**_git_env(), **(env or {})},
+            env=child,
             timeout=timeout,
             input=stdin,
         )
@@ -205,7 +216,7 @@ def readiness(vault: Path, *, check_push: bool = True) -> dict[str, Any]:
     A remote probe costs three processes: identity, configured remotes, then ls-remote.
     ``output`` retains the probe's complete stdout and stderr (empty when skipped).
     """
-    if shutil.which(_GIT) is None or not is_repo(vault):
+    if not git_installed(git_env()) or not is_repo(vault):
         return {"is_repo": False, "identity": False, "remote": False, "push_access": False, "output": ""}
     email = run_git(vault, "config", "user.email", check=False).strip()
     remote = run_git(vault, "remote", check=False).strip()

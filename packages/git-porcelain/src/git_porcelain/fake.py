@@ -29,7 +29,7 @@ from git_porcelain import fake_checkout as checkout_ops
 from git_porcelain import fake_flow as flow
 from git_porcelain import fake_read as read
 from git_porcelain import fake_write as write
-from git_porcelain.api import CommandResult, Sha
+from git_porcelain.api import DEFAULT_TIMEOUT, CommandResult, Sha
 from git_porcelain.errors import GitReadFailure, GitUnavailable, MissingRevision, NotARepo
 from git_porcelain.fake_diff import grep_files
 from git_porcelain.fake_ops import branch_ref, clean, hard_to
@@ -513,10 +513,10 @@ class FakeWorktree:
             self._repo, self.state(), remote, refspecs, force=force, allow_delete=allow_delete, hook_env=hook_env
         )
 
-    def push_lease(self, remote: str, refspec: str, *, timeout: float = 3600) -> CommandResult:
+    def push_lease(self, remote: str, refspec: str, *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         return self.push_request(remote, [refspec], options=["--force-with-lease"], timeout=timeout)
 
-    def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = 3600) -> CommandResult:
+    def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         _ = remote, refs, timeout  # LFS outcomes are controlled by hooks, without transferring objects.
         self.state()
         if self._repo.hooks.lfs_spawn_failure is not None:

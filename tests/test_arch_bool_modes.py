@@ -120,7 +120,6 @@ _ALLOWED: dict[str, str] = {
         "git-porcelain:readiness:check_push",
         "git-porcelain:remote_url:push",
         "git-porcelain:remote_urls:push",
-        "git-porcelain:command:lfs",
     ),
     **_rows(
         "mode: a feature toggle on one operation (render, include, strip, create, offline); consumer wave splits or defaults it",

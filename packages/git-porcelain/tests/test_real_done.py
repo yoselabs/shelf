@@ -13,6 +13,7 @@ from git_porcelain.porcelain import run_git_result
 from git_porcelain.real_done import Done, unavailable
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
 
@@ -28,13 +29,13 @@ def test_done_keeps_raw_bytes_but_replaces_invalid_utf8_in_diagnostics() -> None
 
 
 @pytest.mark.parametrize("outcome", ["success", "refusal", "timeout"])
-def test_runner_diagnostics_replace_invalid_utf8(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, outcome: str) -> None:
+def test_runner_diagnostics_replace_invalid_utf8(tmp_path: Path, git_process: Callable[..., None], outcome: str) -> None:
     def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
         if outcome == "timeout":
             raise subprocess.TimeoutExpired(args, 1, output=b"out-\xff\n", stderr=b"err-\xfe\n")
         return subprocess.CompletedProcess(args, int(outcome == "refusal"), b"out-\xff\n", b"err-\xfe\n")
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     repo = RealRepo(tmp_path)
     if outcome == "success":
         done = repo.run(tmp_path, "fetch", pin=False)
@@ -51,7 +52,7 @@ def test_runner_diagnostics_replace_invalid_utf8(tmp_path: Path, monkeypatch: py
 @pytest.mark.parametrize("outcome", ["success", "refusal", "timeout"])
 @pytest.mark.parametrize("path_api", [False, True])
 def test_runner_redacts_credentials_in_both_output_streams(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, outcome: str, *, path_api: bool
+    tmp_path: Path, git_process: Callable[..., None], outcome: str, *, path_api: bool
 ) -> None:
     stdout = b"To https://user:pass@example.invalid/repo\n"
     stderr = b"fatal: ssh://user@example.invalid/repo\n"
@@ -64,7 +65,7 @@ def test_runner_redacts_credentials_in_both_output_streams(
             return subprocess.CompletedProcess(args, int(outcome == "refusal"), stdout.decode(), stderr.decode())
         return subprocess.CompletedProcess(args, int(outcome == "refusal"), stdout, stderr)
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     repo = RealRepo(tmp_path)
     if outcome == "success":
         if path_api:

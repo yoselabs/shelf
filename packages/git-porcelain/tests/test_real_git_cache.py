@@ -106,7 +106,7 @@ def test_remote_operations_have_a_fixed_process_budget(rig: Rig, operation: str)
 
 @pytest.mark.parametrize("operation", _REMOTE_OPERATIONS)
 @pytest.mark.parametrize("code", [0, 1])
-def test_remote_results_preserve_complete_process_output(rig: Rig, monkeypatch: pytest.MonkeyPatch, operation: str, code: int) -> None:
+def test_remote_results_preserve_complete_process_output(rig: Rig, git_process: Callable[..., None], operation: str, code: int) -> None:
     sha = Sha("a" * 40)
     stdout = f"{sha}\trefs/heads/main\n" if operation == "ls_remote" else "stdout-start\n" + "x\n" * 1000 + "stdout-end\n"
     if code and operation in {"push", "push_known", "push_refspecs", "delete_remote_at"}:
@@ -118,7 +118,7 @@ def test_remote_results_preserve_complete_process_output(rig: Rig, monkeypatch: 
             return subprocess.CompletedProcess(args, 0, (sha + "\n").encode(), b"")
         return subprocess.CompletedProcess(args, code, stdout.encode(), stderr.encode())
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     rig.calls.clear()
     try:
         result = _remote_call(rig, operation, sha)
@@ -146,7 +146,7 @@ def test_configured_pre_push_hook_is_observed_in_the_push_process(rig: Rig, monk
 
 
 @pytest.mark.parametrize("hook_code", [0, 1, None])
-def test_push_needs_a_failed_hook_exit_to_report_hook_rejection(rig: Rig, monkeypatch: pytest.MonkeyPatch, hook_code: int | None) -> None:
+def test_push_needs_a_failed_hook_exit_to_report_hook_rejection(rig: Rig, git_process: Callable[..., None], hook_code: int | None) -> None:
     output = "transport-start\n" + "detail\n" * 200 + "fatal: the remote end hung up unexpectedly\n"
 
     def process(args: list[str], *, env: dict[str, str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
@@ -158,7 +158,7 @@ def test_push_needs_a_failed_hook_exit_to_report_hook_rejection(rig: Rig, monkey
             Path(env["GIT_TRACE2_EVENT"]).write_text("\n".join(json.dumps(event) for event in events), encoding="utf-8")
         return subprocess.CompletedProcess(args, 128, b"", output.encode())
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     rig.calls.clear()
     result = rig.wt.push_refspecs("origin", [f"{'a' * 40}:refs/heads/main"])
     assert type(result).__name__ == ("HookRejected" if hook_code == 1 else "Transient")
@@ -167,7 +167,7 @@ def test_push_needs_a_failed_hook_exit_to_report_hook_rejection(rig: Rig, monkey
 
 
 @pytest.mark.parametrize("old_trace", [False, True])
-def test_hook_failure_without_trace_evidence_is_unavailable(rig: Rig, monkeypatch: pytest.MonkeyPatch, *, old_trace: bool) -> None:
+def test_hook_failure_without_trace_evidence_is_unavailable(rig: Rig, git_process: Callable[..., None], *, old_trace: bool) -> None:
     output = "error: pre-push declined\n" + "detail\n" * 200
 
     def process(args: list[str], *, env: dict[str, str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
@@ -179,7 +179,7 @@ def test_hook_failure_without_trace_evidence_is_unavailable(rig: Rig, monkeypatc
             Path(env["GIT_TRACE2_EVENT"]).write_text("\n".join(json.dumps(event) for event in events), encoding="utf-8")
         return subprocess.CompletedProcess(args, 1, b"", output.encode())
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     with pytest.raises(GitUnavailable) as caught:
         rig.wt.push_refspecs("origin", [f"{'a' * 40}:refs/heads/main"])
     assert caught.value.output == output.strip()
@@ -229,7 +229,7 @@ def test_absent_remote_deletion_only_probes_when_idempotency_is_requested(rig: R
     assert len(rig.calls) == (2 if missing_ok else 1)
 
 
-def test_deletion_verification_failure_retains_both_invocations(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deletion_verification_failure_retains_both_invocations(rig: Rig, git_process: Callable[..., None]) -> None:
     pushed = "push stdout\n" + "push detail\n" * 1000
     probed = "probe stdout\n" + "probe detail\n" * 1000
 
@@ -237,7 +237,7 @@ def test_deletion_verification_failure_retains_both_invocations(rig: Rig, monkey
         output = probed if "ls-remote" in args else pushed
         return subprocess.CompletedProcess(args, 1, output.encode(), b"error: refused\n")
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     rig.calls.clear()
     with pytest.raises(GitReadFailure) as caught:
         rig.repo.delete_remote_at("origin", "refs/heads/main", Sha("a" * 40))
@@ -261,14 +261,14 @@ def test_remote_hook_text_cannot_be_classified_as_a_ref_race(rig: Rig, monkeypat
 
 
 @pytest.mark.parametrize("operation", ["push_lease", "lfs_push", "fetch", "sync", "ls_remote"])
-def test_remote_timeouts_preserve_partial_output(rig: Rig, monkeypatch: pytest.MonkeyPatch, operation: str) -> None:
+def test_remote_timeouts_preserve_partial_output(rig: Rig, git_process: Callable[..., None], operation: str) -> None:
     output = b"stdout-start\n" + b"x\n" * 1000
     stderr = b"stderr-start\n" + b"detail\n" * 1000
 
     def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
         raise subprocess.TimeoutExpired(args, 1, output=output, stderr=stderr)
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     rig.calls.clear()
     try:
         result = _remote_call(rig, operation, Sha("a" * 40))
@@ -279,7 +279,7 @@ def test_remote_timeouts_preserve_partial_output(rig: Rig, monkeypatch: pytest.M
 
 
 @pytest.mark.parametrize("path_api", [False, True])
-def test_malformed_advertisements_keep_complete_diagnostics(rig: Rig, monkeypatch: pytest.MonkeyPatch, *, path_api: bool) -> None:
+def test_malformed_advertisements_keep_complete_diagnostics(rig: Rig, git_process: Callable[..., None], *, path_api: bool) -> None:
     stdout = "not a ref row\n"
     stderr = "detail\n" * 1000
 
@@ -288,7 +288,7 @@ def test_malformed_advertisements_keep_complete_diagnostics(rig: Rig, monkeypatc
             return subprocess.CompletedProcess(args, 0, stdout, stderr)
         return subprocess.CompletedProcess(args, 0, stdout.encode(), stderr.encode())
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     with pytest.raises(GitReadFailure) as caught:
         if path_api:
             porcelain.ls_remote(rig.path, "origin")
@@ -300,7 +300,7 @@ def test_malformed_advertisements_keep_complete_diagnostics(rig: Rig, monkeypatc
 @pytest.mark.parametrize("operation", ["push", "fetch", "lfs_push", "lfs_fetch", "pull_rebase", "ls_remote", "readiness"])
 @pytest.mark.parametrize("code", [0, 1])
 def test_path_remote_operations_keep_complete_output_with_a_fixed_budget(
-    rig: Rig, monkeypatch: pytest.MonkeyPatch, operation: str, code: int
+    rig: Rig, git_process: Callable[..., None], operation: str, code: int
 ) -> None:
     stdout = "a" * 40 + "\trefs/heads/main\n"
     stderr = "detail\n" * 1000
@@ -310,7 +310,7 @@ def test_path_remote_operations_keep_complete_output_with_a_fixed_budget(
         calls.append(args)
         return subprocess.CompletedProcess(args, code, stdout, stderr)
 
-    monkeypatch.setattr(subprocess, "run", process)
+    git_process(process)
     operations: dict[str, Callable[[], object]] = {
         "push": lambda: porcelain.push(rig.path, "origin"),
         "fetch": lambda: porcelain.fetch(rig.path, "origin"),
