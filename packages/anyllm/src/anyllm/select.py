@@ -39,7 +39,7 @@ from anyllm.providers import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from anyllm.base import Completion, LLMProvider, PromptParts
 
@@ -60,32 +60,34 @@ DEFAULT_ORDER: tuple[ProviderName, ...] = (
 _KNOWN = tuple(ProviderName)
 
 
-def build_adapter(provider: str, config: dict[str, object] | None = None) -> LLMProvider:
+def build_adapter(provider: str, config: dict[str, object] | None = None, *, env: Mapping[str, str]) -> LLMProvider:
     """Return the configured backend, or raise :class:`AnyLLMError` if it is unusable.
 
     ``provider`` is any of :class:`~anyllm.base.ProviderName`'s values — callers may pass
     the enum member or the equivalent plain string (a ``StrEnum`` compares equal to its
     value), since config commonly arrives as a bare string from a registry file or env.
-    ``config`` holds the provider's options (e.g.
+    ``env`` is the environment the backends read (API keys, ``PATH`` for the CLIs, the CLI login); the caller's edge passes it,
+    the library never reads the process environment. ``config`` holds the provider's options (e.g.
     ``{"anthropic_api": {"api_key_env": ...}}`` or
     ``{"openai_compatible": {"base_url": ..., "default_model": ...}}``). Raises if
     the name is unknown, or if the built backend is not available on this machine.
     """
     cfg = config or {}
     if provider == ProviderName.CLAUDE_CODE_CLI:
-        adapter: LLMProvider = ClaudeCodeCliAdapter()
+        adapter: LLMProvider = ClaudeCodeCliAdapter(env=env)
     elif provider == ProviderName.CODEX_CLI:
-        adapter = CodexCliAdapter()
+        adapter = CodexCliAdapter(env=env)
     elif provider == ProviderName.CLAUDE_CODE_SDK:
-        adapter = ClaudeCodeSdkAdapter()
+        adapter = ClaudeCodeSdkAdapter(env=env)
     elif provider == ProviderName.ANTHROPIC_API:
         raw = cfg.get("anthropic_api")
         api_cfg: dict[str, object] = raw if isinstance(raw, dict) else {}
-        adapter = AnthropicApiAdapter(api_key_env=str(api_cfg.get("api_key_env", "ANTHROPIC_API_KEY")))
+        adapter = AnthropicApiAdapter(env=env, api_key_env=str(api_cfg.get("api_key_env", "ANTHROPIC_API_KEY")))
     elif provider == ProviderName.OPENAI_COMPATIBLE:
         raw = cfg.get("openai_compatible")
         oai_cfg: dict[str, object] = raw if isinstance(raw, dict) else {}
         adapter = OpenAICompatibleAdapter(
+            env=env,
             base_url=str(oai_cfg.get("base_url", "")),
             api_key_env=str(oai_cfg.get("api_key_env", "OPENAI_API_KEY")),
             default_model=str(oai_cfg.get("default_model", "")),
@@ -164,6 +166,7 @@ def resolve_provider(
     order: Sequence[ProviderName | str] = DEFAULT_ORDER,
     config: dict[str, object] | None = None,
     *,
+    env: Mapping[str, str],
     wrap: Callable[[LLMProvider], LLMProvider] | None = None,
     fallback: bool = True,
 ) -> LLMProvider | None:
@@ -186,12 +189,12 @@ def resolve_provider(
     is where a host attaches per-backend concerns (most importantly
     :func:`~anyllm.cost.with_cost_guard`, so the guard keys on each real backend
     id rather than the fallback's primary-name proxy). ``config`` is threaded to
-    every :func:`build_adapter` call (see its docstring for the shape).
+    every :func:`build_adapter` call (see its docstring for the shape), as is ``env``.
     """
     built: list[LLMProvider] = []
     for name in order:
         try:
-            provider = build_adapter(str(name), config)
+            provider = build_adapter(str(name), config, env=env)
         except AnyLLMError:
             continue
         built.append(wrap(provider) if wrap is not None else provider)

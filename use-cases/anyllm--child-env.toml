@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "anyllm"
+software = "child-env"
+why = "anyllm's claude-code-cli and codex-cli adapters spawned a child with a whole os.environ (or all but two keys) and found the binary with shutil.which on the process PATH; that is the env scrub and binary discovery child-env owns."
+needs = "find(name, env, extra_dirs) for the CLI binaries on the injected PATH, and build_env(env, allow=) so a child gets an explicit allow list and never a whole environ."
+sponsor = "yoselabs"
+requester = "anyllm"
+status = "active" # active | retired

@@ -4,6 +4,13 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see `ledger/0032-anyllm-v2-delivered.toml` for why). Read this before source/README when
 reconciling a pin (agent-loop.md WORKFLOW: RECEIVE).
 
+## 0.9.0
+
+- BREAKING: every adapter takes `env: Mapping[str, str]` (required keyword); `build_adapter(provider, config, *, env)`, `resolve_provider(order, config, *, env, ...)`. The library no longer reads `os.environ`: the caller's edge passes it (`env=os.environ`). `hermetic_llm_env` unchanged
+- CLI binary: found on the injected env's PATH via child-env `find` (was `shutil.which` on the process PATH); a missing binary ⇒ the same `AnyLLMError`, no bare-name fallback. claude-code-sdk: bundled binary, then env PATH, then its fixed fallback dirs (`~` is the env's HOME); a candidate must now be executable
+- claude-code-cli / codex-cli child env: allow list via child-env `build_env` (HOME/USER/PATH/locale + proxy and CA vars + `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CONFIG_DIR`, the four lane variables / `CODEX_HOME`), was the whole `os.environ` (claude) or all but two keys (codex). Other variables (AWS_*, GITHUB_*, ssh agent, app settings) no longer reach the child. Needs child-env>=0.2
+- claude-code-sdk: credential probe reads the token and `~/.claude/.credentials.json` from the injected env (HOME); platform read behind one function
+
 ## 0.8.1
 
 - claude-code-cli: an ambient `CLAUDE_CODE_SIMPLE` no longer reaches the child (it hid the subscription login); `ANTHROPIC_AUTH_TOKEN` or `CLAUDE_CODE_USE_BEDROCK/VERTEX/FOUNDRY` set in the environment ⇒ `ValueError` from the harness at launch. `anyllm[agent]` needs any-agent>=0.1.4

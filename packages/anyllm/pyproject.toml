@@ -1,13 +1,13 @@
 [project]
 name = "anyllm"
-version = "0.8.1"
+version = "0.9.0"
 description = "Stop caring which LLM provider is underneath — one async completion contract with token/cost accounting and five backends (claude-code-cli/-sdk, codex-cli, anthropic-api, openai-compatible)."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
-# Base imports need no provider libraries; every backend dependency is opt-in.
-dependencies = []
+# Base imports need no provider libraries (child-env is pure stdlib); every backend dependency is opt-in.
+dependencies = ["child-env>=0.2,<1"]
 
 [project.optional-dependencies]
 agent = ["any-agent>=0.1.4,<1"]

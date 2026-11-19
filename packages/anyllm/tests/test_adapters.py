@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import platform
-import shutil
 import types
 from typing import Any
 
@@ -70,17 +69,18 @@ class _FakeAnthropicError(anthropic.APIError):
 
 
 def test_anthropic_available_reflects_key() -> None:
-    assert AnthropicApiAdapter(api_key="k").available() is True
-    assert AnthropicApiAdapter(api_key_env="NOPE_MISSING_KEY").available() is False
+    assert AnthropicApiAdapter(api_key="k", env={}).available() is True
+    assert AnthropicApiAdapter(api_key_env="NOPE_MISSING_KEY", env={}).available() is False
+    assert AnthropicApiAdapter(api_key_env="MY_KEY", env={"MY_KEY": "k"}).available() is True
 
 
 def test_anthropic_missing_key_fails_loud() -> None:
     with pytest.raises(AnyLLMError):
-        asyncio.run(AnthropicApiAdapter(api_key_env="NOPE_MISSING_KEY").complete(user="hi"))
+        asyncio.run(AnthropicApiAdapter(api_key_env="NOPE_MISSING_KEY", env={}).complete(user="hi"))
 
 
 def test_anthropic_happy_maps_completion(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = AnthropicApiAdapter(api_key="k")
+    adapter = AnthropicApiAdapter(api_key="k", env={})
     monkeypatch.setattr(adapter, "_client", _FakeAnthropicClient)
     result = asyncio.run(adapter.complete(user="hi", model="claude-haiku-4-5"))
     assert result.text == "hello"
@@ -91,7 +91,7 @@ def test_anthropic_happy_maps_completion(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_anthropic_api_error_is_fail_loud(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = AnthropicApiAdapter(api_key="k")
+    adapter = AnthropicApiAdapter(api_key="k", env={})
     monkeypatch.setattr(adapter, "_client", lambda: _FakeAnthropicClient(raises=_FakeAnthropicError(429)))
     with pytest.raises(AnyLLMError) as exc:
         asyncio.run(adapter.complete(user="hi"))
@@ -99,7 +99,7 @@ def test_anthropic_api_error_is_fail_loud(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_anthropic_client_error_not_retryable(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = AnthropicApiAdapter(api_key="k")
+    adapter = AnthropicApiAdapter(api_key="k", env={})
     monkeypatch.setattr(adapter, "_client", lambda: _FakeAnthropicClient(raises=_FakeAnthropicError(401)))
     with pytest.raises(AnyLLMError) as exc:
         asyncio.run(adapter.complete(user="hi"))
@@ -146,15 +146,14 @@ class _FakeOaiError(openai.APIError):
         Exception.__init__(self, f"status {status}")
 
 
-def test_openai_available_reflects_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    assert OpenAICompatibleAdapter().available() is False
-    monkeypatch.setenv("OPENAI_API_KEY", "k")
-    assert OpenAICompatibleAdapter().available() is True
+def test_openai_available_reflects_key() -> None:
+    assert OpenAICompatibleAdapter(env={}).available() is False
+    assert OpenAICompatibleAdapter(env={"OPENAI_API_KEY": " "}).available() is False
+    assert OpenAICompatibleAdapter(env={"OPENAI_API_KEY": "k"}).available() is True
 
 
 def test_openai_happy_maps_completion_zero_cost(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = OpenAICompatibleAdapter(default_model="gpt-x")
+    adapter = OpenAICompatibleAdapter(default_model="gpt-x", env={})
     monkeypatch.setattr(adapter, "_client", _FakeOaiClient)
     result = asyncio.run(adapter.complete(user="hi"))
     assert result.text == "oai answer"
@@ -163,7 +162,7 @@ def test_openai_happy_maps_completion_zero_cost(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_openai_api_error_is_fail_loud(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = OpenAICompatibleAdapter(default_model="gpt-x")
+    adapter = OpenAICompatibleAdapter(default_model="gpt-x", env={})
     monkeypatch.setattr(adapter, "_client", lambda: _FakeOaiClient(raises=_FakeOaiError(503)))
     with pytest.raises(AnyLLMError) as exc:
         asyncio.run(adapter.complete(user="hi"))
@@ -172,7 +171,7 @@ def test_openai_api_error_is_fail_loud(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # ── claude-code-sdk (fake module surface) ─────────────────────────────────────
 def test_sdk_unavailable_fails_loud(monkeypatch: pytest.MonkeyPatch) -> None:
-    adapter = ClaudeCodeSdkAdapter()
+    adapter = ClaudeCodeSdkAdapter(env={})
     monkeypatch.setattr(adapter, "available", lambda: False)
     with pytest.raises(AnyLLMError):
         asyncio.run(adapter.complete(user="hi"))
@@ -232,7 +231,7 @@ def test_sdk_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sdk, "TextBlock", FakeText)
     monkeypatch.setattr(sdk, "query", fake_query)
 
-    adapter = ClaudeCodeSdkAdapter()
+    adapter = ClaudeCodeSdkAdapter(env={})
     monkeypatch.setattr(adapter, "available", lambda: True)
     result = asyncio.run(adapter.complete(user="hi", model="claude-haiku-4-5"))
     assert result.text == "sdk answer"
@@ -243,24 +242,27 @@ def test_sdk_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
 # ── select factory + protocol conformance ─────────────────────────────────────
 def test_build_adapter_unknown_provider() -> None:
     with pytest.raises(AnyLLMError) as exc:
-        build_adapter("gpt-9000")
+        build_adapter("gpt-9000", env={})
     assert "unknown LLM provider" in str(exc.value)
 
 
-def test_build_adapter_unavailable_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+def test_build_adapter_unavailable_raises() -> None:
     with pytest.raises(AnyLLMError):
-        build_adapter("openai-compatible")
+        build_adapter("openai-compatible", env={})
 
 
-def test_build_adapter_returns_available(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
-    adapter = build_adapter("anthropic-api")
+def test_build_adapter_returns_available() -> None:
+    adapter = build_adapter("anthropic-api", env={"ANTHROPIC_API_KEY": "k"})
     assert adapter.name == "anthropic-api"
 
 
 def test_all_backends_satisfy_protocol() -> None:
-    for adapter in (ClaudeCodeCliAdapter(), ClaudeCodeSdkAdapter(), AnthropicApiAdapter(), OpenAICompatibleAdapter()):
+    for adapter in (
+        ClaudeCodeCliAdapter(env={}),
+        ClaudeCodeSdkAdapter(env={}),
+        AnthropicApiAdapter(env={}),
+        OpenAICompatibleAdapter(env={}),
+    ):
         assert isinstance(adapter, LLMProvider)
 
 
@@ -275,51 +277,52 @@ def test_all_backends_satisfy_protocol() -> None:
 
 
 def test_claude_code_available_needs_cli_and_session(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(_cc, "_find_cli", lambda: "/usr/local/bin/claude")
-    monkeypatch.setattr(_cc, "_session_credentials_present", lambda: True)
-    assert ClaudeCodeSdkAdapter().available() is True
+    monkeypatch.setattr(_cc, "_find_cli", lambda _env: "/usr/local/bin/claude")
+    monkeypatch.setattr(_cc, "_session_credentials_present", lambda _env: True)
+    assert ClaudeCodeSdkAdapter(env={}).available() is True
 
 
 def test_claude_code_unavailable_when_cli_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(_cc, "_find_cli", lambda: None)
-    monkeypatch.setattr(_cc, "_session_credentials_present", lambda: True)
-    assert ClaudeCodeSdkAdapter().available() is False
+    monkeypatch.setattr(_cc, "_find_cli", lambda _env: None)
+    monkeypatch.setattr(_cc, "_session_credentials_present", lambda _env: True)
+    assert ClaudeCodeSdkAdapter(env={}).available() is False
 
 
 def test_claude_code_unavailable_when_cli_bundled_but_no_session(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The container shape. The SDK bundles a runnable `claude`, so a CLI IS
-    present -- only the absent session distinguishes it from a working host."""
-    monkeypatch.setattr(_cc, "_find_cli", lambda: "/site-packages/claude_agent_sdk/_bundled/claude")
-    monkeypatch.setattr(_cc, "_session_credentials_present", lambda: False)
-    assert ClaudeCodeSdkAdapter().available() is False
+    """The container shape: the extra bundles a runnable CLI, but nobody is logged in."""
+    monkeypatch.setattr(_cc, "_find_cli", lambda _env: "/site-packages/claude_agent_sdk/_bundled/claude")
+    monkeypatch.setattr(_cc, "_session_credentials_present", lambda _env: False)
+    assert ClaudeCodeSdkAdapter(env={}).available() is False
 
 
-def test_session_credentials_from_env_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok")
-    assert _cc._session_credentials_present() is True
+def test_session_credentials_from_env_token() -> None:
+    assert _cc._session_credentials_present({"CLAUDE_CODE_OAUTH_TOKEN": "tok"}) is True
 
 
-def test_session_credentials_from_file(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
-    creds = tmp_path / "creds.json"
-    creds.write_text("{}")
-    monkeypatch.setattr(_cc, "_CREDENTIALS_FILE", str(creds))
-    assert _cc._session_credentials_present() is True
+def test_session_credentials_from_file(tmp_path) -> None:
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / ".credentials.json").write_text("{}")
+    assert _cc._session_credentials_present({"HOME": str(tmp_path)}) is True
 
 
 def test_session_credentials_absent_on_linux_container(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """No token, no credential file, non-Darwin -> no session."""
-    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
-    monkeypatch.setattr(_cc, "_CREDENTIALS_FILE", str(tmp_path / "nope.json"))
+    monkeypatch.setattr(_cc, "_system", lambda: "Linux")
+    assert _cc._session_credentials_present({"HOME": str(tmp_path)}) is False
+    assert _cc._session_credentials_present({}) is False
+
+
+def test_the_platform_is_read_in_one_place(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(platform, "system", lambda: "Windows")
+    assert _cc._cli_name() == "claude.exe"
     monkeypatch.setattr(platform, "system", lambda: "Linux")
-    assert _cc._session_credentials_present() is False
+    assert _cc._cli_name() == "claude"
 
 
 def test_find_cli_returns_none_when_sdk_absent(monkeypatch: pytest.MonkeyPatch) -> None:
     """No SDK -> no bundled binary to find, and nothing to spawn."""
     monkeypatch.setattr(importlib.util, "find_spec", lambda *a, **k: None)
-    monkeypatch.setattr(shutil, "which", lambda _n: None)
-    assert _cc._find_cli() is None
+    assert _cc._find_cli({"PATH": "/usr/bin"}) is None
 
 
 def _no_bundled(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -327,19 +330,33 @@ def _no_bundled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(importlib.util, "find_spec", lambda *a, **k: types.SimpleNamespace(submodule_search_locations=[]))
 
 
+def _exe(folder, name="claude"):
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / name).write_text("#!/bin/sh\n")
+    (folder / name).chmod(0o755)
+    return str(folder / name)
+
+
 def test_find_cli_prefers_path_over_fallback_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     _no_bundled(monkeypatch)
-    monkeypatch.setattr(shutil, "which", lambda _n: "/from/path/claude")
-    monkeypatch.setattr(_cc, "_CLI_FALLBACK_DIRS", (str(tmp_path),))
-    (tmp_path / "claude").write_text("#!/bin/sh\n")
-    assert _cc._find_cli() == "/from/path/claude"
+    monkeypatch.setattr(_cc, "_CLI_FALLBACK_DIRS", (str(tmp_path / "fallback"),))
+    _exe(tmp_path / "fallback")
+    on_path = _exe(tmp_path / "bin")
+    assert _cc._find_cli({"PATH": str(tmp_path / "bin")}) == on_path
 
 
 def test_find_cli_uses_fallback_dirs_when_not_on_path(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    """A CLI outside PATH (e.g. ~/.claude/local) is still found."""
+    """A CLI outside PATH is still found; a `~` folder is the injected HOME's, not the process's."""
     _no_bundled(monkeypatch)
-    monkeypatch.setattr(shutil, "which", lambda _n: None)
-    monkeypatch.setattr(_cc, "_CLI_FALLBACK_DIRS", (str(tmp_path),))
-    fallback = tmp_path / "claude"
-    fallback.write_text("#!/bin/sh\n")
-    assert _cc._find_cli() == str(fallback)
+    monkeypatch.setattr(_cc, "_CLI_FALLBACK_DIRS", ("~/.claude/local",))
+    fallback = _exe(tmp_path / ".claude" / "local")
+    assert _cc._find_cli({"PATH": "", "HOME": str(tmp_path)}) == fallback
+    assert _cc._find_cli({"PATH": ""}) is None  # no HOME injected: the ~ folder is not guessed
+
+
+def test_find_cli_never_consults_the_process_path(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    _no_bundled(monkeypatch)
+    monkeypatch.setattr(_cc, "_CLI_FALLBACK_DIRS", ())
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    _exe(tmp_path / "bin")
+    assert _cc._find_cli({"PATH": ""}) is None

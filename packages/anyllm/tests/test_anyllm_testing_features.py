@@ -49,16 +49,16 @@ def _none_set() -> None:
 
 @then("the Claude Code CLI and SDK backends report unavailable")
 def _unavailable() -> None:
-    assert ClaudeCodeCliAdapter().available() is False
-    assert ClaudeCodeSdkAdapter().available() is False
-    assert CodexCliAdapter().available() is False
+    assert ClaudeCodeCliAdapter(env=os.environ).available() is False
+    assert ClaudeCodeSdkAdapter(env=os.environ).available() is False
+    assert CodexCliAdapter(env=os.environ).available() is False
 
 
 @then("no provider is selected")
 def _none_selected() -> None:
-    assert resolve_provider() is None
+    assert resolve_provider(env=os.environ) is None
 
 
 @then("the openai-compatible backend reports available")
 def _openai_available() -> None:
-    assert OpenAICompatibleAdapter().available() is True
+    assert OpenAICompatibleAdapter(env=os.environ).available() is True

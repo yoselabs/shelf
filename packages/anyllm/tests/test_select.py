@@ -56,8 +56,8 @@ class _FakeProvider:
 def _patch_builds(monkeypatch: pytest.MonkeyPatch, table: dict[str, _FakeProvider | AnyLLMError]) -> None:
     """Make build_adapter return/raise per `table` keyed on the provider string."""
 
-    def fake_build(provider: str, config: dict | None = None) -> _FakeProvider:
-        _ = config
+    def fake_build(provider: str, config: dict | None = None, *, env: object) -> _FakeProvider:
+        _ = config, env
         outcome = table.get(provider)
         if outcome is None:
             msg = f"unknown {provider!r}"
@@ -77,13 +77,13 @@ def test_resolve_none_when_nothing_usable(monkeypatch: pytest.MonkeyPatch) -> No
             "anthropic-api": AnyLLMError("no key"),
         },
     )
-    assert resolve_provider([ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API]) is None
+    assert resolve_provider([ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API], env={}) is None
 
 
 def test_resolve_bare_provider_for_single_survivor(monkeypatch: pytest.MonkeyPatch) -> None:
     only = _FakeProvider(ProviderName.ANTHROPIC_API)
     _patch_builds(monkeypatch, {"claude-code-cli": AnyLLMError("no CLI"), "anthropic-api": only})
-    resolved = resolve_provider([ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API])
+    resolved = resolve_provider([ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API], env={})
     assert resolved is only  # no wrapper — nothing to fall back to
 
 
@@ -91,7 +91,7 @@ def test_resolve_fallback_provider_for_multiple(monkeypatch: pytest.MonkeyPatch)
     first = _FakeProvider(ProviderName.CLAUDE_CODE_CLI)
     second = _FakeProvider(ProviderName.ANTHROPIC_API)
     _patch_builds(monkeypatch, {"claude-code-cli": first, "anthropic-api": second})
-    resolved = resolve_provider([ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API])
+    resolved = resolve_provider([ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API], env={})
     assert isinstance(resolved, _FallbackProvider)
     assert resolved.name == ProviderName.CLAUDE_CODE_CLI  # primary
 
@@ -102,6 +102,7 @@ def test_resolve_fallback_false_returns_first_only(monkeypatch: pytest.MonkeyPat
     _patch_builds(monkeypatch, {"claude-code-cli": first, "anthropic-api": second})
     resolved = resolve_provider(
         [ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API],
+        env={},
         fallback=False,
     )
     assert resolved is first
@@ -117,7 +118,7 @@ def test_resolve_applies_wrap_per_candidate(monkeypatch: pytest.MonkeyPatch) -> 
         wrapped.append(p.name)
         return p
 
-    resolve_provider([ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API], wrap=wrap)
+    resolve_provider([ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API], env={}, wrap=wrap)
     assert wrapped == [ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API]  # each survivor, in order
 
 

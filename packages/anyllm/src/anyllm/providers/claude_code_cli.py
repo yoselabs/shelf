@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import os
-import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from child_env import build_env
 
 from anyllm.base import Completion, ProviderName
 from anyllm.errors import AnyLLMError
 from anyllm.providers._agent import complete_run
+from anyllm.providers._child import CLAUDE_ENV, program
 from anyllm.providers._prompt import flat_system, flat_user
 
 try:
@@ -18,6 +19,8 @@ except ImportError:
     any_agent = None
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from anyllm.base import PromptParts
 
 
@@ -26,9 +29,12 @@ class ClaudeCodeCliAdapter:
 
     name = ProviderName.CLAUDE_CODE_CLI
 
+    def __init__(self, *, env: Mapping[str, str]) -> None:
+        self._env = env
+
     def available(self) -> bool:
         """Whether the extra and the CLI are installed."""
-        return any_agent is not None and shutil.which("claude") is not None
+        return any_agent is not None and program("claude", self._env) is not None
 
     async def complete(
         self,
@@ -46,19 +52,19 @@ class ClaudeCodeCliAdapter:
         if any_agent is None:
             msg = "any-agent is not installed"
             raise AnyLLMError(msg, retryable=False, hint="install anyllm[agent]")
-        exe = shutil.which("claude")
+        exe = program("claude", self._env)
         if exe is None:
             msg = "claude CLI not found on PATH"
             raise AnyLLMError(msg, retryable=False, hint="install Claude Code or pick another provider")
         harness = any_agent.ClaudeHarness()
         inputs = any_agent.LaunchInputs(
-            exe=exe,
+            exe=str(exe),
             cwd=str(Path.cwd()),
             model=model or "",
             effort="low",
             prompt=flat_user(parts, user),
             system=flat_system(parts, system),
-            env=dict(os.environ),
+            env=build_env(self._env, allow=CLAUDE_ENV),
             sealed=True,  # a pure completion: the harness owns every flag, this adapter reconstructs none
         )
         try:

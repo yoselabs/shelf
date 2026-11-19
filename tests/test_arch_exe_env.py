@@ -32,9 +32,6 @@ _WHICH_ALLOWED = {
     "packages/any-agent/src/any_agent/harnesses/opencode.py",
     "packages/any-speech/src/any_speech/defaults.py",
     "packages/any-speech/src/any_speech/setup.py",
-    "packages/anyllm/src/anyllm/providers/claude_code_cli.py",
-    "packages/anyllm/src/anyllm/providers/claude_code_sdk.py",
-    "packages/anyllm/src/anyllm/providers/codex_cli.py",
     "packages/beads-client/src/beads_client/client.py",
     "packages/blueprint/src/blueprint/concerns/stack.py",
     "packages/blueprint/src/blueprint/model.py",
@@ -50,7 +47,6 @@ _WHICH_ALLOWED = {
 # env=<whole environ> keyword is seen: blueprint's gate_state.py and testing.py build the dict in a variable first
 # (the consumer wave routes those through build_env too; this test does not follow data flow).
 _WHOLE_ENV_ALLOWED = {
-    "packages/anyllm/src/anyllm/providers/claude_code_cli.py",
     "packages/any-lease/src/any_lease/__main__.py",
 }
 

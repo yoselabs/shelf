@@ -43,6 +43,8 @@ verb-cli = { workspace = true }
 atomic-io = { workspace = true }
 # sqlite-store composes sqlite-sidecar.
 sqlite-sidecar = { workspace = true }
+# anyllm composes child-env.
+child-env = { workspace = true }
 # any-agent composes stream-proc.
 stream-proc = { workspace = true }
 any-agent = { workspace = true }
@@ -634,6 +636,7 @@ ignore_imports = [
     "llm_cache -> any_ttl_cache",
     "llm_cache -> anyllm",
     "anyllm.providers.* -> any_agent",
+    "anyllm.providers.* -> child_env",
     "mcp_result_wire._format_routing -> page_tsv",
     "page_tsv.page -> lean_wire",
     "page_tsv.render -> lean_wire",

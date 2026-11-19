@@ -13,8 +13,14 @@ usage centrally), so this backend keeps no pricing table.
 
 from __future__ import annotations
 
+import importlib.util
+import platform
+import subprocess
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from child_env import NotFound, find
 
 from anyllm.accounting import extract_token_counts
 from anyllm.base import Completion, ProviderName
@@ -22,6 +28,8 @@ from anyllm.errors import AnyLLMError
 from anyllm.providers._prompt import flat_system, flat_user
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from anyllm.base import PromptParts
 
 _SDK_MODULE = "claude_agent_sdk"
@@ -39,24 +47,36 @@ _CLI_FALLBACK_DIRS = (
 )
 
 
+def _system() -> str:
+    """The operating system's name: the one place this module reads the platform (the Windows binary name, the macOS Keychain probe)."""
+    return platform.system()
+
+
 def _cli_name() -> str:
-    import platform  # noqa: PLC0415 — lazy: only needed on the availability path
-
-    return "claude.exe" if platform.system() == "Windows" else "claude"
+    return "claude.exe" if _system() == "Windows" else "claude"
 
 
-def _find_cli() -> str | None:
+def _home_dirs(env: Mapping[str, str]) -> tuple[Path, ...]:
+    """The fallback folders, a leading ``~`` being the injected HOME's; with no HOME in ``env`` those are skipped, not guessed."""
+    home = env.get("HOME")
+    dirs: list[Path] = []
+    for raw in _CLI_FALLBACK_DIRS:
+        if raw.startswith("~/"):
+            if home:
+                dirs.append(Path(home) / raw[2:])
+        else:
+            dirs.append(Path(raw))
+    return tuple(dirs)
+
+
+def _find_cli(env: Mapping[str, str]) -> str | None:
     """Locate the Claude Code CLI the SDK would spawn, or None.
 
     Mirrors the SDK's own resolution order — bundled binary, then ``PATH``, then
     its fixed fallback list — so this probe cannot disagree with what
-    ``complete()`` goes on to do. Filesystem-only: no SDK import, no process
-    spawn, no network.
+    ``complete()`` goes on to do. The ``PATH`` is ``env``'s, never the process's.
+    Filesystem-only: no SDK import, no process spawn, no network.
     """
-    import importlib.util  # noqa: PLC0415 — lazy: cheap find_spec, avoids importing the ~210MB SDK
-    import shutil  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
-
     name = _cli_name()
 
     # 1. Bundled CLI, shipped inside the SDK package itself. Located via the
@@ -69,51 +89,40 @@ def _find_cli() -> str | None:
         if bundled.is_file():
             return str(bundled)
 
-    # 2. PATH.
-    if found := shutil.which(name):
-        return found
-
-    # 3. The SDK's fixed fallback locations.
-    for raw in _CLI_FALLBACK_DIRS:
-        candidate = Path(raw).expanduser() / name
-        if candidate.is_file():
-            return str(candidate)
-    return None
+    # 2. PATH, then 3. the SDK's fixed fallback locations.
+    try:
+        return str(find(name, env, _home_dirs(env)).path)
+    except NotFound:
+        return None
 
 
 # Where the CLI keeps an OAuth session, by platform. macOS uses the Keychain;
-# Linux (and every container) writes this file.
-_CREDENTIALS_FILE = "~/.claude/.credentials.json"
+# Linux (and every container) writes this file, under the injected HOME.
+_CREDENTIALS_FILE = ".claude/.credentials.json"
 _KEYCHAIN_SERVICE = "Claude Code-credentials"
 _OAUTH_TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN"  # noqa: S105 — an env var NAME, not a secret
 
 
-def _session_credentials_present() -> bool:
+def _session_credentials_present(env: Mapping[str, str]) -> bool:
     """Whether a Claude Code session's credentials exist, without reading them.
 
     Never decrypts, never prompts, never spawns the CLI. The Keychain branch
     uses a metadata lookup (no ``-w``), which returns an exit code only — asking
     *whether* an item exists is not a secret read, so no auth dialog appears.
     """
-    import os  # noqa: PLC0415 — lazy: availability path only
-    import platform  # noqa: PLC0415
-    from pathlib import Path  # noqa: PLC0415
-
-    if os.environ.get(_OAUTH_TOKEN_ENV, "").strip():
+    if env.get(_OAUTH_TOKEN_ENV, "").strip():
         return True
-    if Path(_CREDENTIALS_FILE).expanduser().is_file():
+    if (home := env.get("HOME")) and (Path(home) / _CREDENTIALS_FILE).is_file():
         return True
-    if platform.system() == "Darwin":
-        import shutil  # noqa: PLC0415
-        import subprocess  # noqa: PLC0415
-
-        security = shutil.which("security")
-        if not security:
+    if _system() == "Darwin":
+        try:
+            security = find("security", env, ("/usr/bin",)).path
+        except NotFound:
             return False
         try:
             return (
                 subprocess.run(  # fixed argv, no shell, no user input
-                    [security, "find-generic-password", "-s", _KEYCHAIN_SERVICE],
+                    [str(security), "find-generic-password", "-s", _KEYCHAIN_SERVICE],
                     capture_output=True,
                     timeout=5,
                     check=False,
@@ -129,6 +138,9 @@ class ClaudeCodeSdkAdapter:
     """Backend running prompts through the user's Claude Code OS session."""
 
     name = ProviderName.CLAUDE_CODE_SDK
+
+    def __init__(self, *, env: Mapping[str, str]) -> None:
+        self._env = env
 
     def available(self) -> bool:
         """Report whether this backend is usable: a CLI plus a session for it.
@@ -152,7 +164,7 @@ class ClaudeCodeSdkAdapter:
         — degraded, not broken. That is the safe direction, because the opposite
         error silently shadows every working backend.
         """
-        return _find_cli() is not None and _session_credentials_present()
+        return _find_cli(self._env) is not None and _session_credentials_present(self._env)
 
     async def complete(
         self,
@@ -170,7 +182,7 @@ class ClaudeCodeSdkAdapter:
             # Name which precondition failed. "Not installed" was the only story
             # this could tell before availability included the session, and it
             # sent operators to reinstall a package that was already present.
-            if _find_cli() is None:
+            if _find_cli(self._env) is None:
                 msg = "claude-agent-sdk: no `claude` CLI found to run"
                 hint = "install anyllm[claude-code-sdk] (it bundles the CLI), or use another backend"
             else:

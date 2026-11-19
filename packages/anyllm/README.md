@@ -9,14 +9,14 @@ own error type, or catch it to degrade, at your own seam.
 ```python
 from anyllm import build_adapter
 
-adapter = build_adapter("claude-code-cli")            # or -sdk / anthropic-api / openai-compatible
+adapter = build_adapter("claude-code-cli", env=os.environ)   # the edge passes the environment; or -sdk / anthropic-api / openai-compatible
 result = await adapter.complete(user="Summarize this.")
 print(result.text, result.cost_usd, result.prompt_tokens)
 ```
 
 ## Backends
 
-Base install has no dependencies. Install `anyllm[agent]` for either CLI backend
+Base install needs only child-env (pure stdlib). Install `anyllm[agent]` for either CLI backend
 (any-agent brings stream-proc). Without it, CLI adapters report unavailable and
 completion fails with `hint="install anyllm[agent]"`. The default remains
 `claude-code-cli`; consumers using it, including a2kay, must add the extra when upgrading.
@@ -64,7 +64,7 @@ class LLMProvider(Protocol):
     def available(self) -> bool: ...   # cheap probe — usable on this machine now?
 ```
 
-`build_adapter(provider, config)` maps a provider name + options to a backend and
+`build_adapter(provider, config, *, env)` maps a provider name + options to a backend and
 raises `AnyLLMError` if the provider is unknown or unavailable. *Where* the config
 comes from (a file, env, a settings object) is the host's business.
 
