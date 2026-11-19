@@ -6,7 +6,7 @@ import sqlite3
 from collections.abc import Callable
 from typing import TypeAlias
 
-from sqlite_store.transaction import begin_immediate
+from sqlite_sidecar import transaction
 
 Step: TypeAlias = Callable[[sqlite3.Connection], None]
 
@@ -21,7 +21,7 @@ def upgrade(con: sqlite3.Connection, steps: dict[int, Step], current: int, targe
     Steps must use execute, never executescript, commit or rollback: the entire
     chain, its DDL and its version changes belong to this one transaction.
     """
-    with begin_immediate(con):
+    with transaction(con):
         current = int(con.execute("PRAGMA user_version").fetchone()[0])
         if current > target:
             message = f"{name} is schema v{current}, this code knows v{target}: update it"

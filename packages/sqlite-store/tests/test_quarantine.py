@@ -30,6 +30,22 @@ def test_quarantine_moves_database_and_sidecars(tmp_path: Path) -> None:
         assert Path(str(bad) + suffix).read_bytes() == (suffix.encode() or b"database")
 
 
+def test_quarantine_moves_the_sidecars_before_the_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "journal.db"
+    for suffix in ("", "-wal", "-shm"):
+        Path(str(path) + suffix).write_bytes(b"x")
+    order: list[str] = []
+    real = Path.replace
+
+    def spy(self: Path, target: Path) -> Path:
+        order.append(self.name)
+        return real(self, target)
+
+    monkeypatch.setattr(Path, "replace", spy)
+    quarantine(path)
+    assert order[-1] == "journal.db"
+
+
 def test_old_derived_schema_is_quarantined_and_recreated(tmp_path: Path, schema: Schema) -> None:
     path = tmp_path / "journal.db"
     old = sqlite3.connect(path, isolation_level=None)

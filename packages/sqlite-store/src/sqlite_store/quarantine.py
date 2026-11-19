@@ -7,19 +7,18 @@ import sqlite3
 import time
 from pathlib import Path
 
+from sqlite_sidecar import move_aside
+
 
 def quarantine(path: Path) -> Path:
     """Move a database and its WAL/SHM sidecars to <name>.bad-<time_ns>.
 
+    Sidecars move first, the database last (sqlite-sidecar's `move_aside`).
     Call only after closing its connections and stopping its writers. This
     primitive does not lock; the opener serializes its version decision below.
     """
     bad = path.with_name(f"{path.name}.bad-{time.time_ns()}")
-    path.replace(bad)
-    for suffix in ("-wal", "-shm"):
-        side = Path(str(path) + suffix)
-        if side.exists():
-            side.replace(Path(str(bad) + suffix))
+    move_aside(path, lambda src: bad.with_name(bad.name + src.name[len(path.name) :]))
     return bad
 
 

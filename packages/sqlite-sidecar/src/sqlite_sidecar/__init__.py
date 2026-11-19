@@ -8,6 +8,8 @@ is deliberately not a lifecycle base class (the sibling of ``duckdb-sidecar``).
 
 What is here because it was learned, not read:
 
+* :func:`is_busy` — a wait, read from the result code; :func:`integrity_ok` raises on it
+  rather than report a busy file as damaged.
 * :func:`is_corruption` — busy and locked are ``OperationalError``, a subclass of
   ``DatabaseError``, so ``except DatabaseError`` alone treats a busy file as damage.
 * :func:`integrity_ok` runs on a fresh connection: a long-lived reader's ``PRAGMA
@@ -39,6 +41,9 @@ if TYPE_CHECKING:
 #: The primary result codes that mean the file itself is damaged. Busy and locked are
 #: `OperationalError`s too — a subclass of `DatabaseError` — and are not damage.
 _DAMAGE_CODES = frozenset({sqlite3.SQLITE_CORRUPT, sqlite3.SQLITE_NOTADB})
+
+#: Busy (another connection holds the file) and locked (a table inside this one): both are waits.
+_BUSY_CODES = frozenset({sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED})
 
 #: What travels with a SQLite file: its WAL and the WAL's shared-memory index.
 _COMPANIONS = ("-wal", "-shm")
@@ -128,10 +133,11 @@ def transaction(conn: sqlite3.Connection, *, lock: threading.RLock | None = None
         conn.execute("BEGIN IMMEDIATE")
         try:
             yield conn
+            conn.execute("COMMIT")
         except BaseException:
-            conn.execute("ROLLBACK")
+            if conn.in_transaction:  # a failed COMMIT leaves it open; SQLite may also have ended it
+                conn.execute("ROLLBACK")
             raise
-        conn.execute("COMMIT")
     finally:
         if lock is not None:
             lock.release()
@@ -163,6 +169,15 @@ def is_corruption(exc: BaseException) -> bool:
     return code is not None and code & 0xFF in _DAMAGE_CODES
 
 
+def is_busy(exc: BaseException) -> bool:
+    """Whether ``exc`` is SQLite saying the file or a table is busy or locked: wait and retry.
+
+    Read from the result code, never the message text.
+    """
+    code = cast("int | None", getattr(exc, "sqlite_errorcode", None)) if isinstance(exc, sqlite3.Error) else None
+    return code is not None and code & 0xFF in _BUSY_CODES
+
+
 def unreadable(path: Path) -> bool:
     """Whether a file exists at ``path`` that SQLite cannot open as a database.
 
@@ -184,25 +199,50 @@ def unreadable(path: Path) -> bool:
     return False
 
 
-def integrity_ok(path: Path, *, extra: Callable[[sqlite3.Connection], object] | None = None) -> bool:
+def integrity_ok(path: Path, *, extra: Callable[[sqlite3.Connection], object] | None = None, timeout: float = 5.0) -> bool:
     """Whether the file passes ``PRAGMA integrity_check`` and ``extra`` (which raises to fail).
 
     Always on a fresh connection, never a long-lived one (see the module docstring).
+    ``False`` means damaged: a failed check, a corrupt or not-a-database file, or ``extra``
+    raising its own ``sqlite3.Error``. A file that cannot be judged (busy past ``timeout``,
+    absent, an I/O error) raises that error: unknown is not damaged, and damage gets the file set aside.
     """
     try:
-        conn = sqlite3.connect(f"file:{path}?mode=rw", uri=True, isolation_level=None)
-    except sqlite3.Error:
-        return False
+        conn = sqlite3.connect(f"file:{path}?mode=rw", uri=True, isolation_level=None, timeout=timeout)
+    except sqlite3.Error as exc:
+        return _damaged(exc)
     try:
         if conn.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
             return False
         if extra is not None:
             extra(conn)
-    except sqlite3.Error:
-        return False
+    except sqlite3.Error as exc:
+        return _damaged(exc)
     finally:
         conn.close()
     return True
+
+
+def _damaged(exc: sqlite3.Error) -> bool:
+    """False for damage, or for a failure with no result code (raised by a caller's ``extra``); else re-raise."""
+    if is_corruption(exc) or getattr(exc, "sqlite_errorcode", None) is None:
+        return False
+    raise exc
+
+
+def move_aside(path: Path, destination: Callable[[Path], Path]) -> list[Path]:
+    """Move ``path`` and its ``-wal``/``-shm`` to ``destination(source)`` each; return the new paths.
+
+    The companions go first and the file last: a crash part-way never leaves a WAL beside a
+    fresh file to be replayed, and a second call finishes the job. Absent files are skipped.
+    """
+    moved: list[Path] = []
+    for src in (*(path.with_name(path.name + sfx) for sfx in _COMPANIONS), path):
+        if src.exists():
+            dst = destination(src)
+            src.replace(dst)
+            moved.append(dst)
+    return moved
 
 
 def set_aside(path: Path, *, at: datetime | None = None) -> list[Path]:
@@ -211,12 +251,7 @@ def set_aside(path: Path, *, at: datetime | None = None) -> list[Path]:
     Kept for a post-mortem, never deleted. The next open starts an empty file.
     """
     stamp = (at or datetime.now(UTC)).astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
-    moved: list[Path] = []
-    for src in (path, *(path.with_name(path.name + sfx) for sfx in _COMPANIONS)):
-        if src.exists():
-            dst = src.with_name(f"{src.name}.corrupt-{stamp}")
-            src.rename(dst)
-            moved.append(dst)
+    moved = move_aside(path, lambda src: src.with_name(f"{src.name}.corrupt-{stamp}"))
     _mark(path).unlink(missing_ok=True)
     return moved
 
@@ -303,8 +338,10 @@ __all__ = [
     "ensure_schema",
     "from_text",
     "integrity_ok",
+    "is_busy",
     "is_corruption",
     "mark_for_rebuild",
+    "move_aside",
     "needs_rebuild",
     "prepare",
     "set_aside",

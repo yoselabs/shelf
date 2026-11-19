@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "sqlite-store"
+software = "sqlite-sidecar"
+why = "sqlite-store hand-wrote the rollback-on-BaseException transaction, the move of a database with its -wal/-shm, and a busy test that matched the word 'locked'; sqlite-sidecar already owned all three. One implementation each (Article III); store depends on sidecar, never the reverse, so a2kay's sidecar stays zero-dependency."
+needs = "transaction (BEGIN IMMEDIATE, rollback on any BaseException including a failed COMMIT), is_busy (result code), move_aside (sidecars first, file last)."
+sponsor = "yoselabs"
+requester = "shelf-tyld.3"
+status = "active" # active | retired
