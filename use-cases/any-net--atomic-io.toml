@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-net"
+software = "atomic-io"
+why = "any-net.record hand-rolled mkstemp + replace for the on-disk probe cache; a concurrent reader must never see a partial JSON file."
+needs = "atomic_write_text with fsync=False (a cache rewritten on every probe): atomic swap, no durability cost."
+sponsor = "yoselabs"
+requester = "any-net"
+status = "active" # active | retired

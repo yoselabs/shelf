@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
 from shelf_vendor import Vendor, dir_files, newer_tags, tree_hash
 from shelf_vendor.__main__ import main
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -129,3 +127,42 @@ def test_cli_sync_then_check(tmp_path: Path, shelf: Path, capsys: pytest.Capture
     assert "NEWER" in err and "DRIFT" not in err
     (tmp_path / "v" / "process_lock" / "__init__.py").write_text("x", encoding="utf-8")
     assert main([*base, "check"]) == 1
+
+
+def test_manifest_bytes_are_two_space_json_sorted_with_one_newline(vendor: Vendor, shelf: Path) -> None:
+    entry = vendor.sync("process-lock", "process-lock-v0.1.0", shelf=shelf)
+    assert vendor.manifest_path.read_bytes() == (json.dumps([entry], indent=2) + "\n").encode()
+    assert [p.name for p in vendor.manifest_path.parent.iterdir()] == ["vendor.json"]
+
+
+def test_a_crash_mid_install_leaves_the_old_tree_and_manifest(vendor: Vendor, shelf: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    old = vendor.sync("process-lock", "process-lock-v0.1.0", shelf=shelf)
+    before = dir_files(vendor.vendor_dir / "process_lock")
+    manifest = vendor.manifest_path.read_bytes()
+    (shelf / "packages" / "process-lock" / "src" / "process_lock" / "extra.py").parent.mkdir(parents=True, exist_ok=True)
+    (shelf / "packages" / "process-lock" / "src" / "process_lock" / "extra.py").write_text("E = 1\n", encoding="utf-8")
+    _release(shelf, "V = 2\n", "process-lock-v0.2.0")
+    real, calls = Path.write_bytes, []
+
+    def crash_on_second_file(self: Path, data: bytes) -> int:
+        calls.append(self)
+        if len(calls) == 2:
+            msg = "power cut"
+            raise OSError(msg)
+        return real(self, data)
+
+    monkeypatch.setattr(Path, "write_bytes", crash_on_second_file)
+    with pytest.raises(OSError, match="power cut"):
+        vendor.sync("process-lock", "process-lock-v0.2.0", shelf=shelf)
+    monkeypatch.undo()
+    assert dir_files(vendor.vendor_dir / "process_lock") == before
+    assert vendor.manifest_path.read_bytes() == manifest
+    assert vendor.load() == [old]
+    assert sorted(p.name for p in vendor.vendor_dir.iterdir()) == ["process_lock"]
+
+
+def test_a_sync_leaves_no_staging_or_backup_directory(vendor: Vendor, shelf: Path) -> None:
+    vendor.sync("process-lock", "process-lock-v0.1.0", shelf=shelf)
+    _release(shelf, "V = 2\n", "process-lock-v0.2.0")
+    vendor.sync("process-lock", "process-lock-v0.2.0", shelf=shelf)
+    assert sorted(p.name for p in vendor.vendor_dir.iterdir()) == ["process_lock"]

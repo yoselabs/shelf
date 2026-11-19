@@ -180,3 +180,27 @@ def test_round_trip_yaml_carries_the_double_space_rule() -> None:
     buf = StringIO()
     round_trip_yaml().dump({"t": "a  b", "u": "plain"}, buf)
     assert buf.getvalue() == 't: "a  b"\nu: plain\n'
+
+
+def test_written_bytes_are_the_dump_utf8_with_no_newline_translation(tmp_path: Path) -> None:
+    doc = Document(frontmatter={"title": "Café — 日本"}, body="line one\r\nline two\rend")
+    target = tmp_path / "e.md"
+    write(target, doc)
+    assert target.read_bytes() == "---\ntitle: Café — 日本\n---\nline one\r\nline two\rend".encode()
+
+
+def test_a_crash_before_the_swap_keeps_the_old_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "e.md"
+    write(target, Document(frontmatter={"id": "x"}, body="old\n"))
+    before = target.read_bytes()
+
+    def crash(self: Path, target: object) -> Path:
+        msg = "power cut"
+        raise OSError(msg)
+
+    monkeypatch.setattr(type(target), "replace", crash)
+    with pytest.raises(OSError, match="power cut"):
+        write(target, Document(frontmatter={"id": "y"}, body="new\n"))
+    monkeypatch.undo()
+    assert target.read_bytes() == before
+    assert [p.name for p in tmp_path.iterdir()] == ["e.md"]

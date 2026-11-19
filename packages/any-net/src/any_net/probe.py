@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
-import os
 import re
 import socket
-import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
+
+from atomic_io import atomic_write_text
 
 Resolve = Callable[[str, int], str]
 """name, port -> address; raises OSError when the name does not resolve."""
@@ -119,17 +120,8 @@ def record(path: str | Path, result: Probe) -> Probe:
         "ms": stored.ms,
         "since": since,
     }
-    target = Path(path)
-    tmp = None
-    try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(row, f)
-        Path(tmp).replace(target)
-    except (OSError, ValueError):
-        if tmp is not None:
-            Path(tmp).unlink(missing_ok=True)
+    with contextlib.suppress(OSError, ValueError):
+        atomic_write_text(Path(path), json.dumps(row), fsync=False)
     return stored
 
 
