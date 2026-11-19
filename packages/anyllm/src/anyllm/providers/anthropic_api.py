@@ -8,7 +8,6 @@ on exhaustion its ``APIError`` is translated to a fail-loud :class:`AnyLLMError`
 
 from __future__ import annotations
 
-import os
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -18,6 +17,8 @@ from anyllm.errors import AnyLLMError
 from anyllm.providers._prompt import resolve_system
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from anyllm.base import PromptParts
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
@@ -29,13 +30,16 @@ class AnthropicApiAdapter:
 
     name = ProviderName.ANTHROPIC_API
 
-    def __init__(self, *, api_key_env: str = "ANTHROPIC_API_KEY", api_key: str | None = None, max_retries: int = 2) -> None:
+    def __init__(
+        self, *, env: Mapping[str, str], api_key_env: str = "ANTHROPIC_API_KEY", api_key: str | None = None, max_retries: int = 2
+    ) -> None:
+        self._env = env
         self._api_key_env = api_key_env
         self._api_key = api_key
         self._max_retries = max_retries
 
     def _key(self) -> str | None:
-        return self._api_key or os.environ.get(self._api_key_env)
+        return self._api_key or self._env.get(self._api_key_env)
 
     def available(self) -> bool:
         """Report whether an API key is resolvable (literal or from the env var)."""

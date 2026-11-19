@@ -516,8 +516,11 @@ wheels = [
 
 [[package]]
 name = "anyllm"
-version = "0.8.1"
+version = "0.9.0"
 source = { editable = "packages/anyllm" }
+dependencies = [
+    { name = "child-env" },
+]
 
 [package.optional-dependencies]
 agent = [
@@ -537,6 +540,7 @@ openai = [
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.40,<1" },
     { name = "any-agent", marker = "extra == 'agent'", editable = "packages/any-agent" },
+    { name = "child-env", editable = "packages/child-env" },
     { name = "claude-agent-sdk", marker = "extra == 'claude-code-sdk'", specifier = ">=0.1.80,<1" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.50" },
 ]

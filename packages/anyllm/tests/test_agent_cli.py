@@ -17,8 +17,18 @@ from anyllm.errors import AnyLLMError
 from anyllm.select import DEFAULT_ORDER, DEFAULT_PROVIDER
 
 
+def _env(tmp_path: Path, binary: str, **more: str) -> dict[str, str]:
+    """An injected environment whose PATH holds one executable `binary`: the only place discovery may look."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    exe = bin_dir / binary
+    exe.write_text("#!/bin/sh\n")
+    exe.chmod(0o755)
+    return {"PATH": str(bin_dir), "HOME": str(tmp_path / "home"), **more}
+
+
 @pytest.fixture(params=[("claude_code_cli", "ClaudeCodeCliAdapter", "claude"), ("codex_cli", "CodexCliAdapter", "codex")])
-def backend(request, monkeypatch):
+def backend(request, monkeypatch, tmp_path):
     module, adapter, binary = request.param
     provider = importlib.import_module(f"anyllm.providers.{module}")
 
@@ -27,14 +37,19 @@ def backend(request, monkeypatch):
 
     # Keep the supervisor boundary fake, including its executor dispatch.
     monkeypatch.setattr("anyllm.providers._agent.asyncio.to_thread", to_thread)
-    monkeypatch.setattr(provider.shutil, "which", lambda _: f"/bin/{binary}")
-    return provider, getattr(provider, adapter)(), binary
+    return provider, getattr(provider, adapter)(env=_env(tmp_path, binary)), binary
 
 
 def test_success_and_launch_safeguards(backend, monkeypatch):
-    provider, adapter, binary = backend
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "must-not-bill")
-    monkeypatch.setenv("CLAUDE_CODE_SIMPLE", "1")  # what --bare sets: it would hide the subscription login from claude
+    provider, _, binary = backend
+    adapter = type(backend[1])(
+        env={
+            **backend[1]._env,
+            "ANTHROPIC_API_KEY": "must-not-bill",
+            "OPENAI_API_KEY": "must-not-bill",
+            "CLAUDE_CODE_SIMPLE": "1",  # what --bare sets: it would hide the subscription login from claude
+        }
+    )
     specs = []
 
     def run(harness, spec, timeout):
@@ -123,9 +138,9 @@ def test_failures_never_fall_back_to_api(backend, monkeypatch, rc, vendor):
     run.assert_called_once()
 
 
-def test_missing_binary(backend, monkeypatch):
-    provider, adapter, _ = backend
-    monkeypatch.setattr(provider.shutil, "which", lambda _: None)
+def test_missing_binary(backend, tmp_path):
+    _, adapter, _ = backend
+    adapter = type(adapter)(env={"PATH": str(tmp_path / "empty"), "HOME": str(tmp_path)})
     assert not adapter.available()
     with pytest.raises(AnyLLMError, match="not found on PATH"):
         asyncio.run(adapter.complete(user="hello"))
@@ -143,7 +158,7 @@ def test_missing_extra(backend, monkeypatch):
 
 def test_codex_selection(backend):
     _, adapter, binary = backend
-    assert build_adapter(adapter.name).name == adapter.name
+    assert build_adapter(adapter.name, env=adapter._env).name == adapter.name
     assert DEFAULT_PROVIDER == ProviderName.CLAUDE_CODE_CLI
     assert DEFAULT_ORDER[:2] == (ProviderName.CLAUDE_CODE_CLI, ProviderName.CODEX_CLI)
     assert binary in {"claude", "codex"}
@@ -157,12 +172,12 @@ sys.modules['any_agent'] = None
 sys.modules['stream_proc'] = None
 import anyllm
 import anyllm.select
-assert not anyllm.ClaudeCodeCliAdapter().available()
-assert not anyllm.CodexCliAdapter().available()
+assert not anyllm.ClaudeCodeCliAdapter(env={"PATH": ""}).available()
+assert not anyllm.CodexCliAdapter(env={"PATH": ""}).available()
 """
     subprocess.run([sys.executable, "-c", code], check=True, capture_output=True)
     project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())["project"]
-    assert project["dependencies"] == []
+    assert project["dependencies"] == ["child-env>=0.2,<1"]
     assert project["optional-dependencies"]["agent"] == ["any-agent>=0.1.4,<1"]
 
 
@@ -177,13 +192,66 @@ def test_invalid_output_fails_loud(backend, monkeypatch):
         asyncio.run(adapter.complete(user="hello"))
 
 
-def test_an_environment_that_moves_the_lane_fails_loud_before_launch(monkeypatch):
+def test_an_environment_that_moves_the_lane_fails_loud_before_launch(monkeypatch, tmp_path):
     provider = importlib.import_module("anyllm.providers.claude_code_cli")
-    monkeypatch.setattr(provider.shutil, "which", lambda _: "/bin/claude")
-    monkeypatch.setenv("CLAUDE_CODE_USE_BEDROCK", "1")
     run = Mock()
     monkeypatch.setattr(provider.any_agent, "run", run)
+    adapter = provider.ClaudeCodeCliAdapter(env=_env(tmp_path, "claude", CLAUDE_CODE_USE_BEDROCK="1"))
     with pytest.raises(AnyLLMError, match="CLAUDE_CODE_USE_BEDROCK") as caught:
-        asyncio.run(provider.ClaudeCodeCliAdapter().complete(user="hello"))
+        asyncio.run(adapter.complete(user="hello"))
     assert not caught.value.retryable
     run.assert_not_called()
+
+
+def _launched_env(provider, monkeypatch, adapter) -> dict[str, str]:
+    seen: dict[str, dict[str, str]] = {}
+
+    def run(harness, spec, timeout):
+        seen["env"] = spec.env
+        return provider.any_agent.RunOutcome(rc=0, summary=harness.summary(0, "", "", None, False))
+
+    monkeypatch.setattr(provider.any_agent, "run", run)
+    with pytest.raises(AnyLLMError):
+        asyncio.run(adapter.complete(user="hello"))
+    return seen["env"]
+
+
+_AMBIENT = {
+    "AWS_SECRET_ACCESS_KEY": "s",
+    "GITHUB_TOKEN": "s",
+    "SSH_AUTH_SOCK": "/s",
+    "SOME_APP_SETTING": "x",
+    "ANTHROPIC_API_KEY": "s",
+    "OPENAI_API_KEY": "s",
+}
+
+
+def test_claude_child_gets_an_allow_list_not_the_whole_environment(monkeypatch, tmp_path):
+    """Exactly: the user's place, proxy and CA settings, the config folder and the OAuth token (a container login); nothing else."""
+    provider = importlib.import_module("anyllm.providers.claude_code_cli")
+    kept = {"HTTPS_PROXY": "p", "NODE_EXTRA_CA_CERTS": "/ca", "CLAUDE_CONFIG_DIR": "/c", "CLAUDE_CODE_OAUTH_TOKEN": "tok", "LANG": "C"}
+    env = _launched_env(provider, monkeypatch, provider.ClaudeCodeCliAdapter(env={**_env(tmp_path, "claude"), **kept, **_AMBIENT}))
+    assert {k: env[k] for k in kept} == kept
+    assert "HOME" in env
+    assert not set(_AMBIENT) & set(env)
+
+
+def test_codex_child_gets_an_allow_list_not_the_whole_environment(monkeypatch, tmp_path):
+    provider = importlib.import_module("anyllm.providers.codex_cli")
+    kept = {"HTTPS_PROXY": "p", "CODEX_HOME": "/codex", "LANG": "C"}
+    env = _launched_env(provider, monkeypatch, provider.CodexCliAdapter(env={**_env(tmp_path, "codex"), **kept, **_AMBIENT}))
+    assert {k: env[k] for k in kept} == kept
+    assert "HOME" in env
+    assert not set(_AMBIENT) & set(env)
+
+
+def test_discovery_never_consults_the_process_path(backend, monkeypatch, tmp_path):
+    """The injected PATH is the only one searched: a binary on the real PATH but not the injected one is not found."""
+    _, adapter, binary = backend
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / binary).write_text("#!/bin/sh\n")
+    (elsewhere / binary).chmod(0o755)
+    monkeypatch.setenv("PATH", str(elsewhere))
+    blind = type(adapter)(env={"PATH": str(tmp_path / "nothing"), "HOME": str(tmp_path)})
+    assert not blind.available()

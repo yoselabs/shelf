@@ -635,6 +635,7 @@ ignore_imports = [
     "llm_cache -> any_ttl_cache",
     "llm_cache -> anyllm",
     "anyllm.providers.* -> any_agent",
+    "anyllm.providers.* -> child_env",
     "mcp_result_wire._format_routing -> page_tsv",
     "page_tsv.page -> lean_wire",
     "page_tsv.render -> lean_wire",

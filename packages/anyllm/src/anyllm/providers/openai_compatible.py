@@ -9,7 +9,6 @@ streaming — text in, text out. Pricing for arbitrary endpoints is unknown, so
 
 from __future__ import annotations
 
-import os
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -18,6 +17,8 @@ from anyllm.errors import AnyLLMError
 from anyllm.providers._prompt import flat_system, flat_user
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from anyllm.base import PromptParts
 
 
@@ -29,11 +30,13 @@ class OpenAICompatibleAdapter:
     def __init__(
         self,
         *,
+        env: Mapping[str, str],
         base_url: str = "",
         api_key_env: str = "OPENAI_API_KEY",
         default_model: str = "",
         max_retries: int = 2,
     ) -> None:
+        self._env = env
         self._base_url = base_url
         self._api_key_env = api_key_env
         self._max_retries = max_retries
@@ -41,10 +44,10 @@ class OpenAICompatibleAdapter:
 
     def available(self) -> bool:
         """Report whether an API key is resolvable from the configured env var."""
-        return bool(os.environ.get(self._api_key_env, "").strip())
+        return bool(self._env.get(self._api_key_env, "").strip())
 
     def _client(self) -> Any:
-        key = os.environ.get(self._api_key_env, "").strip()
+        key = self._env.get(self._api_key_env, "").strip()
         if not key:
             msg = f"no OpenAI-compatible API key (env {self._api_key_env})"
             raise AnyLLMError(msg, retryable=False, hint="set the key or configure another provider")
