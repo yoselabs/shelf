@@ -27,10 +27,13 @@ import os
 import time
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from .base import BackendCookie, RenderedPage, RenderOutcome
 from .playwright import _CHALLENGE_STATUSES, _SCROLL_STABLE_MAX_PASSES, _THIN_FLOOR, _ms, _summarize_exc
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 _SAMESITE = {"strict": "STRICT", "lax": "LAX", "none": "NONE"}
 
@@ -56,7 +59,7 @@ _CONTAINER_ARGS = ("--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu")
 _CONFIG_ADDABLE_ARGS = ("--disable-dev-shm-usage", "--disable-gpu")
 
 
-def _resolve_executable() -> str | None:
+def _resolve_executable(env: Mapping[str, str]) -> str | None:
     """Locate a Chromium binary for zendriver, or None to let it auto-discover.
 
     zendriver's default is to search for a SYSTEM Chrome install. An image with
@@ -67,10 +70,10 @@ def _resolve_executable() -> str | None:
     Playwright-managed Chromium â†’ None (auto-discover, the developer-machine
     path).
     """
-    explicit = os.environ.get(_EXECUTABLE_ENV, "").strip()
+    explicit = env.get(_EXECUTABLE_ENV, "").strip()
     if explicit:
         return explicit
-    root = os.environ.get(_PLAYWRIGHT_PATH_ENV, "").strip()
+    root = env.get(_PLAYWRIGHT_PATH_ENV, "").strip()
     if not root:
         return None
     base = Path(root)
@@ -210,8 +213,9 @@ async def _launch_diagnostics(executable: str | None) -> str:  # noqa: PLR0911 â
 class ZendriverBackend:
     """CDP rendering engine. Per-render launch (v1). Satisfies ``BrowserBackend``."""
 
-    def __init__(self, *, name: str = "zendriver", page_budget_s: int = 30) -> None:
+    def __init__(self, *, env: Mapping[str, str], name: str = "zendriver", page_budget_s: int = 30) -> None:
         self.name = name
+        self._env = env  # where the browser location variables are read from; the process environment is never read
         self.page_budget_s = page_budget_s
 
     async def render(
@@ -239,7 +243,7 @@ class ZendriverBackend:
         # render happened, so nothing was observed.
         blocked: list[int] = []
         try:
-            executable = _resolve_executable()
+            executable = _resolve_executable(self._env)
             try:
                 # zendriver's default connection handshake (0.25s x 10 tries
                 # ~2.5s) gives up before Chromium's CDP socket is ready on a

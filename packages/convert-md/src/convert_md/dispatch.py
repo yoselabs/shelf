@@ -12,11 +12,12 @@ reconversion is a future migration script, not a runtime knob.
 from __future__ import annotations
 
 import importlib.util
-import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from child_env import NotFound, find
 
 from convert_md.base import ConversionEngine, ConversionError, ConversionResult
 from convert_md.engines import (
@@ -29,7 +30,7 @@ from convert_md.engines import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Mapping
 
 # Primary → fallback, per extension (R142 verdict table; PDF chain revised
 # in v0.5.0 per bench/results/2026-07-09-findings.md + design.md D5 —
@@ -72,17 +73,19 @@ def select_engine(path: Path) -> type[ConversionEngine] | None:
     return chain[0] if chain else None
 
 
-def convert(path: Path) -> ConversionResult:
+def convert(path: Path, *, env: Mapping[str, str]) -> ConversionResult:
     """Convert ``path`` to Markdown, walking the format's fallback chain.
 
     Legacy ``.doc/.ppt/.xls`` are first normalized via LibreOffice headless and
     re-dispatched through the modern chain. If every engine fails, a ``failed``
     result is returned (never an exception) so the attachment pipeline can still
     write a stub.
+
+    ``env`` is the environment the LibreOffice lookup reads (its ``PATH``); the process environment is never read.
     """
     suffix = path.suffix.lower()
     if suffix in _LEGACY and suffix not in _CHAINS:
-        return _convert_legacy(path)
+        return _convert_legacy(path, env)
 
     chain = fallback_chain_for(path)
     if not chain:
@@ -111,7 +114,7 @@ def convert(path: Path) -> ConversionResult:
     )
 
 
-def missing_engines(suffixes: Iterable[str]) -> dict[str, list[str]]:
+def missing_engines(suffixes: Iterable[str], *, env: Mapping[str, str]) -> dict[str, list[str]]:
     """What would stop each format converting, checked before any file arrives.
 
     :func:`convert` never raises: a missing engine library becomes a
@@ -124,7 +127,7 @@ def missing_engines(suffixes: Iterable[str]) -> dict[str, list[str]]:
     Call this from a test (or at startup) with the formats you promise, and assert
     it is empty. Returns ``{suffix: [problem, ...]}`` for each suffix with a problem:
     no engine chain, an engine whose library is not installed, or a legacy format
-    with no LibreOffice on ``PATH``. Checks with ``importlib.util.find_spec``, so no
+    with no LibreOffice on ``env["PATH"]``. Checks with ``importlib.util.find_spec``, so no
     engine library is imported.
     """
     problems: dict[str, list[str]] = {}
@@ -132,7 +135,7 @@ def missing_engines(suffixes: Iterable[str]) -> dict[str, list[str]]:
         suffix = raw.lower() if raw.startswith(".") else f".{raw.lower()}"
         found: list[str] = []
         modern = _LEGACY_TARGET[suffix] if suffix in _LEGACY and suffix not in _CHAINS else suffix
-        if modern != suffix and shutil.which("soffice") is None and shutil.which("libreoffice") is None:
+        if modern != suffix and _libreoffice(env) is None:
             found.append("libreoffice not on PATH")
         chain = _CHAINS.get(modern, [])
         if not chain:
@@ -151,9 +154,19 @@ def _installed(module: str) -> bool:
         return False
 
 
-def _convert_legacy(path: Path) -> ConversionResult:
+def _libreoffice(env: Mapping[str, str]) -> Path | None:
+    """The ``soffice`` (else ``libreoffice``) program on ``env["PATH"]``, or None."""
+    for name in ("soffice", "libreoffice"):
+        try:
+            return find(name, env).path
+        except NotFound:
+            continue
+    return None
+
+
+def _convert_legacy(path: Path, env: Mapping[str, str]) -> ConversionResult:
     """Normalize a legacy binary via LibreOffice, then re-dispatch."""
-    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    soffice = _libreoffice(env)
     if soffice is None:
         return ConversionResult(
             body_markdown="",
@@ -166,7 +179,7 @@ def _convert_legacy(path: Path) -> ConversionResult:
     with tempfile.TemporaryDirectory() as tmp:
         try:
             subprocess.run(
-                [soffice, "--headless", "--convert-to", target_suffix.lstrip("."), "--outdir", tmp, str(path)],
+                [str(soffice), "--headless", "--convert-to", target_suffix.lstrip("."), "--outdir", tmp, str(path)],
                 check=True,
                 capture_output=True,
                 timeout=120,
@@ -188,7 +201,7 @@ def _convert_legacy(path: Path) -> ConversionResult:
                 lost=["all"],
                 warnings=["normalize_no_output"],
             )
-        return convert(normalized)
+        return convert(normalized, env=env)
 
 
 __all__ = ["convert", "fallback_chain_for", "missing_engines", "select_engine"]

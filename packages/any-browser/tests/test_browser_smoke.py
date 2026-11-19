@@ -143,7 +143,7 @@ async def test_zendriver_cdp_family_executes_js(js_fixture_url: str) -> None:
     except ImportError as exc:
         _browser_unavailable(f"zendriver not installed: {exc}")
 
-    backend = ZendriverBackend(name="zendriver")
+    backend = ZendriverBackend(name="zendriver", env=os.environ)
     # zendriver launches per-render; a launch failure surfaces as
     # RenderOutcome.unavailable — skip on that (dev machine), fail if obligated.
     page = await backend.render(js_fixture_url, cookies=[], budget_s=20.0, js_heavy=True)

@@ -43,7 +43,7 @@ else:
   engine via a `launch_fn` (per-host LRU context pool, an idle reaper that bounds
   resident browser processes on a long-lived server, and opt-in driver-stderr
   capture through an injected async sink). `ZendriverBackend` drives Chromium
-  directly over CDP (per-render launch), for the SPAs a Playwright drop-in fails
+  directly over CDP (per-render launch; `ZendriverBackend(env=...)` reads the browser-location variables from the env you pass), for the SPAs a Playwright drop-in fails
   to read — proof the seam spans engine families, not just one driver API.
 - **`subresource_blocks` is an observation, not a verdict.** `RenderedPage`
   reports how many page subresources (XHR/fetch) returned a challenge status

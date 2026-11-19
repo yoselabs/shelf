@@ -9,14 +9,10 @@ from __future__ import annotations
 
 import plistlib
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import launchd_agent as la
 import pytest
 from launchd_agent.testing import FakeLaunchctl, RefusingLaunchctl
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 _LABEL = "dev.example.agent"
 
@@ -60,28 +56,49 @@ def test_render_plist_without_a_working_dir_names_none(tmp_path: Path) -> None:
     assert parsed["KeepAlive"] is False
 
 
-def _which(found: dict[str, str]) -> Callable[[str], str | None]:
-    return found.get
+def _tools(root: Path, **folders: tuple[str, ...]) -> dict[str, str]:
+    """An env whose PATH holds a folder per name in ``folders`` (each with the listed executables); returns that env."""
+    dirs = []
+    for folder, names in folders.items():
+        where = root / folder
+        where.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            exe = where / name
+            exe.write_text("#!/bin/sh\n")
+            exe.chmod(0o755)
+        dirs.append(str(where))
+    return {"PATH": ":".join(dirs)}
 
 
-def test_path_puts_a_tools_folder_before_launchds_default() -> None:
-    which = _which({"git": "/usr/bin/git", "git-lfs": "/opt/homebrew/bin/git-lfs"})
-    assert la.launch_path(["git", "git-lfs"], which) == "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+def test_path_puts_a_tools_folder_before_launchds_default(tmp_path: Path) -> None:
+    env = _tools(tmp_path, brew=("git-lfs",))
+    assert la.launch_path(["git-lfs"], env) == f"{tmp_path / 'brew'}:/usr/bin:/bin:/usr/sbin:/sbin"
 
 
-def test_path_is_launchds_default_when_nothing_is_found_elsewhere() -> None:
-    assert la.launch_path(["git", "git-lfs"], _which({})) == "/usr/bin:/bin:/usr/sbin:/sbin"
-    assert la.launch_path(["git"], _which({"git": "/usr/bin/git"})) == "/usr/bin:/bin:/usr/sbin:/sbin"
+def test_path_is_launchds_default_when_nothing_is_found(tmp_path: Path) -> None:
+    assert la.launch_path(["git", "git-lfs"], _tools(tmp_path, brew=())) == "/usr/bin:/bin:/usr/sbin:/sbin"
+    assert la.launch_path(["git"], {}) == "/usr/bin:/bin:/usr/sbin:/sbin"
 
 
-def test_path_names_each_folder_once() -> None:
-    which = _which({"git": "/opt/homebrew/bin/git", "git-lfs": "/opt/homebrew/bin/git-lfs"})
-    assert la.launch_path(["git", "git-lfs"], which) == "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+def test_a_tool_already_in_a_launchd_folder_adds_nothing() -> None:
+    assert la.launch_path(["sh"], {"PATH": "/bin"}) == "/usr/bin:/bin:/usr/sbin:/sbin"
 
 
-def test_path_keeps_the_tools_order() -> None:
-    which = _which({"git": "/usr/bin/git", "claude": "/Users/u/.local/bin/claude", "git-lfs": "/opt/homebrew/bin/git-lfs"})
-    assert la.launch_path(["git", "claude", "git-lfs"], which) == "/Users/u/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+def test_path_names_each_folder_once(tmp_path: Path) -> None:
+    env = _tools(tmp_path, brew=("git", "git-lfs"))
+    assert la.launch_path(["git", "git-lfs"], env) == f"{tmp_path / 'brew'}:/usr/bin:/bin:/usr/sbin:/sbin"
+
+
+def test_path_keeps_the_tools_order(tmp_path: Path) -> None:
+    env = _tools(tmp_path, brew=("git-lfs",), local=("claude",))
+    expected = f"{tmp_path / 'local'}:{tmp_path / 'brew'}:/usr/bin:/bin:/usr/sbin:/sbin"
+    assert la.launch_path(["claude", "git-lfs"], env) == expected
+
+
+def test_path_does_not_look_in_the_process_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    ambient = _tools(tmp_path, ambient=("only-in-ambient",))
+    monkeypatch.setenv("PATH", ambient["PATH"])
+    assert la.launch_path(["only-in-ambient"], {"PATH": ""}) == "/usr/bin:/bin:/usr/sbin:/sbin"
 
 
 def test_install_status_uninstall_round_trip(tmp_path: Path) -> None:
@@ -136,6 +153,11 @@ def test_the_real_runner_captures_and_never_raises() -> None:
     assert result.stdout == "out\n"
 
 
-def test_user_agents_dir_is_under_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("HOME", str(tmp_path))
-    assert la.user_agents_dir() == tmp_path / "Library" / "LaunchAgents"
+def test_user_agents_dir_is_under_the_given_home(tmp_path: Path) -> None:
+    assert la.user_agents_dir(tmp_path) == tmp_path / "Library" / "LaunchAgents"
+
+
+def test_the_real_runner_answers_a_hung_launchctl_with_exit_124_not_a_hang() -> None:
+    result = la.run_launchctl(["sh", "-c", "sleep 30"], timeout=0.2)
+    assert result.returncode == 124
+    assert "no answer" in result.stderr

@@ -23,17 +23,21 @@ from __future__ import annotations
 
 import os
 import plistlib
-import shutil
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from child_env import NotFound, find
+
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Mapping, Sequence
+    from pathlib import Path
 
 #: The PATH launchd starts an agent with, and nothing else.
 LAUNCHD_PATH = ("/usr/bin", "/bin", "/usr/sbin", "/sbin")
+#: Seconds a launchctl call may take before the real runner gives up on it.
+LAUNCHCTL_TIMEOUT_S = 30.0
+EXIT_TIMEOUT = 124
 
 
 class LaunchdError(RuntimeError):
@@ -58,14 +62,21 @@ class LoginItemStatus:
     loaded: bool  # launchd knows the label (RunAtLoad will fire it at login)
 
 
-def run_launchctl(cmd: list[str]) -> subprocess.CompletedProcess[str]:
-    """The real runner: ``cmd`` as a subprocess, output captured, never raising on exit code."""
-    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+def run_launchctl(cmd: list[str], timeout: float = LAUNCHCTL_TIMEOUT_S) -> subprocess.CompletedProcess[str]:
+    """The real runner: ``cmd`` as a subprocess, output captured, never raising on exit code.
+
+    A launchctl that answers nothing in ``timeout`` seconds is killed and reported as exit 124 (a failed call,
+    like any other non-zero exit), so a wedged launchd cannot hang the caller.
+    """
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, EXIT_TIMEOUT, "", f"{cmd[0]}: no answer in {timeout:g}s")
 
 
-def user_agents_dir() -> Path:
-    """``~/Library/LaunchAgents``: where a per-user agent's plist lives."""
-    return Path.home() / "Library" / "LaunchAgents"
+def user_agents_dir(home: Path) -> Path:
+    """``<home>/Library/LaunchAgents``: where a per-user agent's plist lives."""
+    return home / "Library" / "LaunchAgents"
 
 
 def domain() -> str:
@@ -77,17 +88,19 @@ def plist_path(label: str, agents_dir: Path) -> Path:
     return agents_dir / f"{label}.plist"
 
 
-def launch_path(tools: Sequence[str], which: Callable[[str], str | None] = shutil.which) -> str:
+def launch_path(tools: Sequence[str], env: Mapping[str, str]) -> str:
     """launchd's PATH with the folders holding ``tools`` in front, each folder once.
 
-    A tool ``which`` cannot find, or one already in a launchd folder, adds nothing.
+    The tools are looked up on ``env["PATH"]`` (the caller's, never the process's). A tool not found there, or one
+    already in a launchd folder, adds nothing.
     """
     folders: list[str] = []
     for tool in tools:
-        found = which(tool)
-        if found is None:
+        try:
+            found = find(tool, env).path
+        except NotFound:
             continue
-        folder = str(Path(found).parent)
+        folder = str(found.parent)
         if folder not in folders and folder not in LAUNCHD_PATH:
             folders.append(folder)
     return ":".join([*folders, *LAUNCHD_PATH])
@@ -172,6 +185,8 @@ def status(label: str, *, agents_dir: Path, run_launchctl: Launchctl = run_launc
 
 
 __all__ = [
+    "EXIT_TIMEOUT",
+    "LAUNCHCTL_TIMEOUT_S",
     "LAUNCHD_PATH",
     "Launchctl",
     "LaunchctlResult",

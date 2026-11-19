@@ -4,9 +4,12 @@
 this machine and which of them already name your server.
 
 ```python
+import os
+from pathlib import Path
+
 from mcp_clients import ClientState, client_statuses
 
-for status in client_statuses("my-server", Path.home()):
+for status in client_statuses("my-server", Path.home(), env=os.environ):
     print(status.name, status.state)      # Claude Code connected / OpenCode not_installed / ...
 ```
 
@@ -24,6 +27,6 @@ for status in client_statuses("my-server", Path.home()):
   not fail because someone hand-edited a file.
 - **Installer folders count.** A launchd login item gets a PATH without `~/.local/bin`
   or `~/.opencode/bin`; each program is also looked for where its installer puts it.
-- `which`, `applications` and `clients` are injectable; pass your own `McpClient` rows to
+- `env` (the PATH the programs are found on), `applications` and `clients` are injectable; pass your own `McpClient` rows to
   check a client this table does not know yet. `ClientState` values are plain words —
   the display text is the caller's.

@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import ast
 import inspect
+from typing import TYPE_CHECKING
 
 import pytest
 from convert_md import dispatch, engines, missing_engines
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _ENGINES = [
     engines.PymupdfLlmEngine,
@@ -19,25 +23,30 @@ _ENGINES = [
 
 
 def test_the_dev_environment_has_every_document_engine() -> None:
-    assert missing_engines([".pdf", ".docx", ".pptx", ".xlsx", ".html"]) == {}
+    assert missing_engines([".pdf", ".docx", ".pptx", ".xlsx", ".html"], env={}) == {}
 
 
 def test_suffix_spelling_is_forgiving() -> None:
-    assert missing_engines(["PDF", "docx"]) == {}
+    assert missing_engines(["PDF", "docx"], env={}) == {}
 
 
 def test_an_unsupported_format_is_reported() -> None:
-    assert missing_engines([".odt"]) == {".odt": ["no engine chain"]}
+    assert missing_engines([".odt"], env={}) == {".odt": ["no engine chain"]}
 
 
 def test_a_missing_library_is_named(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(dispatch, "_installed", lambda module: module != "mammoth")
-    assert missing_engines([".docx", ".pdf"]) == {".docx": ["MammothEngine: module 'mammoth' not installed"]}
+    assert missing_engines([".docx", ".pdf"], env={}) == {".docx": ["MammothEngine: module 'mammoth' not installed"]}
 
 
-def test_a_legacy_format_needs_libreoffice(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(dispatch.shutil, "which", lambda _name: None)
-    assert missing_engines([".doc"]) == {".doc": ["libreoffice not on PATH"]}
+def test_a_legacy_format_needs_libreoffice_on_the_given_path(tmp_path: Path) -> None:
+    assert missing_engines([".doc"], env={"PATH": str(tmp_path)}) == {".doc": ["libreoffice not on PATH"]}
+    for name in ("libreoffice", "soffice"):
+        exe = tmp_path / name
+        exe.write_text("#!/bin/sh\n")
+        exe.chmod(0o755)
+        assert missing_engines([".doc"], env={"PATH": str(tmp_path)}) == {}
+        exe.unlink()
 
 
 def test_nothing_is_imported_to_check(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -46,7 +55,7 @@ def test_nothing_is_imported_to_check(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AssertionError(msg)
 
     monkeypatch.setattr("builtins.__import__", refuse)
-    assert missing_engines([".pdf"]) == {}
+    assert missing_engines([".pdf"], env={}) == {}
 
 
 @pytest.mark.parametrize("engine", _ENGINES, ids=lambda e: e.__name__)

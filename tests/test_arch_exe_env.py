@@ -35,15 +35,11 @@ _WHICH_ALLOWED = {
     "packages/anyllm/src/anyllm/providers/claude_code_cli.py",
     "packages/anyllm/src/anyllm/providers/claude_code_sdk.py",
     "packages/anyllm/src/anyllm/providers/codex_cli.py",
-    "packages/beads-client/src/beads_client/client.py",
     "packages/blueprint/src/blueprint/concerns/stack.py",
     "packages/blueprint/src/blueprint/model.py",
-    "packages/convert-md/src/convert_md/dispatch.py",
     "packages/git-porcelain/src/git_porcelain/lfs.py",
     "packages/git-porcelain/src/git_porcelain/porcelain.py",
     "packages/git-porcelain/src/git_porcelain/real.py",
-    "packages/launchd-agent/src/launchd_agent/__init__.py",
-    "packages/mcp-clients/src/mcp_clients/__init__.py",
 }
 
 # CURRENT callers that pass a whole os.environ as a child's env. The consumer wave empties this. Only a literal
@@ -51,7 +47,6 @@ _WHICH_ALLOWED = {
 # (the consumer wave routes those through build_env too; this test does not follow data flow).
 _WHOLE_ENV_ALLOWED = {
     "packages/anyllm/src/anyllm/providers/claude_code_cli.py",
-    "packages/any-lease/src/any_lease/__main__.py",
 }
 
 

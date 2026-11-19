@@ -17,13 +17,14 @@ from __future__ import annotations
 
 import enum
 import json
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from child_env import NotFound, find
+
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Mapping, Sequence
 
 __all__ = ["KNOWN_CLIENTS", "ClientState", "ClientStatus", "McpClient", "client_statuses", "configured_servers"]
 
@@ -84,20 +85,28 @@ def client_statuses(
     server: str,
     home: Path,
     *,
-    which: Callable[[str], str | None] = shutil.which,
+    env: Mapping[str, str],
     applications: Sequence[Path] | None = None,
     clients: Sequence[McpClient] = KNOWN_CLIENTS,
 ) -> tuple[ClientStatus, ...]:
     """Each client's state for ``server``, in ``clients`` order.
 
     ``applications`` are the folders searched for an ``app``: ``~/Applications`` and
-    ``/Applications`` by default. ``which`` is the PATH lookup, injectable for tests.
+    ``/Applications`` by default. A program is found on ``env["PATH"]`` (the caller's, never the process's)
+    or in its ``install_dir`` under ``home``.
     """
     folders = applications if applications is not None else (home / "Applications", Path("/Applications"))
 
+    def on_path(program: str) -> bool:
+        try:
+            find(program, env)
+        except NotFound:
+            return False
+        return True
+
     def installed(client: McpClient) -> bool:
         if client.program is not None and (
-            which(client.program) is not None or (client.install_dir is not None and (home / client.install_dir / client.program).exists())
+            on_path(client.program) or (client.install_dir is not None and (home / client.install_dir / client.program).exists())
         ):
             return True
         return client.app is not None and any((folder / client.app).exists() for folder in folders)

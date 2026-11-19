@@ -6,9 +6,12 @@ Office formats are normalized through LibreOffice headless, then re-dispatched. 
 graded for fidelity by a cheap, model-free heuristic (yield / structure / garbage).
 
 ```python
+import os
+from pathlib import Path
+
 from convert_md import convert
 
-result = convert(Path("report.pdf"))
+result = convert(Path("report.pdf"), env=os.environ)   # env: where LibreOffice is looked up (legacy .doc/.ppt/.xls)
 result.body_markdown   # the converted text
 result.fidelity        # "high" | "partial" | "failed"
 result.engine          # "<engine>@<version>"
@@ -40,15 +43,17 @@ every file of that format into `fidelity="failed"`, quietly. That is how a bare
 promise in a test:
 
 ```python
+import os
+
 from convert_md import missing_engines
 
 def test_document_engines_are_installed():
-    assert missing_engines([".pdf", ".docx", ".pptx", ".xlsx"]) == {}
+    assert missing_engines([".pdf", ".docx", ".pptx", ".xlsx"], env=os.environ) == {}
     # else e.g. {".docx": ["MammothEngine: module 'mammoth' not installed"]}
 ```
 
 It reports a format with no engine chain, an engine whose library is missing, and a
-legacy format (`.doc`/`.ppt`) with no LibreOffice on `PATH`. Nothing is imported to
+legacy format (`.doc`/`.ppt`) with no LibreOffice on `env["PATH"]`. Nothing is imported to
 check. It runs against whatever version you have pinned, so it fails at the moment
 you bump the pin, which is when the fix is cheap.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import signal
 import subprocess
 import sys
@@ -105,3 +106,12 @@ def test_a_second_run_waits_for_the_first_and_says_who_it_waits_for(tmp_path: Pa
     assert second.returncode == 0
     assert "second ran" in out
     first.wait(timeout=30)
+
+
+def test_the_command_gets_the_environment_minus_secrets_and_the_held_names(tmp_path: Path) -> None:
+    """The child's env is child_env.build_env of ours: ordinary variables pass, credentials do not, and the held list is added."""
+    env = {**os.environ, "KEEP_ME": "k", "MY_SERVICE_TOKEN": "s3cret"}
+    show = "import os; print(os.environ.get('KEEP_ME'), os.environ.get('MY_SERVICE_TOKEN'), os.environ.get('ANY_LEASE_HELD'))"
+    proc = _run(tmp_path / "locks", "unity", 1, "job", sys.executable, "-c", show, env=env)
+    out, _ = proc.communicate(timeout=30)
+    assert out.split() == ["k", "None", "unity"]

@@ -4,9 +4,11 @@ A lean, typed, fail-loud client over the `bd` (beads) CLI. Stdlib only; imports 
 `any-beads`: it wraps exactly one tool.
 
 ```python
+import os
+
 from beads_client import Bd, BdError, NewBead
 
-bd = Bd("worker-1", cwd="/path/to/repo")
+bd = Bd("worker-1", cwd="/path/to/repo", env=os.environ)   # bd is found on env["PATH"]; none there: child_env.NotFound
 bd.check_version()                       # BdError("version") outside the tested bd range
 bead_id = bd.create(NewBead("Fix it", description="...", labels=("shelf",)))
 if bd.claim(bead_id):                    # False: someone else holds it

@@ -24,8 +24,6 @@ _ALLOWLIST = {
     "any-agent/src/any_agent/harnesses/claude.py": "~/.claude/projects transcript lookup (app-dirs.tool_home)",
     "any-agent/src/any_agent/harnesses/opencode.py": "XDG_DATA_HOME / ~/.local/share log + auth.json, ~/.opencode/bin (app-dirs.data_dir)",
     "any-agent/src/any_agent/harnesses/opencode_sandbox.py": "reads home and XDG_CONFIG_HOME for the sandbox deny list",
-    "any-browser/src/any_browser/zendriver.py": "reads the executable and Playwright path variables to find the browser",
-    "any-recorded-fixture/src/any_recorded_fixture/__init__.py": "default argument env=os.environ for update_requested",
     "any-speech/src/any_speech/defaults.py": "falls back to os.environ and Path.home() when env/home are not passed",
     "anyembed/src/anyembed/local.py": "MUTATES os.environ (setdefault HF_HUB_OFFLINE, TRANSFORMERS_OFFLINE)",
     "anyllm/src/anyllm/providers/claude_code_cli.py": "passes dict(os.environ) to the child process",
@@ -40,7 +38,6 @@ _ALLOWLIST = {
     "blueprint/src/blueprint/testing.py": "test double builds PATH from os.environ",
     "git-porcelain/src/git_porcelain/porcelain.py": "filters os.environ for git children and reads GIT_DIR",
     "git-porcelain/src/git_porcelain/real_env.py": "default source for the git child environment is os.environ",
-    "launchd-agent/src/launchd_agent/__init__.py": "LaunchAgents folder under Path.home()",
     "stream-proc/src/stream_proc/registered.py": "falls back to os.environ for the child environment",
     "child-env/src/child_env/__init__.py": "scrub_current() reads os.environ (callers should pass the mapping to scrub)",
 }
