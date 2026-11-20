@@ -10,7 +10,6 @@ name refs are kept while the files they come from are unchanged (``real_cache``)
 
 from __future__ import annotations
 
-import json
 import time
 from contextlib import nullcontext
 from pathlib import Path
@@ -38,6 +37,7 @@ from git_porcelain import (
 from git_porcelain.api import DEFAULT_TIMEOUT
 from git_porcelain.errors import GitTimeout, GitUnavailable, NotARepo
 from git_porcelain.real_done import Done, unavailable
+from git_porcelain.real_trace import trace_hooks
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -75,35 +75,6 @@ if TYPE_CHECKING:
     from git_porcelain.history import Identity
 
 __all__ = ["Done", "RealRepo", "RealWorktree", "unavailable"]
-
-
-def _trace_hooks(trace: Path) -> tuple[tuple[str, ...], tuple[tuple[str, int], ...]]:
-    if not trace.exists():
-        return (), ()
-    hooks: list[str] = []
-    children: dict[tuple[str, int], str] = {}
-    exits: list[tuple[str, int]] = []
-    for line in trace.read_text(encoding="utf-8", errors="replace").splitlines():  # lossy-ok: parse: JSON trace lines, bad lines skipped
-        try:
-            event = json.loads(line)
-        except ValueError:
-            continue
-        if not isinstance(event, dict):
-            continue
-        child_id, sid = event.get("child_id"), event.get("sid", "")
-        if not isinstance(child_id, int) or not isinstance(sid, str):
-            continue
-        key = (sid, child_id)
-        if event.get("event") == "child_start" and event.get("child_class") == "hook":
-            name = event.get("hook_name")
-            if isinstance(name, str):
-                hooks.append(name)
-                children[key] = name
-        elif event.get("event") == "child_exit" and key in children:
-            code = event.get("code")
-            if isinstance(code, int):
-                exits.append((children.pop(key), code))
-    return tuple(hooks), tuple(exits)
 
 
 def _find_git(env: Mapping[str, str]) -> Path | None:
@@ -215,7 +186,7 @@ class RealRepo:
                     timeout=limit,
                     input=None if stdin is None else stdin.encode("utf-8", "surrogateescape"),
                 )
-                hooks, hook_exits = _trace_hooks(trace) if trace is not None else ((), ())
+                hooks, hook_exits = trace_hooks(trace) if trace is not None else ((), ())
         except OSError as exc:
             msg = f"failed to invoke git: {exc}"
             raise GitUnavailable(msg) from exc

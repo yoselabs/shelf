@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import urlparse
 
 from .base import BackendCookie, RenderedPage, RenderOutcome
+from .scroll import scroll_and_retry
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine
@@ -118,38 +119,6 @@ def _summarize_exc(exc: BaseException) -> str:
     lines = str(exc).strip().splitlines()
     first = lines[0].strip() if lines else ""
     return f"{name}: {first}" if first else name
-
-
-async def _scroll_and_retry(page: Any, original_html: str, *, log: logging.Logger) -> str:
-    """Scroll-to-bottom + 2s networkidle wait + re-snapshot.
-
-    Returns whichever capture (original or post-scroll) is longer. Never
-    raises. Emits ``browser_scroll_retry`` diagnostics on the injected logger
-    (typed-record shape: message = event name, payload on ``fields``) so
-    consumers measure firing rate without coupling this package to their event
-    types.
-    """
-    log.info("StageStarted", extra={"fields": {"t_ms": 0, "step": "browser_scroll_retry"}})
-    start = time.perf_counter()
-    larger = original_html
-    outcome = "smaller"
-    try:
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        try:
-            await page.wait_for_load_state("networkidle", timeout=2_000)
-        except Exception:
-            # networkidle never settled — try a brief sleep then snapshot anyway
-            await asyncio.sleep(0.5)
-        retry_html = await page.content()
-        if len(retry_html) > len(original_html):
-            larger = retry_html
-            outcome = "larger"
-    except Exception:
-        outcome = "timeout"
-    dur_ms = int((time.perf_counter() - start) * 1000)
-    fields = {"t_ms": 0, "step": "browser_scroll_retry", "verdict": "ok", "dur_ms": dur_ms, "extra": {"outcome": outcome}}
-    log.info("StageEnded", extra={"fields": fields})
-    return larger
 
 
 async def _keep(_page: Any, html: str) -> str:
@@ -354,7 +323,7 @@ class PlaywrightBackend:
                 # Scroll-on-thin: sub-floor first snapshot on a JS-heavy host →
                 # scroll + 2s networkidle, keep the larger snapshot.
                 if len(html) < _THIN_FLOOR and js_heavy:
-                    html = await _scroll_and_retry(page, html, log=self._log)
+                    html = await scroll_and_retry(page, html, log=self._log)
                 html = await settle(page, html)  # listing completion (render_listing), else unchanged
         except Exception as exc:  # navigation/network/driver errors
             return RenderedPage(

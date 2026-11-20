@@ -247,6 +247,7 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 # to exactly the two driver modules — the seam (base.py) and launchers raise no
 # such thing.
 "packages/any-browser/src/any_browser/playwright.py" = ["BLE001"]
+"packages/any-browser/src/any_browser/scroll.py" = ["BLE001"]
 "packages/any-browser/src/any_browser/zendriver.py" = ["BLE001"]
 # CAS interpolates only quoted identifiers; all data values remain bound parameters.
 "packages/sqlite-store/src/sqlite_store/cas.py" = ["S608"]

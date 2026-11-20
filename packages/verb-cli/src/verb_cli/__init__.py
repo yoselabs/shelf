@@ -147,7 +147,7 @@ def flags_of(fn: Callable[..., Any]) -> list[FlagSpec]:  # Any: a verb's paramet
     return _flags(fn, _no_choices)
 
 
-def choice_flags_of(fn: Callable[..., Any]) -> list[FlagSpec]:
+def choice_flags_of(fn: Callable[..., Any]) -> list[FlagSpec]:  # Any: a verb's parameters and defaults are of any type
     """:func:`flags_of` that turns a ``Literal`` or an ``Enum`` of one value type into argparse choices instead of a JSON flag."""
     return _flags(fn, _choices_of)
 

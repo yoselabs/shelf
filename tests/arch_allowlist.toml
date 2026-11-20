@@ -17,6 +17,7 @@ page-tsv = "Intra-shelf workspace dependency (mcp-result-wire composes its rende
 [name_collision]
 # _example_helper = "why this convergence is by design"
 _client = "anyllm: each SDK provider's lazy client-builder method (anthropic vs openai). Same intent, genuinely different bodies — a convergence of concept, not a re-implementation."
+_render = "any-browser: each engine's page-driving render (Playwright API vs CDP); the shared shape is the settle callback, the bodies drive different drivers."
 _git = "any-gate (changed.py, state.py) and any-gate-python (select.py): their git calls differ in output shape (NUL-split list vs stripped text), and any-gate-python is stdlib only with no dependency on any-gate."
 
 # [[body_dup]]

@@ -9,7 +9,6 @@ the only tests that touch real git for this API.
 from __future__ import annotations
 
 import ast
-import dataclasses
 import hashlib
 import json
 import os
@@ -21,10 +20,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 import pytest
+from contract_support import _COMMIT_FAILURE_STDERR, _COMMIT_STDERR, _COMMIT_STDOUT, _dig, _hook_script, _plain
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from git_porcelain import (
-    Change,
     CommandResult,
     GitTimeout,
     GitUnavailable,
@@ -50,22 +49,6 @@ _ME = Identity("Contract Author", "author@example.invalid")
 _PLACEHOLDER = re.compile(r"<(\w+)(?::([^>]*))?>")
 _FILE = re.compile(r'("[^"]+"|\S+?)="((?:[^"\\]|\\.)*)"')
 _PATH_ARGS = {"add_worktree", "drop_worktree", "release_branch", "worktree_state"}
-_COMMIT_STDOUT = "stdout-start\n" + "x" * 1024 + "\nstdout-end\n"
-_COMMIT_STDERR = "stderr-start\n" + "y" * 1024 + "\nstderr-end\n"
-_COMMIT_FAILURE_STDERR = "error: gpg failed to sign the data\n" + _COMMIT_STDERR
-
-
-def _hook_script(kind: str, mode: str) -> str:
-    if mode == "error only":
-        return "echo 'error: nope' >&2\nexit 1\n"
-    if mode == "silent":
-        return "exit 1\n"
-    if mode.startswith("verbose"):
-        code = 1 if mode.endswith("refuses") else 0
-        return f"printf '%s' '{_COMMIT_STDOUT}'\nprintf '%s' '{_COMMIT_STDERR}' >&2\nexit {code}\n"
-    if mode == "refuses":
-        return f"echo '{kind} hook declined' >&2\nexit 1\n"
-    return '[ "$X" = "1" ] || { echo "X is not set" >&2; exit 1; }\n'
 
 
 # -- the two ways to arrange a repository -----------------------------------------------------------------
@@ -352,18 +335,6 @@ def _expand(world: World, raw: str) -> str:
     return _PLACEHOLDER.sub(value, raw)
 
 
-def _plain(item: object) -> object:
-    if isinstance(item, Change):
-        return f"{item.path} {item.kind} +{item.added} -{item.deleted}"
-    if dataclasses.is_dataclass(item) and not isinstance(item, type):
-        return {f.name: _plain(getattr(item, f.name)) for f in dataclasses.fields(item)}
-    if isinstance(item, (frozenset, set)):
-        return sorted(_plain(i) for i in item)  # type: ignore[type-var]
-    if isinstance(item, (list, tuple)):
-        return [_plain(i) for i in item]
-    return str(item) if hasattr(item, "parts") else item
-
-
 def _call(world: World, name: str, call: str) -> object:
     node = ast.parse(_expand(world, call), mode="eval").body
     assert isinstance(node, ast.Call)
@@ -375,12 +346,6 @@ def _call(world: World, name: str, call: str) -> object:
     wt = world.wts[name]
     target = wt if hasattr(wt, node.func.id) else wt.repo
     return getattr(target, node.func.id)(*args, **kwargs)
-
-
-def _dig(value: object, path: str) -> object:
-    for part in path.split("."):
-        value = value[int(part)] if part.isdigit() else getattr(value, part)  # type: ignore[index]
-    return value
 
 
 # -- arranging -----------------------------------------------------------------------------------------

@@ -130,7 +130,7 @@ def _cookie_to_cdp(cookie: BackendCookie, cdp: Any) -> Any:
 async def _scroll_and_retry_cdp(tab: Any, original_html: str) -> str:
     """Scroll-to-bottom + brief settle + re-snapshot; keep the larger capture.
 
-    The CDP-side mirror of :func:`any_browser.playwright._scroll_and_retry` —
+    The CDP-side mirror of :func:`any_browser.scroll.scroll_and_retry` —
     same intent (a sub-floor first paint on a JS-heavy host often grows after
     scroll), zendriver methods. Never raises.
     """

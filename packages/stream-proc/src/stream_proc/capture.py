@@ -125,7 +125,7 @@ def run_inherited(
     cwd: str | os.PathLike[str] | None = None,
     env: Mapping[str, str] | None = None,
     timeout: float,
-    stdin: int | IO[Any] | None = subprocess.DEVNULL,
+    stdin: int | IO[Any] | None = subprocess.DEVNULL,  # Any: passed through to subprocess unchanged
     grace: float = 5.0,
 ) -> int:
     """:func:`capture_bytes` for a child that writes to OUR stdout and stderr (a build someone watches): returns its exit code.

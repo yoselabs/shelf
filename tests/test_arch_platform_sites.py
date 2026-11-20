@@ -21,6 +21,7 @@ _ALLOWED: dict[str, str] = {
     "packages/sqlite-store/src/sqlite_store/filesystem.py": "fs-type probe reads /proc/mounts on linux only; others report unknown",
     "packages/anyllm/src/anyllm/providers/claude_code_sdk.py": "claude.exe name on Windows; darwin-only keychain credential probe",
     "packages/any-agent/src/any_agent/harnesses/opencode.py": "reports whether the command sandbox exists: sandbox-exec is darwin only",
+    "packages/stream-proc/src/stream_proc/hold.py": "ru_maxrss unit differs: bytes on darwin, kilobytes on linux",
     "packages/any-speech/src/any_speech/adapters/_child.py": "ru_maxrss unit differs: bytes on darwin, kilobytes on linux",
 }
 
