@@ -37,7 +37,7 @@ lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACH
 # working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
 # pre-push hook then skips the gate for that exact tree.
 [group('gate')]
-check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test") check-extra
+check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "tag-check" "test") check-extra
     uv run python -m any_gate passed --gate check
 
 [group('gate')]
@@ -54,6 +54,12 @@ scripts scope="changed":
     uv run python -m any_gate changed --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
     [ -s "$list" ] || { echo "skipped scripts: no shell script changed"; exit 0; }
     xargs -0 shellcheck < "$list"
+
+# Every package version on origin/main has its `<name>-v<version>` tag (2026-11-09: anyllm 0.8.0 was merged and never tagged, so a consumer
+# could not pin it). A release is bump, merge, tag, so the next gate after an untagged merge is the one that stops. Offline it reads local tags.
+[group('gate')]
+tag-check:
+    python3 -I tools/tag_check.py
 
 # One-time (idempotent, safe to re-run) setup for a CONSUMER repo: wires the commit guard,
 # resolver block, beads (opt-out), and this linter preset via the operations in
