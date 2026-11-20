@@ -442,7 +442,7 @@ dev = [
 
 [[package]]
 name = "any-gate"
-version = "0.1.1"
+version = "0.2.0"
 source = { editable = "packages/any-gate" }
 dependencies = [
     { name = "any-lease" },
@@ -475,10 +475,12 @@ dev = [
 
 [[package]]
 name = "any-gate-python"
-version = "0.1.2"
+version = "0.2.0"
 source = { editable = "packages/any-gate-python" }
 dependencies = [
     { name = "any-gate" },
+    { name = "child-env" },
+    { name = "content-digest" },
     { name = "stream-proc" },
 ]
 
@@ -499,6 +501,8 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "any-gate", editable = "packages/any-gate" },
+    { name = "child-env", editable = "packages/child-env" },
+    { name = "content-digest", editable = "packages/content-digest" },
     { name = "pytest", marker = "extra == 'pytest'", specifier = ">=8" },
     { name = "pytest-xdist", marker = "extra == 'pytest'", specifier = ">=3.6,<4" },
     { name = "stream-proc", editable = "packages/stream-proc" },
@@ -858,8 +862,22 @@ dependencies = [
     { name = "aiosqlite" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "aiosqlite", specifier = ">=0.20,<1" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-versioned"
@@ -944,6 +962,7 @@ transformers = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "anyembed", extra = ["transformers"] },
     { name = "hypothesis" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -964,6 +983,7 @@ provides-extras = ["transformers", "llamacpp"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "anyembed", extras = ["transformers"], editable = "packages/anyembed" },
     { name = "hypothesis", specifier = ">=6.100,<7" },
     { name = "pytest", specifier = ">=8,<9" },
     { name = "pytest-asyncio", specifier = ">=0.24,<1" },

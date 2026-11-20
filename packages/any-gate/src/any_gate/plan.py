@@ -5,8 +5,9 @@ from __future__ import annotations
 import math
 import os
 import re
-import subprocess
 from dataclasses import dataclass
+
+from stream_proc import capture
 
 __all__ = ["Resources", "detect", "too_wide", "workers"]
 
@@ -34,7 +35,7 @@ def _free_gb() -> float:
     size = os.sysconf("SC_PAGE_SIZE")
     if "SC_AVPHYS_PAGES" in os.sysconf_names:
         return os.sysconf("SC_AVPHYS_PAGES") * size / 1024**3
-    out = subprocess.run(["vm_stat"], capture_output=True, text=True, check=False).stdout  # macOS has no SC_AVPHYS_PAGES
+    out = capture(["vm_stat"], timeout=10.0).out  # macOS has no SC_AVPHYS_PAGES
     pages = sum(int(m[1]) for m in re.finditer(r"Pages (?:free|inactive|speculative):\s+(\d+)", out))
     return pages * size / 1024**3
 

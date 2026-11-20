@@ -7,12 +7,12 @@ cannot see (an unknown path, or a pytest plugin package that loads into every ru
 from __future__ import annotations
 
 import hashlib
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from any_gate.plan import too_wide
+from stream_proc import capture
 
 from any_gate_python.graph import (
     LOCK_FILES,
@@ -28,6 +28,8 @@ from any_gate_python.rules import Rules, matches
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+GIT_TIMEOUT = 600.0  # seconds one git call may take
 
 
 def _fitness(repo: Path, changed: list[str], rules: Rules) -> list[str]:
@@ -176,7 +178,7 @@ def wide_alarm(repo: Path, paths: list[str]) -> str | None:
 
 
 def _git(repo: Path, *args: str) -> str:
-    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=False).stdout
+    return capture(["git", *args], cwd=repo, timeout=GIT_TIMEOUT).out
 
 
 def merge_base(repo: Path) -> str:

@@ -1,6 +1,6 @@
 [project]
 name = "any-gate"
-version = "0.1.1"
+version = "0.2.0"
 description = "Stop re-running what already passed: green results remembered under a key of exactly what they ran on, the units left run through a stack's runner under a lease and limits that stop a hang."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
@@ -10,7 +10,7 @@ dependencies = [
     "any-lease>=0.1,<1",
     "atomic-io>=0.2,<1",
     "content-digest>=0.1,<1",
-    "stream-proc>=0.6,<1",
+    "stream-proc>=0.10,<1",
 ]
 
 [tool.uv.sources]

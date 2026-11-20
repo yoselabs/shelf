@@ -53,7 +53,7 @@ _UNSORTED_OK = {
     "packages/blueprint/src/blueprint/profile.py::_source_uses": "returns a bool (any file matches): no order reaches output",
     "tools/blueprint_fitness.py::_whole_suite": "builds a set",
     "tools/blueprint_fitness.py::pytest_sessionfinish": "the observed records feed `judge`, which compares sets, and are not stored",
-    "tools/changed.py::everything": "sorted on the line that returns the list",
+    "packages/any-gate/src/any_gate/changed.py::everything": "sorted on the line that returns the list",
 }
 
 

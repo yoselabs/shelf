@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-versioned"
+kind = "any-lib"
+tier = "T1"
+release = "any-versioned-v0.1.0"
+capability = "Stop hand-writing the stored-version check: one Versioned type knows the readable versions, migrates an old body to the current one in order, refuses the rest with one UnknownVersionError, and stamps the version key first on write, so existing files keep their bytes."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from any-speech format.py (readable set, error, v1 branch) and any-net probe.py (a written 'v' never read). Not here: SQL schema migration (sqlite-store migrate.py owns ordered user_version steps), derived-store drop-and-rebuild (sqlite-sidecar), content hashes. Born candidate; any-speech and any-net are its first consumers."

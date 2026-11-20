@@ -2,7 +2,7 @@
 name = "any-net"
 kind = "any-lib"
 tier = "T1"
-release = "any-net-v0.2.0"
+release = "any-net-v0.3.0"
 capability = "Stop re-writing the online check: a DNS/TCP-split probe bounded by a join deadline with an IP-literal fallback, a connection-drop error matcher and a one-file probe cache."
 implementation = "ours"
 status = "candidate"

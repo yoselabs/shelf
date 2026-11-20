@@ -1,14 +1,15 @@
 # Changelog
 
-## 0.1.2
+## 0.2.0
 
-- The `pytest` extra declares `pytest-xdist` (the runner passes `-n` to the pytest of the project under test).
-
-## Unreleased
-
+- Breaking: `run_tests(..., env=)` is required (the environment the pytest processes get and `nice` is found on); the CLI passes `os.environ`. `nice` is found with `child_env.find`. Git and `uv export` run through `stream_proc.capture` with a timeout; the per-package export hash is `content_digest.digest_text(length=64)`, the same bytes. Depends on `child-env`, `content-digest`, `stream-proc>=0.10`. No suite key changes.
 - `plan` prints an alarm to stderr when the change reaches more than half of the package suites (`wide_alarm`, on `any_gate.too_wide`); it does not fail.
 - `run --nice N` (default 10) and `run_tests(nice=)` start every pytest process that many steps nicer, so a gate yields the box to what the owner waits on.
 - Dev group: the package's tests run isolated (`uv run --isolated --package any-gate-python --group dev pytest packages/any-gate-python/tests`).
+
+## 0.1.2
+
+- The `pytest` extra declares `pytest-xdist` (the runner passes `-n` to the pytest of the project under test).
 
 ## 0.1.0
 

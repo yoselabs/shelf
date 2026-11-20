@@ -24,11 +24,9 @@ _ALLOWED = {
     "packages/blueprint/src/blueprint/secret_scan.py": "blueprint is stdlib only (bare clone, PYTHONPATH): no verb-cli",
     "packages/stream-proc/src/stream_proc/_exec_gate.py": "a child-side gate script run by path: stdlib only, no shelf import",
     "tools/catalog.py": "a repo tool script, run by `just`: stdlib only, no workspace import",
-    "tools/preset_drift.py": "a repo tool script, run by `just`: stdlib only, no workspace import",
-    "tools/affected.py": "a repo tool script, run by `just`: stdlib only, no workspace import",
-    "tools/gate_state.py": "a repo tool script, run by `just`: stdlib only, no workspace import",
-    "tools/changed.py": "a repo tool script, run by `just`: stdlib only, no workspace import",
-    "tools/hooks/forbid-local-shelf-source.py": "a git hook script copied into consumer repos: stdlib only",
+    "tools/tag_check.py": "a repo tool script, run by the pre-push hook as bare `python3 -I`: stdlib only, no workspace import",
+    "packages/any-gate/src/any_gate/cli.py": "needs argparse.REMAINDER (`-- RUNNER`, `-- CMD`) and repeatable flags; verb-cli has neither",
+    "packages/any-gate-python/src/any_gate_python/cli.py": "the runner `any-gate test` calls, beside any-gate's CLI; same flag shapes",
 }
 
 

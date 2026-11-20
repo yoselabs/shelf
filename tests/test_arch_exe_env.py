@@ -34,7 +34,11 @@ _WHICH_ALLOWED = {
 # CURRENT callers that pass a whole os.environ as a child's env. The consumer wave empties this. Only a literal
 # env=<whole environ> keyword is seen: blueprint's gate_state.py and testing.py build the dict in a variable first
 # (the consumer wave routes those through build_env too; this test does not follow data flow).
-_WHOLE_ENV_ALLOWED: set[str] = set()
+_WHOLE_ENV_ALLOWED: set[str] = {
+    # the gate passes the caller's own environment to the recipes and pytest it launches (UV_*, MISE_*, GIT_*, PRE_COMMIT_*)
+    "packages/any-gate/src/any_gate/cli.py",
+    "packages/any-gate-python/src/any_gate_python/cli.py",
+}
 
 
 def _rel(path: Path) -> str:

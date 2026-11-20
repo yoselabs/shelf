@@ -9,6 +9,7 @@ quarantine); exit 0 when none failed (a failing quarantined test is reported, no
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import sys
 from pathlib import Path
@@ -28,6 +29,7 @@ def _run(args: argparse.Namespace) -> int:
         args.paths,
         cwd=Path.cwd(),
         workers=workers,
+        env=os.environ,
         wall=args.wall,
         idle=args.idle,
         on_output=show,

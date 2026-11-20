@@ -84,7 +84,7 @@ def _receipts(given: str | None, repo: Path) -> Receipts | None:
     """The receipts file named, else `gate-receipts.json` in the git directory every worktree of `repo` shares; None outside a repo."""
     if given:
         return Receipts(Path(given))
-    shared = common_dir(repo)
+    shared = common_dir(repo, os.environ)
     return Receipts(shared / "gate-receipts.json") if shared else None
 
 
@@ -180,7 +180,9 @@ def _say(line: str) -> None:
 
 
 def _steps(args: argparse.Namespace) -> int:
-    return run_and_report(args.names, runner=args.runner, step_budget=args.step_budget, gate_budget=args.gate_budget, say=_say)
+    return run_and_report(
+        args.names, env=os.environ, runner=args.runner, step_budget=args.step_budget, gate_budget=args.gate_budget, say=_say
+    )
 
 
 def _exec(cmd: Sequence[str]) -> int:
@@ -201,13 +203,13 @@ def _state(args: argparse.Namespace) -> int:
         if not cmd:
             notice("pre-push: give the command after --")
             return 2
-        if receipts is not None and GateState(repo, receipts).green(args.gate):
+        if receipts is not None and GateState(repo, receipts, os.environ).green(args.gate):
             notice(f"tree already passed `{args.gate}`; not run again")
             return 0
         return _exec(cmd)
     if receipts is None:  # outside a git repo nothing is noted and nothing is recorded
         return 0
-    gate = GateState(repo, receipts)
+    gate = GateState(repo, receipts, os.environ)
     if args.command == "start":
         gate.start()
     elif not gate.passed(args.gate):

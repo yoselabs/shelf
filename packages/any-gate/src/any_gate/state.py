@@ -10,46 +10,49 @@ The record is a receipt named `gate-<gate>`, keyed `<tree> <base>`, in the share
 
 from __future__ import annotations
 
-import os
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from stream_proc import capture
+
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from any_gate.receipts import Receipts
 
 START = "gate-green.start"
+GIT_TIMEOUT = 600.0  # seconds one git call may take: `add -A` on a large tree is the slow one
 
 
-def _git(repo: Path, *args: str, env: dict[str, str] | None = None) -> str | None:
+def _git(repo: Path, env: Mapping[str, str], *args: str) -> str | None:
     """What git prints, stripped; None when git fails (not a repo, no upstream, ...)."""
     try:
-        done = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=False, env=env)
+        done = capture(["git", *args], cwd=repo, env=env, timeout=GIT_TIMEOUT)
     except OSError:
         return None
-    return done.stdout.strip() if done.returncode == 0 else None
+    return done.out.strip() if done.exit == 0 else None
 
 
-def common_dir(repo: Path) -> Path | None:
+def common_dir(repo: Path, env: Mapping[str, str]) -> Path | None:
     """The git directory every worktree of this checkout shares; None outside a repo."""
-    found = _git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    found = _git(repo, env, "rev-parse", "--path-format=absolute", "--git-common-dir")
     return Path(found) if found else None
 
 
-def _own_path(repo: Path, name: str) -> Path | None:
-    found = _git(repo, "rev-parse", "--path-format=absolute", "--git-path", name)
+def _own_path(repo: Path, env: Mapping[str, str], name: str) -> Path | None:
+    found = _git(repo, env, "rev-parse", "--path-format=absolute", "--git-path", name)
     return Path(found) if found else None
 
 
-def _base(repo: Path) -> str:
-    return _git(repo, "merge-base", "HEAD", "@{upstream}") or "none"
+def _base(repo: Path, env: Mapping[str, str]) -> str:
+    return _git(repo, env, "merge-base", "HEAD", "@{upstream}") or "none"
 
 
-def working_key(repo: Path) -> str | None:
+def working_key(repo: Path, env: Mapping[str, str]) -> str | None:
     """`<tree> <base>` for the working tree as `git add -A` would commit it; None when git cannot say."""
-    index = _own_path(repo, "index")
+    index = _own_path(repo, env, "index")
     if index is None:
         return None
     with tempfile.TemporaryDirectory() as scratch:
@@ -58,31 +61,32 @@ def working_key(repo: Path) -> str | None:
             # Its stat cache keeps `add -A` from rehashing every file. The copy keeps the index's mtime: git trusts an entry's recorded stat
             # unless the entry is not older than the index file (racily clean); a copy stamped now would hide a same-tick edit.
             shutil.copy2(index, temp_index)
-        env = {**os.environ, "GIT_INDEX_FILE": str(temp_index)}
-        if _git(repo, "add", "-A", env=env) is None:
+        scratch_env = {**env, "GIT_INDEX_FILE": str(temp_index)}
+        if _git(repo, scratch_env, "add", "-A") is None:
             return None
-        tree = _git(repo, "write-tree", env=env)
-    return f"{tree} {_base(repo)}" if tree else None
+        tree = _git(repo, scratch_env, "write-tree")
+    return f"{tree} {_base(repo, env)}" if tree else None
 
 
-def head_key(repo: Path) -> str | None:
+def head_key(repo: Path, env: Mapping[str, str]) -> str | None:
     """`<tree> <base>` for HEAD; None when the working tree is not clean or git cannot say."""
-    if _git(repo, "status", "--porcelain") != "":
+    if _git(repo, env, "status", "--porcelain") != "":
         return None
-    tree = _git(repo, "rev-parse", "HEAD^{tree}")
-    return f"{tree} {_base(repo)}" if tree else None
+    tree = _git(repo, env, "rev-parse", "HEAD^{tree}")
+    return f"{tree} {_base(repo, env)}" if tree else None
 
 
 class GateState:
-    """The trees `repo`'s gates passed, kept as receipts."""
+    """The trees `repo`'s gates passed, kept as receipts. `env` is the environment git runs in and `PRE_COMMIT_TO_REF` is read from."""
 
-    def __init__(self, repo: Path, receipts: Receipts) -> None:
+    def __init__(self, repo: Path, receipts: Receipts, env: Mapping[str, str]) -> None:
         self._repo = repo
         self._receipts = receipts
+        self._env = env
 
     def start(self) -> None:
         """Note the working tree's key as the gate begins; a repo git cannot read notes nothing."""
-        path, key = _own_path(self._repo, START), working_key(self._repo)
+        path, key = _own_path(self._repo, self._env, START), working_key(self._repo, self._env)
         if path is None or key is None:
             return
         try:
@@ -92,12 +96,12 @@ class GateState:
 
     def passed(self, gate: str) -> bool:
         """Record the working tree as green for `gate` when it is the tree `start` noted. Never raises; True when recorded."""
-        begun = _own_path(self._repo, START)
+        begun = _own_path(self._repo, self._env, START)
         if begun is None or not begun.is_file():
             return False
         noted = begun.read_text().strip()
         begun.unlink(missing_ok=True)
-        key = working_key(self._repo)
+        key = working_key(self._repo, self._env)
         if key is None or key != noted:
             return False
         try:
@@ -108,10 +112,10 @@ class GateState:
 
     def green(self, gate: str) -> bool:
         """Whether HEAD's tree passed `gate` and a push may skip it: a clean tree, HEAD being pushed, and a record."""
-        key = head_key(self._repo)
+        key = head_key(self._repo, self._env)
         if key is None:
             return False
-        pushed = os.environ.get("PRE_COMMIT_TO_REF", "")
-        if pushed and pushed != _git(self._repo, "rev-parse", "HEAD"):
+        pushed = self._env.get("PRE_COMMIT_TO_REF", "")
+        if pushed and pushed != _git(self._repo, self._env, "rev-parse", "HEAD"):
             return False
         return self._receipts.has(f"gate-{gate}", key)

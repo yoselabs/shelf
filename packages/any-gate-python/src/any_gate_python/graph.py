@@ -9,17 +9,18 @@ rest (lint, types, architecture, test paths) as no suite's concern. When uv or t
 
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 import re
-import subprocess
 import tarfile
 import tempfile
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from content_digest import digest_text
+from stream_proc import capture, capture_bytes
 
 _REQ_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 
@@ -43,7 +44,7 @@ def workspace(repo: Path) -> tuple[dict[str, set[str]], set[str]]:
     raw: dict[str, set[str]] = {}
     plugins: set[str] = set()
     for manifest in sorted(repo.glob("packages/*/pyproject.toml")):
-        data = tomllib.loads(manifest.read_text())
+        data = tomllib.loads(manifest.read_text(encoding="utf-8"))
         project = data.get("project", {})
         directory = manifest.parent.name
         names[_norm(project.get("name", directory))] = directory
@@ -61,13 +62,16 @@ class ExportError(Exception):
 # (a workspace directory, package directories) -> each package's export hash
 Exporter = Callable[[Path, list[str]], dict[str, str]]
 LOCK_FILES = ("uv.lock", "pyproject.toml")
+TOOL_TIMEOUT = 600.0  # seconds one `uv export` or git call may take
 
 
 def member_names(repo: Path) -> dict[str, str]:
     """`packages/*` directory -> its project name, which `uv export --package` takes."""
     names: dict[str, str] = {}
     for manifest in sorted(repo.glob("packages/*/pyproject.toml")):
-        names[manifest.parent.name] = tomllib.loads(manifest.read_text()).get("project", {}).get("name", manifest.parent.name)
+        names[manifest.parent.name] = (
+            tomllib.loads(manifest.read_text(encoding="utf-8")).get("project", {}).get("name", manifest.parent.name)
+        )
     return names
 
 
@@ -78,11 +82,11 @@ def package_exports(repo: Path, packages: list[str]) -> dict[str, str]:
     for directory in packages:
         cmd = ["uv", "export", "--frozen", "--package", names[directory], "--group", "dev"]
         cmd += ["--no-emit-workspace", "--no-hashes", "--no-header", "--no-annotate", "-q"]
-        done = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, check=False)
-        if done.returncode:
-            message = f"uv export --package {names[directory]} failed: {done.stderr.strip()[:200]}"
+        done = capture(cmd, cwd=repo, timeout=TOOL_TIMEOUT)
+        if done.exit:
+            message = f"uv export --package {names[directory]} failed: {done.err.strip()[:200]}"
             raise ExportError(message)
-        hashes[directory] = hashlib.sha256(done.stdout.encode()).hexdigest()
+        hashes[directory] = digest_text(done.out, length=64)
     return hashes
 
 
@@ -92,23 +96,23 @@ def root_config(manifest: Path) -> str:
     The dependency tables are answered by the exports, and ruff, pyrefly, import-linter, deptry, `tool.uv` and the list of test paths
     are read by whole-repo gate steps, never by a suite. What stays is how pytest and coverage run, which reaches every suite.
     """
-    data = tomllib.loads(manifest.read_text()) if manifest.is_file() else {}
+    data = tomllib.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
     tool: dict[str, Any] = data.get("tool", {})
     options = {k: v for k, v in tool.get("pytest", {}).get("ini_options", {}).items() if k != "testpaths"}
-    return json.dumps({"pytest": options, "coverage": tool.get("coverage", {})}, sort_keys=True, default=str)
+    return json.dumps({"pytest": options, "coverage": tool.get("coverage", {})}, sort_keys=True)
 
 
 def extract_base(repo: Path, base: str, dest: Path) -> None:
-    listed = subprocess.run(["git", "ls-tree", "-r", "--name-only", base], cwd=repo, capture_output=True, text=True, check=False)
-    names = [n for n in listed.stdout.splitlines() if n in LOCK_FILES or re.fullmatch(r"packages/[^/]+/pyproject\.toml", n)]
-    if listed.returncode or not names:
+    listed = capture(["git", "ls-tree", "-r", "--name-only", base], cwd=repo, timeout=TOOL_TIMEOUT)
+    names = [n for n in listed.out.splitlines() if n in LOCK_FILES or re.fullmatch(r"packages/[^/]+/pyproject\.toml", n)]
+    if listed.exit or not names:
         message = f"the base tree {base!r} cannot be read"
         raise ExportError(message)
-    archive = subprocess.run(["git", "archive", base, "--", *names], cwd=repo, capture_output=True, check=False)
-    if archive.returncode:
+    archive = capture_bytes(["git", "archive", base, "--", *names], cwd=repo, timeout=TOOL_TIMEOUT)
+    if archive.exit:
         message = f"git archive {base!r} failed"
         raise ExportError(message)
-    with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as bundle:
+    with tarfile.open(fileobj=io.BytesIO(archive.out)) as bundle:
         bundle.extractall(dest, filter="data")
 
 

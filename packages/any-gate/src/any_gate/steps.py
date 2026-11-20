@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
 STEP_BUDGET = 60.0
 GATE_BUDGET = 180.0
@@ -48,11 +48,13 @@ class Report:
         return tuple(step for step in self.steps if step.returncode != 0)
 
 
-def run_steps(names: Sequence[str], *, runner: str = "just", cwd: Path | None = None, terminal: int | None = None) -> Report:
-    """Run `runner NAME` for every name at once; `terminal` is the descriptor notices go to (default: a copy of stderr)."""
+def run_steps(
+    names: Sequence[str], *, env: Mapping[str, str], runner: str = "just", cwd: Path | None = None, terminal: int | None = None
+) -> Report:
+    """Run `runner NAME` for every name at once in `env`; `terminal` is the descriptor notices go to (default: a copy of stderr)."""
     own = terminal is None
     tty = os.dup(2) if own else terminal
-    env = {**os.environ, "GATE_NOTICE_FD": str(tty)}
+    child_env = {**env, "GATE_NOTICE_FD": str(tty)}
     results: dict[str, Step] = {}
     began = time.monotonic()
     with tempfile.TemporaryDirectory() as scratch:
@@ -63,12 +65,14 @@ def run_steps(names: Sequence[str], *, runner: str = "just", cwd: Path | None = 
             with log.open("wb") as sink:
                 try:
                     code = subprocess.run(
-                        [runner, name], stdout=sink, stderr=subprocess.STDOUT, env=env, cwd=cwd, pass_fds=(tty,), check=False
+                        [runner, name], stdout=sink, stderr=subprocess.STDOUT, env=child_env, cwd=cwd, pass_fds=(tty,), check=False
                     ).returncode
                 except OSError as err:
                     sink.write(f"cannot run {runner}: {err}\n".encode())
                     code = 127
-            results[name] = Step(name, code, int(time.monotonic() - started), log.read_text(errors="replace"))
+            results[name] = Step(
+                name, code, int(time.monotonic() - started), log.read_text(errors="replace")
+            )  # lossy-ok: display: a step's log is shown, not stored or hashed
 
         threads = [threading.Thread(target=one, args=(name,)) for name in names]
         for thread in threads:
@@ -99,11 +103,18 @@ def render(report: Report, *, step_budget: float, gate_budget: float) -> list[st
 
 
 def run_and_report(
-    names: Sequence[str], *, runner: str, step_budget: float, gate_budget: float, say: Callable[[str], None], cwd: Path | None = None
+    names: Sequence[str],
+    *,
+    env: Mapping[str, str],
+    runner: str,
+    step_budget: float,
+    gate_budget: float,
+    say: Callable[[str], None],
+    cwd: Path | None = None,
 ) -> int:
     """Run the steps, say what happened through `say`, and return 0 when every step passed, else 1."""
     say(f"gate: {' '.join(names)} (in parallel)")
-    report = run_steps(names, runner=runner, cwd=cwd)
+    report = run_steps(names, env=env, runner=runner, cwd=cwd)
     for line in render(report, step_budget=step_budget, gate_budget=gate_budget):
         say(line)
     return 1 if report.failed else 0
