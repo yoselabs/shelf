@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "channel-research"
+software = "any-disk"
+why = "channel-research's batch loops (iorlas-wip skills/channel-research/batch.py disk_ok) sleep below 50 GB free and stop below 40 GB, sharing one disk across about ten processes. Not yet adopted: the skill's migration deletes that local copy after release."
+needs = "await_space(path, wait_below_gb=, stop_below_gb=, poll=, on_wait=) -> bool, True when there is room (after waiting between the levels), False below the stop level."
+sponsor = "yoselabs"
+requester = "channel-research"
+status = "active"          # active | retired -- the planned retention claim until the skill's migration lands
