@@ -48,10 +48,6 @@ def _rows(reason: str, *keys: str) -> dict[str, str]:
 _ALLOWED: dict[str, str] = {
     # --- split: the flag chooses between behaviours; a separate type or function is the fix ---
     **_rows(
-        "split: choices=True is a compatibility switch between two flag shapes; ogy consumes verb-cli",
-        "verb-cli:flags_of:choices",
-    ),
-    **_rows(
         "split: capture=False inherits stdio instead of capturing; a second operation",
         "stream-proc:capture_bytes:capture",
     ),

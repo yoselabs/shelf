@@ -46,10 +46,10 @@ class VerbCli:
     def __init__(self, verbs: Mapping[str, Callable[..., Any]], *, shared: type | None = None) -> None:
         self.verbs = dict(verbs)
         self.shared = shared
-        self._shared_specs = vc.flags_of(shared, choices=True) if shared is not None else []
+        self._shared_specs = vc.choice_flags_of(shared) if shared is not None else []
         self._specs: dict[str, list[vc.FlagSpec]] = {}
         for name, fn in self.verbs.items():
-            specs = [s for s in vc.flags_of(fn, choices=True) if shared is None or s.base is not shared]
+            specs = [s for s in vc.choice_flags_of(fn) if shared is None or s.base is not shared]
             clash = {s.dest for s in specs} & {s.dest for s in self._shared_specs}
             if clash:
                 message = f"{name}: parameter {sorted(clash)} is also a shared parameter"

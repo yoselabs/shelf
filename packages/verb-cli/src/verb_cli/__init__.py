@@ -5,7 +5,7 @@
   outside the scalars (``str``, ``int``, ``float``, ``bool``, ``Path``) is one JSON flag.
 - :func:`to_argparse` adds the flags to a parser; ``bool`` is a paired ``--flag/--no-flag``.
   ``Annotated[T, POSITIONAL]`` is a positional argument (``*args`` too, as ``nargs="*"``);
-  ``flags_of(fn, choices=True)`` maps a ``Literal`` or ``Enum`` to argparse choices.
+  ``choice_flags_of(fn)`` is ``flags_of`` that maps a ``Literal`` or ``Enum`` to argparse choices.
 - :class:`VerbCli` turns ``{name: fn}`` into one parser with a subparser per verb, folds a shared
   parameter class (``--repo``, ``--kb``) into every verb, and parses argv into an :class:`Invocation`.
 - :func:`kwargs_of` turns the parsed namespace into keyword arguments, decoding JSON flags
@@ -132,16 +132,27 @@ def _analyze(pname: str, ann: Any) -> tuple[str, Any, bool, str | None, bool]:
     return flag, base, not is_scalar, help_text, positional
 
 
-def flags_of(fn: Callable[..., Any], *, choices: bool = False) -> list[FlagSpec]:
+def _no_choices(_base: Any) -> tuple[tuple[Any, ...] | None, Any]:
+    return None, None
+
+
+def flags_of(fn: Callable[..., Any]) -> list[FlagSpec]:
     """One :class:`FlagSpec` per parameter of ``fn``, in signature order.
 
     String annotations (``from __future__ import annotations``) are resolved with their
     ``Annotated`` metadata. ``self`` and ``**kwargs`` are skipped, and so is ``*args`` unless it is
     marked :data:`POSITIONAL`. A class works as well as a function (its ``__init__`` signature).
-
-    ``choices=True`` turns a ``Literal`` or an ``Enum`` of one value type into argparse choices
-    instead of a JSON flag. It is off by default so a caller built on the JSON flag is unchanged.
+    A ``Literal`` or an ``Enum`` is one JSON flag; :func:`choice_flags_of` makes it argparse choices.
     """
+    return _flags(fn, _no_choices)
+
+
+def choice_flags_of(fn: Callable[..., Any]) -> list[FlagSpec]:
+    """:func:`flags_of` that turns a ``Literal`` or an ``Enum`` of one value type into argparse choices instead of a JSON flag."""
+    return _flags(fn, _choices_of)
+
+
+def _flags(fn: Callable[..., Any], choices_of: Callable[[Any], tuple[tuple[Any, ...] | None, Any]]) -> list[FlagSpec]:
     hints = typing.get_type_hints(fn, include_extras=True)
     specs: list[FlagSpec] = []
     for pname, param in inspect.signature(fn).parameters.items():
@@ -151,7 +162,7 @@ def flags_of(fn: Callable[..., Any], *, choices: bool = False) -> list[FlagSpec]
         variadic = param.kind is param.VAR_POSITIONAL
         if variadic and not positional:
             continue
-        values, enum_type = _choices_of(base) if choices else (None, None)
+        values, enum_type = choices_of(base)
         if values is not None:
             needs_json = False
         if positional and base is bool:
@@ -251,6 +262,7 @@ __all__ = [
     "Invocation",
     "VerbCli",
     "VerbCliError",
+    "choice_flags_of",
     "flags_of",
     "kwargs_of",
     "to_argparse",

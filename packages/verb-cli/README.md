@@ -66,8 +66,8 @@ cli.specs("show")                    # the verb's own FlagSpecs, for another sur
 
 - `Annotated[T, POSITIONAL]` is a positional argument; with a default it is optional (`nargs="?"`);
   on `*args` it is `nargs="*"`. Positional-only parameters are called by position.
-- `flags_of(fn, choices=True)` maps `Literal[...]` and an `Enum` of one value type (by value) to argparse
-  `choices`; off by default, so a Literal stays one JSON flag for existing callers. `VerbCli` turns it on.
+- `choice_flags_of(fn)` maps `Literal[...]` and an `Enum` of one value type (by value) to argparse
+  `choices`; `flags_of(fn)` keeps a Literal as one JSON flag. `VerbCli` uses `choice_flags_of`.
 - `shared` is a class whose signature names the shared parameters (dataclass or model); they become flags on
   every verb, and a verb parameter annotated with that class receives the built instance. A clash raises
   `VerbCliError`. The subparser help is the docstring's first line.
