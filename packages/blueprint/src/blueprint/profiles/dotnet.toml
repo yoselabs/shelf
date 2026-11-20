@@ -159,15 +159,3 @@ config = [
     { path = ".pre-commit-config.yaml", contains = "dotnet csharpier check" },
     { path = ".pre-commit-config.yaml", contains = "typos" },
 ]
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/dotnet.md (build and test commands, analyzer policy, layering, nullability, comment conventions), linked from AGENTS.md; a short AGENTS.md per top-level code folder"
-install = """create docs/agents/dotnet.md (<= 150 lines): commands (just check/build/test/fmt); `Directory.Build.props` and `Directory.Packages.props` are the only places for \
-settings and versions; analyzers: never #pragma, add a path-scoped .editorconfig line with a reason; nullability: no `!` outside tests; \
-comments: `// why:` for non-obvious decisions (units, determinism, workarounds with a link), `<summary>` on public types of library projects stating the contract and invariants, no file headers, no comment that restates code; \
-layering table; test naming. Link it from AGENTS.md with the line `.NET conventions: docs/agents/dotnet.md`"""
-config = [
-    { path = "docs/agents/dotnet.md" },
-    { path = "AGENTS.md", contains = "docs/agents/dotnet.md" },
-]

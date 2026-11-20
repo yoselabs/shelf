@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import tempfile
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from blueprint import templates
 from blueprint.model import FixedBy, check, failing, not_applicable, not_checked, not_set_up, passing, uses_beads
 
 if TYPE_CHECKING:
@@ -224,104 +222,3 @@ def worktrees_in_sync(ctx: Context) -> Finding:
 
 def _ago(stamp: int) -> str:
     return f"{(time.time() - stamp) / 3600:.0f}h ago"
-
-
-_INSTALL = "uv run blueprint init"
-
-
-# What `bd init` writes into CLAUDE.md/AGENTS.md for the owner to fill: `_Add your build and test commands here_`
-# (or `*...*`). Left in, agents get no build or test command.
-_BD_PLACEHOLDER = re.compile(
-    r"^[ \t>*_-]*[*_]\s*Add (?:your\b[^\n]*?\bhere|a brief overview\b[^\n]*?)[*_]\s*$", re.MULTILINE | re.IGNORECASE
-)
-
-
-def _instruction_files(ctx: Context) -> dict[str, str]:
-    """AGENTS.md and CLAUDE.md by name; a symlink to the other is read once."""
-    seen: dict[Path, str] = {}
-    files: dict[str, str] = {}
-    for name in ("AGENTS.md", "CLAUDE.md"):
-        text = ctx.read(name)
-        if text is not None and ctx.path(name).resolve() not in seen:
-            seen[ctx.path(name).resolve()] = name
-            files[name] = text
-    return files
-
-
-_FENCE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
-_BACKTICKED = re.compile(r"`([^`\n]+)`")
-_LINKED = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
-# A repo-relative file: no scheme, placeholder, glob or command; ends in a known extension; `NNNN` and `YYYY` are patterns.
-_PATH = re.compile(r"[\w.-]+(?:/[\w.-]+)*\.(?:md|toml|ya?ml|json|py|sh|txt|just)")
-_PATTERN = re.compile(r"N{2,}|YYYY|MM-DD")
-_OPTIONAL = re.compile(r"\bif (?:it|one|they) exists?\b|\bif present\b|\bwhen present\b", re.IGNORECASE)
-
-
-def _named_paths(text: str) -> list[str]:
-    """The repo files a conventions file names in backticks or links, outside code fences, in first-seen order."""
-    # A path named only "if it exists" (the domain template's CONTEXT-MAP.md) is optional, not a claim.
-    prose = "\n".join(line for line in _FENCE.sub("", text).splitlines() if not _OPTIONAL.search(line))
-    named = [*_BACKTICKED.findall(prose), *(t.split("#")[0] for t in _LINKED.findall(prose))]
-    return list(dict.fromkeys(t for t in named if _PATH.fullmatch(t) and not _PATTERN.search(t)))
-
-
-def _missing_paths(ctx: Context, name: str) -> list[str]:
-    """Paths docs/agents/<name>.md names that exist neither from the repo root nor, for a link, beside the file."""
-    here = Path("docs/agents")
-    named = _named_paths(ctx.read(f"docs/agents/{name}.md") or "")
-    return [p for p in named if not ctx.path(p).exists() and not ctx.path(str(here / p)).exists()]
-
-
-@check(
-    "agents.culture-files",
-    "every docs/agents/ file the repo's profile requires exists; no template placeholder is left in it, AGENTS.md or CLAUDE.md; "
-    "domain.md names only files that exist",
-    layer="agent",
-    version=3,
-)
-def culture_files(ctx: Context) -> Finding:
-    """Missing files are not set up (auto: copied from the templates); a leftover `{{name}}` or bd template line is failing.
-
-    domain.md also fails when it names a file the repo lacks (`docs/adr/INDEX.md`, `CONTEXT.md`): a template that
-    contradicts the repo's real layout passes the placeholder test. Only domain.md is read: the other files name
-    generated or optional paths (`.github/workflows/`, `recipes/...`) that a correct repo may not have.
-    """
-    names = templates.required(ctx.profile)
-    missing = [n for n in names if ctx.read(f"docs/agents/{n}.md") is None]
-    if missing:
-        return not_set_up(f"missing docs/agents/: {', '.join(f'{n}.md' for n in missing)}", _INSTALL, FixedBy.AUTO)
-    unfilled = [n for n in names if templates.PLACEHOLDER.search(ctx.read(f"docs/agents/{n}.md") or "")]
-    if unfilled:
-        return failing(f"placeholders left in: {', '.join(f'{n}.md' for n in unfilled)}", "fill each {{name}} from the repo")
-    gone = _missing_paths(ctx, "domain")
-    if gone:
-        return failing(
-            f"docs/agents/domain.md names files that do not exist: {', '.join(gone)}",
-            "make the file exist (the standard layout is CONTEXT.md and docs/adr/, ADR 0017), or migrate the repo to it; "
-            "a durable different layout needs an override backed by an accepted ADR",
-        )
-    left = {
-        name: len(templates.PLACEHOLDER.findall(text)) + len(_BD_PLACEHOLDER.findall(text))
-        for name, text in _instruction_files(ctx).items()
-    }
-    left = {name: n for name, n in left.items() if n}
-    if left:
-        where = ", ".join(f"{n} template placeholder{'' if n == 1 else 's'} in {name}" for name, n in left.items())
-        return failing(
-            where,
-            "replace each `_Add your ... here_` or `{{name}}` line with the repo's real content "
-            "(build and test: `just check`; architecture; conventions), or delete the heading",
-        )
-    return passing(f"{len(names)} conventions files: {', '.join(names)}; no placeholder in the instruction files")
-
-
-@check("agents.managed-block", "AGENTS.md carries blueprint's managed block, current for this profile", layer="agent")
-def managed_block(ctx: Context) -> Finding:
-    """The block between the markers equals what the templates produce for this profile."""
-    text = ctx.read("AGENTS.md") or ""
-    if templates.BEGIN not in text or templates.END not in text:
-        return not_set_up("AGENTS.md has no blueprint block", _INSTALL, FixedBy.AUTO)
-    current = text[text.index(templates.BEGIN) : text.index(templates.END) + len(templates.END)].strip()
-    if current != templates.block(ctx.profile).strip():
-        return failing("the managed block differs from the template for this profile", _INSTALL, FixedBy.AUTO)
-    return passing("managed block current")

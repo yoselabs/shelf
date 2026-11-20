@@ -6,7 +6,7 @@ concerns: [knowledge]
 status: accepted
 decided_by: owner
 updated: 2026-10-12
-distilled_into: blueprint knowledge.glossary, knowledge.adr-format, knowledge.adr-index; templates/agents/domain.md
+distilled_into: any-knowledge (`check`, `index`, `seed`); the shelf's check-extra runs `adr-check`
 ---
 
 # 0017 — Living ADRs and a generated index
@@ -19,7 +19,7 @@ distilled_into: blueprint knowledge.glossary, knowledge.adr-format, knowledge.ad
   for the same topic: that splits its reasons.
 - **Short:** frontmatter (`id`, `title`, `statement` ≤200 chars, `concerns`, `status`, `decided_by`,
   `updated`), the decision and why, rejected options one line each, then History.
-- **Index:** `docs/adr/INDEX.md`, generated (`blueprint gate adr-index --write`), one line per decision in
+- **Index:** `docs/adr/INDEX.md`, generated (`python -m any_knowledge index --write`), one line per decision in
   force, grouped by concern. It is all an agent needs to work; an ADR file is opened only to
   challenge or change its decision. The gate fails on a stale index.
 
@@ -38,3 +38,4 @@ distilled_into: blueprint knowledge.glossary, knowledge.adr-format, knowledge.ad
   glossary and ADRs keep frontmatter and History, because the index, the gate and the one-file-per-topic history
   depend on them. Blueprint's `domain.md` tells the skills so and forbids running the setup skill over its files.
   Dropped: adopting the skills' layouts, which would split the glossary and the decision history across two formats.
+- 2026-11-20: blueprint no longer checks or seeds the glossary, ADRs or docs/agents (owner): the rows `knowledge.*`, `agents.culture-files`, `agents.managed-block` and `gate adr-index` are gone; the code lives in the any-knowledge package, wired through each repo's own `check-extra`.

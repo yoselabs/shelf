@@ -2,7 +2,7 @@
 
   blueprint init    set a repo up: detect its stack, audit, plan, write only what is missing (no shelf clone needed)
   blueprint check   judge the repo against every checkpoint that applies, and say what to fix
-  blueprint gate    the steps of `just check` (guard, preset, render, test, adr-index): the justfile and the git hooks
+  blueprint gate    the steps of `just check` (guard, preset, render, test): the justfile and the git hooks
                     call them; you rarely type one
 
 Installed as a dev dependency (`uv run blueprint check --repo .`), or from a shelf clone with no install:
@@ -21,7 +21,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from blueprint import adr, checkpoints, gate_test, guard, init, preset, render, report
+from blueprint import checkpoints, gate_test, guard, init, preset, render, report
 from blueprint.runner import run, run_audit
 
 _GATE_HELP = """\
@@ -31,7 +31,6 @@ The steps of `just check`. The justfile and the git hooks run them; each one is 
   preset     compare the repo's ruff and pyrefly config with the shelf's preset, or with the differences it declares (`just preset`)
   render     write the justfile parts blueprint owns (.blueprint/*.just); with --check, fail on any difference (`just render`)
   test       run the tests the change reaches, through any-gate (`just test`)
-  adr-index  print docs/adr/INDEX.md as the ADRs generate it; with --write, write it
 """
 
 
@@ -63,14 +62,11 @@ def _parser() -> argparse.ArgumentParser:
     chk.add_argument("--write", action="store_true", help="write docs/blueprint/<concern>.md reports")
     gate = sub.add_parser(
         "gate",
-        help="the steps of `just check` (guard, preset, render, test, adr-index): for the justfile and hooks",
+        help="the steps of `just check` (guard, preset, render, test): for the justfile and hooks",
         description=_GATE_HELP,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     steps = gate.add_subparsers(dest="step", required=True, metavar="STEP")
-    idx = steps.add_parser("adr-index", help="print docs/adr/INDEX.md as the ADRs generate it")
-    idx.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
-    idx.add_argument("--write", action="store_true", help="write it to docs/adr/INDEX.md instead")
     grd = steps.add_parser("guard", help="refuse a local shelf source in [tool.uv.sources] (the commit hook and `just guard`)")
     grd.add_argument("--committed", action="store_true", help="check HEAD (the gate's question); the default checks the index (the hook's)")
     pre = steps.add_parser("preset", help="compare the repo's linter config with the shelf's preset (`just preset`)")
@@ -133,16 +129,7 @@ def _test(args: argparse.Namespace) -> int:
     return gate_test.run(args.repo.expanduser().resolve(), receipts=args.receipts, lease_root=args.lease_root, pytest_args=args.pytest_args)
 
 
-def _adr_index(args: argparse.Namespace) -> int:
-    text = adr.index(args.repo.resolve())
-    if args.write:
-        (args.repo / adr.FOLDER / adr.INDEX).write_text(text, encoding="utf-8")
-    else:
-        sys.stdout.write(text)
-    return 0
-
-
-_GATE_STEPS = {"guard": _guard, "preset": _preset, "render": _render, "test": _test, "adr-index": _adr_index}
+_GATE_STEPS = {"guard": _guard, "preset": _preset, "render": _render, "test": _test}
 
 
 if __name__ == "__main__":

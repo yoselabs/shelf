@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from blueprint import templates
 from blueprint.model import Verdict
-from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -155,9 +153,8 @@ def test_one_script_in_a_python_repo_is_the_shell_stack_with_its_conventions_fil
     rows = _rows(repo)
     assert "packaging/macos/build_app.sh" in rows["stack.shell.profile"][1]
     assert rows["stack.shell.strict-mode"][0] is Verdict.FAILING
-    assert "stack.shell.agent-guidance" not in rows  # cut: agents.culture-files covers it
+    assert "stack.shell.agent-guidance" not in rows
     assert not any(row.startswith("stack.shell-scripts.") for row in rows)
-    assert "shell" in templates.required(detect(repo.root, load_state(repo.root)))
 
 
 def test_an_image_nothing_in_the_gate_builds_fails_the_tests_row(repo: Repo) -> None:
@@ -238,7 +235,6 @@ def test_one_compose_file_in_a_python_repo_is_the_full_compose_stack(repo: Repo)
     rows = _rows(repo)
     assert "stack.compose.profile" in rows
     assert not any(row.startswith("stack.compose-lite.") for row in rows)
-    assert "compose" in templates.required(detect(repo.root, load_state(repo.root)))
 
 
 def test_an_ignored_script_is_not_a_shell_stack(repo: Repo) -> None:
@@ -247,7 +243,6 @@ def test_an_ignored_script_is_not_a_shell_stack(repo: Repo) -> None:
     reason = 'reason = "macOS-only tool the owner runs by hand"\nexpires = 2099-01-01\n'
     repo.write("docs/blueprint/blueprint.toml", f'[[profile.ignore]]\npath = "packaging/macos/build_app.sh"\n{reason}')
     assert "stack.shell.profile" not in _rows(repo)
-    assert "shell" not in templates.required(detect(repo.root, load_state(repo.root)))
 
 
 # ADR 0026: what the repo does adds checkpoints. A repo classified as shipping an image needs a base-image updater;

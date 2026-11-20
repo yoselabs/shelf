@@ -134,7 +134,7 @@ def test_the_profile_reads_stacks_and_takes_declared_values(repo: Repo) -> None:
 def test_write_produces_one_table_per_concern(repo: Repo) -> None:
     result = run(repo.root, env=repo.env)
     paths = report.write(result, repo.root, date(2026, 10, 10))
-    concerns = ("gate", "backlog", "knowledge", "secrets", "hooks", "stack", "agents")
+    concerns = ("gate", "backlog", "secrets", "hooks", "stack", "agents")
     assert {p.name for p in paths} == {"README.md", "checkpoints.txt", *(f"{c}.md" for c in concerns)}
     text = (repo.root / "docs/blueprint/gate.md").read_text()
     assert "| | checkpoint | set up | working | evidence | remediation | fixed by |" in text
@@ -158,7 +158,7 @@ def test_write_removes_the_report_of_a_concern_that_no_longer_applies(repo: Repo
 def test_a_run_of_one_concern_keeps_the_other_reports(repo: Repo) -> None:
     report.write(run(repo.root, env=repo.env), repo.root, date(2026, 10, 10))
     report.write_concern(run(repo.root, concern="gate", env=repo.env), repo.root, date(2026, 10, 10))
-    assert (repo.root / "docs/blueprint/knowledge.md").exists()
+    assert (repo.root / "docs/blueprint/backlog.md").exists()
 
 
 def test_the_cli_prints_json_and_exits_with_the_runs_code(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
@@ -250,13 +250,6 @@ def test_an_audit_from_before_the_record_counts_as_an_empty_record(repo: Repo) -
     assert all(r.new for r in rows if r.verdict is not Verdict.PASSING)
 
 
-def _adr(number: str, status: str) -> str:
-    return (
-        f"---\nid: {number}\ntitle: Builds on owner machines\nstatement: No CI; the gate runs on the owner's machines.\n"
-        f"concerns: [gate]\nstatus: {status}\ndecided_by: owner\nupdated: 2026-10-11\n---\n# {number}\n"
-    )
-
-
 def _red_override(repo: Repo, fields: str) -> None:
     repo.write("docs/blueprint/blueprint.toml", f'[[override]]\nid = "scratch.red"\ncode = "not-applicable"\n{fields}\n')
 
@@ -268,8 +261,7 @@ def red_check(scratch_concern: None) -> None:
         return failing("red", "nothing")
 
 
-def test_an_override_backed_by_an_accepted_adr_needs_no_expiry(repo: Repo, red_check: None) -> None:
-    repo.write("docs/adr/0003-builds-on-owner-machines.md", _adr("0003", "accepted"))
+def test_an_override_citing_a_decision_record_needs_no_expiry(repo: Repo, red_check: None) -> None:
     _red_override(repo, 'reason = "no CI by decision"\nadr = "0003"')
     result = run(repo.root, concern="scratch", env=repo.env, today=date(2099, 1, 1))
     assert result.rows[0].verdict is Verdict.PASSING
@@ -278,21 +270,10 @@ def test_an_override_backed_by_an_accepted_adr_needs_no_expiry(repo: Repo, red_c
 
 
 @pytest.mark.parametrize(
-    ("adr_file", "fields", "named"),
-    [
-        (None, 'reason = "r"\nadr = "0003"', "ADR 0003"),
-        (("0003", "proposed"), 'reason = "r"\nadr = "0003"', "not accepted"),
-        (("0003", "superseded"), 'reason = "r"\nadr = "0003"', "not accepted"),
-        (None, 'reason = "r"', "expires"),
-        (None, 'reason = "  "\nexpires = 2099-01-01', "reason"),
-        (None, 'reason = "r"\nadr = "3"', "NNNN"),
-    ],
+    ("fields", "named"),
+    [('reason = "r"', "expires"), ('reason = "  "\nexpires = 2099-01-01', "reason")],
 )
-def test_an_unjustified_override_is_a_reported_problem_and_does_not_count(
-    repo: Repo, red_check: None, adr_file: tuple[str, str] | None, fields: str, named: str
-) -> None:
-    if adr_file:
-        repo.write(f"docs/adr/{adr_file[0]}-x.md", _adr(*adr_file))
+def test_an_unjustified_override_is_a_reported_problem_and_does_not_count(repo: Repo, red_check: None, fields: str, named: str) -> None:
     _red_override(repo, fields)
     result = run(repo.root, concern="scratch", env=repo.env)
     assert result.rows[0].verdict is Verdict.FAILING
@@ -329,7 +310,7 @@ def test_the_same_dir_without_the_ignore_sets_dotnet_and_names_the_file(repo: Re
 
 @pytest.mark.parametrize(
     ("fields", "named"),
-    [("expires = 2099-01-01", "reason"), ('reason = "r"', "expires"), ('reason = "r"\nadr = "0009"', "ADR 0009")],
+    [("expires = 2099-01-01", "reason"), ('reason = "r"', "expires")],
 )
 def test_an_unjustified_ignore_is_a_problem_and_ignores_nothing(repo: Repo, fields: str, named: str) -> None:
     _ignore(repo, fields)
@@ -433,7 +414,6 @@ def _two_overrides(repo: Repo) -> None:
         '[[override]]\nid = "scratch.red"\nreason = "no CI by design"\ndecided_by = "owner"\nadr = "0003"\n\n'
         '[[override]]\nid = "stack.shell.strict-mode"\nscope = "tools/probe.sh"\nreason = "a probe"\nexpires = 2099-01-01\n',
     )
-    repo.write("docs/adr/0003-x.md", _adr("0003", "accepted"))
 
 
 def test_the_markdown_report_lists_every_override_before_the_facts(repo: Repo, red_check: None) -> None:

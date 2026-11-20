@@ -10,7 +10,6 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from blueprint import adr
 from blueprint.facts import KINDS, SURFACES, TRAITS, Judgement, detect_facts, judgement_problem, package_json
 from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, is_skipped, override_toml, walk
 
@@ -19,33 +18,16 @@ STATE_FILE = f"{STATE_DIR}/blueprint.toml"
 OVERRIDE_CODES = ("test-data", "remediated", "not-applicable", "not-supported", "not-detected")
 
 
-_ADR_NUMBER = re.compile(r"^\d{4}$")
-
-
-def _adr_problem(repo: Path, number: str) -> str | None:
-    """Why the ADR a justification cites does not count: not a number, absent from docs/adr/, or not accepted."""
-    if not _ADR_NUMBER.match(number):
-        return f"adr {number!r} is not an NNNN number"
-    path = next(iter(sorted((repo / adr.FOLDER).glob(f"{number}-*.md"))), None)
-    if path is None:
-        return f"ADR {number} is not in {adr.FOLDER}/"
-    found = adr.parse(path)
-    status = found.fields.get("status") if found else None
-    return None if status == "accepted" else f"ADR {number} is not accepted (status: {status or 'unreadable'})"
-
-
-def justification_problem(what: str, reason: str, expires: date | None, adr_number: str, repo: Path) -> str | None:
+def justification_problem(what: str, reason: str, expires: date | None, adr_number: str) -> str | None:
     """Why an exception to a blueprint rule is not justified, or None.
 
     One rule for every exception (an override, an ignored path): a reason, and either an `expires` date
-    (a temporary exception) or an `adr` naming an accepted ADR that records the durable decision.
+    (a temporary exception) or an `adr` citing the decision record that makes it durable (blueprint does not read it).
     """
     if not reason.strip():
         return f"{what} has no reason"
     if expires is None and not adr_number:
-        return f"{what} needs an expires date, or an adr naming the accepted ADR that records the decision"
-    if adr_number and (found := _adr_problem(repo, adr_number)):
-        return f"{what}: {found}"
+        return f"{what} needs an expires date, or an adr citing the decision record"
     return None
 
 
@@ -161,7 +143,7 @@ def _load_judgements(declared: dict[str, Any], problems: list[str]) -> tuple[tup
     return tuple(loaded["classified"]), tuple(loaded["rejected"])
 
 
-def _load_override(raw: dict[str, Any], repo: Path, problems: list[str]) -> Override | None:
+def _load_override(raw: dict[str, Any], problems: list[str]) -> Override | None:
     oid = str(raw.get("id", ""))
     if not oid:
         problems.append("an override has no id")
@@ -173,7 +155,7 @@ def _load_override(raw: dict[str, Any], repo: Path, problems: list[str]) -> Over
     # Missing means nobody recorded who decided; "agent" would claim it (a2kay 2026-10-12: an owner's yes read as agent).
     decided_by = str(raw.get("decided_by", "unknown"))
     what = f"override {oid!r}" + (f" ({scope})" if scope else "")
-    unjustified = justification_problem(what, reason, expires, adr_number, repo)
+    unjustified = justification_problem(what, reason, expires, adr_number)
     if unjustified is None and decided_by not in (*DECIDERS, "unknown"):
         unjustified = f"{what}: decided_by {decided_by!r} is not one of {', '.join(DECIDERS)}"
     if unjustified is None and oid == DETECTION and not scope:
@@ -183,16 +165,14 @@ def _load_override(raw: dict[str, Any], repo: Path, problems: list[str]) -> Over
     return Override(oid, reason, scope, str(raw.get("code", "")), decided_by, expires, adr_number, unjustified)
 
 
-def _legacy_ignore(raw: dict[str, Any], repo: Path, today: date, problems: list[str]) -> tuple[Override | None, str]:
+def _legacy_ignore(raw: dict[str, Any], today: date, problems: list[str]) -> tuple[Override | None, str]:
     """An old `[[profile.ignore]]` entry as the detection override it becomes, and the notice to move it."""
     path = str(raw.get("path", "")).strip()
     expires = _date_or_none(raw.get("expires"))
     adr_number = str(raw.get("adr", ""))
     why = str(raw.get("reason", ""))
     problem = (
-        f"ignore entry has no path (reason: {why!r})"
-        if not path
-        else justification_problem(f"ignore {path!r}", why, expires, adr_number, repo)
+        f"ignore entry has no path (reason: {why!r})" if not path else justification_problem(f"ignore {path!r}", why, expires, adr_number)
     )
     if problem is None and expires is not None and expires < today:
         problem = f"ignore {path!r} expired {expires.isoformat()}"
@@ -219,11 +199,11 @@ def load_state(repo: Path, today: date | None = None) -> State:
         return State({}, (), {}, (f"{STATE_FILE} is not valid TOML: {exc}",))
     today = today or date.today()  # noqa: DTZ011 -- a calendar date in the owner's zone
     problems: list[str] = []
-    overrides = [o for raw in data.get("override", []) if (o := _load_override(raw, repo, problems)) is not None]
+    overrides = [o for raw in data.get("override", []) if (o := _load_override(raw, problems)) is not None]
     declared = data.get("profile", {})
     notices: list[str] = []
     for raw in declared.get("ignore", []):
-        legacy, notice = _legacy_ignore(raw, repo, today, problems)
+        legacy, notice = _legacy_ignore(raw, today, problems)
         if legacy is not None:
             overrides.append(legacy)
             notices.append(notice)

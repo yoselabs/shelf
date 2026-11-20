@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "shelf"
+software = "any-knowledge"
+why = "The shelf keeps living ADRs and an index agents read; blueprint no longer owns their format, so the shelf's gate runs the check itself (check-extra)."
+needs = "`index --write` regenerates docs/adr/INDEX.md; `check` fails the gate on a malformed ADR or a stale index."
+sponsor = "yoselabs"
+requester = "shelf"
+status = "active"          # active | retired

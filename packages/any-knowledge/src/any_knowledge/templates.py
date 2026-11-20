@@ -7,11 +7,8 @@ managed block in AGENTS.md is the one exception, rewritten between its markers o
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from blueprint.model import Profile
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 ALWAYS = ("constitution", "working-with-agents", "gate", "testing", "architecture", "domain")
@@ -23,15 +20,24 @@ _STACK_TRIGGER = "before writing or changing {name} code"
 PLACEHOLDER = re.compile(r"\{\{[a-z_]+\}\}")
 
 
-def required(profile: Profile) -> list[str]:
-    """The docs/agents/<name>.md files this profile requires, by template name."""
-    names = list(ALWAYS) + (list(WITH_BEADS) if profile.tracker == "beads" else [])
+@dataclass(frozen=True)
+class Selection:
+    """What the repo is: its stacks, its frameworks and whether it tracks work in beads (the caller says; this package detects nothing)."""
+
+    stacks: tuple[str, ...] = ()
+    frameworks: tuple[str, ...] = ()
+    beads: bool = False
+
+
+def required(profile: Selection) -> list[str]:
+    """The docs/agents/<name>.md files this selection requires, by template name."""
+    names = list(ALWAYS) + (list(WITH_BEADS) if profile.beads else [])
     names += [PER_STACK[s] for s in profile.stacks if s in PER_STACK]
-    names += [PER_FRAMEWORK[f] for f, _ in profile.frameworks if f in PER_FRAMEWORK]
+    names += [PER_FRAMEWORK[f] for f in profile.frameworks if f in PER_FRAMEWORK]
     return list(dict.fromkeys(names))
 
 
-def block(profile: Profile) -> str:
+def block(profile: Selection) -> str:
     """The AGENTS.md managed block, its stack rows filled from the profile."""
     rows = [
         f"| [docs/agents/{n}.md](docs/agents/{n}.md) | {_STACK_TRIGGER.format(name=n)} |"
@@ -46,7 +52,7 @@ def render(name: str) -> str:
     return (TEMPLATES / "agents" / f"{name}.md").read_text()
 
 
-def install(repo: Path, profile: Profile) -> list[str]:
+def install(repo: Path, profile: Selection) -> list[str]:
     """Copy each missing docs/agents file and write the managed block; return what changed."""
     changed: list[str] = []
     for name in required(profile):

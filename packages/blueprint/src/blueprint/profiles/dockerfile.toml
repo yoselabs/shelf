@@ -73,11 +73,6 @@ tool = "prek hook per commit on staged Dockerfiles: hadolint"
 install = ".pre-commit-config.yaml local hook, id hadolint / language: system / entry hadolint / files: (^|/)(Dockerfile|Containerfile)|\\.Dockerfile$"
 config = [{ path = ".pre-commit-config.yaml", contains = "hadolint" }]
 
-[[role]]
-role = "agent-guidance"
-na = "the rule ids and the reasons in .hadolint.yaml are the guidance; a convention hadolint cannot carry goes in the main stack's docs/agents file"
-
-# Purpose rows (ADR 0026): they apply to a repo whose `ships-image` trait is classified (the repo publishes an image; no repository has CI, so no workflow shows it).
 
 [[role]]
 role = "ship-updater"

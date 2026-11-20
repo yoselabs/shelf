@@ -137,14 +137,3 @@ tool = "prek local hooks: unity-integrity (python3 tools/unity_integrity.py <roo
 install = """.pre-commit-config.yaml local hooks: id: unity-integrity / entry: python3 tools/unity_integrity.py {root} / language: system / always_run: true / pass_filenames: false (it walks Assets and Packages in well under a second on a small project; time it on a big one). \
 csharpier is the dotnet.toml hook; `.csharpierignore` gets Library/, Temp/, Logs/, UserSettings/, Builds/, obj/ (seen: `dotnet csharpier check Assets` red on an unformatted file, green on formatted, csharpier 1.3.0). Never a hook that starts the editor"""
 config = [{ path = ".pre-commit-config.yaml", contains = "unity-integrity" }]
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/unity.md (editor pin, headless commands, meta/GUID rules, serialization and fake-null traps, asmdef layer map, analyzer exemptions, what never to edit), linked from AGENTS.md"
-install = """create docs/agents/unity.md (<= 140 lines) from the shelf template (`blueprint init`): the just recipes; never hand-edit .meta, Library/, Temp/, generated csproj/slnx; new file means commit its .meta in the same commit; \
-`obj == null` on a UnityEngine.Object is the fake-null check, `is null` and `?.` skip it; serialization rules; message-method traps; asmdef layer table; async/Awaitable. \
-Link from AGENTS.md: `Unity conventions: docs/agents/unity.md`"""
-config = [
-    { path = "docs/agents/unity.md" },
-    { path = "AGENTS.md", contains = "docs/agents/unity.md" },
-]

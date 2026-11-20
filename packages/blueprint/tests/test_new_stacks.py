@@ -101,7 +101,7 @@ def _rows(repo: Repo, stack: str) -> dict[str, Verdict]:
 def test_a_repo_set_up_the_profiles_way_passes_every_role(repo: Repo, stack: str) -> None:
     _set_up(repo, stack)
     rows = _rows(repo, stack)
-    assert {f"stack.{stack}.{role}" for role in ROLES if role != "agent-guidance"} <= rows.keys()  # no row is projected from it
+    assert {f"stack.{stack}.{role}" for role in ROLES} <= rows.keys()
     assert {k: v for k, v in rows.items() if v is not Verdict.PASSING} == {}
 
 

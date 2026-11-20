@@ -27,6 +27,7 @@ _ALLOWED = {
     "tools/preset_refresh.py": "a repo tool script, run by `just`: takes no arguments, argparse only serves --help",
     "tools/tag_check.py": "a repo tool script, run by the pre-push hook as bare `python3 -I`: stdlib only, no workspace import",
     "packages/any-gate/src/any_gate/cli.py": "needs argparse.REMAINDER (`-- RUNNER`, `-- CMD`) and repeatable flags; verb-cli has neither",
+    "packages/any-knowledge/src/any_knowledge/cli.py": "repeatable flags (--stack, --framework); verb-cli has none",
     "packages/any-gate-python/src/any_gate_python/cli.py": "the runner `any-gate test` calls, beside any-gate's CLI; same flag shapes",
 }
 
