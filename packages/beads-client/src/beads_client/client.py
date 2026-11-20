@@ -223,11 +223,16 @@ class Bd:
             return False
         raise err
 
-    def unclaim(self, bead: str, *, force: bool = False, if_assignee: str | None = None) -> bool:
-        """Release a claim. False when the bead is not the caller's (or the fence is stale); other failures raise."""
-        r = self.call(
-            "unclaim", bead, *(["--force"] if force else []), *(["--if-assignee", if_assignee] if if_assignee is not None else [])
-        )
+    def unclaim(self, bead: str, *, if_assignee: str | None = None) -> bool:
+        """Release the caller's own claim. False when the bead is not the caller's (or the fence is stale); other failures raise."""
+        return self._release(bead, *(["--if-assignee", if_assignee] if if_assignee is not None else []))
+
+    def evict(self, bead: str) -> bool:
+        """Release a claim whoever holds it (``bd unclaim --force``): coordinate with the holder first, its claim may be live."""
+        return self._release(bead, "--force")
+
+    def _release(self, bead: str, *flags: str) -> bool:
+        r = self.call("unclaim", bead, *flags)
         if r.code == 0:
             return True
         err = error_of(r)
@@ -235,8 +240,16 @@ class Bd:
             return False
         raise err
 
-    def reclaim(self, older_than: str = "", *, ids: Sequence[str] = (), labels: Sequence[str] = (), any_replica: bool = False) -> list[str]:
-        """Revert in_progress beads whose lease expired (more than ``older_than`` ago, e.g. "10m") back to open. -> their ids."""
+    def reclaim(self, older_than: str = "", *, ids: Sequence[str] = (), labels: Sequence[str] = ()) -> list[str]:
+        """Revert in_progress beads whose lease expired (more than ``older_than`` ago, e.g. "10m") back to open. -> their ids.
+        Covers the leases this replica granted."""
+        return self._reclaim(older_than, ids, labels)
+
+    def reclaim_foreign(self, older_than: str = "", *, ids: Sequence[str] = (), labels: Sequence[str] = ()) -> list[str]:
+        """``reclaim`` for the leases other replicas granted (``bd reclaim --any-replica``): only when that replica is gone for good."""
+        return self._reclaim(older_than, ids, labels, "--any-replica")
+
+    def _reclaim(self, older_than: str, ids: Sequence[str], labels: Sequence[str], *flags: str) -> list[str]:
         a = ["reclaim"]
         if older_than:
             a += ["--older-than", older_than]
@@ -244,9 +257,7 @@ class Bd:
             a += ["--id", i]
         for lab in labels:
             a += ["--label", lab]
-        if any_replica:
-            a.append("--any-replica")
-        data = loads(self._must(*a).out)
+        data = loads(self._must(*a, *flags).out)
         rows = data.get("reclaimed") if isinstance(data, dict) else None
         if not isinstance(data, dict) or not (rows is None or isinstance(rows, list)):
             msg = "bd reclaim answered with an unexpected shape"

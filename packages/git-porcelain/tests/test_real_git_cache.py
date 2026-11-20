@@ -95,7 +95,7 @@ def _remote_call(rig: Rig, operation: str, sha: Sha) -> object:
         "lfs_push": lambda: rig.wt.lfs_push("origin", ["HEAD"]),
         "fetch": rig.repo.fetch,
         "sync": rig.repo.sync,
-        "delete_remote_at": lambda: rig.repo.delete_remote_at("origin", "refs/heads/main", sha, missing_ok=False),
+        "delete_remote_at": lambda: rig.repo.delete_remote_at("origin", "refs/heads/main", sha),
         "ls_remote": lambda: rig.repo.ls_remote("origin"),
     }
     return operations[operation]()
@@ -222,36 +222,13 @@ def test_configured_remote_discovery_uses_one_config_query(rig: Rig) -> None:
     assert rig.count("config") == 1
 
 
-@pytest.mark.parametrize("missing_ok", [False, True])
-def test_absent_remote_deletion_only_probes_when_idempotency_is_requested(rig: Rig, *, missing_ok: bool) -> None:
+def test_absent_remote_deletion_is_refused_in_one_process(rig: Rig) -> None:
     sha = Sha(run(rig.path, "rev-parse", "HEAD").strip())
     rig.calls.clear()
-    if missing_ok:
-        result = rig.repo.delete_remote_at("origin", "refs/heads/absent", sha)
-        assert result.ok
-        assert "stale info" in result.output
-    else:
-        with pytest.raises(GitUnavailable) as caught:
-            rig.repo.delete_remote_at("origin", "refs/heads/absent", sha, missing_ok=False)
-        assert "stale info" in caught.value.output
-    assert len(rig.calls) == (2 if missing_ok else 1)
-
-
-def test_deletion_verification_failure_retains_both_invocations(rig: Rig, git_process: Callable[..., None]) -> None:
-    pushed = "push stdout\n" + "push detail\n" * 1000
-    probed = "probe stdout\n" + "probe detail\n" * 1000
-
-    def process(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
-        output = probed if "ls-remote" in args else pushed
-        return subprocess.CompletedProcess(args, 1, output.encode(), b"error: refused\n")
-
-    git_process(process)
-    rig.calls.clear()
-    with pytest.raises(GitReadFailure) as caught:
-        rig.repo.delete_remote_at("origin", "refs/heads/main", Sha("a" * 40))
-    assert caught.value.output == (probed + "error: refused\n").strip()
-    assert caught.value.push_output == (pushed + "error: refused\n").strip()
-    assert len(rig.calls) == 2
+    with pytest.raises(GitUnavailable) as caught:
+        rig.repo.delete_remote_at("origin", "refs/heads/absent", sha)
+    assert "stale info" in caught.value.output
+    assert len(rig.calls) == 1
 
 
 def test_remote_hook_text_cannot_be_classified_as_a_ref_race(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -350,7 +327,7 @@ def test_path_remote_operations_keep_complete_output_with_a_fixed_budget(
 )
 def test_revision_reads_start_one_process_per_ask(rig: Rig, operation: str, a: str, b: str, expected: bool | None) -> None:
     root = run(rig.path, "rev-parse", "HEAD").strip()
-    rig.wt.record("second", allow_empty=True)
+    rig.wt.record_empty("second")
     for _ in range(2):
         rig.calls.clear()
         if operation == "is_ancestor":
@@ -470,7 +447,7 @@ def test_an_edited_tree_is_written_again(rig: Rig) -> None:
 
 def test_a_new_head_is_written_again_even_when_the_files_are_the_same(rig: Rig) -> None:
     first = rig.wt.snapshot("origin/main")
-    assert rig.wt.record("empty", allow_empty=True).__class__.__name__ == "Recorded"
+    assert rig.wt.record_empty("empty").__class__.__name__ == "Recorded"
     second = rig.wt.snapshot("origin/main")
     assert second.head != first.head
     assert second.tree == first.tree
@@ -493,7 +470,7 @@ def test_a_ref_name_answer_is_kept_until_the_ref_moves(rig: Rig) -> None:
     first = rig.repo.relate("HEAD", "origin/main")
     rig.repo.relate("HEAD", "origin/main")
     assert rig.count("merge-base") == 1
-    assert rig.wt.record("ahead", allow_empty=True).__class__.__name__ == "Recorded"
+    assert rig.wt.record_empty("ahead").__class__.__name__ == "Recorded"
     moved = rig.repo.relate("HEAD", "origin/main")
     assert (first.ahead, moved.ahead) == (0, 1)
 

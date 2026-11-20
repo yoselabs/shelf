@@ -222,7 +222,7 @@ def _hook_rejection(output: str) -> bool:
 
 def _clean(wt: RealWorktree, clean_keep: Sequence[str] | None) -> None:
     if clean_keep is not None:
-        real_checkout.clean(wt, clean_keep, ignored=False, nested=False)
+        real_checkout.clean(wt, clean_keep)
 
 
 def _same(a: Path, b: Path) -> bool:
@@ -295,10 +295,9 @@ def _keep_ignored(wt: RealWorktree, base: str) -> None:
     exclude_worktree(wt, [literal_pattern(p) for p in ignored])
 
 
-def park(wt: RealWorktree, base: str, clean_keep: Sequence[str] | None, *, keep_ignored: bool = False) -> Sha:
+def park(wt: RealWorktree, base: str, clean_keep: Sequence[str] | None) -> Sha:
     try:
-        if keep_ignored:
-            _keep_ignored(wt, real_checkout.resolve_commit(wt, base))
+        _keep_ignored(wt, real_checkout.resolve_commit(wt, base))
         wt.run("checkout", "-q", "--detach", base)
         _clean(wt, clean_keep)
     finally:

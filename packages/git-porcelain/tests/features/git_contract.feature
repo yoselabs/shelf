@@ -175,7 +175,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" writes a="new"
     And "r" stages ["a"]
     And the verbose commit hook of "r" <outcome>
-    When "r" calls record("work", paths="<scope>", mode="<mode>", hooks=True)
+    When "r" calls record_with_hooks("work", paths="<scope>", mode="<mode>")
     Then the result is a <kind>
     And the complete hook output is preserved
 
@@ -191,7 +191,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "root" with a="old"
     And "r" writes a="new"
     And the commit command of "r" fails with a long diagnostic
-    When "r" tries record("work", paths="tracked", hooks=True)
+    When "r" tries record_with_hooks("work", paths="tracked")
     Then the call raises GitUnavailable
     And the complete commit failure output is preserved
 
@@ -213,7 +213,7 @@ Feature: One Repo and Worktree, real or fake
   Scenario: Amending an unborn branch exposes git's refusal after staging
     Given a repository "r"
     And "r" writes a="pending"
-    When "r" tries record("amend", paths="tracked", mode="amend", hooks=True)
+    When "r" tries record_with_hooks("amend", paths="tracked", mode="amend")
     Then the call raises GitUnavailable
     When "r" tries record("amend", paths="staged", mode="amend")
     Then the call raises GitUnavailable
@@ -319,31 +319,7 @@ Feature: One Repo and Worktree, real or fake
     When "linked" calls branch()
     Then the result is "topic"
 
-  Scenario Outline: Push safety requires explicit consent before invoking git
-    Given a repository "r"
-    When "r" tries <operation>
-    Then the call raises ValueError
-
-    Examples:
-      | operation                                                         |
-      | push_refspecs("origin", ["+HEAD:main"])                             |
-      | push_request("origin", ["+HEAD:main"])                              |
-      | push_refspecs("origin", [":main"])                                  |
-      | push_refspecs("origin", ["+:main"], force=True)                      |
-      | push_request("origin", ["+:main"], force=True)                       |
-      | push_refspecs("origin", ["+:main"], allow_delete=True)               |
-      | push_request("origin", ["+:main"], allow_delete=True)                |
-      | push_request("origin", [":main"])                                   |
-      | push_request("origin", ["main"], options=["--force"])                |
-      | push_request("origin", ["main"], options=["-f"])                     |
-      | push_request("origin", ["main"], options=["--delete"])               |
-      | push_request("origin", ["main"], options=["-d"])                     |
-      | push_request("origin", [], options=["--mirror"])                    |
-      | push_request("origin", [], options=["--mirror"], force=True)         |
-      | push_request("origin", [], options=["--mirror"], allow_delete=True)  |
-      | push_request("origin", [], options=["--prune"])                     |
-
-  Scenario Outline: Push opt ins permit their corresponding forms
+  Scenario Outline: Push forms carry their own opt ins
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
@@ -352,16 +328,16 @@ Feature: One Repo and Worktree, real or fake
 
     Examples:
       | operation                                                                                  |
-      | push_refspecs("origin", ["+HEAD:refs/heads/main"], force=True)                                |
-      | push_request("origin", ["+HEAD:refs/heads/main"], force=True)                                 |
-      | push_refspecs("origin", [":refs/heads/main"], allow_delete=True)                              |
-      | push_request("origin", [":refs/heads/main"], allow_delete=True)                               |
-      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force"], force=True)              |
-      | push_request("origin", ["HEAD:refs/heads/main"], options=["-f"], force=True)                   |
-      | push_request("origin", ["main"], options=["--delete"], allow_delete=True)                     |
-      | push_request("origin", ["main"], options=["-d"], allow_delete=True)                           |
-      | push_request("origin", [], options=["--mirror"], force=True, allow_delete=True)               |
-      | push_request("origin", ["HEAD:refs/heads/main"], options=["--prune"], allow_delete=True)       |
+      | push_refspecs("origin", ["+HEAD:refs/heads/main"])                                |
+      | push_request("origin", ["+HEAD:refs/heads/main"])                                 |
+      | push_refspecs("origin", [":refs/heads/main"])                              |
+      | push_request("origin", [":refs/heads/main"])                               |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force"])              |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["-f"])                   |
+      | push_request("origin", ["main"], options=["--delete"])                     |
+      | push_request("origin", ["main"], options=["-d"])                           |
+      | push_request("origin", [], options=["--mirror"])               |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--prune"])       |
       | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease"])               |
       | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease=refs/heads/main:<head:r>"]) |
 
@@ -380,19 +356,19 @@ Feature: One Repo and Worktree, real or fake
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
-    When "r" calls push_refspecs("origin", [":refs/heads/main"], allow_delete=True)
+    When "r" calls push_refspecs("origin", [":refs/heads/main"])
     Then the result is a Pushed
     And the result's sha is ""
     When "r" tries fetch("origin", refspecs=["refs/heads/main"])
     Then the call raises GitUnavailable
 
-  Scenario Outline: Force options authorize replacing a remote tip
+  Scenario Outline: Force options replace a remote tip
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
     And "r" remembers its head as "root"
     And the origin "o" advances "main" with b="remote"
-    When "r" calls push_request("origin", ["HEAD:refs/heads/main"], options=["<option>"], force=True)
+    When "r" calls push_request("origin", ["HEAD:refs/heads/main"], options=["<option>"])
     Then the result's ok is True
     When "r" calls fetch("origin")
     And "r" calls history(["origin/main"], limit=1)
@@ -407,7 +383,7 @@ Feature: One Repo and Worktree, real or fake
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
-    When "r" calls push_request("origin", ["main"], options=["<option>"], allow_delete=True)
+    When "r" calls push_request("origin", ["main"], options=["<option>"])
     Then the result's ok is True
     When "r" tries fetch("origin", refspecs=["refs/heads/main"])
     Then the call raises GitUnavailable
@@ -422,7 +398,7 @@ Feature: One Repo and Worktree, real or fake
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
     And "r" calls push_refspecs("origin", ["HEAD:refs/heads/stale"])
-    When "r" calls push_request("origin", <refspecs>, options=["<option>"], force=<force>, allow_delete=True)
+    When "r" calls push_request("origin", <refspecs>, options=["<option>"])
     Then the result's ok is True
     When "r" tries fetch("origin", refspecs=["refs/heads/stale"])
     Then the call raises GitUnavailable
@@ -430,9 +406,9 @@ Feature: One Repo and Worktree, real or fake
     Then the result's ok is True
 
     Examples:
-      | option   | refspecs                      | force |
-      | --mirror | []                            | True  |
-      | --prune  | ["refs/heads/*:refs/heads/*"]   | False |
+      | option   | refspecs                      |
+      | --mirror | []                            |
+      | --prune  | ["refs/heads/*:refs/heads/*"]   |
 
   Scenario Outline: Remote option injection is rejected
     Given a repository "r"
@@ -513,7 +489,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" remembers its head as "before"
     And "r" writes b="pending"
     And the signer of "r" fails
-    When "r" tries record("signed", paths="all", hooks=True)
+    When "r" tries record_with_hooks("signed", paths="all")
     Then the call raises GitUnavailable
     When "r" calls snapshot("HEAD")
     Then the result's head is "<mem:before>"
@@ -527,7 +503,7 @@ Feature: One Repo and Worktree, real or fake
     And the origin "o" advances "main" with a="theirs\n"
     And "r" calls fetch()
     And "r" calls rebase("origin/main")
-    When "r" tries record("unresolved", paths="staged", hooks=True, allow_empty=True)
+    When "r" tries record_empty("unresolved")
     Then the call raises GitUnavailable
     When "r" calls rebasing()
     Then the result is True
@@ -677,18 +653,16 @@ Feature: One Repo and Worktree, real or fake
     When "r" calls delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
     Then the result's ok is True
     And the remote result carries command output
-    When "r" calls delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
-    Then the result's ok is True
-    When "r" tries delete_remote_at("origin", "refs/heads/pinned", "<mem:root>", missing_ok=False)
+    When "r" tries delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
     Then the call raises GitUnavailable
 
   Scenario: Push requests preserve namespaces multiple refs and deletion
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
-    When "r" calls push_request("origin", ["HEAD:refs/heads/one", "+HEAD:refs/tags/two"], force=True)
+    When "r" calls push_request("origin", ["HEAD:refs/heads/one", "+HEAD:refs/tags/two"])
     Then the result's ok is True
-    When "r" calls push_request("origin", [":refs/heads/one", ":refs/tags/two"], allow_delete=True)
+    When "r" calls push_request("origin", [":refs/heads/one", ":refs/tags/two"])
     Then the result's ok is True
 
   Scenario: A lease refuses a branch changed since fetching
@@ -706,17 +680,17 @@ Feature: One Repo and Worktree, real or fake
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
     And "r" commits "local" with b="local"
-    When "r" calls push_request(<remote>, <refspecs>, options=<options>, force=<force>)
+    When "r" calls push_request(<remote>, <refspecs>, options=<options>)
     Then the result's ok is True
 
     Examples:
-      | remote   | refspecs          | options        | force |
-      | "origin" | ["HEAD"]          | []             | False |
-      | "origin" | ["HEAD:main"]     | []             | False |
-      | "origin" | ["+HEAD:main"]    | []             | True  |
-      | "origin" | []                | []             | False |
-      | None     | []                | []             | False |
-      | None     | ["HEAD:main"]     | ["--dry-run"]  | False |
+      | remote   | refspecs          | options        |
+      | "origin" | ["HEAD"]          | []             |
+      | "origin" | ["HEAD:main"]     | []             |
+      | "origin" | ["+HEAD:main"]    | []             |
+      | "origin" | []                | []             |
+      | None     | []                | []             |
+      | None     | ["HEAD:main"]     | ["--dry-run"]  |
 
   Scenario: Remote policy refusal is distinct from a ref race
     Given an origin "o"
@@ -726,7 +700,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "local" with b="local"
     And "r" calls push_request("origin", ["HEAD:refs/heads/main"])
     And the origin "o" refuses non fast forward pushes
-    When "r" calls push_refspecs("origin", ["+<mem:before>:refs/heads/main"], force=True)
+    When "r" calls push_refspecs("origin", ["+<mem:before>:refs/heads/main"])
     Then the result is a RemoteRejected
 
   Scenario: An explicit push reports a ref race separately
@@ -923,10 +897,10 @@ Feature: One Repo and Worktree, real or fake
     When "r" writes a="resolved\n"
     And "r" calls resolve_and_continue()
     Then the result's ok is True
-    When "r" calls continue_rebase(missing_ok=True)
-    Then the result's ok is True
-    When "r" calls abort_rebase(missing_ok=False)
+    When "r" calls continue_rebase()
     Then the result's ok is False
+    When "r" calls abort_rebase()
+    Then the result's ok is True
 
   Scenario: A guarded remote deletion refuses an advanced destination
     Given an origin "o"
@@ -937,16 +911,13 @@ Feature: One Repo and Worktree, real or fake
     When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:before>")
     Then the call raises GitUnavailable
 
-  Scenario: Failed deletion verification cannot report authoritative absence
+  Scenario: A deletion on an offline origin is refused with git's output
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
     And "r" remembers its head as "before"
     And the origin "o" is offline
     When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:before>")
-    Then the call raises GitReadFailure
-    And the failure retains push and verification diagnostics
-    When "r" tries delete_remote_at("origin", "refs/heads/main", "<mem:before>", missing_ok=False)
     Then the call raises GitUnavailable
 
   Scenario: Scoped fetch refuses a missing remote ref
@@ -1136,7 +1107,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "root" with .gitignore=".venv/\n" tracked="one"
     And "r" writes .venv/lib="env", sub/.venv/lib="nested", stray="stray"
-    When "r" calls clean(["/.venv"], ignored=True)
+    When "r" calls clean_ignored(["/.venv"])
     Then the file ".venv/lib" of "r" holds "env"
     And the file "sub/.venv/lib" of "r" is absent
     And the file "stray" of "r" is absent
@@ -1151,7 +1122,7 @@ Feature: One Repo and Worktree, real or fake
     Then the file "drop/file" of "r" is absent
     And the file "keep/file" of "r" holds "keep"
     And the file "ignored.cache" of "r" holds "cache"
-    When "r" calls clean(["keep/", "saved.cache"], ignored=True)
+    When "r" calls clean_ignored(["keep/", "saved.cache"])
     Then the file "ignored.cache" of "r" is absent
     And the file "saved.cache" of "r" holds "saved"
     And the file "tracked" of "r" holds "one"
@@ -1248,7 +1219,7 @@ Feature: One Repo and Worktree, real or fake
     Then the result is a Recorded
     When "r" calls tree("HEAD")
     Then the tree lists ["a"]
-    When "r" calls record("empty", paths="staged", allow_empty=True)
+    When "r" calls record_empty("empty")
     Then the result is a Recorded
     When "r" calls history(["HEAD"])
     Then the subject of each result entry is ["empty", "root"]
@@ -1311,7 +1282,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" stages ["a"]
     And "r" writes a="unstaged"
     And "r" has a pre-commit hook that refuses
-    When "r" calls record("blocked", paths="staged", hooks=True)
+    When "r" calls record_with_hooks("blocked", paths="staged")
     Then the result is a HookRejected
     And the index of "r" reads "a" as "staged"
     And the file "a" of "r" holds "unstaged"
@@ -1634,22 +1605,17 @@ Feature: One Repo and Worktree, real or fake
     Then the result's ignored is []
 
   @real_only
-  Scenario: A nested repository in an ignored folder survives an ignored clean and goes with nested (the fake has none)
+  Scenario: A nested repository in an ignored folder survives an ignored clean (the fake has none)
     Given a repository "r"
     And "r" commits "base" with .gitignore=".venv/\n", a.txt="a\n"
     When "r" writes .venv/lib/x.py="x\n"
     And "r" makes a nested repository ".venv/src/dep" holding f.txt="f\n"
-    And "r" calls clean(ignored=True)
+    And "r" calls clean_ignored()
     Then the file ".venv/src/dep/f.txt" of "r" holds "f\n"
     And the file ".venv/lib/x.py" of "r" is absent
     When "r" calls dirty(ignored_under=["."])
     Then the result's ignored is [".venv/src/dep/"]
-    When "r" calls clean(ignored=True, nested=True)
-    Then the file ".venv/src/dep/f.txt" of "r" is absent
     And the file "a.txt" of "r" holds "a\n"
-    When "r" calls dirty(ignored_under=["."])
-    Then the result's ignored is []
-    And the result's untracked is []
 
   # -- record ------------------------------------------------------------------------------------------
   Scenario: Own paths leave out what the base would ignore, all paths take everything
@@ -1674,7 +1640,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "first" with a.txt="1\n"
     When "r" calls record("again")
     Then the result is a NothingToRecord
-    When "r" calls record("on purpose", allow_empty=True)
+    When "r" calls record_empty("on purpose")
     Then the result is a Recorded
 
   Scenario: Amend folds into the last commit and keeps its message when none is given
@@ -1708,7 +1674,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "base" with a.txt="1\n"
     And "r" has a pre-commit hook that refuses
     When "r" writes a.txt="2\n"
-    And "r" calls record("guarded", hooks=True)
+    And "r" calls record_with_hooks("guarded")
     Then the result is a HookRejected
     When "r" calls record("quick")
     Then the result is a Recorded
@@ -2225,7 +2191,7 @@ Feature: One Repo and Worktree, real or fake
     Then the dirty of each result entry is [True, False]
     And the head of each result entry is ["<head:r>", "<head:r>"]
 
-  Scenario: A clean worktree is dropped, a dirty one needs force
+  Scenario: A clean worktree is dropped, a dirty one is discarded
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" adds a worktree "w" at "HEAD" as "w"
@@ -2233,7 +2199,7 @@ Feature: One Repo and Worktree, real or fake
     When "r" tries drop_worktree("<root>/w")
     Then the call raises WorktreeRemoveRefused
     And the refusal reason is "fatal: '<root>/w' contains modified or untracked files, use --force to delete it"
-    When "r" calls drop_worktree("<root>/w", force=True)
+    When "r" calls discard_worktree("<root>/w")
     And "r" calls worktrees()
     Then the result has 1 entries
 
@@ -2246,24 +2212,25 @@ Feature: One Repo and Worktree, real or fake
     And "r" calls worktrees()
     Then the result has 1 entries
 
-  Scenario: A missing registered checkout needs force to be added again
+  Scenario: A missing registered checkout is dropped before it is added again
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" adds a worktree "w" at "HEAD" as "w"
     And the folder of "w" is deleted behind git's back
     When "r" tries add_worktree("<root>/w", "HEAD")
     Then the call raises GitUnavailable
-    When "r" calls add_worktree("<root>/w", "HEAD", force=True)
+    When "r" calls drop_worktree("<root>/w")
+    And "r" calls add_worktree("<root>/w", "HEAD")
     And "r" calls worktrees(with_dirty=True)
     Then the path of each result entry is ["<root>/r", "<root>/w"]
     And the dirty of each result entry is [False, False]
     And the file "a.txt" of "w" holds "1\n"
 
-  Scenario: Force does not replace a live checkout
+  Scenario: A live checkout is never replaced
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" adds a worktree "w" at "HEAD" as "w"
-    When "r" tries add_worktree("<root>/w", "HEAD", force=True)
+    When "r" tries add_worktree("<root>/w", "HEAD")
     Then the call raises GitUnavailable
     And the file "a.txt" of "w" holds "1\n"
 
@@ -2279,49 +2246,40 @@ Feature: One Repo and Worktree, real or fake
     And "r" calls worktrees()
     Then the path of each result entry is ["<root>/r", "<root>/live"]
 
-  Scenario: Strict removal refuses an unregistered absent path without pruning
+  Scenario: Removal refuses an unregistered path without pruning
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" adds a worktree "gone" at "HEAD" as "gone"
     And the folder of "gone" is deleted behind git's back
-    When "r" tries drop_worktree("<root>/unknown", missing_ok=False)
-    Then the call raises WorktreeRemoveRefused
+    When "r" tries drop_worktree("<root>/unknown")
+    Then the call raises NotAWorktree
     And the refusal reason is "fatal: '<root>/unknown' is not a working tree"
     When "r" calls worktrees()
     Then the result has 2 entries
 
-  Scenario: Default removal accepts an absent unregistered path and prunes
-    Given a repository "r"
-    And "r" commits "one" with a.txt="1\n"
-    And "r" adds a worktree "gone" at "HEAD" as "gone"
-    And the folder of "gone" is deleted behind git's back
-    When "r" calls drop_worktree("<root>/unknown")
-    And "r" calls worktrees()
-    Then the result has 1 entries
-
-  Scenario: Strict removal removes only its target without pruning other registrations
+  Scenario: Removal removes only its target without pruning other registrations
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" adds a worktree "gone" at "HEAD" as "gone"
     And "r" adds a worktree "live" at "HEAD" as "live"
     And the folder of "gone" is deleted behind git's back
-    When "r" calls drop_worktree("<root>/live", missing_ok=False)
+    When "r" calls drop_worktree("<root>/live")
     And "r" calls worktrees()
     Then the path of each result entry is ["<root>/r", "<root>/gone"]
-    When "r" calls drop_worktree("<root>/gone", missing_ok=False)
+    When "r" calls drop_worktree("<root>/gone")
     And "r" calls worktrees()
     Then the result has 1 entries
 
-  Scenario: Strict removal preserves a dirty checkout and exposes its refusal
+  Scenario: Removal preserves a dirty checkout and exposes its refusal
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" adds a worktree "w" at "HEAD" as "w"
     And "w" writes a.txt="edited\n"
-    When "r" tries drop_worktree("<root>/w", missing_ok=False)
+    When "r" tries drop_worktree("<root>/w")
     Then the call raises WorktreeRemoveRefused
     And the refusal reason is "fatal: '<root>/w' contains modified or untracked files, use --force to delete it"
     And the file "a.txt" of "w" holds "edited\n"
-    When "r" calls drop_worktree("<root>/w", missing_ok=False, force=True)
+    When "r" calls discard_worktree("<root>/w")
     And "r" calls worktrees()
     Then the result has 1 entries
 
@@ -2343,7 +2301,7 @@ Feature: One Repo and Worktree, real or fake
     When "r" calls prune_worktrees()
     And "r" calls worktrees()
     Then the path of each result entry is ["<root>/r", "<root>/w"]
-    When "r" calls drop_worktree("<root>/w", missing_ok=False)
+    When "r" calls drop_worktree("<root>/w")
     And "r" calls worktrees()
     Then the result has 1 entries
 
@@ -2660,7 +2618,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" calls take_branch("task/x", "HEAD", mode="resume")
     And "r" commits "rules" with .gitignore="*.cache\n", b.txt="2\n"
     And "r" writes junk.cache="junk\n", weird[1]*.out="w\n"
-    When "r" calls park("<mem:base>", keep_ignored=True)
+    When "r" calls park("<mem:base>")
     Then the result is "<mem:base>"
     And the file "junk.cache" of "r" holds "junk\n"
     When "r" calls dirty()
@@ -2674,7 +2632,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" calls take_branch("task/x", "HEAD", mode="resume")
     And "r" commits "rules" with .gitignore="*.cache\n", b.txt="2\n"
     And "r" writes junk.cache="junk\n"
-    When "r" calls park("<mem:base>", keep_ignored=True)
+    When "r" calls park("<mem:base>")
     And "r" calls dirty()
     Then the result's untracked is []
     And the result's tracked is []
@@ -2687,7 +2645,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" calls take_branch("task/x", "HEAD", mode="resume")
     And "r" commits "rules" with .gitignore="*.cache\n"
     And "r" writes we*ird.cache="a\n"
-    When "r" calls park("<mem:base>", keep_ignored=True)
+    When "r" calls park("<mem:base>")
     And "r" writes weXird.cache="b\n"
     And "r" calls dirty()
     Then the result's untracked is ["weXird.cache"]
@@ -2701,7 +2659,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" removes "keep.cache"
     And "r" stages ["keep.cache"]
     And "r" writes keep.cache="mine\n"
-    When "r" tries park("<mem:base>", keep_ignored=True)
+    When "r" tries park("<mem:base>")
     Then the call raises IgnoredFilesWouldBeOverwritten
     And the file "keep.cache" of "r" holds "mine\n"
 
@@ -2855,7 +2813,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" remembers the result of commit_tree("<mem:t>", ["HEAD"], "wip", when=1700000000) as "wip"
     And "r" calls update_ref("refs/heads/task/x", "<mem:wip>", expected="HEAD")
     When "r" calls reset("<mem:wip>")
-    And "r" calls park("<mem:base>", keep_ignored=True)
+    And "r" calls park("<mem:base>")
     And "r" calls dirty()
     Then the result's tracked is []
     And the result's untracked is []
@@ -2875,7 +2833,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" remembers the result of commit_tree("<mem:t>", ["task/x"], "wip", when=1700000000) as "wip"
     And "r" calls update_ref("refs/heads/task/x", "<mem:wip>", expected="task/x")
     When "r" calls reset("<mem:wip>")
-    And "r" calls park("<mem:base>", keep_ignored=True)
+    And "r" calls park("<mem:base>")
     And "r" calls dirty()
     Then the result's tracked is []
     And the result's untracked is []

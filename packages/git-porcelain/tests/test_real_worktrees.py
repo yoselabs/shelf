@@ -66,7 +66,7 @@ def test_remove_refusal_keeps_the_first_diagnostic_and_final_hint(tmp_path: Path
 
     monkeypatch.setattr(repo, "try_run", run)
     with pytest.raises(WorktreeRemoveRefused) as caught:
-        repo.drop_worktree(tmp_path / "w", missing_ok=False)
+        repo.drop_worktree(tmp_path / "w")
     expected = intro if intro.startswith("error:") else reason
     assert caught.value.reason == expected
     message = f"git worktree remove exited 128: {expected}"
@@ -83,7 +83,7 @@ def test_locked_worktree_removal_keeps_fatal_reason_and_hint(tmp_path: Path) -> 
     git(tmp_path, "worktree", "lock", "--reason", "contract lock", str(path))
 
     with pytest.raises(WorktreeRemoveRefused) as caught:
-        repo.drop_worktree(path, missing_ok=False)
+        repo.drop_worktree(path)
 
     assert caught.value.reason == "fatal: cannot remove a locked working tree, lock reason: contract lock"
     assert str(caught.value).startswith(f"git worktree remove exited 128: {caught.value.reason}")
@@ -114,7 +114,7 @@ def test_remove_preserves_infrastructure_errors(
 
     monkeypatch.setattr(repo, "try_run", run)
     with pytest.raises(error) as caught:
-        repo.drop_worktree(tmp_path / "w", missing_ok=False)
+        repo.drop_worktree(tmp_path / "w")
     assert not isinstance(caught.value, WorktreeRemoveRefused)
 
 
@@ -178,7 +178,7 @@ def test_a_pinned_checkout_keeps_its_verified_git_directory_after_the_pointer_is
     (slot / ".git").write_text(f"gitdir: {hostile}\n", encoding="utf-8")
     (slot / "note.txt").write_text("hello\n", encoding="utf-8")
     wt.stage(["note.txt"])
-    made = wt.record("pinned", paths="staged", hooks=True)
+    made = wt.record_with_hooks("pinned", paths="staged")
 
     assert isinstance(made, Recorded)
     assert git(main, "log", "-1", "--format=%H %s", "task").split() == [made.sha, "pinned"]

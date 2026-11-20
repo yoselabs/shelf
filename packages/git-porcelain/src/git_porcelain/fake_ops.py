@@ -141,13 +141,19 @@ def make_commit(repo: RepoState, wt: CheckoutState, message: str, parents: tuple
     return made.sha
 
 
-def clean(repo: RepoState, wt: CheckoutState, keep: Sequence[str], *, ignored: bool = False, nested: bool = False) -> None:
-    """Remove untracked files except keep patterns; optionally include ignored files. The model holds no nested
-    repositories, so ``nested`` changes nothing here."""
-    del nested
+def clean(repo: RepoState, wt: CheckoutState, keep: Sequence[str]) -> None:
+    """Remove untracked files except keep patterns and ignored files."""
     # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
-    lines = [] if ignored else [*wt.exclude, *repo.info_exclude, *wt.files.get(".gitignore", b"").decode("utf-8", "replace").splitlines()]
-    ignore = Ignore([*lines, *keep])
+    lines = [*wt.exclude, *repo.info_exclude, *wt.files.get(".gitignore", b"").decode("utf-8", "replace").splitlines()]
+    _remove_untracked(wt, Ignore([*lines, *keep]))
+
+
+def clean_ignored(wt: CheckoutState, keep: Sequence[str]) -> None:
+    """``clean`` that takes ignored files too (the model holds no nested repositories)."""
+    _remove_untracked(wt, Ignore(list(keep)))
+
+
+def _remove_untracked(wt: CheckoutState, ignore: Ignore) -> None:
     for path in [p for p in wt.files if p not in wt.index and not ignore.ignores(p)]:
         del wt.files[path]
 

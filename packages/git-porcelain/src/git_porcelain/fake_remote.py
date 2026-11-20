@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING
 
 from git_porcelain import fake_flow
 from git_porcelain.api import CommandResult, Pushed, RefRejected, RemoteRejected, Sha, Transient
-from git_porcelain.errors import GitReadFailure, GitUnavailable, MissingRemote
+from git_porcelain.errors import GitUnavailable, MissingRemote
 from git_porcelain.fake_store import ancestors
-from git_porcelain.remote_validation import validate_delete_ref, validate_push, validate_remote
+from git_porcelain.remote_validation import validate_delete_ref, validate_remote
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -87,22 +87,13 @@ def fetch(state: RepoState, remote: str, refspecs: Sequence[str]) -> CommandResu
     return CommandResult(ok=True, output="")
 
 
-def delete_remote_at(state: RepoState, remote: str, ref: str, expected: Sha, *, missing_ok: bool = True) -> CommandResult:
+def delete_remote_at(state: RepoState, remote: str, ref: str, expected: Sha) -> CommandResult:
     validate_remote(remote)
     validate_delete_ref(ref)
-    try:
-        name, there = _source(state, remote)
-    except GitUnavailable as exc:
-        if not missing_ok:
-            raise
-        msg = f"cannot verify remote deletion: {exc}"
-        raise GitReadFailure(msg, output=exc.output, push_output=exc.output) from exc
-    old = there.refs.get(ref)
-    if old is None and missing_ok:
-        return CommandResult(ok=True, output=f"To {remote}\n!\t:{ref}\t[rejected] (stale info)\nDone")
-    if old != expected:
+    name, there = _source(state, remote)
+    if there.refs.get(ref) != expected:
         msg = "[rejected] (stale info)"
-        raise GitUnavailable(msg)
+        raise GitUnavailable(msg, output=f"To {remote}\n!\t:{ref}\t[rejected] (stale info)\nDone")
     refusal = fake_flow.hook_refusal(state, {})
     if refusal:
         raise GitUnavailable(refusal.tail, output=refusal.output)
@@ -283,11 +274,9 @@ def push_refspecs(
     *,
     hook_env: Mapping[str, str] | None,
     options: Sequence[str] = (),
-    force: bool = False,
-    allow_delete: bool = False,
 ) -> PushResult:
     """Push explicit refs; deletion-only success carries an empty sha."""
-    validate_push(remote, refspecs, options=options, force=force, allow_delete=allow_delete)
+    validate_remote(remote)
     refusal = fake_flow.hook_refusal(state, hook_env or {})
     if refusal:
         return refusal
@@ -310,10 +299,8 @@ def push_request(
     *,
     options: Sequence[str],
     hook_env: Mapping[str, str] | None,
-    force: bool = False,
-    allow_delete: bool = False,
 ) -> CommandResult:
-    validate_push(remote, refspecs, options=options, force=force, allow_delete=allow_delete)
+    validate_remote(remote)
     branch = (checkout.head_ref or "").removeprefix("refs/heads/")
     name = (
         remote
@@ -322,7 +309,7 @@ def push_request(
         or state.config.get(f"branch.{branch}.remote", "origin")
     )
     try:
-        result = push_refspecs(state, checkout, name, refspecs, hook_env=hook_env, options=options, force=force, allow_delete=allow_delete)
+        result = push_refspecs(state, checkout, name, refspecs, hook_env=hook_env, options=options)
     except GitUnavailable as exc:
         return CommandResult(ok=False, output=exc.output)
     return CommandResult(ok=isinstance(result, Pushed), output=result.output)

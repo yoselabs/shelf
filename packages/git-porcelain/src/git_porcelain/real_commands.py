@@ -42,9 +42,7 @@ def rebase(wt: RealWorktree, base: str, *, update_refs: bool | None) -> CommandR
     return command(wt, [*config, "rebase", "-q", target])
 
 
-def continue_rebase(wt: RealWorktree, *, missing_ok: bool) -> CommandResult:
-    if missing_ok and not real_observe.rebasing(wt):
-        return CommandResult(ok=True, output="")
+def continue_rebase(wt: RealWorktree) -> CommandResult:
     return command(wt, ["-c", "core.editor=true", "rebase", "--continue"])
 
 
@@ -60,10 +58,10 @@ def resolve_and_continue(wt: RealWorktree) -> CommandResult:
     return command(wt, ["-c", "core.editor=true", "rebase", "--continue"])
 
 
-def abort_rebase(wt: RealWorktree, *, missing_ok: bool, restore_to: Sha | None) -> CommandResult:
+def abort_rebase(wt: RealWorktree, *, restore_to: Sha | None) -> CommandResult:
     target = real_checkout.resolve_commit(wt, str(restore_to)) if restore_to is not None else None
     result = CommandResult(ok=True, output="")
-    if not missing_ok or real_observe.rebasing(wt):
+    if real_observe.rebasing(wt):
         result = command(wt, ["rebase", "--abort"])
     if result.ok and target is not None:
         result = command(wt, ["reset", "--hard", target])

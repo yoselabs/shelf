@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING
 
 from git_porcelain import real_commands, real_parse, real_write
 from git_porcelain.api import CommandResult, HookRejected, Pushed, RefRejected, RemoteRejected, Sha, Transient
-from git_porcelain.errors import GitReadFailure, GitUnavailable, RefRace
+from git_porcelain.errors import GitUnavailable, RefRace
 from git_porcelain.real_done import unavailable
-from git_porcelain.remote_validation import validate_delete_ref, validate_push, validate_remote
+from git_porcelain.remote_validation import validate_delete_ref, validate_remote
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -41,32 +41,14 @@ def fetch(repo: RealRepo, remote: str, refspecs: Sequence[str], timeout: float |
         repo.invalidate()
 
 
-def delete_remote_at(repo: RealRepo, remote: str, ref: str, expected: Sha, *, missing_ok: bool = True) -> CommandResult:
-    """Delete with one push; missing_ok=False returns that invocation's refusal immediately.
-
-    The default preserves idempotency: a refused lease requires one additional ls-remote,
-    because push's stale-info row cannot distinguish an absent ref from a moved ref.
-    """
+def delete_remote_at(repo: RealRepo, remote: str, ref: str, expected: Sha) -> CommandResult:
+    """Delete with one push; a refusal (a moved ref, an absent one) raises with that invocation's output."""
     validate_remote(remote)
     validate_delete_ref(ref)
     try:
         done = repo.try_run(repo.path, "push", "--porcelain", f"--force-with-lease={ref}:{expected}", "--", remote, f":{ref}")
-        if done.rc == 0:
-            return CommandResult(ok=True, output=done.output)
-        if not missing_ok:
+        if done.rc != 0:
             raise unavailable(("push",), done)
-        try:
-            found = repo.run(repo.path, "ls-remote", "--refs", "--", remote, ref)
-        except GitUnavailable as exc:
-            msg = f"cannot verify remote deletion: {exc}"
-            raise GitReadFailure(msg, output=exc.output, push_output=done.output) from exc
-        for line in found.out.splitlines():
-            oid, sep, name = line.partition("\t")
-            if not sep or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", oid) or not name:
-                msg = "ls-remote returned a malformed record"
-                raise GitReadFailure(msg, output=found.output, push_output=done.output)
-            if name == ref:
-                raise unavailable(("push",), done)
         return CommandResult(ok=True, output=done.output)
     finally:
         repo.invalidate()
@@ -101,8 +83,6 @@ def push_request(
     options: Sequence[str],
     hook_env: Mapping[str, str] | None,
     timeout: float | None,
-    force: bool = False,
-    allow_delete: bool = False,
 ) -> CommandResult:
     """One push process with an explicit remote (or no refspecs).
 
@@ -110,7 +90,7 @@ def push_request(
     and explicit refspecs, symbolic-ref and one config query select its configured push remote
     before the push: three processes. Passing the remote avoids both discovery calls.
     """
-    validate_push(remote, refspecs, options=options, force=force, allow_delete=allow_delete)
+    validate_remote(remote)
     # Command-style pushes need no returned SHA: let git resolve HEAD in its own invocation.
     specs = tuple(refspecs)
     if remote is None and specs:
@@ -135,8 +115,6 @@ def push_refspecs(
     *,
     hook_env: Mapping[str, str] | None,
     timeout: float | None,
-    force: bool = False,
-    allow_delete: bool = False,
 ) -> PushResult:
     """Push explicit refs; deletion-only success is Pushed(Sha("")), with nothing pushed.
 
@@ -144,7 +122,7 @@ def push_refspecs(
     resolution process because push porcelain omits the full oid for new/up-to-date refs.
     Bare HEAD also needs symbolic-ref to preserve its implicit branch destination.
     """
-    validate_push(remote, refspecs, force=force, allow_delete=allow_delete)
+    validate_remote(remote)
     specs = _pin(wt, refspecs)
     source = next((src for spec in specs if (src := spec.removeprefix("+").partition(":")[0])), None)
     if not specs:

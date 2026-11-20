@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.27.0
+
+**Breaking** (shelf-tyld.26): tolerance and destructive flags are gone (Article III: tolerance is a handler, not a flag; ADR 0030). Store bytes unchanged.
+
+- `Repo.delete_remote_at(remote, ref, expected, *, missing_ok=True)` => `delete_remote_at(remote, ref, expected)`: one process; a refusal (moved or already-absent ref) raises `GitUnavailable` with git's output. The old tolerant path (the extra `ls-remote`, `GitReadFailure`) is gone: catch `GitUnavailable`, ask `ls_remote`.
+- `Repo.drop_worktree(path, *, force=False, missing_ok=True)` => `drop_worktree(path)` (registered linked worktree; clean) and `discard_worktree(path)` (drops changes). A path git does not know raises the new `NotAWorktree` (a `WorktreeRemoveRefused`); the old default also pruned every stale registration: call `prune_worktrees()`.
+- `Repo.add_worktree(path, rev, *, force=False)` => `add_worktree(path, rev)`: a registered-but-missing checkout refuses; `drop_worktree(path)` it first.
+- `Worktree.continue_rebase(*, missing_ok=False)` => `continue_rebase()` (`ok=False` with no rebase paused); `abort_rebase(*, missing_ok=True, restore_to=None)` => `abort_rebase(*, restore_to=None)` (idempotent).
+- `Worktree.push_refspecs` and `push_request` lose `force=` and `allow_delete=`: forms are sent as written (`+`, `:dst`, `--force`, `--delete`, `--mirror`, `--prune`); the `ValueError` for an unconfirmed force or deletion no longer exists. Remote validation still raises.
+- `Worktree.clean(keep, *, ignored=False, nested=False)` => `clean(keep)` and `clean_ignored(keep)` (`git clean -fdx`). `nested=True` (`-ff`, deleting nested repositories) is removed: a nested repository is left in place.
+- `Worktree.record(..., hooks=False, allow_empty=False)` => `record(...)` (no hooks), `record_with_hooks(...)` and `record_empty(message)` (`git commit --allow-empty` of the index).
+- `Worktree.park(base, *, clean_keep=None, keep_ignored=False)` => `park(base, *, clean_keep=None)`, which always keeps the ignored files (was the `keep_ignored=True` behaviour; `IgnoredFilesWouldBeOverwritten` when base tracks one, nothing changes). The default no longer lets base's tracked files overwrite ignored ones.
+- Migrate: catch `NotAWorktree` / `GitUnavailable` where you passed `missing_ok=True`; use the new verbs where you passed `force`, `ignored`, `hooks`, `allow_empty`.
+
 ## 0.26.0
 
 **Breaking** (shelf-tyld.6): the library no longer reads `os.environ`; the caller passes its environment at its edge.

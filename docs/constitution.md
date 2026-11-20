@@ -66,7 +66,7 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 | One CLI home (III) | `tests/test_arch_cli_surfaces.py` `import argparse` only in verb-cli, argparse-mcp, `__main__` modules and reasoned files | blocking |
 | No backward compatibility | shim / legacy / compat ban | task shelf-au97 |
 | No silent failures | planted-violation test for a swallowed exception (effects research, task shelf-tyld.22) | task |
-| Tolerance is a handler | bool-mode test extended to `Literal` policy parameters; the 28 C rows converted | task |
+| Tolerance is a handler | `tests/test_arch_bool_modes.py` public parameters named force/overwrite/missing_ok/exist_ok/ignore_errors/check, or annotated Literal/Enum (aliases included); `debt:` rows are conversions still owed | blocking |
 | No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
 | Size limit (IV) | `tests/test_size_caps.py` file and function SLOC caps | blocking on changed files |
 

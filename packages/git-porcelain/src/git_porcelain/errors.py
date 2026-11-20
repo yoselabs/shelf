@@ -112,6 +112,10 @@ class WorktreeRemoveRefused(GitUnavailable):
         self.reason = reason
 
 
+class NotAWorktree(WorktreeRemoveRefused):
+    """The path is not a registered linked worktree; a caller that wants "gone is fine" catches this."""
+
+
 class IndexLocked(GitUnavailable):
     """Another writer holds the index lock."""
 

@@ -109,9 +109,9 @@ land(RealRepo(path, ambient=env).worktree(path))             # the binary, memoi
 land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no subprocess
 ```
 
-- **`Repo`**: `identity sync fetch remote_url remote_push_url remote_urls remote_push_urls ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch commit tree squash commit_tree update_ref worktrees add_worktree drop_worktree
+- **`Repo`**: `identity sync fetch remote_url remote_push_url remote_urls remote_push_urls ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch commit tree squash commit_tree update_ref worktrees add_worktree drop_worktree discard_worktree
   prune_worktrees worktree_state exclude_locally worktree`.
-- **`Worktree`**: `health branch checkout checkout_new clean reset checkout_force snapshot diff dirty stage stage_tracked record merge_ff take_branch release_branch park exclude capture start_merge merging finish_merge abort_merge rebase_onto
+- **`Worktree`**: `health branch checkout checkout_new clean clean_ignored reset checkout_force snapshot diff dirty stage stage_tracked record record_with_hooks record_empty merge_ff take_branch release_branch park exclude capture start_merge merging finish_merge abort_merge rebase_onto
   finish_rebase rebase continue_rebase abort_rebase rebasing unmerged push push_refspecs push_request push_lease lfs_push landed grep_tracked`.
 - **Reading files, commit or disk** (0.24): `Repo.commit(rev)` is the commit id (`MissingRevision` if none); `Repo.tree("rev:folder")` and `worktree_tree(root, folder)` both give a `Tree` (`files` path to `(mode, blob sha)`, `read`, `read_many`, `sha`), so a commit's folder and the same folder on disk compare entry by entry; `blob_sha(data)` is Git's id for bytes.
 - **Results are frozen unions** (`Recorded | NothingToRecord | HookRejected`, `BranchTaken |
@@ -128,11 +128,11 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   `DirtyTree`. A branch held by another worktree raises `BranchPinned` with its `holder`.
   `checkout_force(branch, start)` runs checkout with `-B -f`: create or reset the branch and
   discard local changes, while still respecting another worktree's branch pin.
-- **Cleanup and reset**: `clean(keep=(), ignored=False, nested=False)` removes untracked files and directories
+- **Cleanup and reset**: `clean(keep=())` removes untracked files and directories
   except gitignore-style `keep` patterns, without moving HEAD or changing tracked files.
-  `ignored=True` also removes ignored files. `nested=True` also removes nested repositories (git skips a
-  directory holding its own `.git` without a second `-f`); `ignored=True, nested=True` is `git clean -ffdx`.
-  `dirty(ignored_under=["."])` then lists what is still ignored in the whole checkout (empty after that clean). `reset(rev, mode="mixed")` moves HEAD; `soft`
+  `clean_ignored(keep=())` also removes ignored files (`git clean -fdx`); a nested repository (a directory
+  holding its own `.git`) is left in place, as git leaves it.
+  `dirty(ignored_under=["."])` lists what is still ignored in the whole checkout. `reset(rev, mode="mixed")` moves HEAD; `soft`
   preserves the index and working files, `mixed` resets the index, and `hard` also resets tracked
   files, discarding edits. Unrelated untracked files survive a hard reset or forced checkout;
   untracked files obstructing the target's tracked files may be removed by git.
@@ -141,15 +141,14 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   compare-and-delete (`update-ref -d`); a moved or missing tip raises non-retryable `RefRace`.
   A branch checked out in any worktree raises `BranchPinned`, preserving its tip and HEAD.
   There is no merged check. No retry can delete a newly advanced tip.
-- **Recording scopes**: `record(message, paths="own", base=None, mode="new", squash_to=None,
-  hooks=False, allow_empty=False)` keeps the original `own` and `all` behavior. `tracked` stages
+- **Recording scopes**: `record(message, paths="own", base=None, mode="new", squash_to=None)` keeps the original `own` and `all` behavior. `tracked` stages
   modifications/deletions of index-tracked paths and commits them with already staged additions;
   untracked files stay out. `staged` commits the existing index contents, preserving staged blob
   contents and leaving unstaged edits and untracked files alone. `mode="amend"` replaces HEAD
   rather than adding a child, including message-only amendments; an empty message keeps HEAD's
   message. An unborn HEAD cannot be amended. `squash_to` retains its existing soft-reset behavior.
-  Hooks run only with `hooks=True`; their refusal returns `HookRejected`. An unchanged index
-  returns `NothingToRecord` for a new commit unless `allow_empty=True`.
+  `record` skips hooks; `record_with_hooks(...)` (same arguments) runs them and a refusal returns `HookRejected`.
+  An unchanged index returns `NothingToRecord` for a new commit; `record_empty(message)` commits the index anyway.
   `Recorded.output` contains complete stripped stdout plus stderr, including successful hook output.
   `HookRejected.output` retains the entire diagnostic; `tail` is a short display excerpt, even when the hook
   prints no hook name. Commit rejection requires positive hook evidence: a hook name, a hook failure
@@ -161,7 +160,7 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   Conflict-marker text is not a precondition; git decides whether the selected index can commit.
 - **`RealRepo` owns the environment**: it strips the variables that make `-C` lie, forbids prompts,
   pins `GIT_DIR`/`GIT_WORK_TREE` from the checkout's `.git` (re-read on every call), sets `LC_ALL=C`, and runs hooks:
-  `record(hooks=False)` skips them, `push` always runs `pre-push`. Under `user.useConfigOnly` a
+  `record` skips them, `push` always runs `pre-push`. Under `user.useConfigOnly` a
   missing identity is a `GitUnavailable` whose hint says to set `user.name` and `user.email`.
 - **A bounded read**: `RealRepo(path, read_timeout=30)` kills a read-only command (`status`, `diff`, `ls-files`, `rev-parse`, ... see `real_reads`) after 30 s and raises `GitTimeout`; they run with `GIT_OPTIONAL_LOCKS=0`. Every other call is bounded by `DEFAULT_TIMEOUT` (one hour) unless it names a `timeout`; git is stopped with SIGTERM first so it can drop its `index.lock`.
 - **A verified git directory**: `RealRepo(path, pins={path: git_dir})` pins each listed checkout to the git
@@ -178,15 +177,15 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   signatures do not cover needs `invalidate()`.
 - **Explicit landing operations** supplement `push(dst)`; their contracts are described below.
 - **Worktree pools** stay pinned to the checkout's `.git`, including add, remove and prune.
-  `add_worktree(path, rev, force=True)` passes `--force`: it recreates a registered checkout
-  whose folder disappeared, still detached at `rev`; it cannot replace a live checkout.
+  `add_worktree(path, rev)` refuses (`GitUnavailable`) a path that is registered, even if its folder disappeared:
+  `drop_worktree(path)` it first.
   `prune_worktrees()` independently prunes stale registrations and invalidates the worktree memo.
-  `drop_worktree(path, force=False, missing_ok=True)` retains the original absent-folder acceptance
-  and prune behavior. With `missing_ok=False`, it requires a registered linked worktree and removes
-  only that registration, even if its folder is gone; it never prunes other registrations.
-  Removal refusals raise `WorktreeRemoveRefused` (a `GitUnavailable` subclass) with `.reason` equal
-  to the final nonempty stderr line, so a caller can explain why the checkout stayed. Dirty checkouts
-  need `force=True`; infrastructure errors retain their own types.
+  `drop_worktree(path)` requires a registered linked worktree and removes only that registration,
+  even if its folder is gone; it never prunes other registrations. A path git does not know raises
+  `NotAWorktree`, the handler for "gone is fine". Removal refusals raise `WorktreeRemoveRefused` (a
+  `GitUnavailable` subclass) with `.reason` equal to the final nonempty stderr line, so a caller can explain
+  why the checkout stayed. A dirty checkout is refused; `discard_worktree(path)` removes it and its changes.
+  Infrastructure errors retain their own types.
   `worktrees()` reads NUL-delimited porcelain: quotes, tabs, newlines and non-ASCII path bytes
   round trip, and incomplete records raise `GitUnavailable`.
 - **`repo.worktree_state(path)`** returns the exact bytes from
@@ -274,7 +273,7 @@ returns the complete squash diagnostic in `Rebased.squash_failure` or
 `Conflict.squash_failure`. Conflicts remain paused; `abort_rebase(restore_to=original)`
 can restore the pre-squash HEAD.
 
-`rebase(base, update_refs=None)`, `continue_rebase(missing_ok=False)`, `resolve_and_continue()` (refuses while conflict markers remain, else stages every unmerged file and continues) and `abort_rebase(missing_ok=True, restore_to=None)`
+`rebase(base, update_refs=None)`, `continue_rebase()`, `resolve_and_continue()` (refuses while conflict markers remain, else stages every unmerged file and continues) and `abort_rebase(restore_to=None)` (idempotent: with no rebase paused it only restores)
 return `CommandResult(ok, output)`. These preserve complete stripped stdout plus stderr;
 git refusals are `ok=False`, while invocation failures raise. `rebase` first resolves `base`
 to a commit OID with `rev-parse --verify --end-of-options`; an absent base raises
@@ -326,13 +325,11 @@ and returns `Offline` from `sync`. `fetch(source, refspecs=[ref])` is the scoped
 there is no redundant `fetch_ref` method. Missing remote refs raise. `timeout=None` means
 no timeout. `Repo.delete_remote_at(remote, ref, expected)` sends an explicit expected-SHA
 lease with a deletion refspec. `ref` must start with `refs/`; short names raise `ValueError`
-before invoking git. Success returns `CommandResult`. The default `missing_ok=True`
-preserves idempotency: after refusal, one advertisement verifies absence. A failed probe
-raises `GitReadFailure`, carrying its complete `output` and the original `push_output`.
-Pass `missing_ok=False` for exactly one process: every refusal then raises the original
-push error with complete output, including a stale lease on an already absent destination.
+before invoking git. Success returns `CommandResult`. It is one process: every refusal raises the original
+push error with complete output, including a stale lease on an already absent destination. A caller that
+treats "already gone" as done catches `GitUnavailable` and asks `ls_remote`.
 
-`Worktree.push_refspecs(remote, refspecs, *, force=False, allow_delete=False, hook_env=None, timeout=None)` supports explicit
+`Worktree.push_refspecs(remote, refspecs, *, hook_env=None, timeout=None)` supports explicit
 OIDs, full namespaces, multiple updates and deletion. It returns `Pushed`, `RefRejected`
 (a `Rejected` subclass for non-fast-forward/stale races), `HookRejected`, `RemoteRejected`
 (policy/other per-ref refusal), or `Transient`. Diagnostics are complete combined output.
@@ -345,18 +342,16 @@ refusals remain `RemoteRejected` even when hook text contains "rejected".
 with a nonzero status. A hook that passed before a connection drop remains `Transient`.
 Silent hooks and hooks printing only `error:` are supported, including configured hook paths.
 
-`push_request(remote, refspecs, *, options=(), force=False, allow_delete=False, hook_env=None, timeout=None)` returns
+`push_request(remote, refspecs, *, options=(), hook_env=None, timeout=None)` returns
 `CommandResult` for configured landing forms, including omitted remote/refspec defaults,
 `HEAD`, `HEAD:main`, `+HEAD:main`, OIDs, tags, deletion and multiple refs. Exact HEAD
 sources are resolved by the push process itself; force prefixes and explicit destinations survive.
 A bare HEAD retains Git's symbolic branch destination. For an explicit refspec with omitted
 remote, selection follows branch pushRemote, remote.pushDefault, branch remote, then origin.
 Normal pre-push hooks, checkout pinning and the repository's injected environment remain
-in force. Both push methods reject leading `+` without `force=True`, and empty-source
-deletion refspecs (`:destination`) without `allow_delete=True`, before invoking git.
-In `push_request`, `--force`/`-f` require `force=True`; `--delete`/`-d` and `--prune`
-require `allow_delete=True`; `--mirror` requires both. `--force-with-lease[=...]`
-remains allowed. Opt ins authorize the supplied forms; they do not add push options.
+in force. Both push methods send the forms exactly as written: a leading `+`, an empty-source deletion
+refspec (`:destination`), `--force`/`-f`, `--delete`/`-d`, `--prune` and `--mirror` are git's own opt ins and
+there is no second flag to confirm them (`push(dst)` and `push_lease` never force or delete).
 Remote arguments starting with `-` raise `ValueError` in push, fetch, sync and guarded
 remote deletion. Other options pass to git without changing configuration or upstream settings.
 `push_lease(remote, refspec, timeout=3600)` uses plain `--force-with-lease`, preserving
@@ -408,8 +403,7 @@ Process budgets (top-level git invocations, excluding processes Git itself launc
 | `push_request(None, [])` | 1 |
 | `fetch`, `sync` | 1 per attempt; at most 5, retrying only ref races |
 | `ls_remote` | 1 |
-| `delete_remote_at(..., missing_ok=False)` | 1 |
-| `delete_remote_at` with default idempotency | 1 on success, 2 after refusal to distinguish absence from a moved ref |
+| `delete_remote_at` | 1 |
 | Path-based push, fetch, LFS push/fetch, pull/rebase, ls-remote | 1 |
 | `readiness` with a remote probe | 3: identity, configured remotes, ls-remote |
 

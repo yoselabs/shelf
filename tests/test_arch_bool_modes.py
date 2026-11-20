@@ -9,8 +9,12 @@ a row whose flag is gone must be deleted. Reason prefixes:
 
 - `split:` the flag picks between two behaviours of one operation; the reason names the separate type or function
 - `fact:` the flag is data about one call, one value or one error (or a third-party library's own option), not a code path
-- `exception:` a named, justified opt-in (cost, safety, durability) that Article III allows only as a row; each needs an
-  accepted ADR (ADR 0030) to be durable
+- `cost:` the default is the complete or durable answer and the flag skips or adds a named cost (Article IX); ADR 0030
+- `construction:` chosen once when the object is built, never per call; ADR 0030
+
+Tolerance is a handler, not a flag (Article III, ADR 0030): a second check below covers public parameters named
+force, overwrite, missing_ok, exist_ok, ignore_errors or check, and public parameters annotated Literal or an Enum
+(the same flag in a coat). Each hit needs a row in `_POLICY_ALLOWED` with a reason.
 """
 
 import ast
@@ -46,10 +50,9 @@ def _rows(reason: str, *keys: str) -> dict[str, str]:
 
 
 _ALLOWED: dict[str, str] = {
-    # --- split: the flag chooses between behaviours; a separate type or function is the fix ---
-    # --- exceptions: a named, justified opt-in (ADR 0030) ---
+    # --- cost opt-ins and construction config (ADR 0030) ---
     **_rows(
-        "exception: durability tier of one write (fsync or not); the default is the safe one, off is for caches and hot state; ADR 0030",
+        "cost: durability tier of one write (fsync or not); the default is the safe one, off is for caches and hot state; ADR 0030",
         "any-json-doc:__init__:fsync",
         "atomic-io:atomic_write_bytes:fsync",
         "atomic-io:atomic_write_json:fsync",
@@ -59,47 +62,19 @@ _ALLOWED: dict[str, str] = {
         "atomic-io:atomic_replace_text:fsync",
     ),
     **_rows(
-        "exception: a cost opt-in: the dirty flag needs one `git status` per worktree (Article IX: cost makes it opt-in); ADR 0030",
+        "cost: the dirty flag needs one `git status` per worktree (Article IX: cost makes it opt-in); ADR 0030",
         "git-porcelain:worktrees:with_dirty",
     ),
     **_rows(
-        "exception: a cost opt-in: the network ls-remote probe; check_push=False stays local and fast; ADR 0030",
+        "cost: the network ls-remote probe; check_push=False stays local and fast; ADR 0030",
         "git-porcelain:readiness:check_push",
     ),
     **_rows(
-        "exception: the safe default and a named opt-out that mirrors git's own flag for one "
-        "destructive or history-changing call; ADR 0030",
-        "git-porcelain:add_worktree:force",
-        "git-porcelain:drop_worktree:force",
-        "git-porcelain:worktree_add:force",
-        "git-porcelain:push_refspecs:force",
-        "git-porcelain:push_request:force",
-        "git-porcelain:validate_push:force",
-        "git-porcelain:push_refspecs:allow_delete",
-        "git-porcelain:push_request:allow_delete",
-        "git-porcelain:validate_push:allow_delete",
-        "git-porcelain:clean:ignored",
-        "git-porcelain:clean:nested",
-        "git-porcelain:record:allow_empty",
-        "git-porcelain:record:hooks",
-        "git-porcelain:park:keep_ignored",
-        "beads-client:unclaim:force",
-        "beads-client:reclaim:any_replica",
-    ),
-    **_rows(
-        "exception: the caller names that a missing target is success (as Path.unlink(missing_ok=)); a split needs an outcome "
-        "value on three result shapes; ADR 0030",
-        "git-porcelain:abort_rebase:missing_ok",
-        "git-porcelain:continue_rebase:missing_ok",
-        "git-porcelain:delete_remote_at:missing_ok",
-        "git-porcelain:drop_worktree:missing_ok",
-    ),
-    **_rows(
-        "exception: whether a repo observation is cached, chosen once at construction, for fresh reads; ADR 0030",
+        "construction: whether a repo observation is cached, chosen once at construction, for fresh reads; ADR 0030",
         "git-porcelain:__init__:memoize",
     ),
     **_rows(
-        "exception: pin=False skips the checkout's environment pin for one call (the runner's own escape hatch); ADR 0030",
+        "cost: pin=False skips the checkout's environment pin for one call (the runner's own escape hatch); ADR 0030",
         "git-porcelain:run:pin",
         "git-porcelain:try_run:pin",
     ),
@@ -202,6 +177,106 @@ _ALLOWED: dict[str, str] = {
 }
 
 
+_NAMED = frozenset({"force", "overwrite", "missing_ok", "exist_ok", "ignore_errors", "check"})
+_ENUM_BASES = frozenset({"Enum", "StrEnum", "IntEnum", "Flag", "IntFlag"})
+
+
+def _enums_and_aliases(tree: ast.Module) -> set[str]:
+    """Names in one module that stand for a Literal or an Enum: Enum subclasses and `X = Literal[...]` aliases."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and any(ast.unparse(base).split(".")[-1] in _ENUM_BASES for base in node.bases):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign | ast.AnnAssign | ast.TypeAlias):
+            value = node.value
+            target = node.name if isinstance(node, ast.TypeAlias) else (node.targets[0] if isinstance(node, ast.Assign) else node.target)
+            if value is not None and "Literal[" in ast.unparse(value) and isinstance(target, ast.Name):
+                names.add(target.id)
+    return names
+
+
+def policy_params(root: Path) -> dict[str, int]:
+    """`package:function:parameter` for each public function parameter that is a tolerance or policy switch."""
+    hits: dict[str, int] = {}
+    for path in sorted((root / "packages").glob("*/src/**/*.py")):
+        package = path.relative_to(root / "packages").parts[0]
+        tree = ast.parse(path.read_text())
+        coats = _enums_and_aliases(tree)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) or (node.name.startswith("_") and node.name != "__init__"):
+                continue
+            for arg in [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]:
+                note = ast.unparse(arg.annotation) if arg.annotation is not None else ""
+                names = {n.id for n in ast.walk(arg.annotation) if isinstance(n, ast.Name)} if arg.annotation is not None else set()
+                if arg.arg in _NAMED or "Literal[" in note or names & coats:
+                    key = f"{package}:{node.name}:{arg.arg}"
+                    hits[key] = hits.get(key, 0) + 1
+    return hits
+
+
+_POLICY_ALLOWED: dict[str, str] = {
+    **_rows(
+        "debt: a Literal that picks between behaviours of one operation (the flag in a coat); convert to separate verbs "
+        "(ADR 0030, Article III); not part of the 2026-11-20 tolerance conversion",
+        "git-porcelain:finish_rebase:action",
+        "git-porcelain:rebase_onto:squash_failure",
+        "git-porcelain:record:mode",
+        "git-porcelain:record_with_hooks:mode",
+        "git-porcelain:record_args:mode",
+        "git-porcelain:record_commit:mode",
+        "git-porcelain:record_needed:mode",
+        "git-porcelain:record_prepare:mode",
+        "git-porcelain:take_branch:mode",
+    ),
+    **_rows(
+        "fact: which part of the checkout one `record` stages is a selection of data, not a second behaviour",
+        "git-porcelain:record:paths",
+        "git-porcelain:record_with_hooks:paths",
+        "git-porcelain:record_prepare:paths",
+        "git-porcelain:record_stage:paths",
+    ),
+    **_rows(
+        "fact: git reset's own --soft/--mixed/--hard, passed through; it names git's three reset depths",
+        "git-porcelain:reset:mode",
+    ),
+    **_rows(
+        "fact: a one-member Literal naming the single setup target, a CLI positional, not a switch",
+        "any-speech:setup:what",
+    ),
+    **_rows(
+        "fact: a tag naming the kind or outcome of one value or error; no code path branches on a caller's choice",
+        "a2effect:register_error_kind:base",
+        "any-agent:end:status",
+        "beads-client:__init__:kind",
+        "blueprint:failing:fixed_by",
+        "blueprint:not_checked:fixed_by",
+        "blueprint:not_set_up:fixed_by",
+        "git-porcelain:__init__:reason",
+        "llm-wobble:emit_wobble:tolerance",
+        "task-spec:resolve:kind",
+    ),
+    **_rows(
+        "fact: a lookup key or backend setting forwarded as data (which model, store, directory kind or request level)",
+        "any-speech:__init__:model_version",
+        "any-speech:default_card:role",
+        "anyembed:__init__:pooling",
+        "anyllm:complete:effort",
+        "app-dirs:plugin_dir:kind",
+        "browser-cookies:read_cookies:source",
+        "convert-md:convert_html:source_kind",
+        "http-fetch:__init__:opener",
+    ),
+    **_rows(
+        "debt: an enum or Literal that picks between behaviours or output forms of one function; convert to separate functions "
+        "(ADR 0030, Article III, IX); not part of the 2026-11-20 tolerance conversion",
+        "any-markdown:find:anchors",
+        "any-markdown:outline:anchors",
+        "blueprint:scan:mode",
+        "page-tsv:render:consumer",
+    ),
+}
+
+
 def _plant(tmp_path: Path, source: str) -> dict[str, int]:
     module = tmp_path / "packages" / "pkg" / "src" / "pkg" / "mod.py"
     module.parent.mkdir(parents=True)
@@ -233,3 +308,46 @@ def test_planted_positional_bool_with_default_and_tri_state_are_found(tmp_path: 
 def test_required_bool_and_non_bool_defaults_pass(tmp_path: Path) -> None:
     source = "def a(*, flag: bool): ...\ndef b(n: int = 0, s: str = 'x', f=False): ...\n"
     assert _plant(tmp_path, source) == {}
+
+
+def test_repo_has_no_unlisted_policy_parameter() -> None:
+    new = sorted(set(policy_params(_ROOT)) - set(_POLICY_ALLOWED))
+    assert not new, (
+        "public parameter named force/overwrite/missing_ok/exist_ok/ignore_errors/check, or a Literal/Enum policy switch: "
+        f"raise a typed exception the caller catches, or make two verbs (Article III, ADR 0030): {new}"
+    )
+
+
+def test_listed_policy_parameters_still_exist() -> None:
+    assert not sorted(set(_POLICY_ALLOWED) - set(policy_params(_ROOT))), "a listed policy parameter no longer exists: delete its row"
+    assert all(reason.strip() for reason in _POLICY_ALLOWED.values())
+
+
+def test_planted_tolerance_names_are_found_with_any_annotation(tmp_path: Path) -> None:
+    source = "def drop(path, *, missing_ok): ...\ndef put(path, overwrite=False, force: bool = True, check=None): ...\n"
+    assert _plant_policy(tmp_path, source) == {"pkg:drop:missing_ok": 1, "pkg:put:overwrite": 1, "pkg:put:force": 1, "pkg:put:check": 1}
+
+
+def test_planted_literal_enum_and_alias_policy_are_found(tmp_path: Path) -> None:
+    source = (
+        "from enum import Enum\nfrom typing import Literal, Annotated\n"
+        "class Mode(Enum):\n    A = 1\n"
+        "Policy = Literal['a', 'b']\n"
+        "def a(x: Literal['p', 'q']): ...\n"
+        "def b(x: Mode | None = None): ...\n"
+        "def c(x: Policy): ...\n"
+        "def d(x: Annotated[Literal['p'], 1]): ...\n"
+    )
+    assert _plant_policy(tmp_path, source) == {"pkg:a:x": 1, "pkg:b:x": 1, "pkg:c:x": 1, "pkg:d:x": 1}
+
+
+def test_private_functions_and_plain_parameters_pass(tmp_path: Path) -> None:
+    source = "def _hidden(force: bool): ...\ndef shown(path: str, limit: int = 3, mode_name: str = 'x'): ...\n"
+    assert _plant_policy(tmp_path, source) == {}
+
+
+def _plant_policy(tmp_path: Path, source: str) -> dict[str, int]:
+    module = tmp_path / "packages" / "pkg" / "src" / "pkg" / "mod.py"
+    module.parent.mkdir(parents=True)
+    module.write_text(source)
+    return policy_params(tmp_path)

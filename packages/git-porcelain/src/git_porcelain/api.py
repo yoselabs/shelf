@@ -223,8 +223,9 @@ class Repo(Protocol):
         """Fetch with bounded ref-race retries, writing FETCH_HEAD; raise on final refusal."""
         ...
 
-    def delete_remote_at(self, remote: str, ref: str, expected: Sha, *, missing_ok: bool = True) -> CommandResult:
-        """Lease-guarded deletion; missing_ok=False avoids the verification call after refusal."""
+    def delete_remote_at(self, remote: str, ref: str, expected: Sha) -> CommandResult:
+        """Lease-guarded deletion in one process; a refusal (the ref moved or is already gone) raises ``GitUnavailable``
+        whose ``output`` is git's. A caller that treats "gone" as done catches it and checks ``ls_remote``."""
         ...
 
     def identity(self) -> RepoIdentity:
@@ -282,14 +283,18 @@ class Repo(Protocol):
         """Every worktree, the main one first; ``dirty`` is filled only with ``with_dirty``."""
         ...
 
-    def add_worktree(self, path: Path, rev: str, *, force: bool = False) -> Worktree:
-        """A linked worktree detached at ``rev``; ``force`` permits a registered but missing checkout."""
+    def add_worktree(self, path: Path, rev: str) -> Worktree:
+        """A linked worktree detached at ``rev``. A registered but missing checkout refuses (``GitUnavailable``):
+        ``drop_worktree`` it first."""
         ...
 
-    def drop_worktree(self, path: Path, *, force: bool = False, missing_ok: bool = True) -> None:
-        """Remove a worktree, raising ``WorktreeRemoveRefused`` with git's reason on refusal.
-        By default absent folders are accepted and registrations pruned. ``missing_ok=False``
-        requires a registered linked worktree and never prunes other registrations."""
+    def drop_worktree(self, path: Path) -> None:
+        """Remove a clean, registered linked worktree (a missing folder is forgotten). ``WorktreeRemoveRefused`` with git's
+        reason when it holds changes; ``NotAWorktree`` for a path git does not know. Other registrations are not pruned."""
+        ...
+
+    def discard_worktree(self, path: Path) -> None:
+        """``drop_worktree`` for a checkout holding changes: they are lost (``git worktree remove --force``)."""
         ...
 
     def prune_worktrees(self) -> None:
@@ -343,12 +348,15 @@ class Worktree(Protocol):
         """Create and check out a branch exclusively; ``BranchExists`` if already present."""
         ...
 
-    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False, nested: bool = False) -> None:
-        """Remove untracked files except keep patterns; optionally remove ignored files too (``ignored=True`` with
-        ``keep=["/.venv"]`` is the reset that preserves a folder: a leading ``/`` anchors a pattern to the checkout root,
-        without it a same-named folder anywhere below is kept too). ``nested`` also removes nested repositories
-        (directories holding their own ``.git``; ``git clean -ff``), which git skips otherwise. A symlink is removed
-        as a link, never followed: nothing outside the checkout is touched, and a kept folder is left whole."""
+    def clean(self, keep: Sequence[str] = ()) -> None:
+        """Remove untracked files except keep patterns and ignored files. A symlink is removed as a link, never followed:
+        nothing outside the checkout is touched, and a kept folder is left whole."""
+        ...
+
+    def clean_ignored(self, keep: Sequence[str] = ()) -> None:
+        """``clean`` that removes ignored files too: with ``keep=["/.venv"]`` the reset that preserves a folder (a leading
+        ``/`` anchors a pattern to the checkout root, without it a same-named folder anywhere below is kept too). A nested
+        repository (a directory holding its own ``.git``) is left in place, as ``git clean -fdx`` leaves it."""
         ...
 
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
@@ -411,16 +419,31 @@ class Worktree(Protocol):
         base: str | None = None,
         mode: Literal["new", "amend", "squash_to"] = "new",
         squash_to: Sha | None = None,
-        hooks: bool = False,
-        allow_empty: bool = False,
     ) -> RecordResult:
         """Stage and commit. ``own``: tracked changes plus untracked files base's ignore rules do not cover, by
         exact path. ``all``: everything. ``tracked``: index-tracked changes, including staged additions,
         without untracked files. ``staged``: commit the existing index without staging working files.
         ``amend`` folds into HEAD (empty ``message`` keeps its message), even without staged changes;
-        ``squash_to`` first moves HEAD softly to ``squash_to``. Hooks are skipped unless ``hooks``.
+        ``squash_to`` first moves HEAD softly to ``squash_to``. Hooks are skipped (``record_with_hooks`` runs them);
+        an unchanged index gives ``NothingToRecord`` (``record_empty`` commits anyway).
         Results retain complete combined command output; infrastructure exceptions carry ``output`` too.
         Marker text is not a precondition: git decides whether the index can commit."""
+        ...
+
+    def record_with_hooks(
+        self,
+        message: str,
+        *,
+        paths: Literal["own", "all", "tracked", "staged"] = "own",
+        base: str | None = None,
+        mode: Literal["new", "amend", "squash_to"] = "new",
+        squash_to: Sha | None = None,
+    ) -> RecordResult:
+        """``record`` with the repository's commit hooks run; a hook's refusal returns ``HookRejected``."""
+        ...
+
+    def record_empty(self, message: str) -> RecordResult:
+        """Commit the index as it is, even when it equals HEAD (``git commit --allow-empty``); hooks are skipped."""
         ...
 
     def take_branch(
@@ -442,9 +465,9 @@ class Worktree(Protocol):
         """Free the branch ``holder`` holds: remove a clean linked worktree, else detach it there."""
         ...
 
-    def park(self, base: str, *, clean_keep: Sequence[str] | None = None, keep_ignored: bool = False) -> Sha:
-        """Detach HEAD at ``base`` (the branch stays); ``clean_keep`` as in :meth:`take_branch`. With ``keep_ignored``
-        the ignored untracked files of now (a folder as one entry) are added to this checkout's own excludes first
+    def park(self, base: str, *, clean_keep: Sequence[str] | None = None) -> Sha:
+        """Detach HEAD at ``base`` (the branch stays); ``clean_keep`` as in :meth:`take_branch`. The ignored untracked
+        files of now (a folder as one entry) are added to this checkout's own excludes first
         (:meth:`exclude`), so they stay ignored and on disk at ``base`` whatever its ignore rules say; when ``base``
         tracks a file among them, ``IgnoredFilesWouldBeOverwritten`` is raised and nothing changes."""
         ...
@@ -469,8 +492,8 @@ class Worktree(Protocol):
         """
         ...
 
-    def continue_rebase(self, *, missing_ok: bool = False) -> CommandResult:
-        """Continue using the existing index; ``missing_ok`` accepts no paused rebase as success."""
+    def continue_rebase(self) -> CommandResult:
+        """Continue using the existing index; ``ok=False`` when no rebase is paused (``rebasing()`` tells first)."""
         ...
 
     def resolve_and_continue(self) -> CommandResult:
@@ -478,8 +501,8 @@ class Worktree(Protocol):
         every unmerged file and continue the paused rebase."""
         ...
 
-    def abort_rebase(self, *, missing_ok: bool = True, restore_to: Sha | None = None) -> CommandResult:
-        """Abort, optionally restoring HEAD; missing_ok permits no paused rebase, even unborn."""
+    def abort_rebase(self, *, restore_to: Sha | None = None) -> CommandResult:
+        """Abort, optionally restoring HEAD; idempotent: with no paused rebase (even unborn) it only restores."""
         ...
 
     def start_merge(self, rev: str) -> MergeStarted | UpToDate:
@@ -520,12 +543,10 @@ class Worktree(Protocol):
         refspecs: Sequence[str],
         *,
         options: Sequence[str] = (),
-        force: bool = False,
-        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> CommandResult:
-        """Push supplied forms and options once; force/deletion need explicit opt ins. Git resolves HEAD."""
+        """Push supplied forms and options once, as written (``+``, ``:dst``, ``--force``, ``--delete`` are git's own)."""
         ...
 
     def push_refspecs(
@@ -533,12 +554,10 @@ class Worktree(Protocol):
         remote: str,
         refspecs: Sequence[str],
         *,
-        force: bool = False,
-        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> PushResult:
-        """Push explicit refs with opt ins for force/deletion; deletion-only success has an empty sha."""
+        """Push explicit refs exactly as written (``+`` forces, ``:dst`` deletes); deletion-only success has an empty sha."""
         ...
 
     def push_lease(self, remote: str, refspec: str, *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:

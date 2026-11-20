@@ -48,7 +48,7 @@ scenarios("features/git_contract.feature")
 _ME = Identity("Contract Author", "author@example.invalid")
 _PLACEHOLDER = re.compile(r"<(\w+)(?::([^>]*))?>")
 _FILE = re.compile(r'("[^"]+"|\S+?)="((?:[^"\\]|\\.)*)"')
-_PATH_ARGS = {"add_worktree", "drop_worktree", "release_branch", "worktree_state"}
+_PATH_ARGS = {"add_worktree", "discard_worktree", "drop_worktree", "release_branch", "worktree_state"}
 
 
 # -- the two ways to arrange a repository -----------------------------------------------------------------
