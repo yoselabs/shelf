@@ -2,11 +2,6 @@
 # The list only shrinks: close a gap with a scenario, then delete its entry. Every entry names its bead.
 
 [[gap]]
-id = "framework.godot.agent-guidance"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
 id = "framework.godot.architecture"
 direction = "passing"
 bead = "shelf-fkx.11"
@@ -19,16 +14,6 @@ bead = "shelf-fkx.11"
 [[gap]]
 id = "framework.godot.build"
 direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "framework.godot.ci"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "framework.godot.ci"
-direction = "adverse"
 bead = "shelf-fkx.11"
 
 [[gap]]
@@ -47,16 +32,6 @@ direction = "passing"
 bead = "shelf-fkx.11"
 
 [[gap]]
-id = "framework.mcp.agent-guidance"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "framework.unity.agent-guidance"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
 id = "framework.unity.binary-assets"
 direction = "passing"
 bead = "shelf-fkx.11"
@@ -64,16 +39,6 @@ bead = "shelf-fkx.11"
 [[gap]]
 id = "framework.unity.build"
 direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "framework.unity.ci"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "framework.unity.ci"
-direction = "adverse"
 bead = "shelf-fkx.11"
 
 [[gap]]
@@ -93,11 +58,6 @@ bead = "shelf-fkx.11"
 
 [[gap]]
 id = "framework.unity.tests"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "stack.compose.agent-guidance"
 direction = "passing"
 bead = "shelf-fkx.11"
 
@@ -147,11 +107,6 @@ direction = "passing"
 bead = "shelf-fkx.11"
 
 [[gap]]
-id = "stack.dotnet.agent-guidance"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
 id = "stack.dotnet.architecture"
 direction = "passing"
 bead = "shelf-fkx.11"
@@ -192,11 +147,6 @@ direction = "passing"
 bead = "shelf-fkx.11"
 
 [[gap]]
-id = "stack.nix.agent-guidance"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
 id = "stack.nix.dependencies"
 direction = "passing"
 bead = "shelf-fkx.11"
@@ -232,22 +182,12 @@ direction = "adverse"
 bead = "shelf-fkx.11"
 
 [[gap]]
-id = "stack.python-uv.agent-guidance"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
 id = "stack.python-uv.hooks"
 direction = "passing"
 bead = "shelf-fkx.11"
 
 [[gap]]
 id = "stack.python-uv.spelling"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "stack.python-uv.tests"
 direction = "passing"
 bead = "shelf-fkx.11"
 
@@ -264,11 +204,6 @@ bead = "shelf-fkx.11"
 [[gap]]
 id = "stack.shell-strict"
 direction = "adverse"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "stack.shell.agent-guidance"
-direction = "passing"
 bead = "shelf-fkx.11"
 
 [[gap]]

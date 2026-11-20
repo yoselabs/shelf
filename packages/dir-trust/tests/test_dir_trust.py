@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 import pytest
@@ -193,3 +194,12 @@ def test_a_crash_before_the_swap_keeps_the_old_store(tmp_path: Path, monkeypatch
     monkeypatch.undo()
     assert store_path.read_bytes() == before
     assert [p.name for p in store_path.parent.iterdir()] == ["trust.yml"]
+
+
+def test_many_threads_reading_one_store_all_get_the_same_answer(setup: tuple[Path, Path, TrustStore]) -> None:
+    """A scheduler checks trust from executor threads: ruamel's YAML object is not thread-safe, so a shared one corrupts a parse."""
+    key, folder, store = setup
+    store.grant(key, folder, pattern="*.py")
+    with ThreadPoolExecutor(16) as pool:
+        answers = list(pool.map(lambda _: store.is_trusted(key, folder, pattern="*.py"), range(2000)))
+    assert all(answers)

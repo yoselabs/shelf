@@ -20,10 +20,11 @@ the file holds the reasons, the rejected options and the history.
 - [0005](0005-architecture-rules-are-native-fitness-tests.md) **Architecture rules run in the toolchain; AST facts are native tests**: Import-graph rules run in-toolchain (import-linter in pyproject; ruff TID251 for banned APIs); AST-fact rules stay pure-stdlib pytest, body duplication blocking across packages too; no policy engine.
 - [0018](0018-new-checkpoints-warn-until-the-next-audit.md) **A new blueprint checkpoint warns until the repo's next audit**: Each audit records the checkpoints it judged in docs/blueprint/checkpoints.txt; between audits the gate enforces that set and a newer checkpoint only warns (🆕).
 - [0020](0020-prek-runs-every-hook.md) **prek runs every git hook, bd's included**: prek is the one hook manager; bd's events run from .pre-commit-config.yaml via `bd hooks run`; bd never installs hooks itself and core.hooksPath stays unset.
-- [0021](0021-affected-tests-stay-on-affected-py.md) **Affected-only tests stay on tools/affected.py; moon is the migration target**: just check narrows tests with tools/affected.py; no build tool yet. Migrate to moon's generic task graph when the shelf gets its first non-Python package (bead shelf-qgz).
+- [0021](0021-affected-tests-stay-on-affected-py.md) **The gate core is the shelf's own, one adapter per stack; moon is rejected**: Affected selection, receipts and the run guard live in a shelf-owned neutral core with one adapter per stack (Python first, via uv export). No external build tool.
 - [0022](0022-every-exception-is-justified.md) **Every exception to a blueprint rule is justified**: An override or ignored path in blueprint.toml needs a reason and either an expires date or an adr naming the accepted ADR that records the durable decision; the gate reports one without.
 - [0023](0023-the-gate-runner-is-just.md) **The gate runner is just**: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`.
-- [0027](0027-the-shelf-has-no-ci.md) **The shelf has no CI; the local gate is the gate**: The shelf runs no CI. Done is the local `just check` green on the tree pushed, run natively on the Mac; the pre-push hook enforces it.
+- [0027](0027-no-repository-has-ci.md) **No repository has GitHub Actions CI; the local gate is the gate**: No repository holds GitHub Actions configuration. Done is the local `just check` green on the tree pushed and on a merged tree; blueprint's `gate.no-ci` fails a repo with workflows.
+- [0029](0029-the-justfile-imports-blueprint-rendered-parts.md) **A repo's justfile imports blueprint-rendered parts; `import`, not `mod`**: The gate's common recipes are files `blueprint render` writes per stack; the repo's justfile imports them (`import`, not `mod`) and owns the rest; `render --check` is the drift check.
 
 ## knowledge
 
@@ -40,7 +41,7 @@ the file holds the reasons, the rejected options and the history.
 
 ## stack
 
-- [0016](0016-python-and-uv-pins.md) **Python and uv are pinned once each, and CI reads the pins**: one X.Y in .python-version; requires-python ">=X.Y", uncapped, pin inside; lower bounds below the pin run in CI; uv floored by required-version; CI reads the pin.
+- [0016](0016-python-and-uv-pins.md) **Python and uv are pinned once each, and images read the pins**: one X.Y in .python-version; requires-python ">=X.Y", uncapped, pin inside; uv floored by required-version; images install the pinned uv.
 - [0024](0024-mise-pins-every-repo-tool.md) **mise pins every repo tool, locked**: Each repo pins its tools exactly in mise.toml with a committed mise.lock; `mise install --locked` installs them; uv keeps Python, global.json keeps the .NET SDK; just keeps the tasks.
 - [0025](0025-every-cli-answers-help.md) **every command answers --help and refuses what it does not know**: Every command and script answers `--help` with its usage and changes nothing, refuses an unknown flag, and acts only on the action given; built on a CLI library.
 - [0026](0026-checkpoints-follow-facts.md) **checkpoints follow facts about the repo, never its size; one override format**: Checkpoints apply because of facts (technology, surface, trait, what happens to a file), never file counts; the agent classifies the rest; every exception is one override.

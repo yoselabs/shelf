@@ -9,6 +9,7 @@ MODULES = (
     "backlog",
     "knowledge",
     "secrets",
+    "hooks",
     "stack",
     "python_pin",
     "cli_parse",

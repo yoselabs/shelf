@@ -4,7 +4,7 @@ ADR 0024. Two machines sharing one Dolt remote ran bd 1.1.2 and 1.3.1, and the n
 under the older; just, prek and the Godot editor had no pin at all. mise pins them; the languages keep their
 own pin files (`.python-version` is uv's, `global.json` is the .NET SDK's), and just stays with uv where it is
 the `rust-just` dev dependency (ADR 0023), so nothing is pinned twice.
-Research: openspec/changes/blueprint-skill/research/toolchain-installer.md.
+Research: docs/research/blueprint-skill/research/toolchain-installer.md.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import re
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
+from blueprint.concerns.profile_data import load_profiles
 from blueprint.model import FixedBy, check, failing, not_applicable, not_set_up, passing, toml_table, uses_beads
 
 if TYPE_CHECKING:
@@ -48,8 +49,10 @@ def _rust_just(ctx: Context) -> bool:
 def _needed(ctx: Context) -> dict[str, str]:
     """Each tool the repo runs, with what says so."""
     needed: dict[str, str] = {}
-    if "python-uv" in ctx.profile.stacks:
-        needed["uv"] = "uv.lock"
+    profiles = load_profiles()
+    for stack in ctx.profile.stacks:
+        if profile := profiles.get(stack):
+            needed.update(profile.pins)
     if ctx.read(".pre-commit-config.yaml") is not None:
         needed["prek"] = ".pre-commit-config.yaml"
     if uses_beads(ctx.profile):

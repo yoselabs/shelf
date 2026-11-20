@@ -192,6 +192,10 @@ class Profile:
     # Each detected stack with the files that set it (or "declared in docs/blueprint/blueprint.toml"), so a
     # wrong stack can be traced to the file that caused it.
     stack_files: tuple[tuple[str, str], ...] = ()
+    # The folder each detected stack's manifest sits in ("." unless a stack lives in a subfolder: web/package.json -> "web").
+    stack_roots: tuple[tuple[str, str], ...] = ()
+    # Declared contact between stacks sharing the repo (`[[edge]]` in blueprint.toml): (from stack, to stack, contract file).
+    edges: tuple[tuple[str, str, str], ...] = ()
     # Paths the repo declared throwaway or vendored (a `detection` [[override]]): detection and role globs skip them.
     ignore: tuple[str, ...] = ()
     # What detection read (blueprint.facts): reported, not yet acted on. Declared surfaces and traits stay as declared.
@@ -234,6 +238,8 @@ class Context:
     # Old shapes a check still honoured, each with the text that replaces it: reported, never failing (Run.notices).
     notices: list[str] = field(default_factory=list)
     timeouts: list[tuple[tuple[str, ...], float]] = field(default_factory=list, compare=False, repr=False)
+    # `(id, scope)` of every scoped override that excused an offender this run: one never in here excused nothing.
+    used_overrides: set[tuple[str, str]] = field(default_factory=set, compare=False, repr=False)
 
     def excused(self, checkpoint_id: str, path: str | None = None, line: int | None = None, service: str | None = None) -> Override | None:
         """The justified, unexpired, scoped override that excuses this offender of `checkpoint_id`, or None.
@@ -242,10 +248,13 @@ class Context:
         override in its evidence. An override without a scope is not asked here: the runner applies it to the whole row.
         """
         day = self.today or date.today()  # noqa: DTZ011 -- override expiry is a calendar date in the owner's zone
-        return next(
+        found = next(
             (o for o in self.overrides if o.id == checkpoint_id and o.problem(day) is None and o.covers(path, line, service)),
             None,
         )
+        if found is not None:
+            self.used_overrides.add((found.id, found.scope))
+        return found
 
     def expiry_hint(self, days: int = 180) -> date:
         """A date to put in the override a check tells the owner to write: a temporary exception, `days` out."""

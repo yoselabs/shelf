@@ -1,5 +1,5 @@
 # Git hooks, owned by prek (or pre-commit, which reads the same file). The blueprint recipe
-# (openspec/changes/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself
+# (docs/research/blueprint-skill/research/hooks-and-beads.md): bd never installs hooks itself
 # (`bd init --skip-hooks`); its hooks run from here, first, so a failing check below still blocks the
 # commit and bd still runs. Install: `prek install` (installs every type in default_install_hook_types).
 default_install_hook_types: [pre-commit, post-merge, pre-push, post-checkout, prepare-commit-msg]
@@ -52,12 +52,22 @@ repos:
     stages: [prepare-commit-msg]
 - repo: local
   hooks:
+  - id: secret-scan
+    name: secrets in the staged changes
+    # gitleaks (pinned in mise.toml) over the index only, so it costs a fraction of a second; the gate scans the changed range.
+    entry: uv run python -m blueprint.secret_scan staged
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [pre-commit]
+- repo: local
+  hooks:
   - id: gate
     name: just check
     # just is pinned as the `rust-just` dev dependency (ADR 0023); a repo without uv runs `just check` from brew.
-    # Skipped only when the working tree is clean and HEAD's tree already passed `just check` (tools/gate_state.py,
-    # `blueprint recipe gate-state`); any doubt runs it.
-    entry: python3 -I tools/gate_state.py pre-push --gate check -- uv run just check
+    # Skipped only when the working tree is clean and HEAD's tree already passed `just check` (any-gate, a dev dependency
+    # pinned by git tag); any doubt runs it. A repo with no python runs `just check` directly.
+    entry: uv run python -m any_gate pre-push --gate check -- uv run just check
     language: system
     always_run: true
     pass_filenames: false

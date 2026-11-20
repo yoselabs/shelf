@@ -5,11 +5,12 @@ import sys
 import tomllib
 from pathlib import Path
 
+from any_gate import changed
+from blueprint import preset as preset_drift
+
 _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT / "tools"))
 
-import changed  # noqa: E402 -- repository tool path
-import preset_drift  # noqa: E402 -- repository tool path
 import size_caps  # noqa: E402 -- repository tool path
 from onboard.linter_preset import _missing_toml_blocks  # noqa: E402 -- repository tool path
 

@@ -1,12 +1,12 @@
 # The gate
 
-One command decides done. Humans, agents, hooks and CI all call the same one.
+One command decides done. Humans, agents and hooks all call the same one.
 
 | item | value |
 |---|---|
 | Command | `just check` |
 | Runs | format check, lint, types, spelling, dependency hygiene, tests with coverage, architecture rules, `just blueprint` (the stack list is in the stack file) |
-| Passes when | exit 0; cross-file checks cover the whole repo, per-file linters the changed files (CI: everything), nothing else skipped |
+| Passes when | exit 0; cross-file checks cover the whole repo, per-file linters the changed files, nothing else skipped |
 
 ## Changed files and the whole repo
 
@@ -14,9 +14,14 @@ Locally, a linter that judges one file at a time (formatter, per-file linter, sh
 the files changed against the base: committed on the branch, staged, unstaged, untracked and not ignored; never a
 deleted one. A linter with nothing to look at is skipped and says so in one line. A change to a linter's own
 config runs it over everything. A check that reads across files (types, architecture, dependencies) always
-covers the whole repo, and so does the gate in CI (`just check-all`). No base found means everything runs.
+covers the whole repo, and so does `just check-all`. No base found means everything runs.
 
-`blueprint recipe changed > tools/changed.py` copies the selector (stdlib only; `--help` documents it). It prints the
+**Run `just check` while working; `just check-all` is rare.** `check` runs the tests the change reaches and skips any suite that already
+passed on the same input, so a normal change takes seconds to a minute. `check-all` runs every test in every package with the coverage floor,
+two minutes or more, and is the release gate: run it before a release tag. Do not run it per task, per
+commit or per PR: it re-proves what `check` already proved.
+
+`python -m any_gate changed` is the selector (`any-gate`, a dev dependency pinned by git tag; `--help` documents it). It prints the
 changed files matching its globs, NUL-separated, or everything on `--scope all`, when a `--config` file changed, or with
 no base. A repo adds a `-changed` twin of each per-file recipe and `check` calls the twins:
 
@@ -25,19 +30,19 @@ lint-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --config pyproject.toml --config ruff.toml 'src/*.py' 'tests/*.py' > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config ruff.toml 'src/*.py' 'tests/*.py' > "$list"
     [ -s "$list" ] || { echo "skipped lint: no Python file changed"; exit 0; }
     xargs -0 uv run ruff check --force-exclude < "$list"
     xargs -0 uv run ruff format --check --force-exclude < "$list"
 ```
 
 `spell-changed` is the same with `--config .codespellrc` and `xargs -0 uv run codespell < "$list"`. Keep the whole-repo
-`lint` and `spell`; `check-all` and CI call those.
+`lint` and `spell`; `check-all` calls those.
 
 ## The runner
 
 The gate is a `justfile`, and `just` is the runner (shelf ADR 0023). Pin it per repo: Python `uv add --dev rust-just`,
-run as `uv run just check`; other stacks `uvx rust-just@<version>`, brew, or a CI setup action. A gate that is only a
+run as `uv run just check`; other stacks `uvx rust-just@<version>` or brew. A gate that is only a
 Makefile fails `gate.runner`. Three rules keep the file readable by blueprint, which dumps the graph with
 `just --dump --dump-format json`:
 
@@ -48,19 +53,21 @@ Makefile fails `gate.runner`. Three rules keep the file readable by blueprint, w
 ## One box, many gates
 
 Several agents share one machine, and each test run takes every core: on 2026-10-20 four gates at once on a 6-CPU box
-took 11-14 min each instead of 2, and a push was killed. `blueprint recipe gate-state > tools/gate_state.py` copies the
-script that prevents both halves of that (stdlib only; `--help` documents it):
+took 11-14 min each instead of 2, and a push was killed. The shelf's `any-gate` package (a dev dependency, pinned by git
+tag; `python -m any_gate --help` documents it) prevents both halves of that:
 
 | piece | in the justfile | does |
 |---|---|---|
-| the test lock | the test command runs as `python3 -I tools/gate_state.py lock -- <command>` | one test run per box at a time; a second gate waits and says who holds it. |
-| the green record | `check` takes a first dependency running `gate_state.py start`, and its body runs `gate_state.py passed --gate check` | records the tree a green `check` saw, if no file changed during the run |
-| the pre-push skip | the hook's entry is `python3 -I tools/gate_state.py pre-push --gate check -- uv run just check` | no second run when the working tree is clean and HEAD's tree is recorded; any doubt runs it |
+| the test slot | the test command runs as `python -m any_lease run --root <dir> tests 1 <label> -- <command>`, or through `python -m any_gate test` | one test run per box at a time; a second gate waits and says who holds the slot. |
+| the green record | `check` takes a first dependency running `python -m any_gate start`, and its body runs `python -m any_gate passed --gate check` | records the tree a green `check` saw, if no file changed during the run |
+| the pre-push skip | the hook's entry is `uv run python -m any_gate pre-push --gate check -- uv run just check` | no second run when the working tree is clean and HEAD's tree is recorded; any doubt runs it |
 
-Only the expensive step takes the lock, so the gate's parallel steps never wait on one another. `steps` points
-`GATE_NOTICE_FD` at its terminal (`exec 3>&2; export GATE_NOTICE_FD=3`), so the "waiting" line shows while the step's
-own output goes to its log. The record keys on the tree and the upstream merge-base: a rebase changes the tree, and the
-gate runs again.
+Only the expensive step takes the slot, so the gate's parallel steps never wait on one another. `any-gate steps` (the `steps` recipe
+runs it: `python -m any_gate steps --runner <just> <step>...`) points `GATE_NOTICE_FD` at its terminal, so the "waiting" line shows while the
+step's own output goes to its log; it prints one timing line, marks a step over `GATE_STEP_BUDGET` (default 60 s) and the gate over
+`GATE_BUDGET` (default 180 s), and prints the log of each failed step. The record keys on the tree and the upstream merge-base, and lives in the git directory every
+worktree of the checkout shares: a rebase changes the key, and the gate runs again. A repo with no python runs `just check`
+from the hook directly, with no skip.
 
 ## Never bypass
 
@@ -94,16 +101,12 @@ Every tool the repo runs (uv, just, prek, bd, git-lfs, an engine editor) is pinn
 `mise.lock`; never install one with brew, apt or a curl script for this repo. A bump is a commit: edit the version, run
 `mise lock`, commit both. `.python-version` (uv) and `global.json` (.NET) keep their own pins; mise does not pin them again.
 
-## CI
+## No CI
 
-CI runs `just check` and nothing else of its own. A CI step missing from `just check` is a gate gap: move it in.
-CI gates the committed dependency set: install from the lockfile (`uv sync --locked`, `npm ci`), and let no step
-before the gate edit a manifest or re-lock (`sed -i` on `pyproject.toml`, `uv lock`, `npm install`). A patch CI needs
-is a commit.
-CI reads the beads database before the gate: `bd bootstrap` with git's HTTPS rewrite of the SSH remote in its env
-(`GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0=ssh://git@github.com/`). A public repo rewrites to
-`url.https://github.com/.insteadOf`; a private one carries the job token,
-`url.https://x-access-token:${{ github.token }}@github.com/.insteadOf`, or the anonymous clone asks for a username.
+No repository has GitHub Actions CI (shelf ADR 0027). The gate runs locally: the pre-push hook and `just check` on the
+machine that pushes are the only enforcement, so run `just check` before every push and never skip the hook. A
+`.github/workflows` or `.github/actions` folder fails `gate.no-ci`: delete it. A duty a workflow carried that is not CI
+(image publish, deploy, a scheduled eval) becomes a local command or waits for an owner decision; never keep a workflow to hold it.
 
 ## Exceptions
 

@@ -21,10 +21,6 @@ PER_FRAMEWORK = {"godot": "godot", "mcp": "mcp", "unity": "unity"}
 BEGIN, END = "<!-- blueprint:begin -->", "<!-- blueprint:end -->"
 _STACK_TRIGGER = "before writing or changing {name} code"
 PLACEHOLDER = re.compile(r"\{\{[a-z_]+\}\}")
-# The CI wording of gate.md, swapped for templates/agents/gate-no-ci.md when the profile has the `no-ci` trait.
-_CI_SECTION = re.compile(r"^## CI\n.*?(?=^## )", re.MULTILINE | re.DOTALL)
-_CI_INTRO = "Humans, agents, hooks and CI all call the same one."
-_NO_CI_INTRO = "Humans, agents and hooks all call the same one."
 
 
 def required(profile: Profile) -> list[str]:
@@ -45,13 +41,9 @@ def block(profile: Profile) -> str:
     return (TEMPLATES / "agents-md-block.md").read_text().replace("{{stack_rows}}", "\n".join(rows)).strip() + "\n"
 
 
-def render(name: str, profile: Profile) -> str:
-    """The text of one docs/agents template for this profile."""
-    text = (TEMPLATES / "agents" / f"{name}.md").read_text()
-    if name == "gate" and "no-ci" in profile.traits:
-        section = (TEMPLATES / "agents" / "gate-no-ci.md").read_text()
-        text = _CI_SECTION.sub(lambda _: section, text.replace(_CI_INTRO, _NO_CI_INTRO))
-    return text
+def render(name: str) -> str:
+    """The text of one docs/agents template."""
+    return (TEMPLATES / "agents" / f"{name}.md").read_text()
 
 
 def install(repo: Path, profile: Profile) -> list[str]:
@@ -61,7 +53,7 @@ def install(repo: Path, profile: Profile) -> list[str]:
         target = repo / "docs" / "agents" / f"{name}.md"
         if not target.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(render(name, profile))
+            target.write_text(render(name))
             changed.append(str(target.relative_to(repo)))
     agents = repo / "AGENTS.md"
     text = agents.read_text() if agents.exists() else "# AGENTS.md\n"

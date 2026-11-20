@@ -4,23 +4,25 @@ A Fact means one thing only. Evidence points without proving, with a confidence.
 or trait from the closed lists below, and say `where` they were read (`path:line`, or `path`). Nothing here
 turns a checkpoint on yet: the report only lists them.
 
-Workflow files are read line by line, not parsed: the repo has no YAML dependency, and the signals are
-a few literal keys (`uses:`, `push:`, `schedule:`, `cron:`).
+No repository has CI (ADR 0027), so no workflow file is read: `ships-image`, `deployed` and `scheduled-jobs`
+are traits the agent classifies, not facts detection finds.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import asdict, dataclass
 from fnmatch import fnmatch
 from typing import TYPE_CHECKING, Literal
 
 from blueprint.concerns.cli_parse import _scripts
-from blueprint.concerns.gate_ci import workflows
 from blueprint.concerns.secrets import _RULES, _sops_files
 from blueprint.model import walk
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from blueprint.model import Context, Profile
 
 # The closed lists (ADR 0026); they grow by an ADR.
@@ -102,107 +104,67 @@ _DEPENDENCY_EVIDENCE = (
     ("stores-data", ("sqlite*", "duckdb*", "aiosqlite", "sqlalchemy", "sqlmodel", "apsw")),
     ("llm-backed", ("anthropic", "openai", "anyllm")),
 )
-# A deploy step: a script named for deploying, or the usual deploy verbs. `ssh` alone is an access test, not a deploy.
-_DEPLOY_STEP = re.compile(
-    r"[\w/.-]*deploy[\w-]*\.(py|sh)\b|\b(make|just|task|npm run) deploy\b|\bkubectl apply\b|\bhelm (upgrade|install)\b|\bansible-playbook\b"
+# The same, for a Node package: names in `dependencies` and `optionalDependencies` (dev and peer groups are left out).
+_NODE_DEPENDENCY_EVIDENCE = (
+    ("mcp-server", ("@modelcontextprotocol/sdk", "fastmcp")),
+    ("http-server", ("express", "fastify", "koa", "hono", "@nestjs/core")),
+    (
+        "stores-data",
+        ("better-sqlite3", "sqlite3", "pg", "mysql2", "mongodb", "mongoose", "ioredis", "@prisma/client", "drizzle-orm", "duckdb"),
+    ),
+    ("llm-backed", ("@anthropic-ai/sdk", "openai", "ai", "@ai-sdk/*", "langchain", "@langchain/*")),
 )
-_DEPLOY_SECRET = re.compile(r"secrets\.\w*DEPLOY\w*", re.IGNORECASE)
 
 
 def _where(rel: str, line: int) -> str:
     return f"{rel}:{line}"
 
 
-def _workflow_files(ctx: Context) -> list[tuple[str, list[str]]]:
-    return [(p.relative_to(ctx.repo).as_posix(), p.read_text(errors="replace").splitlines()) for p in workflows(ctx)]
-
-
-def _code(lines: list[str]) -> list[tuple[int, str]]:
-    """`(line number, text)` of the lines that are not comments."""
-    return [(n, ln) for n, ln in enumerate(lines, 1) if not ln.lstrip().startswith("#")]
-
-
-def _indent(text: str) -> int:
-    return len(text) - len(text.lstrip())
-
-
-def _step(lines: list[tuple[int, str]], at: int) -> list[tuple[int, str]]:
-    """The workflow step holding line index `at`: from its `- ` line to the next step or a shallower line."""
-    start = at
-    while start > 0 and not lines[start][1].lstrip().startswith("- "):
-        start -= 1
-    base = _indent(lines[start][1])
-    end = start + 1
-    while end < len(lines) and lines[end][1].strip() and _indent(lines[end][1]) > base:
-        end += 1
-    return lines[start:end]
-
-
-def _push_steps(lines: list[str]) -> list[tuple[int, list[tuple[int, str]]]]:
-    """Each `docker/build-push-action` step with `push: true`, as `(line, step lines)`, in a workflow that logs in to a registry."""
-    code = _code(lines)
-    if not any("docker/login-action" in t or "docker login" in t for _, t in code):
-        return []
-    found = []
-    for i, (n, t) in enumerate(code):
-        step = _step(code, i)
-        if "docker/build-push-action" in t and any(re.match(r"\s*push:\s*true\s*(#.*)?$", s) for _, s in step):
-            found.append((n, step))
-    return found
-
-
-def _ships_image(rel: str, lines: list[str]) -> list[Fact]:
-    pushes = _push_steps(lines)
-    return [Fact("ships-image", _where(rel, pushes[0][0]))] if pushes else []
-
-
-def _option(step: list[tuple[int, str]], key: str) -> str:
-    for _, t in step:
-        if m := re.match(rf"\s*{key}:\s*(.+?)\s*(?:\s#.*)?$", t):
-            return m.group(1).strip("\"'").removeprefix("./")
-    return ""
-
-
-def shipped_images(ctx: Context, dockerfiles: list[str]) -> dict[str, str]:
-    """Which of `dockerfiles` a `push: true` step builds (ADR 0026), each with the `path:line` of that step.
-
-    The step names its file by `file:`, else by `context:` (its `Dockerfile`), else the root one; a `${{ matrix.* }}`
-    template matches every file its pattern fits.
-    """
-    from blueprint.concerns.stack import _names  # noqa: PLC0415 -- stack imports the model, not this module
-
-    shipped: dict[str, str] = {}
-    for rel, lines in _workflow_files(ctx):
-        for n, step in _push_steps(lines):
-            file = _option(step, "file")
-            context = _option(step, "context").rstrip("/")
-            named = file or (f"{context}/Dockerfile" if context and context != "." else "Dockerfile")
-            for d in dockerfiles:
-                if d not in shipped and (d == named or ("${{" in named and _names(named, d))):
-                    shipped[d] = _where(rel, n)
-    return shipped
-
-
 def is_deployed(profile: Profile) -> bool:
-    """Whether the repo is deployed: high-confidence deploy evidence, or the classified `deployed` trait (ADR 0026)."""
-    return "deployed" in profile.traits or any(e.claim == "deployed" and e.confidence == "high" for e in profile.evidence)
+    """Whether the repo is deployed: the classified `deployed` trait (ADR 0026; no workflow shows a deploy, ADR 0027)."""
+    return "deployed" in profile.traits
 
 
-def _scheduled(rel: str, lines: list[str]) -> list[Fact]:
-    code = _code(lines)
-    for i, (n, t) in enumerate(code):
-        if re.match(r"\s*schedule:\s*$", t) and any("cron:" in s for _, s in code[i + 1 : i + 4]):
-            return [Fact("scheduled-jobs", _where(rel, n))]
-    return []
+def package_json(path: Path) -> dict[str, object]:
+    """A package.json as a dict; an unreadable or non-object file is empty."""
+    try:
+        data = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
-def _deployed(rel: str, lines: list[str]) -> list[Evidence]:
-    """A deploy key secret and a deploy step in one workflow file (not per job: the signal is the pair)."""
-    code = _code(lines)
-    if not any(_DEPLOY_SECRET.search(t) for _, t in code):
-        return []
-    step = next((n for n, t in code if _DEPLOY_STEP.search(t)), None)
-    return [Evidence("deployed", _where(rel, step), "high")] if step else []
+def _package_runtime_dependencies(data: dict[str, object]) -> set[str]:
+    groups = (data.get("dependencies"), data.get("optionalDependencies"))
+    return {name for group in groups if isinstance(group, dict) for name in group}
+
+
+def _first_line(lines: list[str], needle: str) -> int:
+    return next((i for i, ln in enumerate(lines, 1) if needle in ln), 0)
+
+
+def _node_cli(ctx: Context) -> list[Fact]:
+    """A `bin` entry in a package.json is a command the package ships."""
+    found = []
+    for path in walk(ctx.repo, "package.json", 4):
+        if package_json(path).get("bin"):
+            rel = path.relative_to(ctx.repo).as_posix()
+            n = _first_line(path.read_text(errors="replace").splitlines(), '"bin"')
+            found.append(Fact("cli", _where(rel, n) if n else rel))
+    return found[:1]
+
+
+def _node_dependencies(ctx: Context) -> list[Evidence]:
+    found: list[Evidence] = []
+    for path in walk(ctx.repo, "package.json", 4):
+        have = _package_runtime_dependencies(package_json(path))
+        rel = path.relative_to(ctx.repo).as_posix()
+        lines = path.read_text(errors="replace").splitlines()
+        for claim, names in _NODE_DEPENDENCY_EVIDENCE:
+            if hit := sorted(h for h in have if any(fnmatch(h, n) for n in names)):
+                n = _first_line(lines, f'"{hit[0]}"')
+                found.append(Evidence(claim, _where(rel, n) if n else rel, "low"))
+    return found
 
 
 def _console_scripts(ctx: Context) -> list[Fact]:
@@ -250,11 +212,8 @@ def _named_volumes(ctx: Context) -> list[Evidence]:
 
 def detect_facts(ctx: Context) -> tuple[tuple[Fact, ...], tuple[Evidence, ...]]:
     """Every fact and piece of evidence the repo's files give, each once."""
-    facts = [*_console_scripts(ctx), *_sops(ctx)]
-    evidence = [*_dependencies(ctx), *_named_volumes(ctx)]
-    for rel, lines in _workflow_files(ctx):
-        facts += [*_ships_image(rel, lines), *_scheduled(rel, lines)]
-        evidence += _deployed(rel, lines)
+    facts = [*_console_scripts(ctx), *_node_cli(ctx), *_sops(ctx)]
+    evidence = [*_dependencies(ctx), *_node_dependencies(ctx), *_named_volumes(ctx)]
     return tuple(dict.fromkeys(facts)), tuple(dict.fromkeys(evidence))
 
 

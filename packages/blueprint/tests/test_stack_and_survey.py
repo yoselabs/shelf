@@ -122,24 +122,42 @@ def test_the_profile_row_lists_the_expected_toolset(repo: Repo) -> None:
     assert "types: pyrefly" in evidence
 
 
-def test_a_stack_without_a_profile_is_a_blueprint_gap_not_a_repo_failure(repo: Repo) -> None:
-    repo.write("go.mod", "module x\n")
+def test_a_stack_without_a_profile_fails_blueprint_with_a_clear_error(repo: Repo) -> None:
+    # Owner 2026-11-19: "stack X found, no profile" is an error, never silence and never a pass.
+    repo.write("pyproject.toml", _PYPROJECT)  # no uv.lock: the `python` stack, which has no profile
     result = run(repo.root, concern="stack", env=repo.env)
-    row = next(r for r in result.rows if r.id == "stack.go.profile")
-    assert row.verdict is Verdict.NOT_CHECKED
-    assert row.blueprint_gap
-    assert "no standard for go" in row.evidence
-    assert "profiles/go.toml" in row.remediation
-    assert result.exit_code == 0
+    row = next(r for r in result.rows if r.id == "stack.python.profile")
+    assert row.verdict is Verdict.FAILING
+    assert not row.blueprint_gap
+    assert "stack python found, no profile" in row.evidence
+    assert result.exit_code != 0
 
 
-def test_an_untested_role_is_a_blueprint_gap(repo: Repo) -> None:
-    # Unity's embedded shader lint has no tested standard; framework rows share the stack rows' judging.
+def test_a_justified_override_is_the_only_way_past_a_stack_without_a_profile(repo: Repo) -> None:
+    repo.write("pyproject.toml", _PYPROJECT)
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        '[[override]]\nid = "stack.python.profile"\nreason = "legacy script folder"\ndecided_by = "owner"\nexpires = 2099-01-01\n',
+    )
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == "stack.python.profile")
+    assert row.verdict is Verdict.PASSING
+
+
+@pytest.mark.parametrize(("manifest", "stack"), [("package.json", "node"), ("go.mod", "go"), ("Cargo.toml", "rust")])
+def test_node_go_and_rust_have_profiles_with_an_architecture_row(repo: Repo, manifest: str, stack: str) -> None:
+    repo.write(manifest, "{}" if stack == "node" else "x\n")
+    rows = _rows(repo)
+    assert rows[f"stack.{stack}.profile"][0] is Verdict.PASSING
+    assert rows[f"stack.{stack}.architecture"][0] is Verdict.NOT_SET_UP
+
+
+def test_untested_and_na_cut_roles_are_not_checkpoints(repo: Repo) -> None:
+    # checkpoint-review.md: framework ci and embedded-script-lint are `untested` or `na` everywhere; they project no row.
     repo.write("Game/ProjectSettings/ProjectVersion.txt", "m_EditorVersion: 6000.3.2f1\n")
-    row = next(r for r in run(repo.root, concern="framework", env=repo.env).rows if r.id == "framework.unity.embedded-script-lint")
-    assert row.verdict is Verdict.NOT_CHECKED
-    assert row.blueprint_gap
-    assert "no standard yet" in row.evidence
+    ids = {r.id for r in run(repo.root, concern="framework", env=repo.env).rows}
+    assert "framework.unity.embedded-script-lint" not in ids
+    assert "framework.unity.ci" not in ids
+    assert "framework.unity.tests" in ids
 
 
 def test_the_architecture_role_wants_import_linter_configured_and_run_by_the_gate(repo: Repo) -> None:
@@ -274,7 +292,7 @@ def test_flake_nix_in_a_subfolder_detects_the_nix_stack(repo: Repo) -> None:
     repo.write("hosts/bee/flake.lock", "{}")
     rows = _rows(repo)
     assert "detected from hosts/bee/flake.nix, hosts/sol/flake.nix" in rows["stack.nix.profile"][1]
-    assert rows["stack.nix.coverage"][0] is Verdict.NOT_APPLICABLE
+    assert "stack.nix.coverage" not in rows  # na for the stack: not a checkpoint
     assert rows["stack.nix.tests"][0] is Verdict.NOT_SET_UP  # the eval tier: tests/nix/*.nix
 
 
@@ -397,3 +415,53 @@ def test_pyrefly_must_not_read_ignore_files(repo: Repo) -> None:
     verdict, evidence, _ = _rows(repo)["stack.python-uv.types"]
     assert verdict is Verdict.NOT_SET_UP
     assert "use-ignore-files = false" in evidence
+
+
+# --- outcome contracts (mission blueprint-multi-stack-contracts, task 3): judged by what the gate does, not which tool ---
+
+
+def test_a_floor_enforced_by_pytest_cov_from_config_counts(repo: Repo) -> None:
+    # The floor sits in pyproject and pytest-cov enforces it: no coverage.py command, no `--cov-fail-under` flag.
+    _gate_with_cov(repo, "pytest --cov", pyproject=_PYPROJECT + "\n[tool.coverage.report]\nfail_under = 90\n")
+    assert _rows(repo)["stack.python-uv.coverage"][0] is Verdict.PASSING
+
+
+def test_a_floor_script_beside_a_committed_floor_file_counts(repo: Repo) -> None:
+    _gate_with_cov(repo, "pytest --cov && python tools/check_coverage.py coverage.xml coverage-floor.json")
+    repo.write("coverage-floor.json", '{"line": 90}')
+    assert _rows(repo)["stack.python-uv.coverage"][0] is Verdict.PASSING
+
+
+def test_measuring_without_any_floor_fails_the_coverage_outcome(repo: Repo) -> None:
+    _gate_with_cov(repo, "pytest --cov")
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.coverage"]
+    assert verdict is Verdict.FAILING
+    assert "floor" in evidence
+
+
+def _gate_with_tests(repo: Repo, recipe: str) -> None:
+    _python_repo(repo)
+    repo.write("pyproject.toml", _PYPROJECT + "\n[tool.pytest.ini_options]\naddopts = '-q'\n")
+    repo.write("Makefile", f"check: lint t\n{_MAKEFILE.split(chr(10), 1)[1]}t:\n\t{recipe}\n")
+
+
+@pytest.mark.parametrize(
+    "recipe",
+    [
+        "uv run pytest",
+        "uv run python -m any_gate test -- uv run python -m any_gate_python run",
+        "uv run python -m any_gate_python run",
+        "uv run blueprint test",
+        "uv run python -m blueprint test",
+    ],
+)
+def test_tests_pass_when_the_gate_reaches_any_test_runner(repo: Repo, recipe: str) -> None:
+    _gate_with_tests(repo, recipe)
+    assert _rows(repo)["stack.python-uv.tests"][0] is Verdict.PASSING
+
+
+def test_tests_fail_when_the_gate_reaches_no_test_runner(repo: Repo) -> None:
+    _gate_with_tests(repo, "true")
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.tests"]
+    assert verdict is Verdict.FAILING
+    assert "runner" in evidence

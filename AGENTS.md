@@ -9,7 +9,7 @@ open backlog, fitness records): those have derived homes, linked below, and are 
 If you catch this file naming a specific package count or roster, that's a bug — delete it.
 
 > This is the canonical agent instructions file (read by Claude Code, opencode, Codex, …).
-> `CLAUDE.md` is a symlink to it — edit only this file.
+> There is no `CLAUDE.md`: AGENTS.md is the only instructions file (owner, 2026-11-20).
 
 ## Read in this order
 
@@ -22,12 +22,12 @@ If you catch this file naming a specific package count or roster, that's a bug �
 
 ### Definition of Done
 
-A task is **done** only when the full quality gate passes across the **entire repo** —
-not just the files the task touched:
+A task is **done** only when `just check` passes: its linters, types and architecture rules cover the **entire repo**, and its tests are the
+ones the change reaches (the rest already passed on the same input). `just check-all` is not part of a task's Done; it is the release gate:
 
 ```bash
 just check      # ruff + format + pyrefly (strict) + codespell + deptry + the tests the change reaches
-just check-all  # the same, every test, with the coverage floor (run locally; the shelf has no CI, ADR 0027)
+just check-all  # the same, every test, with the coverage floor: RARE, before a release tag only (no repository has CI, ADR 0027)
 ```
 
 The runner is [just](https://just.systems) ([ADR 0023](docs/adr/0023-the-gate-runner-is-just.md)), pinned as the
@@ -36,10 +36,10 @@ plain commands, `mise trust --yes && mise install --locked` (the exact uv, prek 
 [ADR 0024](docs/adr/0024-mise-pins-every-repo-tool.md); until the trust every mise shim refuses, uv included), then
 `uv sync --locked` and `bd bootstrap`. After a pin bump: `uv run just tools`. Never install those tools another way.
 
-Both run natively on the Mac, one way. In `check` the per-file linters (ruff, codespell, shellcheck) run on the changed files only (`tools/changed.py`; a changed linter config selects
+Both run natively on the Mac, one way. In `check` the per-file linters (ruff, codespell, shellcheck) run on the changed files only (`any-gate changed`; a changed linter config selects
 everything). The cross-file checks (types, architecture, dependencies, blueprint) always cover the whole
-repo, and the tests are narrowed to the changed packages and every package depending on them (`tools/affected.py`).
-There is no CI ([ADR 0027](docs/adr/0027-the-shelf-has-no-ci.md)): the pre-push hook runs the gate, and `just check-all` is run locally before a tag.
+repo, and the tests are narrowed to the changed packages and every package depending on them (`any-gate-python`).
+There is no CI, here or in any repository ([ADR 0027](docs/adr/0027-no-repository-has-ci.md)): the pre-push hook runs the gate, and `just check-all` is run locally before a tag.
 
 **No carve-outs.** "Pre-existing drift", "unrelated file", or "that's a separate change" do **not**
 satisfy Done. If `just check` is red for any reason, the task is not finished. This toolchain is the
@@ -82,8 +82,8 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
   double lives in the `testing` module of the package it fakes (no runtime dependency: pytest/pytest-bdd only
   behind a `testing` extra), or in a new package only where none is related.
 - Versions are **git tags**, namespaced per package (`anyllm-v0.2.0`). Never delete an old tag.
-- Changes go through **OpenSpec** (`openspec/changes/<name>/`): proposal → design → tasks → apply →
-  archive. Project context for the AI lives in [openspec/config.yaml](openspec/config.yaml).
+- A change is a bead with acceptance criteria (`bd`). A plan larger than a bead is a mission, `docs/missions/<name>/` (proposal, design, tasks),
+  written when it helps and never required; the decision it ends in is an ADR. There is no spec tool: tests are the contract (OpenSpec was removed 2026-11-19).
 
 ## How the repo is organized
 
@@ -99,7 +99,7 @@ backwards — a2kay is a *donor of ideas* and the *first consumer*, nothing more
 ## Consuming & contributing
 
 - **Blueprint** (`skills/blueprint/`, engine `packages/blueprint/`; being built:
-  [openspec/changes/blueprint-skill](openspec/changes/blueprint-skill/design.md)) — the shelf's
+  [docs/research/blueprint-skill](docs/research/blueprint-skill/design.md)) — the shelf's
   standard for every software repo, this one included: start a new repo, or audit an existing one,
   by running `/blueprint` in it. The audit changes nothing; remediation follows the owner's yes.
 - **[docs/skill-authoring.md](docs/skill-authoring.md)** — how to build a skill: cost model, layout,
@@ -245,7 +245,7 @@ Read a file below when its trigger applies, not before.
 |---|---|
 | [docs/agents/constitution.md](docs/agents/constitution.md) | before changing anything: how work is done here |
 | [docs/agents/working-with-agents.md](docs/agents/working-with-agents.md) | at session start and handoff: loop, rules, survey |
-| [docs/agents/gate.md](docs/agents/gate.md) | when a check fails, or you add one or touch hooks or CI |
+| [docs/agents/gate.md](docs/agents/gate.md) | when a check fails, or you add one or touch hooks |
 | [docs/agents/testing.md](docs/agents/testing.md) | before writing or changing any test |
 | [docs/agents/architecture.md](docs/agents/architecture.md) | before adding a module, dependency or layer |
 | [docs/agents/health.md](docs/agents/health.md) | before planning a bead: the trends that say slicing is failing |

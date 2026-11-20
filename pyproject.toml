@@ -279,6 +279,8 @@ testpaths = [
     "packages/child-env/tests",
     "packages/content-extract/tests",
     "packages/dir-trust/tests",
+    "packages/any-gate/tests",
+    "packages/any-gate-python/tests",
     "packages/content-digest/tests",
     "packages/convert-md/tests",
     "packages/dom-schema/tests",
@@ -353,6 +355,8 @@ markers = [
     "contract: a scenario of a package's contract suite that runs the same steps against the real implementation and its in-memory fake (git-porcelain's RealRepo and FakeRepo), so the fake cannot drift. Runs in the default gate and in `just check`; `-m contract` runs just this lane.",
     "real_only: a contract scenario that only the real implementation can run: it names a fidelity gap of the in-memory fake (git-porcelain's FakeRepo), which the suite leaves out of the fake run.",
     "browser: real-browser test that launches a headless engine (any-browser); opt-in, excluded from the default run and `just check`; `just test-browser` runs it, and CI runs it with SHELF_REQUIRE_BROWSER=1 where a missing engine FAILS instead of skipping",
+    "serial: must not share the box with other tests (it takes a whole core, a global lock or a fixed port). `any_gate_python run` runs these after the parallel stage, one process, no workers.",
+    "quarantine: a test known to fail sometimes (name the bead in its reason). It runs apart, is reported when it fails, and never blocks the gate; fix it or delete it.",
     "net: binds a real loopback TCP port and serves HTTP over it (async-scope's asgi lane). Names the slice, does NOT carve one out: it runs in the default gate and in `just check`, because the behaviours it covers are invisible without a real socket and a promotion that ships them unverified ships a blind spot to every consumer. `-m net` runs just this lane.",
 ]
 asyncio_mode = "auto"
@@ -382,6 +386,8 @@ root_packages = [
     "blueprint",
     "browser_cookies",
     "child_env",
+    "any_gate",
+    "any_gate_python",
     "content_digest",
     "content_extract",
     "convert_md",
@@ -474,6 +480,8 @@ source_modules = [
     "blueprint",
     "browser_cookies",
     "child_env",
+    "any_gate",
+    "any_gate_python",
     "content_digest",
     "content_extract",
     "convert_md",
@@ -568,6 +576,8 @@ modules = [
     "blueprint",
     "browser_cookies",
     "child_env",
+    "any_gate",
+    "any_gate_python",
     "content_digest",
     "content_extract",
     "convert_md",
@@ -706,6 +716,13 @@ ignore_imports = [
     "git_porcelain.real -> child_env",
     "git_porcelain.porcelain -> child_env",
     "git_porcelain.lfs -> child_env",
+    "any_gate.cli -> any_lease",
+    "any_gate.receipts -> atomic_io",
+    "any_gate.receipts -> content_digest",
+    "any_gate.runner -> stream_proc",
+    "any_gate_python.stages -> stream_proc",
+    "any_gate_python.stages -> any_gate.plan",
+    "any_gate_python.select -> any_gate.plan",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",
     "sqlite_store.* -> sqlite_sidecar",
@@ -858,7 +875,9 @@ unannotated-return = false
 # sites. Editing one to satisfy a spellchecker would make it a hand-written
 # approximation — the precise defect dom-schema exists to prevent — so the
 # fixture is authoritative and the linter yields to it, never the reverse.
-skip = "uv.lock,.venv,.git,*.pyc,.ruff_cache,.pytest_cache,docs/thoughts/*,packages/*/bench/corpus/*,packages/*/bench/outputs/*,packages/*/tests/fixtures/*.html"
+#
+# docs/thoughts and docs/research are raw evidence (quoted owner words, tool output, notes written in passing), kept as written.
+skip = "uv.lock,.venv,.git,*.pyc,.ruff_cache,.pytest_cache,docs/thoughts/*,docs/research/*,packages/*/bench/corpus/*,packages/*/bench/outputs/*,packages/*/tests/fixtures/*.html"
 # doctrine/glossary coinages the dictionary flags but we mean on purpose.
 ignore-words-list = "wins,ontology,noqa,crate,ba,te,alls,errorprone,haa,statics,uptodate"
 # A glob's case class (`[Ll]ibrary/` in a .gitignore) is not a word.
@@ -952,3 +971,47 @@ packages = [
     "test-reach",
     "timefmt",
 ]
+
+# The shelf's own paths for the Python adapter of the gate (`python -m any_gate_python`, packages/any-gate-python).
+# `no-effect`: paths no package test can observe (docs, the ontology, agent files); the repo tests in `tests/` cover what of these is checked.
+# The onboarding tests build real consumer repos (8-14 s each, 2026-10-11) and read only the onboarding machinery, so they run when an input of
+# it changes; every other repo test runs on every change, and `check-all` runs them all.
+[tool.any-gate.python]
+no-effect = [
+    "tests/",
+    "tools/",
+    "docs/",
+    "catalog/",
+    "use-cases/",
+    "ledger/",
+    "skills/",
+    "evals/",
+    ".beads/",
+    ".agents/",
+    ".claude/",
+    ".claude-plugin/",
+    ".gitignore",
+    "LICENSE",
+    "README.md",
+    "AGENTS.md",
+]
+repo-tests = "tests"
+
+[tool.any-gate.python.gated]
+tests = ["test_onboard_*", "test_bootstrap_target.py"]
+inputs = [
+    "tools/onboard/",
+    "tools/preset_drift.py",
+    ".agents/skills/onboard-consumer/",
+    "tests/conftest.py",
+    "justfile",
+    "pyproject.toml",
+    "uv.lock",
+    "conftest.py",
+    ".pre-commit-config.yaml",
+    ".beads/config.yaml",
+]
+
+[tool.any-gate.python.gated.reads]
+"test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/backlog.py"]
+"test_onboard_hooks.py" = ["packages/blueprint/src/blueprint/recipes/"]

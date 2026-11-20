@@ -47,35 +47,29 @@ def _lines(n: int) -> str:
 
 def _no_agents_md(claude_text: str | None) -> Finding:
     if claude_text is not None:
-        return not_set_up(
-            "CLAUDE.md is the only instructions file; other agents read AGENTS.md",
-            "mv CLAUDE.md AGENTS.md, then `ln -s AGENTS.md CLAUDE.md`",
-        )
-    return not_set_up("no AGENTS.md", "write AGENTS.md (the map and the working agreement), then `ln -s AGENTS.md CLAUDE.md`")
+        return not_set_up("CLAUDE.md is the only instructions file; AGENTS.md is the one", "git mv CLAUDE.md AGENTS.md")
+    return not_set_up("no AGENTS.md", "write AGENTS.md (the map and the working agreement)")
 
 
-@check("agents.instructions", "AGENTS.md is the one instructions file; CLAUDE.md points to it", layer="agent", version=2)
+@check("agents.instructions", "AGENTS.md is the only instructions file; there is no CLAUDE.md", layer="agent", version=3)
 def instructions(ctx: Context) -> Finding:
-    """AGENTS.md exists; CLAUDE.md is absent, a symlink to it, or imports it."""
+    """AGENTS.md exists and CLAUDE.md does not (owner, 2026-11-20): a CLAUDE.md in any form, file, copy or symlink, is a second home."""
     agents = ctx.read("AGENTS.md")
     claude_text = ctx.read("CLAUDE.md")
     if agents is None:
         return _no_agents_md(claude_text)
     claude = ctx.path("CLAUDE.md")
-    if claude.is_symlink() and claude.resolve() == ctx.path("AGENTS.md").resolve():
-        return passing("CLAUDE.md is a symlink to AGENTS.md")
-    if not claude.exists():
-        return failing("no CLAUDE.md, so Claude Code does not read AGENTS.md", "ln -s AGENTS.md CLAUDE.md", FixedBy.AUTO)
-    if "@AGENTS.md" in (claude_text or ""):
-        return passing("CLAUDE.md imports @AGENTS.md")
-    # Two files drift: each tool reads one, so the agents on one repo follow different rules.
+    if not claude.exists() and not claude.is_symlink():
+        return passing("AGENTS.md is the only instructions file (no CLAUDE.md)")
+    if claude.is_symlink():
+        return failing("CLAUDE.md is a symlink to AGENTS.md: the repo has one instructions file", "git rm CLAUDE.md", FixedBy.AUTO)
     theirs, ours = _only_in(claude_text or "", agents), _only_in(agents, claude_text or "")
     if not theirs and not ours:
-        return failing("CLAUDE.md is a copy of AGENTS.md: it drifts at the next edit", "ln -sf AGENTS.md CLAUDE.md", FixedBy.AUTO)
+        return failing("CLAUDE.md is a copy of AGENTS.md: it drifts at the next edit", "git rm CLAUDE.md", FixedBy.AUTO)
     return failing(
         f"CLAUDE.md is a second instructions file: {_lines(theirs)} only in CLAUDE.md, {_lines(ours)} only in AGENTS.md, "
         "so agents reading one get different rules than agents reading the other",
-        "move what only CLAUDE.md holds into AGENTS.md (`diff AGENTS.md CLAUDE.md`), then `ln -sf AGENTS.md CLAUDE.md`",
+        "move what only CLAUDE.md holds into AGENTS.md (`diff AGENTS.md CLAUDE.md`), then `git rm CLAUDE.md`",
     )
 
 
@@ -112,42 +106,6 @@ def session_hooks(ctx: Context) -> Finding:
     if missing:
         return not_set_up(f"missing {'; '.join(missing)}", "copy both hooks from the shelf's .claude/settings.json", FixedBy.AUTO)
     return passing("SessionStart runs bd prime; Stop flags in-progress beads")
-
-
-_POCOCK_FIX = (
-    "claude plugin marketplace add mattpocock/skills --scope project && "
-    "claude plugin install mattpocock-skills@mattpocock --scope project (writes .claude/settings.json; commit it)"
-)
-
-
-@check(
-    "agents.pocock-skills",
-    "Matt Pocock's skills are installed at project scope: .claude/settings.json declares the mattpocock marketplace "
-    "and enables mattpocock-skills",
-    layer="agent",
-)
-def pocock_skills(ctx: Context) -> Finding:
-    """Every repo carries the same skills, so every clone and every agent session has them (owner, 2026-10-12).
-
-    The skills' setup and domain-modeling write docs/agents/*.md, GLOSSARY.md and their own ADR format;
-    blueprint's domain.md tells them not to (ADR 0017).
-    """
-    settings = _settings(ctx)
-    if settings is None:
-        return failing(".claude/settings.json is not a JSON object", "fix the JSON")
-    markets, plugins = settings.get("extraKnownMarketplaces"), settings.get("enabledPlugins")
-    market = markets.get("mattpocock") if isinstance(markets, dict) else None
-    source = market.get("source") if isinstance(market, dict) else None
-    declared = isinstance(source, dict) and source.get("source") == "github" and source.get("repo") == "mattpocock/skills"
-    enabled = isinstance(plugins, dict) and plugins.get("mattpocock-skills@mattpocock") is True
-    if declared and enabled:
-        return passing("mattpocock marketplace declared and mattpocock-skills enabled in .claude/settings.json")
-    gaps = [
-        *([] if declared else ["no extraKnownMarketplaces.mattpocock from github mattpocock/skills"]),
-        *([] if enabled else ['enabledPlugins["mattpocock-skills@mattpocock"] is not true']),
-    ]
-    build = failing if ctx.read(".claude/settings.json") is not None else not_set_up
-    return build(f"{'; '.join(gaps)} in .claude/settings.json", _POCOCK_FIX)
 
 
 def _repo_gitignores(ctx: Context) -> list[str] | None:

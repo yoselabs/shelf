@@ -2,7 +2,7 @@
 
 A shell has no type checker; `set -u` and `pipefail` are the nearest thing, and `-e` stops at the first failure.
 Only executable scripts are judged: a non-executable .sh is a library its caller sets the modes for.
-Research: openspec/changes/blueprint-skill/research/shell-and-secrets.md.
+Research: docs/research/blueprint-skill/research/shell-and-secrets.md.
 """
 
 from __future__ import annotations

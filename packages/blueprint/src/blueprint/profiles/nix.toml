@@ -1,7 +1,9 @@
 # Stack profile (see python-uv.toml for the format). Nix flakes (NixOS hosts, dev shells), nixos-26.05 / Nix 2.34, late 2026.
-# Research: openspec/changes/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a flake.nix within three levels.
+# Research: docs/research/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a flake.nix within three levels.
 # Tested 2026-10-11 inside the nixos/nix Docker image (arm64 Linux on a Mac, no local Nix) against a scratch copy of homelab (hosts/bee, hosts/sol).
 stack = "nix"
+# language: carries code that grows layers, so it needs a layering tool; artifact: a file format with no layers of code (its architecture row says why).
+family = "artifact"
 status = "provisional"
 source = "nix-compose-profile.md (2026-10-11): nixfmt 1.5.0, statix, deadnix 1.3.2 and `nix eval ...toplevel.drvPath` run in nixos/nix (Nix 2.34.7) on homelab's 28 .nix files; the eval seen red on a planted misspelled option and green on the real host; homelab is the only consumer"
 
@@ -18,7 +20,6 @@ config = [
     { path = "Makefile", lacks = "nixos/nix:latest" },
     { path = "tools/*.sh", lacks = "nixos/nix:latest" },
     { path = "scripts/*.sh", lacks = "nixos/nix:latest" },
-    { path = ".github/workflows/*.y*ml", lacks = "nixos/nix:latest" },
 ]
 gate = "--no-update-lock-file"
 
@@ -41,8 +42,8 @@ gate = "statix check"
 [[role]]
 role = "types"
 tool = """evaluating every output the repo deploys: `nix eval "path:<repo>?dir=hosts/<h>#nixosConfigurations.<h>.config.system.build.toplevel.drvPath" --raw` per host. The module system type-checks every option value, rejects unknown/misspelled options, fires module assertions and undefined variables; evaluation is architecture-independent, so an x86_64 host evaluates on an arm64 Mac. Seen red on a planted misspelled option (exit 1, `The option services.avahi.<typo> does not exist`), green on the real host. A `path:` flake ref checks the working tree, a `git+file:` ref misses uncommitted files"""
-install = """a `just check-hosts` that loops over hosts/*/flake.nix and runs the eval (inside the pinned nixos/nix image when Nix is not installed), and is reached by `just check` and by CI. homelab has the command (tools/check-host.sh, `make check-host HOST=` (homelab is still on make)) but `just check` never reaches it and no workflow runs it. \
-Cost: 40 s warm to 3 min cold per host, so CI caches /nix. `nix flake check --no-build "path:<repo>?dir=hosts/<h>"` is the equal alternative (tested green on bee: it evaluates `nixosConfigurations.bee`, 2 min cold; not seen red) and also runs `checks.*` if the flake defines any"""
+install = """a `just check-hosts` that loops over hosts/*/flake.nix and runs the eval (inside the pinned nixos/nix image when Nix is not installed), and is reached by `just check`. homelab has the command (tools/check-host.sh, `make check-host HOST=` (homelab is still on make)) but `just check` never reaches it. \
+Cost: 40 s warm to 3 min cold per host. `nix flake check --no-build "path:<repo>?dir=hosts/<h>"` is the equal alternative (tested green on bee: it evaluates `nixosConfigurations.bee`, 2 min cold; not seen red) and also runs `checks.*` if the flake defines any"""
 config = [{ any = [{ path = "tools/check-host.sh" }, { any = [{ path = "justfile", contains = "nixosConfigurations" }, { path = "Makefile", contains = "nixosConfigurations" }] }, { path = "flake.nix", contains = "checks" }] }]
 gate = "nixosConfigurations"
 [[role.alternative]]
@@ -58,8 +59,8 @@ config = [{ any = [{ path = "flake.nix", contains = "follows" }, { path = "*/fla
 
 [[role]]
 role = "tests"
-tool = "two tiers. (1) eval tests, no KVM: `nix eval --impure --raw --file tests/nix/<name>.nix`, a nix file that reads nixosConfigurations.<host>.config and `assert`s/throws on the values a past incident depended on (udev rule filters, firewall rules, option values); exit 1 and the throw text when one is gone. (2) NixOS VM tests (`pkgs.testers.runNixOSTest`, exposed as flake `checks.x86_64-linux.<name>`) for what only a booted system shows (udev coldplug, mount order, unit ordering), run by CI on a runner with /dev/kvm. Seen: the eval tier red and green on a homelab host module (the udev automount filters behind a recorded incident) under nix 2.20; the VM tier not yet run. KVM is there: a standard GitHub ubuntu-latest runner has /dev/kvm, usable after one udev rule (`KERNEL==\"kvm\", GROUP=\"kvm\", MODE=\"0666\"`, then `udevadm trigger --name-match=kvm`), seen in https://github.com/yoselabs/shelf/actions/runs/38185504352"
-install = "tests/nix/*.nix + a `nix-test` recipe looping them (a dependency of `check`); VM tier: flake checks + a CI job on a KVM runner running `nix build .#checks.x86_64-linux.<name>`, not part of the local `just check` (needs KVM)"
+tool = "two tiers. (1) eval tests, no KVM: `nix eval --impure --raw --file tests/nix/<name>.nix`, a nix file that reads nixosConfigurations.<host>.config and `assert`s/throws on the values a past incident depended on (udev rule filters, firewall rules, option values); exit 1 and the throw text when one is gone. (2) NixOS VM tests (`pkgs.testers.runNixOSTest`, exposed as flake `checks.x86_64-linux.<name>`) for what only a booted system shows (udev coldplug, mount order, unit ordering), run locally on a machine with /dev/kvm. Seen: the eval tier red and green on a homelab host module (the udev automount filters behind a recorded incident) under nix 2.20; the VM tier not yet run"
+install = "tests/nix/*.nix + a `nix-test` recipe looping them (a dependency of `check`); VM tier: flake checks run on a KVM machine with `nix build .#checks.x86_64-linux.<name>`, not part of `just check` (needs KVM)"
 config = [{ path = "tests/nix/*.nix" }]
 gate = "nix eval"
 

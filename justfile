@@ -3,58 +3,45 @@
 #
 # This is the reference toolchain every consumer of the shelf inherits (ADR 0004). The runner is
 # just (ADR 0023): pinned per repo as the `rust-just` dev dependency, run as `uv run just <recipe>`.
-# Each recipe is one linter doing one job; `check` is the gate.
+#
+# The gate's common recipes are the blueprint's, rendered into .blueprint/ (ADR 0029): `uv run blueprint render` rewrites them and
+# `just render` fails on any difference. This file keeps only what is the shelf's own: a recipe defined here replaces the rendered one
+# of the same name (`set allow-duplicate-recipes`). Consumers keep the same shape and own even less.
 #
 # No backticks anywhere in this file: `just --dry-run` evaluates them, and blueprint's
 # gate.one-command dry-runs `check` and reads this graph from `just --dump --dump-format json`.
 # Anything that needs a command's output lives inside a shebang recipe.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
+set allow-duplicate-recipes
+
+import '.blueprint/base.just'
+import '.blueprint/python.just'
 
 # pytest runs one worker per core (pytest-xdist).
 pytest_par := "-n auto"
 
+# Where whole test runs queue (check-all's pytest below; `blueprint test` queues in the same folder): one slot, so gates started at once wait instead of thrashing.
+lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACHE_HOME", env_var("HOME") + "/.cache") + "/gate-leases")
+
 # The gate. Fast, deterministic tools first; tests last. Tests cover only what the change
-# touches (`test-affected`); `check-all` runs every test with the coverage floor.
+# touches (`test`, the rendered `blueprint test`); `check-all` runs every test with the coverage floor: rare, before a release tag, never per task.
 #
 # The per-file linters (scripts, lint-changed, spell-changed) check only the files changed against the base
-# in `check` (tools/changed.py; a changed config file, or no base, selects everything). `check-all` runs them on every
+# in `check` (`any-gate changed`; a changed config file, or no base, selects everything). `check-all` runs them on every
 # file (`scripts "all"`, `lint`, `spell`). The cross-file checks (typecheck, arch, deps, blueprint)
 # always cover the whole repo. A linter with nothing changed prints "skipped <linter>: ..." and the gate
 # repeats that line.
 #
-# A green `check` records the tree it checked (tools/gate_state.py, `blueprint recipe gate-state`): `gate-start` notes the
+# A green `check` records the tree it checked (`any-gate`, `python -m any_gate start|passed|pre-push`): `gate-start` notes the
 # working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
 # pre-push hook then skips the gate for that exact tree.
 [group('gate')]
-check: gate-start beads-lint scripts (steps "guard" "preset" "blueprint" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test-affected")
-    python3 -I tools/gate_state.py passed --gate check
+check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "tag-check" "test") check-extra
+    uv run python -m any_gate passed --gate check
 
 [group('gate')]
-check-all: beads-lint (scripts "all") (steps "guard" "preset" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test")
-
-# Notes the working tree as the gate starts, for `check` to record when it passes.
-[private]
-gate-start:
-    python3 -I tools/gate_state.py start
-
-# Every bead still to be started (open or blocked) carries its acceptance criteria: criteria are what make a bead
-# ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. bd's database lives in this clone.
-[group('gate')]
-beads-lint:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    [ -d .beads ] || exit 0
-    command -v bd >/dev/null || { echo "beads-lint: bd is not installed -- run just tools" >&2; exit 2; }
-    # A clone with no (or an uninitialized) database lints 0 beads and exits 0; that is no pass (shelf-9g7).
-    if ! out=$(BD_DISABLE_METRICS=1 bd list --limit 1 --json 2>&1); then
-        echo "beads-lint: bd's database does not answer in this clone -- run bd bootstrap" >&2
-        case "$out" in *"not initialized"*) echo "  (bootstrap calls an uninitialized one 'nothing to do': mv .beads/embeddeddolt .beads/embeddeddolt.broken first)" >&2;; esac
-        exit 1
-    fi
-    rc=0
-    for status in open blocked; do BD_DISABLE_METRICS=1 bd lint --status "$status" || rc=1; done
-    exit "$rc"
+check-all: beads-lint (scripts "all") (steps "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "arch" "spell" "deps" "test-all")
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
 # blueprint's for this step in every repo (stack/shell).
@@ -64,106 +51,21 @@ scripts scope="changed":
     set -euo pipefail
     command -v shellcheck >/dev/null || { echo "scripts: shellcheck is not installed -- run just tools" >&2; exit 2; }
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
+    uv run python -m any_gate changed --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
     [ -s "$list" ] || { echo "skipped scripts: no shell script changed"; exit 0; }
     xargs -0 shellcheck < "$list"
 
-# Runs the gate's steps at once, each into its own log, then prints one timing line (a step over its budget is
-# marked) and the log of every step that failed. Each name is a recipe, so the gate graph still reads the edges.
-# Budgets, in seconds: GATE_STEP_BUDGET (default 60) per step, GATE_BUDGET (default 180) for the whole gate. The
-# gate runs several times within one feature, so a slow step is a cost to see and fix, not to wait out.
-[private]
-steps +names:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    step_budget=${GATE_STEP_BUDGET:-60}; gate_budget=${GATE_BUDGET:-180}
-    dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
-    # A step's output goes to its log; a notice it must show now (the test lock's "waiting") goes to fd 3, this terminal.
-    exec 3>&2; export GATE_NOTICE_FD=3
-    SECONDS=0
-    echo "gate: {{ names }} (in parallel)" >&2
-    for n in {{ names }}; do
-        ( SECONDS=0; {{ just_executable() }} "$n" > "$dir/$n.log" 2>&1; echo "$? $SECONDS" > "$dir/$n.rc" ) &
-    done
-    wait
-    total=$SECONDS; failed=(); line=()
-    for n in {{ names }}; do
-        read -r rc took < "$dir/$n.rc"
-        mark=""; [ "$took" -gt $step_budget ] && mark=" ⚠ over ${step_budget}s"
-        [ "$rc" -eq 0 ] || { failed+=("$n"); mark="$mark ✗"; }
-        line+=("$n ${took}s$mark")
-    done
-    grep -h '^skipped ' "$dir"/*.log >&2 || true
-    for n in "${failed[@]}"; do echo "--- $n" >&2; cat "$dir/$n.log" >&2; done
-    summary=$(printf '%s · ' "${line[@]}"); echo "gate: ${summary% · } -- total ${total}s" >&2
-    [ "$total" -gt $gate_budget ] && echo "gate: ⚠ ${total}s is over the ${gate_budget}s gate budget: find the slow step above" >&2
-    [ "${#failed[@]}" -eq 0 ] || { echo "gate: failed: ${failed[*]}" >&2; exit 1; }
-
-# The blueprint's per-commit checkpoints (packages/blueprint): one line per one that is not
-# passing. The audit-only ones (slow, or reading this clone's bd database) run in the
-# /blueprint audit, not here. Same resolution order as `guard`.
+# Every package version on origin/main has its `<name>-v<version>` tag (2026-11-09: anyllm 0.8.0 was merged and never tagged, so a consumer
+# could not pin it). A release is bump, merge, tag, so the next gate after an untagged merge is the one that stops. Offline it reads local tags.
 [group('gate')]
-blueprint:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    s=packages/blueprint/src
-    [ -d "$s/blueprint" ] || s="${SHELF_HOME:-../shelf}/packages/blueprint/src"
-    [ -d "$s/blueprint" ] || s="$HOME/Workspaces/shelf/packages/blueprint/src"
-    if [ -d "$s/blueprint" ]; then PYTHONPATH="$s" python3 -m blueprint check --repo . --gate
-    else echo "blueprint: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
-
-# The commit guard as a GATE, not only a hook. A pre-commit hook is per-clone and
-# can be silently disabled by anything that claims core.hooksPath -- beads, husky,
-# lefthook -- which happened in this very repo and went unnoticed because the hook
-# file still existed and looked installed. So the hook is FAST FEEDBACK and this is
-# the ENFORCEMENT: it needs no onboarding, no hooks, and holds on any fresh clone.
-#
-# --committed reads HEAD, deliberately not the working tree: an *uncommitted* local
-# override is the supported co-development workflow (docs/consuming-the-shelf.md
-# §1), and a gate that failed on it would break the thing the docs prescribe.
-#
-# Consumers copy this recipe verbatim -- it finds the guard in-repo (the shelf) or
-# via $SHELF_HOME -> ../shelf -> ~/Workspaces/shelf (a consumer). Exit 2 means the
-# guard could not run, which is never treated as a pass.
-[group('gate')]
-guard:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    g=tools/hooks/forbid-local-shelf-source.py
-    [ -f "$g" ] || g="${SHELF_HOME:-../shelf}/tools/hooks/forbid-local-shelf-source.py"
-    [ -f "$g" ] || g="$HOME/Workspaces/shelf/tools/hooks/forbid-local-shelf-source.py"
-    if [ -f "$g" ]; then python3 "$g" --committed
-    else echo "guard: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
-
-# The linter preset, as a GATE. ADR 0004 makes this repo's config the preset and
-# says drift is "acceptable and visible" -- it was not visible. The onboarding copy is
-# append-only, so it reports "already current" for a repo missing whole rule families.
-# This fails on any difference from the preset that the consumer has not declared, with
-# a reason, in its own [tool.shelf-preset]. Inside the shelf it is a no-op: this repo IS
-# the preset, so there is nothing to compare against.
-#
-# Consumers copy this recipe verbatim, same resolution order as `guard`.
-[group('gate')]
-preset:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    g=tools/preset_drift.py
-    [ -f "$g" ] || g="${SHELF_HOME:-../shelf}/tools/preset_drift.py"
-    [ -f "$g" ] || g="$HOME/Workspaces/shelf/tools/preset_drift.py"
-    if [ -f "$g" ]; then python3 "$g" --repo .
-    else echo "preset: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
-
-# The pinned tools (mise.toml, locked by mise.lock; ADR 0024). The user's own config is left out: its
-# unlocked tools (`latest`) would make `--locked` refuse the whole install.
-tools:
-    mise trust --yes .
-    MISE_IGNORED_CONFIG_PATHS="$HOME/.config/mise" mise install --locked
+tag-check:
+    python3 -I tools/tag_check.py
 
 # One-time (idempotent, safe to re-run) setup for a CONSUMER repo: wires the commit guard,
 # resolver block, beads (opt-out), and this linter preset via the operations in
 # tools/onboard/ -- ordering and verification are enforced there (run_all()'s precondition
 # harness), never re-implemented here as a recipe dependency graph. See
-# openspec/changes/onboard-consumer-skill and openspec/changes/bootstrap-target-contract.
+# docs/research/onboard-consumer-skill and docs/research/bootstrap-target-contract.
 #
 # Consumers copy this recipe the same way as `guard` above. Run inside the shelf's OWN repo,
 # the underlying script refuses (there is nothing to onboard here -- this repo IS the shelf).
@@ -188,24 +90,19 @@ lint:
     uv run ruff check packages tests tools conftest.py
     uv run ruff format --check packages tests tools conftest.py
 
-# `lint` over the files changed against the base (tools/changed.py), for `check`. Shelf-only: consumers copy `lint`.
+# `lint` over the files changed against the base (`any-gate changed`), for `check`. Shelf-only: consumers copy `lint`.
 [group('gate')]
 lint-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' 'tools/*.py' conftest.py > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' 'tools/*.py' conftest.py > "$list"
     [ -s "$list" ] || { echo "skipped lint: no Python file changed"; exit 0; }
     xargs -0 uv run ruff check --force-exclude < "$list"
     xargs -0 uv run ruff format --check --force-exclude < "$list"
 
 format:
     uv run ruff format packages tests tools conftest.py
-
-# A type warning fails the build (pyrefly's config). No slow rot.
-[group('gate')]
-typecheck:
-    uv run pyrefly check
 
 # the import graph against the contracts in [tool.importlinter] (pyproject.toml): no package
 # imports a consumer app, packages stay independent except their declared workspace edges.
@@ -217,7 +114,7 @@ arch:
 # typos in code, docstrings, and docs.
 [group('gate')]
 spell:
-    uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md CLAUDE.md conftest.py
+    uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md conftest.py
 
 # `spell` over the files changed against the base, for `check`. Shelf-only: consumers copy `spell`.
 [group('gate')]
@@ -225,57 +122,28 @@ spell-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md CLAUDE.md conftest.py > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md conftest.py > "$list"
     [ -s "$list" ] || { echo "skipped spell: no file changed"; exit 0; }
     xargs -0 uv run codespell < "$list"
 
-# dependency hygiene: uv.lock matches every pyproject (`uv run` alone never notices a stale lock;
-# shelf main ran green on one, 2026-10-11), then per package (unused / missing / transitive). deptry reads each
-# package's own pyproject from its dir; --known-first-party (the src import name)
-# silences the src-layout self-import DEP003 noise. A shebang recipe: just has no loops.
-[group('gate')]
-deps:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    env -u UV_FROZEN uv lock --check
-    # One deptry per package, all cores at once; a package's output prints only when it fails.
-    printf '%s\n' packages/*/ | xargs -P "$(getconf _NPROCESSORS_ONLN)" -I{} bash -c \
-        'p={}; imp=$(ls "$p/src"); out=$(cd "$p" && uv run deptry . --known-first-party "$imp" 2>&1) || { printf -- "-- deptry %s\n%s\n" "$p" "$out"; exit 1; }'
-    echo "deptry: every package clean"
-
-# The test runs take the box-wide test lock (tools/gate_state.py lock): each takes every core, so gates started at once
-# on one box queue for it instead of thrashing (2026-10-20: four at once took 11-14 min each).
+# The test runs queue for one slot (`any-lease`, `lease_root` above): each takes every core, so gates started at once
+# on one box wait instead of thrashing (2026-10-20: four at once took 11-14 min each).
 #
 # tests with coverage; the floor guards against REGRESSION (set just below current).
 # Substrate adapters (docling/torch/subprocess) are legitimately hard to unit-test,
 # so the floor is a rot-guard, not a vanity number. Raise it as coverage climbs.
 [group('gate')]
-test:
-    python3 -I tools/gate_state.py lock -- uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
-
-# Only the tests a change can reach: the changed packages, every package depending on them,
-# and the fitness tests (tools/affected.py). A package whose inputs are unchanged since its suite
-# last passed is skipped (the result cache, .cache/affected-passed.json). No coverage floor: it is
-# measured over the whole repo, so a partial run cannot meet it.
-[group('gate')]
-test-affected:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    paths="$(python3 tools/affected.py --explain --skip-passed)"
-    python3 -I tools/gate_state.py lock -- uv run pytest {{ pytest_par }} -p no:cov $paths && python3 tools/affected.py --record $paths
+test-all:
+    uv run python -m any_lease run --root {{ lease_root }} tests 1 check-all -- uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
-# Launches each real engine against a local JS page and asserts a render. CI runs
+# Launches each real engine against a local JS page and asserts a render. Run
 # this with SHELF_REQUIRE_BROWSER=1 (after installing Chromium: `patchright
 # install --with-deps chromium`), where a non-launching engine is a hard FAILURE
 # rather than a skip -- the one environment obligated to prove the browser starts.
 # The trailing `-m browser` overrides the pyproject `-m "not browser"` default.
 test-browser:
     uv run pytest packages/any-browser/tests -m browser -p no:cacheprovider
-
-# coverage report only (human view).
-cov:
-    uv run pytest --cov --cov-report=term-missing
 
 # The skills' eval cases (evals/<skill>/<case>/), with `claude plugin eval`. Not in `check`: live
 # runs cost money. Run from a copy without .venv and .git: plugin eval refuses a plugin dir of
@@ -297,6 +165,3 @@ eval *args:
 # test in `just test` fails if they drift.
 catalog:
     uv run python tools/catalog.py
-
-sync:
-    uv sync

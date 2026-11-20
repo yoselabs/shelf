@@ -5,7 +5,7 @@ The reference for writing any agent skill: a `Kind: skill` member under `skills/
 `docs/linting.md` is the reference for code; this file is the reference for skills.
 
 > **Status: one research pass, 2026-10-10, not cross-checked.** Collected while designing
-> `blueprint` (`openspec/changes/blueprint-skill/`). Every claim names its source; the raw research
+> `blueprint` (`docs/research/blueprint-skill/`). Every claim names its source; the raw research
 > with full tables is in that change's `research/skill-practices.md` and `research/plugin-tooling.md`.
 > Two sources were read secondhand (marked). A claim marked *untested* has not been run here.
 > Claude Code version at the time: 2.1.296.

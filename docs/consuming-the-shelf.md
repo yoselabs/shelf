@@ -41,7 +41,7 @@ source — it ties the project to one filesystem. (For local co-development of s
 ## 2. The commit guard — enforced by `just check`, accelerated by a hook
 
 The shelf ships a guard that **refuses a local `path=`/editable shelf source**, so a co-development
-override can never leak into a commit and break CI or another checkout.
+override can never leak into a commit and break another checkout.
 
 **Enforcement is the `guard` target in `just check`** (copied with the rest of the preset, §4). It
 reads `HEAD` — committed content — so it holds on any clone, with no hooks, no onboarding, and
@@ -87,20 +87,10 @@ silently dead, and nothing in your repo will tell you; only re-running checks.
 `.beads/hooks`, which `bd init` commits), the hooks are **tracked files that travel with a clone** —
 the "hooks are per-clone and cannot be committed" premise above has that exception.
 
-**Using the pre-commit framework instead?** add to `.pre-commit-config.yaml` (skips the installer):
+**Using the pre-commit framework instead?** the onboarding writes `.pre-commit-config.yaml` for you (prek). The guard entry is `uv run blueprint guard` and the preset
+check is `uv run blueprint preset --repo .`, both from the `blueprint` dev dependency the onboarding adds, pinned by git tag. The shelf ships no hook repository.
 
-```yaml
-- repo: https://github.com/yoselabs/shelf
-  rev: <a shelf commit or tag>
-  hooks:
-    - id: no-local-shelf-source
-    - id: shelf-preset-drift
-```
-
-Ruff is not shipped here — use `astral-sh/ruff-pre-commit` for that. What the shelf adds is the
-preset check: whether your ruff and pyrefly config still match this repo's, or declare why not.
-
-## 3. The resolver block, in the project's `AGENTS.md` / `CLAUDE.md`
+## 3. The resolver block, in the project's `AGENTS.md`
 
 This is the only thing duplicated per repo — tiny and stable. It reaches the full loop from the local
 shelf clone (which every contributor has anyway), touching GitHub only on greenfield or a real

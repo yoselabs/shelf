@@ -6,7 +6,7 @@ description: Onboard a project as a shelf (github.com/yoselabs/shelf) consumer �
 # Onboard a project as a shelf consumer
 
 Wires a repo to consume the shelf and (by default) beads, then proves each piece actually works —
-not just that a file landed. Read `<shelf>/openspec/changes/onboard-consumer-skill/design.md` (D1,
+not just that a file landed. Read `<shelf>/docs/research/onboard-consumer-skill/design.md` (D1,
 D4) if you want the full reasoning; the short version is below.
 
 ## The split this skill relies on
@@ -39,6 +39,9 @@ verified based on your own inspection instead of the operation's own `Result`.
      `guard` operation's underlying installer already detects beads/pre-commit/husky/lefthook and
      refuses to clobber a foreign hook, naming the tool and where to add to it instead. Just relay
      what it reports; don't re-derive the diagnosis or second-guess it.
+   - **CI?** None: no repository has GitHub Actions CI (shelf ADR 0027). Onboarding never creates a
+     `.github/workflows` file or a `.github/actions` folder, and an existing one is reported to the owner
+     (blueprint's `gate.no-ci` fails it), not kept or copied. The gate is the local `just check` and the hooks.
    - **Is beads wanted?** Default yes — most shelf consumers use it. Ask if it's not obvious from
      context; `--no-beads` skips it and everything else still applies.
    - **Is this a python+uv project?** Auto-detected from `pyproject.toml`'s presence — you don't

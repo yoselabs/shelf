@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "shelf"
+software = "any-gate"
+why = "The shelf's gate runs the same tests several times per change (agent run, pre-push, tag), serialises whole pytest runs behind one box-wide lock, and has no lane for a flaky test or a limit for a hung one. The mechanism is copied between tools/, blueprint recipes and consumers."
+needs = "Receipts keyed by what a result ran on, so a hook or a rebase reuses a green result; a worker count sized to the selection and the box; pytest stages with serial and quarantine lanes under wall and idle limits."
+sponsor = "yoselabs"
+requester = "shelf"
+status = "active" # active | retired

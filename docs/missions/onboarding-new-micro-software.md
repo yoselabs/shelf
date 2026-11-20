@@ -44,10 +44,10 @@ Raised by the owner. Four distinct entry paths, one shared lifecycle gate.
 ## The consumer half (DONE — the first slice of this mission)
 
 Onboarding also has a *consumer* side: a project must (1) depend on the shelf by git+tag and (2) carry
-the shelf directive in its own `AGENTS.md`/`CLAUDE.md` so every agent reaches for the shelf, contributes
+the shelf directive in its own `AGENTS.md` so every agent reaches for the shelf, contributes
 back, and thinks micro-software. The canonical description lives in `../consuming-the-shelf.md`;
 mechanical onboarding runs via the `onboard-consumer` skill (`.agents/skills/onboard-consumer/`,
-`openspec/changes/onboard-consumer-skill/`); a2kay and a2web were onboarded by an earlier manual path
+`docs/research/onboard-consumer-skill/`); a2kay and a2web were onboarded by an earlier manual path
 and haven't been re-run against the current operations — `shelf-n63`'s tasks.md §6.2 tracks that.
 
 This line originally read simply "DONE" — that claim was **false**: a whole session

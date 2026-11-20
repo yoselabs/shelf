@@ -32,8 +32,9 @@ preinstalled outside Python repos.
 
 ## History
 
-- 2026-10-11: proposed after the trial (`openspec/changes/blueprint-skill/research/toolchain-installer.md`).
+- 2026-10-11: proposed after the trial (`docs/research/blueprint-skill/research/toolchain-installer.md`).
 - 2026-10-11: accepted by the owner; shelf-1y4.19 builds the pin checks and pins the shelf and lifesim.
 - 2026-10-11: built (shelf-1y4.19): the install recipe is `just tools`, since `bootstrap` already names consumer onboarding; just stays with uv where rust-just pins it.
 - 2026-10-12: git-lfs leaves mise: its shim breaks git clone in an untrusted checkout (lifesim audit).
 - 2026-10-27: gitleaks leaves the pins (owner: remove gitleaks everywhere); blueprint's `secrets.scanner` checkpoint and the tool-pin rule for it are removed. The sops checks stay.
+- 2026-11-20: gitleaks returns to the pins (mission blueprint-multi-stack-contracts, task 6). The 2026-10-27 removal paid for a full-history scan in the gate; the scan now covers only staged or changed code (`python -m blueprint.secret_scan staged|range|full`), and `secrets.scanner` checks the pin and that a hook or the gate runs it.

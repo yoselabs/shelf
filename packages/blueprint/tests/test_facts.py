@@ -15,15 +15,6 @@ from blueprint.runner import run
 if TYPE_CHECKING:
     from blueprint.testing import Repo
 
-_LOGIN = "      - uses: docker/login-action@v3\n"
-
-
-def _build(push: str) -> str:
-    return (
-        "on: push\njobs:\n  b:\n    steps:\n"
-        f"{_LOGIN}      - uses: docker/build-push-action@v6\n        with:\n          push: {push}\n      - run: echo done\n"
-    )
-
 
 def _detected(repo: Repo) -> tuple[set[tuple[str, str]], set[tuple[str, str, str]]]:
     repo.commit()
@@ -40,28 +31,15 @@ def test_console_scripts_are_a_cli_fact(repo: Repo) -> None:
     assert ("cli", "pyproject.toml:4") in _detected(repo)[0]
 
 
-@pytest.mark.parametrize(("push", "ships"), [("true", True), ("false", False)])
-def test_a_push_step_with_a_login_ships_an_image(repo: Repo, push: str, ships: bool) -> None:
-    repo.write(".github/workflows/img.yml", _build(push))
-    assert (("ships-image", ".github/workflows/img.yml:6") in _detected(repo)[0]) is ships
-
-
-def test_a_push_step_without_a_login_or_with_only_load_ships_nothing(repo: Repo) -> None:
-    repo.write(".github/workflows/a.yml", _build("true").replace(_LOGIN, ""))
-    repo.write(".github/workflows/b.yml", _build("true").replace("push: true", "load: true"))
-    assert not [f for f in _detected(repo)[0] if f[0] == "ships-image"]
-
-
-def test_a_deploy_key_and_a_deploy_step_is_high_evidence_and_an_access_check_is_not(repo: Repo) -> None:
-    key = "      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}\n"
-    repo.write(".github/workflows/deploy.yml", f"jobs:\n  d:\n    steps:\n      - env:\n{key}        run: uv run tools/ci_deploy.py\n")
-    repo.write(".github/workflows/check.yml", f"jobs:\n  d:\n    steps:\n      - env:\n{key}        run: ssh -i k deploy@host list\n")
-    assert _detected(repo)[1] == {("deployed", ".github/workflows/deploy.yml:6", "high")}
-
-
-def test_a_cron_schedule_is_a_scheduled_jobs_fact(repo: Repo) -> None:
-    repo.write(".github/workflows/s.yml", 'on:\n  schedule:\n    - cron: "0 7 * * 3"\n')
-    assert ("scheduled-jobs", ".github/workflows/s.yml:2") in _detected(repo)[0]
+def test_a_workflow_is_never_read_for_facts(repo: Repo) -> None:
+    # No repository has CI (ADR 0027): a leftover workflow is gate.no-ci's finding, not a source of traits.
+    repo.write(
+        ".github/workflows/img.yml",
+        "on:\n  schedule:\n    - cron: '0 7 * * 3'\njobs:\n  b:\n    steps:\n"
+        "      - uses: docker/login-action@v3\n      - uses: docker/build-push-action@v6\n        with:\n          push: true\n"
+        "      - env:\n          K: ${{ secrets.DEPLOY_KEY }}\n        run: python tools/deploy.py\n",
+    )
+    assert _detected(repo) == (set(), set())
 
 
 @pytest.mark.parametrize(

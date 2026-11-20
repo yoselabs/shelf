@@ -1,18 +1,18 @@
 # Framework profile (see ../python-uv.toml for the format). Layers on dotnet.toml for a Godot 4.x C# game: every
 # dotnet.toml rule applies to the Godot csproj too (verified: strict props build it clean), the rows here add what is Godot's.
 # `{root}` is the folder holding project.godot (lifesim: src/Game.Godot); repo-level files (.gitignore,
-# .gitattributes, justfile, .github/workflows) stay at the repo root. Paths may be globs (`*.csproj`, no `**`).
-# Research: openspec/changes/blueprint-skill/research/dotnet-godot-layering.md
+# .gitattributes, justfile) stay at the repo root. Paths may be globs (`*.csproj`, no `**`).
+# Research: docs/research/blueprint-skill/research/dotnet-godot-layering.md
 stack = "godot"
 status = "provisional"
 source = "dotnet-godot-layering.md (2026-10-10, one web pass + Godot 4.7.2 run headless on a scratch copy of lifesim; architecture re-checked 2026-10-11 with the extra-strict analyzer set built clean on a Godot.NET.Sdk 4.7.2 csproj); lifesim is the only consumer"
 
 [[role]]
 role = "framework-version"
-tool = "Godot.NET.Sdk/<x.y.z> exact in the Godot csproj (single source); config/features in project.godot says the same major.minor; CI reads the csproj"
+tool = "Godot.NET.Sdk/<x.y.z> exact in the Godot csproj (single source); config/features in project.godot says the same major.minor; the justfile reads the csproj"
 install = """csproj `<Project Sdk="Godot.NET.Sdk/4.7.2">` plus an explicit <TargetFramework> (the editor rewrites a csproj missing either); \
-project.godot config/features=PackedStringArray("4.7", "C#", ...). CI derives the version: \
-`grep -o 'Godot.NET.Sdk/[0-9.]*' {root}/*.csproj | cut -d/ -f2` into setup-godot's `version`"""
+project.godot config/features=PackedStringArray("4.7", "C#", ...). The justfile derives the version: \
+`grep -o 'Godot.NET.Sdk/[0-9.]*' {root}/*.csproj | cut -d/ -f2`"""
 config = [
     { path = "{root}/*.csproj", contains = "Godot.NET.Sdk/" },
     { path = "{root}/project.godot", contains = 'config/features=PackedStringArray("4.' },
@@ -106,13 +106,6 @@ config = [
     { path = ".editorconfig", contains = "VSTHRD100" },
 ]
 gate = "dotnet build"
-
-[[role]]
-role = "ci"
-# Owner, 2026-10-10: no CI pipelines for Godot projects for now; agents run `just check` locally,
-# where the Godot binary is installed (see the build role). The tool below is the answer once CI comes.
-tool = "TBD; when CI comes: actions/setup-dotnet (global.json) + chickensoft-games/setup-godot@v2, then `just check`"
-untested = "TBD by the owner: Godot projects run their gate on the agent's machine, not in CI"
 
 [[role]]
 role = "hooks"

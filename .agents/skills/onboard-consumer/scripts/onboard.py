@@ -43,7 +43,7 @@ def _resolve_shelf_home(explicit: str | None) -> Path | None:
 
 
 def _run(shelf_home: Path, repo: Path, *, want_beads: bool) -> int:
-    # The prek config's guard hook resolves the shelf clone via $SHELF_HOME; propagate what THIS
+    # The `bootstrap` recipe and docs resolve the shelf clone via $SHELF_HOME; propagate what THIS
     # script resolved so the two never disagree.
     os.environ["SHELF_HOME"] = str(shelf_home)
     sys.path.insert(0, str(shelf_home / "tools"))

@@ -25,7 +25,10 @@ if TYPE_CHECKING:
 
 __all__ = ["TrustStore", "TrustStoreError", "folder_hash"]
 
-_yaml = YAML(typ="safe")
+
+def _yaml() -> YAML:
+    """A fresh parser per call: ruamel's YAML object keeps parse state, so one shared across threads corrupts reads."""
+    return YAML(typ="safe")
 
 
 class TrustStoreError(Exception):
@@ -93,7 +96,7 @@ class TrustStore:
         if not self._path.exists():
             return {}
         try:
-            data = _yaml.load(self._path.read_text(encoding="utf-8"))
+            data = _yaml().load(self._path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, YAMLError) as exc:
             raise TrustStoreError(self._path, str(exc)) from exc
         return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
@@ -101,7 +104,7 @@ class TrustStore:
     def _save(self, data: dict[str, str]) -> None:
         # Atomic: a torn write leaves every granted folder looking untrusted.
         buf = io.StringIO()
-        _yaml.dump(data, buf)
+        _yaml().dump(data, buf)
         try:
             atomic_write_text(self._path, buf.getvalue())
         except OSError as exc:

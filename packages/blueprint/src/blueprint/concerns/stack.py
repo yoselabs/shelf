@@ -10,12 +10,12 @@ from __future__ import annotations
 import json
 import re
 import shutil
-import tomllib
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from blueprint import gate_graph
+from blueprint.concerns.profile_data import Role, StackProfile, load_profiles
 from blueprint.model import (
     Finding,
     FixedBy,
@@ -34,7 +34,6 @@ from blueprint.model import (
 if TYPE_CHECKING:
     from blueprint.model import Context
 
-PROFILE_DIR = Path(__file__).resolve().parent.parent / "profiles"
 # The roles every stack profile answers, and every framework profile on top of it. A profile that
 # leaves a role out is a blueprint gap for that role, so the list is the research brief for a new one.
 ROLES = (
@@ -61,69 +60,27 @@ FRAMEWORK_ROLES = (
     "tests",  # tests run through the framework itself (scene tree, in-memory client), headless
     "surface-integrity",  # the surface the framework exposes (scene references, tool list) cannot drift unseen
     "architecture",  # the core stays framework-free; the framework layer is thin
-    "ci",  # the framework runs in CI, version taken from the pin
     "hooks",  # what prek adds per commit for the framework
     "agent-guidance",  # the framework's conventions file agents read (docs/agents/<framework>.md)
 )
+# Cut 2026-11-20 (checkpoint-review.md): `agent-guidance` repeats agents.culture-files and the managed block; a role that is
+# `na` for the stack is not a checkpoint. The profile files keep the data; no row is projected from it.
+_NEVER_ROWS = frozenset({"agent-guidance"})
+_NA_NOT_ROWS = frozenset({"coverage", "embedded-script-lint"})
+
+
+def is_checkpoint(profile: StackProfile, role: str) -> bool:
+    """Whether a role of this profile becomes a row: not a cut role, and not a cut role the profile marks `na`."""
+    if role in _NEVER_ROWS:
+        return False
+    spec = profile.roles.get(role)
+    return not (role in _NA_NOT_ROWS and spec is not None and bool(spec.na or spec.untested))
+
+
 _RESEARCH = (
     "research the tools for each role ({roles}) and write blueprint/profiles/{stack}.toml in the shelf "
     "(`blueprint lacks: profile for {stack}` bead); the rows for this stack stay unjudged until then"
 )
-
-
-@dataclass(frozen=True)
-class Role:
-    """One role in a profile: the tool, how to install it, what proves it is set up and that it runs."""
-
-    role: str
-    tool: str = ""
-    install: str = ""
-    config: tuple[dict[str, Any], ...] = ()
-    gate: str = ""
-    # Other ways to prove the role runs: each is a `label`, a `gate` regex over the gate text, and
-    # optionally a `path`/`contains` the repo's config must also hold.
-    alternatives: tuple[dict[str, Any], ...] = ()
-    untested: str = ""
-    na: str = ""
-    # Where the role's executable may live, besides PATH: `$PATH`, `$DOTNET_ROOT` or an absolute folder. A
-    # toolchain role names them when a second install can be the one a tool resolves (Godot's dotnet).
-    installs: tuple[str, ...] = ()
-    # A purpose (ADR 0026): the row applies only to a repo with this fact, `shipped-image` or `deployed`, else it is not applicable.
-    requires: str = ""
-
-
-@dataclass(frozen=True)
-class StackProfile:
-    """A stack's answers, one per role."""
-
-    stack: str
-    status: str
-    source: str
-    roles: dict[str, Role] = field(default_factory=dict)
-
-
-def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
-    """Every `<stack>.toml` in `directory`."""
-    profiles: dict[str, StackProfile] = {}
-    for path in sorted(directory.glob("*.toml")):  # frameworks/ is a subfolder, not read here
-        data: dict[str, Any] = tomllib.loads(path.read_text())
-        roles = {
-            r["role"]: Role(
-                role=r["role"],
-                tool=r.get("tool", ""),
-                install=r.get("install", ""),
-                config=tuple(r.get("config", ())),
-                gate=r.get("gate", ""),
-                alternatives=tuple(r.get("alternative", ())),
-                untested=r.get("untested", ""),
-                na=r.get("na", ""),
-                installs=tuple(r.get("installs", ())),
-                requires=r.get("requires", ""),
-            )
-            for r in data.get("role", [])
-        }
-        profiles[data["stack"]] = StackProfile(data["stack"], data.get("status", "provisional"), data.get("source", ""), roles)
-    return profiles
 
 
 def gate_text(ctx: Context) -> str:
@@ -158,48 +115,19 @@ def _offenders(ctx: Context, spec: dict[str, Any], root: str = ".") -> list[str]
     return [r for r in rels if not is_skipped(r, ctx.profile.ignore) and spec["lacks"] in (ctx.read(r) or "")]
 
 
-_CI_BUILD = re.compile(r"docker/build-push-action|docker build")
-_CI_RUN = re.compile(r"docker run|test\.sh")
-_CI_FILE = re.compile(r"(?:[\w./-]|\$\{\{[^}]*\}\})*Dockerfile")
-_EXPR = re.compile(r"\$\{\{[^}]*\}\}")
-
-
-def _names(text: str, rel: str) -> bool:
-    """`text` names `rel`, or a templated path in it (`images/${{ matrix.image }}/Dockerfile`) matches `rel`."""
-    templated = (_EXPR.split(m.group().removeprefix("./")) for m in _CI_FILE.finditer(text) if "${{" in m.group())
-    return rel in text or any(re.fullmatch("[^/]+".join(map(re.escape, parts)), rel) for parts in templated)
-
-
 def _unbuilt(ctx: Context) -> list[str]:
-    """The Dockerfiles neither the gate nor a CI job that builds an image names; a root Dockerfile is CI's default."""
+    """The Dockerfiles the gate does not name."""
     gate = gate_text(ctx)
-    ci = [t for t in _workflow_texts(ctx) if _CI_BUILD.search(t)]
-    return [r for r in _dockerfile_rels(ctx) if r not in gate and not any(r == "Dockerfile" or _names(t, r) for t in ci)]
-
-
-def _workflow_texts(ctx: Context) -> list[str]:
-    return [t for f in sorted(ctx.repo.glob(".github/workflows/*.y*ml")) if (t := ctx.read(f.relative_to(ctx.repo).as_posix()))]
+    return [r for r in _dockerfile_rels(ctx) if r not in gate]
 
 
 def _dockerfile_rels(ctx: Context) -> list[str]:
     return [p.relative_to(ctx.repo).as_posix() for p in dockerfiles(ctx.repo, ctx.profile.ignore)]
 
 
-def _shipped(ctx: Context) -> list[str]:
-    from blueprint.facts import shipped_images  # noqa: PLC0415 -- facts imports the concerns
-
-    return list(shipped_images(ctx, _dockerfile_rels(ctx)))
-
-
-def _unsmoked(ctx: Context, shipped: list[str]) -> list[str]:
-    """The shipped images no CI job that builds and runs an image names (a root Dockerfile is CI's default)."""
-    ci = [t for t in _workflow_texts(ctx) if _CI_BUILD.search(t) and _CI_RUN.search(t)]
-    return [r for r in shipped if not any(r == "Dockerfile" or _names(t, r) for t in ci)]
-
-
 _PURPOSE_FACT = {
-    "shipped-image": "a Dockerfile a `push: true` workflow step builds (with a registry login)",
-    "deployed": "the repo is deployed: high deploy evidence or a classified deployed trait",
+    "shipped-image": "the repo ships an image: a classified ships-image trait and a Dockerfile",
+    "deployed": "the repo is deployed: a classified deployed trait",
 }
 
 
@@ -209,16 +137,13 @@ def purpose_fact(requires: str) -> str:
 
 
 def _purpose(ctx: Context, requires: str) -> tuple[bool, str]:
-    """Whether the fact holds, and what it is about: the shipped files, or the deploy evidence."""
-    from blueprint.facts import is_deployed, shipped_images  # noqa: PLC0415 -- facts imports the concerns
+    """Whether the fact holds, and what it is about: the shipped images, or the classified trait."""
+    from blueprint.facts import is_deployed  # noqa: PLC0415 -- facts imports the concerns
 
     if requires == "shipped-image":
-        shipped = shipped_images(ctx, _dockerfile_rels(ctx))
-        return bool(shipped), ", ".join(f"{d} (`{w}`)" for d, w in shipped.items())
-    deploy = [e.where for e in ctx.profile.evidence if e.claim == "deployed" and e.confidence == "high"]
-    if "deployed" in ctx.profile.traits:
-        deploy.insert(0, "classified trait")
-    return is_deployed(ctx.profile), ", ".join(deploy)
+        images = _dockerfile_rels(ctx) if "ships-image" in ctx.profile.traits else []
+        return bool(images), ", ".join(images)
+    return is_deployed(ctx.profile), "classified trait" if is_deployed(ctx.profile) else ""
 
 
 def _describe(spec: dict[str, Any]) -> str:
@@ -259,11 +184,9 @@ def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str
 
 
 def _judge_set_up(ctx: Context, stack: str, spec: Role, role: str, gate_text: str, *, root: str) -> _Judged:
-    plain = [c for c in spec.config if not {"lacks", "built", "smoked"} & c.keys()]
+    plain = [c for c in spec.config if not {"lacks", "built"} & c.keys()]
     missing = [_describe(c).replace("{root}", root) for c in plain if not _config_holds(ctx, c, root)]
     missing += [f"nothing builds {r}" for c in spec.config if "built" in c for r in _unbuilt(ctx)]
-    shipped: list[str] = _shipped(ctx) if any("smoked" in c for c in spec.config) else []
-    missing += [f"no CI job builds and runs {r}" for c in spec.config if "smoked" in c for r in _unsmoked(ctx, shipped)]
     forbidden = [f"{hit} has {c['lacks']!r}" for c in spec.config if "lacks" in c for hit in _offenders(ctx, c, root)]
     if missing or forbidden:
         why = "; ".join([*([f"missing {'; '.join(missing)}"] if missing else []), *forbidden])
@@ -351,6 +274,8 @@ def _sdk_installs(ctx: Context, stack: str, spec: Role, judged: _Judged) -> _Jud
 
 def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judged:
     """Pass when the gate runs the role's command, or one of its alternatives; else failing."""
+    if spec.outcome:
+        return _outcome_verdict(ctx, stack, spec, gate_text)
     if not spec.gate or re.search(re.escape(spec.gate), gate_text):
         return _Judged(stack, "pass", spec.tool + (f", run by the gate (`{spec.gate}`)" if spec.gate else ""))
     via = next((a for a in spec.alternatives if _alternative_runs(ctx, a, gate_text)), None)
@@ -371,6 +296,28 @@ def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judg
         f"{spec.tool} set up, but the gate never runs `{spec.gate}`{others}",
         f"run `{spec.gate}` from `just check`{others}",
     )
+
+
+OUTCOMES = ("runs", "floor")
+
+
+def _floor_holds(ctx: Context, floor: dict[str, Any], gate_text: str) -> bool:
+    return bool(re.search(floor["gate"], gate_text)) and ("path" not in floor or _config_holds(ctx, floor))
+
+
+def _outcome_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judged:
+    """Judge a role by its outcome: a test runner is reached, or a floor is enforced, by any tool the profile accepts."""
+    if spec.outcome == "runs":
+        if any(re.search(pattern, gate_text) for pattern in spec.runs):
+            return _Judged(stack, "pass", f"{spec.tool}; the gate reaches a test runner")
+        problem, fix = f"the gate reaches no test runner (accepted: {', '.join(spec.runs)})", "run the tests from `just check`"
+    else:
+        if via := next((f for f in spec.floors if _floor_holds(ctx, f, gate_text)), None):
+            return _Judged(stack, "pass", f"{via['label']}, run by the gate")
+        accepted = " or ".join(f["label"] for f in spec.floors)
+        problem, fix = f"the gate enforces no floor (accepted: {accepted})", f"enforce a floor from `just check`: {accepted}"
+    verdict = "failing" if spec.config else "not-set-up"
+    return _Judged(stack, verdict, f"{spec.tool}: {problem}", spec.install or fix if verdict == "not-set-up" else fix)
 
 
 def finding_for(judged: _Judged) -> Finding:
@@ -410,10 +357,11 @@ def provisional_finding(status: str, finding: Finding) -> Finding:
 def _profile_row(stack: str, prof: StackProfile | None, origin: str = "") -> Sub:
     statement = f"the shelf has a profile for {stack}: the tool for every role"
     if prof is None:
-        finding = not_checked(
-            f"no standard for {stack} yet: blueprint has no profile, so no tool per role can be judged",
-            _RESEARCH.format(roles=", ".join(ROLES), stack=stack),
-            blueprint_gap=True,
+        # An error, never silence and never a pass (owner, 2026-11-19); a justified override is the only way past.
+        finding = failing(
+            f"stack {stack} found, no profile: blueprint has no tool per role for it, so the repo's {stack} code is unjudged",
+            _RESEARCH.format(roles=", ".join(ROLES), stack=stack)
+            + "; or record a justified `not-supported` override with an expiry or an accepted ADR",
         )
         return Sub(f"stack/{stack}", f"stack.{stack}.profile", statement, finding)
     tools = " · ".join(f"{r.role}: {r.tool or '(untested)'}" for r in prof.roles.values() if not r.na)
@@ -435,6 +383,7 @@ def roles(ctx: Context) -> list[Sub]:
     profiles = load_profiles()
     reached = gate_text(ctx)
     origins = dict(ctx.profile.stack_files)
+    roots = dict(ctx.profile.stack_roots)
     subs: list[Sub] = []
     for stack in ctx.profile.stacks:
         prof = profiles.get(stack)
@@ -443,7 +392,36 @@ def roles(ctx: Context) -> list[Sub]:
         if prof is None:
             continue
         for role in (*ROLES, *(r for r in prof.roles if r not in ROLES)):
-            judged = judge_role(ctx, stack, prof, role, reached)
+            if not is_checkpoint(prof, role):
+                continue
+            judged = judge_role(ctx, stack, prof, role, reached, root=roots.get(stack, "."))
             statement = f"{stack} {role}: the profile's tool is set up and run by `just check`"
             subs.append(Sub(f"stack/{stack}", f"stack.{stack}.{role}", statement, provisional_finding(prof.status, finding_for(judged))))
+    if edges := _edges_row(ctx):
+        subs.append(edges)
     return subs
+
+
+def _edges_row(ctx: Context) -> Sub | None:
+    """Two code stacks in one repo touch only through a declared `[[edge]]` (from, to, via a contract file that exists)."""
+    profiles = load_profiles()
+    # A language stack, or one with no profile yet (python without a lock): code that can call across a language boundary.
+    present = [s for s in ctx.profile.stacks if s not in profiles or profiles[s].family == "language"]
+    if len(present) < 2:
+        return None
+    statement = "stacks sharing the repo touch only through a declared [[edge]] with a contract file"
+    edges = ctx.profile.edges
+    if not edges:
+        finding = not_set_up(
+            f"{' and '.join(present)} share the repo and no [[edge]] says how they touch",
+            "declare each contact in docs/blueprint/blueprint.toml: [[edge]] from = <stack>, to = <stack>, via = <contract file>, "
+            "reason = <why>; an undeclared cross-stack path selects every test",
+        )
+        return Sub("stack", "stack.edges", statement, finding)
+    problems = [f"edge {f} -> {t} names {s}, not a stack of this repo" for f, t, _ in edges for s in (f, t) if s not in present]
+    problems += [f"edge {f} -> {t}: contract file {via} is missing" for f, t, via in edges if not ctx.path(via).exists()]
+    if problems:
+        return Sub(
+            "stack", "stack.edges", statement, failing("; ".join(problems), "fix or delete the [[edge]] in docs/blueprint/blueprint.toml")
+        )
+    return Sub("stack", "stack.edges", statement, passing("; ".join(f"{f} -> {t} via {via}" for f, t, via in edges)))

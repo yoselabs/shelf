@@ -1,0 +1,99 @@
+# Stack profile (see python-uv.toml for the format). Rust stable, late 2026.
+# Research: docs/research/blueprint-skill/research/node-go-rust-layering.md (architecture: tool, evidence URL, date, verdict).
+# The other roles are the current defaults, documented but never run here: provisional until a consumer runs the set red and green.
+stack = "rust"
+# language: carries code that grows layers, so it needs a layering tool; artifact: a file format with no layers of code (its architecture row says why).
+family = "language"
+status = "provisional"
+source = "node-go-rust-layering.md (2026-11-20, web research only, nothing run); no consumer yet"
+
+[[role]]
+role = "toolchain"
+tool = "rust-toolchain.toml pins the channel; Cargo.lock committed; the gate builds with `--locked`"
+install = "rust-toolchain.toml `[toolchain] channel = \"1.x.y\"`, components rustfmt and clippy; commit Cargo.lock; every cargo call in the gate takes `--locked`"
+config = [{ path = "{root}/rust-toolchain.toml", contains = "channel" }, { path = "{root}/Cargo.lock" }]
+gate = "--locked"
+
+[[role]]
+role = "formatter"
+tool = "rustfmt (`cargo fmt --check`), config in rustfmt.toml only when it differs from the default"
+install = "the gate runs `cargo fmt --all --check`"
+config = []
+gate = "cargo fmt"
+
+[[role]]
+role = "linter"
+tool = "clippy with warnings as errors and `[workspace.lints]` (clippy pedantic, rust unsafe_code forbid)"
+install = "Cargo.toml `[workspace.lints.clippy] pedantic = { level = \"warn\", priority = -1 }`, `[workspace.lints.rust] unsafe_code = \"forbid\"`, each member `[lints] workspace = true`; the gate runs `cargo clippy --workspace --all-targets --locked -- -D warnings`"
+config = [{ path = "{root}/Cargo.toml", contains = "lints" }]
+gate = "cargo clippy"
+
+[[role]]
+role = "types"
+tool = "rustc itself (the type system is not optional); `cargo check --locked` over every target and feature set"
+install = "the gate runs `cargo check --workspace --all-targets --locked` (clippy's run counts when it covers all targets)"
+config = []
+gate = "cargo check"
+
+[[role.alternative]]
+label = "clippy, which type-checks every target it lints"
+gate = "cargo clippy"
+
+[[role]]
+role = "dependencies"
+tool = "cargo-deny (advisories, licenses, sources) and cargo-machete (unused dependencies)"
+install = "cargo install cargo-deny cargo-machete (pinned in mise.toml); `cargo deny init` -> deny.toml; the gate runs `cargo deny check` and `cargo machete`"
+config = [{ path = "{root}/deny.toml" }]
+gate = "cargo deny"
+
+[[role]]
+role = "tests"
+tool = "`cargo test` or cargo-nextest, whole workspace, headless"
+install = "the gate runs `cargo nextest run --workspace --locked` (or `cargo test --workspace --locked`)"
+config = []
+outcome = "runs"
+runs = ['\bcargo (?:test|nextest)\b', '\bcargo llvm-cov\b']
+
+[[role]]
+role = "coverage"
+tool = "cargo-llvm-cov with `--fail-under-lines`; any step that fails the run under a floor counts"
+install = "cargo install cargo-llvm-cov (pinned in mise.toml); the gate runs `cargo llvm-cov --workspace --locked --fail-under-lines <floor>` (a floor only rises)"
+config = [{ path = "{root}/Cargo.toml" }]
+outcome = "floor"
+
+[[role.floor]]
+label = "`cargo llvm-cov --fail-under-lines`"
+gate = 'llvm-cov[^\n]*--fail-under'
+
+[[role.floor]]
+label = "a script comparing coverage to a committed coverage-floor file"
+gate = 'check_coverage|coverage-floor'
+path = "coverage-floor.json"
+
+[[role]]
+role = "spelling"
+tool = "typos (crate-ci) with a committed config"
+install = "typos.toml with [default.extend-words] for domain terms; the gate runs `typos`"
+config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
+gate = "typos"
+
+[[role]]
+role = "architecture"
+tool = "crates are the layers (cargo refuses cycles between them); cargo-deny `[bans]` with `deny = [{ crate, wrappers }]` lets only named crates depend on a lower-layer crate, `wildcards = \"deny\"`"
+install = """one crate per layer in the workspace; deny.toml `[bans] wildcards = \"deny\"` and, per protected crate, `deny = [{ crate = \"core\", wrappers = [\"app\", \"server\"] }]`; \
+internal path dependencies carry an explicit `version` (else the wildcard ban fires); the gate runs `cargo deny check bans`; plant a forbidden dependency and see it fail. \
+Limit: `wrappers` judge direct dependencies only"""
+config = [{ path = "{root}/deny.toml", contains = "[bans" }, { path = "{root}/deny.toml", contains = "wrappers" }]
+gate = "cargo deny check"
+
+[[role]]
+role = "hooks"
+tool = "prek runs cargo fmt --check and typos on staged files (pre-commit); just check on pre-push"
+install = "add local hooks (types: [rust]) to .pre-commit-config.yaml after bd's; the gate on pre-push"
+config = [{ path = ".pre-commit-config.yaml", contains = "cargo fmt" }, { path = ".pre-commit-config.yaml", contains = "typos" }]
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/rust.md: commands, crate layering table, lint policy, test naming; linked from AGENTS.md"
+install = "create docs/agents/rust.md (<= 150 lines) and link it from AGENTS.md"
+config = [{ path = "docs/agents/rust.md" }, { path = "AGENTS.md", contains = "docs/agents/rust.md" }]

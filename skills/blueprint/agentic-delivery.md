@@ -39,7 +39,7 @@ first, each with its fix; the fixes become beads.
 | T3 | Domain code does IO only through ports (Git, task store, checks, delegate) and typed stores, each with an in-memory fake in the port's own package. No filesystem-mocking library. | Patching builtins hides where IO happens; a port names it | a rule test: no `tempfile` / `subprocess` import under `tests/domain/**` |
 | T4 | Every fake is pinned by the @contract suite the real adapter also passes. | An unchecked fake drifts (shelf git-porcelain: 74 scenarios, run against real git and FakeGit) | each fake has its contract suite |
 | T5 | The writer does not free-write unit tests. Unit tests exist for one function's rule (tables), property tests for maths. Behavioural tests stay; tests that pin internals go. | Test count is not coverage of behaviour; pinned internals break on every refactor | sample 20 new tests: each names a behaviour |
-| T6 | Coverage floors stay low (line 75, diff 60, no branch floor): a backstop against untested code, never a target. | 92/90 floors once drove a repo to ~4,000 slow tests | the floor values in the gate |
+| T6 | Coverage floors stay low (line 65, diff 60, no branch floor): a backstop against untested code, never a target. | 92/90 floors once drove a repo to ~4,000 slow tests | the floor values in the gate |
 
 ## 4. Test count and cost
 
@@ -100,8 +100,9 @@ starts per test.
 
 | # | rule | why | check |
 |---|---|---|---|
-| G1 | The local gate is the only gate. CI is a non-blocking backstop after landing. | A blocking remote CI that is red on every OS blocks nothing useful and stalls everything | CI is not a required check |
+| G1 | The local gate is the only gate. No repository has CI (ADR 0027). | A remote CI that is red on every OS blocks nothing useful and stalls everything | No workflow exists; `gate.no-ci` fails one |
 | G2 | One command is the gate; landing holds a lock; the release suite runs on the rebased result before push. | Two loops race to land on one main; the race is tested with real processes (task-loop `test_race`) | the land lock and its test |
+| G4 | Agents run the selecting gate (`just check`) per task, and the full suite (`check-all`) only before a release tag. | Agents re-ran the full suite per task and per PR: minutes each time, re-proving what the selected gate and its receipts already proved. | agents' gate calls in the last 20 task records |
 | G3 | A scanner of all history (secrets across every commit and branch) does not run in the gate. | 34 s per run for the same history every time | gate steps |
 | G4 | Rebase at land, squashed to one commit; after a stop, squash the WIP commits and try a conflict fix before restarting the branch. | A merge gives the same conflicts; restarting loses work | the land path |
 | G5 | Every run is classified against a failure taxonomy (MAST, arXiv 2503.13657) and the result is shown with the run. | Without a class per failure, the same failure repeats unnoticed | the run report has the class |

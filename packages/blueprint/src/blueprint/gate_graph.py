@@ -67,7 +67,7 @@ class Gate:
         """The body text of everything `check` or `check-all` reaches, joined.
 
         `check-all` counts: a repo may narrow `check` to what a change touches and keep the whole
-        run (coverage floor included) in `check-all`, which CI runs.
+        run (coverage floor included) in `check-all`, which is run before a release tag.
         """
         return "\n".join(dict.fromkeys(self.reachable("check") + self.reachable("check-all")))
 
@@ -82,10 +82,18 @@ def load(ctx: Context) -> Gate | None:
     """The repo's gate: its justfile when it has one (a Makefile beside it is leftover), else its Makefile, else None."""
     for name in JUSTFILES:
         if (text := ctx.read(name)) is not None:
-            return _just(ctx, name, text)
+            return _just(ctx, name, _with_imports(ctx, text))
     if (text := ctx.read(MAKEFILE)) is not None:
         return Gate("make", MAKEFILE, text, _make_recipes(text))
     return None
+
+
+_IMPORT = re.compile(r"^import\??\s+['\"]([^'\"]+)['\"]", re.MULTILINE)
+
+
+def _with_imports(ctx: Context, text: str) -> str:
+    """The justfile's text followed by the text of each file it imports (just flattens them: `.blueprint/*.just`, ADR 0029)."""
+    return "\n".join([text, *(part for path in _IMPORT.findall(text) if (part := ctx.read(path)) is not None)])
 
 
 def has_makefile_only(ctx: Context) -> bool:

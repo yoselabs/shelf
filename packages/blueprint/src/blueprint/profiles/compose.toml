@@ -1,8 +1,10 @@
 # Stack profile (see python-uv.toml for the format). Docker Compose files (compose.y*ml / docker-compose.y*ml), Compose v5, late 2026.
-# Research: openspec/changes/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a compose file within three levels.
+# Research: docs/research/blueprint-skill/research/nix-compose-profile.md (shelf-v2p). Detection: a compose file within three levels.
 # A stack, not a framework: a repo with 19 compose files should get one table, and framework detection yields one table per marker folder.
 # Tested 2026-10-11 with Docker Compose v5.1.2 and dclint 3.1.0 on a scratch copy of homelab (19 stacks/*/compose.yml).
 stack = "compose"
+# language: carries code that grows layers, so it needs a layering tool; artifact: a file format with no layers of code (its architecture row says why).
+family = "artifact"
 status = "provisional"
 source = "nix-compose-profile.md (2026-10-11): `docker compose config --no-interpolate`, a jq digest-pin check and dclint 3.1.0 seen red on planted violations and green on homelab's real files; hadolint 2.15.1 run on images/devbox/Dockerfile (2 real warnings, exit 1); homelab is the only consumer"
 

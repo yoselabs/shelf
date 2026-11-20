@@ -1,0 +1,35 @@
+[project]
+name = "any-gate-python"
+version = "0.1.2"
+description = "Which package suites a change reaches in a uv workspace, the key each passed under, and the pytest runner (parallel, serial and quarantine lanes) that any-gate runs them with: the Python adapter of any-gate."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "any-gate>=0.1,<1",
+    "stream-proc>=0.6,<1",
+]
+
+[project.optional-dependencies]
+# The stages load `any_gate_python.lanes_plugin` into the pytest of the project under test and pass it `-n` (xdist) for the parallel stage.
+pytest = ["pytest>=8", "pytest-xdist>=3.6,<4"]
+
+[tool.uv.sources]
+any-gate = { workspace = true }
+stream-proc = { workspace = true }
+
+[dependency-groups]
+# The test libraries this package's suite imports, plus what the root conftest and pytest settings load (tests/test_package_tests_declare_their_dependencies.py).
+dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "hypothesis>=6.100,<7", "pytest-xdist>=3.6,<4"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/any_gate_python"]
+
+[tool.deptry.per_rule_ignores]
+# Never imported: the runner passes `-n` to the pytest of the project under test, which needs the plugin installed.
+DEP002 = ["pytest-xdist"]

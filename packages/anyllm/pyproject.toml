@@ -15,6 +15,10 @@ anthropic = ["anthropic>=0.40,<1"]
 openai = ["openai>=1.50"]
 claude-code-sdk = ["claude-agent-sdk>=0.1.80,<1"]
 
+[dependency-groups]
+# The test libraries this package's suite imports, plus what the root conftest and pytest settings load (tests/test_package_tests_declare_their_dependencies.py).
+dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "hypothesis>=6.100,<7", "pytest-bdd>=8,<9", "anyllm[agent,anthropic,openai,claude-code-sdk]"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

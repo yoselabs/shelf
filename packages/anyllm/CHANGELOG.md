@@ -10,6 +10,8 @@ reconciling a pin (agent-loop.md WORKFLOW: RECEIVE).
 - CLI binary: found on the injected env's PATH via child-env `find` (was `shutil.which` on the process PATH); a missing binary ⇒ the same `AnyLLMError`, no bare-name fallback. claude-code-sdk: bundled binary, then env PATH, then its fixed fallback dirs (`~` is the env's HOME); a candidate must now be executable
 - claude-code-cli / codex-cli child env: allow list via child-env `build_env` (HOME/USER/PATH/locale + proxy and CA vars + `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CONFIG_DIR`, the four lane variables / `CODEX_HOME`), was the whole `os.environ` (claude) or all but two keys (codex). Other variables (AWS_*, GITHUB_*, ssh agent, app settings) no longer reach the child. Needs child-env>=0.2
 - claude-code-sdk: credential probe reads the token and `~/.claude/.credentials.json` from the injected env (HOME); platform read behind one function
+- claude-code-sdk: `thinking_disabled=True` (the default) also passes `effort="low"` to the SDK; Haiku 5.5 otherwise thinks (about 4x output tokens, same answer)
+
 
 ## 0.8.1
 
