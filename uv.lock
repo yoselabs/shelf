@@ -430,7 +430,7 @@ dev = [
 
 [[package]]
 name = "any-gate"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/any-gate" }
 dependencies = [
     { name = "any-lease" },
@@ -463,7 +463,7 @@ dev = [
 
 [[package]]
 name = "any-gate-python"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/any-gate-python" }
 dependencies = [
     { name = "any-gate" },
@@ -1201,7 +1201,7 @@ wheels = [
 
 [[package]]
 name = "blueprint"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/blueprint" }
 
 [package.dev-dependencies]

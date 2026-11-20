@@ -16,7 +16,7 @@ from onboard.hooks import config_text, ensure_gate_dependency
 SOURCE = {
     "git": "https://github.com/yoselabs/shelf",
     "subdirectory": "packages/any-gate",
-    "tag": "any-gate-v0.1.0",
+    "tag": "any-gate-v0.1.1",
 }
 
 
@@ -25,7 +25,7 @@ def test_blueprint_is_added_the_same_way_with_its_own_tag(tmp_path: Path) -> Non
     ensure_gate_dependency(tmp_path)
     data = tomllib.loads((tmp_path / "pyproject.toml").read_text())
     assert "blueprint" in data["dependency-groups"]["dev"]
-    assert data["tool"]["uv"]["sources"]["blueprint"] == {**SOURCE, "subdirectory": "packages/blueprint", "tag": "blueprint-v0.1.0"}
+    assert data["tool"]["uv"]["sources"]["blueprint"] == {**SOURCE, "subdirectory": "packages/blueprint", "tag": "blueprint-v0.2.0"}
 
 
 def _wired(repo: Path) -> tuple[list[str], dict[str, object]]:
@@ -100,6 +100,6 @@ def test_the_shelf_packages_the_gate_needs_get_a_tag_source_too(tmp_path: Path) 
 
 def test_every_tag_a_consumer_is_pinned_to_for_a_dependency_exists() -> None:
     # The gate packages' own tags are made at release; their dependencies were released before and must still be tagged.
-    needed = {hooks.release_tag(d) for name in hooks.GATE_PACKAGES for d in hooks.shelf_closure(name)}
+    needed = {hooks.release_tag(d) for name in hooks.GATE_PACKAGES for d in hooks.shelf_closure(name) if d not in hooks.GATE_PACKAGES}
     have = set(subprocess.run(["git", "tag"], cwd=hooks._SHELF_ROOT, capture_output=True, text=True, check=True).stdout.split())
     assert needed <= have, f"tag the release first: {sorted(needed - have)}"
