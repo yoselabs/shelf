@@ -42,7 +42,7 @@ the file holds the reasons, the rejected options and the history.
 ## stack
 
 - [0016](0016-python-and-uv-pins.md) **Python and uv are pinned once each, and images read the pins**: one X.Y in .python-version; requires-python ">=X.Y", uncapped, pin inside; uv floored by required-version; images install the pinned uv.
-- [0024](0024-mise-pins-every-repo-tool.md) **mise pins every repo tool, locked**: Each repo pins its tools exactly in mise.toml with a committed mise.lock; `mise install --locked` installs them; uv keeps Python, global.json keeps the .NET SDK; just keeps the tasks.
+- [0024](0024-mise-pins-every-repo-tool.md) **mise pins every repo tool, locked**: Each repo pins the tools that build or test it exactly in mise.toml, locked in mise.lock; agent CLIs are never pinned, git gets a floor; uv keeps Python, global.json the .NET SDK.
 - [0025](0025-every-cli-answers-help.md) **every command answers --help and refuses what it does not know**: Every command and script answers `--help` with its usage and changes nothing, refuses an unknown flag, and acts only on the action given; built on a CLI library.
 - [0026](0026-checkpoints-follow-facts.md) **checkpoints follow facts about the repo, never its size; one override format**: Checkpoints apply because of facts (technology, surface, trait, what happens to a file), never file counts; the agent classifies the rest; every exception is one override.
 

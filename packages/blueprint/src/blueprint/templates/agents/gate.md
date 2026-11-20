@@ -97,8 +97,9 @@ then `prek install`. A repo with LFS also needs `git lfs install --skip-repo` on
 
 ## Tool versions
 
-Every tool the repo runs (uv, just, prek, bd, git-lfs, an engine editor) is pinned exactly in `mise.toml` and locked in
-`mise.lock`; never install one with brew, apt or a curl script for this repo. A bump is a commit: edit the version, run
+Every tool that builds or tests the repo (uv, just, prek, bd, an engine editor) is pinned exactly in `mise.toml` and locked in
+`mise.lock`; agent CLIs (codex, claude code, opencode, gemini) are never pinned (they update themselves per machine), and
+a machine-owned tool such as git gets a minimum (`git = ">=2.40"`), not a pin; never install one with brew, apt or a curl script for this repo. A bump is a commit: edit the version, run
 `mise lock`, commit both. `.python-version` (uv) and `global.json` (.NET) keep their own pins; mise does not pin them again.
 
 ## No CI

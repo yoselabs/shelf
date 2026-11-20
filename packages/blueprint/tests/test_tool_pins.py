@@ -30,7 +30,8 @@ _JUSTFILE = "check:\n    true\n\ntools:\n    mise install --locked\n"
 
 def _rows(repo: Repo, *, audit: bool = False) -> dict[str, tuple[Verdict, str]]:
     report = (run_audit if audit else run)(repo.root, concern="stack", env=repo.env)
-    return {r.id: (r.verdict, r.evidence) for r in report.rows if r.id in {"stack.tool-pins", "stack.tools-installed"}}
+    ids = {"stack.tool-pins", "stack.tools-installed", "stack.agent-cli-pins"}
+    return {r.id: (r.verdict, r.evidence) for r in report.rows if r.id in ids}
 
 
 def _installed_row(repo: Repo) -> Row:
@@ -204,3 +205,63 @@ def test_a_python_repo_may_run_bare_just_pinned_in_mise(repo: Repo) -> None:
     assert _pins(repo)[0] is Verdict.PASSING
     gate = {r.id: r.verdict for r in run(repo.root, concern="gate", env=repo.env).rows}
     assert gate["gate.runner"] is Verdict.PASSING
+
+
+def _agents(repo: Repo) -> tuple[Verdict, str]:
+    return _rows(repo)["stack.agent-cli-pins"]
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        'codex = "0.40.0"',
+        'opencode = "1.2.3"',
+        '"npm:@openai/codex" = "0.40.0"',
+        '"npm:@anthropic-ai/claude-code" = "2.0.1"',
+        'gemini = "0.3.1"',
+    ],
+)
+def test_pinning_a_self_updating_agent_cli_fails_and_names_the_reason(repo: Repo, entry: str) -> None:
+    _tools_repo(repo, _PINS + entry + "\n")
+    verdict, evidence = _agents(repo)
+    assert verdict is Verdict.FAILING
+    assert "updates itself" in evidence
+
+
+def test_a_repo_pinning_no_agent_cli_passes_the_agent_row(repo: Repo) -> None:
+    _tools_repo(repo)
+    assert _agents(repo)[0] is Verdict.PASSING
+
+
+def test_a_repo_with_no_mise_toml_has_no_agent_row_to_judge(repo: Repo) -> None:
+    assert _agents(repo)[0] is Verdict.NOT_APPLICABLE
+
+
+def test_an_agent_cli_in_the_pins_does_not_fail_tool_pins_itself(repo: Repo) -> None:
+    _tools_repo(repo, _PINS + 'codex = "0.40.0"\n', _LOCK + '\n[[tools.codex]]\nversion = "0.40.0"\n')
+    assert _pins(repo)[0] is Verdict.PASSING
+
+
+def test_a_floor_for_git_is_accepted_and_needs_no_lock_entry(repo: Repo) -> None:
+    _tools_repo(repo, _PINS + 'git = ">=2.40"\n')
+    assert _pins(repo)[0] is Verdict.PASSING
+
+
+def test_a_floor_for_a_build_tool_is_still_not_a_pin(repo: Repo) -> None:
+    _tools_repo(repo, _PINS.replace('prek = "0.5.5"', 'prek = ">=0.5"'))
+    verdict, evidence = _pins(repo)
+    assert verdict is Verdict.FAILING
+    assert "prek '>=0.5' is not an exact version" in evidence
+
+
+def test_the_installed_git_must_meet_its_floor(repo: Repo) -> None:
+    _tools_repo(repo, _PINS + 'git = ">=2.40"\n')
+    repo.fake_tool(repo.bin_dir / "bd", "bd version 1.3.1 (dev)")
+    repo.fake_tool(repo.bin_dir / "prek", "prek 0.5.5")
+    repo.fake_tool(repo.bin_dir / "just", "just 1.58.0")
+    repo.fake_tool(repo.bin_dir / "git", "git version 2.39.5")
+    verdict, evidence = _rows(repo, audit=True)["stack.tools-installed"]
+    assert verdict is Verdict.FAILING
+    assert "git 2.39.5 (floor >=2.40)" in evidence
+    repo.fake_tool(repo.bin_dir / "git", "git version 2.51.0")
+    assert _rows(repo, audit=True)["stack.tools-installed"][0] is Verdict.PASSING
