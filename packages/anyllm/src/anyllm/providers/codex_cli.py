@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, get_args
 
-from anyllm.base import Completion, ProviderName
+from anyllm.base import Completion, Effort, ProviderName
 from anyllm.errors import AnyLLMError
 from anyllm.providers._agent import complete_run
 from anyllm.providers._prompt import flat_system, flat_user
@@ -18,13 +20,23 @@ except ImportError:
     any_agent = None
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+    from typing import Any
+
     from anyllm.base import PromptParts
+
+
+def _write_schema(directory: str, schema: Mapping[str, Any]) -> str:
+    path = Path(directory) / "schema.json"
+    path.write_text(json.dumps(schema), encoding="utf-8")
+    return str(path)
 
 
 class CodexCliAdapter:
     """Run CodexHarness and fail loud on any CLI failure."""
 
     name = ProviderName.CODEX_CLI
+    supports_structured = True  # response_schema and effort: see anyllm.base.StructuredProvider
 
     def available(self) -> bool:
         """Whether the extra and the CLI are installed."""
@@ -40,9 +52,18 @@ class CodexCliAdapter:
         temperature: float = 0.0,
         thinking_disabled: bool = True,
         parts: PromptParts | None = None,
+        response_schema: Mapping[str, Any] | None = None,
+        effort: Effort | None = None,
     ) -> Completion:
-        """Complete once; max_tokens, temperature and thinking_disabled are not CLI knobs."""
+        """Complete once; max_tokens, temperature and thinking_disabled are not CLI knobs.
+
+        ``response_schema``: codex enforces it (`--output-schema`), so ``Completion.text`` is schema-valid JSON text. ``effort``:
+        the reasoning effort; ``None`` keeps ``low``. Cancelling the await kills the child's process group.
+        """
         del max_tokens, temperature, thinking_disabled
+        if effort is not None and effort not in get_args(Effort):
+            msg = f"unknown effort {effort!r}"
+            raise AnyLLMError(msg, retryable=False, hint=f"use one of {get_args(Effort)}")
         if any_agent is None:
             msg = "any-agent is not installed"
             raise AnyLLMError(msg, retryable=False, hint="install anyllm[agent]")
@@ -50,18 +71,21 @@ class CodexCliAdapter:
         if exe is None:
             msg = "codex CLI not found on PATH"
             raise AnyLLMError(msg, retryable=False, hint="install Codex or pick another provider")
-        harness = any_agent.CodexHarness()
         prompt = "\n\n".join(p for p in (flat_system(parts, system), flat_user(parts, user)) if p)
-        inputs = any_agent.LaunchInputs(
-            exe=exe,
-            cwd=str(Path.cwd()),
-            model=model or "",
-            effort="low",
-            prompt=prompt,
-            env={k: v for k, v in os.environ.items() if k not in {"ANTHROPIC_API_KEY", "OPENAI_API_KEY"}},
-            sealed=True,
-        )
-        return await complete_run(any_agent, harness, harness.launch_spec(inputs), model or "")
+        with tempfile.TemporaryDirectory(prefix="anyllm-codex-schema-") as schema_dir:  # the schema file goes with it
+            schema_path = _write_schema(schema_dir, response_schema) if response_schema is not None else None
+            inputs = any_agent.LaunchInputs(
+                exe=exe,
+                cwd="",  # sealed: the harness runs the child in its own empty directory
+                model=model or "",
+                effort=effort or "low",
+                prompt=prompt,
+                env={k: v for k, v in os.environ.items() if k not in {"ANTHROPIC_API_KEY", "OPENAI_API_KEY"}},
+                schema=schema_path,
+                sealed=True,
+            )
+            harness = any_agent.CodexHarness()
+            return await complete_run(any_agent, harness, harness.launch_spec(inputs), model or "")
 
 
 __all__ = ["CodexCliAdapter"]

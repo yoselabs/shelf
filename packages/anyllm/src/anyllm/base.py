@@ -20,7 +20,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast, runtime_checkable
+
+from anyllm.errors import AnyLLMError
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+Effort = Literal["low", "medium", "high"]
 
 
 class ProviderName(StrEnum):
@@ -113,4 +120,42 @@ class LLMProvider(Protocol):
         ...
 
 
-__all__ = ["Completion", "LLMProvider", "PromptParts", "ProviderName"]
+@runtime_checkable
+class StructuredProvider(LLMProvider, Protocol):
+    """A backend that enforces a JSON Schema on the answer and takes a reasoning effort (today: ``codex-cli``).
+
+    Kept off :class:`LLMProvider`: a backend that cannot meet these must not accept them. ``supports_structured`` is the marker
+    :func:`require_structured` checks (``isinstance`` against a Protocol checks method names only, so it cannot tell them apart).
+    """
+
+    supports_structured: bool
+
+    async def complete(
+        self,
+        *,
+        user: str,
+        system: tuple[str, ...] | str = (),
+        model: str | None = None,
+        max_tokens: int = 1024,
+        temperature: float = 0.0,
+        thinking_disabled: bool = True,
+        parts: PromptParts | None = None,
+        response_schema: Mapping[str, Any] | None = None,
+        effort: Effort | None = None,
+    ) -> Completion:
+        """As :meth:`LLMProvider.complete`; with ``response_schema`` ``Completion.text`` is schema-valid JSON text.
+
+        ``effort=None`` keeps the backend's default (``low`` on codex-cli).
+        """
+        ...
+
+
+def require_structured(provider: LLMProvider) -> StructuredProvider:
+    """``provider`` as a :class:`StructuredProvider`, or :class:`AnyLLMError` (never a silent ignore of schema or effort)."""
+    if getattr(provider, "supports_structured", False) is not True:
+        msg = f"{provider.name} cannot enforce a response schema or an effort"
+        raise AnyLLMError(msg, retryable=False, hint="use provider codex-cli, or drop response_schema / effort")
+    return cast("StructuredProvider", provider)
+
+
+__all__ = ["Completion", "Effort", "LLMProvider", "PromptParts", "ProviderName", "StructuredProvider", "require_structured"]
