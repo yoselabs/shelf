@@ -1,6 +1,6 @@
 """Affected-only tests are exact only if every workspace import is a declared dependency (shelf-wctp).
 
-`tools/affected.py` walks each package's declared dependencies, optional dependencies and dependency groups. A package whose source or tests
+`any_gate_python` walks each package's declared dependencies, optional dependencies and dependency groups. A package whose source or tests
 import another workspace package without declaring it is never re-tested when that package changes. A mutation of `atomic-io` on
 2026-11-19 showed the class of miss; `mcp-bridge` and `mcp-call` imported `async-scope` in their tests undeclared.
 """
@@ -8,13 +8,10 @@ import another workspace package without declaring it is never re-tested when th
 from __future__ import annotations
 
 import ast
-import sys
 from pathlib import Path
 
 import pytest
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
-import affected
+from any_gate_python import workspace
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -45,7 +42,7 @@ def _imported(path: Path) -> set[str]:
 
 def undeclared(repo: Path) -> list[str]:
     """One line per `package imports other` pair the package does not declare."""
-    graph, _plugins = affected.workspace(repo)
+    graph, _plugins = workspace(repo)
     owners = _module_owners(repo)
     found: set[str] = set()
     for package, declared in graph.items():

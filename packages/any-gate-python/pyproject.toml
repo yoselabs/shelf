@@ -1,0 +1,16 @@
+[project]
+name = "any-gate-python"
+version = "0.1.0"
+description = "Which package suites a change reaches in a uv workspace, and the key each suite passed under: the Python adapter of any-gate."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/any_gate_python"]

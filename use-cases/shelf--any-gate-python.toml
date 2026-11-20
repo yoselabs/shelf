@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "shelf"
+software = "any-gate-python"
+why = "The shelf's gate must run only the suites a change reaches; the selection lived in a stdlib script (tools/affected.py) no consumer could depend on, and the shelf's own paths were hard-coded in it."
+needs = "The uv workspace graph, the lock read per package, the suites a change reaches and a fingerprint per suite, with the repo-specific path rules in config."
+sponsor = "yoselabs"
+requester = "shelf"
+status = "active" # active | retired

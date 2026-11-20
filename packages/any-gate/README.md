@@ -23,7 +23,7 @@ if not receipts.has("tests", k):
 ## The command
 
 ```bash
-python tools/affected.py --plan | python -m any_gate test --receipts .git/gate-receipts.json -- -p no:cov
+python -m any_gate_python --plan | python -m any_gate test --receipts .git/gate-receipts.json -- -p no:cov
 ```
 
 The plan is `path<TAB>key` per suite on stdin (empty key: never skipped). A suite whose key has a receipt is skipped; the rest run in

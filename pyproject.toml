@@ -261,6 +261,7 @@ testpaths = [
     "packages/content-extract/tests",
     "packages/dir-trust/tests",
     "packages/any-gate/tests",
+    "packages/any-gate-python/tests",
     "packages/content-digest/tests",
     "packages/convert-md/tests",
     "packages/dom-schema/tests",
@@ -366,6 +367,7 @@ root_packages = [
     "browser_cookies",
     "child_env",
     "any_gate",
+    "any_gate_python",
     "content_digest",
     "content_extract",
     "convert_md",
@@ -458,6 +460,7 @@ source_modules = [
     "browser_cookies",
     "child_env",
     "any_gate",
+    "any_gate_python",
     "content_digest",
     "content_extract",
     "convert_md",
@@ -552,6 +555,7 @@ modules = [
     "browser_cookies",
     "child_env",
     "any_gate",
+    "any_gate_python",
     "content_digest",
     "content_extract",
     "convert_md",
@@ -833,3 +837,48 @@ exclude_lines = [
 code-file = 400
 function = 80
 test-file = 800
+
+# The shelf's own paths for the Python adapter of the gate (`python -m any_gate_python`, packages/any-gate-python).
+# `no-effect`: paths no package test can observe (docs, the ontology, agent files); the repo tests in `tests/` cover what of these is checked.
+# The onboarding tests build real consumer repos (8-14 s each, 2026-10-11) and read only the onboarding machinery, so they run when an input of
+# it changes; every other repo test runs on every change, and `check-all` runs them all.
+[tool.any-gate.python]
+no-effect = [
+    "tests/",
+    "tools/",
+    "docs/",
+    "catalog/",
+    "use-cases/",
+    "ledger/",
+    "skills/",
+    "evals/",
+    ".beads/",
+    ".agents/",
+    ".claude/",
+    ".claude-plugin/",
+    ".gitignore",
+    "LICENSE",
+    "README.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+]
+repo-tests = "tests"
+
+[tool.any-gate.python.gated]
+tests = ["test_onboard_*", "test_bootstrap_target.py"]
+inputs = [
+    "tools/onboard/",
+    "tools/preset_drift.py",
+    ".agents/skills/onboard-consumer/",
+    "tests/conftest.py",
+    "justfile",
+    "pyproject.toml",
+    "uv.lock",
+    "conftest.py",
+    ".pre-commit-config.yaml",
+    ".beads/config.yaml",
+]
+
+[tool.any-gate.python.gated.reads]
+"test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/backlog.py"]
+"test_onboard_hooks.py" = ["packages/blueprint/src/blueprint/recipes/"]

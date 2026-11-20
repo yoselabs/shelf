@@ -22,6 +22,7 @@ members = [
     "any-file",
     "any-frontmatter",
     "any-gate",
+    "any-gate-python",
     "any-json-doc",
     "any-lease",
     "any-mailbox",
@@ -312,6 +313,11 @@ requires-dist = [
     { name = "stream-proc", editable = "packages/stream-proc" },
 ]
 provides-extras = ["pytest"]
+
+[[package]]
+name = "any-gate-python"
+version = "0.1.0"
+source = { editable = "packages/any-gate-python" }
 
 [[package]]
 name = "any-json-doc"
