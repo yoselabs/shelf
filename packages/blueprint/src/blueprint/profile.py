@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from blueprint import adr
-from blueprint.facts import KINDS, SURFACES, TRAITS, Judgement, detect_facts, judgement_problem
+from blueprint.facts import KINDS, SURFACES, TRAITS, Judgement, detect_facts, judgement_problem, package_json
 from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, is_skipped, override_toml, walk
 
 STATE_DIR = "docs/blueprint"
@@ -365,6 +365,10 @@ def _detect_kind(repo: Path, skip: tuple[str, ...] = ()) -> str:
     if pyproject.is_file():
         data = tomllib.loads(pyproject.read_text())
         if "workspace" in data.get("tool", {}).get("uv", {}) and not data.get("project", {}).get("scripts"):
+            return "library"
+    if (repo / "package.json").is_file():
+        manifest = package_json(repo / "package.json")
+        if manifest.get("workspaces") and not manifest.get("bin"):
             return "library"
     if walk(repo, "*.tf", 2, skip) or (repo / "ansible.cfg").is_file():
         return "infrastructure"

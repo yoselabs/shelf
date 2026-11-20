@@ -82,7 +82,8 @@ def judge(observed: Iterable[tuple[str, str]], required: Iterable[str], gaps: se
 
 def _required() -> frozenset[str]:
     from blueprint.concerns.framework import FRAMEWORK_DIR  # noqa: PLC0415
-    from blueprint.concerns.stack import PROFILE_DIR, is_checkpoint, load_profiles  # noqa: PLC0415
+    from blueprint.concerns.profile_data import PROFILE_DIR, load_profiles  # noqa: PLC0415
+    from blueprint.concerns.stack import is_checkpoint  # noqa: PLC0415
     from blueprint.model import REGISTRY  # noqa: PLC0415
 
     ids = {check.id for check in REGISTRY} - _FAMILIES

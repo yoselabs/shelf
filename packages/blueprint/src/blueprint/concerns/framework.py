@@ -8,14 +8,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from blueprint.concerns.profile_data import PROFILE_DIR, load_profiles
 from blueprint.concerns.stack import (
     FRAMEWORK_ROLES,
-    PROFILE_DIR,
     finding_for,
     gate_text,
     is_checkpoint,
     judge_role,
-    load_profiles,
     provisional_finding,
 )
 from blueprint.model import Finding, Sub, check_each, is_skipped, not_checked, not_set_up, passing

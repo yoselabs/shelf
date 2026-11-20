@@ -10,6 +10,7 @@ a few literal keys (`uses:`, `push:`, `schedule:`, `cron:`).
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import asdict, dataclass
 from fnmatch import fnmatch
@@ -21,6 +22,8 @@ from blueprint.concerns.secrets import _RULES, _sops_files
 from blueprint.model import walk
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from blueprint.model import Context, Profile
 
 # The closed lists (ADR 0026); they grow by an ADR.
@@ -101,6 +104,16 @@ _DEPENDENCY_EVIDENCE = (
     ("http-server", ("fastapi", "starlette", "uvicorn", "aiohttp", "flask")),
     ("stores-data", ("sqlite*", "duckdb*", "aiosqlite", "sqlalchemy", "sqlmodel", "apsw")),
     ("llm-backed", ("anthropic", "openai", "anyllm")),
+)
+# The same, for a Node package: names in `dependencies` and `optionalDependencies` (dev and peer groups are left out).
+_NODE_DEPENDENCY_EVIDENCE = (
+    ("mcp-server", ("@modelcontextprotocol/sdk", "fastmcp")),
+    ("http-server", ("express", "fastify", "koa", "hono", "@nestjs/core")),
+    (
+        "stores-data",
+        ("better-sqlite3", "sqlite3", "pg", "mysql2", "mongodb", "mongoose", "ioredis", "@prisma/client", "drizzle-orm", "duckdb"),
+    ),
+    ("llm-backed", ("@anthropic-ai/sdk", "openai", "ai", "@ai-sdk/*", "langchain", "@langchain/*")),
 )
 # A deploy step: a script named for deploying, or the usual deploy verbs. `ssh` alone is an access test, not a deploy.
 _DEPLOY_STEP = re.compile(
@@ -205,6 +218,48 @@ def _deployed(rel: str, lines: list[str]) -> list[Evidence]:
     return [Evidence("deployed", _where(rel, step), "high")] if step else []
 
 
+def package_json(path: Path) -> dict[str, object]:
+    """A package.json as a dict; an unreadable or non-object file is empty."""
+    try:
+        data = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _package_runtime_dependencies(data: dict[str, object]) -> set[str]:
+    groups = (data.get("dependencies"), data.get("optionalDependencies"))
+    return {name for group in groups if isinstance(group, dict) for name in group}
+
+
+def _first_line(lines: list[str], needle: str) -> int:
+    return next((i for i, ln in enumerate(lines, 1) if needle in ln), 0)
+
+
+def _node_cli(ctx: Context) -> list[Fact]:
+    """A `bin` entry in a package.json is a command the package ships."""
+    found = []
+    for path in walk(ctx.repo, "package.json", 4):
+        if package_json(path).get("bin"):
+            rel = path.relative_to(ctx.repo).as_posix()
+            n = _first_line(path.read_text(errors="replace").splitlines(), '"bin"')
+            found.append(Fact("cli", _where(rel, n) if n else rel))
+    return found[:1]
+
+
+def _node_dependencies(ctx: Context) -> list[Evidence]:
+    found: list[Evidence] = []
+    for path in walk(ctx.repo, "package.json", 4):
+        have = _package_runtime_dependencies(package_json(path))
+        rel = path.relative_to(ctx.repo).as_posix()
+        lines = path.read_text(errors="replace").splitlines()
+        for claim, names in _NODE_DEPENDENCY_EVIDENCE:
+            if hit := sorted(h for h in have if any(fnmatch(h, n) for n in names)):
+                n = _first_line(lines, f'"{hit[0]}"')
+                found.append(Evidence(claim, _where(rel, n) if n else rel, "low"))
+    return found
+
+
 def _console_scripts(ctx: Context) -> list[Fact]:
     if not _scripts(ctx):
         return []
@@ -250,8 +305,8 @@ def _named_volumes(ctx: Context) -> list[Evidence]:
 
 def detect_facts(ctx: Context) -> tuple[tuple[Fact, ...], tuple[Evidence, ...]]:
     """Every fact and piece of evidence the repo's files give, each once."""
-    facts = [*_console_scripts(ctx), *_sops(ctx)]
-    evidence = [*_dependencies(ctx), *_named_volumes(ctx)]
+    facts = [*_console_scripts(ctx), *_node_cli(ctx), *_sops(ctx)]
+    evidence = [*_dependencies(ctx), *_node_dependencies(ctx), *_named_volumes(ctx)]
     for rel, lines in _workflow_files(ctx):
         facts += [*_ships_image(rel, lines), *_scheduled(rel, lines)]
         evidence += _deployed(rel, lines)

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from blueprint.concerns.stack import ROLES, load_profiles
+from blueprint.concerns.profile_data import load_profiles
+from blueprint.concerns.stack import ROLES
 
 _PROFILES = load_profiles()
 

@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING
 
 from blueprint import concerns
 from blueprint.concerns.framework import FRAMEWORK_DIR
-from blueprint.concerns.stack import FRAMEWORK_ROLES, PROFILE_DIR, ROLES, Role, StackProfile, is_checkpoint, load_profiles, purpose_fact
+from blueprint.concerns.profile_data import PROFILE_DIR, Role, StackProfile, load_profiles
+from blueprint.concerns.stack import FRAMEWORK_ROLES, ROLES, is_checkpoint, purpose_fact
 from blueprint.model import REGISTRY, Check
 
 if TYPE_CHECKING:

@@ -10,12 +10,12 @@ from __future__ import annotations
 import json
 import re
 import shutil
-import tomllib
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from blueprint import gate_graph
+from blueprint.concerns.profile_data import Role, StackProfile, load_profiles
 from blueprint.model import (
     Finding,
     FixedBy,
@@ -34,7 +34,6 @@ from blueprint.model import (
 if TYPE_CHECKING:
     from blueprint.model import Context
 
-PROFILE_DIR = Path(__file__).resolve().parent.parent / "profiles"
 # The roles every stack profile answers, and every framework profile on top of it. A profile that
 # leaves a role out is a blueprint gap for that role, so the list is the research brief for a new one.
 ROLES = (
@@ -83,74 +82,6 @@ _RESEARCH = (
     "research the tools for each role ({roles}) and write blueprint/profiles/{stack}.toml in the shelf "
     "(`blueprint lacks: profile for {stack}` bead); the rows for this stack stay unjudged until then"
 )
-
-
-@dataclass(frozen=True)
-class Role:
-    """One role in a profile: the tool, how to install it, what proves it is set up and that it runs."""
-
-    role: str
-    tool: str = ""
-    install: str = ""
-    config: tuple[dict[str, Any], ...] = ()
-    gate: str = ""
-    # Other ways to prove the role runs: each is a `label`, a `gate` regex over the gate text, and
-    # optionally a `path`/`contains` the repo's config must also hold.
-    alternatives: tuple[dict[str, Any], ...] = ()
-    untested: str = ""
-    na: str = ""
-    # An outcome contract (instead of `gate`): the role is judged by what the gate does, whatever tool does it.
-    # `runs`: some step the gate reaches runs a test runner (any regex matches). `floor`: some step enforces a floor,
-    # where each `floors` entry is a `label`, a `gate` regex over the gate text and optionally a `path`/`contains` the repo must hold.
-    outcome: str = ""
-    runs: tuple[str, ...] = ()
-    floors: tuple[dict[str, Any], ...] = ()
-    # Where the role's executable may live, besides PATH: `$PATH`, `$DOTNET_ROOT` or an absolute folder. A
-    # toolchain role names them when a second install can be the one a tool resolves (Godot's dotnet).
-    installs: tuple[str, ...] = ()
-    # A purpose (ADR 0026): the row applies only to a repo with this fact, `shipped-image` or `deployed`, else it is not applicable.
-    requires: str = ""
-
-
-@dataclass(frozen=True)
-class StackProfile:
-    """A stack's answers, one per role."""
-
-    stack: str
-    status: str
-    source: str
-    roles: dict[str, Role] = field(default_factory=dict)
-    # `language` (code that grows layers: needs a layering tool) or `artifact` (a file format: architecture is `na` with its reason).
-    family: str = ""
-
-
-def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
-    """Every `<stack>.toml` in `directory`."""
-    profiles: dict[str, StackProfile] = {}
-    for path in sorted(directory.glob("*.toml")):  # frameworks/ is a subfolder, not read here
-        data: dict[str, Any] = tomllib.loads(path.read_text())
-        roles = {
-            r["role"]: Role(
-                role=r["role"],
-                tool=r.get("tool", ""),
-                install=r.get("install", ""),
-                config=tuple(r.get("config", ())),
-                gate=r.get("gate", ""),
-                alternatives=tuple(r.get("alternative", ())),
-                untested=r.get("untested", ""),
-                na=r.get("na", ""),
-                outcome=r.get("outcome", ""),
-                runs=tuple(r.get("runs", ())),
-                floors=tuple(r.get("floor", ())),
-                installs=tuple(r.get("installs", ())),
-                requires=r.get("requires", ""),
-            )
-            for r in data.get("role", [])
-        }
-        profiles[data["stack"]] = StackProfile(
-            data["stack"], data.get("status", "provisional"), data.get("source", ""), roles, data.get("family", "")
-        )
-    return profiles
 
 
 def gate_text(ctx: Context) -> str:
