@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools
+import hashlib
 import json
 import os
 import subprocess
@@ -44,6 +46,42 @@ def clip(text: str, limit: int) -> str:
     head = text[: limit - 1]
     space = head.rfind(" ")
     return (head[:space] if space > limit // 2 else head).rstrip(" ,;:") + "…"
+
+
+def fingerprint(row: Row) -> str:
+    """What a report keeps of one checkpoint: its id, version and verdict; never the evidence words or a date."""
+    return hashlib.sha256(f"{row.key}={row.verdict}".encode()).hexdigest()[:12]
+
+
+def _fingerprint(rows: list[Row] | tuple[Row, ...]) -> str:
+    return hashlib.sha256("\n".join(sorted(fingerprint(r) for r in rows)).encode()).hexdigest()[:12]
+
+
+_FP_OPENING = "verdicts: "
+
+
+def _unchanged(path: Path, fp: str) -> bool:
+    try:
+        return f"\n{_FP_OPENING}{fp}\n" in path.read_text()
+    except OSError:
+        return False
+
+
+@dataclasses.dataclass(frozen=True)
+class Batch:
+    """One converge run's remediation: every failing row once, agent-fixable apart from the owner's, one commit message."""
+
+    agent: tuple[Row, ...]
+    owner: tuple[Row, ...]
+    commit_message: str
+
+
+def converge_batch(rows: list[Row] | tuple[Row, ...]) -> Batch:
+    """All the run's remediation as ONE batch in a stable order (concern, id), never one batch per checkpoint."""
+    bad = sorted((r for r in rows if r.verdict in {Verdict.FAILING, Verdict.NOT_SET_UP} and not r.new), key=lambda r: (r.concern, r.id))
+    agent = tuple(r for r in bad if r.fixed_by is not FixedBy.OWNER)
+    owner = tuple(r for r in bad if r.fixed_by is FixedBy.OWNER)
+    return Batch(agent, owner, f"blueprint converge: {', '.join(r.id for r in agent)}" if agent else "blueprint converge: nothing to fix")
 
 
 def table(rows: list[Row] | tuple[Row, ...]) -> str:
@@ -122,7 +160,9 @@ def overrides_section(run: Run, today: date | None = None) -> str:
         )
     for notice in run.notices:
         head, _, toml = notice.partition("\n")
-        lines += ["", f"⚠️ {head}", "", "```toml", toml, "```"]
+        lines += ["", f"⚠️ {head}"]
+        if toml:
+            lines += ["", "```toml", toml, "```"]
     return "\n".join(lines)
 
 
@@ -239,20 +279,28 @@ def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path
     out_dir.mkdir(parents=True, exist_ok=True)
     # Not "Generated ...; do not edit": a repo's own generated-file guard fails a tracked file that claims a generator it does
     # not know (homelab's tools/generate.py did).
-    stamp = f"{_STAMP_OPENING}{today.isoformat()}; rewritten on every run."
-    index = out_dir / "README.md"
-    index.write_text(f"# Blueprint\n\n{stamp}\n\n{_header(run)}\n\n{overrides_section(run, today)}\n\n{summary(run)}\n")
-    written = [index]
+    stamp = f"{_STAMP_OPENING}{today.isoformat()}; rewritten only when a checkpoint verdict changes."
+    written: list[Path] = []
+
+    def emit(path: Path, rows: list[Row] | tuple[Row, ...], body: str) -> None:
+        """Write `body` only when the verdicts it reports differ from the file's: no timestamp-only or reorder-only diff."""
+        fp = _fingerprint(rows)
+        if not _unchanged(path, fp):
+            path.write_text(body.replace("{stamp}", f"{stamp}\n\n{_FP_OPENING}{fp}", 1))
+        written.append(path)
+
+    emit(out_dir / "README.md", run.rows, f"# Blueprint\n\n{{stamp}}\n\n{_header(run)}\n\n{overrides_section(run, today)}\n\n{summary(run)}\n")
     # The audit record: what the gate enforces until the next audit (runner.ACCEPTED).
     accepted = repo / ACCEPTED
-    accepted.write_text("".join(f"{r.key}\n" for r in sorted(run.rows, key=lambda r: r.key)))
+    record = "".join(f"{r.key}\n" for r in sorted(run.rows, key=lambda r: r.key))
+    if not accepted.is_file() or accepted.read_text() != record:
+        accepted.write_text(record)
     written.append(accepted)
     for layer, concern in _concerns(run):
         rows = [r for r in run.rows if r.concern == concern]
         path = out_dir / f"{concern.replace('/', '-')}.md"
         title = f"# Blueprint: {concern} ({LAYER_TITLES.get(layer, layer)})"
-        path.write_text(f"{title}\n\n{stamp}\n\n{_header(run)}\n\n{overrides_section(run, today)}\n\n{table(rows)}\n")
-        written.append(path)
+        emit(path, rows, f"{title}\n\n{{stamp}}\n\n{_header(run)}\n\n{overrides_section(run, today)}\n\n{table(rows)}\n")
     if prune:
         for stale in sorted(set(out_dir.glob("*.md")) - set(written)):
             if stale.read_text(errors="replace").startswith("# Blueprint: ") and _STAMP_OPENING in stale.read_text(errors="replace"):
