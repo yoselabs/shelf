@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,7 @@ from git_porcelain.testing import apply_hermetic_env, git
 
 
 def test_worktree_state_preserves_bytes_and_asks_each_time(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    repo = RealRepo(tmp_path)
+    repo = RealRepo(tmp_path, ambient=dict(os.environ))
     raw = b"# branch.oid (initial)\0# branch.head main\0? name\xff\n\0"
     calls: list[tuple[str, ...]] = []
 
@@ -41,7 +42,7 @@ def test_worktree_state_preserves_bytes_and_asks_each_time(tmp_path: Path, monke
 def test_worktree_state_distinguishes_absence_from_read_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stderr: str, error: type[GitUnavailable] | None
 ) -> None:
-    repo = RealRepo(tmp_path)
+    repo = RealRepo(tmp_path, ambient=dict(os.environ))
 
     def run(cwd: Path, *args: str, check: bool = True) -> Done:
         return Done(128, b"", stderr)
@@ -56,7 +57,7 @@ def test_worktree_state_distinguishes_absence_from_read_failure(
 
 @pytest.mark.parametrize("intro", ["introductory diagnostic", "error: introductory diagnostic"])
 def test_remove_refusal_keeps_the_first_diagnostic_and_final_hint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, intro: str) -> None:
-    repo = RealRepo(tmp_path)
+    repo = RealRepo(tmp_path, ambient=dict(os.environ))
     reason = "fatal: " + "long path " * 100 + "contains modified or untracked files"
     calls: list[tuple[str, ...]] = []
 
@@ -77,7 +78,7 @@ def test_remove_refusal_keeps_the_first_diagnostic_and_final_hint(tmp_path: Path
 def test_locked_worktree_removal_keeps_fatal_reason_and_hint(tmp_path: Path) -> None:
     git(tmp_path, "init", "-q", "-b", "main")
     git(tmp_path, "commit", "--allow-empty", "-qm", "seed")
-    repo = RealRepo(tmp_path)
+    repo = RealRepo(tmp_path, ambient=dict(os.environ))
     path = tmp_path / "locked"
     repo.add_worktree(path, "HEAD")
     git(tmp_path, "worktree", "lock", "--reason", "contract lock", str(path))
@@ -107,7 +108,7 @@ def test_locked_worktree_removal_keeps_fatal_reason_and_hint(tmp_path: Path) -> 
 def test_remove_preserves_infrastructure_errors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stderr: str, error: type[GitUnavailable]
 ) -> None:
-    repo = RealRepo(tmp_path)
+    repo = RealRepo(tmp_path, ambient=dict(os.environ))
 
     def run(cwd: Path, *args: str, check: bool = True) -> Done:
         return Done(128, b"", stderr)
@@ -137,7 +138,7 @@ def test_identity_is_canonical_across_linked_and_symlinked_paths(
     git(main, "worktree", "add", "--detach", str(linked), "HEAD")
     alias = tmp_path / "alias"
     alias.symlink_to(main, target_is_directory=True)
-    identities = [RealRepo(path, memoize=False).identity() for path in (main, linked, alias)]
+    identities = [RealRepo(path, memoize=False, ambient=dict(os.environ)).identity() for path in (main, linked, alias)]
     assert all(value.common_dir == common.resolve() for value in identities)
     assert len({value.key for value in identities}) == 1
     assert all(value.origin_url is None for value in identities)
@@ -171,7 +172,7 @@ def test_a_pinned_checkout_keeps_its_verified_git_directory_after_the_pointer_is
     slot = tmp_path / "slot"
     git(main, "worktree", "add", "-q", "-b", "task", str(slot), "HEAD")
     verified = Path(git(slot, "rev-parse", "--absolute-git-dir").strip())
-    wt = RealRepo(slot, memoize=False, pins={slot: verified}).worktree(slot)
+    wt = RealRepo(slot, memoize=False, pins={slot: verified}, ambient=dict(os.environ)).worktree(slot)
     mark = tmp_path / "mark"
     hostile = _hostile(tmp_path, mark)
 
@@ -191,7 +192,7 @@ def test_a_pinned_checkout_keeps_its_verified_git_directory_after_the_pointer_is
 def test_a_checkout_without_a_pin_is_not_a_repo_and_runs_no_git(tmp_path: Path) -> None:
     git(tmp_path, "init", "-q", "-b", "main")
     ran: list[tuple[str, ...]] = []
-    repo = RealRepo(tmp_path, pins={}, observer=ran.append)
+    repo = RealRepo(tmp_path, pins={}, observer=ran.append, ambient=dict(os.environ))
     with pytest.raises(NotARepo, match="no pinned git directory"):
         repo.identity()
     with pytest.raises(NotARepo):

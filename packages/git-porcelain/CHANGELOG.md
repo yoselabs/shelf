@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.26.0
+
+**Breaking** (shelf-tyld.6): the library no longer reads `os.environ`; the caller passes its environment at its edge.
+
+- `RealRepo(path, *, ambient=...)`: `ambient` is required (was optional; without it each call read the live process environment). The snapshot is taken once; a later change to the process environment does not reach git.
+- Every path function that runs git takes a required keyword `ambient`: `run_git`, `run_git_result`, `git_returncode`, `has_upstream`, `sync_status`, `readiness`, `unmerged_paths`, `show_stage`, `dirty_rels`, `status`, `head`, `log_grep`, `show_at`, `is_ancestor`, `upstream`, `push`, `fetch`, `merge`, `finish_merge`, `commit_paths`, the `lfs_*` functions (`lfs_available(*, ambient)` too), `ls_remote`, `branches`, `delete_ref_at`, `symbolic_ref`, `config_get`, `config_entries`, `merge_ff`, `pull_rebase`, `check_ignore`, `ls_files`. The `Plumbing` protocol methods take it too; `FakePlumbing` ignores it. `git_env(ambient)` and `real_env.base(source, extra)` take the mapping as an argument.
+- `env=` keeps its meaning: variables added to one call on top of `ambient`. Child environments are built exactly as before (same stripped variables, prompt off, `LC_ALL=C`), so behaviour with `ambient=dict(os.environ)` is unchanged.
+- `head()` no longer consults the process `GIT_DIR`; it checks `ambient`.
+- Migrate: pass `ambient=dict(os.environ)` (read once at your `__main__`/cli) to each call above and to `RealRepo`.
+
 ## 0.25.0
 
 Consumer wave (shelf-tyld): git-porcelain now runs on the shelf's owners instead of its own copies. Behaviour change: **every git call is bounded**.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -29,7 +30,7 @@ def test_fetch_retries_ref_races_with_a_five_attempt_limit(
         return subprocess.CompletedProcess(args, int(bool(err)), b"", err)
 
     git_process(process)
-    repo = RealRepo(tmp_path, sleep=rests.append)
+    repo = RealRepo(tmp_path, sleep=rests.append, ambient=dict(os.environ))
     if operation == "fetch" and failures == 5:
         with pytest.raises(RefRace):
             repo.fetch()
@@ -52,7 +53,7 @@ def test_fetch_does_not_retry_other_failures(tmp_path: Path, git_process: Callab
         return subprocess.CompletedProcess(args, 128, b"", error)
 
     git_process(process)
-    repo = RealRepo(tmp_path, sleep=rests.append)
+    repo = RealRepo(tmp_path, sleep=rests.append, ambient=dict(os.environ))
     if operation == "fetch":
         with pytest.raises(GitUnavailable):
             repo.fetch()
@@ -77,7 +78,7 @@ def test_identity_does_not_turn_origin_read_failure_into_absence(
 
     git_process(process)
     with pytest.raises(GitReadFailure):
-        RealRepo(tmp_path, memoize=False).identity()
+        RealRepo(tmp_path, memoize=False, ambient=dict(os.environ)).identity()
 
 
 @pytest.mark.parametrize("implementation", ["real", "fake"])
@@ -86,7 +87,7 @@ def test_origin_changes_do_not_change_local_identity(tmp_path: Path, monkeypatch
     apply_hermetic_env(monkeypatch, home=tmp_path / "home")
     if implementation == "real":
         git(tmp_path, "init", "-q", "-b", "main")
-        repo = RealRepo(tmp_path, memoize=False)
+        repo = RealRepo(tmp_path, memoize=False, ambient=dict(os.environ))
     else:
         repo = FakeRepo.init(tmp_path)
     before = repo.identity()

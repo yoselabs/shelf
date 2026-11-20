@@ -6,7 +6,6 @@ no prompts, fail loud with :class:`GitError`.
 
 from __future__ import annotations
 
-import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -30,9 +29,10 @@ _GIT = "git"
 _REDIRECTS = frozenset({"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY", "GIT_PREFIX"})
 
 
-def git_env() -> dict[str, str]:
-    """Child env that fails loud instead of prompting for credentials, and acts on the repo it is pointed at."""
-    env = {k: v for k, v in os.environ.items() if k not in _REDIRECTS}
+def git_env(ambient: Mapping[str, str]) -> dict[str, str]:
+    """Child env built from ``ambient`` (the caller's environment): fails loud instead of prompting for credentials,
+    and acts on the repo it is pointed at."""
+    env = {k: v for k, v in ambient.items() if k not in _REDIRECTS}
     env["GIT_TERMINAL_PROMPT"] = "0"
     env["LC_ALL"] = "C"
     env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
@@ -51,11 +51,13 @@ def git_installed(env: Mapping[str, str]) -> bool:
 def _run(
     vault: Path,
     args: tuple[str, ...],
+    ambient: Mapping[str, str],
     env: Mapping[str, str] | None,
     timeout: float | None,
+    *,
     stdin: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    child = {**git_env(), **(env or {})}
+    child = {**git_env(ambient), **(env or {})}
     if not git_installed(child):
         msg = "git not found on PATH"
         raise GitError(msg, retryable=False, hint="install git")
@@ -83,6 +85,7 @@ def _run(
 def run_git(
     vault: Path,
     *args: str,
+    ambient: Mapping[str, str],
     check: bool = True,
     env: Mapping[str, str] | None = None,
     timeout: float | None = None,
@@ -91,19 +94,22 @@ def run_git(
     """Run ``git -C <vault> <args>`` fail-loud; return stdout. The repo is always the one at ``vault``:
     a ``GIT_DIR`` or ``GIT_WORK_TREE`` the process inherited (a git hook sets them) is dropped.
 
-    ``env`` adds variables for this call only (an author identity, say). ``timeout``
+    ``ambient`` is the environment the child starts from (the caller's ``os.environ``, read once at its edge; this
+    library never reads it). ``env`` adds variables for this call only (an author identity, say). ``timeout``
     bounds a network call; running out raises a retryable :class:`GitError`. ``stdin`` is fed to git.
     """
-    proc = _run(vault, args, env, timeout, stdin)
+    proc = _run(vault, args, ambient, env, timeout, stdin=stdin)
     if check and proc.returncode != 0:
         msg = f"git {args[0] if args else ''} exited {proc.returncode}: {proc.stderr.strip()[:300]}"
         raise failure(msg, proc.stderr, proc.returncode, output=(proc.stdout + proc.stderr).strip())
     return proc.stdout
 
 
-def run_git_result(vault: Path, *args: str, env: Mapping[str, str] | None = None, timeout: float | None = None) -> CommandResult:
+def run_git_result(
+    vault: Path, *args: str, ambient: Mapping[str, str], env: Mapping[str, str] | None = None, timeout: float | None = None
+) -> CommandResult:
     """One invocation with complete stdout and stderr on success and on raised failure."""
-    proc = _run(vault, args, env, timeout)
+    proc = _run(vault, args, ambient, env, timeout)
     output = (proc.stdout + proc.stderr).strip()
     if proc.returncode:
         msg = f"git {args[0] if args else ''} exited {proc.returncode}: {proc.stderr.strip()[-600:]}"
@@ -111,9 +117,9 @@ def run_git_result(vault: Path, *args: str, env: Mapping[str, str] | None = None
     return CommandResult(ok=True, output=output)
 
 
-def git_returncode(vault: Path, *args: str) -> int:
+def git_returncode(vault: Path, *args: str, ambient: Mapping[str, str]) -> int:
     """Run a git command whose answer is its exit code (``merge-base --is-ancestor``)."""
-    return _run(vault, args, None, None).returncode
+    return _run(vault, args, ambient, None, None).returncode
 
 
 def _dot_git(path: Path) -> Path | None:
@@ -159,11 +165,11 @@ def git_dir(vault: Path) -> Path | None:
 _SHA = re.compile(r"[0-9a-f]{40}([0-9a-f]{24})?")
 
 
-def _head_from_files(vault: Path) -> str | None:
+def _head_from_files(vault: Path, ambient: Mapping[str, str]) -> str | None:
     """The sha ``HEAD`` points at, read from the ref files; None when they cannot say
     (packed or reftable refs, an unborn branch, ``GIT_DIR`` set) — ask git then."""
     found = git_dir(vault)
-    if found is None or "GIT_DIR" in os.environ:
+    if found is None or "GIT_DIR" in ambient:
         return None
     try:
         text = (found / "HEAD").read_text(encoding="utf-8").strip()
@@ -176,9 +182,9 @@ def _head_from_files(vault: Path) -> str | None:
     return text if _SHA.fullmatch(text) else None
 
 
-def has_upstream(vault: Path) -> bool:
+def has_upstream(vault: Path, *, ambient: Mapping[str, str]) -> bool:
     """Return True if the current branch has an upstream tracking branch configured."""
-    out = run_git(vault, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}", check=False)
+    out = run_git(vault, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}", ambient=ambient, check=False)
     return bool(out.strip()) and "fatal" not in out.lower()
 
 
@@ -188,14 +194,14 @@ def merge_in_progress(vault: Path) -> bool:
     return found is not None and (found / "MERGE_HEAD").exists()
 
 
-def sync_status(vault: Path) -> dict[str, Any]:
+def sync_status(vault: Path, *, ambient: Mapping[str, str]) -> dict[str, Any]:
     """Branch / clean / changed count / ahead-behind / merge-in-progress (no network)."""
-    branch = run_git(vault, "rev-parse", "--abbrev-ref", "HEAD", check=False).strip() or "HEAD"
-    porcelain = run_git(vault, "status", "--porcelain", check=False).strip()
+    branch = run_git(vault, "rev-parse", "--abbrev-ref", "HEAD", check=False, ambient=ambient).strip() or "HEAD"
+    porcelain = run_git(vault, "status", "--porcelain", check=False, ambient=ambient).strip()
     changed = len([ln for ln in porcelain.splitlines() if ln.strip()])
     ahead = behind = 0
-    if has_upstream(vault):
-        counts = run_git(vault, "rev-list", "--left-right", "--count", "@{upstream}...HEAD", check=False).split()
+    if has_upstream(vault, ambient=ambient):
+        counts = run_git(vault, "rev-list", "--left-right", "--count", "@{upstream}...HEAD", check=False, ambient=ambient).split()
         if len(counts) == 2:
             behind, ahead = int(counts[0]), int(counts[1])
     return {
@@ -208,7 +214,7 @@ def sync_status(vault: Path) -> dict[str, Any]:
     }
 
 
-def readiness(vault: Path, *, check_push: bool = True) -> dict[str, Any]:
+def readiness(vault: Path, *, ambient: Mapping[str, str], check_push: bool = True) -> dict[str, Any]:
     """Is git usable here? (repo / identity / remote / push access). Never raises.
 
     ``check_push=False`` skips the network ``ls-remote`` probe — used by ``intro``,
@@ -216,15 +222,15 @@ def readiness(vault: Path, *, check_push: bool = True) -> dict[str, Any]:
     A remote probe costs three processes: identity, configured remotes, then ls-remote.
     ``output`` retains the probe's complete stdout and stderr (empty when skipped).
     """
-    if not git_installed(git_env()) or not is_repo(vault):
+    if not git_installed(git_env(ambient)) or not is_repo(vault):
         return {"is_repo": False, "identity": False, "remote": False, "push_access": False, "output": ""}
-    email = run_git(vault, "config", "user.email", check=False).strip()
-    remote = run_git(vault, "remote", check=False).strip()
+    email = run_git(vault, "config", "user.email", check=False, ambient=ambient).strip()
+    remote = run_git(vault, "remote", check=False, ambient=ambient).strip()
     push_access: bool | None = None
     output = ""
     if check_push and remote:
         try:
-            output = run_git_result(vault, "ls-remote", "--exit-code").output
+            output = run_git_result(vault, "ls-remote", "--exit-code", ambient=ambient).output
             push_access = True
         except GitError as exc:
             push_access = False
@@ -232,9 +238,9 @@ def readiness(vault: Path, *, check_push: bool = True) -> dict[str, Any]:
     return {"is_repo": True, "identity": bool(email), "remote": bool(remote), "push_access": push_access, "output": output}
 
 
-def unmerged_paths(vault: Path, *, env: Mapping[str, str] | None = None) -> list[str]:
+def unmerged_paths(vault: Path, *, ambient: Mapping[str, str], env: Mapping[str, str] | None = None) -> list[str]:
     """Return the repo-relative paths that are currently unmerged (conflicted)."""
-    out = run_git(vault, "diff", "--name-only", "--diff-filter=U", check=False, env=env)
+    out = run_git(vault, "diff", "--name-only", "--diff-filter=U", check=False, env=env, ambient=ambient)
     return [ln.strip() for ln in out.splitlines() if ln.strip()]
 
 
@@ -247,18 +253,18 @@ def has_conflict_markers(path: Path) -> bool:
     return "<<<<<<<" in text and ">>>>>>>" in text
 
 
-def show_stage(vault: Path, stage: int, rel: str) -> str:
+def show_stage(vault: Path, stage: int, rel: str, *, ambient: Mapping[str, str]) -> str:
     """The clean blob for an index stage (1 base, 2 ours, 3 theirs); '' if absent."""
-    return run_git(vault, "show", f":{stage}:{rel}", check=False)
+    return run_git(vault, "show", f":{stage}:{rel}", check=False, ambient=ambient)
 
 
-def dirty_rels(vault: Path) -> list[str]:
+def dirty_rels(vault: Path, *, ambient: Mapping[str, str]) -> list[str]:
     """Return the repo-relative paths of all changed and untracked files, unquoted.
 
     Each untracked FILE is listed (git otherwise collapses an untracked directory), and a
     rename lists its new path.
     """
-    return [entry.path for entry in status(vault)]
+    return [entry.path for entry in status(vault, ambient=ambient)]
 
 
 @dataclass(frozen=True)
@@ -275,9 +281,9 @@ class StatusEntry:
         return self.code not in {"??", "!!"}
 
 
-def status(vault: Path, *, env: Mapping[str, str] | None = None) -> list[StatusEntry]:
+def status(vault: Path, *, ambient: Mapping[str, str], env: Mapping[str, str] | None = None) -> list[StatusEntry]:
     """Every changed, staged and untracked path, one entry per file, paths unquoted."""
-    fields = run_git(vault, "status", "--porcelain=v1", "-z", "-uall", check=False, env=env).split("\0")
+    fields = run_git(vault, "status", "--porcelain=v1", "-z", "-uall", check=False, env=env, ambient=ambient).split("\0")
     entries: list[StatusEntry] = []
     i = 0
     while i < len(fields):

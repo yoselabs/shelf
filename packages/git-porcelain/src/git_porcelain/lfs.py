@@ -37,51 +37,51 @@ _FILTER = {
 }
 
 
-def lfs_available() -> bool:
-    """True when ``git lfs`` runs here."""
-    env = git_env()
+def lfs_available(*, ambient: Mapping[str, str]) -> bool:
+    """True when ``git lfs`` runs with ``ambient`` as its environment."""
+    env = git_env(ambient)
     try:
         find("git", env)
         find("git-lfs", env)
     except NotFound:
         return False
     try:
-        return git_returncode(Path.cwd(), "lfs", "version") == 0
+        return git_returncode(Path.cwd(), "lfs", "version", ambient=ambient) == 0
     except GitError:
         return False
 
 
-def lfs_setup(repo: Path) -> bool:
+def lfs_setup(repo: Path, *, ambient: Mapping[str, str]) -> bool:
     """Configure LFS in ``repo``'s local config; True when LFS is ready to commit through.
 
     Idempotent: a value already set is not rewritten. Returns False, changing nothing, when
     git-lfs is not available. Touches no working-tree file and makes no network call:
     pointer files already on disk wait for :func:`lfs_fetch` and :func:`lfs_checkout`.
     """
-    if not lfs_available():
+    if not lfs_available(ambient=ambient):
         return False
     for key, value in _FILTER.items():
-        current = run_git(repo, "config", "--local", "--get", key, check=False).strip()
+        current = run_git(repo, "config", "--local", "--get", key, check=False, ambient=ambient).strip()
         if current != value:
-            run_git(repo, "config", "--local", key, value)
+            run_git(repo, "config", "--local", key, value, ambient=ambient)
     return True
 
 
-def lfs_checkout(repo: Path) -> None:
+def lfs_checkout(repo: Path, *, ambient: Mapping[str, str]) -> None:
     """Replace pointer files in the working tree with bytes already in the local LFS store.
 
     Touches nothing else; a pointer whose object is not local stays a pointer.
     """
-    if git_returncode(repo, "rev-parse", "--verify", "-q", "HEAD") == 0:
-        run_git(repo, "lfs", "checkout")
+    if git_returncode(repo, "rev-parse", "--verify", "-q", "HEAD", ambient=ambient) == 0:
+        run_git(repo, "lfs", "checkout", ambient=ambient)
 
 
-def lfs_paths(repo: Path, paths: Iterable[str]) -> set[str]:
+def lfs_paths(repo: Path, paths: Iterable[str], *, ambient: Mapping[str, str]) -> set[str]:
     """The subset of ``paths`` (repo-relative) whose ``filter`` attribute is ``lfs``."""
     wanted = list(dict.fromkeys(paths))
     if not wanted:
         return set()
-    out = run_git(repo, "check-attr", "-z", "filter", "--", *wanted)
+    out = run_git(repo, "check-attr", "-z", "filter", "--", *wanted, ambient=ambient)
     fields = out.split("\0")
     owned: set[str] = set()
     for i in range(0, len(fields) - 2, 3):
@@ -91,11 +91,15 @@ def lfs_paths(repo: Path, paths: Iterable[str]) -> set[str]:
     return owned
 
 
-def lfs_push(repo: Path, remote: str, ref: str, *, timeout: float = 600, config: Mapping[str, str] | None = None) -> CommandResult:
+def lfs_push(
+    repo: Path, remote: str, ref: str, *, ambient: Mapping[str, str], timeout: float = 600, config: Mapping[str, str] | None = None
+) -> CommandResult:
     """Upload the LFS objects ``ref`` references to ``remote``. Call before ``git push``."""
-    return _remote(repo, "lfs", "push", remote, ref, timeout=timeout, config=config)
+    return _remote(repo, "lfs", "push", remote, ref, timeout=timeout, config=config, ambient=ambient)
 
 
-def lfs_fetch(repo: Path, remote: str, ref: str, *, timeout: float = 600, config: Mapping[str, str] | None = None) -> CommandResult:
+def lfs_fetch(
+    repo: Path, remote: str, ref: str, *, ambient: Mapping[str, str], timeout: float = 600, config: Mapping[str, str] | None = None
+) -> CommandResult:
     """Download the LFS objects ``ref`` references from ``remote``. Call before a merge."""
-    return _remote(repo, "lfs", "fetch", remote, ref, timeout=timeout, config=config)
+    return _remote(repo, "lfs", "fetch", remote, ref, timeout=timeout, config=config, ambient=ambient)

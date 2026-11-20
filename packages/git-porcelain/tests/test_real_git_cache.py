@@ -17,7 +17,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 import git_porcelain as porcelain
-from git_porcelain import GitReadFailure, GitUnavailable, Identity, MissingRevision, NotFastForward, RealRepo, RealWorktree, Sha
+from git_porcelain import GitReadFailure, GitUnavailable, Identity, MissingRevision, NotFastForward, RealRepo, RealWorktree, Sha, real_env
+from git_porcelain.real import _find_git
 from git_porcelain.real_done import Done
 from git_porcelain.testing import apply_hermetic_env
 from git_porcelain.testing import git as run
@@ -49,12 +50,17 @@ class Rig:
         run(self.root, "init", "-q", "--bare", "-b", "main", str(origin))
         run(self.root, "clone", "-q", str(origin), "r")
         self.path = self.root / "r"
-        self.repo = RealRepo(self.path, observer=self.calls.append)
+        self.repo = RealRepo(self.path, observer=self.calls.append, ambient=dict(os.environ))
         self.wt: RealWorktree = self.repo.worktree(self.path)
         (self.path / "a.txt").write_text("one\n", encoding="utf-8")
         self.wt.record("first", paths="all")
         self.wt.push("main")
         self.calls.clear()
+
+    def env_changed(self) -> None:
+        """The test changed the process environment after the rig was made: hand the repo the new one."""
+        self.repo._ambient = real_env.base(dict(os.environ))
+        self.repo._git = _find_git(self.repo._ambient)
 
     def count(self, *words: str) -> int:
         return sum(all(w in call for w in words) for call in self.calls)
@@ -137,6 +143,7 @@ def test_configured_pre_push_hook_is_observed_in_the_push_process(rig: Rig, monk
     hook.write_text(f"#!/bin/sh\nprintf '%s' '{diagnostic}' >&2\nexit 1\n", encoding="utf-8")
     hook.chmod(0o755)
     apply_hermetic_env(monkeypatch, identity=_ME, home=rig.root / "home", config={"core.hooksPath": str(hooks)})
+    rig.env_changed()
     sha = Sha(run(rig.path, "rev-parse", "HEAD").strip())
     rig.calls.clear()
     result = rig.wt.push_refspecs("origin", [f"{sha}:refs/heads/main"])
@@ -192,6 +199,7 @@ def test_push_hook_receives_the_pinned_object_as_its_local_ref(rig: Rig, monkeyp
     hook.write_text(f"#!/bin/sh\ncat > '{captured}'\n", encoding="utf-8")
     hook.chmod(0o755)
     apply_hermetic_env(monkeypatch, identity=_ME, home=rig.root / "home", config={})
+    rig.env_changed()
     sha = run(rig.path, "rev-parse", "HEAD").strip()
     result = rig.wt.push("new")
     assert type(result).__name__ == "Pushed"
@@ -248,6 +256,7 @@ def test_deletion_verification_failure_retains_both_invocations(rig: Rig, git_pr
 
 def test_remote_hook_text_cannot_be_classified_as_a_ref_race(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
     apply_hermetic_env(monkeypatch, identity=_ME, home=rig.root / "home", config={"maintenance.auto": "false"})
+    rig.env_changed()
     hook = rig.root / "o.git" / "hooks" / "pre-receive"
     hook.parent.mkdir(exist_ok=True)
     hook.write_text("#!/bin/sh\necho 'rejected by policy hook' >&2\nexit 1\n", encoding="utf-8")
@@ -291,7 +300,7 @@ def test_malformed_advertisements_keep_complete_diagnostics(rig: Rig, git_proces
     git_process(process)
     with pytest.raises(GitReadFailure) as caught:
         if path_api:
-            porcelain.ls_remote(rig.path, "origin")
+            porcelain.ls_remote(rig.path, "origin", ambient=dict(os.environ))
         else:
             rig.repo.ls_remote("origin")
     assert caught.value.output == (stdout + stderr).strip()
@@ -312,13 +321,13 @@ def test_path_remote_operations_keep_complete_output_with_a_fixed_budget(
 
     git_process(process)
     operations: dict[str, Callable[[], object]] = {
-        "push": lambda: porcelain.push(rig.path, "origin"),
-        "fetch": lambda: porcelain.fetch(rig.path, "origin"),
-        "lfs_push": lambda: porcelain.lfs_push(rig.path, "origin", "HEAD"),
-        "lfs_fetch": lambda: porcelain.lfs_fetch(rig.path, "origin", "HEAD"),
-        "pull_rebase": lambda: porcelain.pull_rebase(rig.path, "origin", "main"),
-        "ls_remote": lambda: porcelain.ls_remote(rig.path, "origin"),
-        "readiness": lambda: porcelain.readiness(rig.path),
+        "push": lambda: porcelain.push(rig.path, "origin", ambient=dict(os.environ)),
+        "fetch": lambda: porcelain.fetch(rig.path, "origin", ambient=dict(os.environ)),
+        "lfs_push": lambda: porcelain.lfs_push(rig.path, "origin", "HEAD", ambient=dict(os.environ)),
+        "lfs_fetch": lambda: porcelain.lfs_fetch(rig.path, "origin", "HEAD", ambient=dict(os.environ)),
+        "pull_rebase": lambda: porcelain.pull_rebase(rig.path, "origin", "main", ambient=dict(os.environ)),
+        "ls_remote": lambda: porcelain.ls_remote(rig.path, "origin", ambient=dict(os.environ)),
+        "readiness": lambda: porcelain.readiness(rig.path, ambient=dict(os.environ)),
     }
     try:
         result = operations[operation]()
@@ -398,7 +407,7 @@ def test_fast_forward_failure_is_typed_with_an_injected_non_english_locale(rig: 
     run(rig.path, "commit", "--allow-empty", "-qm", "other")
     run(rig.path, "checkout", "-q", "main")
     run(rig.path, "commit", "--allow-empty", "-qm", "local")
-    repo = RealRepo(rig.path, env={"LC_ALL": "fr_FR.UTF-8", "LANG": "fr_FR.UTF-8"})
+    repo = RealRepo(rig.path, env={"LC_ALL": "fr_FR.UTF-8", "LANG": "fr_FR.UTF-8"}, ambient=dict(os.environ))
     wt = repo.worktree(rig.path)
     before = repo.history(["HEAD"])
     with pytest.raises(NotFastForward):
@@ -433,7 +442,7 @@ def test_memo_can_be_switched_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     apply_hermetic_env(monkeypatch, identity=_ME, home=tmp_path / "home")
     run(tmp_path, "init", "-q", "-b", "main", "x")
     calls: list[tuple[str, ...]] = []
-    repo = RealRepo(tmp_path / "x", memoize=False, observer=calls.append)
+    repo = RealRepo(tmp_path / "x", memoize=False, observer=calls.append, ambient=dict(os.environ))
     repo.identity()
     repo.identity()
     assert sum("--git-common-dir" in c for c in calls) == 2
@@ -573,7 +582,7 @@ def test_a_repository_on_the_reftable_backend_is_never_memoized(tmp_path: Path, 
     path = tmp_path / "t"
     run(tmp_path, "init", "-q", "-b", "main", "--ref-format=reftable", "t")
     calls: list[tuple[str, ...]] = []
-    repo = RealRepo(path, observer=calls.append)
+    repo = RealRepo(path, observer=calls.append, ambient=dict(os.environ))
     wt = repo.worktree(path)
     (path / "a.txt").write_text("x\n", encoding="utf-8")
     wt.record("one", paths="all")

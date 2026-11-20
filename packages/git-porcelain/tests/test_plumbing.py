@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
@@ -48,32 +49,32 @@ def plumbing(request: pytest.FixtureRequest, tmp_path: Path, monkeypatch: pytest
 
 def test_refs_are_named_and_delete_is_compare_and_swap(plumbing: tuple[Plumbing, Path]) -> None:
     api, path = plumbing
-    local = api.branches(path)
+    local = api.branches(path, ambient=dict(os.environ))
     assert [r.name for r in local] == ["main"]
-    assert api.branches(path, "origin") == local
-    advertised = api.ls_remote(path, "origin", "refs/heads/main")
+    assert api.branches(path, "origin", ambient=dict(os.environ)) == local
+    advertised = api.ls_remote(path, "origin", "refs/heads/main", ambient=dict(os.environ))
     assert advertised == [porcelain.Ref("refs/heads/main", local[0].oid)]
     assert advertised.output == f"{local[0].oid}\trefs/heads/main"
-    assert api.ls_remote(path, "origin", "missing*") == []
+    assert api.ls_remote(path, "origin", "missing*", ambient=dict(os.environ)) == []
     with pytest.raises(RefRace) as caught:
-        api.delete_ref_at(path, "refs/remotes/origin/main", "1" * 40)
+        api.delete_ref_at(path, "refs/remotes/origin/main", "1" * 40, ambient=dict(os.environ))
     assert caught.value.retryable is False
-    assert api.branches(path, "origin") == local
-    api.delete_ref_at(path, "refs/remotes/origin/main", local[0].oid)
-    assert api.branches(path, "origin") == []
+    assert api.branches(path, "origin", ambient=dict(os.environ)) == local
+    api.delete_ref_at(path, "refs/remotes/origin/main", local[0].oid, ambient=dict(os.environ))
+    assert api.branches(path, "origin", ambient=dict(os.environ)) == []
 
 
 def test_config_and_symbolic_reads_preserve_absence_and_multiline_values(plumbing: tuple[Plumbing, Path]) -> None:
     api, path = plumbing
-    assert api.config_get(path, "task.absent") is None
-    assert api.config_get(path, "task.absent", "fallback") == "fallback"
-    assert api.config_get(path, "task.value") == "first\nsecond"
-    assert api.config_entries(path, r"^task\.") == [("task.value", "first\nsecond")]
-    assert api.config_entries(path, "^absent\\.") == []
-    assert api.symbolic_ref(path, "HEAD") == "refs/heads/main"
-    assert api.symbolic_ref(path, "refs/heads/main") is None
+    assert api.config_get(path, "task.absent", ambient=dict(os.environ)) is None
+    assert api.config_get(path, "task.absent", "fallback", ambient=dict(os.environ)) == "fallback"
+    assert api.config_get(path, "task.value", ambient=dict(os.environ)) == "first\nsecond"
+    assert api.config_entries(path, r"^task\.", ambient=dict(os.environ)) == [("task.value", "first\nsecond")]
+    assert api.config_entries(path, "^absent\\.", ambient=dict(os.environ)) == []
+    assert api.symbolic_ref(path, "HEAD", ambient=dict(os.environ)) == "refs/heads/main"
+    assert api.symbolic_ref(path, "refs/heads/main", ambient=dict(os.environ)) is None
     with pytest.raises(porcelain.GitUnavailable):
-        api.config_entries(path, "[")
+        api.config_entries(path, "[", ambient=dict(os.environ))
 
 
 @pytest.mark.parametrize(
@@ -87,32 +88,36 @@ def test_config_and_symbolic_reads_preserve_absence_and_multiline_values(plumbin
 )
 def test_file_scopes(plumbing: tuple[Plumbing, Path], scope: str, expected: set[str]) -> None:
     api, path = plumbing
-    assert set(api.ls_files(path, scope=scope)) == expected
-    assert api.check_ignore(path, ["tracked", "new file", "declared.input"]) == {"declared.input"}
-    assert api.check_ignore(path, []) == set()
+    assert set(api.ls_files(path, scope=scope, ambient=dict(os.environ))) == expected
+    assert api.check_ignore(path, ["tracked", "new file", "declared.input"], ambient=dict(os.environ)) == {"declared.input"}
+    assert api.check_ignore(path, [], ambient=dict(os.environ)) == set()
 
 
 def test_fast_forward_preserves_edits_and_pull_rebase_refuses_a_dirty_tree(plumbing: tuple[Plumbing, Path]) -> None:
     api, path = plumbing
-    api.merge_ff(path, "origin/main")
+    api.merge_ff(path, "origin/main", ambient=dict(os.environ))
     # Pull's rebase requires a clean tree, even if the remote has not moved.
     with pytest.raises(porcelain.GitError):
-        api.pull_rebase(path, "origin", "main")
+        api.pull_rebase(path, "origin", "main", ambient=dict(os.environ))
     with pytest.raises(porcelain.MissingRevision):
-        api.merge_ff(path, "does-not-exist")
+        api.merge_ff(path, "does-not-exist", ambient=dict(os.environ))
 
 
 @pytest.mark.parametrize("revision", ["--root", "--abort", "--all", "--independent", "-x"])
 def test_fast_forward_rejects_option_like_revisions(plumbing: tuple[Plumbing, Path], revision: str) -> None:
     api, path = plumbing
-    before = api.branches(path)
+    before = api.branches(path, ambient=dict(os.environ))
     with pytest.raises(ValueError, match="revision must not start"):
-        api.merge_ff(path, revision)
-    assert api.branches(path) == before
+        api.merge_ff(path, revision, ambient=dict(os.environ))
+    assert api.branches(path, ambient=dict(os.environ)) == before
 
 
 def _worktree(api: Plumbing, path: Path) -> Worktree:
-    return FakeRepo(api.state, path).worktree(path) if isinstance(api, FakePlumbing) else RealRepo(path).worktree(path)
+    return (
+        FakeRepo(api.state, path).worktree(path)
+        if isinstance(api, FakePlumbing)
+        else RealRepo(path, ambient=dict(os.environ)).worktree(path)
+    )
 
 
 def test_snapshot_includes_declared_ignored_inputs_on_both_implementations(plumbing: tuple[Plumbing, Path]) -> None:
@@ -133,9 +138,9 @@ def test_snapshot_includes_declared_ignored_inputs_on_both_implementations(plumb
 def test_read_failures_are_typed_and_invalid_scopes_are_refused(plumbing: tuple[Plumbing, Path]) -> None:
     api, path = plumbing
     with pytest.raises(porcelain.NotARepo):
-        api.branches(path.parent / "missing")
+        api.branches(path.parent / "missing", ambient=dict(os.environ))
     with pytest.raises(ValueError, match="scope"):
-        api.ls_files(path, scope="bogus")
+        api.ls_files(path, scope="bogus", ambient=dict(os.environ))
 
 
 def _advance_remote(api: Plumbing, path: Path) -> None:
@@ -157,7 +162,7 @@ def test_pull_fetches_and_rebases_local_commits(plumbing: tuple[Plumbing, Path])
     wt = _worktree(api, path)
     wt.record("local", paths="all")
     _advance_remote(api, path)
-    api.pull_rebase(path, "origin", "main")
+    api.pull_rebase(path, "origin", "main", ambient=dict(os.environ))
     assert wt.repo.relate("origin/main", "HEAD").ahead == 0
     assert wt.repo.relate("origin/main", "HEAD").behind == 1
     tree = wt.repo.tree("HEAD")
@@ -179,14 +184,14 @@ def test_merge_fast_forwards_and_refuses_divergence(
     _advance_remote(api, path)
     wt.repo.sync()
     if diverged:
-        before = api.branches(path)
+        before = api.branches(path, ambient=dict(os.environ))
         with pytest.raises(porcelain.GitError):
-            api.merge_ff(path, "origin/main")
-        assert api.branches(path) == before
+            api.merge_ff(path, "origin/main", ambient=dict(os.environ))
+        assert api.branches(path, ambient=dict(os.environ)) == before
     else:
         # The upstream only adds "remote", so local tracked edits survive.
-        api.merge_ff(path, "origin/main")
-        assert api.branches(path) == api.branches(path, "origin")
+        api.merge_ff(path, "origin/main", ambient=dict(os.environ))
+        assert api.branches(path, ambient=dict(os.environ)) == api.branches(path, "origin", ambient=dict(os.environ))
         assert wt.snapshot("HEAD").tree != wt.snapshot("HEAD").head_tree
 
 
@@ -197,7 +202,7 @@ def test_branch_pinned_reports_the_holder_from_git(tmp_path: Path, monkeypatch: 
     linked = tmp_path / "linked"
     run(tmp_path, "worktree", "add", "--detach", str(linked), "HEAD")
     with pytest.raises(porcelain.BranchPinned) as caught:
-        porcelain.run_git(linked, "checkout", "main")
+        porcelain.run_git(linked, "checkout", "main", ambient=dict(os.environ))
     assert caught.value.holder == str(tmp_path)
 
 
@@ -211,7 +216,7 @@ def test_snapshot_matches_taskloop_throwaway_index_with_declared_ignored_input(t
     (tmp_path / "tracked").write_text("changed", encoding="utf-8")
     (tmp_path / "new").write_text("new", encoding="utf-8")
     (tmp_path / "declared.input").write_text("input", encoding="utf-8")
-    wt = RealRepo(tmp_path).worktree(tmp_path)
+    wt = RealRepo(tmp_path, ambient=dict(os.environ)).worktree(tmp_path)
     before = run(tmp_path, "ls-files", "--stage", "-z")
     state_before = run(tmp_path, "--no-optional-locks", "status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all")
     default = wt.snapshot("HEAD")
@@ -226,11 +231,11 @@ def test_snapshot_matches_taskloop_throwaway_index_with_declared_ignored_input(t
     # independent throwaway-index algorithm is the reference for Snapshot.tree.
     with TemporaryDirectory() as folder:
         env = {"GIT_INDEX_FILE": str(Path(folder) / "index")}
-        porcelain.run_git(tmp_path, "read-tree", "HEAD", env=env)
-        porcelain.run_git(tmp_path, "add", "-A", env=env)
-        expected = porcelain.run_git(tmp_path, "write-tree", env=env).strip()
+        porcelain.run_git(tmp_path, "read-tree", "HEAD", env=env, ambient=dict(os.environ))
+        porcelain.run_git(tmp_path, "add", "-A", env=env, ambient=dict(os.environ))
+        expected = porcelain.run_git(tmp_path, "write-tree", env=env, ambient=dict(os.environ)).strip()
         assert wt.snapshot("HEAD").tree == expected
-        porcelain.run_git(tmp_path, "add", "-f", "declared.input", env=env)
-        expected_input = porcelain.run_git(tmp_path, "write-tree", env=env).strip()
+        porcelain.run_git(tmp_path, "add", "-f", "declared.input", env=env, ambient=dict(os.environ))
+        expected_input = porcelain.run_git(tmp_path, "write-tree", env=env, ambient=dict(os.environ)).strip()
         assert second.tree == expected_input
     assert before == run(tmp_path, "ls-files", "--stage", "-z")

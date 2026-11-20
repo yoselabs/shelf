@@ -90,13 +90,13 @@ def _config_args(config: Mapping[str, str] | None) -> list[str]:
     return [arg for key, value in (config or {}).items() for arg in ("-c", f"{key}={value}")]
 
 
-def _known(repo: Path, specs: Sequence[str], config: list[str]) -> tuple[list[str], bool]:
+def _known(repo: Path, specs: Sequence[str], config: list[str], ambient: Mapping[str, str]) -> tuple[list[str], bool]:
     """Which of ``specs`` git can stage, and whether any of them holds an untracked file.
 
     One ``ls-files`` lists the tracked files under each path (deleted ones included) and the
     untracked ones that are not ignored; a path counts when it is, or holds, one of them. So
     a moved folder stages from its old path too, and an ignored, untracked path is skipped."""
-    out = run_git(repo, *config, "ls-files", "-z", "-t", "--cached", "--others", "--exclude-standard", "--", *specs)
+    out = run_git(repo, *config, "ls-files", "-z", "-t", "--cached", "--others", "--exclude-standard", "--", *specs, ambient=ambient)
     listed = [(item[0], item[2:]) for item in out.split("\0") if len(item) > 2]
     known: list[str] = []
     untracked = False
@@ -115,6 +115,7 @@ def commit_paths(
     paths: Sequence[str],
     message: str,
     *,
+    ambient: Mapping[str, str],
     author: Identity,
     committer: Identity,
     trailers: Iterable[tuple[str, str]] = (),
@@ -136,13 +137,13 @@ def commit_paths(
     if not paths:
         return None
     cfg = _config_args(config)
-    specs, untracked = _known(repo, [f":(literal){p}" for p in dict.fromkeys(paths)], cfg)
+    specs, untracked = _known(repo, [f":(literal){p}" for p in dict.fromkeys(paths)], cfg, ambient=ambient)
     if not specs:
         return None
     if untracked:
         # Only a new file needs staging first; `commit --only` takes tracked paths as they are.
-        run_git(repo, *cfg, "add", "-A", "--", *specs)
-    elif git_returncode(repo, *cfg, "diff", "--quiet", "HEAD", "--", *specs) == 0:
+        run_git(repo, *cfg, "add", "-A", "--", *specs, ambient=ambient)
+    elif git_returncode(repo, *cfg, "diff", "--quiet", "HEAD", "--", *specs, ambient=ambient) == 0:
         return None  # the working tree matches HEAD; with no HEAD the commit below decides
     run_git(
         repo,
@@ -156,27 +157,40 @@ def commit_paths(
         "--",
         *specs,
         env=_identity_env(author, committer),
+        ambient=ambient,
     )
-    return head(repo)
+    return head(repo, ambient=ambient)
 
 
-def head(repo: Path) -> str:
+def head(repo: Path, *, ambient: Mapping[str, str]) -> str:
     """The sha ``HEAD`` points at (read from the ref files when they can say, else from git)."""
-    return _head_from_files(repo) or run_git(repo, "rev-parse", "HEAD").strip()
+    return _head_from_files(repo, ambient) or run_git(repo, "rev-parse", "HEAD", ambient=ambient).strip()
 
 
 _FIELD = "\x1f"
 _RECORD = "\x1e"
 
 
-def log_grep(repo: Path, pattern: str, *, limit: int = 20) -> list[Commit]:
+def log_grep(repo: Path, pattern: str, *, ambient: Mapping[str, str], limit: int = 20) -> list[Commit]:
     """Commits reachable from ``HEAD`` whose message matches ``pattern`` (extended regex,
     one line at a time — so ``^Key: value$`` matches a trailer), newest first, with the
     paths each one changed. Empty on a repo with no commits."""
-    if not run_git(repo, "rev-parse", "--verify", "-q", "HEAD", check=False).strip():
+    if not run_git(repo, "rev-parse", "--verify", "-q", "HEAD", check=False, ambient=ambient).strip():
         return []
     fmt = _RECORD + _FIELD.join(["%H", "%aI", "%an", "%ae", "%s", "%(trailers:only,unfold,separator=%x1d)"]) + _FIELD
-    out = run_git(repo, "log", "-E", f"--grep={pattern}", f"-n{limit}", f"--format={fmt}", "--name-only", "-z", "--no-renames", "HEAD")
+    out = run_git(
+        repo,
+        "log",
+        "-E",
+        f"--grep={pattern}",
+        f"-n{limit}",
+        f"--format={fmt}",
+        "--name-only",
+        "-z",
+        "--no-renames",
+        "HEAD",
+        ambient=ambient,
+    )
     commits: list[Commit] = []
     for record in out.split(_RECORD)[1:]:
         sha, at, name, email, subject, trailer_text, rest = record.split(_FIELD, 6)
@@ -195,24 +209,24 @@ def log_grep(repo: Path, pattern: str, *, limit: int = 20) -> list[Commit]:
     return commits
 
 
-def show_at(repo: Path, rel: str, rev: str) -> str | None:
+def show_at(repo: Path, rel: str, rev: str, *, ambient: Mapping[str, str]) -> str | None:
     """The text of ``rel`` as of ``rev``, or None when the path did not exist there."""
     validate_revisions(rev)
     try:
-        return run_git(repo, "show", f"{rev}:{rel}")
+        return run_git(repo, "show", f"{rev}:{rel}", ambient=ambient)
     except GitError:
         return None
 
 
-def is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
+def is_ancestor(repo: Path, ancestor: str, descendant: str, *, ambient: Mapping[str, str]) -> bool:
     """True when ``ancestor`` is reachable from ``descendant`` (a push would fast-forward)."""
     validate_revisions(ancestor, descendant)
-    return git_returncode(repo, "merge-base", "--is-ancestor", "--end-of-options", ancestor, descendant) == 0
+    return git_returncode(repo, "merge-base", "--is-ancestor", "--end-of-options", ancestor, descendant, ambient=ambient) == 0
 
 
-def upstream(repo: Path) -> str | None:
+def upstream(repo: Path, *, ambient: Mapping[str, str]) -> str | None:
     """The current branch's upstream (``origin/main``), or None when none is set."""
-    out = run_git(repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}", check=False).strip()
+    out = run_git(repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}", check=False, ambient=ambient).strip()
     return out or None
 
 
@@ -241,9 +255,9 @@ def classify_remote_failure(stderr: str) -> RemoteFailure:
     return "other"
 
 
-def _remote(repo: Path, *args: str, timeout: float, config: Mapping[str, str] | None = None) -> CommandResult:
+def _remote(repo: Path, *args: str, ambient: Mapping[str, str], timeout: float, config: Mapping[str, str] | None = None) -> CommandResult:
     try:
-        return run_git_result(repo, *_config_args(config), *args, timeout=timeout)
+        return run_git_result(repo, *_config_args(config), *args, timeout=timeout, ambient=ambient)
     except GitError as exc:
         reason = "offline" if exc.retryable else classify_remote_failure(exc.output or str(exc))
         raise RemoteError(str(exc), reason=reason, output=exc.output) from exc
@@ -254,6 +268,7 @@ def push(
     remote: str | None = None,
     refspec: str | None = None,
     *,
+    ambient: Mapping[str, str],
     timeout: float = 120,
     config: Mapping[str, str] | None = None,
 ) -> CommandResult:
@@ -266,15 +281,17 @@ def push(
         args.append(remote)
         if refspec is not None:
             args.append(refspec)
-    return _remote(repo, *args, timeout=timeout, config=config)
+    return _remote(repo, *args, timeout=timeout, config=config, ambient=ambient)
 
 
-def fetch(repo: Path, remote: str | None = None, *, timeout: float = 120, config: Mapping[str, str] | None = None) -> CommandResult:
+def fetch(
+    repo: Path, remote: str | None = None, *, ambient: Mapping[str, str], timeout: float = 120, config: Mapping[str, str] | None = None
+) -> CommandResult:
     """Fetch the remote's refs. Never touches the working tree or the current branch.
 
     A fetch that brings new commits starts a detached ``git maintenance run --auto``; ``config``
     turns that off (``{"maintenance.auto": "false"}``) — each entry is a ``git -c key=value``."""
-    return _remote(repo, "fetch", "--quiet", *([remote] if remote else []), timeout=timeout, config=config)
+    return _remote(repo, "fetch", "--quiet", *([remote] if remote else []), timeout=timeout, config=config, ambient=ambient)
 
 
 @dataclass(frozen=True)
@@ -293,8 +310,10 @@ class MergeResult:
     output: str = ""
 
 
-def _changed_since(repo: Path, rev: str) -> tuple[str, ...]:
-    out = run_git(repo, "-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", "-z", rev, "HEAD", check=False)
+def _changed_since(repo: Path, rev: str, ambient: Mapping[str, str]) -> tuple[str, ...]:
+    out = run_git(
+        repo, "-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", "-z", rev, "HEAD", check=False, ambient=ambient
+    )
     return tuple(p for p in out.split("\0") if p)
 
 
@@ -302,6 +321,7 @@ def merge(
     repo: Path,
     ref: str,
     *,
+    ambient: Mapping[str, str],
     author: Identity,
     committer: Identity,
     message: str | None = None,
@@ -316,27 +336,33 @@ def merge(
     merge would overwrite blocks it before anything changes (``blocked``). ``config`` is as
     for :func:`commit_paths`; it cannot change the conflict style.
     """
-    if is_ancestor(repo, ref, "HEAD"):
+    if is_ancestor(repo, ref, "HEAD", ambient=ambient):
         return MergeResult("up_to_date")
-    before = head(repo)
-    fast_forward = is_ancestor(repo, "HEAD", ref)
+    before = head(repo, ambient=ambient)
+    fast_forward = is_ancestor(repo, "HEAD", ref, ambient=ambient)
     # The caller's config comes first, so it cannot take the base section (diff3) away.
     args = [*_config_args(config), "-c", "merge.conflictStyle=diff3", "merge", "--no-verify", "--no-edit"]
     if message is not None:
         args += ["-m", _message(message, trailers)]
-    proc = _run(repo, (*args, "--", ref), _identity_env(author, committer), None)
+    proc = _run(repo, (*args, "--", ref), ambient, _identity_env(author, committer), None)
     output = redact_output((proc.stdout + proc.stderr).strip())
     if proc.returncode != 0:
         if merge_in_progress(repo):
-            return MergeResult("conflict", changed=_changed_since(repo, before), conflicted=tuple(unmerged_paths(repo)), output=output)
+            return MergeResult(
+                "conflict",
+                changed=_changed_since(repo, before, ambient),
+                conflicted=tuple(unmerged_paths(repo, ambient=ambient)),
+                output=output,
+            )
         return MergeResult("blocked", error=output, output=output)
-    return MergeResult("fast_forward" if fast_forward else "merged", changed=_changed_since(repo, before), output=output)
+    return MergeResult("fast_forward" if fast_forward else "merged", changed=_changed_since(repo, before, ambient), output=output)
 
 
 def finish_merge(
     repo: Path,
     paths: Iterable[str],
     *,
+    ambient: Mapping[str, str],
     author: Identity,
     committer: Identity,
     message: str | None = None,
@@ -353,16 +379,16 @@ def finish_merge(
     """
     if not merge_in_progress(repo):
         return MergeResult("up_to_date")
-    wanted = list(dict.fromkeys([*paths, *unmerged_paths(repo)]))
+    wanted = list(dict.fromkeys([*paths, *unmerged_paths(repo, ambient=ambient)]))
     left = tuple(p for p in wanted if (repo / p).exists() and has_conflict_markers(repo / p))
     if left:
         return MergeResult("conflict", conflicted=left)
     if wanted:
-        run_git(repo, "add", "-A", "--", *[f":(literal){p}" for p in wanted])
+        run_git(repo, "add", "-A", "--", *[f":(literal){p}" for p in wanted], ambient=ambient)
     args = [*_config_args(config), "commit", "--no-verify", "-q"]
     args += ["--no-edit"] if message is None else ["-m", _message(message, trailers)]
-    done = run_git_result(repo, *args, env=_identity_env(author, committer))
-    return MergeResult("merged", changed=_changed_since(repo, "HEAD^1"), output=done.output)
+    done = run_git_result(repo, *args, env=_identity_env(author, committer), ambient=ambient)
+    return MergeResult("merged", changed=_changed_since(repo, "HEAD^1", ambient), output=done.output)
 
 
 __all__ = [

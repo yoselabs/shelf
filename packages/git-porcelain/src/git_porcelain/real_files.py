@@ -9,21 +9,23 @@ from git_porcelain.real import RealRepo
 from git_porcelain.real_done import unavailable
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
 
-def check_ignore(repo: Path, paths: Sequence[str]) -> set[str]:
+def check_ignore(repo: Path, paths: Sequence[str], *, ambient: Mapping[str, str]) -> set[str]:
     """Paths ignored by the checkout's rules, even when already tracked (``--no-index``)."""
     if not paths:
         return set()
-    done = RealRepo(repo).run(repo, "check-ignore", "--no-index", "--stdin", "-z", stdin="\0".join(paths) + "\0", check=False)
+    done = RealRepo(repo, ambient=ambient).run(
+        repo, "check-ignore", "--no-index", "--stdin", "-z", stdin="\0".join(paths) + "\0", check=False
+    )
     if done.rc not in (0, 1):
         raise unavailable(("check-ignore",), done)
     return {p for p in done.out.split("\0") if p}
 
 
-def ls_files(repo: Path, *, scope: str = "tracked") -> list[str]:
+def ls_files(repo: Path, *, ambient: Mapping[str, str], scope: str = "tracked") -> list[str]:
     """Sorted repo-relative paths: tracked (index), untracked, ignored, or all three."""
     options = {
         "tracked": ("--cached",),
@@ -34,5 +36,5 @@ def ls_files(repo: Path, *, scope: str = "tracked") -> list[str]:
     if scope not in options:
         msg = f"unknown file scope: {scope!r}"
         raise ValueError(msg)
-    out = run_git(repo, "ls-files", "-z", *options[scope])
+    out = run_git(repo, "ls-files", "-z", *options[scope], ambient=ambient)
     return sorted({p for p in out.split("\0") if p})

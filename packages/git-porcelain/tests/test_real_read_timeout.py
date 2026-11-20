@@ -35,14 +35,14 @@ def test_the_fifo_blocks_status_without_a_bound(fifo_repo: Path) -> None:
 
 
 def test_a_bounded_read_times_out_instead_of_hanging(fifo_repo: Path) -> None:
-    repo = RealRepo(fifo_repo, read_timeout=2)
+    repo = RealRepo(fifo_repo, read_timeout=2, ambient=dict(os.environ))
     with pytest.raises(GitTimeout, match=r"git status timed out after 2"):
         repo.run(fifo_repo, "status", "--porcelain")
 
 
 def test_every_call_is_bounded_and_a_read_takes_no_optional_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     apply_hermetic_env(monkeypatch)
-    repo = RealRepo(tmp_path, read_timeout=5)
+    repo = RealRepo(tmp_path, read_timeout=5, ambient=dict(os.environ))
     seen: list[tuple[float, str | None]] = []
 
     def fake_capture(argv: list[str], *, env: dict[str, str], timeout: float, **_: object) -> stream_proc.CapturedBytes:
@@ -66,7 +66,9 @@ def test_a_write_that_runs_over_its_timeout_is_stopped_with_its_children(tmp_pat
     (tmp_path / "f").write_text("x")
     git(tmp_path, "add", "f")
     with pytest.raises(GitTimeout, match=r"timed out after 2"):
-        RealRepo(tmp_path).run(tmp_path, "-c", "user.name=a", "-c", "user.email=a@b", "commit", "-q", "-m", "m", pin=False, timeout=2)
+        RealRepo(tmp_path, ambient=dict(os.environ)).run(
+            tmp_path, "-c", "user.name=a", "-c", "user.email=a@b", "commit", "-q", "-m", "m", pin=False, timeout=2
+        )
     child = int(pidfile.read_text())
     deadline = time.monotonic() + 5
     while _running(child) and time.monotonic() < deadline:
@@ -90,7 +92,7 @@ def test_a_timeout_kills_the_git_child_too(tmp_path: Path, monkeypatch: pytest.M
     program.chmod(0o755)
     git(tmp_path, "config", "core.fsmonitor", str(program))
     with pytest.raises(GitTimeout):
-        RealRepo(tmp_path, read_timeout=2).run(tmp_path, "status", "--porcelain")
+        RealRepo(tmp_path, read_timeout=2, ambient=dict(os.environ)).run(tmp_path, "status", "--porcelain")
     child = int(pidfile.read_text())
     deadline = time.monotonic() + 5
     while _running(child) and time.monotonic() < deadline:

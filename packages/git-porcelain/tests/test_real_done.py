@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -36,7 +37,7 @@ def test_runner_diagnostics_replace_invalid_utf8(tmp_path: Path, git_process: Ca
         return subprocess.CompletedProcess(args, int(outcome == "refusal"), b"out-\xff\n", b"err-\xfe\n")
 
     git_process(process)
-    repo = RealRepo(tmp_path)
+    repo = RealRepo(tmp_path, ambient=dict(os.environ))
     if outcome == "success":
         done = repo.run(tmp_path, "fetch", pin=False)
         assert done.out == "out-\ufffd\n"
@@ -66,10 +67,10 @@ def test_runner_redacts_credentials_in_both_output_streams(
         return subprocess.CompletedProcess(args, int(outcome == "refusal"), stdout, stderr)
 
     git_process(process)
-    repo = RealRepo(tmp_path)
+    repo = RealRepo(tmp_path, ambient=dict(os.environ))
     if outcome == "success":
         if path_api:
-            assert run_git_result(tmp_path, "fetch").output == expected
+            assert run_git_result(tmp_path, "fetch", ambient=dict(os.environ)).output == expected
         else:
             done = repo.run(tmp_path, "fetch", pin=False)
             assert done.output == expected
@@ -79,7 +80,7 @@ def test_runner_redacts_credentials_in_both_output_streams(
     else:
         with pytest.raises(GitError) as caught:
             if path_api:
-                run_git_result(tmp_path, "fetch")
+                run_git_result(tmp_path, "fetch", ambient=dict(os.environ))
             else:
                 repo.run(tmp_path, "fetch", pin=False)
         assert caught.value.output == expected
