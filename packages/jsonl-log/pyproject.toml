@@ -8,7 +8,7 @@ requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
     "atomic-io>=0.2,<1",
-    "process-lock>=0.2,<1",
+    "process-lock>=0.4,<1",
 ]
 
 [tool.uv.sources]

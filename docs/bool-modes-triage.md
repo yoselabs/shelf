@@ -40,7 +40,6 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `git-porcelain:stage:literal` | A | `stage(paths)` literal and `stage_pathspec(patterns)`. git-porcelain public Repo protocol. Not touched. |
 | `jsonl-log:__init__:read_only` | A | `JsonlReader(path)` (read, no fd, no rotate) beside `JsonlLog` (append). a2kay (use-cases/a2kay--jsonl-log) must move. Left: external consumer. |
 | `jsonl-log:open:read_only` | A | `JsonlReader(path)` (read, no fd, no rotate) beside `JsonlLog` (append). a2kay (use-cases/a2kay--jsonl-log) must move. Left: external consumer. |
-| `process-lock:acquire:reentrant` | A | `acquire` (reentrant) and `acquire_exclusive`; the `_Held.reentrant` field stays as data. a2kay (use-cases/a2kay--process-lock). Left: external consumer. |
 | `sqlite-sidecar:connect:read_only` | A | `connect_read_only(target)` beside `connect(target)`. In-tree: sqlite-store, anyembed, fts-query; external: a2kay. Left: consumers. |
 | `sqlite-sidecar:from_text:aware` | A | `from_text(text) -> datetime` (naive UTC) and `from_text_utc(text)` (aware). a2kay (use-cases/a2kay--sqlite-sidecar). Left: external consumer. |
 | `stream-proc:_hit:group` | A | `_hit_pid` and `_hit` (group, then pid). Private to stream-proc, but it is the signal path that kills process trees; left for an owner-reviewed change, not a drive-by. |

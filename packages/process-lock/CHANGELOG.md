@@ -4,6 +4,7 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see the ledger for why). Read this before source/README when reconciling a pin
 (agent-loop.md WORKFLOW: RECEIVE).
 
+- 0.4.0: breaking  ⇒  `acquire(path, *, timeout, on_wait, label, meta)` loses `reentrant=` (always re-entrant); new `ProcessLock.acquire_exclusive(path, *, timeout, on_wait, label, meta)` (the old `reentrant=False`: a second acquire in this process waits or raises `LockHeldError`)
 - 0.2.0: `acquire(path)` only  ⇒  `acquire(path, *, timeout=0.0, on_wait=None, label=None, meta=None, reentrant=True)`; `timeout` seconds to wait (None: forever), `on_wait(Waiting(path, elapsed, holder))` per poll, expiry ⇒ `LockHeldError`
 - 0.2.0: lock-file body bare pid  ⇒  JSON `{pid, created, label, meta}`; new `holder(path) -> Holder | None` reads it without the lock (bare-pid files still parse)
 - 0.2.0: `reentrant=False` ⇒ a second acquire of the path in the same process waits or raises `LockHeldError` (pid = own); re-entry needs both acquirers reentrant

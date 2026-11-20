@@ -55,7 +55,7 @@ class Mailbox:
 
     def _locked(self) -> ProcessLock:
         self.lock.parent.mkdir(parents=True, exist_ok=True)
-        return ProcessLock.acquire(self.lock, timeout=self.timeout, label="any-mailbox", reentrant=False)
+        return ProcessLock.acquire_exclusive(self.lock, timeout=self.timeout, label="any-mailbox")
 
     def _read(self) -> bytes | None:
         try:

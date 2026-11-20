@@ -1,6 +1,6 @@
 [project]
 name = "any-json-doc"
-version = "0.3.0"
+version = "0.3.1"
 description = "One JSON document per file, replaced atomically, read as one of four states: Present, Absent, Torn (half-written or unreadable) or ForeignVersion (another install's schema)."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
@@ -9,7 +9,7 @@ license = "Apache-2.0"
 dependencies = [
     "atomic-io>=0.2,<1",
     "content-digest>=0.2,<1",
-    "process-lock>=0.2,<1",
+    "process-lock>=0.4,<1",
 ]
 
 [tool.uv.sources]

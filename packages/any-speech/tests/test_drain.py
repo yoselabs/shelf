@@ -282,7 +282,7 @@ async def test_an_always_failing_diarizer_is_tried_three_times_then_left_with_no
 async def test_a_cancelled_waiter_does_not_leave_the_claim_held(tmp_path: Path) -> None:
     speech = _speech(tmp_path)
     job = _job(tmp_path, "c")
-    holder = ProcessLock.acquire(claim_path(job.out), timeout=None, reentrant=False)
+    holder = ProcessLock.acquire_exclusive(claim_path(job.out), timeout=None)
     waiter = asyncio.create_task(speech.transcribe(job.audio, job.out))
     await asyncio.sleep(0.2)
     waiter.cancel()

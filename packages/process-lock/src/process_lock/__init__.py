@@ -9,7 +9,7 @@
 - **Never broken.** A lock the kernel says is held is never taken over. If the recorded pid is
   gone, a forked child kept the descriptor; the error says so and the caller decides.
 - **Re-entrant within a process** by default: two handles on one descriptor, released at the
-  last :meth:`ProcessLock.release`. ``reentrant=False`` makes a second acquire of the same
+  last :meth:`ProcessLock.release`. ``acquire_exclusive`` makes a second acquire of the same
   path in this process wait or fail like any other holder. Not ``lockf``: a POSIX record lock
   is dropped when *any* descriptor on the file closes.
 - **Not inherited.** The descriptor is non-inheritable (PEP 446), so a child does not keep the lock.
@@ -119,13 +119,39 @@ class ProcessLock:
         on_wait: Callable[[Waiting], None] | None = None,
         label: str | None = None,
         meta: Mapping[str, object] | None = None,
-        reentrant: bool = True,
     ) -> ProcessLock:
-        """Lock ``path`` for this process.
+        """Lock ``path`` for this process; a second acquire in this process shares the lock (re-entrant).
 
         ``timeout`` is seconds to wait (0: refuse at once, None: wait forever); on expiry raise
         :class:`LockHeldError`. ``on_wait`` is called on every poll while waiting.
         """
+        return cls._take(path, reentrant=True, timeout=timeout, on_wait=on_wait, label=label, meta=meta)
+
+    @classmethod
+    def acquire_exclusive(
+        cls,
+        path: Path,
+        *,
+        timeout: float | None = 0.0,
+        on_wait: Callable[[Waiting], None] | None = None,
+        label: str | None = None,
+        meta: Mapping[str, object] | None = None,
+    ) -> ProcessLock:
+        """:meth:`acquire` that is not re-entrant: a second acquire of ``path`` in this process waits or raises
+        :class:`LockHeldError` (pid = own), like any other holder. Re-entry needs both acquirers re-entrant."""
+        return cls._take(path, reentrant=False, timeout=timeout, on_wait=on_wait, label=label, meta=meta)
+
+    @classmethod
+    def _take(
+        cls,
+        path: Path,
+        *,
+        reentrant: bool,
+        timeout: float | None,
+        on_wait: Callable[[Waiting], None] | None,
+        label: str | None,
+        meta: Mapping[str, object] | None,
+    ) -> ProcessLock:
         key = path.resolve()
         record: dict[str, object] = {"label": label, "meta": dict(meta or {})}
         json.dumps(record)  # refuse an unserializable record before taking anything

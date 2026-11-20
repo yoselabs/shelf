@@ -61,7 +61,7 @@ def test_a_rotator_that_waited_finds_the_file_already_rotated(tmp_path: Path) ->
     lock = tmp_path / "log.jsonl.lock"
     with JsonlLog.open(path, rotate_bytes=100, keep=5, rotate_lock=True) as log:
         log.append(b"a" * 90)
-        with ProcessLock.acquire(lock, reentrant=False):  # another rotator is mid-shift
+        with ProcessLock.acquire_exclusive(lock):  # another rotator is mid-shift
             t = threading.Thread(target=lambda: log.append(b"c" * 20))  # needs a rotation: waits on the lock
             t.start()
             time.sleep(0.2)  # no hook shows a thread blocked on the lock; a miss only weakens the assert

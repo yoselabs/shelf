@@ -64,7 +64,7 @@ class Drain:
                 self._note(self._report.skipped, job.out, unless=self._report.failed)
             elif not await is_current(job.out, self._speech.pipeline, job.audio):
                 try:
-                    lock = ProcessLock.acquire(claim_path(job.out), timeout=0, reentrant=False)
+                    lock = ProcessLock.acquire_exclusive(claim_path(job.out), timeout=0)
                 except LockHeldError:
                     continue  # another worker has it
                 if await is_current(job.out, self._speech.pipeline, job.audio):  # finished while we asked

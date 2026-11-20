@@ -47,7 +47,7 @@ def default_out(audio: Path) -> Path:
 
 async def _acquire_claim(target: Path) -> ProcessLock:
     """Take the claim on `target`. A waiter cancelled mid-wait still gets the thread's lock released once it lands."""
-    acquiring = asyncio.ensure_future(asyncio.to_thread(ProcessLock.acquire, claim_path(target), timeout=None, reentrant=False))
+    acquiring = asyncio.ensure_future(asyncio.to_thread(ProcessLock.acquire_exclusive, claim_path(target), timeout=None))
     try:
         return await asyncio.shield(acquiring)
     except asyncio.CancelledError:

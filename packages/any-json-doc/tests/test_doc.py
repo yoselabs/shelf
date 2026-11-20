@@ -324,14 +324,13 @@ def test_update_lock_timeout_propagates(tmp_path: Path, monkeypatch: pytest.Monk
     doc: Doc[int] = Doc(tmp_path / "counter.json")
     error = LockHeldError(doc.path, None)
 
-    def acquire(cls: type[ProcessLock], path: Path, *, timeout: float, reentrant: bool) -> ProcessLock:
+    def acquire_exclusive(cls: type[ProcessLock], path: Path, *, timeout: float) -> ProcessLock:
         assert path == type(doc.path)(str(doc.path) + ".lock")
         assert timeout == 10.0
-        assert reentrant is False
         raise error
 
     with monkeypatch.context() as patch:
-        patch.setattr(ProcessLock, "acquire", classmethod(acquire))
+        patch.setattr(ProcessLock, "acquire_exclusive", classmethod(acquire_exclusive))
         with pytest.raises(LockHeldError) as caught:
             doc.update(lambda _: 1)
         assert caught.value is error

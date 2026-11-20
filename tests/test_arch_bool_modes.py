@@ -66,10 +66,6 @@ _ALLOWED: dict[str, str] = {
         "sqlite-sidecar:from_text:aware",
     ),
     **_rows(
-        "split: reentrant vs exclusive acquire are two lock semantics; a2kay consumes acquire",
-        "process-lock:acquire:reentrant",
-    ),
-    **_rows(
         "split: keep_mode picks between two permission behaviours; consumers a2kay, any-frontmatter, any-net, dir-trust",
         "atomic-io:atomic_write_bytes:keep_mode",
         "atomic-io:atomic_write_json:keep_mode",
