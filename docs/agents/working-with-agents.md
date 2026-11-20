@@ -55,8 +55,9 @@ Never invent a blocker bead for "not started". Commands: [issue-tracker.md](issu
 
 ## After a blueprint run
 
-- Fill the survey: `blueprint survey --repo . > docs/blueprint/survey.md`, answer every row with one line of
-  evidence, then `blueprint survey --check docs/blueprint/survey.md` must print `complete`.
+- Fill the survey: copy the questions of `survey.toml` (in the installed blueprint package) into `docs/blueprint/survey.md`, one table
+  per section (`id | question | answer | evidence`), answer every row from the file's closed `answers` set with one line of
+  evidence; a row with no answer, or a non-yes with no evidence, is not done.
 - Answer as a critic of the run: a "yes" without evidence is a "partly".
 - A gap in blueprint itself (no profile, no checkpoint) becomes one bead in the shelf repo, titled
   `blueprint lacks: <what>`; never patch blueprint from inside this repo.

@@ -82,12 +82,10 @@ def test_a_main_script_that_parses_nothing_is_not_a_command(repo: Repo) -> None:
     assert _direct_row(repo)[0] is Verdict.NOT_APPLICABLE
 
 
-def test_sys_argv_and_typer_count_as_parsing(repo: Repo) -> None:
-    repo.write("tools/a.py", "import sys\nif __name__ == '__main__':\n    print(sys.argv)\n")
+def test_typer_counts_as_parsing(repo: Repo) -> None:
     repo.write("tools/b.py", "import typer\nif __name__ == '__main__':\n    typer.run(print)\n")
     verdict, evidence = _direct_row(repo)
     assert verdict is Verdict.FAILING
-    assert "tools/a.py" in evidence
     assert "tools/b.py" in evidence
 
 
@@ -107,3 +105,21 @@ def test_the_lenient_parsing_row_is_gone(repo: Repo) -> None:
     repo.write("src/x/cli.py", "p.parse_known_args()\n")
     repo.commit()
     assert "stack.python-uv.cli-parse" not in {r.id for r in run(repo.root, concern="stack", env=repo.env).rows}
+
+
+def test_an_internal_entry_script_with_a_fixed_argv_is_not_a_command(repo: Repo) -> None:
+    repo.write("tools/hook.py", 'import sys\n\nif __name__ == "__main__":\n    print(sys.argv[1])\n')
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    repo.write("uv.lock", "")
+    repo.commit()
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == _HELP_ROW)
+    assert row.verdict is Verdict.NOT_APPLICABLE
+
+
+def test_a_script_with_an_argument_parser_is_a_command_and_needs_the_help_test(repo: Repo) -> None:
+    repo.write("tools/run.py", 'import argparse\n\nif __name__ == "__main__":\n    argparse.ArgumentParser().parse_args()\n')
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    repo.write("uv.lock", "")
+    repo.commit()
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == _HELP_ROW)
+    assert row.verdict is Verdict.FAILING

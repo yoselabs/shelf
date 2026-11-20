@@ -1,0 +1,27 @@
+# One owner per fact: the single file allowed to hold it. A second copy fails `stack.one-owner`, naming the owner.
+# A copy is a `toml` key (dotted, in `file`) or a `pattern` (regex over the file's lines). Plain text on purpose: any reader needs no Python.
+
+[[fact]]
+name = "the Python version you run"
+owner = ".python-version"
+why = "uv installs Python from it; `requires-python` stays a range"
+copies = [
+    { file = "mise.toml", toml = "tools.python" },
+    { file = ".tool-versions", pattern = "^\\s*python\\s" },
+    { file = "pyproject.toml", toml = "tool.uv.python" },
+]
+
+[[fact]]
+name = "the .NET SDK version"
+owner = "global.json"
+why = "mise reads it (idiomatic_version_file_enable_tools)"
+copies = [{ file = "mise.toml", toml = "tools.dotnet" }, { file = ".tool-versions", pattern = "^\\s*dotnet(-core)?\\s" }]
+
+[[fact]]
+name = "the uv version you run"
+owner = "mise.toml"
+why = "`[tool.uv] required-version` is a floor (`>=`), never the pin: a floor and a pin are two facts"
+copies = [
+    { file = "pyproject.toml", toml = "tool.uv.required-version", exact = true },
+    { file = "uv.toml", toml = "required-version", exact = true },
+]

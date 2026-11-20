@@ -4,7 +4,7 @@
 # This is the reference toolchain every consumer of the shelf inherits (ADR 0004). The runner is
 # just (ADR 0023): pinned per repo as the `rust-just` dev dependency, run as `uv run just <recipe>`.
 #
-# The gate's common recipes are the blueprint's, rendered into .blueprint/ (ADR 0029): `uv run blueprint render` rewrites them and
+# The gate's common recipes are the blueprint's, rendered into .blueprint/ (ADR 0029): `uv run blueprint gate render` rewrites them and
 # `just render` fails on any difference. This file keeps only what is the shelf's own: a recipe defined here replaces the rendered one
 # of the same name (`set allow-duplicate-recipes`). Consumers keep the same shape and own even less.
 #
@@ -21,11 +21,11 @@ import '.blueprint/python.just'
 # pytest runs one worker per core (pytest-xdist).
 pytest_par := "-n auto"
 
-# Where whole test runs queue (check-all's pytest below; `blueprint test` queues in the same folder): one slot, so gates started at once wait instead of thrashing.
+# Where whole test runs queue (check-all's pytest below; `blueprint gate test` queues in the same folder): one slot, so gates started at once wait instead of thrashing.
 lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACHE_HOME", env_var("HOME") + "/.cache") + "/gate-leases")
 
 # The gate. Fast, deterministic tools first; tests last. Tests cover only what the change
-# touches (`test`, the rendered `blueprint test`); `check-all` runs every test with the coverage floor: rare, before a release tag, never per task.
+# touches (`test`, the rendered `blueprint gate test`); `check-all` runs every test with the coverage floor: rare, before a release tag, never per task.
 #
 # The per-file linters (scripts, lint-changed, spell-changed) check only the files changed against the base
 # in `check` (`any-gate changed`; a changed config file, or no base, selects everything). `check-all` runs them on every
@@ -60,30 +60,6 @@ scripts scope="changed":
 [group('gate')]
 tag-check:
     python3 -I tools/tag_check.py
-
-# One-time (idempotent, safe to re-run) setup for a CONSUMER repo: wires the commit guard,
-# resolver block, beads (opt-out), and this linter preset via the operations in
-# tools/onboard/ -- ordering and verification are enforced there (run_all()'s precondition
-# harness), never re-implemented here as a recipe dependency graph. See
-# docs/research/onboard-consumer-skill and docs/research/bootstrap-target-contract.
-#
-# Consumers copy this recipe the same way as `guard` above. Run inside the shelf's OWN repo,
-# the underlying script refuses (there is nothing to onboard here -- this repo IS the shelf).
-bootstrap:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    s=.agents/skills/onboard-consumer/scripts/onboard.py
-    [ -f "$s" ] || s="${SHELF_HOME:-../shelf}/.agents/skills/onboard-consumer/scripts/onboard.py"
-    [ -f "$s" ] || s="$HOME/Workspaces/shelf/.agents/skills/onboard-consumer/scripts/onboard.py"
-    if [ -f "$s" ]; then python3 "$s" --repo .
-    else echo "bootstrap: shelf clone not found (set SHELF_HOME) -- clone https://github.com/yoselabs/shelf" >&2; exit 2; fi
-
-# Re-check this repo's onboarding state. NOT a `check` prerequisite -- an environment
-# assertion, not a content one (bootstrap-target-contract design.md D4) -- and deliberately
-# NOT read-only: the operations converge drift back to correct state on every call rather
-# than merely reporting it (tools/onboard/verify.py's whole design). Mechanically identical
-# to `bootstrap` above; the separate name signals intent to the caller.
-bootstrap-verify: bootstrap
 
 [group('gate')]
 lint:

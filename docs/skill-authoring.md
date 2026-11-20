@@ -146,14 +146,14 @@ error there (PR). Claude Code ignores unknown keys.
   (harnesses truncate around 10–30k chars). Say whether a script is to be *run* or *read* (BP).
 - **Plan → validate → execute** for changes: write a plan file, validate it with a script, apply
   (BP, AS).
-- **A check proves the effect, never the artifact** — the onboard-consumer operations assert by
+- **A check proves the effect, never the artifact** — the retired onboard-consumer operations asserted by
   exercising (`Result.verified`); agent-weiss's file-existence checks inverted its own scores (PA).
 - **Injected commands (`` !`cmd` ``) run before the skill renders; any non-zero exit aborts the
   invocation** — append `|| true` to anything that exits 1 on findings (CC).
 - Reach bundled files with `${CLAUDE_SKILL_DIR}`. No plugin `bin/`: claude.ai and Cowork refuse to
   install a plugin with one (PR).
 - **In the shelf:** script logic goes under `tools/` with tests under `tests/`, and the skill holds
-  a thin caller (the onboard-consumer precedent). Today pyrefly and coverage cover `packages/` only,
+  a thin caller (the pattern). Today pyrefly and coverage cover `packages/` only,
   so `tools/` is outside the type gate too until shelf-yz4 extends it.
 
 ## 7. Evals — `claude plugin eval`

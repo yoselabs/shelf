@@ -46,9 +46,21 @@ def test_no_pin_file_is_not_set_up(repo: Repo) -> None:
     assert _verdict(repo, "python-pin") is Verdict.NOT_SET_UP
 
 
-def test_a_patch_level_pin_fails(repo: Repo) -> None:
+def test_a_patch_level_pin_passes(repo: Repo) -> None:
     _sound(repo)
     repo.write(".python-version", "3.12.7\n")
+    assert _verdict(repo, "python-pin") is Verdict.PASSING
+
+
+def test_a_pre_release_pin_passes(repo: Repo) -> None:
+    _sound(repo)
+    repo.write(".python-version", "3.15.0a1\n")
+    assert _verdict(repo, "python-pin") is Verdict.PASSING
+
+
+def test_a_range_in_the_pin_file_fails(repo: Repo) -> None:
+    _sound(repo)
+    repo.write(".python-version", ">=3.12\n")
     assert _verdict(repo, "python-pin") is Verdict.FAILING
 
 

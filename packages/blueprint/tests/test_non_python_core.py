@@ -113,7 +113,7 @@ def _one_command(repo: Repo) -> str:
 def test_the_remediation_comes_from_the_stack_profile(repo: Repo) -> None:
     repo.write("pyproject.toml", '[project]\nname = "x"\n')
     repo.write("uv.lock", "")
-    assert "onboard" in _one_command(repo)
+    assert "blueprint init" in _one_command(repo)
     repo.root.joinpath("pyproject.toml").unlink()
     repo.root.joinpath("uv.lock").unlink()
     repo.write("package.json", json.dumps(_PACKAGE))

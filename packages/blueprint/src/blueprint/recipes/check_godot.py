@@ -4,7 +4,7 @@
 Why: `godot --headless --import` only parses what the editor loads (main scene, project theme); a broken ext_resource
 or a garbage line in any other scene or .tres passes it silently (seen on Godot 4.7.2, lifesim scratch copy, 2026-10-11).
 
-A blueprint recipe (`blueprint recipe godot-integrity > tools/check_godot.py`): the repo copies it and owns the copy.
+A blueprint recipe (`blueprint init`): the repo copies it and owns the copy.
 
 Usage: python3 -I tools/check_godot.py <folder holding project.godot> [csproj]
 Fails (exit 1) on:

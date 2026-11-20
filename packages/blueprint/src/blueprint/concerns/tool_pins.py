@@ -106,12 +106,8 @@ def _godot_sdk(ctx: Context) -> str | None:
 
 
 def _cross_file(ctx: Context, pins: dict[str, tuple[str, str]]) -> list[str]:
-    """Pins that disagree with the language pin files, or are pinned twice."""
+    """Pins that disagree with each other (the language pin files' copies are `stack.one-owner`)."""
     problems: list[str] = []
-    if "python" in pins and ctx.read(".python-version") is not None:
-        problems.append("python is pinned in mise.toml; .python-version is the pin (uv installs Python)")
-    if "dotnet" in pins and ctx.read("global.json") is not None:
-        problems.append("dotnet is pinned in mise.toml; global.json is the pin (mise reads it: idiomatic_version_file_enable_tools)")
     if "just" in pins and _rust_just(ctx):
         problems.append("just is pinned twice: in mise.toml and as the rust-just dev dependency; keep one")
     floor = _FLOOR.search(str(toml_table(ctx.toml("pyproject.toml"), "tool", "uv").get("required-version", "")))

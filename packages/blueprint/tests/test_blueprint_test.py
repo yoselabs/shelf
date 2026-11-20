@@ -1,4 +1,4 @@
-"""`blueprint test`: the gate's tests through any-gate, with the repo's adapter runner; one entry point for a `test` recipe."""
+"""`blueprint gate test`: the gate's tests through any-gate, with the repo's adapter runner; one entry point for a `test` recipe."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Recipes: files `blueprint recipe <name>` prints for a repo to copy and own (ADR 0004)."""
+"""Recipes: files `blueprint init` writes for a repo to copy and own (ADR 0004)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from blueprint.__main__ import RECIPE_FILES, RECIPES, main
+from blueprint.init import RECIPE_TARGETS, RECIPES
 
 if TYPE_CHECKING:
     import pytest
@@ -17,10 +17,21 @@ if TYPE_CHECKING:
 _GUID = "0123456789abcdef0123456789abcdef"
 
 
-def test_every_recipe_prints_its_file(capsys: pytest.CaptureFixture[str]) -> None:
-    for name, file in RECIPE_FILES.items():
-        assert main(["recipe", name]) == 0
-        assert capsys.readouterr().out == (RECIPES / file).read_text()
+RECIPE_FILES = {
+    "hooks": "pre-commit-config.yaml",
+    "unity-integrity": "unity_integrity.py",
+    "dotnet-coverage": "check_coverage.py",
+    "godot-integrity": "check_godot.py",
+    "dockerfile-pins": "check_dockerfile_pins.py",
+    "compose-policy": "compose_policy.rego",
+    "godot-test": "godot-test.just",
+}
+
+
+def test_every_recipe_file_exists_and_is_the_target_of_one_stack() -> None:
+    targets = {src for pairs in RECIPE_TARGETS.values() for src, _ in pairs}
+    assert {p.name for p in RECIPES.iterdir() if p.is_file()} - targets <= {"pre-commit-config.yaml"}
+    assert all((RECIPES / src).is_file() for src in targets)
 
 
 def _run(recipe: str, args: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, str]:

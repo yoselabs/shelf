@@ -128,7 +128,7 @@ def no_clone_path(ctx: Context) -> Finding:
     if bad:
         return failing(
             f"a hook reaches into a shelf clone: {_named(bad)}",
-            "run it through the pinned dependency instead (`uv run blueprint guard`, `uv run python -m any_gate ...`)",
+            "run it through the pinned dependency instead (`uv run blueprint gate guard`, `uv run python -m any_gate ...`)",
         )
     return passing("no hook path goes through a shelf clone")
 

@@ -107,7 +107,7 @@ coverlet stays the default for a new repo (open source, own threshold option for
 install = """The collector is the whole requirement. Everything from "ReportGenerator" below on is the OPTIONAL floor: adopt it only when the repo wants a coverage floor. \
 Directory.Packages.props: <PackageVersion Include="coverlet.MTP" Version="10.1.0" />; tests/Directory.Build.props: <PackageReference Include="coverlet.MTP" PrivateAssets="all" /> \
 (builds clean under latest-all + warnings as errors; regenerate the packages.lock.json files). dotnet new tool-manifest (if none) && dotnet tool install dotnet-reportgenerator-globaltool --version 5.5.11. \
-Commit coverage-floor.json = {"line": <floor>, "branch": <floor>} (start at the current value rounded down) and tools/check_coverage.py (`blueprint recipe dotnet-coverage > tools/check_coverage.py`). \
+Commit coverage-floor.json = {"line": <floor>, "branch": <floor>} (start at the current value rounded down) and tools/check_coverage.py (`blueprint init` writes it). \
 justfile: `coverage: build` / `rm -rf TestResults cov` / `dotnet test --solution X.slnx --no-build -- --coverlet --coverlet-output-format cobertura --coverlet-include '[Sim.*]*'` / \
 `dotnet reportgenerator "-reports:TestResults/coverage.cobertura*.xml" -targetdir:cov -reporttypes:JsonSummary` / `python3 tools/check_coverage.py cov/Summary.json coverage-floor.json`; \
 let `check` run `coverage` INSTEAD of the plain test run so the suite runs once. Add TestResults/ and cov/ to .gitignore. \

@@ -48,7 +48,7 @@ def _run(repo: Path, shelf: Path) -> subprocess.CompletedProcess[str]:
     if (shelf / "pyproject.toml").is_file():
         reference.write_text(preset.render(preset.snapshot(shelf)))
     return subprocess.run(
-        [sys.executable, "-m", "blueprint", "preset", "--repo", str(repo), "--reference", str(reference)],
+        [sys.executable, "-m", "blueprint", "gate", "preset", "--repo", str(repo), "--reference", str(reference)],
         capture_output=True,
         text=True,
         check=False,
@@ -108,7 +108,7 @@ def test_a_pyrefly_kind_set_false_is_a_rejection_not_a_rule(tmp_path: Path, shel
 
 
 def test_the_justfile_is_not_compared_here(tmp_path: Path, shelf: Path) -> None:
-    """Its parts are rendered and `blueprint render --check` is their drift check (ADR 0029); a recipe set is no axis of the preset."""
+    """Its parts are rendered and `blueprint gate render --check` is their drift check (ADR 0029); a recipe set is no axis of the preset."""
     consumer = _write(tmp_path / "consumer", _SHELF, justfile=_JUSTFILE + "\narchlint:\n    @true\n")
     (consumer / "Makefile").write_text("extra:\n\t@true\n")
     result = _run(consumer, shelf)
@@ -143,7 +143,7 @@ def test_the_shelf_does_not_compare_against_itself(shelf: Path) -> None:
     (shelf / "packages" / "blueprint" / "src" / "blueprint").mkdir(parents=True)
     (shelf / "packages" / "blueprint" / "src" / "blueprint" / "preset.toml").write_text("")
     result = subprocess.run(
-        [sys.executable, "-m", "blueprint", "preset", "--repo", str(shelf)], capture_output=True, text=True, check=False
+        [sys.executable, "-m", "blueprint", "gate", "preset", "--repo", str(shelf)], capture_output=True, text=True, check=False
     )
     assert result.returncode == 0
     assert "this IS the shelf" in result.stdout
@@ -152,7 +152,7 @@ def test_the_shelf_does_not_compare_against_itself(shelf: Path) -> None:
 def test_a_consumer_is_compared_with_the_packaged_snapshot_by_default(tmp_path: Path) -> None:
     consumer = _write(tmp_path / "consumer", _SHELF)
     result = subprocess.run(
-        [sys.executable, "-m", "blueprint", "preset", "--repo", str(consumer)], capture_output=True, text=True, check=False
+        [sys.executable, "-m", "blueprint", "gate", "preset", "--repo", str(consumer)], capture_output=True, text=True, check=False
     )
     assert result.returncode == 1  # a three-rule config is far from the shelf's
     assert "missing" in result.stderr
@@ -198,7 +198,7 @@ def test_a_declared_linter_version_difference_passes(tmp_path: Path, shelf: Path
 
 
 # ── the EFFECTIVE ruff config: ruff.toml wins over pyproject, as ruff does (shelf-166r) ──
-# OGY showed 252 errors under the preset while `blueprint preset` passed: a ruff.toml shadowed the preset block in pyproject.toml.
+# OGY showed 252 errors under the preset while `blueprint gate preset` passed: a ruff.toml shadowed the preset block in pyproject.toml.
 
 _OLD_RULES = '[lint]\nselect = ["F"]\nignore = []\n'
 
@@ -244,3 +244,11 @@ def test_dot_ruff_toml_wins_over_ruff_toml(tmp_path: Path, shelf: Path) -> None:
     result = _run(consumer, shelf)
     assert result.returncode == 1
     assert "missing 'RUF'" in result.stderr
+
+
+def test_the_packaged_preset_carries_no_shelf_only_path() -> None:
+    """A consumer's copy of the preset holds rules, versions and size caps: never `packages/*` or `tools/**` of the shelf's own tree."""
+    text = preset.REFERENCE.read_text()
+    assert "packages/" not in text
+    assert "tools/" not in text
+    assert "per-file-ignores" not in text

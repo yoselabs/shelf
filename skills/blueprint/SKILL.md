@@ -47,14 +47,16 @@ use `packages/blueprint/src` in the shelf, the first that exists: `$SHELF_HOME/�
 Code, `${CLAUDE_SKILL_DIR}/../../…`) and run `PYTHONPATH=<engine> python3 -m blueprint …` (Python 3.11+, nothing to install). For a clone,
 `git -C <shelf> pull --ff-only` first; on failure say so in one line and go on.
 
-The gate's own steps are verbs too: `guard` (no committed local shelf source), `preset` (linter config against the shelf's snapshot), `render`
-(`--check` fails when the blueprint-owned parts of the justfile differ from what the repo's stacks render), `test` (the repo's tests through
-any-gate: receipts skip what passed, a lease queues runs) and `check --gate`. A repo's justfile imports the rendered base; it does not copy recipes.
+`blueprint init` sets a repo up (detect the stack, audit, plan, write only what is missing; `--no-hooks` leaves the git hooks alone) and ends with
+the rows it could not set up. `blueprint gate <step>` runs one step of `just check` (the justfile and hooks call them; you rarely type one):
+`guard` (no committed local shelf source), `preset` (linter config against the shelf's snapshot), `render` (`--check` fails when the
+blueprint-owned parts of the justfile differ from what the repo's stacks render), `test` (the repo's tests through any-gate: receipts skip
+what passed, a lease queues runs) and `adr-index`; `check --brief` is the per-commit step. A repo's justfile imports the rendered base; it does not copy recipes.
 
 ## 2. Audit
 
 1. `check --repo . --audit --write` writes `docs/blueprint/README.md` (one row per concern,
-   grouped by layer) and one table per concern. Read the README and `--audit --summary` only; open a
+   grouped by layer) and one table per concern. Read the README and `--audit` only; open a
    concern's file only to remediate it. The JSON (`--json`) is for scripts, not for reading.
 2. A `not checked` row that is not a blueprint gap: find why (a missing tool, no commits).
 3. Read the report's "Facts and evidence" (also `facts_and_evidence` in the JSON); each item is accepted, rejected or
@@ -92,7 +94,7 @@ The owner's one yes covers the `auto` and `agent` rows, never the `owner` rows. 
   `# lenient:`, `# strict: no -e` and `x-policy-exempt` are the old shapes: still honoured for now, but the report prints a notice with the override to
   write in their place). Excusing a file from detection is also how to except a whole stack for it. A linter's own suppression (`# noqa`, hadolint `ignored:`, `# shellcheck disable`) stays
   where the linter reads it. Every report lists all overrides first. Rows still not ✅ at the end become beads.
-- `blueprint checkpoints [id-prefix] [--json]` lists every checkpoint id, its statement and the fact that turns it on: read it before writing an override or declaring a missed fact.
+- `blueprint check --list [id-prefix] [--json]` lists every checkpoint id, its statement and the fact that turns it on: read it before writing an override or declaring a missed fact.
 - Finish with the repo's own `just check` green and `--write` again. Never run `just check-all` for this: `check` already runs what the change
   reaches and skips what passed on the same input; `check-all` (every test, the coverage floor) is the release gate, before a tag.
 
@@ -101,7 +103,7 @@ The owner's one yes covers the `auto` and `agent` rows, never the `owner` rows. 
 The owner sees outcomes and decisions, never the process: no tool-by-tool narration, no recap of
 the report files, no step lists. In chat, only:
 
-1. **The summary**: `check --audit --summary` as printed (without `--audit` it leaves out the audit-only rows and
+1. **The summary**: `check --audit` as printed (without `--audit` it leaves out the audit-only rows and
    shows fewer failures than the README), one row per concern under its layer.
 2. **Need from you**: decisions that are the owner's, at most three, each with your default.
 3. Mistakes that reached the owner, if any. One line each.
@@ -124,10 +126,9 @@ gets a short plain-words picture first; much work ahead gets one page outlining 
 
 ## 6. Start, reabsorb
 
-- **Start:** audit the empty repo, then on the yes: onboarding (`python3
-  <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo .`: beads strict and quiet, prek
-  hooks from the recipe, the gate as a `justfile` with `just blueprint` in it; the runner is `just`, pinned as `rust-just`) → `template --repo .` (docs/agents/
-  and the AGENTS.md block; then fill every `{{name}}` from the repo) → the stack's profile → the
+- **Start:** audit the empty repo, then on the yes: `blueprint init` (the gate as rendered justfile parts with `just blueprint` in it, the preset tables,
+  prek hooks from the recipe unless `--no-hooks`, docs/agents/ and the AGENTS.md block, the stack's recipe files; the runner is `just`, pinned as
+  `rust-just`; beads setup is the owner's), then fill every `{{name}}` from the repo → the stack's profile → the
   framework's profile. Never add CI: no repository has GitHub Actions (ADR 0027).
 - **Reabsorb:** a blueprint gap, or anything the run met that no checkpoint covers, becomes one
   bead in the **shelf** titled `blueprint lacks: <what>` (repo, evidence, the checkpoint or profile
@@ -140,8 +141,9 @@ gets a short plain-words picture first; much work ahead gets one page outlining 
 
 ## 7. Survey (end of every run)
 
-`survey --repo . > docs/blueprint/survey.md`, answer every row from the closed set with one line of
-evidence, then `survey --check docs/blueprint/survey.md` must print `complete`. Answer as a critic of
+Copy the questions of `survey.toml` (in the blueprint package) into `docs/blueprint/survey.md`, one table per
+section (`id | question | answer | evidence`), and answer every row from the file's closed `answers` set with one line of
+evidence. Answer as a critic of
 the run: a "yes" without evidence is a "partly".
 
 **No run ends without the relay.** The shelf improves only from what comes back, and people forget.

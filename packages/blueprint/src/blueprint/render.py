@@ -1,8 +1,8 @@
-"""`blueprint render`: the justfile parts the blueprint owns, written per detected stack, and the drift check on them.
+"""`blueprint gate render`: the justfile parts the blueprint owns, written per detected stack, and the drift check on them.
 
 A repo's gate is its own `justfile` importing `.blueprint/base.just` and one `.blueprint/<stack>.just` per stack it has (ADR 0029: `import`,
 not `mod`). The parts are plain text, rendered from the files under `just/` and the stacks detected: the same repo gives the same bytes, so
-`blueprint render --check` can fail on any difference between what is committed and what the blueprint would write now. A consumer stops
+`blueprint gate render --check` fails on any difference between what is committed and what the blueprint would write now. A consumer stops
 copying recipe text: it re-renders, and the repo's own `justfile` keeps only what is its own.
 
 Extension points, all in the repo's own justfile: a recipe defined there replaces the base or stack recipe of the same name
@@ -33,6 +33,8 @@ _STACKS = {
     "python": ("python", ("lint", "typecheck", "spell", "deps", "test")),
     "shell": ("shell", ("scripts",)),
 }
+# What the release gate runs instead of a step: the whole-history and whole-suite form.
+_WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all"}
 _COMMON_STEPS = ("guard", "preset", "render", "blueprint", "secrets")
 
 
@@ -49,7 +51,9 @@ def parts(repo: Path) -> dict[str, str]:
     """`{path relative to the repo: text}` of every part this repo's stacks call for."""
     stack_parts = _stack_parts(repo)
     steps = [*_COMMON_STEPS, *(step for _, group in stack_parts for step in group)]
-    base = (_TEMPLATES / "base.just").read_text().replace("@STEPS@", " ".join(f'"{s}"' for s in steps))
+    whole = [_WHOLE.get(s, s) for s in steps]
+    base = (_TEMPLATES / "base.just").read_text()
+    base = base.replace("@STEPS@", " ".join(f'"{s}"' for s in steps)).replace("@STEPS_ALL@", " ".join(f'"{s}"' for s in whole))
     rendered = {f"{FOLDER}/base.just": base}
     for name, _ in stack_parts:
         rendered[f"{FOLDER}/{name}.just"] = (_TEMPLATES / f"{name}.just").read_text()
@@ -115,12 +119,12 @@ def drift(repo: Path) -> list[str]:
 
 
 def check(repo: Path) -> int:
-    """The exit code of `blueprint render --check`."""
+    """The exit code of `blueprint gate render --check`."""
     found = drift(repo)
     if not found:
         sys.stdout.write(f"render: {repo.name}'s justfile parts are current\n")
         return 0
     sys.stderr.write(f"render: {len(found)} difference(s) from what the blueprint renders:\n")
     sys.stderr.write("".join(f"{line}\n" for line in found))
-    sys.stderr.write("\nRun `uv run blueprint render` and commit the result.\n")
+    sys.stderr.write("\nRun `uv run blueprint gate render` and commit the result.\n")
     return 1

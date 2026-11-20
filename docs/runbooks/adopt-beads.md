@@ -6,9 +6,9 @@ it — bootstrap once, then keep it wired — so the next consumer doesn't re-de
 (a2web hit three of them adopting it, 2026-08-05/06: the status-mapping mismatch below, a personal-
 identifier scan that would have silently narrowed, and the git-sync gap in Phase 2).
 
-**Beads is part of onboarding a shelf consumer, opt-out by default.** The `onboard-consumer` skill
-(`<shelf>/.agents/skills/onboard-consumer/SKILL.md`) runs the `beads` operation
-(`tools/onboard/beads.py`) automatically unless `--no-beads` is passed: `bd init --skip-hooks`, the
+**Beads is part of onboarding a shelf consumer, opt-out by default.** Since 2026-11-20 no script does it
+(the `onboard-consumer` skill and `tools/onboard` were replaced by `blueprint init`, which leaves beads to the owner): run
+`bd init --skip-hooks`, then set the
 blueprint's strict settings with readback (never trust the success message, see §1.2 below), and the
 session settings (metrics off, `bd prime` at session start). Since 2026-10-11 bd never installs hooks:
 its events, and the `bd dolt push` of §2.2, run from prek's `.pre-commit-config.yaml` (the `hooks`

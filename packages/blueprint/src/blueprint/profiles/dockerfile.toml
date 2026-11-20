@@ -43,7 +43,7 @@ tool = """every FROM, `COPY --from=<image>` and `RUN --mount=from=<image>` is `n
 judged by the `dockerfile-pins` recipe (stdlib, no network). Exempt: `scratch`, an earlier stage alias, a stage number, and a bare name in COPY --from (a `--build-context`, e.g. `--from=shelf`). An ARG default before the first FROM is substituted; an ARG with no default is a finding. \
 Seen red (exit 1) on a planted file (`:latest`, a bare `nginx`, an ARG-built `python:${PY}-slim`, a `COPY --from=uv:0.13.0`) and on 9 real unpinned references in 4 Dockerfiles; green (exit 0) on homelab's images/devbox (digest-pinned) and on a planted file of pinned forms. \
 The digest to write comes from `crane digest <image:tag>` (network; seen: exit 0, one sha256 line). Keeping a pin from freezing a shipped image is the ship-updater row's"""
-install = "`blueprint recipe dockerfile-pins > tools/check_dockerfile_pins.py`; justfile: `python3 -I tools/check_dockerfile_pins.py --context <name>...` (a dependency of `check`); pin with `crane digest`"
+install = "`blueprint init` writes tools/check_dockerfile_pins.py; justfile: `python3 -I tools/check_dockerfile_pins.py --context <name>...` (a dependency of `check`); pin with `crane digest`"
 config = [{ any = [{ path = "justfile", contains = "check_dockerfile_pins" }, { path = "Makefile", contains = "check_dockerfile_pins" }] }]
 gate = "check_dockerfile_pins"
 

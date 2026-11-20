@@ -78,7 +78,7 @@ gate target:
 check-host: blueprint
 
 blueprint:
-    python3 -m blueprint check --repo . --gate
+    python3 -m blueprint check --repo . --brief
 """
 
 
@@ -152,7 +152,7 @@ def _fix(repo: Repo, check_id: str) -> str:
 
 def test_a_repo_with_no_code_that_declares_python_gets_the_onboarding_fix(repo: Repo) -> None:
     repo.write("docs/blueprint/blueprint.toml", '[profile]\nstacks = ["python-uv"]\n')
-    assert "onboard.py" in _fix(repo, "gate.one-command")
+    assert "blueprint init" in _fix(repo, "gate.one-command")
 
 
 def test_a_repo_with_no_stack_is_told_how_to_declare_one(repo: Repo) -> None:

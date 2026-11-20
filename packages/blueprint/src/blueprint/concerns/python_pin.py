@@ -18,10 +18,10 @@ if TYPE_CHECKING:
     from blueprint.model import Context, Finding
 
 _STACK = "python-uv"
-_PIN = re.compile(r"^(\d+)\.(\d+)$")
+# X.Y, or X.Y.Z with an optional pre-release tag (`3.15.0a1`: an unreleased Python has no X.Y minor to pin).
+_PIN = re.compile(r"^(\d+)\.(\d+)(?:\.\d+(?:(?:a|b|rc)\d+)?)?$")
 _LOWER = re.compile(r">=\s*(\d+)\.(\d+)")
 _UV_IMAGE = re.compile(r"--from=ghcr\.io/astral-sh/uv(?::([^\s@/]+))?")
-_EXACT_FLOOR = re.compile(r"^==\s*(\d+\.\d+\.\d+)$")
 
 
 def _ranges(ctx: Context) -> dict[str, str]:
@@ -45,13 +45,13 @@ def _lower(spec: str) -> tuple[int, int] | None:
 def _pin(ctx: Context) -> tuple[tuple[int, int] | None, Finding]:
     text = ctx.read(".python-version")
     if text is None:
-        return None, not_set_up("no .python-version", "uv python pin 3.12 (X.Y, the version you run); commit it", FixedBy.AUTO)
+        return None, not_set_up("no .python-version", "uv python pin 3.12 (X.Y or X.Y.Z, the version you run); commit it", FixedBy.AUTO)
     lines = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.startswith("#")]
     match = _PIN.match(lines[0]) if len(lines) == 1 else None
     if match is None:
         return None, failing(
-            f".python-version says {' | '.join(lines) or 'nothing'}; want one X.Y line",
-            "write one line, e.g. 3.12; the lock carries the patch reproducibility",
+            f".python-version says {' | '.join(lines) or 'nothing'}; want one X.Y or X.Y.Z line",
+            "write one line, e.g. 3.12 (or 3.15.0a1 for a pre-release); .python-version is the only place the version is pinned",
         )
     pin = (int(match.group(1)), int(match.group(2)))
     below = [f"{folder} ({spec})" for folder, spec in _ranges(ctx).items() if (low := _lower(spec)) is not None and pin < low]
@@ -90,21 +90,10 @@ def _uv_version(ctx: Context) -> Finding:
 
 
 def _uv_pin(ctx: Context) -> tuple[str, str] | None:
-    """The one uv version the repo runs, with where it is pinned: mise.toml (ADR 0024), else an exact required-version."""
+    """The one uv version the repo runs: mise.toml's (ADR 0024), the owner of that fact (owners.toml)."""
     spec = toml_table(ctx.toml("mise.toml"), "tools").get("uv")
     version = str(spec.get("version", "")) if isinstance(spec, dict) else str(spec or "")
-    if re.match(r"^\d+\.\d+\.\d+$", version):
-        return version, "mise.toml"
-    exact = _EXACT_FLOOR.match(str(_floor(ctx) or "").strip())
-    return (exact.group(1), "required-version") if exact else None
-
-
-def _floor(ctx: Context) -> object:
-    for rel in ("uv.toml", "pyproject.toml"):
-        data = ctx.toml(rel)
-        if floor := (data if rel == "uv.toml" else toml_table(data, "tool", "uv")).get("required-version"):
-            return floor
-    return None
+    return (version, "mise.toml") if re.match(r"^\d+\.\d+\.\d+$", version) else None
 
 
 def _uv_images(ctx: Context) -> Finding:
