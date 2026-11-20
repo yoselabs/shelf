@@ -12,8 +12,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -48,30 +46,36 @@ class Leak:
         return f"{self.file}:{self.line} {self.rule}"
 
 
+_GIT_TIMEOUT = 60
+_GITLEAKS_TIMEOUT = 900
+
+
+def _exec(argv: Sequence[str], repo: Path, env: Mapping[str, str] | None, timeout: int) -> subprocess.CompletedProcess[str]:
+    """One child run; a hang or a missing program is a ScanError, never a clean scan."""
+    try:
+        return subprocess.run(argv, cwd=repo, env=env, capture_output=True, text=True, check=False, timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        hung = f"`{argv[0]}` timed out after {timeout}s"
+        raise ScanError(hung) from error
+    except FileNotFoundError as error:
+        missing = f"{argv[0]} is not installed: run `just tools` (pinned in mise.toml)"
+        raise ScanError(missing) from error
+
+
 def _git(repo: Path, env: Mapping[str, str] | None, *args: str) -> str | None:
-    done = subprocess.run(["git", *args], cwd=repo, env=env, capture_output=True, text=True, check=False)
+    done = _exec(["git", *args], repo, env, _GIT_TIMEOUT)
     return done.stdout if done.returncode == 0 else None
 
 
 def _run(repo: Path, env: Mapping[str, str] | None, args: Sequence[str]) -> list[Leak]:
     """One gitleaks run; its JSON report holds the findings (exit 1 is "leaks found", anything else above 1 is a failure)."""
-    if shutil.which("gitleaks", path=(env or os.environ).get("PATH")) is None:
-        missing = "gitleaks is not installed: run `just tools` (pinned in mise.toml)"
-        raise ScanError(missing)
     with tempfile.TemporaryDirectory() as tmp:
         report = Path(tmp) / "report.json"
-        done = subprocess.run(
-            [*_BASE, *args, "--report-format", "json", "--report-path", str(report)],
-            cwd=repo,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        done = _exec([*_BASE, *args, "--report-format", "json", "--report-path", str(report)], repo, env, _GITLEAKS_TIMEOUT)
         if done.returncode not in (0, 1):
             failed = f"gitleaks failed ({done.returncode}): {done.stderr.strip()[:300]}"
             raise ScanError(failed)
-        found: list[dict[str, object]] = json.loads(report.read_text() or "[]") if report.exists() else []
+        found: list[dict[str, object]] = json.loads(report.read_text(encoding="utf-8") or "[]") if report.exists() else []
     return [Leak(str(f["File"]), int(str(f["StartLine"])), str(f["RuleID"])) for f in found]
 
 

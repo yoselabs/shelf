@@ -54,12 +54,14 @@ def uid_of(target: Path) -> str | None:
     """The uid a resource file declares: its own header, its .uid sibling, or its .import file."""
     sibling = Path(f"{target}.uid")
     if sibling.is_file():
-        return sibling.read_text().strip() or None
+        return sibling.read_text(encoding="utf-8").strip() or None
     imported = Path(f"{target}.import")
-    if imported.is_file() and (m := re.search(r'^uid="(uid://[^"]+)"', imported.read_text(), re.MULTILINE)):
+    if imported.is_file() and (m := re.search(r'^uid="(uid://[^"]+)"', imported.read_text(encoding="utf-8"), re.MULTILINE)):
         return m.group(1)
     if target.suffix in {".tscn", ".tres"} and target.is_file():
-        first = target.read_text(errors="replace").splitlines()[:1]
+        first = target.read_text(encoding="utf-8", errors="replace").splitlines()[
+            :1
+        ]  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
         m = UID.search(first[0]) if first else None
         return m.group(1) if m else None
     return None
@@ -69,7 +71,9 @@ def check_file(root: Path, path: Path) -> list[str]:
     """Every finding in one .tscn/.tres."""
     rel = path.relative_to(root).as_posix()
     errors: list[str] = []
-    lines = path.read_text(errors="replace").splitlines()
+    lines = path.read_text(
+        encoding="utf-8", errors="replace"
+    ).splitlines()  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
     if not lines or not HEADER.match(lines[0].strip()):
         return [f"{rel}:1 header is not [gd_scene|gd_resource ... format=3]"]
     declared: dict[str, str] = {}
@@ -106,7 +110,7 @@ def check_file(root: Path, path: Path) -> list[str]:
 
 def check_uids(root: Path) -> list[str]:
     """Each script without its .uid sibling."""
-    scripts = (p for p in root.rglob("*") if p.suffix in SCRIPT_EXT and not SKIP & set(p.relative_to(root).parts))
+    scripts = (p for p in sorted(root.rglob("*")) if p.suffix in SCRIPT_EXT and not SKIP & set(p.relative_to(root).parts))
     return [f"{p.relative_to(root).as_posix()} has no committed .uid file" for p in scripts if not Path(f"{p}.uid").is_file()]
 
 

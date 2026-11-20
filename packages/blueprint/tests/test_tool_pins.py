@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint.model import FixedBy, Verdict
-from blueprint.runner import Row, run
+from blueprint.runner import Row, run, run_audit
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -29,17 +29,17 @@ _JUSTFILE = "check:\n    true\n\ntools:\n    mise install --locked\n"
 
 
 def _rows(repo: Repo, *, audit: bool = False) -> dict[str, tuple[Verdict, str]]:
-    report = run(repo.root, concern="stack", audit=audit, env=repo.env)
+    report = (run_audit if audit else run)(repo.root, concern="stack", env=repo.env)
     return {r.id: (r.verdict, r.evidence) for r in report.rows if r.id in {"stack.tool-pins", "stack.tools-installed"}}
 
 
 def _installed_row(repo: Repo) -> Row:
-    return next(r for r in run(repo.root, concern="stack", audit=True, env=repo.env).rows if r.id == "stack.tools-installed")
+    return next(r for r in run_audit(repo.root, concern="stack", env=repo.env).rows if r.id == "stack.tools-installed")
 
 
 def _refusing_tool(path: Path, stderr: str) -> None:
     """A probe that fails with `stderr` on its mind and exits 1."""
-    path.write_text(f"#!/bin/sh\ncat >&2 <<'EOF'\n{stderr}\nEOF\nexit 1\n")
+    path.write_text(f"#!/bin/sh\ncat >&2 <<'EOF'\n{stderr}\nEOF\nexit 1\n", encoding="utf-8")
     path.chmod(0o755)
 
 

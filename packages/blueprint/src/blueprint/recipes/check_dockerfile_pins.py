@@ -94,7 +94,9 @@ def check_file(path: Path, rel: str, contexts: set[str]) -> list[str]:
     stages: set[str] = set()
     seen_from = False
     errors: list[str] = []
-    for n, text in logical_lines(path.read_text(errors="replace")):
+    for n, text in logical_lines(
+        path.read_text(encoding="utf-8", errors="replace")
+    ):  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
         if m := FROM.match(text):
             seen_from = True
             err = judge(m.group(1), f"{rel}:{n}", (args, stages, contexts), bare_is_context=False)
@@ -115,7 +117,7 @@ def tracked() -> list[Path]:
     try:
         files = subprocess.run(["git", "ls-files"], capture_output=True, text=True, check=True).stdout.splitlines()
     except (OSError, subprocess.CalledProcessError):
-        files = [p.as_posix() for p in Path().rglob("*") if p.is_file() and ".git" not in p.parts]
+        files = [p.as_posix() for p in sorted(Path().rglob("*")) if p.is_file() and ".git" not in p.parts]
     return [Path(f) for f in files if NAME.search(f) and not f.endswith(".dockerignore")]
 
 

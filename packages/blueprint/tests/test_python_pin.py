@@ -6,7 +6,7 @@ import json
 from typing import TYPE_CHECKING
 
 from blueprint.model import Verdict
-from blueprint.runner import run
+from blueprint.runner import run, run_audit
 
 if TYPE_CHECKING:
     from blueprint.testing import Repo
@@ -89,7 +89,7 @@ def _installed_tool(repo: Repo, versions: dict[str, str], *, installed: bool = T
 
 
 def _tool_row(repo: Repo) -> tuple[Verdict, str, str]:
-    row = {r.id: r for r in run(repo.root, concern="stack", audit=True, env=repo.env).rows}[_TOOL_ROW]
+    row = {r.id: r for r in run_audit(repo.root, concern="stack", env=repo.env).rows}[_TOOL_ROW]
     return row.verdict, row.evidence, row.remediation
 
 

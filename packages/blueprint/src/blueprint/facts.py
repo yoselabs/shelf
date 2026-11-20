@@ -128,7 +128,7 @@ def is_deployed(profile: Profile) -> bool:
 def package_json(path: Path) -> dict[str, object]:
     """A package.json as a dict; an unreadable or non-object file is empty."""
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -149,7 +149,9 @@ def _node_cli(ctx: Context) -> list[Fact]:
     for path in walk(ctx.repo, "package.json", 4):
         if package_json(path).get("bin"):
             rel = path.relative_to(ctx.repo).as_posix()
-            n = _first_line(path.read_text(errors="replace").splitlines(), '"bin"')
+            n = _first_line(
+                path.read_text(encoding="utf-8", errors="replace").splitlines(), '"bin"'
+            )  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
             found.append(Fact("cli", _where(rel, n) if n else rel))
     return found[:1]
 
@@ -159,7 +161,9 @@ def _node_dependencies(ctx: Context) -> list[Evidence]:
     for path in walk(ctx.repo, "package.json", 4):
         have = _package_runtime_dependencies(package_json(path))
         rel = path.relative_to(ctx.repo).as_posix()
-        lines = path.read_text(errors="replace").splitlines()
+        lines = path.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
         for claim, names in _NODE_DEPENDENCY_EVIDENCE:
             if hit := sorted(h for h in have if any(fnmatch(h, n) for n in names)):
                 n = _first_line(lines, f'"{hit[0]}"')
@@ -189,7 +193,9 @@ def _dependencies(ctx: Context) -> list[Evidence]:
     for path in walk(ctx.repo, "pyproject.toml", 4):
         rel = path.relative_to(ctx.repo).as_posix()
         have = _runtime_dependencies(path)
-        lines = path.read_text(errors="replace").splitlines()
+        lines = path.read_text(
+            encoding="utf-8", errors="replace"
+        ).splitlines()  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
         for claim, names in _DEPENDENCY_EVIDENCE:
             if hit := sorted(h for h in have if any(fnmatch(h, n) for n in names)):
                 pattern = re.compile(rf"[\"']{re.escape(hit[0])}[\w\[\]<>=!~. ,;-]*[\"']", re.IGNORECASE)
@@ -203,7 +209,9 @@ def _named_volumes(ctx: Context) -> list[Evidence]:
 
     for pattern in COMPOSE_FILES:
         for path in walk(ctx.repo, pattern, 3):
-            lines = path.read_text(errors="replace").splitlines()
+            lines = path.read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
             for n, ln in enumerate(lines, 1):
                 if ln.rstrip() == "volumes:" and n < len(lines) and lines[n].startswith((" ", "\t")) and lines[n].strip():
                     return [Evidence("stores-data", _where(path.relative_to(ctx.repo).as_posix(), n), "low")]

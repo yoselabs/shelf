@@ -8,7 +8,7 @@ import time
 from typing import TYPE_CHECKING
 
 from blueprint.model import FixedBy, Verdict
-from blueprint.runner import Row, run
+from blueprint.runner import Row, run_audit
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,7 +27,7 @@ def _commit(cwd: Path, name: str, age_s: int) -> None:
 
 
 def _rows(repo: Repo) -> dict[str, Row]:
-    return {r.id: r for r in run(repo.root, concern="agents", audit=True, env=repo.env).rows}
+    return {r.id: r for r in run_audit(repo.root, concern="agents", env=repo.env).rows}
 
 
 def _verdict(repo: Repo) -> tuple[Verdict, str]:

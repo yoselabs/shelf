@@ -274,7 +274,9 @@ class Context:
     def read(self, rel: str) -> str | None:
         """The text of `rel`, or None when it is not a file."""
         p = self.repo / rel
-        return p.read_text(errors="replace") if p.is_file() else None
+        return (
+            p.read_text(encoding="utf-8", errors="replace") if p.is_file() else None
+        )  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
 
     def toml(self, rel: str) -> dict[str, object]:
         """The parsed TOML file `rel`; empty when it is absent or not valid TOML (the checks that need it report that themselves)."""
@@ -297,7 +299,7 @@ class Context:
         if exe is None:
             return None
         try:
-            return subprocess.run(
+            return subprocess.run(  # lossy-ok: display: the captured text of a child process is shown, never stored
                 [exe, *argv[1:]],
                 cwd=cwd or self.repo,
                 env=env,

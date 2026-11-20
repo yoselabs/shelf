@@ -22,7 +22,6 @@ _ALLOWLIST = {
     "any-agent/src/any_agent/harnesses/opencode_sandbox.py": "reads home and XDG_CONFIG_HOME for the sandbox deny list",
     "blueprint/src/blueprint/concerns/gate_clone.py": "~/.config/mise path from Path.home()",
     "blueprint/src/blueprint/model.py": "Context.env defaults to dict(os.environ)",
-    "blueprint/src/blueprint/recipes/gate_state.py": "standalone copied recipe: GATE_LOCK_FILE, XDG_CACHE_HOME, child env",
     "blueprint/src/blueprint/report.py": "passes os.environ (minus git location) to a git child",
     "blueprint/src/blueprint/testing.py": "test double builds PATH from os.environ",
     "git-porcelain/src/git_porcelain/porcelain.py": "filters os.environ for git children and reads GIT_DIR",

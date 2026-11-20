@@ -100,7 +100,9 @@ def _godot_sdk(ctx: Context) -> str | None:
     """The Godot.NET.Sdk version a csproj beside project.godot pins."""
     for _, root in ctx.profile.frameworks:
         for csproj in sorted(ctx.path(root).glob("*.csproj")):
-            if found := re.search(r"Godot\.NET\.Sdk/(\d+\.\d+\.\d+)", csproj.read_text(errors="replace")):
+            if found := re.search(
+                r"Godot\.NET\.Sdk/(\d+\.\d+\.\d+)", csproj.read_text(encoding="utf-8", errors="replace")
+            ):  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
                 return found.group(1)
     return None
 

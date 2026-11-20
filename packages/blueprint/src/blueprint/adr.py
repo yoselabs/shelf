@@ -49,7 +49,9 @@ def files(repo: Path) -> list[Path]:
 
 def parse(path: Path) -> Adr | None:
     """The frontmatter of `path`; None when the file does not open with a `---` block."""
-    text = path.read_text(errors="replace")
+    text = path.read_text(
+        encoding="utf-8", errors="replace"
+    )  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
     if not text.startswith("---\n") or "\n---" not in text[4:]:
         return None
     block = text[4 : text.index("\n---", 4)]
@@ -79,7 +81,9 @@ def problems(path: Path) -> list[str]:
         out.append(f"statement over {STATEMENT_MAX} characters")
     if fields.get("updated") and not _DATE.match(fields["updated"]):
         out.append("updated is not YYYY-MM-DD")
-    if not _HISTORY.search(path.read_text(errors="replace")):
+    if not _HISTORY.search(
+        path.read_text(encoding="utf-8", errors="replace")
+    ):  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
         out.append("no ## History")
     return out
 

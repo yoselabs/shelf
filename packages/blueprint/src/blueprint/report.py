@@ -62,7 +62,7 @@ _FP_OPENING = "verdicts: "
 
 def _unchanged(path: Path, fp: str) -> bool:
     try:
-        return f"\n{_FP_OPENING}{fp}\n" in path.read_text()
+        return f"\n{_FP_OPENING}{fp}\n" in path.read_text(encoding="utf-8")
     except OSError:
         return False
 
@@ -269,12 +269,21 @@ def as_json(run: Run) -> str:
 _STAMP_OPENING = "Written by `blueprint check --write` on "
 
 
-def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path]:
+def write(run: Run, repo: Path, today: date) -> list[Path]:
     """Write `docs/blueprint/README.md` (the summary) and `<concern>.md` per concern; return the paths.
 
-    `prune` removes the reports this command wrote for a concern the run no longer has (a stack that became
-    another, a report left by a stack name that no longer exists); a run of one concern passes False.
+    It removes the reports this command wrote for a concern the run no longer has (a stack that became
+    another, a report left by a stack name that no longer exists).
     """
+    return _write(run, repo, today, prune=True)
+
+
+def write_concern(run: Run, repo: Path, today: date) -> list[Path]:
+    """`write` for a run of one concern: it leaves every other report in place."""
+    return _write(run, repo, today, prune=False)
+
+
+def _write(run: Run, repo: Path, today: date, *, prune: bool) -> list[Path]:
     out_dir = repo / STATE_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
     # Not "Generated ...; do not edit": a repo's own generated-file guard fails a tracked file that claims a generator it does
@@ -286,7 +295,7 @@ def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path
         """Write `body` only when the verdicts it reports differ from the file's: no timestamp-only or reorder-only diff."""
         fp = _fingerprint(rows)
         if not _unchanged(path, fp):
-            path.write_text(body.replace("{stamp}", f"{stamp}\n\n{_FP_OPENING}{fp}", 1))
+            path.write_text(body.replace("{stamp}", f"{stamp}\n\n{_FP_OPENING}{fp}", 1), encoding="utf-8")
         written.append(path)
 
     head = f"{_header(run)}\n\n{overrides_section(run, today)}"
@@ -303,7 +312,11 @@ def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path
         title = f"# Blueprint: {concern} ({LAYER_TITLES.get(layer, layer)})"
         emit(path, rows, f"{title}\n\n{{stamp}}\n\n{head}\n\n{table(rows)}\n")
     if prune:
-        for stale in sorted(set(out_dir.glob("*.md")) - set(written)):
-            if stale.read_text(errors="replace").startswith("# Blueprint: ") and _STAMP_OPENING in stale.read_text(errors="replace"):
+        kept = set(written)
+        for stale in sorted(p for p in out_dir.glob("*.md") if p not in kept):
+            text = stale.read_text(
+                encoding="utf-8", errors="replace"
+            )  # lossy-ok: detect: only the stamp near the start decides whether a stale report may be deleted
+            if text.startswith("# Blueprint: ") and _STAMP_OPENING in text:
                 stale.unlink()
     return written

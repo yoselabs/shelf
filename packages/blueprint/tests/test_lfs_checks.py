@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint.model import Verdict
-from blueprint.runner import run
+from blueprint.runner import run, run_audit
 
 if TYPE_CHECKING:
     from blueprint.testing import Repo
@@ -25,7 +25,7 @@ def _no_user_git_config(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _rows(repo: Repo, *, audit: bool = False) -> dict[str, tuple[Verdict, str]]:
     repo.env |= {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
-    report = run(repo.root, concern="gate", audit=audit, env=repo.env)
+    report = (run_audit if audit else run)(repo.root, concern="gate", env=repo.env)
     return {r.id: (r.verdict, r.evidence) for r in report.rows if r.id.startswith("gate.lfs")}
 
 
@@ -95,7 +95,7 @@ def test_a_missing_git_lfs_is_fixed_through_the_system_package_manager_not_mise(
     repo.write(".gitattributes", "*.png filter=lfs diff=lfs merge=lfs -text\n")
     repo.env["PATH"] = "/nonexistent"
     verdict, remediation = next(
-        (r.verdict, r.remediation) for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows if r.id == "gate.lfs-installed"
+        (r.verdict, r.remediation) for r in run_audit(repo.root, concern="gate", env=repo.env).rows if r.id == "gate.lfs-installed"
     )
     assert verdict is Verdict.NOT_SET_UP
     assert "system package manager" in remediation
