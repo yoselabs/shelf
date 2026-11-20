@@ -224,6 +224,7 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
         ("gate.guards-have-red-tests", 2, False),
         ("gate.clean-clone", 1, True),
         ("gate.checkers-wired", 1, False),
+        ("gate.superseded-scripts", 1, False),
         ("gate.default-branch", 1, True),
         ("gate.git-remote", 1, True),
         ("gate.ci-green", 1, True),

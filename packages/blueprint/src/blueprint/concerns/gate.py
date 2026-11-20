@@ -27,6 +27,9 @@ check("gate.guards-have-red-tests", "every repo-local script `just check` runs h
 )
 check("gate.clean-clone", "a fresh clone passes `just check` within its recorded budget", audit_only=True)(gate_clone.clean_clone)
 check("gate.checkers-wired", "every check/lint script under tools/ or scripts/ is run by `just check`")(gate_guards.checkers_wired)
+check("gate.superseded-scripts", "no gate script the shelf now ships as a package is copied into tools/ or scripts/")(
+    gate_guards.superseded_scripts
+)
 check("gate.default-branch", "the default branch is `main`", audit_only=True)(gate_git.default_branch)
 check("gate.git-remote", "an `origin` remote exists, so pushes, CI and bd's Dolt sync have somewhere to go", audit_only=True)(
     gate_git.git_remote

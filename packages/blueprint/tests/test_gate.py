@@ -841,3 +841,32 @@ def test_non_repository_reports_missing_repository(tmp_path: Path) -> None:
     row = next(r for r in result.rows if r.id == "gate.git-remote")
     assert row.verdict is Verdict.NOT_CHECKED
     assert row.evidence == "not a git repository"
+
+
+def test_a_copied_gate_script_the_shelf_now_ships_as_a_package_is_flagged(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("tools/gate_state.py", "# a2kay's copy\n")
+    repo.write("scripts/changed.py", "")
+    repo.write("tools/check_images.py", "")  # the repo's own, not a retired shelf script
+    verdict, evidence = _verdict(repo, "gate.superseded-scripts")
+    assert verdict is Verdict.FAILING
+    assert "tools/gate_state.py" in evidence
+    assert "any_gate" in evidence
+    assert "scripts/changed.py" in evidence
+    assert "check_images" not in evidence
+
+
+def test_a_repo_with_none_of_the_retired_scripts_passes(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("tools/check_images.py", "")
+    assert _verdict(repo, "gate.superseded-scripts")[0] is Verdict.PASSING
+
+
+def test_a_retired_script_kept_on_purpose_is_excused_by_a_scoped_override(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("tools/gate_state.py", "")
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        '[[override]]\nid = "gate.superseded-scripts"\nscope = "tools/gate_state.py"\nreason = "x"\nexpires = 2099-01-01\n',
+    )
+    assert _verdict(repo, "gate.superseded-scripts")[0] is Verdict.PASSING

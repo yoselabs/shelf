@@ -145,3 +145,31 @@ def checkers_wired(ctx: Context) -> Finding:
             "or delete it; a script kept on purpose is an override of gate.checkers-wired with a reason and an expiry or adr",
         )
     return passing(f"{len(scripts)} checker script(s), each run by the gate")
+
+
+# Gate scripts the shelf once handed to consumers as copies and now ships as a package: file name -> what replaces it.
+_SUPERSEDED = {
+    "gate_state.py": "`python -m any_gate start|passed|pre-push` (any-gate)",
+    "changed.py": "`python -m any_gate changed` (any-gate)",
+    "affected.py": "`python -m any_gate test` with the any-gate-python adapter",
+    "preset_drift.py": "the `preset` step of `blueprint check` (blueprint)",
+}
+
+
+def superseded_scripts(ctx: Context) -> Finding:
+    """A repo carries a copy of a gate script the shelf now ships as a package: the copy drifts, the package is pinned and tested."""
+    found: list[str] = []
+    for folder in ("tools", "scripts"):
+        if not ctx.path(folder).is_dir():
+            continue
+        for path in walk(ctx.path(folder), "*.py"):
+            rel = path.relative_to(ctx.repo).as_posix()
+            if path.name in _SUPERSEDED and not is_skipped(rel, ctx.profile.ignore) and ctx.excused("gate.superseded-scripts", rel) is None:
+                found.append(rel)
+    if found:
+        return failing(
+            "; ".join(f"{rel} is shelf-owned, replaced by {_SUPERSEDED[Path(rel).name]}" for rel in sorted(found)),
+            "depend on the package, point the gate at it, delete the copy; a copy kept on purpose is a scoped override of "
+            "gate.superseded-scripts with a reason and an expiry or adr",
+        )
+    return passing(f"none of {', '.join(sorted(_SUPERSEDED))} under tools/ or scripts/")
