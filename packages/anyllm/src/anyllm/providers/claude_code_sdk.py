@@ -253,6 +253,7 @@ def _options_kwargs(*, model: str, system: str, thinking_disabled: bool) -> dict
     if thinking_disabled:
         kwargs["thinking"] = ThinkingConfigDisabled(type="disabled")
         kwargs["max_thinking_tokens"] = 0
+        kwargs["effort"] = "low"  # the two settings above do not stop Haiku 5.5 thinking; effort does
     return {k: v for k, v in kwargs.items() if v is not None}
 
 

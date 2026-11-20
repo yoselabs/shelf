@@ -188,6 +188,13 @@ def test_sdk_options_kwargs_block_host_context() -> None:
     assert "thinking" in kwargs
 
 
+def test_sdk_thinking_disabled_also_sets_effort_low() -> None:
+    # Haiku 5.5 thinks through ThinkingConfigDisabled and max_thinking_tokens=0 (4x the output tokens for the same answer,
+    # measured 2026-11-20); only effort "low" stops it.
+    assert claude_code_sdk._options_kwargs(model="m", system="s", thinking_disabled=True)["effort"] == "low"
+    assert "effort" not in claude_code_sdk._options_kwargs(model="m", system="s", thinking_disabled=False)
+
+
 def test_sdk_result_raw_projection() -> None:
     assert claude_code_sdk._result_raw(None) is None
 
