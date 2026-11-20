@@ -82,10 +82,18 @@ def load(ctx: Context) -> Gate | None:
     """The repo's gate: its justfile when it has one (a Makefile beside it is leftover), else its Makefile, else None."""
     for name in JUSTFILES:
         if (text := ctx.read(name)) is not None:
-            return _just(ctx, name, text)
+            return _just(ctx, name, _with_imports(ctx, text))
     if (text := ctx.read(MAKEFILE)) is not None:
         return Gate("make", MAKEFILE, text, _make_recipes(text))
     return None
+
+
+_IMPORT = re.compile(r"^import\??\s+['\"]([^'\"]+)['\"]", re.MULTILINE)
+
+
+def _with_imports(ctx: Context, text: str) -> str:
+    """The justfile's text followed by the text of each file it imports (just flattens them: `.blueprint/*.just`, ADR 0029)."""
+    return "\n".join([text, *(part for path in _IMPORT.findall(text) if (part := ctx.read(path)) is not None)])
 
 
 def has_makefile_only(ctx: Context) -> bool:

@@ -24,6 +24,7 @@ the file holds the reasons, the rejected options and the history.
 - [0022](0022-every-exception-is-justified.md) **Every exception to a blueprint rule is justified**: An override or ignored path in blueprint.toml needs a reason and either an expires date or an adr naming the accepted ADR that records the durable decision; the gate reports one without.
 - [0023](0023-the-gate-runner-is-just.md) **The gate runner is just**: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`.
 - [0027](0027-the-shelf-has-no-ci.md) **The shelf has no CI; the local gate is the gate**: The shelf runs no CI. Done is the local `just check` green on the tree pushed and on a merged tree after a pull; the pre-push and post-merge hooks run it.
+- [0029](0029-the-justfile-imports-blueprint-rendered-parts.md) **A repo's justfile imports blueprint-rendered parts; `import`, not `mod`**: The gate's common recipes are files `blueprint render` writes per stack; the repo's justfile imports them (`import`, not `mod`) and owns the rest; `render --check` is the drift check.
 
 ## knowledge
 

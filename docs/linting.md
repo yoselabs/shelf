@@ -112,21 +112,18 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
    `pyproject.toml`, and each package's `[tool.deptry]` if it needs ignores. `[tool.pyrefly]` and
    `[tool.pytest.ini_options]` are generated for the consumer: the strict preset, the same error
    severities and the lighter test bar, without the shelf's own paths.
-2. The `justfile` recipes (`check guard preset blueprint bootstrap bootstrap-verify tools lint format typecheck
-   spell deps test cov sync`); `deps` becomes a single-package `uv run deptry .`. The shelf-only
-   recipes (`catalog test-browser`) are not copied and are not drift. Pin the runner with
-   `uv add --dev rust-just` and run it as `uv run just check` (the `dev` group below carries it). Copy `guard` and `bootstrap`/`bootstrap-verify` **verbatim**. `guard`, `preset` and `blueprint` call the `blueprint` dev
-   dependency (pinned by git tag), so they need no shelf clone; `bootstrap` resolves the clone itself
-   (`$SHELF_HOME` → `../shelf` → `~/Workspaces/shelf`). `guard` is what actually enforces the no-committed-local-shelf-source rule; the
-   pre-commit hook is fast feedback, not enforcement (a hook is per-clone and any tool claiming
-   `core.hooksPath` can disable it silently). `bootstrap` re-runs the onboarding operations
-   (`tools/onboard/`) any time — idempotent, safe to re-run to check or repair your repo's state;
-   `bootstrap-verify` is the same call under a name that signals intent (checking, not setting up)
-   — neither is a `check` prerequisite, since they assert this working copy's environment, not
-   the repo's committed content.
-   For gate speed, use the changed-file selector (`python -m any_gate changed`, from the `any-gate` dev dependency) and add
-   `lint-changed` and `spell-changed` twins of `lint` and `spell`, as the pattern in `docs/agents/gate.md` shows; the
-   preset treats them as shelf-only recipes, neither owed nor extra.
+2. The justfile is **rendered, not copied** ([ADR 0029](adr/0029-the-justfile-imports-blueprint-rendered-parts.md)): `uv run blueprint render`
+   writes `.blueprint/base.just` (`check guard preset render blueprint tools` ...) and one part per stack (python: `lint format typecheck
+   spell deps test cov sync`; shell: `scripts`), and your `justfile` keeps `set allow-duplicate-recipes` plus an `import` per part and owns
+   the rest. A recipe you define replaces the rendered one of the same name; `check-extra` runs one more thing in the gate. `just render`
+   (a step of `check`) fails on any difference from what the blueprint renders. Only `bootstrap` and `bootstrap-verify` are copied (they
+   find the shelf clone through `$SHELF_HOME` → `../shelf` → `~/Workspaces/shelf`). `test` is `uv run blueprint test`: the tests the change
+   reaches through `any-gate` and the `any-gate-python` adapter (a repo with no `packages/*` runs its whole suite as one unit), no
+   coverage floor; `just cov` measures. Pin the runner with `uv add --dev rust-just` and run it as `uv run just check`. `guard` is what
+   actually enforces the no-committed-local-shelf-source rule; the pre-commit hook is fast feedback, not enforcement (a hook is
+   per-clone and any tool claiming `core.hooksPath` can disable it silently). `bootstrap` re-runs the onboarding operations
+   (`tools/onboard/`) any time, idempotently; `bootstrap-verify` is the same call under a name that signals intent. Neither is a `check`
+   prerequisite: they assert this working copy's environment, not the repo's committed content.
 3. The `dev` dependency-group (pytest, pytest-cov, ruff, pyrefly, codespell, deptry).
 
 Then **own it**: override any rule your project genuinely needs to, on purpose. Divergence is a local
@@ -140,7 +137,7 @@ owns, so it reports *"already current"* for a repo missing two whole rule famili
 reached ten rule sets without anyone deciding to.
 
 `blueprint preset`, wired as `just preset` and copied verbatim like `guard`, compares three axes
-— `[tool.ruff.lint] select`/`ignore`, `[tool.pyrefly.errors]`, and the `justfile` recipe set — plus the ruff and
+— `[tool.ruff.lint] select`/`ignore`, and `[tool.pyrefly.errors]` (the justfile is rendered and has its own check, `blueprint render --check`) — plus the ruff and
 pyrefly versions both `uv.lock` files hold and the shared size-cap table (one config under another ruff is another rule set: a2kay's ruff 0.17 raised
 30 findings the shelf's 0.15 does not), against the snapshot of the shelf's own config packaged in `blueprint` (`preset.toml`, regenerated with `blueprint preset --refresh`, a test fails when stale), and fails on any difference the consumer has not declared in its own:
 
@@ -148,11 +145,10 @@ pyrefly versions both `uv.lock` files hold and the shared size-cap table (one co
 [tool.shelf-preset]
 ruff-select-omitted = []
 pyrefly-errors-extra = ["unknown-argument-type"]  # reflective verb dispatch, a2kay only
-recipes-extra = ["archlint"]                      # import-linter contracts, no shelf equivalent
 linter-versions-differ = ["ruff"]                 # trying a newer ruff ahead of the shelf
 ```
 
-An empty list means "identical here". (`make-targets-extra`, the axis's name before ADR 0023, still counts.) The tool never edits, never proposes a value, and takes no side
+An empty list means "identical here". The tool never edits, never proposes a value, and takes no side
 about which repo is right — a declared difference passes, exactly as 0004 intends. It only refuses to
 let one happen by accident.
 

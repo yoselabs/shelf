@@ -5,18 +5,17 @@ result". That resolution also says drift is acceptable *and visible*. `tools/onb
 reports "already current" for a repo missing two whole rule families, which is how ten repos here reached ten different rule sets with no
 one deciding to.
 
-This closes that loop without taking the ownership away. It compares three axes (`[tool.ruff.lint] select`/`ignore`,
-`[tool.pyrefly.errors]`, and the `justfile` recipe set; a consumer still on a `Makefile` is compared by its targets) plus the ruff and
-pyrefly versions both `uv.lock` files hold and the shared `[tool.shelf-size]` caps. Size differences always fail; other differences fail
-unless the consumer declares them in its own::
+This closes that loop without taking the ownership away. It compares two axes (`[tool.ruff.lint] select`/`ignore`,
+and `[tool.pyrefly.errors]`) plus the ruff and pyrefly versions both `uv.lock` files hold and the shared `[tool.shelf-size]` caps. The
+justfile is not compared here: its parts are rendered, and `blueprint render --check` is the drift check on them (ADR 0029). Size
+differences always fail; other differences fail unless the consumer declares them in its own::
 
     [tool.shelf-preset]
     ruff-select-omitted = []
     pyrefly-errors-extra = ["unknown-argument-type"]  # reflective verb dispatch
-    recipes-extra = ["archlint"]                      # import-linter contracts
     linter-versions-differ = ["ruff"]                 # trying ruff 0.17 ahead of the shelf
 
-(`make-targets-extra` / `make-targets-omitted`, this axis's name before ADR 0023, still count.) An empty list means "identical here". A
+An empty list means "identical here". A
 declared entry is a local choice made on purpose, in the consumer's own file, next to a reason. An *undeclared* one is drift, and that is
 the only thing this fails on: it never edits, never proposes a value, and has no opinion about which side is right.
 
@@ -30,7 +29,6 @@ Exit codes: 0 no undeclared drift · 1 drift · 2 could not check (unreadable re
 
 from __future__ import annotations
 
-import re
 import sys
 import tomllib
 from pathlib import Path
@@ -44,18 +42,6 @@ _AXES = (
     ("ruff-select", "ruff select"),
     ("ruff-ignore", "ruff ignore"),
     ("pyrefly-errors", "pyrefly error kinds"),
-    ("recipes", "gate recipes"),
-)
-
-# A recipe header: `name:`, `name arg:`, `name *args: dep`; an assignment (`:=`) and `set x := y` are not recipes.
-_RECIPE = re.compile(r"^@?([A-Za-z_][\w-]*)(?:[ \t]+[^:=\n]*?)?[ \t]*:(?!=)")
-_JUSTFILES = ("justfile", "Justfile", ".justfile")
-
-# Recipes that operate on the shelf's own layout (its catalog, its import-graph contracts, its any-browser lane, its affected-only run). A
-# consumer has nothing for them to act on, so their absence is not drift. `images` and `scripts` are the blueprint's names for the hadolint
-# and shellcheck steps: owed only by a repo with Dockerfiles or scripts (its stack rows say so), so never drift either way.
-SHELF_ONLY_TARGETS = frozenset(
-    {"catalog", "lint-changed", "spell-changed", "arch", "test-browser", "check-all", "test-affected", "eval", "images", "scripts"}
 )
 
 # The linters whose version is part of the rule set: one config under two ruff versions is two rule sets.
@@ -77,14 +63,6 @@ def _pyrefly_errors(config: dict[str, Any]) -> set[str]:
     return {kind for kind, severity in errors.items() if severity == "error"}
 
 
-def _recipes(repo: Path) -> set[str]:
-    """The names in the repo's justfile, else in its Makefile (a consumer not yet migrated); empty when it has neither."""
-    for name in (*_JUSTFILES, "Makefile"):
-        if (path := repo / name).is_file():
-            return {m.group(1) for line in path.read_text().splitlines() if (m := _RECIPE.match(line))}
-    return set()
-
-
 def _locked_linters(repo: Path) -> dict[str, str]:
     """name -> version of each linter in the repo's uv.lock; empty when there is no lock."""
     path = repo / "uv.lock"
@@ -101,7 +79,6 @@ def snapshot(shelf: Path) -> dict[str, Any]:
         "ruff-select": sorted(_ruff(config, "select")),
         "ruff-ignore": sorted(_ruff(config, "ignore")),
         "pyrefly-errors": sorted(_pyrefly_errors(config)),
-        "recipes": sorted(_recipes(shelf) - SHELF_ONLY_TARGETS),
         "linters": _locked_linters(shelf),
         "shelf-size": config.get("tool", {}).get("shelf-size", {}),
     }
@@ -182,15 +159,10 @@ def check(repo: Path, reference_file: Path | None = None) -> int:
         return 2
 
     declared = consumer.get("tool", {}).get("shelf-preset", {})
-    # This axis was called make-targets before ADR 0023; a consumer's declaration under the old name still excuses.
-    for suffix in ("omitted", "extra"):
-        declared[f"recipes-{suffix}"] = [*declared.get(f"recipes-{suffix}", []), *declared.get(f"make-targets-{suffix}", [])]
     values = {
         "ruff-select": _ruff(consumer, "select"),
         "ruff-ignore": _ruff(consumer, "ignore"),
         "pyrefly-errors": _pyrefly_errors(consumer),
-        # A shelf-only recipe is neither owed nor extra: a consumer may copy the dispatch pattern (`gate`, a2kay: shelf-cld).
-        "recipes": _recipes(repo) - SHELF_ONLY_TARGETS,
     }
     findings = [line for axis, _ in _AXES for line in _compare(axis, set(reference.get(axis, [])), values[axis], declared)]
     findings += _version_drift(reference.get("linters", {}), repo, declared)
