@@ -48,14 +48,6 @@ def _rows(reason: str, *keys: str) -> dict[str, str]:
 _ALLOWED: dict[str, str] = {
     # --- split: the flag chooses between behaviours; a separate type or function is the fix ---
     **_rows(
-        "split: capture=False inherits stdio instead of capturing; a second operation",
-        "stream-proc:capture_bytes:capture",
-    ),
-    **_rows(
-        "split: _hit(group=) sends to the pid only or to its group too; the call site computes the flag",
-        "stream-proc:_hit:group",
-    ),
-    **_rows(
         "split: the same call, two policies for a missing target; the codebase already returns outcome values (NothingToRecord)",
         "git-porcelain:abort_rebase:missing_ok",
         "git-porcelain:continue_rebase:missing_ok",

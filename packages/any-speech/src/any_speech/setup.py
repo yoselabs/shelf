@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import app_dirs
 from child_env import NotFound, find
-from stream_proc import capture_bytes
+from stream_proc import run_inherited
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -37,9 +37,9 @@ def installed_binary(env: Mapping[str, str], home: Path) -> Path:
 
 def _run(args: Sequence[str | Path], *, cwd: Path | None = None) -> None:
     argv = [str(a) for a in args]
-    done = capture_bytes(argv, cwd=cwd, timeout=_STEP_TIMEOUT, capture=False)  # output goes to the terminal: a build is watched
-    if done.exit != 0:
-        raise subprocess.CalledProcessError(done.exit, argv)
+    exit_ = run_inherited(argv, cwd=cwd, timeout=_STEP_TIMEOUT)  # output goes to the terminal: a build is watched
+    if exit_ != 0:
+        raise subprocess.CalledProcessError(exit_, argv)
 
 
 def install_fluidaudio(

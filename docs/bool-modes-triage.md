@@ -31,8 +31,6 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `git-porcelain:run:check` | A | `run` (raises) and `try_run` (returns `Done`). git-porcelain internal runner, 40+ call sites. Not touched (git-porcelain). |
 | `git-porcelain:run_git:check` | A | `run` (raises) and `try_run` (returns `Done`). git-porcelain internal runner, 40+ call sites. Not touched (git-porcelain). |
 | `git-porcelain:stage:literal` | A | `stage(paths)` literal and `stage_pathspec(patterns)`. git-porcelain public Repo protocol. Not touched. |
-| `stream-proc:_hit:group` | A | `_hit_pid` and `_hit` (group, then pid). Private to stream-proc, but it is the signal path that kills process trees; left for an owner-reviewed change, not a drive-by. |
-| `stream-proc:capture_bytes:capture` | A | `run_inherited(argv, timeout=...) -> int` beside `capture_bytes`. In-tree: any-proc, any-speech, delegate; external: a2kay. Left: external consumer. |
 | `any-json-doc:__init__:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
 | `atomic-io:atomic_write_bytes:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
 | `atomic-io:atomic_write_json:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |

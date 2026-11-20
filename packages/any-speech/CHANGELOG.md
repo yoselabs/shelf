@@ -2,7 +2,7 @@
 
 ## 0.6.1
 
-- Claim locks use `ProcessLock.acquire_exclusive` (process-lock 0.4.0); requires `process-lock>=0.4,<1`; no behaviour change.
+- Claim locks use `ProcessLock.acquire_exclusive` (process-lock 0.4.0); requires `process-lock>=0.4,<1`; the setup build step runs `stream_proc.run_inherited` (requires `stream-proc>=0.11,<1`); no behaviour change.
 
 ## 0.6.0
 
