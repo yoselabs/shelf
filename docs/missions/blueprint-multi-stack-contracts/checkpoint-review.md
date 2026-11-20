@@ -1,13 +1,13 @@
 # Checkpoint review (task 1)
 
-For the owner. Nothing here is cut; each verdict is a proposal. Measured 2026-11-20 on this repo, warm cache, one process:
+A dated snapshot (2026-11-20, main at 7ef6bff), not maintained: every count below is as of that day. The live list is `uv run blueprint checkpoints`; do not update numbers here, re-run it. For the owner. Nothing here is cut; each verdict is a proposal. Measured 2026-11-20 on this repo, warm cache, one process:
 `blueprint check --repo . --json` = **1.75 s wall** (gate set), `--audit` = about 7.3 s summed per checkpoint. Per-checkpoint times
 come from timing `runner._judge` for each active check (a throwaway script, not committed).
 
 ## What was counted
 
-`blueprint checkpoints --json` lists **155** ids: 45 registered checks and 110 rows projected from the stack and framework profiles
-(`stack.<stack>.<role>`, `framework.<name>.<role>`). 24 of the 110 are `na` or `untested` by construction. Eleven are `*.profile` rows.
+`blueprint checkpoints --json` lists **155** ids: 43 registered checks and 112 rows projected from the stack and framework profiles
+(`stack.<stack>.<role>`, `framework.<name>.<role>`). 24 of the 112 are `na` or `untested` by construction. Eleven are `*.profile` rows.
 Only 7 of the 155 take more than 50 ms; the rest cost nothing. **Cost is not the problem. Override upkeep and duplicated meaning are.**
 
 ## Who overrides or ignores what
@@ -99,3 +99,8 @@ That is 1 + 1 + 9 + 4 + 6 = 21 rows. The profile files keep the role data; `is_c
   replaced; the code stays.
 
 a2kay's two `cli-parse` overrides now excuse nothing; the run's unused-override notice will say so.
+
+## a2kay's gate after the cuts (task 10, read-only, 2026-11-20)
+
+`blueprint check --repo ~/Workspaces/a2kay --gate` on main at 5c934d8: exit 0, 64 of 76 passing, nothing printed as failing. The expired
+`stack.python-uv.coverage` override (2026-11-11) and the two dangling `cli-parse` overrides do not fail the gate. Not checked: the full audit.
