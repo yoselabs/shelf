@@ -727,6 +727,7 @@ ignore_imports = [
     "any_pipeline.filestore -> atomic_io",
     "any_speech.cli -> verb_cli",
     "any_agent.procs -> stream_proc",
+    "any_agent.supervisor -> stream_proc",
     "any_agent.harnesses.claude -> child_env",
     "any_agent.harnesses.claude -> app_dirs",
     "any_agent.harnesses.codex -> child_env",
