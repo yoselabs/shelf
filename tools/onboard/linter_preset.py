@@ -4,7 +4,7 @@ Implements `docs/linting.md`'s own copy list, mechanically:
 
 1. The `[tool.ruff]`, `[tool.ruff.lint]` (+ subtables), `[tool.codespell]`,
    `[tool.coverage.*]` and `[tool.shelf-size]` blocks from shelf's `pyproject.toml`.
-2. The `justfile` recipes (`check gate-start guard preset bootstrap bootstrap-verify tools lint format typecheck spell deps test`),
+2. The `justfile` recipes (`check gate-start guard preset secrets bootstrap bootstrap-verify tools lint format typecheck spell deps test`),
    with the attributes and comments that sit directly above each (ADR 0023: the gate runner is just);
    `check` is the plain gate (the shelf's own also runs the affected-only tests), and `deps` is rewritten
    for a single-package repo, since the shelf's own loops over `packages/*`. `check` and `test` call
@@ -58,6 +58,8 @@ _RECIPES = (
     "gate-start",
     "guard",
     "preset",
+    "secrets",
+    "secrets-all",
     "bootstrap",
     "bootstrap-verify",
     "tools",
@@ -95,7 +97,7 @@ deps:
 _CONSUMER_CHECK = """# The gate: every step at once (`steps`), one timing line, a warning for a step over its budget.
 # A green run records the tree it checked (any-gate), so the pre-push hook does not run it again on that tree.
 [group('gate')]
-check: gate-start beads-lint (steps "guard" "preset" "blueprint" "lint" "typecheck" "spell" "deps" "test")
+check: gate-start beads-lint (steps "guard" "preset" "blueprint" "secrets" "lint" "typecheck" "spell" "deps" "test")
     uv run python -m any_gate passed --gate check
 
 """

@@ -122,3 +122,12 @@ def test_a_full_history_scan_in_a_commit_hook_fails(repo: Repo) -> None:
     verdict, evidence = _rows(repo)["secrets.scanner"]
     assert verdict is Verdict.FAILING
     assert "full" in evidence
+
+
+def test_a_full_scan_recipe_for_the_release_gate_is_fine(repo: Repo) -> None:
+    repo.write("mise.toml", _PIN)
+    repo.write(
+        "justfile",
+        "secrets:\n    uv run python -m blueprint.secret_scan range\nsecrets-all:\n    uv run python -m blueprint.secret_scan full\n",
+    )
+    assert _rows(repo)["secrets.scanner"][0] is Verdict.PASSING

@@ -1,0 +1,11 @@
+# gitleaks reads this file by default. The shelf holds no real secret; these are the known false positives.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "the fake AWS-shaped keys blueprint's secret_scan tests plant on purpose"
+paths = ['''packages/blueprint/tests/test_secret_scan\.py''']
+
+[[allowlists]]
+description = "a model id in a cost test reads as a generic API key"
+paths = ['''packages/anyllm/tests/test_cost\.py''']

@@ -102,7 +102,8 @@ def scanner(ctx: Context) -> Finding:
             "gitleaks is pinned but neither the justfile nor .pre-commit-config.yaml runs it",
             "add a pre-commit hook `uv run python -m blueprint.secret_scan staged`, and `... range` to the gate",
         )
-    slow = [name for name, text in wired.items() if _FULL_SCAN.search(text)]
+    # Only the hook config: a justfile may keep a `full` recipe for the release gate (`check-all`).
+    slow = [name for name, text in wired.items() if name == ".pre-commit-config.yaml" and _FULL_SCAN.search(text)]
     if slow:
         return failing(
             f"the whole history is scanned on every run ({', '.join(slow)}): the `full` mode is for a release tag",
