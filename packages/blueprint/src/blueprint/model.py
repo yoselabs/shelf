@@ -192,6 +192,10 @@ class Profile:
     # Each detected stack with the files that set it (or "declared in docs/blueprint/blueprint.toml"), so a
     # wrong stack can be traced to the file that caused it.
     stack_files: tuple[tuple[str, str], ...] = ()
+    # The folder each detected stack's manifest sits in ("." unless a stack lives in a subfolder: web/package.json -> "web").
+    stack_roots: tuple[tuple[str, str], ...] = ()
+    # Declared contact between stacks sharing the repo (`[[edge]]` in blueprint.toml): (from stack, to stack, contract file).
+    edges: tuple[tuple[str, str, str], ...] = ()
     # Paths the repo declared throwaway or vendored (a `detection` [[override]]): detection and role globs skip them.
     ignore: tuple[str, ...] = ()
     # What detection read (blueprint.facts): reported, not yet acted on. Declared surfaces and traits stay as declared.
