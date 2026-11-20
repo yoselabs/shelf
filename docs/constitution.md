@@ -42,6 +42,9 @@ Accumulation without consolidation is drift. Hard opinions, a breach is a defect
   This covers stored data too: a cache key, a file format or a hash may change when the right shape needs it, and
   the cache is rebuilt. Never freeze a wrong algorithm to protect old entries; batch such changes into one release
   so a store is rebuilt once. We care about consumers by knowing better for them, and by making them evolve fast.
+- **A small surface.** A public name, parameter or option costs tokens for every AI that learns it. Add one only for a
+  different thing; prefer one idempotent verb (`ensure`: no-op when already so, a typed conflict when it differs) and a typed
+  exception to a verb-plus-flag matrix.
 - **No silent failures.** Never swallow an exception. Handle it where the caller can act on it, or let it raise.
   A failed cleanup or shutdown is reported, and the stop it belonged to still happens: a failure to record never
   leaves a worker running.
