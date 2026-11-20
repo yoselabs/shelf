@@ -44,6 +44,7 @@ atomic-io = { workspace = true }
 stream-proc = { workspace = true }
 any-agent = { workspace = true }
 any-mailbox = { workspace = true }
+any-disk = { workspace = true }
 any-recorded-fixture = { workspace = true }
 task-spec = { workspace = true }
 # test-reach composes py-symbols.
@@ -299,6 +300,7 @@ testpaths = [
     "packages/any-shell-policy/tests",
     "packages/any-net/tests",
     "packages/any-clock/tests",
+    "packages/any-disk/tests",
     "packages/any-plugin-cache/tests",
     "packages/plugin-surface/tests",
     "packages/process-lock/tests",
@@ -407,6 +409,7 @@ root_packages = [
     "any_shell_policy",
     "any_net",
     "any_clock",
+    "any_disk",
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
@@ -500,6 +503,7 @@ source_modules = [
     "any_shell_policy",
     "any_net",
     "any_clock",
+    "any_disk",
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
@@ -595,6 +599,7 @@ modules = [
     "any_shell_policy",
     "any_net",
     "any_clock",
+    "any_disk",
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",

@@ -18,6 +18,7 @@ members = [
     "any-browser",
     "any-clock",
     "any-contract",
+    "any-disk",
     "any-failure-fp",
     "any-file",
     "any-frontmatter",
@@ -329,6 +330,27 @@ dev = [
 name = "any-contract"
 version = "0.1.0"
 source = { editable = "packages/any-contract" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
+[[package]]
+name = "any-disk"
+version = "0.1.0"
+source = { editable = "packages/any-disk" }
 
 [package.dev-dependencies]
 dev = [
