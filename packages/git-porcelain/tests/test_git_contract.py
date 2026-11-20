@@ -487,12 +487,11 @@ def _long_commit_failure(world: World, name: str) -> None:
         repo.hooks.commit_failure = (_COMMIT_STDOUT + _COMMIT_FAILURE_STDERR).strip()
         return
     assert isinstance(repo, RealRepo)
-    original = repo.run
+    original = repo.try_run
 
     def failed_commit(
         cwd: Path,
         *args: str,
-        check: bool = True,
         pin: bool = True,
         stdin: str | None = None,
         env: Mapping[str, str] | None = None,
@@ -500,9 +499,9 @@ def _long_commit_failure(world: World, name: str) -> None:
     ) -> Done:
         if "commit" in args:
             return Done(1, _COMMIT_STDOUT.encode(), _COMMIT_FAILURE_STDERR)
-        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+        return original(cwd, *args, pin=pin, stdin=stdin, env=env, timeout=timeout)
 
-    world.monkeypatch.setattr(repo, "run", failed_commit)
+    world.monkeypatch.setattr(repo, "try_run", failed_commit)
 
 
 @then("the complete commit failure output is preserved")
@@ -520,12 +519,11 @@ def _rebase_command_outcome(world: World, name: str, outcome: str) -> None:
         repo.hooks.rebase_result = CommandResult(ok=False, output=output)
         return
     assert isinstance(repo, RealRepo)
-    original = repo.run
+    original = repo.try_run
 
     def rebase_process(
         cwd: Path,
         *args: str,
-        check: bool = True,
         pin: bool = True,
         stdin: str | None = None,
         env: Mapping[str, str] | None = None,
@@ -536,9 +534,9 @@ def _rebase_command_outcome(world: World, name: str, outcome: str) -> None:
                 msg = "failed to invoke git"
                 raise GitUnavailable(msg)
             return Done(1, _COMMIT_STDOUT.encode(), _COMMIT_STDERR)
-        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+        return original(cwd, *args, pin=pin, stdin=stdin, env=env, timeout=timeout)
 
-    world.monkeypatch.setattr(repo, "run", rebase_process)
+    world.monkeypatch.setattr(repo, "try_run", rebase_process)
 
 
 @then(parsers.parse('the rebase command outcome is "{outcome}"'))
@@ -562,21 +560,20 @@ def _signer_fails(world: World, name: str) -> None:
         repo.hooks.commit_failure = "error: gpg failed to sign the data"
         return
     assert isinstance(repo, RealRepo)
-    original = repo.run
+    original = repo.try_run
 
     def signing_process(
         cwd: Path,
         *args: str,
-        check: bool = True,
         pin: bool = True,
         stdin: str | None = None,
         env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> Done:
         config = ("-c", "commit.gpgsign=true", "-c", "gpg.program=false") if "commit" in args else ()
-        return original(cwd, *config, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+        return original(cwd, *config, *args, pin=pin, stdin=stdin, env=env, timeout=timeout)
 
-    world.monkeypatch.setattr(repo, "run", signing_process)
+    world.monkeypatch.setattr(repo, "try_run", signing_process)
 
 
 @then("the push succeeded")
@@ -801,7 +798,6 @@ def _observations_fail(world: World, name: str) -> None:
     def failed_process(
         cwd: Path,
         *args: str,
-        check: bool = True,
         pin: bool = True,
         stdin: str | None = None,
         env: Mapping[str, str] | None = None,
@@ -810,7 +806,7 @@ def _observations_fail(world: World, name: str) -> None:
         msg = "unknown observation failure"
         raise GitUnavailable(msg)
 
-    world.monkeypatch.setattr(repo, "run", failed_process)
+    world.monkeypatch.setattr(repo, "try_run", failed_process)
 
 
 @given(parsers.parse('the LFS command of "{name}" will {outcome}'))
@@ -823,12 +819,11 @@ def _lfs_outcome(world: World, name: str, outcome: str) -> None:
         repo.hooks.lfs_spawn_failure = "failed to invoke git" if outcome == "start" else None
         return
     assert isinstance(repo, RealRepo)
-    original = repo.run
+    original = repo.try_run
 
     def lfs_process(
         cwd: Path,
         *args: str,
-        check: bool = True,
         pin: bool = True,
         stdin: str | None = None,
         env: Mapping[str, str] | None = None,
@@ -842,9 +837,9 @@ def _lfs_outcome(world: World, name: str, outcome: str) -> None:
                 msg = "failed to invoke git"
                 raise GitUnavailable(msg)
             return Done(0, b"", "")
-        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+        return original(cwd, *args, pin=pin, stdin=stdin, env=env, timeout=timeout)
 
-    world.monkeypatch.setattr(repo, "run", lfs_process)
+    world.monkeypatch.setattr(repo, "try_run", lfs_process)
 
 
 @given(parsers.parse('the origin "{name}" refuses non fast forward pushes'))
@@ -863,12 +858,11 @@ def _squash_fails(world: World, name: str) -> None:
         repo.hooks.squash_failure = "squash failed"
         return
     assert isinstance(repo, RealRepo)
-    original = repo.run
+    original = repo.try_run
 
     def fail_commit(
         cwd: Path,
         *args: str,
-        check: bool = True,
         pin: bool = True,
         stdin: str | None = None,
         env: Mapping[str, str] | None = None,
@@ -876,9 +870,9 @@ def _squash_fails(world: World, name: str) -> None:
     ) -> Done:
         if "commit" in args:
             return Done(1, b"", "squash failed")
-        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+        return original(cwd, *args, pin=pin, stdin=stdin, env=env, timeout=timeout)
 
-    world.monkeypatch.setattr(repo, "run", fail_commit)
+    world.monkeypatch.setattr(repo, "try_run", fail_commit)
 
 
 @then(parsers.parse('the squash policy outcome is "{outcome}"'))

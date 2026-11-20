@@ -17,7 +17,7 @@ def check_ignore(repo: Path, paths: Sequence[str]) -> set[str]:
     """Paths ignored by the checkout's rules, even when already tracked (``--no-index``)."""
     if not paths:
         return set()
-    done = RealRepo(repo).run(repo, "check-ignore", "--no-index", "--stdin", "-z", stdin="\0".join(paths) + "\0", check=False)
+    done = RealRepo(repo).try_run(repo, "check-ignore", "--no-index", "--stdin", "-z", stdin="\0".join(paths) + "\0")
     if done.rc not in (0, 1):
         raise unavailable(("check-ignore",), done)
     return {p for p in done.out.split("\0") if p}

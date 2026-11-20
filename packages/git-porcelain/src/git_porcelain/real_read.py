@@ -52,7 +52,7 @@ def _rev_memo[T](repo: RealRepo, key: object, revs: Sequence[str], compute: Call
 
 def head_of(wt: RealWorktree) -> Sha | None:
     """HEAD's commit; None on an unborn branch."""
-    done = wt.run("rev-parse", "--verify", "-q", "HEAD", check=False)
+    done = wt.try_run("rev-parse", "--verify", "-q", "HEAD")
     return Sha(done.out.strip()) if done.rc == 0 and done.out.strip() else None
 
 
@@ -62,7 +62,7 @@ def git_dir_of(wt: RealWorktree) -> Path:
 
 
 def unmerged(wt: RealWorktree) -> tuple[str, ...]:
-    out = wt.run("diff", "--name-only", "--diff-filter=U", "-z", check=False).out
+    out = wt.try_run("diff", "--name-only", "--diff-filter=U", "-z").out
     return tuple(sorted(p for p in out.split("\0") if p))
 
 
@@ -84,7 +84,7 @@ def relate(repo: RealRepo, a: str, b: str) -> Relation:
     validate_revisions(a, b)
 
     def compute() -> Relation:
-        base = repo.run(repo.path, "merge-base", "--end-of-options", a, b, check=False)
+        base = repo.try_run(repo.path, "merge-base", "--end-of-options", a, b)
         if base.rc not in (0, 1):
             raise unavailable(("merge-base", a, b), base)
         counts = repo.run(repo.path, "rev-list", "--left-right", "--count", "--end-of-options", f"{a}...{b}").out.split()
@@ -130,7 +130,7 @@ def branches(repo: RealRepo, prefix: str) -> tuple[tuple[str, Sha], ...]:
 def commit(repo: RealRepo, rev: str) -> Sha:
     """The commit ``rev`` names; ``MissingRevision`` when it names none."""
     validate_revisions(rev)
-    done = repo.run(repo.path, "rev-parse", "--verify", "--end-of-options", f"{rev}^{{commit}}", check=False)
+    done = repo.try_run(repo.path, "rev-parse", "--verify", "--end-of-options", f"{rev}^{{commit}}")
     if done.rc:
         error = unavailable(("rev-parse",), done)
         if "Needed a single revision" in done.err or "expected commit type" in done.err:
@@ -150,7 +150,7 @@ def tree(repo: RealRepo, rev: str) -> Tree | None:
             oid, _, kind = done.out.partition(" ")
             return Sha(oid) if kind.startswith("tree ") else None
         for kind in ("commit", "tree"):
-            done = repo.run(repo.path, "rev-parse", "--verify", "-q", "--end-of-options", f"{rev}^{{{kind}}}", check=False)
+            done = repo.try_run(repo.path, "rev-parse", "--verify", "-q", "--end-of-options", f"{rev}^{{{kind}}}")
             if done.rc == 0 and done.out.strip():
                 return Sha(done.out.strip())
         return None
@@ -164,7 +164,7 @@ def tree(repo: RealRepo, rev: str) -> Tree | None:
             return real_parse.parse_ls_tree(repo.run(repo.path, "ls-tree", "-r", "-z", sha).out)
 
         def reader(path: str) -> bytes | None:
-            done = repo.run(repo.path, "cat-file", "blob", f"{sha}:{path}", check=False)
+            done = repo.try_run(repo.path, "cat-file", "blob", f"{sha}:{path}")
             return done.raw if done.rc == 0 else None
 
         return Tree(sha, lister, reader, batch=lambda paths: read_objects(repo, [f"{sha}:{p}" for p in paths]))
@@ -184,7 +184,7 @@ def read_objects(repo: RealRepo, names: Sequence[str]) -> list[bytes | None]:
 
 
 def _blob(repo: RealRepo, name: str) -> bytes | None:
-    done = repo.run(repo.path, "cat-file", "blob", name, check=False)
+    done = repo.try_run(repo.path, "cat-file", "blob", name)
     return done.raw if done.rc == 0 else None
 
 
@@ -193,7 +193,7 @@ def worktrees(repo: RealRepo, *, with_dirty: bool) -> tuple[WorktreeInfo, ...]:
         rows = real_parse.parse_worktrees(repo.run(repo.path, "worktree", "list", "--porcelain", "-z").out)
         return tuple(WorktreeInfo(path, Sha(head) if head else None, branch, i == 0, None) for i, (path, head, branch) in enumerate(rows))
 
-    found = repo.memo(("worktrees",), compute, forever=False)
+    found = repo.memo_until_write(("worktrees",), compute)
     if not with_dirty:
         return found
     return tuple(
@@ -204,10 +204,10 @@ def worktrees(repo: RealRepo, *, with_dirty: bool) -> tuple[WorktreeInfo, ...]:
 
 # -- Worktree ---------------------------------------------------------------------------------------------
 def health(wt: RealWorktree) -> Health:
-    asked = wt.run("config", "--show-origin", "--get-regexp", _CONFIG_KEYS, pin=False, check=False)
+    asked = wt.try_run("config", "--show-origin", "--get-regexp", _CONFIG_KEYS, pin=False)
     if asked.rc > 1 and (found := wt.repo.git_dir(wt.path)) is not None:
         # a core.worktree that points nowhere makes git die in setup: read the config file itself
-        asked = wt.run(
+        asked = wt.try_run(
             "config",
             "--file",
             str(real_env.common_of(found) / "config"),
@@ -215,10 +215,9 @@ def health(wt: RealWorktree) -> Health:
             "--get-regexp",
             _CONFIG_KEYS,
             pin=False,
-            check=False,
         )
     cfg = real_parse.parse_config_origin(asked.out, wt.path)
-    top = wt.run("rev-parse", "--show-toplevel", pin=False, check=False)
+    top = wt.try_run("rev-parse", "--show-toplevel", pin=False)
     per_worktree = cfg.get("extensions.worktreeconfig", ("", ""))[0].lower() == "true"
     if "core.worktree" in cfg:
         value, where = cfg["core.worktree"]
@@ -250,14 +249,14 @@ def snapshot(wt: RealWorktree, base: str, *, inputs: Sequence[str] = ()) -> Snap
         if key is not None:
             repo.snapshots[str(wt.path)] = (key, work)
     names = [f"{base}^{{commit}}"] if state.head is None else ["HEAD^{tree}", f"{base}^{{commit}}"]
-    seen = wt.run("rev-parse", *names, check=False)
+    seen = wt.try_run("rev-parse", *names)
     lines = seen.out.split()
     if seen.rc != 0 or len(lines) != len(names):
         raise unavailable(("rev-parse",), seen)
     base_tip = Sha(lines[-1])
     if state.head is None:
         return Snapshot(work, None, None, state.branch, base_tip, base_tip)
-    merged = wt.run("merge-base", "--end-of-options", str(base_tip), "HEAD", check=False)
+    merged = wt.try_run("merge-base", "--end-of-options", str(base_tip), "HEAD")
     mb = Sha(merged.out.strip()) if merged.rc == 0 and merged.out.strip() else base_tip
     return Snapshot(work, Sha(state.head), TreeId(lines[0]), state.branch, mb, base_tip)
 
@@ -314,7 +313,7 @@ def _base_ignored(wt: RealWorktree, base: str, untracked: Sequence[str]) -> froz
     with tempfile.TemporaryDirectory() as folder:
         rules_file = Path(folder) / "rules"
         rules_file.write_text("\n".join(rules) + "\n", encoding="utf-8")
-        done = wt.run(
+        done = wt.try_run(
             "-c",
             f"core.excludesFile={rules_file}",
             "check-ignore",
@@ -322,7 +321,6 @@ def _base_ignored(wt: RealWorktree, base: str, untracked: Sequence[str]) -> froz
             "--stdin",
             "-z",
             stdin="\0".join(untracked) + "\0",
-            check=False,
         )
     if done.rc not in (0, 1):
         raise unavailable(("check-ignore",), done)
@@ -333,7 +331,7 @@ def _base_rules(wt: RealWorktree, base: str) -> tuple[str, ...]:
     listing = wt.run("ls-tree", "-r", "--name-only", "-z", "--", base).out
     texts: dict[str, str] = {}
     for path in (p for p in listing.split("\0") if ignore_rules.is_ignore_file(p)):
-        shown = wt.run("cat-file", "blob", f"{base}:{path}", check=False)
+        shown = wt.try_run("cat-file", "blob", f"{base}:{path}")
         if shown.rc == 0:
             texts[path] = shown.out
     return tuple(ignore_rules.flatten(texts))
@@ -341,7 +339,7 @@ def _base_rules(wt: RealWorktree, base: str) -> tuple[str, ...]:
 
 def landed(wt: RealWorktree, base: str, title_suffix: str) -> Sha | None:
     validate_revisions(base)
-    done = wt.run("log", "-1", "--format=%H%x1f%s", check=False)
+    done = wt.try_run("log", "-1", "--format=%H%x1f%s")
     if done.rc != 0 or "\x1f" not in done.out:
         return None
     tip, _, subject = done.out.strip("\n").partition("\x1f")
@@ -351,7 +349,7 @@ def landed(wt: RealWorktree, base: str, title_suffix: str) -> Sha | None:
 
 
 def grep_tracked(wt: RealWorktree, term: str) -> tuple[str, ...]:
-    done = wt.run("grep", "-w", "-I", "-l", "-z", "-F", "-e", term, check=False)
+    done = wt.try_run("grep", "-w", "-I", "-l", "-z", "-F", "-e", term)
     if done.rc not in (0, 1):
         raise unavailable(("grep",), done)
     return tuple(sorted(p for p in done.out.split("\0") if p))

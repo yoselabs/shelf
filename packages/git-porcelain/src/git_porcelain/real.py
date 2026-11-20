@@ -162,13 +162,28 @@ class RealRepo:
         self,
         cwd: Path,
         *args: str,
-        check: bool = True,
         pin: bool = True,
         stdin: str | None = None,
         env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> Done:
-        """``git -C cwd args``. A failure raises :class:`GitUnavailable` when ``check``; otherwise the caller reads ``rc``."""
+        """``git -C cwd args``. A failure raises :class:`GitUnavailable` (:meth:`try_run` leaves ``rc`` to the caller)."""
+        result = self.try_run(cwd, *args, pin=pin, stdin=stdin, env=env, timeout=timeout)
+        if result.rc != 0:
+            raise unavailable(args, result)
+        return result
+
+    def try_run(
+        self,
+        cwd: Path,
+        *args: str,
+        pin: bool = True,
+        stdin: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Done:
+        """:meth:`run` that returns the :class:`Done` of a failed command too; the caller reads ``rc``. A timeout or a
+        missing git still raises."""
         pin_env = self._checkout_pin(cwd) if pin or self.pins is not None else {}
         extra = {**self.extra_env, **pin_env, **(env or {})}
         reading = self.read_timeout is not None and timeout is None and real_reads.is_read(args)
@@ -206,10 +221,7 @@ class RealRepo:
         if done.timed_out:
             msg = f"git {args[0] if args else ''} timed out after {limit}s"
             raise GitTimeout(msg, retryable=True, output=(done.out + done.err).decode("utf-8", "replace").strip())
-        result = Done(done.exit, done.out, done.err.decode("utf-8", "replace"), hooks=hooks, hook_exits=hook_exits)
-        if check and result.rc != 0:
-            raise unavailable(args, result)
-        return result
+        return Done(done.exit, done.out, done.err.decode("utf-8", "replace"), hooks=hooks, hook_exits=hook_exits)
 
     def git_dir(self, checkout: Path) -> Path | None:
         """The git directory of ``checkout``: its pin when this repo has ``pins`` (None when it has none), else what its
@@ -226,8 +238,15 @@ class RealRepo:
         return {"GIT_DIR": str(found), "GIT_WORK_TREE": str(cwd)}
 
     # -- the memo --------------------------------------------------------------------------------------
-    def memo[T](self, key: object, compute: Callable[[], T], *, forever: bool = True) -> T:
-        store = self._forever if forever else self._mutable
+    def memo[T](self, key: object, compute: Callable[[], T]) -> T:
+        """``compute()`` once per ``key`` for the life of the repo object (an answer that cannot change)."""
+        return self._memo(self._forever, key, compute)
+
+    def memo_until_write[T](self, key: object, compute: Callable[[], T]) -> T:
+        """``compute()`` once per ``key`` until the next :meth:`invalidate` (an answer a write can change)."""
+        return self._memo(self._mutable, key, compute)
+
+    def _memo[T](self, store: dict[object, object], key: object, compute: Callable[[], T]) -> T:
         if self.memoize and key in store:
             return store[key]  # type: ignore[return-value]  # keys are tagged by the call site
         value = compute()
@@ -263,11 +282,17 @@ class RealRepo:
     def cherry(self, upstream: str, head: str) -> tuple[Pick, ...]:
         return real_observe.cherry(self, upstream, head)
 
-    def remote_url(self, remote: str, *, push: bool = False) -> str:
-        return real_observe.remote_url(self, remote, push=push)
+    def remote_url(self, remote: str) -> str:
+        return real_observe.remote_url(self, remote)
 
-    def remote_urls(self, remote: str, *, push: bool = False) -> tuple[str, ...]:
-        return real_observe.remote_urls(self, remote, push=push)
+    def remote_push_url(self, remote: str) -> str:
+        return real_observe.remote_push_url(self, remote)
+
+    def remote_urls(self, remote: str) -> tuple[str, ...]:
+        return real_observe.remote_urls(self, remote)
+
+    def remote_push_urls(self, remote: str) -> tuple[str, ...]:
+        return real_observe.remote_push_urls(self, remote)
 
     def squash(self, onto: str, head: str, message: str) -> SquashResult:
         return real_squash.squash(self, onto, head, message)
@@ -347,14 +372,20 @@ class RealWorktree:
         self.repo = repo
         self.path = path
 
-    def run(self, *args: str, check: bool = True, pin: bool = True, stdin: str | None = None, env: Mapping[str, str] | None = None) -> Done:
-        return self.repo.run(self.path, *args, check=check, pin=pin, stdin=stdin, env=env)
+    def run(self, *args: str, pin: bool = True, stdin: str | None = None, env: Mapping[str, str] | None = None) -> Done:
+        return self.repo.run(self.path, *args, pin=pin, stdin=stdin, env=env)
+
+    def try_run(self, *args: str, pin: bool = True, stdin: str | None = None, env: Mapping[str, str] | None = None) -> Done:
+        return self.repo.try_run(self.path, *args, pin=pin, stdin=stdin, env=env)
 
     def health(self) -> Health:
         return real_read.health(self)
 
-    def stage(self, paths: Sequence[str], *, literal: bool = True) -> None:
-        real_operations.stage(self, paths, literal=literal)
+    def stage(self, paths: Sequence[str]) -> None:
+        real_operations.stage(self, paths)
+
+    def stage_pathspec(self, patterns: Sequence[str]) -> None:
+        real_operations.stage_pathspec(self, patterns)
 
     def stage_tracked(self) -> None:
         real_operations.stage_tracked(self)
@@ -458,8 +489,11 @@ class RealWorktree:
     def unmerged(self) -> tuple[str, ...]:
         return real_observe.unmerged(self)
 
-    def continue_rebase(self, *, stage_conflicts: bool = False, check_markers: bool = False, missing_ok: bool = False) -> CommandResult:
-        return real_commands.continue_rebase(self, stage_conflicts=stage_conflicts, check_markers=check_markers, missing_ok=missing_ok)
+    def continue_rebase(self, *, missing_ok: bool = False) -> CommandResult:
+        return real_commands.continue_rebase(self, missing_ok=missing_ok)
+
+    def resolve_and_continue(self) -> CommandResult:
+        return real_commands.resolve_and_continue(self)
 
     def abort_rebase(self, *, missing_ok: bool = True, restore_to: Sha | None = None) -> CommandResult:
         return real_commands.abort_rebase(self, missing_ok=missing_ok, restore_to=restore_to)

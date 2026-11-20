@@ -42,7 +42,7 @@ def delete_ref_at(repo: Path, ref: str, oid: str) -> None:
 def symbolic_ref(repo: Path, name: str) -> str | None:
     """The target of a symbolic ref; None for an ordinary or detached ref."""
     runner = RealRepo(repo)
-    done = runner.run(repo, "symbolic-ref", "--quiet", name, check=False)
+    done = runner.try_run(repo, "symbolic-ref", "--quiet", name)
     if done.rc == 1 and not done.out and not done.err:
         return None
     if done.rc:

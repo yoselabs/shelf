@@ -107,7 +107,7 @@ land(RealRepo(path).worktree(path))             # the binary, memoized
 land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no subprocess
 ```
 
-- **`Repo`**: `identity sync fetch remote_url remote_urls ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch commit tree squash commit_tree update_ref worktrees add_worktree drop_worktree
+- **`Repo`**: `identity sync fetch remote_url remote_push_url remote_urls remote_push_urls ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch commit tree squash commit_tree update_ref worktrees add_worktree drop_worktree
   prune_worktrees worktree_state exclude_locally worktree`.
 - **`Worktree`**: `health branch checkout checkout_new clean reset checkout_force snapshot diff dirty stage stage_tracked record merge_ff take_branch release_branch park exclude capture start_merge merging finish_merge abort_merge rebase_onto
   finish_rebase rebase continue_rebase abort_rebase rebasing unmerged push push_refspecs push_request push_lease lfs_push landed grep_tracked`.
@@ -227,10 +227,11 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
 
 ### Small repository and index operations
 
-`Worktree.stage(paths, literal=True)` stages additions, edits and deletions for the supplied
+`Worktree.stage(paths)` stages additions, edits and deletions for the supplied
 paths using `git --literal-pathspecs add -A --pathspec-from-file=- --pathspec-file-nul`.
 Names containing whitespace, newlines, leading dashes and wildcard characters are literal by
 default; all paths travel through stdin, without an argv size limit. Empty paths stage nothing.
+`Worktree.stage_pathspec(patterns)` is the same for git pathspecs (globs, folders).
 `literal=False` enables git pathspec matching. `stage_tracked()` uses `add -u` and includes
 already staged additions, leaving untracked files alone. Both are stage-only operations;
 neither commits. Missing/ignored paths and index failures raise `GitUnavailable` or its typed
@@ -271,8 +272,7 @@ returns the complete squash diagnostic in `Rebased.squash_failure` or
 `Conflict.squash_failure`. Conflicts remain paused; `abort_rebase(restore_to=original)`
 can restore the pre-squash HEAD.
 
-`rebase(base, update_refs=None)`, `continue_rebase(stage_conflicts=False,
-check_markers=False, missing_ok=False)` and `abort_rebase(missing_ok=True, restore_to=None)`
+`rebase(base, update_refs=None)`, `continue_rebase(missing_ok=False)`, `resolve_and_continue()` (refuses while conflict markers remain, else stages every unmerged file and continues) and `abort_rebase(missing_ok=True, restore_to=None)`
 return `CommandResult(ok, output)`. These preserve complete stripped stdout plus stderr;
 git refusals are `ok=False`, while invocation failures raise. `rebase` first resolves `base`
 to a commit OID with `rev-parse --verify --end-of-options`; an absent base raises
@@ -298,12 +298,12 @@ for detached and unborn HEAD. `Repo.cherry(upstream, head)`
 returns oldest-first `Pick(oid, upstream)` rows matching git cherry's non-merge selection;
 `upstream=True` denotes patch equivalence. `Repo.remote_url(remote)` uses remote get-url,
 including URL rewrites; missing named remotes raise `MissingRemote`, distinct from failed
-observations. Both errors extend `GitUnavailable`. `remote_url(remote, push=True)` is
+observations. Both errors extend `GitUnavailable`. `remote_push_url(remote)` is
 `remote get-url --push`: the first explicit `pushurl` (with `insteadOf` applied, `pushInsteadOf`
 ignored), else the URL rewritten by `pushInsteadOf`, else by `insteadOf`. A caller that reads a
 remote to decide what a push delivered compares the two to know both go to one repository.
-`remote_urls(remote, push=False)` is `remote get-url --all [--push]`: every URL, each rewritten as
-`remote_url` rewrites one. Only the first `url` is fetched from, but a push goes to every `pushurl`
+`remote_urls(remote)` is `remote get-url --all` and `remote_push_urls(remote)` is `remote get-url --all --push`: every URL, each rewritten as
+`remote_url` / `remote_push_url` rewrites one. Only the first `url` is fetched from, but a push goes to every `pushurl`
 (else to every `url`), so such a caller also requires exactly one URL on each side. In the fake,
 `FakeRepo.add_config(key, value)` adds a second value as `git config --add` does.
 
@@ -468,7 +468,7 @@ Task-loop's `treehash.state_of` is a status/stat signature, while `tree_of` is t
 operation: both omit ignored files by default. Explicit `inputs` extends that default for declared
 ignored inputs; ordinary snapshots retain `tree_of` semantics.
 
-`run_git`, `git_returncode`, `is_repo`, `git_dir`, `has_upstream`, `upstream`, `head`,
+`run_git`, `try_git`, `git_returncode`, `is_repo`, `git_dir`, `has_upstream`, `upstream`, `head`,
 `merge_in_progress`, `sync_status`, `readiness`, `status`, `dirty_rels`, `unmerged_paths`,
 `has_conflict_markers`, `show_stage`, `show_at`, `commit_paths`, `log_grep`, `push`,
 `fetch`, `merge`, `finish_merge`, `is_ancestor`, `classify_remote_failure`, `lfs_available`,

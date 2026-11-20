@@ -22,7 +22,7 @@ from child_env import NotFound, find
 
 from git_porcelain.errors import GitError
 from git_porcelain.history import _remote
-from git_porcelain.porcelain import git_env, git_returncode, run_git
+from git_porcelain.porcelain import git_env, git_returncode, run_git, try_git
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -61,7 +61,7 @@ def lfs_setup(repo: Path) -> bool:
     if not lfs_available():
         return False
     for key, value in _FILTER.items():
-        current = run_git(repo, "config", "--local", "--get", key, check=False).strip()
+        current = try_git(repo, "config", "--local", "--get", key).strip()
         if current != value:
             run_git(repo, "config", "--local", key, value)
     return True

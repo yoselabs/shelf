@@ -23,7 +23,7 @@ def fetch_done(repo: RealRepo, remote: str, refspecs: Sequence[str], timeout: fl
     """Retry only ref races, with at most five single-process attempts."""
     attempt = 0
     while True:
-        done = repo.run(repo.path, "fetch", "--quiet", "--", remote, *refspecs, check=False, timeout=timeout)
+        done = repo.try_run(repo.path, "fetch", "--quiet", "--", remote, *refspecs, timeout=timeout)
         if not done.rc or attempt == 4 or not isinstance(unavailable(("fetch",), done), RefRace):
             return done
         repo.sleep(0.1 * (attempt + 1))
@@ -50,7 +50,7 @@ def delete_remote_at(repo: RealRepo, remote: str, ref: str, expected: Sha, *, mi
     validate_remote(remote)
     validate_delete_ref(ref)
     try:
-        done = repo.run(repo.path, "push", "--porcelain", f"--force-with-lease={ref}:{expected}", "--", remote, f":{ref}", check=False)
+        done = repo.try_run(repo.path, "push", "--porcelain", f"--force-with-lease={ref}:{expected}", "--", remote, f":{ref}")
         if done.rc == 0:
             return CommandResult(ok=True, output=done.output)
         if not missing_ok:
@@ -84,7 +84,7 @@ def _pin(wt: RealWorktree, refspecs: Sequence[str]) -> tuple[str, ...]:
             # Bare HEAD still names the current branch's destination after pinning its source.
             source = captured
             if not colon:
-                branch = wt.run("symbolic-ref", "--quiet", "HEAD", check=False)
+                branch = wt.try_run("symbolic-ref", "--quiet", "HEAD")
                 if branch.rc:
                     msg = "a bare HEAD push needs a symbolic branch or an explicit destination"
                     raise GitUnavailable(msg, output=branch.output)
@@ -117,7 +117,7 @@ def push_request(
         branch = wt.branch()
         keys = [*([f"branch.{branch}.pushremote"] if branch else []), "remote.pushdefault"]
         keys += [f"branch.{branch}.remote"] if branch else []
-        configured = wt.run("config", "--null", "--get-regexp", r"^(branch\..*\.(pushremote|remote)|remote\.pushdefault)$", check=False)
+        configured = wt.try_run("config", "--null", "--get-regexp", r"^(branch\..*\.(pushremote|remote)|remote\.pushdefault)$")
         if configured.rc not in {0, 1}:
             raise unavailable(("config",), configured)
         values = dict(record.split("\n", 1) for record in configured.out.split("\0") if "\n" in record)
@@ -153,7 +153,7 @@ def push_refspecs(
     if source is not None and re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", source) is None:
         sha = wt.run("rev-parse", "--verify", "--end-of-options", source).out.strip()
     try:
-        done = wt.repo.run(wt.path, "push", "--porcelain", "--", remote, *specs, check=False, env=hook_env, timeout=timeout)
+        done = wt.repo.try_run(wt.path, "push", "--porcelain", "--", remote, *specs, env=hook_env, timeout=timeout)
     finally:
         wt.repo.invalidate()
     return classify_push(done, Sha(sha))

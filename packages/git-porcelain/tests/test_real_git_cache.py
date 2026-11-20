@@ -409,12 +409,11 @@ def test_fast_forward_failure_is_typed_with_an_injected_non_english_locale(rig: 
 @pytest.mark.parametrize("operation", ["is_ancestor", "merge_base"])
 @pytest.mark.parametrize("outcome", [Done(128, b"", "unknown read failure"), Done(0, b"malformed", "")])
 def test_revision_read_failures_are_never_absence(rig: Rig, monkeypatch: pytest.MonkeyPatch, operation: str, outcome: Done) -> None:
-    original = rig.repo.run
+    original = rig.repo.try_run
 
     def failed_read(
         cwd: Path,
         *args: str,
-        check: bool = True,
         pin: bool = True,
         stdin: str | None = None,
         env: Mapping[str, str] | None = None,
@@ -422,9 +421,9 @@ def test_revision_read_failures_are_never_absence(rig: Rig, monkeypatch: pytest.
     ) -> Done:
         if args[0] == "merge-base":
             return outcome
-        return original(cwd, *args, check=check, pin=pin, stdin=stdin, env=env, timeout=timeout)
+        return original(cwd, *args, pin=pin, stdin=stdin, env=env, timeout=timeout)
 
-    monkeypatch.setattr(rig.repo, "run", failed_read)
+    monkeypatch.setattr(rig.repo, "try_run", failed_read)
     with pytest.raises(GitReadFailure):
         getattr(rig.repo, operation)("HEAD", "HEAD")
 

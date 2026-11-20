@@ -60,7 +60,7 @@ Feature: One Repo and Worktree, real or fake
     Then the result is a Recorded
     And all the many literal paths were committed
     When "r" writes first.txt="one", second.txt="two", other="keep"
-    And "r" calls stage(["*.txt"], literal=False)
+    And "r" calls stage_pathspec(["*.txt"])
     And "r" calls record("glob", paths="staged")
     Then the result is a Recorded
     When "r" calls dirty()
@@ -577,7 +577,7 @@ Feature: One Repo and Worktree, real or fake
     When "r" calls rebasing()
     Then the result is True
     When "r" writes a="resolved\n"
-    And "r" calls continue_rebase(stage_conflicts=True, check_markers=True)
+    And "r" calls resolve_and_continue()
     Then the result's ok is True
     When "r" calls rebasing()
     Then the result is False
@@ -878,7 +878,7 @@ Feature: One Repo and Worktree, real or fake
     Then the result is True
     When "r" calls unmerged()
     Then the result is ["a"]
-    When "r" calls continue_rebase(check_markers=True, stage_conflicts=True)
+    When "r" calls resolve_and_continue()
     Then the result's ok is False
     When "r" writes a="resolved\n"
     And "r" calls continue_rebase()
@@ -921,7 +921,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" calls fetch()
     And "r" calls rebase_onto("origin/main")
     When "r" writes a="resolved\n"
-    And "r" calls continue_rebase(stage_conflicts=True, check_markers=True)
+    And "r" calls resolve_and_continue()
     Then the result's ok is True
     When "r" calls continue_rebase(missing_ok=True)
     Then the result's ok is True
@@ -2565,9 +2565,9 @@ Feature: One Repo and Worktree, real or fake
   Scenario: The push URL is the fetch URL when nothing redirects pushes
     Given an origin "o"
     And "r" is a clone of the origin "o"
-    When "r" calls remote_url("origin", push=True)
+    When "r" calls remote_push_url("origin")
     Then the result is "<mem:origin:o>"
-    When "r" tries remote_url("missing", push=True)
+    When "r" tries remote_push_url("missing")
     Then the call raises MissingRemote
 
   Scenario Outline: The push URL follows pushurl, pushInsteadOf and insteadOf
@@ -2576,7 +2576,7 @@ Feature: One Repo and Worktree, real or fake
     And "r" config "<key>" is "<value>"
     When "r" calls remote_url("origin")
     Then the result is "<fetch>"
-    When "r" calls remote_url("origin", push=True)
+    When "r" calls remote_push_url("origin")
     Then the result is "<push>"
 
     Examples:
@@ -2590,9 +2590,9 @@ Feature: One Repo and Worktree, real or fake
     And "r" is a clone of the origin "o"
     When "r" calls remote_urls("origin")
     Then the result is ["<mem:origin:o>"]
-    When "r" calls remote_urls("origin", push=True)
+    When "r" calls remote_push_urls("origin")
     Then the result is ["<mem:origin:o>"]
-    When "r" tries remote_urls("missing", push=True)
+    When "r" tries remote_push_urls("missing")
     Then the call raises MissingRemote
 
   Scenario: A second url is listed on both sides; the first stays the one URL
@@ -2602,9 +2602,9 @@ Feature: One Repo and Worktree, real or fake
     And "r" config "url.expanded/.insteadOf" is "<root>/second"
     When "r" calls remote_urls("origin")
     Then the result is ["<mem:origin:o>", "expanded/.git"]
-    When "r" calls remote_urls("origin", push=True)
+    When "r" calls remote_push_urls("origin")
     Then the result is ["<mem:origin:o>", "expanded/.git"]
-    When "r" calls remote_url("origin", push=True)
+    When "r" calls remote_push_url("origin")
     Then the result is "<mem:origin:o>"
 
   Scenario: Every pushurl is listed on the push side only
@@ -2612,11 +2612,11 @@ Feature: One Repo and Worktree, real or fake
     And "r" is a clone of the origin "o"
     And "r" config "remote.origin.pushurl" is "<root>/a.git"
     And "r" config "remote.origin.pushurl" also has "<root>/b.git"
-    When "r" calls remote_urls("origin", push=True)
+    When "r" calls remote_push_urls("origin")
     Then the result is ["<root>/a.git", "<root>/b.git"]
     When "r" calls remote_urls("origin")
     Then the result is ["<mem:origin:o>"]
-    When "r" calls remote_url("origin", push=True)
+    When "r" calls remote_push_url("origin")
     Then the result is "<root>/a.git"
 
   Scenario: An explicit pushurl ignores pushInsteadOf but takes insteadOf
@@ -2624,10 +2624,10 @@ Feature: One Repo and Worktree, real or fake
     And "r" is a clone of the origin "o"
     And "r" config "remote.origin.pushurl" is "<root>/elsewhere.git"
     And "r" config "url.pushed/.pushInsteadOf" is "<root>/"
-    When "r" calls remote_url("origin", push=True)
+    When "r" calls remote_push_url("origin")
     Then the result is "<root>/elsewhere.git"
     When "r" config "url.expanded/.insteadOf" becomes "<root>/"
-    And "r" calls remote_url("origin", push=True)
+    And "r" calls remote_push_url("origin")
     Then the result is "expanded/elsewhere.git"
 
   # -- exclude: ignore rules of one checkout, and park(keep_ignored) ---------------------------------

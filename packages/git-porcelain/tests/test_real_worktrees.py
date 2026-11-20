@@ -16,13 +16,12 @@ def test_worktree_state_preserves_bytes_and_asks_each_time(tmp_path: Path, monke
     raw = b"# branch.oid (initial)\0# branch.head main\0? name\xff\n\0"
     calls: list[tuple[str, ...]] = []
 
-    def run(cwd: Path, *args: str, check: bool = True) -> Done:
+    def run(cwd: Path, *args: str) -> Done:
         assert cwd == tmp_path
-        assert not check
         calls.append(args)
         return Done(0, raw, "")
 
-    monkeypatch.setattr(repo, "run", run)
+    monkeypatch.setattr(repo, "try_run", run)
     assert repo.worktree_state(tmp_path) == raw
     assert repo.worktree_state(tmp_path) == raw
     expected = ("--no-optional-locks", "status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all")
@@ -43,10 +42,10 @@ def test_worktree_state_distinguishes_absence_from_read_failure(
 ) -> None:
     repo = RealRepo(tmp_path)
 
-    def run(cwd: Path, *args: str, check: bool = True) -> Done:
+    def run(cwd: Path, *args: str) -> Done:
         return Done(128, b"", stderr)
 
-    monkeypatch.setattr(repo, "run", run)
+    monkeypatch.setattr(repo, "try_run", run)
     if error is None:
         assert repo.worktree_state(tmp_path) is None
     else:
@@ -60,11 +59,11 @@ def test_remove_refusal_keeps_the_first_diagnostic_and_final_hint(tmp_path: Path
     reason = "fatal: " + "long path " * 100 + "contains modified or untracked files"
     calls: list[tuple[str, ...]] = []
 
-    def run(cwd: Path, *args: str, check: bool = True) -> Done:
+    def run(cwd: Path, *args: str) -> Done:
         calls.append(args)
         return Done(128, b"", f"{intro}\n{reason}\n\n")
 
-    monkeypatch.setattr(repo, "run", run)
+    monkeypatch.setattr(repo, "try_run", run)
     with pytest.raises(WorktreeRemoveRefused) as caught:
         repo.drop_worktree(tmp_path / "w", missing_ok=False)
     expected = intro if intro.startswith("error:") else reason
@@ -109,10 +108,10 @@ def test_remove_preserves_infrastructure_errors(
 ) -> None:
     repo = RealRepo(tmp_path)
 
-    def run(cwd: Path, *args: str, check: bool = True) -> Done:
+    def run(cwd: Path, *args: str) -> Done:
         return Done(128, b"", stderr)
 
-    monkeypatch.setattr(repo, "run", run)
+    monkeypatch.setattr(repo, "try_run", run)
     with pytest.raises(error) as caught:
         repo.drop_worktree(tmp_path / "w", missing_ok=False)
     assert not isinstance(caught.value, WorktreeRemoveRefused)

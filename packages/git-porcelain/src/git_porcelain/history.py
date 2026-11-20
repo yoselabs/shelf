@@ -29,6 +29,7 @@ from git_porcelain.porcelain import (
     merge_in_progress,
     run_git,
     run_git_result,
+    try_git,
     unmerged_paths,
 )
 from git_porcelain.revision_validation import validate_revisions
@@ -173,7 +174,7 @@ def log_grep(repo: Path, pattern: str, *, limit: int = 20) -> list[Commit]:
     """Commits reachable from ``HEAD`` whose message matches ``pattern`` (extended regex,
     one line at a time — so ``^Key: value$`` matches a trailer), newest first, with the
     paths each one changed. Empty on a repo with no commits."""
-    if not run_git(repo, "rev-parse", "--verify", "-q", "HEAD", check=False).strip():
+    if not try_git(repo, "rev-parse", "--verify", "-q", "HEAD").strip():
         return []
     fmt = _RECORD + _FIELD.join(["%H", "%aI", "%an", "%ae", "%s", "%(trailers:only,unfold,separator=%x1d)"]) + _FIELD
     out = run_git(repo, "log", "-E", f"--grep={pattern}", f"-n{limit}", f"--format={fmt}", "--name-only", "-z", "--no-renames", "HEAD")
@@ -212,7 +213,7 @@ def is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
 
 def upstream(repo: Path) -> str | None:
     """The current branch's upstream (``origin/main``), or None when none is set."""
-    out = run_git(repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}", check=False).strip()
+    out = try_git(repo, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").strip()
     return out or None
 
 
@@ -294,7 +295,7 @@ class MergeResult:
 
 
 def _changed_since(repo: Path, rev: str) -> tuple[str, ...]:
-    out = run_git(repo, "-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", "-z", rev, "HEAD", check=False)
+    out = try_git(repo, "-c", "core.quotePath=false", "diff", "--no-renames", "--name-only", "-z", rev, "HEAD")
     return tuple(p for p in out.split("\0") if p)
 
 

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 def tag(repo: RealRepo, name: str, rev: str) -> None:
     validate_revisions(rev)
     try:
-        done = repo.run(repo.path, "rev-parse", "--verify", "--end-of-options", rev, check=False)
+        done = repo.try_run(repo.path, "rev-parse", "--verify", "--end-of-options", rev)
         if done.rc:
             error = unavailable(("rev-parse",), done)
             if "Needed a single revision" in done.err:
@@ -57,13 +57,21 @@ def ls_remote(repo: RealRepo, remote: str, patterns: Sequence[str]) -> RemoteRef
         raise GitReadFailure(msg, output=done.output) from exc
 
 
-def stage(wt: RealWorktree, paths: Sequence[str], *, literal: bool) -> None:
+def stage(wt: RealWorktree, paths: Sequence[str]) -> None:
+    _add(wt, ["--literal-pathspecs"], paths)
+
+
+def stage_pathspec(wt: RealWorktree, patterns: Sequence[str]) -> None:
+    _add(wt, [], patterns)
+
+
+def _add(wt: RealWorktree, options: Sequence[str], paths: Sequence[str]) -> None:
     # An empty pathspec stream makes git add -A stage the entire checkout.
     if not paths:
         return
     try:
         wt.run(
-            *(["--literal-pathspecs"] if literal else []),
+            *options,
             "add",
             "-A",
             "--pathspec-from-file=-",

@@ -178,16 +178,23 @@ class Repo(Protocol):
         """Non-merge picks in git cherry order with patch equivalence."""
         ...
 
-    def remote_url(self, remote: str, *, push: bool = False) -> str:
-        """Expanded fetch URL (``insteadOf`` applied); with ``push``, the URL a push goes to (``remote get-url --push``:
-        the first ``pushurl``, else ``pushInsteadOf`` or ``insteadOf`` over the URL). MissingRemote only for a missing
-        named remote."""
+    def remote_url(self, remote: str) -> str:
+        """Expanded fetch URL (``insteadOf`` applied). MissingRemote only for a missing named remote."""
         ...
 
-    def remote_urls(self, remote: str, *, push: bool = False) -> tuple[str, ...]:
-        """Every URL, as ``remote get-url --all [--push]``, each rewritten as ``remote_url`` rewrites one: a fetch reads
-        only the first ``url``, but a push goes to every ``pushurl`` (else to every ``url``). MissingRemote only for a
-        missing named remote."""
+    def remote_push_url(self, remote: str) -> str:
+        """The URL a push goes to (``remote get-url --push``: the first ``pushurl``, else ``pushInsteadOf`` or
+        ``insteadOf`` over the URL). MissingRemote only for a missing named remote."""
+        ...
+
+    def remote_urls(self, remote: str) -> tuple[str, ...]:
+        """Every URL, as ``remote get-url --all``, each rewritten as ``remote_url`` rewrites one: a fetch reads only the
+        first ``url``. MissingRemote only for a missing named remote."""
+        ...
+
+    def remote_push_urls(self, remote: str) -> tuple[str, ...]:
+        """Every URL a push goes to, as ``remote get-url --all --push``: every ``pushurl``, else every ``url``, each
+        rewritten as ``remote_push_url`` rewrites one. MissingRemote only for a missing named remote."""
         ...
 
     def squash(self, onto: str, head: str, message: str) -> SquashResult:
@@ -308,8 +315,12 @@ class Worktree(Protocol):
 
     path: Path
 
-    def stage(self, paths: Sequence[str], *, literal: bool = True) -> None:
-        """Stage additions, edits and deletions via NUL-delimited pathspecs; git refusals raise GitUnavailable."""
+    def stage(self, paths: Sequence[str]) -> None:
+        """Stage additions, edits and deletions of these literal paths via NUL-delimited pathspecs; git refusals raise GitUnavailable."""
+        ...
+
+    def stage_pathspec(self, patterns: Sequence[str]) -> None:
+        """:meth:`stage` for git pathspecs (globs and folders) instead of literal paths; git refusals raise GitUnavailable."""
         ...
 
     def stage_tracked(self) -> None:
@@ -458,8 +469,13 @@ class Worktree(Protocol):
         """
         ...
 
-    def continue_rebase(self, *, stage_conflicts: bool = False, check_markers: bool = False, missing_ok: bool = False) -> CommandResult:
-        """Continue using the existing index unless staging is explicitly requested."""
+    def continue_rebase(self, *, missing_ok: bool = False) -> CommandResult:
+        """Continue using the existing index; ``missing_ok`` accepts no paused rebase as success."""
+        ...
+
+    def resolve_and_continue(self) -> CommandResult:
+        """Refuse while a conflicted file still holds markers (``ok=False``, ``conflict markers remain``), else stage
+        every unmerged file and continue the paused rebase."""
         ...
 
     def abort_rebase(self, *, missing_ok: bool = True, restore_to: Sha | None = None) -> CommandResult:

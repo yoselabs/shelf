@@ -24,7 +24,7 @@ def command(
     timed_out: str | None = None,
 ) -> CommandResult:
     try:
-        done = wt.repo.run(wt.path, *args, check=False, env=env, timeout=timeout)
+        done = wt.repo.try_run(wt.path, *args, env=env, timeout=timeout)
         return CommandResult(ok=done.rc == 0, output=done.output)
     except GitTimeout as exc:
         if exc.output:
@@ -42,16 +42,18 @@ def rebase(wt: RealWorktree, base: str, *, update_refs: bool | None) -> CommandR
     return command(wt, [*config, "rebase", "-q", target])
 
 
-def continue_rebase(wt: RealWorktree, *, stage_conflicts: bool, check_markers: bool, missing_ok: bool) -> CommandResult:
+def continue_rebase(wt: RealWorktree, *, missing_ok: bool) -> CommandResult:
     if missing_ok and not real_observe.rebasing(wt):
         return CommandResult(ok=True, output="")
-    files = real_observe.unmerged(wt) if stage_conflicts or check_markers else ()
-    if check_markers and any(real_write.has_markers(wt.path / path) for path in files):
+    return command(wt, ["-c", "core.editor=true", "rebase", "--continue"])
+
+
+def resolve_and_continue(wt: RealWorktree) -> CommandResult:
+    files = real_observe.unmerged(wt)
+    if any(real_write.has_markers(wt.path / path) for path in files):
         return CommandResult(ok=False, output="conflict markers remain")
-    if stage_conflicts and files:
-        done = wt.run(
-            "--literal-pathspecs", "add", "-A", "--pathspec-from-file=-", "--pathspec-file-nul", stdin="\0".join(files), check=False
-        )
+    if files:
+        done = wt.try_run("--literal-pathspecs", "add", "-A", "--pathspec-from-file=-", "--pathspec-file-nul", stdin="\0".join(files))
         wt.repo.invalidate()
         if done.rc:
             return CommandResult(ok=False, output=done.output)

@@ -83,7 +83,6 @@ def _run(
 def run_git(
     vault: Path,
     *args: str,
-    check: bool = True,
     env: Mapping[str, str] | None = None,
     timeout: float | None = None,
     stdin: str | None = None,
@@ -95,10 +94,21 @@ def run_git(
     bounds a network call; running out raises a retryable :class:`GitError`. ``stdin`` is fed to git.
     """
     proc = _run(vault, args, env, timeout, stdin)
-    if check and proc.returncode != 0:
+    if proc.returncode != 0:
         msg = f"git {args[0] if args else ''} exited {proc.returncode}: {proc.stderr.strip()[:300]}"
         raise failure(msg, proc.stderr, proc.returncode, output=(proc.stdout + proc.stderr).strip())
     return proc.stdout
+
+
+def try_git(
+    vault: Path,
+    *args: str,
+    env: Mapping[str, str] | None = None,
+    timeout: float | None = None,
+    stdin: str | None = None,
+) -> str:
+    """:func:`run_git` that returns stdout whatever git's exit code was (a timeout or a missing git still raises)."""
+    return _run(vault, args, env, timeout, stdin).stdout
 
 
 def run_git_result(vault: Path, *args: str, env: Mapping[str, str] | None = None, timeout: float | None = None) -> CommandResult:
@@ -178,7 +188,7 @@ def _head_from_files(vault: Path) -> str | None:
 
 def has_upstream(vault: Path) -> bool:
     """Return True if the current branch has an upstream tracking branch configured."""
-    out = run_git(vault, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}", check=False)
+    out = try_git(vault, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}")
     return bool(out.strip()) and "fatal" not in out.lower()
 
 
@@ -190,12 +200,12 @@ def merge_in_progress(vault: Path) -> bool:
 
 def sync_status(vault: Path) -> dict[str, Any]:
     """Branch / clean / changed count / ahead-behind / merge-in-progress (no network)."""
-    branch = run_git(vault, "rev-parse", "--abbrev-ref", "HEAD", check=False).strip() or "HEAD"
-    porcelain = run_git(vault, "status", "--porcelain", check=False).strip()
+    branch = try_git(vault, "rev-parse", "--abbrev-ref", "HEAD").strip() or "HEAD"
+    porcelain = try_git(vault, "status", "--porcelain").strip()
     changed = len([ln for ln in porcelain.splitlines() if ln.strip()])
     ahead = behind = 0
     if has_upstream(vault):
-        counts = run_git(vault, "rev-list", "--left-right", "--count", "@{upstream}...HEAD", check=False).split()
+        counts = try_git(vault, "rev-list", "--left-right", "--count", "@{upstream}...HEAD").split()
         if len(counts) == 2:
             behind, ahead = int(counts[0]), int(counts[1])
     return {
@@ -218,8 +228,8 @@ def readiness(vault: Path, *, check_push: bool = True) -> dict[str, Any]:
     """
     if not git_installed(git_env()) or not is_repo(vault):
         return {"is_repo": False, "identity": False, "remote": False, "push_access": False, "output": ""}
-    email = run_git(vault, "config", "user.email", check=False).strip()
-    remote = run_git(vault, "remote", check=False).strip()
+    email = try_git(vault, "config", "user.email").strip()
+    remote = try_git(vault, "remote").strip()
     push_access: bool | None = None
     output = ""
     if check_push and remote:
@@ -234,7 +244,7 @@ def readiness(vault: Path, *, check_push: bool = True) -> dict[str, Any]:
 
 def unmerged_paths(vault: Path, *, env: Mapping[str, str] | None = None) -> list[str]:
     """Return the repo-relative paths that are currently unmerged (conflicted)."""
-    out = run_git(vault, "diff", "--name-only", "--diff-filter=U", check=False, env=env)
+    out = try_git(vault, "diff", "--name-only", "--diff-filter=U", env=env)
     return [ln.strip() for ln in out.splitlines() if ln.strip()]
 
 
@@ -249,7 +259,7 @@ def has_conflict_markers(path: Path) -> bool:
 
 def show_stage(vault: Path, stage: int, rel: str) -> str:
     """The clean blob for an index stage (1 base, 2 ours, 3 theirs); '' if absent."""
-    return run_git(vault, "show", f":{stage}:{rel}", check=False)
+    return try_git(vault, "show", f":{stage}:{rel}")
 
 
 def dirty_rels(vault: Path) -> list[str]:
@@ -277,7 +287,7 @@ class StatusEntry:
 
 def status(vault: Path, *, env: Mapping[str, str] | None = None) -> list[StatusEntry]:
     """Every changed, staged and untracked path, one entry per file, paths unquoted."""
-    fields = run_git(vault, "status", "--porcelain=v1", "-z", "-uall", check=False, env=env).split("\0")
+    fields = try_git(vault, "status", "--porcelain=v1", "-z", "-uall", env=env).split("\0")
     entries: list[StatusEntry] = []
     i = 0
     while i < len(fields):

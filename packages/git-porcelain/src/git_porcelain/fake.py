@@ -200,13 +200,21 @@ class FakeRepo:
     def cherry(self, upstream: str, head: str) -> tuple[Pick, ...]:
         return read.cherry(self._state, self._anchor(), upstream, head)
 
-    def remote_url(self, remote: str, *, push: bool = False) -> str:
+    def remote_url(self, remote: str) -> str:
         self._read_anchor()
-        return fake_remote.remote_url(self._state, remote, push=push)
+        return fake_remote.remote_urls(self._state, remote)[0]
 
-    def remote_urls(self, remote: str, *, push: bool = False) -> tuple[str, ...]:
+    def remote_push_url(self, remote: str) -> str:
         self._read_anchor()
-        return fake_remote.remote_urls(self._state, remote, push=push)
+        return fake_remote.remote_push_urls(self._state, remote)[0]
+
+    def remote_urls(self, remote: str) -> tuple[str, ...]:
+        self._read_anchor()
+        return fake_remote.remote_urls(self._state, remote)
+
+    def remote_push_urls(self, remote: str) -> tuple[str, ...]:
+        self._read_anchor()
+        return fake_remote.remote_push_urls(self._state, remote)
 
     def squash(self, onto: str, head: str, message: str) -> SquashResult:
         return fake_squash.squash(self._state, self._anchor(), onto, head, message)
@@ -359,12 +367,15 @@ class FakeWorktree:
     def health(self) -> Health:
         return read.health(self._repo, self._find(), self.path)
 
-    def stage(self, paths: Sequence[str], *, literal: bool = True) -> None:
-        fake_operations.stage(self._repo, self.state(), paths, literal=literal)
+    def stage(self, paths: Sequence[str]) -> None:
+        fake_operations.stage(self._repo, self.state(), paths)
+
+    def stage_pathspec(self, patterns: Sequence[str]) -> None:
+        fake_operations.stage_pathspec(self._repo, self.state(), patterns)
 
     def stage_tracked(self) -> None:
         wt = self.state()
-        fake_operations.stage(self._repo, wt, list(wt.index), literal=True)
+        fake_operations.stage(self._repo, wt, list(wt.index))
 
     def merge_ff(self, rev: str) -> None:
         self.repo.plumbing().merge_ff(self.path, rev)
@@ -474,10 +485,11 @@ class FakeWorktree:
         except GitUnavailable as exc:
             raise GitReadFailure(str(exc)) from exc
 
-    def continue_rebase(self, *, stage_conflicts: bool = False, check_markers: bool = False, missing_ok: bool = False) -> CommandResult:
-        return fake_commands.continue_rebase(
-            self._repo, self.state(), stage_conflicts=stage_conflicts, check_markers=check_markers, missing_ok=missing_ok
-        )
+    def continue_rebase(self, *, missing_ok: bool = False) -> CommandResult:
+        return fake_commands.continue_rebase(self._repo, self.state(), missing_ok=missing_ok)
+
+    def resolve_and_continue(self) -> CommandResult:
+        return fake_commands.resolve_and_continue(self._repo, self.state())
 
     def abort_rebase(self, *, missing_ok: bool = True, restore_to: Sha | None = None) -> CommandResult:
         return fake_commands.abort_rebase(self._repo, self.state(), missing_ok=missing_ok, restore_to=restore_to)

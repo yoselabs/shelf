@@ -10,7 +10,7 @@ a row whose flag is gone must be deleted. Reason prefixes:
 - `split:` the flag picks between two behaviours of one operation; the reason names the separate type or function
 - `fact:` the flag is data about one call, one value or one error (or a third-party library's own option), not a code path
 - `exception:` a named, justified opt-in (cost, safety, durability) that Article III allows only as a row; each needs an
-  accepted ADR (ADR 0022) to be durable
+  accepted ADR (ADR 0030) to be durable
 """
 
 import ast
@@ -47,44 +47,9 @@ def _rows(reason: str, *keys: str) -> dict[str, str]:
 
 _ALLOWED: dict[str, str] = {
     # --- split: the flag chooses between behaviours; a separate type or function is the fix ---
+    # --- exceptions: a named, justified opt-in (ADR 0030) ---
     **_rows(
-        "split: the same call, two policies for a missing target; the codebase already returns outcome values (NothingToRecord)",
-        "git-porcelain:abort_rebase:missing_ok",
-        "git-porcelain:continue_rebase:missing_ok",
-        "git-porcelain:delete_remote_at:missing_ok",
-        "git-porcelain:drop_worktree:missing_ok",
-    ),
-    **_rows(
-        "split: raising vs returning the exit code is two functions (run / try_run)",
-        "git-porcelain:run:check",
-        "git-porcelain:run_git:check",
-    ),
-    **_rows(
-        "split: memo(forever=False) is a second cache lifetime (until the next write)",
-        "git-porcelain:memo:forever",
-    ),
-    **_rows(
-        "split: the fake's fetch(retry=False) skips ref races the real fetch always retries; a flag only the fake has",
-        "git-porcelain:fetch:retry",
-    ),
-    **_rows(
-        "split: stage_conflicts and check_markers turn continue_rebase into a resolve-and-continue operation",
-        "git-porcelain:continue_rebase:check_markers",
-        "git-porcelain:continue_rebase:stage_conflicts",
-    ),
-    **_rows(
-        "split: literal=False is pathspec staging, another operation",
-        "git-porcelain:stage:literal",
-    ),
-    **_rows(
-        "split: push=True reads the push URL, git's separate `get-url --push`",
-        "git-porcelain:remote_url:push",
-        "git-porcelain:remote_urls:push",
-    ),
-    # --- exceptions: a named, justified opt-in (needs an accepted ADR, ADR 0022) ---
-    **_rows(
-        "exception: durability tier of one write (fsync or not); the default is the safe one, off is "
-        "for caches and hot state; needs an ADR row (ADR 0022)",
+        "exception: durability tier of one write (fsync or not); the default is the safe one, off is for caches and hot state; ADR 0030",
         "any-json-doc:__init__:fsync",
         "atomic-io:atomic_write_bytes:fsync",
         "atomic-io:atomic_write_json:fsync",
@@ -94,17 +59,16 @@ _ALLOWED: dict[str, str] = {
         "atomic-io:atomic_replace_text:fsync",
     ),
     **_rows(
-        "exception: a cost opt-in: the dirty flag needs one `git status` per worktree (Article IX: cost "
-        "makes it opt-in); needs an ADR row (ADR 0022)",
+        "exception: a cost opt-in: the dirty flag needs one `git status` per worktree (Article IX: cost makes it opt-in); ADR 0030",
         "git-porcelain:worktrees:with_dirty",
     ),
     **_rows(
-        "exception: a cost opt-in: the network ls-remote probe; check_push=False stays local and fast; needs an ADR row (ADR 0022)",
+        "exception: a cost opt-in: the network ls-remote probe; check_push=False stays local and fast; ADR 0030",
         "git-porcelain:readiness:check_push",
     ),
     **_rows(
         "exception: the safe default and a named opt-out that mirrors git's own flag for one "
-        "destructive or history-changing call; needs an ADR row (ADR 0022)",
+        "destructive or history-changing call; ADR 0030",
         "git-porcelain:add_worktree:force",
         "git-porcelain:drop_worktree:force",
         "git-porcelain:worktree_add:force",
@@ -123,13 +87,21 @@ _ALLOWED: dict[str, str] = {
         "beads-client:reclaim:any_replica",
     ),
     **_rows(
-        "exception: whether a repo observation is cached, chosen once at construction, for fresh reads; needs an ADR row (ADR 0022)",
+        "exception: the caller names that a missing target is success (as Path.unlink(missing_ok=)); a split needs an outcome "
+        "value on three result shapes; ADR 0030",
+        "git-porcelain:abort_rebase:missing_ok",
+        "git-porcelain:continue_rebase:missing_ok",
+        "git-porcelain:delete_remote_at:missing_ok",
+        "git-porcelain:drop_worktree:missing_ok",
+    ),
+    **_rows(
+        "exception: whether a repo observation is cached, chosen once at construction, for fresh reads; ADR 0030",
         "git-porcelain:__init__:memoize",
     ),
     **_rows(
-        "exception: pin=False skips the checkout's environment pin for one call (the runner's own "
-        "escape hatch); needs an ADR row (ADR 0022)",
+        "exception: pin=False skips the checkout's environment pin for one call (the runner's own escape hatch); ADR 0030",
         "git-porcelain:run:pin",
+        "git-porcelain:try_run:pin",
     ),
     # --- facts: data about one call, value or error ---
     **_rows(
