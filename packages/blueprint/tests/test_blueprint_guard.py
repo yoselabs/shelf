@@ -1,6 +1,6 @@
 """The commit guard, tested — it had no automated coverage until now.
 
-`blueprint guard` is the one thing standing between a co-development
+`blueprint gate guard` is the one thing standing between a co-development
 override and a poisoned consumer checkout, and it was verified exactly once, by
 hand, against scratch repos that were deleted afterwards (ledger 0038). This
 suite is that verification made repeatable.
@@ -70,7 +70,7 @@ def repo(tmp_path: Path) -> Path:
 
 def _run(repo: Path, *flags: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "-m", "blueprint", "guard", *flags],
+        [sys.executable, "-m", "blueprint", "gate", "guard", *flags],
         cwd=repo,
         capture_output=True,
         text=True,

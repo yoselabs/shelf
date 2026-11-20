@@ -1,4 +1,4 @@
-"""`blueprint test`: the gate's tests through any-gate, with the repo's adapter runner.
+"""`blueprint gate test`: the gate's tests through any-gate, with the repo's adapter runner.
 
 One entry point, so a consumer's `test` recipe is one line. The shape is the gate kit's (any-gate's design.md): the adapter *plans*
 (`path<TAB>key` per suite), the core (`any_gate test`) skips suites whose key already passed, queues for the test slot and calls the

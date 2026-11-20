@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail when merged coverage is under the committed floor; the floor only rises, in the commit that earns it.
 
-A blueprint recipe (`blueprint recipe dotnet-coverage > tools/check_coverage.py`): the repo copies it and owns the copy.
+A blueprint recipe (`blueprint init`): the repo copies it and owns the copy.
 Reads ReportGenerator's JsonSummary, so it serves any stack whose reports ReportGenerator merges.
 
 Usage: check_coverage.py cov/Summary.json coverage-floor.json   (coverage-floor.json: {"line": 89.0, "branch": 75.0})

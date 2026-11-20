@@ -23,7 +23,7 @@ Note what neither mode reads: the **working tree**. An uncommitted local overrid
 is exactly the supported co-development workflow (``docs/consuming-the-shelf.md``
 §1), so failing on it would break the thing the docs tell you to do.
 
-Run as `blueprint guard` (the hook and `just guard` both call it).
+Run as `blueprint gate guard` (the hook and `just guard` both call it).
 
 Exit codes: ``0`` clean · ``1`` offenders found · ``2`` could not check (not a
 git repository). A check that cannot run is never reported as a pass.
@@ -74,7 +74,7 @@ def _is_local_shelf_source(src: object) -> bool:
 
 
 def check(*, committed: bool) -> int:
-    """The exit code of `blueprint guard`: 0 clean, 1 offenders, 2 could not check."""
+    """The exit code of `blueprint gate guard`: 0 clean, 1 offenders, 2 could not check."""
     try:
         return _verdict(committed=committed)
     except subprocess.TimeoutExpired:

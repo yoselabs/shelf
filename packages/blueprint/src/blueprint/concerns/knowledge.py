@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from blueprint.model import Context, Finding
 
 _INDEX = f"{adr.FOLDER}/{adr.INDEX}"
-_REGENERATE = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint adr-index --repo . --write"
+_REGENERATE = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint gate adr-index --repo . --write"
 # A recipe named in evidence, so the agent fixing it does not need the skill open.
 _FORMAT = (
     "frontmatter: id (the file's NNNN), title, statement (one line, the decision), concerns [list], "

@@ -25,7 +25,7 @@ _OTHER_MANAGERS = {
     "husky": (".husky",),
     "githooks": (".githooks",),
 }
-_RECIPE = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint recipe hooks > .pre-commit-config.yaml; then `prek install`"
+_RECIPE = "`uv run blueprint init` (writes .pre-commit-config.yaml and runs `prek install`; `--no-hooks` skips both)"
 _BEADS_MARKER = "BEGIN BEADS INTEGRATION"
 
 
@@ -35,7 +35,7 @@ _BEADS_MARKER = "BEGIN BEADS INTEGRATION"
 _MERGE_FIX = (
     f"merge the recipe into the existing {HOOK_CONFIG}, never overwrite it: `default_install_hook_types` at the top, the "
     "recipe's bd `repo: local` block first under `repos:`, and keep every hook the repo already has after it "
-    "(`python3 -m blueprint recipe hooks` prints the recipe); then `prek install`"
+    "(`blueprint init` writes the recipe); then `prek install`"
 )
 
 

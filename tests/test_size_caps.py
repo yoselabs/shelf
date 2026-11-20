@@ -12,7 +12,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT / "tools"))
 
 import size_caps  # noqa: E402 -- repository tool path
-from onboard.linter_preset import _missing_toml_blocks  # noqa: E402 -- repository tool path
+from blueprint import init  # noqa: E402 -- grouped with the repository tool path above
 
 
 def test_counting_matches_task_loop():
@@ -38,8 +38,9 @@ def test_planted_over_cap_files_and_functions(tmp_path):
     assert size_caps.problems(tmp_path, ["tests/test_big.py"], caps) == []
 
 
-def test_caps_are_copied_to_consumers():
-    copied = tomllib.loads(_missing_toml_blocks(""))
+def test_caps_are_copied_to_consumers(tmp_path):
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\n')
+    copied = tomllib.loads(init._preset_text(tmp_path)[0])
     assert copied["tool"]["shelf-size"] == size_caps.load_caps(_ROOT)
 
 

@@ -1,0 +1,10 @@
+seq = 182
+date = "2026-11-20"
+event = "delivery"
+software = "any-disk"
+release = "any-disk-v0.1.0"
+actor = "channel-research"
+consumer = "channel-research"
+verdict = ""
+cost = ""
+note = "Promoted from channel-research's batch.py disk_ok (wait below 50 GB free, stop below 40): await_space and await_space_async over shutil.disk_usage, sleep and disk_usage injected, levels in GiB. Candidate; the skill's repoint is not done yet, so no adoption verdict."

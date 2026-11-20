@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0
+## 0.8.0
 
 - **Breaking: `runner.run` lost its `audit` flag.** `run(...)` is the per-commit gate, `run_audit(...)` also runs the audit-only checks (the CLI picks one by `--audit`). What is checked and rendered is unchanged.
 - **Breaking: `report.write` lost its `prune` flag.** `write(...)` prunes the reports of a concern the run no longer has, `write_concern(...)` (a one-concern run) leaves the others. Written files are unchanged.

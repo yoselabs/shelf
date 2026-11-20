@@ -30,6 +30,7 @@ _SPAWN_CALLS = {"run", "Popen", "call", "check_call", "check_output"}
 # to be emptied by the consumer wave: files that kill, signal-0 probe or session-spawn themselves today
 _KILL_ALLOWLIST = {
     "packages/any-speech/src/any_speech/adapters/_child.py",  # session spawn only: wait4 alone gives ru_maxrss
+    "packages/anyllm/src/anyllm/providers/_agent.py",  # SIGKILL of a worker group by pgid, no Popen in hand (stop_tree needs one)
 }
 
 # to be emptied by the consumer wave: files outside the spawners that run a subprocess with no timeout=
@@ -40,9 +41,6 @@ _UNBOUNDED_ALLOWLIST = {
     "packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py",
     "packages/blueprint/src/blueprint/testing.py",
     "packages/shelf-vendor/src/shelf_vendor/__init__.py",
-    "tools/onboard/beads.py",
-    "tools/onboard/hooks.py",
-    "tools/onboard/linter_preset.py",
 }
 
 

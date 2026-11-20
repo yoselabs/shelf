@@ -52,7 +52,7 @@ def test_success_and_launch_safeguards(backend, monkeypatch):
     )
     specs = []
 
-    def run(harness, spec, timeout):
+    def run(harness, spec, timeout, hooks=None):
         specs.append(spec)
         assert spec.stdin == "question" if binary == "claude" else "rules\n\nquestion" in spec.stdin
         if binary == "claude":
@@ -96,7 +96,7 @@ def test_pure_completion_closes_the_same_doors_on_every_cli(backend, monkeypatch
     provider, adapter, binary = backend
     seen: dict[str, Any] = {}
 
-    def run(harness, spec, timeout):
+    def run(harness, spec, timeout, hooks=None):
         seen["argv"], seen["cwd"] = spec.argv, spec.cwd
         seen["empty"] = list(Path(spec.cwd).iterdir()) == []
         return provider.any_agent.RunOutcome(rc=0, summary=harness.summary(0, "", "", None, False))
@@ -178,13 +178,13 @@ assert not anyllm.CodexCliAdapter(env={"PATH": ""}).available()
     subprocess.run([sys.executable, "-c", code], check=True, capture_output=True)
     project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())["project"]
     assert project["dependencies"] == ["child-env>=0.2,<1"]
-    assert project["optional-dependencies"]["agent"] == ["any-agent>=0.1.4,<1"]
+    assert project["optional-dependencies"]["agent"] == ["any-agent>=0.17.0,<1"]
 
 
 def test_invalid_output_fails_loud(backend, monkeypatch):
     provider, adapter, _ = backend
 
-    def run(harness, spec, timeout):
+    def run(harness, spec, timeout, hooks=None):
         return provider.any_agent.RunOutcome(rc=0, summary=harness.summary(0, "not json", "", None, False))
 
     monkeypatch.setattr(provider.any_agent, "run", run)
@@ -206,7 +206,7 @@ def test_an_environment_that_moves_the_lane_fails_loud_before_launch(monkeypatch
 def _launched_env(provider, monkeypatch, adapter) -> dict[str, str]:
     seen: dict[str, dict[str, str]] = {}
 
-    def run(harness, spec, timeout):
+    def run(harness, spec, timeout, hooks=None):
         seen["env"] = spec.env
         return provider.any_agent.RunOutcome(rc=0, summary=harness.summary(0, "", "", None, False))
 

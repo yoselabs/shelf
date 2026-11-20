@@ -6,26 +6,13 @@ projects) the linter reference. The full agent behaviour lives in one place —
 [`agent-loop.md`](agent-loop.md) — and matures there; what follows explains each piece and why it
 exists.
 
-**To actually onboard a project, run the `onboard-consumer` skill**
-(`<shelf>/.agents/skills/onboard-consumer/SKILL.md`) rather than following §2–4 by hand — it
-installs the guard, projects the resolver block, wires beads (opt-out), and copies the linter
-reference in one adaptive, verified pass, and it's idempotent (safe to re-run to check a repo's
-current state). This file stays the reference for *what* each piece is and *why*; the skill is the
-mechanism. `docs/runbooks/onboard-a-consumer.md` covers the broader adoption sweep the skill is
-part of.
-
-**`onboard-consumer` is deliberately outside the `Kind: skill` catalog** (ADR 0014). It's
-pull-based — invoked by path from `$SHELF_HOME`, zero standing cost, findable only because this file
-tells you where it is — not push-based/auto-triggered like a catalog-registered, plugin-installed
-skill. Don't fold it into `catalog/*.toml` or gate it on `claude plugin details`; that machinery
-governs the other tier (general-purpose skills meant to auto-fire in a consumer's own, unrelated
-sessions), which this one isn't.
-
-**Once §4's justfile recipes are copied, `just bootstrap` is the same skill under one command**
-(`just bootstrap-verify` re-checks without implying first-time setup — mechanically identical,
-see `bootstrap-target-contract`'s design doc for why that's a deliberate, not lazy, choice). Before
-a justfile exists yet (greenfield, or before §4 is done), invoke the script directly:
-`python3 "$SHELF_HOME/.agents/skills/onboard-consumer/scripts/onboard.py" --repo .`
+**To onboard a project, run `uv run blueprint init`** in its root (a dev dependency pinned by git tag; no shelf clone). It detects the
+stack, audits, then writes only what is missing: the justfile parts, the linter preset tables, `docs/agents/` and the AGENTS.md block, the
+stack's recipe files, and the hook config with `prek install` (`--no-hooks` skips both). It never overwrites a file you have, and ends with
+the rows it could not set up. It also writes `mise.toml` (the tools the repo runs, at the versions found on PATH) and runs `mise lock`. Beads is opt-in: `init` suggests it, and
+`blueprint init --beads` runs `bd init --skip-hooks` (see `runbooks/adopt-beads.md`). Not done by `init`: the shelf git+tag dependencies of §1 (it points at
+the catalog) and the resolver block of §3; `blueprint check` lists what is still missing. This file stays the reference
+for *what* each piece is and *why*. `docs/runbooks/onboard-a-consumer.md` covers the broader adoption sweep.
 
 ## 1. Depend on the shelf (git + tag — distributable, never a local path)
 
@@ -54,8 +41,7 @@ Note what the gate does *not* read: your working tree. An **uncommitted** local 
 supported co-development workflow (§1) and stays legitimate.
 
 **The hooks are prek's** (blueprint's hook recipe, `research/hooks-and-beads.md` in the blueprint
-change). Onboarding's `hooks` operation (`tools/onboard/hooks.py`) writes `.pre-commit-config.yaml`
-and runs `prek install`:
+change). `blueprint init` writes `.pre-commit-config.yaml` and runs `prek install`:
 
 | entry | stage | what it does |
 |---|---|---|
@@ -87,8 +73,8 @@ silently dead, and nothing in your repo will tell you; only re-running checks.
 `.beads/hooks`, which `bd init` commits), the hooks are **tracked files that travel with a clone** —
 the "hooks are per-clone and cannot be committed" premise above has that exception.
 
-**Using the pre-commit framework instead?** the onboarding writes `.pre-commit-config.yaml` for you (prek). The guard entry is `uv run blueprint guard` and the preset
-check is `uv run blueprint preset --repo .`, both from the `blueprint` dev dependency the onboarding adds, pinned by git tag. The shelf ships no hook repository.
+**Using the pre-commit framework instead?** the onboarding writes `.pre-commit-config.yaml` for you (prek). The guard entry is `uv run blueprint gate guard` and the preset
+check is `uv run blueprint gate preset --repo .`, both from the `blueprint` dev dependency the onboarding adds, pinned by git tag. The shelf ships no hook repository.
 
 ## 3. The resolver block, in the project's `AGENTS.md`
 
@@ -96,13 +82,9 @@ This is the only thing duplicated per repo — tiny and stable. It reaches the f
 shelf clone (which every contributor has anyway), touching GitHub only on greenfield or a real
 adopt/promote — never just to start a session.
 
-**Projected, not pasted.** `BLOCK_TEXT` in `tools/onboard/resolver_block.py` is the one source; the
-`resolver-block` operation writes it into a marker-delimited region of the target file, appended
-outside every other tool's managed region (this repo's own `AGENTS.md` already carries two from
-`bd`), and re-projects it in place on re-run — so a consumer can be checked for drift instead of
-silently carrying a stale copy-paste. The `onboard-consumer` skill runs this automatically; to
-project it standalone, instantiate `ResolverBlockOperation(repo).run({})`. The text below is what
-gets projected — useful to read, not to hand-copy:
+**Paste it once, in its own region.** There is no projector any more (the `resolver-block` operation went with `tools/onboard`): the
+block lives in a marker-delimited region of the target file, outside every other tool's managed region (this repo's own `AGENTS.md`
+already carries two from `bd`). The text below is the block:
 
 > ### The shelf — shared micro-software you consume
 >
@@ -137,11 +119,9 @@ copy the `[tool.ruff|codespell|coverage]` blocks + the `justfile` recipes + the 
 from this repo into yours, then override anything you genuinely need to. Full toolchain and the exact
 copy list: **[linting.md](linting.md)**. `just check` green (whole-repo, no carve-outs) is the bar.
 
-The `linter-preset` operation (`tools/onboard/linter_preset.py`, python+uv only) does this copy for
-you, merging per-table/per-recipe rather than overwriting — a project that already has its own
-`[tool.ruff]` keeps it exactly as written, ruff.lint included. The `onboard-consumer` skill runs it
-automatically when `pyproject.toml` exists, and states plainly when it doesn't apply (non-Python
-targets get the guard/resolver-block/beads pieces only).
+`blueprint init` does this copy for you (python+uv only), per table rather than overwriting: a project that already has its own
+`[tool.ruff]`, `ruff.toml` or `pyrefly.toml` keeps it exactly as written. The tables come from the preset packaged in `blueprint`
+(rule lists, error kinds, size caps), so no shelf clone is needed.
 
 ## 5. Pin the tools (mise)
 

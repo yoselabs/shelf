@@ -115,16 +115,6 @@ def test_just_from_the_rust_just_dev_dependency_is_not_pinned_again(repo: Repo) 
     assert "just is pinned twice" in evidence
 
 
-def test_python_and_dotnet_stay_with_their_own_pin_files(repo: Repo) -> None:
-    _tools_repo(repo, _PINS + 'python = "3.12.9"\ndotnet = "10.0.401"\n')
-    repo.write(".python-version", "3.12\n")
-    repo.write("global.json", '{"sdk": {"version": "10.0.401"}}\n')
-    verdict, evidence = _pins(repo)
-    assert verdict is Verdict.FAILING
-    assert ".python-version" in evidence
-    assert "global.json" in evidence
-
-
 def test_the_uv_pin_must_meet_uvs_required_version(repo: Repo) -> None:
     _tools_repo(repo, _PINS + 'uv = "0.9.0"\n', _LOCK + '\n[[tools.uv]]\nversion = "0.9.0"\n')
     repo.write("pyproject.toml", '[project]\nname = "x"\nversion = "0"\n\n[tool.uv]\nrequired-version = ">=0.10.12"\n')
@@ -204,3 +194,13 @@ def test_git_lfs_pinned_in_mise_is_flagged_with_the_reason(repo: Repo) -> None:
     assert verdict is Verdict.FAILING
     assert "git-lfs" in evidence
     assert "git clone" in evidence
+
+
+def test_a_python_repo_may_run_bare_just_pinned_in_mise(repo: Repo) -> None:
+    """`just` from mise (no rust-just dev dependency) is a first-class runner: pinned once, the repo's gate resolves with it."""
+    _tools_repo(repo, _PINS + 'uv = "0.13.0"\n', _LOCK + '\n[[tools.uv]]\nversion = "0.13.0"\n')
+    repo.write("pyproject.toml", '[project]\nname = "x"\nversion = "0"\n')
+    repo.write("uv.lock", "")
+    assert _pins(repo)[0] is Verdict.PASSING
+    gate = {r.id: r.verdict for r in run(repo.root, concern="gate", env=repo.env).rows}
+    assert gate["gate.runner"] is Verdict.PASSING

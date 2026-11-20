@@ -16,22 +16,11 @@ the point, and it never bloats a thin consumer (it keeps its own subset usage).
 
 ## Phase A — mechanical onboarding (fast, mostly reversible)
 
-Run the **`onboard-consumer` skill** (`<shelf>/.agents/skills/onboard-consumer/SKILL.md`) in the
-consumer repo root. It installs the commit guard, projects the resolver block, wires beads
-(opt-out — most consumers want it), and — for python+uv targets — copies the linter reference,
-in one adaptive, verified pass:
+Run `uv run blueprint init` in the consumer repo root (see `consuming-the-shelf.md`). It detects the stack, audits, writes only what is
+missing and ends with the rows it could not set up; it is idempotent, so re-running it checks the repo's state, and it never overwrites a
+file the repo has. Beads setup, the git+tag dependencies and the mise pins are still yours (they are the rows it lists).
 
-```bash
-python3 "$SHELF_HOME/.agents/skills/onboard-consumer/scripts/onboard.py" --repo /path/to/consumer
-```
-
-Once the justfile recipes are copied in (they're part of what this run copies, if it also copies
-the linter reference — see step 3 below), `just bootstrap` is the same call.
-
-It's idempotent: safe to re-run on an already-onboarded repo to check its current state, and it
-adapts to what it finds (an existing pre-commit/husky/lefthook hook, a non-Python target, beads
-already initialized). See `consuming-the-shelf.md` for what each piece is and why; see the skill
-itself for the mechanics — this runbook does not duplicate them.
+See `consuming-the-shelf.md` for what each piece is and why.
 
 **Deps come later** — the skill does NOT add shelf git+tag sources. You add one only when the
 sweep (Phases B–D below) says *adopt*.

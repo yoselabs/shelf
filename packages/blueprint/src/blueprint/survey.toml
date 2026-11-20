@@ -1,8 +1,7 @@
 # The blueprint run survey: the agent answers every question at the end of each run, in
 # docs/blueprint/survey.md; the owner relays it to the shelf, where it feeds the reabsorb direction.
 # Answers come from a closed set so surveys from many repos can be counted. Evidence is one line:
-# a row id, a file, a quote. `blueprint survey` prints the template; `blueprint survey --check FILE`
-# fails on a missing or out-of-set answer.
+# a row id, a file, a quote. The skill copies these questions into the survey; no verb prints or checks it.
 
 answers = ["yes", "partly", "no", "n/a"]
 

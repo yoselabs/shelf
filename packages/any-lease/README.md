@@ -32,6 +32,31 @@ leases.declare("unity", 1)       # the limit is kept in <root>/unity.limit; late
 python -m any_lease run --root ~/.cache/app/leases unity 1 "bead-7:build" -- ./build.sh   # or ANY_LEASE_ROOT
 ```
 
+## Claim a key, pace a key
+
+```python
+# One unit per free-form key: no .limit file, never waits, None when another process holds it.
+held = leases.try_claim(f"model/{cid}", label="model")      # "/" is fine
+if held is not None:
+    with held:                                              # released on exit and when the process dies
+        run_channel(cid)
+
+from any_lease import Pacer
+pacer = Pacer(Path("~/.app/pace").expanduser())             # clock=, sleep=, asleep= injectable
+pacer.wait("proxy-2081", every=1.0)                         # all processes together: one pass per second
+await pacer.apace("proxy-2081", every=1.0)                  # same, sleeping on the event loop
+```
+
+- **`try_claim` files.** The key becomes `<root>/claims/<slug>-<16 hex of sha256(key)>.lock`: flat, readable, and two keys
+  never share a name. 1,400 keys are 1,400 lock files and no `.limit` file. The lock file is kept after release: removing it
+  would let a waiter that opened the old file lock an orphan while a newcomer locks a fresh one, two holders of one key.
+  A second claim of one key inside the same process also returns None. `Held` is not None-safe in `with`: test for None first.
+- **`Pacer`.** `<root>/<slug>-<hash>.pace` holds the next allowed wall-clock time. A caller reserves `max(now, next)` under
+  a flock, stores `slot + every`, drops the lock, then sleeps until its slot: N waiters queue at `every` spacing instead of
+  waking together. `wait`/`apace` return the slot; `reserve(key, every)` books and returns it without sleeping, so a queue can
+  store it as `next_try_at` (the slot is spent: act at or after it). No retry or backoff inside. The first pass on a key is free. Wall time (`time.time`) so processes agree;
+  a clock jump forward delays callers by that jump.
+
 ## Rules
 
 - **Counting.** `acquire(name, limit)` tries units `0..limit-1` in order (`<root>/<name>-<slot>.lock`),

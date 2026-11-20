@@ -18,6 +18,7 @@ members = [
     "any-browser",
     "any-clock",
     "any-contract",
+    "any-disk",
     "any-failure-fp",
     "any-file",
     "any-frontmatter",
@@ -37,6 +38,7 @@ members = [
     "any-speech",
     "any-ttl-cache",
     "any-versioned",
+    "any-work",
     "any-yaml",
     "anyembed",
     "anyllm",
@@ -226,7 +228,7 @@ wheels = [
 
 [[package]]
 name = "any-agent"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "packages/any-agent" }
 dependencies = [
     { name = "app-dirs" },
@@ -337,6 +339,27 @@ dev = [
 name = "any-contract"
 version = "0.1.0"
 source = { editable = "packages/any-contract" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
+[[package]]
+name = "any-disk"
+version = "0.1.0"
+source = { editable = "packages/any-disk" }
 
 [package.dev-dependencies]
 dev = [
@@ -550,10 +573,11 @@ dev = [
 
 [[package]]
 name = "any-lease"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/any-lease" }
 dependencies = [
     { name = "child-env" },
+    { name = "content-digest" },
     { name = "process-lock" },
 ]
 
@@ -567,6 +591,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "child-env", editable = "packages/child-env" },
+    { name = "content-digest", editable = "packages/content-digest" },
     { name = "process-lock", editable = "packages/process-lock" },
 ]
 
@@ -683,8 +708,12 @@ dev = [
 
 [[package]]
 name = "any-pipeline"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "packages/any-pipeline" }
+dependencies = [
+    { name = "atomic-io" },
+    { name = "content-digest" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -696,6 +725,10 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "content-digest", editable = "packages/content-digest" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -901,6 +934,37 @@ dev = [
 ]
 
 [[package]]
+name = "any-work"
+version = "0.1.0"
+source = { editable = "packages/any-work" }
+dependencies = [
+    { name = "any-failure-fp" },
+    { name = "any-lease" },
+    { name = "sqlite-store" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "any-failure-fp", editable = "packages/any-failure-fp" },
+    { name = "any-lease", editable = "packages/any-lease" },
+    { name = "sqlite-store", editable = "packages/sqlite-store" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
+[[package]]
 name = "any-yaml"
 version = "0.1.0"
 source = { editable = "packages/any-yaml" }
@@ -1005,7 +1069,7 @@ wheels = [
 
 [[package]]
 name = "anyllm"
-version = "0.9.0"
+version = "0.10.0"
 source = { editable = "packages/anyllm" }
 dependencies = [
     { name = "child-env" },
@@ -1305,7 +1369,7 @@ wheels = [
 
 [[package]]
 name = "blueprint"
-version = "0.6.0"
+version = "0.8.0"
 source = { editable = "packages/blueprint" }
 
 [package.dev-dependencies]

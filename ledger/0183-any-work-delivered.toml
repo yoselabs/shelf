@@ -1,0 +1,10 @@
+seq = 183
+date = "2026-11-20"
+event = "delivery"
+software = "any-work"
+release = "any-work-v0.1.0"
+actor = "channel-research"
+consumer = "channel-research"
+verdict = ""
+cost = ""
+note = "New package from the 2026-11-20 crawl-architecture verdict: a SQLite work table (status per key, classified failures, backoff, quarantine) with a per-key any-lease flock for liveness and a drain loop. Candidate, capped at add/claim/finish/progress/drain; the channel-research repoint is not done, so no adoption verdict. Stacks on any-lease 0.2.0 (try_claim)."

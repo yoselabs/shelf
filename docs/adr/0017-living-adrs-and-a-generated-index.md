@@ -19,7 +19,7 @@ distilled_into: blueprint knowledge.glossary, knowledge.adr-format, knowledge.ad
   for the same topic: that splits its reasons.
 - **Short:** frontmatter (`id`, `title`, `statement` ≤200 chars, `concerns`, `status`, `decided_by`,
   `updated`), the decision and why, rejected options one line each, then History.
-- **Index:** `docs/adr/INDEX.md`, generated (`blueprint adr-index --write`), one line per decision in
+- **Index:** `docs/adr/INDEX.md`, generated (`blueprint gate adr-index --write`), one line per decision in
   force, grouped by concern. It is all an agent needs to work; an ADR file is opened only to
   challenge or change its decision. The gate fails on a stale index.
 

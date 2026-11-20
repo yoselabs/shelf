@@ -29,6 +29,7 @@ _OWNER = "packages/child-env/src/child_env/exe.py"
 _WHICH_ALLOWED = {
     "packages/blueprint/src/blueprint/concerns/stack.py",
     "packages/blueprint/src/blueprint/model.py",
+    "packages/blueprint/src/blueprint/init.py",  # stdlib-only engine: looks on the injected env's PATH
 }
 
 # CURRENT callers that pass a whole os.environ as a child's env. The consumer wave empties this. Only a literal
@@ -36,6 +37,8 @@ _WHICH_ALLOWED = {
 # (the consumer wave routes those through build_env too; this test does not follow data flow).
 _WHOLE_ENV_ALLOWED: set[str] = {
     # the gate passes the caller's own environment to the recipes and pytest it launches (UV_*, MISE_*, GIT_*, PRE_COMMIT_*)
+    # the edge hands `blueprint init` the user's environment: prek, mise and bd it launches need PATH, HOME and their own settings
+    "packages/blueprint/src/blueprint/__main__.py",
     "packages/any-gate/src/any_gate/cli.py",
     "packages/any-gate-python/src/any_gate_python/cli.py",
 }

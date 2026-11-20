@@ -138,6 +138,8 @@ class CodexHarness(Quiet):
         self.out_file = str(self.sealed_dir.path / "answer.txt")
         argv = [i.exe, "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral"]
         argv += ["--model", i.model] if i.model else []
+        argv += ["-c", "model_reasoning_effort=" + json.dumps(i.effort)] if i.effort else []
+        argv += ["--output-schema", i.schema] if i.schema else []
         argv += ["--json", "-o", self.out_file, "-"]
         return LaunchSpec(argv=argv, env=i.env, cwd=str(self.sealed_dir.path), stdin=i.prompt)
 

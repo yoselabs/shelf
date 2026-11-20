@@ -23,7 +23,7 @@
 - Found an ADR that amends another (imported records often do): fold it into the earlier file, which
   gets the decision as it now stands and a History entry naming the amending ADR; mark the amender superseded.
 - Write one when a choice has two defensible answers and a cost, or when you overrule a default.
-- After any ADR change: `blueprint adr-index --repo . --write`; the gate fails on a stale index.
+- After any ADR change: `blueprint gate adr-index --repo . --write`; the gate fails on a stale index.
 
 Ask the owner before recording a decision as accepted; draft it as `proposed`.
 

@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-lease"
+software = "content-digest"
+why = "a free-form key becomes a flat file name from sha256[:16] of the key; hashlib belongs to content-digest (constitution Article III, one implementation per behaviour; tests/test_arch_hashing.py)."
+needs = "digest_text(key, length=16): the same hex the file name already carries."
+sponsor = "yoselabs"
+requester = "any-lease"
+status = "active" # active | retired

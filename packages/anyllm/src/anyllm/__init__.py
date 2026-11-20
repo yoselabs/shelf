@@ -32,7 +32,7 @@ also purely additive.
 from __future__ import annotations
 
 from anyllm.accounting import anthropic_cost_usd, extract_token_counts
-from anyllm.base import Completion, LLMProvider, PromptParts, ProviderName
+from anyllm.base import Completion, Effort, LLMProvider, PromptParts, ProviderName, StructuredProvider, require_structured
 from anyllm.cost import (
     DEFAULT_COST_POLICY,
     CostPolicy,
@@ -62,14 +62,17 @@ __all__ = [
     "Completion",
     "CostPolicy",
     "CostViolation",
+    "Effort",
     "LLMProvider",
     "OpenAICompatibleAdapter",
     "PromptParts",
     "ProviderName",
+    "StructuredProvider",
     "anthropic_cost_usd",
     "assert_within_budget",
     "build_adapter",
     "extract_token_counts",
+    "require_structured",
     "resolve_provider",
     "with_cost_guard",
 ]

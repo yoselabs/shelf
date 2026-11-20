@@ -91,7 +91,7 @@ def test_a_gate_that_never_runs_blueprint_is_not_set_up(repo: Repo) -> None:
     repo.write("Makefile", "check: lint\nlint:\n\ttrue\n")
     rows = {r.id: r.verdict for r in run(repo.root, concern="gate", env=repo.env).rows}
     assert rows["gate.runs-blueprint"] is Verdict.NOT_SET_UP
-    repo.write("Makefile", "check: blueprint\nblueprint:\n\tpython3 -m blueprint check --repo . --gate\n")
+    repo.write("Makefile", "check: blueprint\nblueprint:\n\tpython3 -m blueprint check --repo . --brief\n")
     rows = {r.id: r.verdict for r in run(repo.root, concern="gate", env=repo.env).rows}
     assert rows["gate.runs-blueprint"] is Verdict.PASSING
 
@@ -152,7 +152,7 @@ def test_a_domain_file_naming_paths_that_exist_passes(repo: Repo) -> None:
 def test_things_that_are_not_repo_paths_are_not_checked(repo: Repo) -> None:
     text = (
         "`docs/adr/NNNN-slug.md` `design/YYYY-MM-DD.md` `docs/*.md` `docs/<name>/x.md` "
-        "`blueprint adr-index --repo . --write` `git worktree add .worktrees/x` `https://example.invalid/a/b.md` "
+        "`blueprint gate adr-index --repo . --write` `git worktree add .worktrees/x` `https://example.invalid/a/b.md` "
         "[web](https://example.invalid/a.md) [anchor](#top) `just check` `a/b` `a.b` `/etc/passwd` `~/notes/x.md` `v1.2/3`\n"
     )
     assert _domain(repo, text) is Verdict.PASSING

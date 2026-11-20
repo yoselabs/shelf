@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Self, cast
 
 import process_lock
 
+from any_lease._keyfile import keyfile
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
     from pathlib import Path
@@ -139,6 +141,17 @@ class Leases:
             pause = poll if timeout is None else max(0.0, min(poll, timeout - elapsed))
             (threading.Event() if cancel is None else cancel).wait(pause)  # flock has no timed wait: poll, and wake early on cancel
 
+    def try_claim(self, key: str, *, label: str | None = None, meta: Mapping[str, object] | None = None) -> Held | None:
+        """Claim ``key`` (any non-empty string, ``model/UCxxxx`` included) for this process, or None when another holds it.
+
+        One unit, no ``.limit`` file, never waits. The flock is at ``<root>/claims/<keyfile>.lock``; see :func:`any_lease._keyfile.keyfile`.
+        Released on :meth:`Held.release`, on leaving the ``with`` block, and when the process dies. A second claim of one key in
+        the same process also returns None. The lock file stays after release: unlinking it would let a waiter that already
+        opened the old file lock an orphan while a newcomer creates and locks a fresh one, so two would hold one key.
+        """
+        lock = self._take_path(self.root / "claims" / f"{keyfile(key)}.lock", label, {**(meta or {}), "name": key, "slot": 0})
+        return None if lock is None else Held(key, 0, 0.0, lock)
+
     def acquire_all(
         self,
         wants: _Wants,
@@ -207,11 +220,13 @@ class Leases:
         return self.root / f"{name}-{slot}.lock"
 
     def _take(self, name: str, slot: int, label: str | None, meta: Mapping[str, object] | None) -> process_lock.ProcessLock | None:
+        return self._take_path(self._path(name, slot), label, {**(meta or {}), "name": name, "slot": slot})
+
+    @staticmethod
+    def _take_path(path: Path, label: str | None, meta: Mapping[str, object]) -> process_lock.ProcessLock | None:
         # reentrant=False: process-lock then refuses a second acquire of one path in this process, threads included.
         try:
-            return process_lock.ProcessLock.acquire(
-                self._path(name, slot), timeout=0, label=label, meta={**(meta or {}), "name": name, "slot": slot}, reentrant=False
-            )
+            return process_lock.ProcessLock.acquire(path, timeout=0, label=label, meta=meta, reentrant=False)
         except process_lock.LockHeldError:
             return None
 

@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-disk"
+kind = "any-lib"
+tier = "T1"
+release = "any-disk-v0.1.0"
+capability = "Stop hand-rolling the disk check in a long loop: await_space(path, wait_below_gb=, stop_below_gb=) waits while free space is low, returns True once there is room and False at once when it is very low; sync and async, sleep and disk_usage injectable."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Promoted from channel-research batch.py disk_ok (below 50 GiB sleep and log, below 40 stop). Stdlib only. Levels in GiB (1024**3). Waits without a deadline while between the levels; the caller bounds it. Born candidate; no release tag created by this change."

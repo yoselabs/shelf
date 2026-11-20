@@ -10,7 +10,6 @@ import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS = [
-    ".agents/skills/onboard-consumer/scripts/onboard.py",
     "packages/blueprint/src/blueprint/recipes/check_coverage.py",
     "packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py",
     "packages/blueprint/src/blueprint/recipes/check_godot.py",

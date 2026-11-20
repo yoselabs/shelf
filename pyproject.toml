@@ -41,6 +41,10 @@ any-clock = { workspace = true }
 any-pipeline = { workspace = true }
 any-versioned = { workspace = true }
 any-lease = { workspace = true }
+# any-work composes any-lease, any-failure-fp and sqlite-store.
+any-work = { workspace = true }
+any-failure-fp = { workspace = true }
+sqlite-store = { workspace = true }
 content-digest = { workspace = true }
 app-dirs = { workspace = true }
 verb-cli = { workspace = true }
@@ -51,6 +55,7 @@ sqlite-sidecar = { workspace = true }
 stream-proc = { workspace = true }
 any-agent = { workspace = true }
 any-mailbox = { workspace = true }
+any-disk = { workspace = true }
 any-recorded-fixture = { workspace = true }
 task-spec = { workspace = true }
 # test-reach composes py-symbols.
@@ -247,6 +252,8 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 "packages/sqlite-store/src/sqlite_store/cas.py" = ["S608"]
 # TtlTable splices only identifiers it validated against a plain-identifier pattern; every value is a bound parameter.
 "packages/any-ttl-cache/src/any_ttl_cache/__init__.py" = ["S608"]
+# the backoff jitter default (`rand=random.random`): spreading retries, not a secret.
+"packages/any-work/src/any_work/work.py" = ["S311"]
 
 [tool.pytest.ini_options]
 # testpaths lists the shelf's own fitness tests + every package's tests.
@@ -312,9 +319,11 @@ testpaths = [
     "packages/any-json-doc/tests",
     "packages/any-path-glob/tests",
     "packages/any-failure-fp/tests",
+    "packages/any-work/tests",
     "packages/any-shell-policy/tests",
     "packages/any-net/tests",
     "packages/any-clock/tests",
+    "packages/any-disk/tests",
     "packages/any-plugin-cache/tests",
     "packages/plugin-surface/tests",
     "packages/process-lock/tests",
@@ -422,10 +431,12 @@ root_packages = [
     "any_json_doc",
     "any_path_glob",
     "any_failure_fp",
+    "any_work",
     "any_shell_policy",
     "any_net",
     "any_clock",
     "any_ttl_cache",
+    "any_disk",
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
@@ -517,10 +528,12 @@ source_modules = [
     "any_json_doc",
     "any_path_glob",
     "any_failure_fp",
+    "any_work",
     "any_shell_policy",
     "any_net",
     "any_clock",
     "any_ttl_cache",
+    "any_disk",
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
@@ -614,10 +627,12 @@ modules = [
     "any_json_doc",
     "any_path_glob",
     "any_failure_fp",
+    "any_work",
     "any_shell_policy",
     "any_net",
     "any_clock",
     "any_ttl_cache",
+    "any_disk",
     "any_plugin_cache",
     "plugin_surface",
     "process_lock",
@@ -671,10 +686,16 @@ ignore_imports = [
     "any_lease.leases -> process_lock",
     "process_lock -> stream_proc",
     "any_lease.__main__ -> child_env",
+    "any_lease._keyfile -> content_digest",
+    "any_pipeline.filestore -> content_digest",
     "launchd_agent -> child_env",
     "mcp_clients -> child_env",
     "beads_client.client -> child_env",
     "convert_md.dispatch -> child_env",
+    "any_work.model -> any_failure_fp.fingerprint",
+    "any_work.work -> any_failure_fp.backoff",
+    "any_work.work -> any_lease",
+    "any_work.work -> sqlite_store",
     "any_yaml -> yaml_merge",
     "any_yaml.write -> yaml_merge",
     "any_yaml.write -> atomic_io",
@@ -703,6 +724,7 @@ ignore_imports = [
     "anyembed.cache -> content_digest",
     "anyembed.cache -> sqlite_sidecar",
     "fts_query -> sqlite_sidecar",
+    "any_pipeline.filestore -> atomic_io",
     "any_speech.cli -> verb_cli",
     "any_agent.procs -> stream_proc",
     "any_agent.harnesses.claude -> child_env",
@@ -1008,22 +1030,3 @@ no-effect = [
     "AGENTS.md",
 ]
 repo-tests = "tests"
-
-[tool.any-gate.python.gated]
-tests = ["test_onboard_*", "test_bootstrap_target.py"]
-inputs = [
-    "tools/onboard/",
-    "tools/preset_drift.py",
-    ".agents/skills/onboard-consumer/",
-    "tests/conftest.py",
-    "justfile",
-    "pyproject.toml",
-    "uv.lock",
-    "conftest.py",
-    ".pre-commit-config.yaml",
-    ".beads/config.yaml",
-]
-
-[tool.any-gate.python.gated.reads]
-"test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/backlog.py"]
-"test_onboard_hooks.py" = ["packages/blueprint/src/blueprint/recipes/"]

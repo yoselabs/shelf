@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "channel-research"
+software = "any-work"
+why = "channel-research's overnight run kept state in file suffixes and two retry logs, wrote a bot check as a permanent .fail, let one removed video fail a whole channel, and ran the next stage on 185 of 3,184 items because 'done' was a process exit. One table with a status per key, a classified failure and a queryable progress replaces the three hand-rolled loops. Not yet adopted: the skill's migration deletes its local loops after release."
+needs = "Work(db_path, lease_root), add(items) idempotent, claim(kind) -> Claimed under a per-key flock, finish(ok | Failure(transient|permanent|unknown)) with backoff and quarantine, progress() and retry_view() as queries, drain(work, handler, concurrency, idle_exit_s)."
+sponsor = "yoselabs"
+requester = "channel-research"
+status = "active"          # active | retired -- the planned retention claim until the skill's migration lands

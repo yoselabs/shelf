@@ -1,0 +1,27 @@
+[project]
+name = "any-work"
+version = "0.1.0"
+description = "A work table for a long job over many keys: add idempotently, claim the next due key under a per-key flock, finish ok or with a classified failure (retry with backoff, permanent, quarantine), count progress, drain until idle. SQLite, single host, many processes."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = [
+    "any-failure-fp>=0.1,<1",
+    "any-lease>=0.2,<1",
+    "sqlite-store>=0.1,<1",
+]
+
+[dependency-groups]
+# The test libraries this package's suite imports, plus what the root conftest and pytest settings load (tests/test_package_tests_declare_their_dependencies.py).
+dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "hypothesis>=6.100,<7"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/any_work"]
+
+[tool.ruff]
+extend = "../../pyproject.toml"

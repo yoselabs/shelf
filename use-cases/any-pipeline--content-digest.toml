@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-pipeline"
+software = "content-digest"
+why = "FileStore names each file from the sha256 of its key; hashlib belongs to content-digest (constitution Article III, one implementation per behaviour; tests/test_arch_hashing.py)."
+needs = "digest_bytes(data, length=64): the same hex the file name already carries."
+sponsor = "yoselabs"
+requester = "any-pipeline"
+status = "active" # active | retired

@@ -112,18 +112,17 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
    `pyproject.toml`, and each package's `[tool.deptry]` if it needs ignores. `[tool.pyrefly]` and
    `[tool.pytest.ini_options]` are generated for the consumer: the strict preset, the same error
    severities and the lighter test bar, without the shelf's own paths.
-2. The justfile is **rendered, not copied** ([ADR 0029](adr/0029-the-justfile-imports-blueprint-rendered-parts.md)): `uv run blueprint render`
+2. The justfile is **rendered, not copied** ([ADR 0029](adr/0029-the-justfile-imports-blueprint-rendered-parts.md)): `uv run blueprint gate render`
    writes `.blueprint/base.just` (`check guard preset render blueprint tools` ...) and one part per stack (python: `lint format typecheck
    spell deps test cov sync`; shell: `scripts`), and your `justfile` keeps `set allow-duplicate-recipes` plus an `import` per part and owns
    the rest. A recipe you define replaces the rendered one of the same name; `check-extra` runs one more thing in the gate. `just render`
-   (a step of `check`) fails on any difference from what the blueprint renders. Only `bootstrap` and `bootstrap-verify` are copied (they
-   find the shelf clone through `$SHELF_HOME` → `../shelf` → `~/Workspaces/shelf`). `test` is `uv run blueprint test`: the tests the change
+   (a step of `check`) fails on any difference from what the blueprint renders. `blueprint init` writes the parts and the preset
+   tables, so no recipe is copied and no shelf clone is needed. `test` is `uv run blueprint gate test`: the tests the change
    reaches through `any-gate` and the `any-gate-python` adapter (a repo with no `packages/*` runs its whole suite as one unit), no
    coverage floor; `just cov` measures. Pin the runner with `uv add --dev rust-just` and run it as `uv run just check`. `guard` is what
    actually enforces the no-committed-local-shelf-source rule; the pre-commit hook is fast feedback, not enforcement (a hook is
-   per-clone and any tool claiming `core.hooksPath` can disable it silently). `bootstrap` re-runs the onboarding operations
-   (`tools/onboard/`) any time, idempotently; `bootstrap-verify` is the same call under a name that signals intent. Neither is a `check`
-   prerequisite: they assert this working copy's environment, not the repo's committed content.
+   per-clone and any tool claiming `core.hooksPath` can disable it silently). `blueprint init` re-runs any time, idempotently
+   (it writes only what is missing); it is not a `check` prerequisite.
 3. The `dev` dependency-group (pytest, pytest-cov, ruff, pyrefly, codespell, deptry).
 
 Then **own it**: override any rule your project genuinely needs to, on purpose. Divergence is a local
@@ -132,14 +131,14 @@ choice, visible in your own `pyproject`. The shelf is the baseline you converge 
 ### Making the divergence actually visible — `just preset`
 
 "Visible" was the word ADR 0004 used, and for a year nothing made it so. The onboarding copy
-(`tools/onboard/linter_preset.py`) is append-only by design: it never opens a table a consumer already
+(`blueprint init`) is append-only by design: it never opens a table a consumer already
 owns, so it reports *"already current"* for a repo missing two whole rule families. Ten repos here
 reached ten rule sets without anyone deciding to.
 
-`blueprint preset`, wired as `just preset` and copied verbatim like `guard`, compares three axes
-— `[tool.ruff.lint] select`/`ignore`, and `[tool.pyrefly.errors]` (the justfile is rendered and has its own check, `blueprint render --check`) — plus the ruff and
+`blueprint gate preset`, wired as `just preset` and copied verbatim like `guard`, compares three axes
+— `[tool.ruff.lint] select`/`ignore`, and `[tool.pyrefly.errors]` (the justfile is rendered and has its own check, `blueprint gate render --check`) — plus the ruff and
 pyrefly versions both `uv.lock` files hold and the shared size-cap table (one config under another ruff is another rule set: a2kay's ruff 0.17 raised
-30 findings the shelf's 0.15 does not), against the snapshot of the shelf's own config packaged in `blueprint` (`preset.toml`, regenerated with `blueprint preset --refresh`, a test fails when stale), and fails on any difference the consumer has not declared in its own:
+30 findings the shelf's 0.15 does not), against the snapshot of the shelf's own config packaged in `blueprint` (`preset.toml`, regenerated with `tools/preset_refresh.py`, a test fails when stale), and fails on any difference the consumer has not declared in its own:
 
 ```toml
 [tool.shelf-preset]

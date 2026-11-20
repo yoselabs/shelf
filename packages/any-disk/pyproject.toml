@@ -1,0 +1,23 @@
+[project]
+name = "any-disk"
+version = "0.1.0"
+description = "A disk-space guard for long loops: wait while free space is low, stop when it is very low. Stdlib only."
+readme = "README.md"
+authors = [{ name = "yoselabs" }]
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = []
+
+[dependency-groups]
+# The test libraries this package's suite imports, plus what the root conftest and pytest settings load (tests/test_package_tests_declare_their_dependencies.py).
+dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "hypothesis>=6.100,<7"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/any_disk"]
+
+[tool.ruff]
+extend = "../../pyproject.toml"

@@ -1,11 +1,10 @@
-"""Stack rows judged from profile data; the survey template and its completeness check."""
+"""Stack rows judged from profile data."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 import pytest
-from blueprint import survey
 from blueprint.model import FixedBy, Verdict
 from blueprint.runner import run
 
@@ -214,21 +213,6 @@ def test_coverage_with_no_enforced_floor_still_fails(repo: Repo, recipe: str, py
     verdict, evidence, _ = _rows(repo)["stack.python-uv.coverage"]
     assert verdict is Verdict.FAILING
     assert "fail-under" in evidence
-
-
-def test_the_survey_template_has_every_question_and_an_empty_one_is_incomplete() -> None:
-    text = survey.template("x", "abc")
-    questions, _, _ = survey.load()
-    assert all(f"| {q.id} |" in text for q in questions)
-    assert len(survey.problems(text)) == len(questions)
-
-
-def test_a_filled_survey_is_complete_and_a_bare_no_is_not() -> None:
-    questions, _, _ = survey.load()
-    filled = "\n".join(f"| {q.id} | q | yes |  |" for q in questions)
-    assert survey.problems(filled) == []
-    bad = filled.replace(f"| {questions[0].id} | q | yes |  |", f"| {questions[0].id} | q | no |  |")
-    assert survey.problems(bad) == [f"{questions[0].id}: 'no' needs evidence"]
 
 
 def _dotnet_repo(repo: Repo, roll_forward: str = "latestPatch") -> None:
@@ -451,8 +435,8 @@ def _gate_with_tests(repo: Repo, recipe: str) -> None:
         "uv run pytest",
         "uv run python -m any_gate test -- uv run python -m any_gate_python run",
         "uv run python -m any_gate_python run",
-        "uv run blueprint test",
-        "uv run python -m blueprint test",
+        "uv run blueprint gate test",
+        "uv run python -m blueprint gate test",
     ],
 )
 def test_tests_pass_when_the_gate_reaches_any_test_runner(repo: Repo, recipe: str) -> None:

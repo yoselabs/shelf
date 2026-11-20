@@ -71,10 +71,10 @@ def runs_blueprint(ctx: Context) -> Finding:
     if "blueprint check" not in gate.gate_recipes():
         return not_set_up(
             "`just check` never runs blueprint",
-            "copy the shelf's `blueprint` recipe into the justfile and add it to `check` (`just bootstrap` does both)",
+            "copy the shelf's `blueprint` recipe into the justfile and add it to `check` (`blueprint init` does both)",
             FixedBy.AUTO,
         )
-    return passing("`just check` reaches `blueprint check --gate`")
+    return passing("`just check` reaches `blueprint check --brief`")
 
 
 def guards_have_red_tests(ctx: Context) -> Finding:
