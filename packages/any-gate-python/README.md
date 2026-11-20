@@ -24,7 +24,7 @@ or a directory with a trailing `/`. With no config every path outside `packages/
 
 ## The runner
 
-`run [--workers auto|N] [--wall S] [--idle S] [--pytest-args "ARGS"] PATH...` is the runner `any-gate test` calls: pytest in stages, parallel
+`run [--workers auto|N] [--wall S] [--idle S] [--nice N] [--pytest-args "ARGS"] PATH...` is the runner `any-gate test` calls: pytest in stages, parallel
 (xdist, sized to the tests and the box), then `serial` alone, then `quarantine` (a failing quarantined test is reported, never blocks). A stage
 selects its lane through a pytest plugin, not `-m`, so the repo's own `-m` default stays in force. A stage over the wall or idle limit has its
 whole process tree stopped. The repo declares the `serial` and `quarantine` markers itself.

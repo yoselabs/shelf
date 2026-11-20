@@ -140,6 +140,14 @@ testing = [
     { name = "pytest-bdd" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "a2effect", extra = ["testing"] },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "pydantic", specifier = ">=2,<3" },
@@ -147,6 +155,14 @@ requires-dist = [
     { name = "pytest-bdd", marker = "extra == 'testing'", specifier = ">=8,<9" },
 ]
 provides-extras = ["testing"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "a2effect", extras = ["testing"] },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "aiofile"
@@ -214,13 +230,43 @@ dependencies = [
     { name = "stream-proc" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "stream-proc", editable = "packages/stream-proc" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-breaker"
 version = "0.1.0"
 source = { editable = "packages/any-breaker" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-browser"
@@ -235,6 +281,14 @@ zendriver = [
     { name = "zendriver" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "zendriver" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "patchright", marker = "extra == 'patchright'", specifier = ">=1.60,<2" },
@@ -242,20 +296,76 @@ requires-dist = [
 ]
 provides-extras = ["patchright", "zendriver"]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "zendriver", specifier = ">=0.15,<1" },
+]
+
 [[package]]
 name = "any-clock"
 version = "0.3.0"
 source = { editable = "packages/any-clock" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-contract"
 version = "0.1.0"
 source = { editable = "packages/any-contract" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "any-failure-fp"
 version = "0.1.0"
 source = { editable = "packages/any-failure-fp" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-file"
@@ -265,8 +375,22 @@ dependencies = [
     { name = "anyascii" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "anyascii", specifier = ">=0.3.2,<1" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-frontmatter"
@@ -281,12 +405,28 @@ merge = [
     { name = "yaml-merge" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "any-frontmatter", extra = ["merge"] },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "ruamel-yaml", specifier = ">=0.18,<1" },
     { name = "yaml-merge", marker = "extra == 'merge'", editable = "packages/yaml-merge" },
 ]
 provides-extras = ["merge"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "any-frontmatter", extras = ["merge"], editable = "packages/any-frontmatter" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-gate"
@@ -299,12 +439,26 @@ dependencies = [
     { name = "stream-proc" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "any-lease", editable = "packages/any-lease" },
     { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "content-digest", editable = "packages/content-digest" },
     { name = "stream-proc", editable = "packages/stream-proc" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -321,6 +475,14 @@ pytest = [
     { name = "pytest" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-xdist" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "any-gate", editable = "packages/any-gate" },
@@ -328,6 +490,14 @@ requires-dist = [
     { name = "stream-proc", editable = "packages/stream-proc" },
 ]
 provides-extras = ["pytest"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-xdist", specifier = ">=3.6,<4" },
+]
 
 [[package]]
 name = "any-json-doc"
@@ -338,10 +508,24 @@ dependencies = [
     { name = "process-lock" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "process-lock", editable = "packages/process-lock" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -352,8 +536,22 @@ dependencies = [
     { name = "process-lock" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "process-lock", editable = "packages/process-lock" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-mailbox"
@@ -364,10 +562,24 @@ dependencies = [
     { name = "process-lock" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "process-lock", editable = "packages/process-lock" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -378,43 +590,173 @@ dependencies = [
     { name = "markdown-it-py" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "markdown-it-py", specifier = ">=3,<5" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-net"
 version = "0.1.0"
 source = { editable = "packages/any-net" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "any-path-glob"
 version = "0.1.0"
 source = { editable = "packages/any-path-glob" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-pipeline"
 version = "0.1.0"
 source = { editable = "packages/any-pipeline" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pyrefly" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pyrefly", specifier = ">=1.3,<2" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "ruff", specifier = ">=0.7,<1" },
+]
+
 [[package]]
 name = "any-plugin-cache"
 version = "0.1.0"
 source = { editable = "packages/any-plugin-cache" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-proc"
 version = "0.3.0"
 source = { editable = "packages/any-proc" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "any-recorded-fixture"
 version = "0.1.0"
 source = { editable = "packages/any-recorded-fixture" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "any-shell-policy"
 version = "0.1.0"
 source = { editable = "packages/any-shell-policy" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-speech"
@@ -439,6 +781,13 @@ parakeet = [
     { name = "parakeet-mlx" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "any-lease", editable = "packages/any-lease" },
@@ -454,6 +803,13 @@ requires-dist = [
 ]
 provides-extras = ["parakeet", "embed"]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "any-yaml"
 version = "0.1.0"
@@ -464,11 +820,25 @@ dependencies = [
     { name = "yaml-merge" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "ruamel-yaml", specifier = ">=0.18,<1" },
     { name = "yaml-merge", editable = "packages/yaml-merge" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -498,6 +868,14 @@ transformers = [
     { name = "transformers" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'llamacpp'", specifier = ">=0.24,<2" },
@@ -507,6 +885,14 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'transformers'", specifier = ">=4.40,<6" },
 ]
 provides-extras = ["transformers", "llamacpp"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
 
 [[package]]
 name = "anyio"
@@ -540,6 +926,15 @@ openai = [
     { name = "openai" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "anyllm", extra = ["agent", "anthropic", "claude-code-sdk", "openai"] },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.40,<1" },
@@ -549,10 +944,37 @@ requires-dist = [
 ]
 provides-extras = ["agent", "anthropic", "openai", "claude-code-sdk"]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "anyllm", extras = ["agent", "anthropic", "openai", "claude-code-sdk"], editable = "packages/anyllm" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
+
 [[package]]
 name = "app-dirs"
 version = "0.1.0"
 source = { editable = "packages/app-dirs" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
 
 [[package]]
 name = "argparse-mcp"
@@ -563,16 +985,50 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "fastmcp-slim" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "pydantic", specifier = ">=2,<3" },
 ]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "fastmcp-slim", specifier = ">=3.4,<4" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "asgi-token-gate"
 version = "0.1.0"
 source = { editable = "packages/asgi-token-gate" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "async-scope"
@@ -584,9 +1040,29 @@ asgi = [
     { name = "uvicorn" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "async-scope", extra = ["asgi"] },
+    { name = "httpx" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "sse-starlette" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "uvicorn", marker = "extra == 'asgi'", specifier = ">=0.30,<1" }]
 provides-extras = ["asgi"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
+    { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "sse-starlette", specifier = ">=3.4,<4" },
+]
 
 [[package]]
 name = "asyncio-atexit"
@@ -601,6 +1077,24 @@ wheels = [
 name = "atomic-io"
 version = "0.2.0"
 source = { editable = "packages/atomic-io" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
 
 [[package]]
 name = "attrs"
@@ -642,16 +1136,46 @@ dependencies = [
     { name = "pytest-bdd" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "pytest", specifier = ">=8,<9" },
     { name = "pytest-bdd", specifier = ">=8,<9" },
 ]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "beads-client"
 version = "0.4.0"
 source = { editable = "packages/beads-client" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "beartype"
@@ -680,6 +1204,24 @@ name = "blueprint"
 version = "0.1.0"
 source = { editable = "packages/blueprint" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "codespell" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "codespell", specifier = ">=2.4,<3" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "browser-cookie3"
 version = "0.20.1"
@@ -705,9 +1247,25 @@ read = [
     { name = "browser-cookie3" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "browser-cookie3" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "browser-cookie3", marker = "extra == 'read'", specifier = ">=0.20,<1" }]
 provides-extras = ["read"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "browser-cookie3", specifier = ">=0.20,<1" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "cachetools"
@@ -899,6 +1457,24 @@ name = "child-env"
 version = "0.1.0"
 source = { editable = "packages/child-env" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
+
 [[package]]
 name = "claude-agent-sdk"
 version = "0.2.113"
@@ -982,6 +1558,22 @@ name = "content-digest"
 version = "0.1.0"
 source = { editable = "packages/content-digest" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "content-extract"
 version = "0.3.0"
@@ -992,11 +1584,25 @@ dependencies = [
     { name = "trafilatura" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "convert-md", editable = "packages/convert-md" },
     { name = "selectolax", specifier = ">=0.3,<1" },
     { name = "trafilatura", specifier = ">=1.12,<2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -1020,6 +1626,16 @@ pdf = [
     { name = "pymupdf4llm" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "convert-md", extra = ["documents"] },
+    { name = "hypothesis" },
+    { name = "openpyxl" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "python-docx" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "html2text", specifier = ">=2025.4.15" },
@@ -1032,6 +1648,16 @@ requires-dist = [
     { name = "trafilatura", specifier = ">=1.9.0,<3" },
 ]
 provides-extras = ["pdf", "documents"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "convert-md", extras = ["documents"], editable = "packages/convert-md" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "openpyxl", specifier = ">=3.1,<4" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "python-docx", specifier = ">=1.2,<2" },
+]
 
 [[package]]
 name = "courlan"
@@ -1377,8 +2003,22 @@ dependencies = [
     { name = "ruamel-yaml" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "ruamel-yaml", specifier = ">=0.18,<1" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "diskcache"
@@ -1424,8 +2064,22 @@ dependencies = [
     { name = "selectolax" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "selectolax", specifier = ">=0.3,<1" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "duckdb"
@@ -1464,8 +2118,22 @@ dependencies = [
     { name = "duckdb" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "duckdb", specifier = ">=1,<2" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "due-schedule"
@@ -1475,8 +2143,22 @@ dependencies = [
     { name = "croniter" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "croniter", specifier = ">=2,<7" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "email-validator"
@@ -1513,6 +2195,22 @@ wheels = [
 name = "event-bus"
 version = "0.1.0"
 source = { editable = "packages/event-bus" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "exceptiongroup"
@@ -1629,6 +2327,22 @@ name = "fts-query"
 version = "0.1.0"
 source = { editable = "packages/fts-query" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "gherkin-official"
 version = "29.0.0"
@@ -1642,6 +2356,24 @@ wheels = [
 name = "git-porcelain"
 version = "0.24.0"
 source = { editable = "packages/git-porcelain" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
 
 [[package]]
 name = "grapheme"
@@ -1854,8 +2586,22 @@ dependencies = [
     { name = "lxml" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "lxml", specifier = ">=5,<7" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "html2text"
@@ -1890,8 +2636,22 @@ dependencies = [
     { name = "sqlite-resource" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "sqlite-resource", editable = "packages/sqlite-resource" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "http-fetch"
@@ -1901,8 +2661,22 @@ dependencies = [
     { name = "curl-cffi" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "curl-cffi", specifier = ">=0.7,<1" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "httpcore"
@@ -2213,13 +2987,45 @@ dependencies = [
     { name = "selectolax" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "selectolax", specifier = ">=0.3,<1" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "json-match"
 version = "0.1.0"
 source = { editable = "packages/json-match" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
 
 [[package]]
 name = "jsonl-log"
@@ -2230,10 +3036,26 @@ dependencies = [
     { name = "process-lock" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "process-lock", editable = "packages/process-lock" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
 ]
 
 [[package]]
@@ -2321,6 +3143,24 @@ name = "launchd-agent"
 version = "0.2.0"
 source = { editable = "packages/launchd-agent" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
+
 [[package]]
 name = "lazy-loader"
 version = "0.6"
@@ -2341,8 +3181,22 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "pydantic", specifier = ">=2,<3" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "librosa"
@@ -2387,16 +3241,46 @@ dependencies = [
     { name = "anyllm" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.20,<1" },
     { name = "anyllm", editable = "packages/anyllm" },
 ]
 
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "llm-wobble"
 version = "0.5.1"
 source = { editable = "packages/llm-wobble" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "llvmlite"
@@ -2618,6 +3502,22 @@ name = "managed-region"
 version = "0.1.0"
 source = { editable = "packages/managed-region" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "markdown-it-py"
 version = "4.2.0"
@@ -2763,10 +3663,28 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "fastmcp-slim" },
+    { name = "hypothesis" },
+    { name = "mcp" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "fastmcp-slim", specifier = ">=3.4,<4" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "mcp", specifier = ">=1.28,<2" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -2781,6 +3699,11 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "async-scope", extra = ["asgi"] },
+    { name = "fastmcp-slim" },
+    { name = "hypothesis" },
+    { name = "mcp" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
 ]
 
 [package.metadata]
@@ -2790,7 +3713,14 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" }]
+dev = [
+    { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
+    { name = "fastmcp-slim", specifier = ">=3.4,<4" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "mcp", specifier = ">=1.28,<2" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "mcp-call"
@@ -2803,18 +3733,46 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "async-scope", extra = ["asgi"] },
+    { name = "fastmcp-slim", extra = ["server"] },
+    { name = "hypothesis" },
+    { name = "mcp" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
 ]
 
 [package.metadata]
 requires-dist = [{ name = "httpx", specifier = ">=0.28,<1" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" }]
+dev = [
+    { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
+    { name = "fastmcp-slim", extras = ["server"], specifier = ">=3.4,<4" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "mcp", specifier = ">=1.28,<2" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "mcp-clients"
 version = "0.1.0"
 source = { editable = "packages/mcp-clients" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "mcp-feedback"
@@ -2827,12 +3785,28 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "fastmcp-slim" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3,<4" },
     { name = "httpx", specifier = ">=0.27,<1" },
     { name = "mcp", specifier = ">=1.28,<2" },
     { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "fastmcp-slim", specifier = ">=3.4,<4" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -2845,11 +3819,27 @@ dependencies = [
     { name = "page-tsv" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "fastmcp-slim" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "mcp", specifier = ">=1.28,<2" },
     { name = "page-tsv", editable = "packages/page-tsv" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "fastmcp-slim", specifier = ">=3.4,<4" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -2861,10 +3851,28 @@ dependencies = [
     { name = "pytest-bdd" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "fastmcp-slim" },
+    { name = "hypothesis" },
+    { name = "mcp" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4,<4" },
     { name = "pytest-bdd", specifier = ">=8,<9" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "fastmcp-slim", specifier = ">=3.4,<4" },
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "mcp", specifier = ">=1.28,<2" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -3432,10 +4440,24 @@ dependencies = [
     { name = "pydantic" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "lean-wire", editable = "packages/lean-wire" },
     { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -3482,6 +4504,22 @@ name = "partial-time"
 version = "0.1.0"
 source = { editable = "packages/partial-time" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "patchright"
 version = "1.61.2"
@@ -3505,6 +4543,22 @@ wheels = [
 name = "path-pattern"
 version = "0.1.0"
 source = { editable = "packages/path-pattern" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "pathable"
@@ -3609,6 +4663,22 @@ name = "plugin-surface"
 version = "0.2.0"
 source = { editable = "packages/plugin-surface" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "pooch"
 version = "1.9.0"
@@ -3644,6 +4714,24 @@ wheels = [
 name = "process-lock"
 version = "0.2.1"
 source = { editable = "packages/process-lock" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
 
 [[package]]
 name = "protobuf"
@@ -3689,6 +4777,22 @@ memory = [
 name = "py-symbols"
 version = "0.1.0"
 source = { editable = "packages/py-symbols" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "pycparser"
@@ -4162,8 +5266,22 @@ dependencies = [
     { name = "lxml" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "lxml", specifier = ">=5,<7" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "referencing"
@@ -4685,8 +5803,24 @@ dependencies = [
     { name = "pydantic-settings" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pyyaml" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "pydantic-settings", specifier = ">=2.5,<3" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+]
 
 [[package]]
 name = "setuptools"
@@ -4713,6 +5847,22 @@ wheels = [
 name = "shelf-vendor"
 version = "0.1.0"
 source = { editable = "packages/shelf-vendor" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "shellingham"
@@ -4878,18 +6028,64 @@ dependencies = [
     { name = "aiosqlite" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "aiosqlite", specifier = ">=0.20,<1" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "sqlite-sidecar"
 version = "0.2.0"
 source = { editable = "packages/sqlite-sidecar" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "sqlite-store"
 version = "0.1.0"
 source = { editable = "packages/sqlite-store" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "sse-starlette"
@@ -4922,10 +6118,42 @@ name = "static-page-check"
 version = "0.1.0"
 source = { editable = "packages/static-page-check" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "stream-proc"
 version = "0.9.0"
 source = { editable = "packages/stream-proc" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "sympy"
@@ -4953,6 +6181,22 @@ name = "task-spec"
 version = "0.1.0"
 source = { editable = "packages/task-spec" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "test-reach"
 version = "0.1.0"
@@ -4963,11 +6207,25 @@ dependencies = [
     { name = "pytest" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "coverage", specifier = ">=7.6,<8" },
     { name = "py-symbols", editable = "packages/py-symbols" },
     { name = "pytest", specifier = ">=8,<10" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
 ]
 
 [[package]]
@@ -4983,6 +6241,24 @@ wheels = [
 name = "timefmt"
 version = "0.3.0"
 source = { editable = "packages/timefmt" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-bdd" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+    { name = "pytest-bdd", specifier = ">=8,<9" },
+]
 
 [[package]]
 name = "tld"
@@ -5280,6 +6556,24 @@ name = "verb-cli"
 version = "0.2.0"
 source = { editable = "packages/verb-cli" }
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pydantic" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
 [[package]]
 name = "watchfiles"
 version = "1.2.0"
@@ -5536,8 +6830,22 @@ dependencies = [
     { name = "ruamel-yaml" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
 [package.metadata]
 requires-dist = [{ name = "ruamel-yaml", specifier = ">=0.18,<1" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "zendriver"

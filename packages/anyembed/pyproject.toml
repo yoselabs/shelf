@@ -19,6 +19,10 @@ transformers = ["torch>=2.4,<3", "transformers>=4.40,<6"]
 # local cache.
 llamacpp = ["llama-cpp-python>=0.3.36,<0.4", "huggingface-hub>=0.24,<2"]
 
+[dependency-groups]
+# The test libraries this package's suite imports, plus what the root conftest and pytest settings load (tests/test_package_tests_declare_their_dependencies.py).
+dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "hypothesis>=6.100,<7", "pytest-bdd>=8,<9"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

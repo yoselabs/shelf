@@ -54,7 +54,10 @@ def test_sigterm_reaches_the_command_and_the_exit_code_says_so(tmp_path: Path) -
         # A handler can interrupt readiness while stdout holds its buffered-writer lock.
         signal.signal(signal.SIGTERM, lambda *_: (os.write(1, b"got term\\n"), sys.exit(7)))
         print("ready", flush=True)
-        time.sleep(60)
+        # Short slices, never one long sleep: CPython's sleep misses a signal that lands just before its first syscall, so the handler
+        # would wait out the whole sleep (seen 2 in 4000 runs on a loaded box, rc 7 at 60 s). The wrapper's own wait slices too.
+        while True:
+            time.sleep(0.05)
         """
     )
     proc = _run(root, "unity", 1, "job", sys.executable, "-c", script)

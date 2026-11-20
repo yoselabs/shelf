@@ -654,6 +654,7 @@ ignore_imports = [
     "any_gate.runner -> stream_proc",
     "any_gate_python.stages -> stream_proc",
     "any_gate_python.stages -> any_gate.plan",
+    "any_gate_python.select -> any_gate.plan",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",
     "any_mailbox -> atomic_io",
