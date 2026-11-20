@@ -101,7 +101,7 @@ def _rows(repo: Repo, stack: str) -> dict[str, Verdict]:
 def test_a_repo_set_up_the_profiles_way_passes_every_role(repo: Repo, stack: str) -> None:
     _set_up(repo, stack)
     rows = _rows(repo, stack)
-    assert {f"stack.{stack}.{role}" for role in ROLES} <= rows.keys()
+    assert {f"stack.{stack}.{role}" for role in ROLES if role != "agent-guidance"} <= rows.keys()  # no row is projected from it
     assert {k: v for k, v in rows.items() if v is not Verdict.PASSING} == {}
 
 
@@ -118,7 +118,7 @@ def test_a_repo_with_only_the_manifest_is_not_set_up_on_its_roles(repo: Repo, st
     repo.write(_MANIFEST[stack], "{}" if stack == "node" else "x\n")
     rows = _rows(repo, stack)
     assert rows[f"stack.{stack}.formatter"] in {Verdict.FAILING, Verdict.NOT_SET_UP}
-    assert rows[f"stack.{stack}.agent-guidance"] is Verdict.NOT_SET_UP
+    assert rows[f"stack.{stack}.architecture"] is Verdict.NOT_SET_UP
 
 
 # --- a repo with two stacks (mission task 5): one gate, each stack judged on its own steps, contact through a declared edge ---
