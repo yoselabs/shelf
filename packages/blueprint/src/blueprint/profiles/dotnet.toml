@@ -3,6 +3,8 @@
 # Coverage: docs/research/blueprint-skill/research/dotnet-coverage.md (coverlet.MTP floor seen red and green on a copy of lifesim).
 # Every property below can sit in Directory.Build.props or Directory.Packages.props; the config entries accept either.
 stack = "dotnet"
+# language: carries code that grows layers, so it needs a layering tool; artifact: a file format with no layers of code (its architecture row says why).
+family = "language"
 status = "provisional"
 source = "dotnet-godot-layering.md (2026-10-10 roles; 2026-10-11 linter + architecture re-researched hands-on, scratch solution + Godot 4.7.2 csproj built clean with the adopted set; 2026-10-11 coverage floor seen red and green under MTP on a copy of lifesim); lifesim is the only consumer"
 

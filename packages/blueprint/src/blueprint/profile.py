@@ -134,6 +134,19 @@ class State:
     # The justified classification: `[[profile.classified]]` and `[[profile.rejected]]`, the refused ones left out.
     classified: tuple[Judgement, ...] = ()
     rejected: tuple[Judgement, ...] = ()
+    # `[[edge]]`: contact between two stacks in one repo, as (from, to, via) with the repo-relative contract file.
+    edges: tuple[tuple[str, str, str], ...] = ()
+
+
+def _load_edges(data: dict[str, Any], problems: list[str]) -> tuple[tuple[str, str, str], ...]:
+    edges: list[tuple[str, str, str]] = []
+    for raw in data.get("edge", []):
+        parts = tuple(str(raw.get(k, "")).strip() for k in ("from", "to", "via"))
+        if not all(parts) or not str(raw.get("reason", "")).strip():
+            problems.append(f"edge {dict(raw)!r} needs from, to (stacks), via (the contract file) and a reason")
+        else:
+            edges.append((parts[0], parts[1], parts[2]))
+    return tuple(edges)
 
 
 def _load_judgements(declared: dict[str, Any], problems: list[str]) -> tuple[tuple[Judgement, ...], tuple[Judgement, ...]]:
@@ -221,7 +234,8 @@ def load_state(repo: Path, today: date | None = None) -> State:
         if o.id == DETECTION and o.scope and o.unjustified is None and o.problem(today)
     ]
     classified, rejected = _load_judgements(declared, problems)
-    return State(declared, tuple(overrides), data.get("settings", {}), tuple(problems), skip, tuple(notices), classified, rejected)
+    edges = _load_edges(data, problems)
+    return State(declared, tuple(overrides), data.get("settings", {}), tuple(problems), skip, tuple(notices), classified, rejected, edges)
 
 
 # Compose files by name; a repo with many (one per service folder) still gets one `compose` table.
@@ -256,11 +270,17 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
     if images := dockerfiles(repo, skip):
         found["dockerfile"] = [p.relative_to(repo).as_posix() for p in images]
     for stack, manifest in (("node", "package.json"), ("go", "go.mod"), ("rust", "Cargo.toml")):
-        if (repo / manifest).is_file():
-            found[stack] = [manifest]
+        # One folder per unit: a manifest at the root, else the ones one level down (web/package.json); never inside a dependency folder.
+        if manifests := walk(repo, manifest, 2, skip):
+            found[stack] = sorted((p.relative_to(repo).as_posix() for p in manifests), key=lambda rel: (rel.count("/"), rel))
     if scripts := _shell_scripts(repo, skip):
         found["shell"] = scripts
     return found
+
+
+def _stack_roots(found: dict[str, list[str]]) -> tuple[tuple[str, str], ...]:
+    """The folder each stack's first manifest sits in; a stack that is not a single manifest (dotnet, nix, ...) is rooted at the repo."""
+    return tuple((s, str(Path(files[0]).parent)) for s, files in found.items() if s in {"node", "go", "rust"})
 
 
 def detect_stacks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[str, ...]:
@@ -370,6 +390,8 @@ def detect(repo: Path, state: State) -> Profile:
         tracker="beads" if (repo / ".beads").is_dir() else declared.get("tracker"),
         frameworks=tuple((str(f), str(r)) for f, r in declared.get("frameworks", {}).items()) or detect_frameworks(repo, skip),
         stack_files=stack_files,
+        stack_roots=_stack_roots(found),
+        edges=state.edges,
         ignore=skip,
     )
     facts, evidence = detect_facts(Context(repo, profile))

@@ -3,6 +3,8 @@
 # three levels, or one of at least 10 lines (a lone exec wrapper is not a shell stack); bd's .beads/hooks shims are skipped.
 # Tested 2026-10-11: shellcheck 0.9.0, shfmt 3.14.1 on a scratch copy of homelab (18 scripts) and on planted files.
 stack = "shell"
+# language: carries code that grows layers, so it needs a layering tool; artifact: a file format with no layers of code (its architecture row says why).
+family = "artifact"
 status = "provisional"
 source = "shell-and-secrets.md (2026-10-11): shellcheck and shfmt seen red on planted files and run on homelab's real scripts (shellcheck clean at -S style, shfmt 32 hunks); strict mode judged by the engine (stack.shell-strict); homelab is the only consumer"
 
