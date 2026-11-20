@@ -42,11 +42,14 @@ yes) · start (empty repo: audit, then remediate) · reabsorb (gaps go to the sh
 
 ## 1. Find the engine
 
-`packages/blueprint/src` in the shelf; use the first that exists: `$SHELF_HOME/…`,
-`../shelf/…`, `~/Workspaces/shelf/…` (or, under Claude Code, `${CLAUDE_SKILL_DIR}/../../…`).
-For a clone, `git -C <shelf> pull --ff-only` first; on failure say so in one line and go on.
-Everything below runs as `PYTHONPATH=<engine> python3 -m blueprint …`: Python 3.11+, nothing to
-install, any agent harness.
+A repo the shelf onboarded has `blueprint` as a dev dependency pinned by git tag: run `uv run blueprint …`, no clone needed. Otherwise
+use `packages/blueprint/src` in the shelf, the first that exists: `$SHELF_HOME/…`, `../shelf/…`, `~/Workspaces/shelf/…` (or, under Claude
+Code, `${CLAUDE_SKILL_DIR}/../../…`) and run `PYTHONPATH=<engine> python3 -m blueprint …` (Python 3.11+, nothing to install). For a clone,
+`git -C <shelf> pull --ff-only` first; on failure say so in one line and go on.
+
+The gate's own steps are verbs too: `guard` (no committed local shelf source), `preset` (linter config against the shelf's snapshot), `render`
+(`--check` fails when the blueprint-owned parts of the justfile differ from what the repo's stacks render), `test` (the repo's tests through
+any-gate: receipts skip what passed, a lease queues runs) and `check --gate`. A repo's justfile imports the rendered base; it does not copy recipes.
 
 ## 2. Audit
 
@@ -90,7 +93,8 @@ The owner's one yes covers the `auto` and `agent` rows, never the `owner` rows. 
   write in their place). Excusing a file from detection is also how to except a whole stack for it. A linter's own suppression (`# noqa`, hadolint `ignored:`, `# shellcheck disable`) stays
   where the linter reads it. Every report lists all overrides first. Rows still not ✅ at the end become beads.
 - `blueprint checkpoints [id-prefix] [--json]` lists every checkpoint id, its statement and the fact that turns it on: read it before writing an override or declaring a missed fact.
-- Finish with the repo's own `just check` green and `--write` again.
+- Finish with the repo's own `just check` green and `--write` again. Never run `just check-all` for this: `check` already runs what the change
+  reaches and skips what passed on the same input; `check-all` (every test, the coverage floor) is the release gate, before a tag.
 
 ## 4. What the owner sees
 
@@ -171,7 +175,7 @@ file's §10 says. Its ❌ rows become beads like any other finding.
 - Culture files: `template --repo .` copies only what is missing and rewrites only the AGENTS.md
   block; fill the placeholders, never delete the block's markers.
 - Concerns: `gate`, `backlog`, `knowledge`, `secrets`, `stack`, `framework`, `agents`; profiles python-uv
-  (evidenced); dotnet, nix, compose, dockerfile, shell, godot, unity and mcp (provisional). A repo with no code yet
+  (evidenced); node, go, rust, dotnet, nix, compose, dockerfile, shell, godot, unity and mcp (provisional). A mixed repo gets one table per stack and declares the edges between them. A repo with no code yet
   declares its stack (`[profile] stacks = ["python-uv"]` in docs/blueprint/blueprint.toml). Do not invent rows for what the engine does not check.
 - ADRs are living: one file per decision topic, rewritten when it changes, the dropped decision and
   why in its `## History`. `adr-index --repo . --write` regenerates the index agents read.
