@@ -81,7 +81,7 @@ _REPO = "https://github.com/yoselabs/shelf"
 GATE_PACKAGES = {
     "any-gate": "any-gate-v0.1.1",
     "any-gate-python": "any-gate-python-v0.1.2",
-    "blueprint": "blueprint-v0.3.0",
+    "blueprint": "blueprint-v0.4.0",
 }
 
 
