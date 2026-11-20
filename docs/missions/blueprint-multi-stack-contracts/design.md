@@ -5,7 +5,7 @@
 - `profile.py`: `State` = declared profile + overrides + settings; `detect()` takes declared stacks else `_stack_files()` (manifests). `Profile.stacks`
   is a tuple, so a repo with several stacks already works at detection.
 - `profiles/*.toml`: one file per stack, each `[[role]]` has `tool`, `install`, `config` (files that must hold), `gate` (regex that
-  `just check` must reach), optional `na` or `untested`, and `[[role.alternative]]`. All six profiles define the same 13 roles
+  `just check` must reach), optional `na` or `untested`, and `[[role.alternative]]`. Every profile defines the same roles (`ROLES` in `concerns/stack.py`)
   including `architecture`.
 - `concerns/stack.py` and the `stack.*` checkpoints project the roles into checkpoints; `runner.py` applies overrides and expiry.
 - `recipes/`: scripts that consumers copy (`changed.py`, `gate_state.py` are byte-identical to `tools/`), plus stack-specific ones
@@ -101,7 +101,7 @@ This addendum is the other half: what the *auditor* needs. Nothing was run or ch
 
 | core need | where it is today | what a stack supplies | python-uv | dotnet |
 |---|---|---|---|---|
-| **Profile loading** | `concerns/stack.py` `load_profiles(profiles/*.toml)`; `ROLES` is a fixed 11-tuple | one TOML: per role `tool`, `install`, `config`, `gate`, `na`/`untested`, `alternative`, optional `requires` | `python-uv.toml`, 11 roles | `dotnet.toml`, the same 11 roles (`types`, `coverage` as tools) |
+| **Profile loading** | `concerns/stack.py` `load_profiles(profiles/*.toml)`; `ROLES` is a fixed tuple | one TOML: per role `tool`, `install`, `config`, `gate`, `na`/`untested`, `alternative`, optional `requires` | `python-uv.toml` | `dotnet.toml`, the same roles (`types`, `coverage` as tools) |
 | **Detection** (which stacks, where) | `profile.py` `_stack_files`: a hard-coded manifest table (`pyproject.toml`+`uv.lock`, `*.sln/*.slnx/*.csproj`, `flake.nix`, `package.json`, `go.mod`, `Cargo.toml`) | a manifest glob and a depth | `pyproject.toml` (+ `uv.lock` gives `python-uv`) | `*.sln`, `*.slnx`, `*.csproj` |
 | **Roles to checkpoints** | `stack.roles` projects `(stack x role)` rows; `runner.py` applies overrides and expiry; `report.py` renders | nothing: it is generic over the profile data | same | same |
 | **Checkpoints specific to one stack** | `python_pin.py`, `cli_parse.py`, `uv_tool.py`, `shell.py` register with `applies=` on the stack | an `applies` predicate and a check | three | none yet (dotnet logic sits inside `stack.py`, see below) |
