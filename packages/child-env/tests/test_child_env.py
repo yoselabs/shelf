@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import child_env
-from child_env import VENV_NAMES, scrub, scrub_current, without_venv
+from child_env import VENV_NAMES, scrub, without_venv
 
 if TYPE_CHECKING:
     import pytest
@@ -72,23 +73,23 @@ def test_scrub_leaves_the_venv_alone_by_default() -> None:
     assert scrub(VENV_ENV) == VENV_ENV
 
 
-def test_scrub_strip_venv_strips_it_next_to_the_other_rules() -> None:
+def test_scrub_after_without_venv_strips_it_next_to_the_other_rules() -> None:
     env = {**VENV_ENV, "CLAUDECODE": "1", "GH_TOKEN": "t"}
-    assert scrub(env, strip_venv=True) == without_venv(VENV_ENV)
+    assert scrub(without_venv(env)) == without_venv(VENV_ENV)
 
 
-def test_strip_venv_wins_over_keep_and_still_cleans_path_when_drop_removed_virtual_env() -> None:
-    kept = scrub(VENV_ENV, keep=["VIRTUAL_ENV", "PYTHON*"], strip_venv=True)
+def test_without_venv_first_wins_over_keep_and_still_cleans_path_when_drop_names_virtual_env() -> None:
+    kept = scrub(without_venv(VENV_ENV), keep=["VIRTUAL_ENV", "PYTHON*"])
     assert "VIRTUAL_ENV" not in kept
     assert "PYTHONHOME" not in kept
     assert kept["PYTHONPATH"] == "/lib"
-    dropped = scrub(VENV_ENV, drop=["VIRTUAL_ENV"], strip_venv=True)
+    dropped = scrub(without_venv(VENV_ENV), drop=["VIRTUAL_ENV"])
     assert dropped["PATH"] == "/usr/bin:/bin"
 
 
-def test_scrub_current_strips_the_venv_of_the_process(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_scrub_current_of_the_process_venv_stripped(monkeypatch: pytest.MonkeyPatch) -> None:
     for name, value in VENV_ENV.items():
         monkeypatch.setenv(name, value)
-    out = scrub_current(strip_venv=True)
+    out = scrub(without_venv(os.environ))
     assert not set(VENV_NAMES) & set(out)
     assert f"{VENV}/bin" not in out["PATH"].split(":")

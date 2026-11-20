@@ -76,11 +76,6 @@ _ALLOWED: dict[str, str] = {
         "atomic-io:atomic_write_text:keep_mode",
     ),
     **_rows(
-        "split: the flag duplicates child_env.without_venv(scrub(...)); a second path to one result",
-        "child-env:scrub:strip_venv",
-        "child-env:scrub_current:strip_venv",
-    ),
-    **_rows(
         "split: check_yield=False means the source size is not comparable to text length; a2kay consumes grade",
         "convert-md:_result:check_yield",
         "convert-md:grade:check_yield",
