@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-gate-python"
+software = "child-env"
+why = "`run_tests` found `nice` with shutil.which; the binary is looked up in the environment the caller passes (constitution Article III, shelf-tyld.5)."
+needs = "find(name, env): the executable `nice` on the injected PATH, NotFound when absent."
+sponsor = "yoselabs"
+requester = "any-gate-python"
+status = "active" # active | retired

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import os
-import subprocess
 
 import pytest
-from any_gate import Resources, detect, too_wide, workers
+from any_gate import Resources, detect, plan, too_wide, workers
+from stream_proc.capture import Captured
 
 
 @pytest.mark.parametrize(
@@ -44,5 +44,5 @@ def test_a_box_without_available_pages_reports_the_memory_vm_stat_calls_free(mon
     vm_stat = "Pages free: 100.\nPages inactive: 50.\nPages speculative: 10.\nPages active: 999999.\n"
     monkeypatch.setattr(os, "sysconf_names", {"SC_PAGE_SIZE": 0})
     monkeypatch.setattr(os, "sysconf", lambda name: 16384)
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout=vm_stat))
+    monkeypatch.setattr(plan, "capture", lambda *a, **k: Captured(0, vm_stat, "", 0.0, False))
     assert detect().ram_gb == pytest.approx(160 * 16384 / 1024**3)

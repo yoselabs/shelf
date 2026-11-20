@@ -214,7 +214,7 @@ def _kit_requirements() -> list[tuple[str, str, str]]:
 
 
 def _all_shelf() -> set[str]:
-    return {p.parent.name for p in (_SHELF_ROOT / "packages").glob("*/pyproject.toml")}
+    return {p.parent.name for p in sorted((_SHELF_ROOT / "packages").glob("*/pyproject.toml"))}
 
 
 def check_shelf_sources(text: str) -> None:

@@ -19,6 +19,7 @@ _HASHLIB_IMPORTERS = {
     "git-porcelain/src/git_porcelain/fake_store.py": "legitimate: git's own blob and tree object id is sha1",
     "git-porcelain/src/git_porcelain/real_cache.py": "legitimate: sha1 change detector of working-tree content, not an identity",
     "git-porcelain/src/git_porcelain/real_read.py": "legitimate: sha1 of the common dir is a stored local key",
+    "any-gate-python/src/any_gate_python/select.py": "legitimate: incremental sha256 over a package's files, a receipt key; no stream door",
     "shelf-vendor/src/shelf_vendor/__init__.py": "legitimate: tree hash framed by path and length; no content-digest door",
 }
 _WEAK = {"md5", "sha1"}

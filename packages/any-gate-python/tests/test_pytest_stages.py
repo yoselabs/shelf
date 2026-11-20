@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 def _run(root: Path, *paths: str, **kw: object):
-    return run_tests(list(paths) or ["."], cwd=root, **kw)  # type: ignore[arg-type]
+    return run_tests(list(paths) or ["."], cwd=root, **{"env": os.environ, **kw})  # type: ignore[arg-type]
 
 
 def test_passing_tests_make_an_ok_outcome(project: Callable[..., Path]) -> None:

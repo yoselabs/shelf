@@ -35,15 +35,12 @@ _KILL_ALLOWLIST = {
 # to be emptied by the consumer wave: files outside the spawners that run a subprocess with no timeout=
 _UNBOUNDED_ALLOWLIST = {
     "packages/any-lease/src/any_lease/__main__.py",  # kept: the run wrapper waits on an arbitrary user command, a deadline would kill it
+    "packages/any-gate/src/any_gate/steps.py",  # kept: recipes may run long (budgets only warn), get pass_fds; stream-proc.run lacks both
     "packages/blueprint/src/blueprint/recipes/changed.py",
     "packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py",
     "packages/blueprint/src/blueprint/recipes/gate_state.py",
     "packages/blueprint/src/blueprint/testing.py",
     "packages/shelf-vendor/src/shelf_vendor/__init__.py",
-    "tools/affected.py",
-    "tools/changed.py",
-    "tools/gate_state.py",
-    "tools/hooks/forbid-local-shelf-source.py",
     "tools/onboard/beads.py",
     "tools/onboard/hooks.py",
     "tools/onboard/linter_preset.py",

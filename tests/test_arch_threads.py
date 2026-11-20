@@ -32,6 +32,9 @@ _ALLOWED = {
     "packages/stream-proc/src/stream_proc/capture.py": (
         "owner of child supervision: pipe drainers, stdin feeder and the tick heartbeat beside a blocking wait; sync API by design"
     ),
+    "packages/any-gate/src/any_gate/steps.py": (
+        "fan-out of blocking `just` recipes with pass_fds, one thread per step joined together; run_steps is sync by design"
+    ),
     "packages/any-agent/src/any_agent/supervisor.py": (
         "supervisor of an agent child: stdout/stderr pumps and a stdin feeder beside a blocking wait; sync API by design"
     ),

@@ -65,7 +65,7 @@ python -m any_gate pre-push --gate check -- uv run just check         # the hook
 
 The tree is what `git add -A` would commit; the key adds the upstream merge-base. `pre-push` skips only when the tree is clean, HEAD is what
 is pushed (`PRE_COMMIT_TO_REF`) and the key is recorded; anything else runs the command in place of the process. The record is a receipt named
-`gate-<gate>` in the same file, so every worktree of a checkout shares it. `GateState(repo, receipts)` is the same in Python.
+`gate-<gate>` in the same file, so every worktree of a checkout shares it. `GateState(repo, receipts, env)` is the same in Python.
 
 A failure is never recorded. A missing or damaged file remembers nothing and is repaired by the next `record`. Two writers at once
 may lose one record (the file is replaced whole, atomically): the cost is one rerun, never a false pass.

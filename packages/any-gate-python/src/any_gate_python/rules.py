@@ -43,7 +43,7 @@ class Rules:
     @classmethod
     def load(cls, repo: Path) -> Rules:
         manifest = repo / "pyproject.toml"
-        data: dict[str, Any] = tomllib.loads(manifest.read_text()) if manifest.is_file() else {}
+        data: dict[str, Any] = tomllib.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
         section: dict[str, Any] = data.get("tool", {}).get("any-gate", {}).get("python", {})
         gated: dict[str, Any] = section.get("gated", {})
         return cls(

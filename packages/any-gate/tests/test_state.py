@@ -33,7 +33,7 @@ class Git(Protocol):
 
 @pytest.fixture
 def state(repo: Git, tmp_path: Path) -> GateState:
-    return GateState(repo.root, Receipts(tmp_path / "receipts.json"))
+    return GateState(repo.root, Receipts(tmp_path / "receipts.json"), repo.env)
 
 
 def _green(state: GateState, *, edit: tuple[Git, str] | None = None, gate: str = "check") -> None:
@@ -109,14 +109,14 @@ def test_a_pass_of_another_gate_does_not_count(state: GateState) -> None:
 
 def test_a_worktree_shares_the_record_of_its_checkout(repo: Git, tmp_path: Path) -> None:
     receipts = Receipts(tmp_path / "shared.json")
-    _green(GateState(repo.root, receipts))
+    _green(GateState(repo.root, receipts, repo.env))
     other = tmp_path / "second"
     repo.git("worktree", "add", "-q", "-b", "other", str(other))
-    assert GateState(other, receipts).green("check")  # the same tree, a different checkout
+    assert GateState(other, receipts, repo.env).green("check")  # the same tree, a different checkout
 
 
 def test_outside_a_git_repo_nothing_is_recorded_and_nothing_is_skipped(tmp_path: Path) -> None:
-    state = GateState(tmp_path, Receipts(tmp_path / "r.json"))
+    state = GateState(tmp_path, Receipts(tmp_path / "r.json"), {"PATH": os.environ["PATH"]})
     state.start()
     assert not state.passed("check")
     assert not state.green("check")
@@ -152,3 +152,10 @@ def test_the_push_hook_runs_the_gate_when_pushing_a_commit_that_is_not_head(repo
     _record(repo, receipts)
     pushed = _push(repo, receipts, PRE_COMMIT_TO_REF="0" * 40)
     assert (pushed.returncode, pushed.stdout) == (9, "gate ran\n")
+
+
+def test_the_pushed_ref_comes_from_the_environment_the_state_was_given(repo: Git, tmp_path: Path) -> None:
+    receipts = Receipts(tmp_path / "r.json")
+    _green(GateState(repo.root, receipts, repo.env))
+    assert GateState(repo.root, receipts, {**repo.env, "PRE_COMMIT_TO_REF": repo.git("rev-parse", "HEAD")}).green("check")
+    assert not GateState(repo.root, receipts, {**repo.env, "PRE_COMMIT_TO_REF": "0" * 40}).green("check")

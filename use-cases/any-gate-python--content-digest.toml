@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-gate-python"
+software = "content-digest"
+why = "The per-package `uv export` hash was a hand-rolled sha256 hexdigest of the export text; the key of a suite is digest_text(text, length=64) (constitution Article III, one implementation per behaviour)."
+needs = "digest_text(text, length=64): the full sha256 hex of a UTF-8 text, the same bytes as hashlib.sha256(text.encode()).hexdigest()."
+sponsor = "yoselabs"
+requester = "any-gate-python"
+status = "active" # active | retired

@@ -7,13 +7,13 @@ that is not a failure. A repo declares the `serial` and `quarantine` markers its
 
 from __future__ import annotations
 
-import shutil
 import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from any_gate.plan import detect
 from any_gate.plan import workers as plan_workers
+from child_env import NotFound, find
 from stream_proc import run as run_process
 
 from any_gate_python.lanes_plugin import PREFIX
@@ -59,14 +59,19 @@ def _ok(stage: Stage) -> bool:
     return stage.stopped is None and stage.returncode in (0, _NO_TESTS)
 
 
-def _niced(cmd: list[str], nice: int) -> list[str]:
+def _niced(cmd: list[str], nice: int, env: Mapping[str, str]) -> list[str]:
     """`cmd` started `nice` steps nicer than the caller, so a gate yields the box to the owner's; unchanged for 0 or without `nice`."""
-    found = shutil.which("nice") if nice else None
-    return [found, "-n", str(nice), *cmd] if found else cmd
+    if not nice:
+        return cmd
+    try:
+        found = find("nice", env)
+    except NotFound:
+        return cmd
+    return [str(found.path), "-n", str(nice), *cmd]
 
 
 def _collect(
-    paths: Sequence[str], *, cwd: Path, python: str, wall: float, idle: float, env: Mapping[str, str] | None, nice: int = 0
+    paths: Sequence[str], *, cwd: Path, python: str, wall: float, idle: float, env: Mapping[str, str], nice: int = 0
 ) -> tuple[int, set[str]]:
     """The number of selected tests and the lanes some are marked for: one collection, so an empty lane costs no process."""
     heard: list[str] = []
@@ -88,7 +93,7 @@ def _collect(
         if line.startswith(PREFIX):
             heard.extend(line.removeprefix(PREFIX).split())
 
-    run_process(_niced(cmd, nice), cwd=cwd, env=env, on_stdout=hear, timeout=wall, idle=idle)
+    run_process(_niced(cmd, nice, env), cwd=cwd, env=env, on_stdout=hear, timeout=wall, idle=idle)
     return (int(heard[0]), set(heard[1:])) if heard and heard[0].isdigit() else (0, set())
 
 
@@ -100,7 +105,7 @@ def run_tests(
     python: str = sys.executable,
     wall: float = 3600.0,
     idle: float = 600.0,
-    env: Mapping[str, str] | None = None,
+    env: Mapping[str, str],
     on_output: Callable[[str], None] | None = None,
     extra: Sequence[str] = (),
     nice: int = 0,
@@ -133,7 +138,7 @@ def run_tests(
         if pool > 1 and not alone:
             cmd += ["-n", str(pool)]
         result = run_process(
-            _niced([*cmd, *paths], nice), cwd=cwd, env=env, on_stdout=on_output, on_stderr=on_output, timeout=wall, idle=idle
+            _niced([*cmd, *paths], nice, env), cwd=cwd, env=env, on_stdout=on_output, on_stderr=on_output, timeout=wall, idle=idle
         )
         stages.append(Stage(name, result.returncode, result.secs, result.timed_out))
         if result.timed_out and name == "parallel":

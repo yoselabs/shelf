@@ -16,20 +16,22 @@ from __future__ import annotations
 
 import fnmatch
 import os
-import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from stream_proc import capture
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 _SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__"}
+GIT_TIMEOUT = 600.0  # seconds one git call may take
 
 
 def _git(repo: Path, *args: str) -> list[str] | None:
     """Lines git prints, or None when git fails (not a repo, no upstream, ...)."""
-    done = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=False)
-    return done.stdout.split("\0") if done.returncode == 0 else None
+    done = capture(["git", *args], cwd=repo, timeout=GIT_TIMEOUT)
+    return done.out.split("\0") if done.exit == 0 else None
 
 
 def base(repo: Path) -> str | None:

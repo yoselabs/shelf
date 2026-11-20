@@ -24,11 +24,15 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 ALLOW_FILE = Path(__file__).with_name("tag_check_allow.toml")
+GIT_TIMEOUT = 60.0  # seconds one git call may take: `ls-remote` on a dead network must not hang a push
 
 
 def git(repo: Path, *args: str) -> str | None:
     """What git prints, or None when it fails."""
-    done = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=False)
+    try:
+        done = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=False, timeout=GIT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return None
     return done.stdout if done.returncode == 0 else None
 
 

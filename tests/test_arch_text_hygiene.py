@@ -54,7 +54,7 @@ _UNSORTED_OK = {
     "packages/stream-proc/src/stream_proc/procfs.py::table": "a dict by pid: callers look up, none rely on its order",
     "tools/blueprint_fitness.py::_whole_suite": "builds a set",
     "tools/blueprint_fitness.py::pytest_sessionfinish": "the observed records feed `judge`, which compares sets, and are not stored",
-    "tools/changed.py::everything": "sorted on the line that returns the list",
+    "packages/any-gate/src/any_gate/changed.py::everything": "sorted on the line that returns the list",
 }
 
 
