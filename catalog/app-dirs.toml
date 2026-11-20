@@ -2,7 +2,7 @@
 name = "app-dirs"
 kind = "primitive"
 tier = "T0"
-release = "app-dirs-v0.2.0"
+release = "app-dirs-v0.3.0"
 capability = "Stop copying the XDG lookup — an app's config, state and cache folders on POSIX from XDG_CONFIG_HOME, XDG_STATE_HOME and XDG_CACHE_HOME with the spec's fallbacks (a relative or empty value ignored), or, when asked, the folder Claude Code hands a plugin in CLAUDE_PLUGIN_DATA; created only on request, the environment and home passed in so a test patches nothing."
 implementation = "ours"
 status = "candidate"

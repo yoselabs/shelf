@@ -2,7 +2,7 @@
 name = "atomic-io"
 kind = "primitive"
 tier = "T0"
-release = "atomic-io-v0.2.0"
+release = "atomic-io-v0.3.0"
 capability = "Stop caring how to write a file crash-safely — bytes, text or JSON through tempfile + optional fsync + os.replace, so a crash or a concurrent reader never observes a partial write; keep_mode carries the replaced file's permissions."
 implementation = "ours"
 status = "candidate"

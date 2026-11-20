@@ -2,7 +2,7 @@
 name = "verb-cli"
 kind = "primitive"
 tier = "T1"
-release = "verb-cli-v0.2.0"
+release = "verb-cli-v0.3.0"
 capability = "Stop hand-writing argparse for a function that already says what it takes — a pydantic-annotated signature becomes flags (Field alias names the flag, description is the help, bool a paired --flag/--no-flag, a non-scalar one JSON flag; a Literal/Enum argparse choices; a positional marker), a set of verbs becomes one parser with subcommands and shared parameters (a Target of repo/kb/rev) folded into each, and the parsed flags become its keyword arguments, a model validated."
 implementation = "ours"
 status = "candidate"

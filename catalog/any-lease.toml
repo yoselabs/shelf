@@ -2,7 +2,7 @@
 name = "any-lease"
 kind = "any-lib"
 tier = "T1"
-release = "any-lease-v0.3.0"
+release = "any-lease-v0.3.1"
 capability = "Stop hand-rolling at-most-N-at-a-time across processes: a counting lease of limit units per named resource, each a process-lock flock the kernel drops when its holder dies (kill -9 included), with queuing (timeout, cancel, waiting callback), ordered multi-acquire that cannot deadlock, and holders readable without taking a lock."
 implementation = "ours"
 status = "candidate"

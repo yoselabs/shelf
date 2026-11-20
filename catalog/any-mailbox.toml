@@ -2,7 +2,7 @@
 name = "any-mailbox"
 kind = "any-lib"
 tier = "T1"
-release = "any-mailbox-v0.1.0"
+release = "any-mailbox-v0.1.1"
 capability = "Stop hand-rolling a request file between processes: a one-slot mailbox where post merges a message under a cross-process lock and an atomic write, take hands it over exactly once, and peek reads without the lock; the caller owns the codec."
 implementation = "ours"
 status = "candidate"

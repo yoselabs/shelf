@@ -2,7 +2,7 @@
 name = "any-browser"
 kind = "any-lib"                 # T1 "stop caring WHICH backend" — value concentrates here
 tier = "T1"
-release = "any-browser-v0.2.0"
+release = "any-browser-v0.3.0"
 capability = "Stop caring which headless engine renders a JS page — one BrowserBackend protocol returning a uniform RenderedPage (carrying a RenderOutcome), backed by Playwright-API (patchright / camoufox) or raw-CDP (zendriver); a missing engine degrades to RenderOutcome.unavailable, never an import crash."
 implementation = "hybrid-adapter"  # neutral seam + per-driver translation over patchright/zendriver
 status = "candidate"
