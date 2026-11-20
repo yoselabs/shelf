@@ -39,6 +39,7 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True, metavar="{init,check,gate}")
     ini = sub.add_parser("init", help="set the repo up: detect, audit, plan, write only what is missing; ends with what it could not")
     ini.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+    ini.add_argument("--beads", action="store_true", help="also set up beads (`bd init --skip-hooks`); init only suggests it otherwise")
     ini.add_argument("--no-hooks", action="store_true", help="write no hook config and install no git hooks")
     chk = sub.add_parser("check", help="judge the repo against every checkpoint that applies")
     chk.add_argument("--repo", default=".", type=Path, help="the repository to judge (default: cwd)")
@@ -89,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
     """The command line."""
     args = _parser().parse_args(argv)
     if args.command == "init":
-        return init.run(args.repo, hooks=not args.no_hooks)
+        return init.run(args.repo, hooks=not args.no_hooks, beads=args.beads)
     if args.command == "gate":
         return _GATE_STEPS[args.step](args)
     if args.list is not None:

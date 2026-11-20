@@ -12,7 +12,7 @@ import fnmatch
 import re
 from typing import TYPE_CHECKING
 
-from blueprint.model import FixedBy, Sub, check_each, dockerfiles, failing, not_set_up, passing, toml_table
+from blueprint.model import FixedBy, Sub, check, check_each, dockerfiles, failing, not_applicable, not_set_up, passing, toml_table
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
@@ -136,3 +136,24 @@ def python_pin(ctx: Context) -> list[Sub]:
         "uv-images": _uv_images(ctx),
     }
     return [Sub(f"stack/{_STACK}", f"stack.{_STACK}.{row}", _ROWS[row], finding) for row, finding in findings.items()]
+
+
+@check(
+    "stack.python-installed",
+    "the Python .python-version pins is installed on this machine (uv finds it)",
+    audit_only=True,
+    layer="stack",
+)
+def python_installed(ctx: Context) -> Finding:
+    """Ask uv for the interpreter the pin names, the way every `uv run` will find it; needs this machine's own state, so audit-only."""
+    if _STACK not in ctx.profile.stacks or ctx.read(".python-version") is None:
+        return not_applicable("no python-uv pin to look for")
+    done = ctx.run("uv", "python", "find", timeout=30)
+    if done is None:
+        return failing("uv is not installed, so the pinned Python cannot be found", "run `just tools` (mise install --locked)")
+    pinned = (ctx.read(".python-version") or "").strip().splitlines()[0]
+    if done.returncode != 0:
+        return failing(
+            f"no Python {pinned} on this machine (uv python find: {done.stderr.strip() or 'nothing'})", f"run `uv python install {pinned}`"
+        )
+    return passing(f"Python {pinned} found: {done.stdout.strip()}")

@@ -186,3 +186,44 @@ def test_an_image_copying_the_pinned_uv_passes(repo: Repo) -> None:
     _sound(repo)
     repo.write("Dockerfile", "FROM python:3.12-slim\nCOPY --from=ghcr.io/astral-sh/uv:0.13.0 /uv /bin/\n")
     assert _uv_images(repo)[0] is Verdict.PASSING
+
+
+_INSTALLED = "stack.python-installed"
+
+
+def _installed(repo: Repo, exit_code: int, out: str = "/x/python3.12") -> tuple[Verdict, str]:
+    _sound(repo)
+    (repo.bin_dir / "uv").write_text(f'#!/bin/sh\necho "{out}"\nexit {exit_code}\n')
+    (repo.bin_dir / "uv").chmod(0o755)
+    row = next(r for r in run(repo.root, concern="stack", audit=True, env=repo.env).rows if r.id == _INSTALLED)
+    return row.verdict, row.evidence
+
+
+def test_an_installed_pinned_python_passes_the_audit_probe(repo: Repo) -> None:
+    verdict, evidence = _installed(repo, 0)
+    assert verdict is Verdict.PASSING
+    assert "3.12" in evidence
+
+
+def test_a_missing_pinned_python_fails_and_says_how_to_install_it(repo: Repo) -> None:
+    verdict, _ = _installed(repo, 2, "")
+    assert verdict is Verdict.FAILING
+    row = next(r for r in run(repo.root, concern="stack", audit=True, env=repo.env).rows if r.id == _INSTALLED)
+    assert "uv python install 3.12" in row.remediation
+
+
+def test_the_probe_is_audit_only(repo: Repo) -> None:
+    _sound(repo)
+    rows = {r.id for r in run(repo.root, concern="stack", env=repo.env).rows}
+    assert _INSTALLED not in rows
+
+
+def test_no_pin_file_means_no_probe(repo: Repo) -> None:
+    _sound(repo)
+    (repo.root / ".python-version").unlink()
+    rows = {r.id for r in run(repo.root, concern="stack", audit=True, env=repo.env).rows}
+    assert _INSTALLED not in rows or _verdict_of(repo) is Verdict.NOT_APPLICABLE
+
+
+def _verdict_of(repo: Repo) -> Verdict:
+    return next(r.verdict for r in run(repo.root, concern="stack", audit=True, env=repo.env).rows if r.id == _INSTALLED)

@@ -16,6 +16,7 @@ is left, 1 when some are, 2 when it could not start. A second run on a finished 
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -24,8 +25,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import preset, render, templates
+from blueprint.concerns import tool_pins
 from blueprint.concerns.profile_data import load_profiles, profile_for
-from blueprint.model import Verdict
+from blueprint.model import Context, Verdict
 from blueprint.profile import detect, load_state
 from blueprint.runner import run as audit_run
 
@@ -131,7 +133,51 @@ def _kinds(profile: Profile) -> tuple[str, ...]:
     return (*profile.stacks, *(name for name, _ in profile.frameworks))
 
 
-def _plan(repo: Path, stacks: tuple[str, ...], *, hooks: bool) -> list[str]:
+_SAID = re.compile(r"\d+\.\d+\.\d+")
+# tool -> the line mise.toml holds for it ({version} filled in); bd ships under another name.
+_MISE_LINE = {"bd": '"github:gastownhall/beads" = {{ version = "{version}", bin = "bd" }}'}
+
+
+def _installed_version(tool: str, env: Mapping[str, str]) -> str | None:
+    """The x.y.z a tool on PATH says it is, the way the audit asks (`uv --version`, `bd --version`)."""
+    argv = tool_pins.VERSION_ARGV.get(tool)
+    if argv is None or shutil.which(argv[0], path=env.get("PATH")) is None:
+        return None
+    done = subprocess.run(argv, env=dict(env), capture_output=True, text=True, check=False, timeout=30)
+    found = _SAID.search(done.stdout) if done.returncode == 0 else None
+    return found.group() if found else None
+
+
+def _mise_needed(repo: Path, profile: Profile, env: Mapping[str, str]) -> dict[str, str]:
+    return tool_pins.needed(Context(repo=repo, profile=profile, env=dict(env)))
+
+
+def _write_mise(repo: Path, profile: Profile, env: Mapping[str, str]) -> list[str]:
+    """mise.toml pinning each tool the repo runs at the version found on PATH, then `mise lock`; a tool with no readable version is left."""
+    lines = [
+        _MISE_LINE.get(tool, '{tool} = "{version}"').format(tool=tool, version=version)
+        for tool in _mise_needed(repo, profile, env)
+        if (version := _installed_version(tool, env))
+    ]
+    if not lines:
+        return []
+    (repo / "mise.toml").write_text("[tools]\n" + "\n".join(lines) + "\n")
+    changed = ["mise.toml"]
+    if shutil.which("mise", path=env.get("PATH")) is not None:
+        done = subprocess.run(["mise", "lock"], cwd=repo, env=dict(env), capture_output=True, text=True, check=False)
+        changed.append("mise.lock" if done.returncode == 0 else f"mise.lock FAILED: {done.stderr.strip()}")
+    return changed
+
+
+def _write_beads(repo: Path, env: Mapping[str, str]) -> list[str]:
+    """`bd init --skip-hooks` (bd never installs hooks: prek runs its events); the strict settings stay audit rows."""
+    if shutil.which("bd", path=env.get("PATH")) is None:
+        return ["beads FAILED: bd is not installed"]
+    done = subprocess.run(["bd", "init", "--skip-hooks"], cwd=repo, env=dict(env), capture_output=True, text=True, check=False)
+    return [".beads/ (bd init --skip-hooks)" if done.returncode == 0 else f"beads FAILED: {done.stderr.strip()}"]
+
+
+def _plan(repo: Path, stacks: tuple[str, ...], env: Mapping[str, str], *, hooks: bool, beads: bool) -> list[str]:
     profile = detect(repo, load_state(repo))
     steps: list[str] = []
     missing_docs = [n for n in templates.required(profile) if not (repo / "docs" / "agents" / f"{n}.md").is_file()]
@@ -146,6 +192,10 @@ def _plan(repo: Path, stacks: tuple[str, ...], *, hooks: bool) -> list[str]:
         steps.append("the stack's recipe files (tools/, policy/)")
     if hooks and _hook_config_missing(repo):
         steps.append("the hook config, then the git hooks")
+    if beads and not (repo / ".beads").is_dir():
+        steps.append("beads (bd init --skip-hooks)")
+    if not (repo / "mise.toml").is_file() and _mise_needed(repo, profile, env):
+        steps.append("mise.toml pins, from the versions of the tools on PATH")
     return steps
 
 
@@ -161,10 +211,14 @@ def _apply(repo: Path, stacks: tuple[str, ...], steps: list[str], env: Mapping[s
         written += _write_recipes(repo, _kinds(detect(repo, load_state(repo))))
     if hooks and any(s.startswith("the hook") for s in steps):
         written += _write_hooks(repo, env)
+    if any(s.startswith("beads") for s in steps):
+        written += _write_beads(repo, env)
+    if any(s.startswith("mise.toml") for s in steps):  # last: the pins follow what the steps above made the repo run
+        written += _write_mise(repo, detect(repo, load_state(repo)), env)
     return written
 
 
-def run(repo: Path, *, hooks: bool = True, env: Mapping[str, str] | None = None) -> int:
+def run(repo: Path, *, hooks: bool = True, beads: bool = False, env: Mapping[str, str] | None = None) -> int:
     """detect, audit, plan, apply, then list what is left; the exit code of `blueprint init`."""
     repo = repo.expanduser().resolve()
     env = env if env is not None else dict(os.environ)
@@ -180,11 +234,13 @@ def run(repo: Path, *, hooks: bool = True, env: Mapping[str, str] | None = None)
         return 2
     first = audit_run(repo, env=dict(env))
     _out(f"audit: {sum(r.verdict in _LEFT for r in first.rows)} of {len(first.rows)} checkpoints not passing")
-    steps = _plan(repo, profile.stacks, hooks=hooks)
+    steps = _plan(repo, profile.stacks, env, hooks=hooks, beads=beads)
     _out("plan: " + ("; ".join(steps) if steps else "nothing missing"))
     written = _apply(repo, profile.stacks, steps, env, hooks=hooks)
     _out("apply: " + (", ".join(written) if written else "nothing to write"))
-    left = [r for r in audit_run(repo, env=dict(env)).rows if r.verdict in _LEFT]
+    has_beads = beads or (repo / ".beads").is_dir()
+    # Beads is the owner's choice: until it is made, its rows are a suggestion, not something init failed to set up.
+    left = [r for r in audit_run(repo, env=dict(env)).rows if r.verdict in _LEFT and (has_beads or r.concern != "backlog")]
     prek_missing = hooks and shutil.which("prek", path=env.get("PATH")) is None and (repo / _HOOK_CONFIG).is_file()
     notes = ["hooks: prek is not installed, so no git hook was installed; run `mise install --locked`, then `prek install`"] * prek_missing
     notes += [] if hooks else ["hooks: not installed (--no-hooks); run `blueprint init` without --no-hooks to install them"]
@@ -193,4 +249,8 @@ def run(repo: Path, *, hooks: bool = True, env: Mapping[str, str] | None = None)
         _out(f"  {note}")
     for row in left:
         _out(f"  {row.id}: {row.evidence} -> {row.remediation}")
+    _out("suggested:")
+    if not has_beads:
+        _out("  beads tracks the work and is recommended: `blueprint init --beads` (runs `bd init --skip-hooks`; needs bd installed)")
+    _out("  the shelf's packages (git+tag dependencies) are listed in its catalog/README.md: depend on one only when it wins")
     return 1 if left else 0
