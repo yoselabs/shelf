@@ -53,11 +53,11 @@ class State:
     keys: dict[str, KeyState] = field(default_factory=dict)
     outs: dict[str, OutState] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:  # Any: the persisted JSON state
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> State:
+    def from_dict(cls, d: dict[str, Any]) -> State:  # Any: the persisted JSON state
         keys = {k: _key_of(v) for k, v in d.get("keys", {}).items()}
         return cls(ts=d.get("ts", 0.0), keys=keys, outs={k: OutState(**v) for k, v in d.get("outs", {}).items()})
 

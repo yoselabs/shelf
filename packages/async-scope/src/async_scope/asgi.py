@@ -62,7 +62,7 @@ def bind_loopback(host: str = LOOPBACK, port: int = 0, *, backlog: int = 16) -> 
 
 @contextlib.asynccontextmanager
 async def serve_asgi(
-    app: Any,
+    app: Any,  # Any: an ASGI app or coroutine of any result type
     *,
     host: str = LOOPBACK,
     port: int = 0,

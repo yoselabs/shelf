@@ -41,7 +41,9 @@ class McpCallError(RuntimeError):
     """The server answered, but not with what the protocol promises (a JSON-RPC error, an
     HTTP error status, or a reply with no message for the request)."""
 
-    def __init__(self, message: str, *, status: int | None = None, code: int | None = None, data: Any = None) -> None:
+    def __init__(
+        self, message: str, *, status: int | None = None, code: int | None = None, data: Any = None
+    ) -> None:  # Any: MCP protocol JSON, foreign data
         super().__init__(message)
         self.status = status
         self.code = code
@@ -67,8 +69,8 @@ class ToolResult:
     """A ``tools/call`` result: its content blocks, its structured content, and whether the
     tool reported a failure."""
 
-    content: list[dict[str, Any]] = field(default_factory=list)
-    structured: dict[str, Any] | None = None
+    content: list[dict[str, Any]] = field(default_factory=list)  # Any: MCP protocol JSON, foreign data
+    structured: dict[str, Any] | None = None  # Any: MCP protocol JSON, foreign data
     is_error: bool = False
 
     @property
@@ -142,7 +144,7 @@ class McpEndpoint:
             self._http.close()
             self._http = None
 
-    def tools(self) -> list[dict[str, Any]]:
+    def tools(self) -> list[dict[str, Any]]:  # Any: MCP protocol JSON, foreign data
         """Every tool the server lists, as the protocol describes them (name, inputSchema, ...)."""
         found: list[dict[str, Any]] = []
         cursor: str | None = None
@@ -153,7 +155,9 @@ class McpEndpoint:
             if not cursor:
                 return found
 
-    def call(self, tool: str, arguments: Mapping[str, Any] | None = None, *, timeout: float | None = None) -> ToolResult:
+    def call(
+        self, tool: str, arguments: Mapping[str, Any] | None = None, *, timeout: float | None = None
+    ) -> ToolResult:  # Any: MCP protocol JSON, foreign data
         """Call ``tool``. A failure the tool reports comes back with ``is_error`` set."""
         result = self._request("tools/call", {"name": tool, "arguments": dict(arguments or {})}, timeout=timeout)
         return ToolResult(

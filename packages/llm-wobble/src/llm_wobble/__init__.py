@@ -75,8 +75,8 @@ class WobblePolicy:
     """
 
     tolerance: WobbleTolerance
-    default: Any = None
-    derive: Callable[[dict[str, Any]], Any] | None = None
+    default: Any = None  # Any: model output is foreign JSON
+    derive: Callable[[dict[str, Any]], Any] | None = None  # Any: model output is foreign JSON
 
 
 class WobbleSkip(Exception):  # noqa: N818 - control-flow signal, not an error; public API name
@@ -102,7 +102,7 @@ class _Parsed(Generic[T]):
 Wobbled = NewType("Wobbled", _Parsed[Any])
 
 
-def unwrap(w: Wobbled) -> Any:
+def unwrap(w: Wobbled) -> Any:  # Any: the caller's local annotation narrows it
     """Extract the wrapped value. Caller's local annotation narrows the type."""
     return w.value
 
@@ -296,7 +296,7 @@ def parse_with_policy(
     raw: str,
     *,
     policies: Mapping[str, WobblePolicy],
-    into: Callable[[dict[str, Any]], T],
+    into: Callable[[dict[str, Any]], T],  # Any: model output is foreign JSON
     boundary: str,
     model: str,
     logger: logging.Logger | None = None,
@@ -351,7 +351,7 @@ def parse_with_policy(
 def parse_list_with_policy(
     raw: str,
     *,
-    item: Callable[[dict[str, Any]], T | None],
+    item: Callable[[dict[str, Any]], T | None],  # Any: model output is foreign JSON
     boundary: str,
     model: str,
     strip_fences: bool = True,

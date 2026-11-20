@@ -25,7 +25,7 @@ class Raises:
         object.__setattr__(self, "types", tuple(types))
 
     @staticmethod
-    def flatten_from_annotation(fn: Callable[..., Any]) -> tuple[type[AppError], ...]:
+    def flatten_from_annotation(fn: Callable[..., Any]) -> tuple[type[AppError], ...]:  # Any: any callable is inspected
         """Collect the `AppError` types declared in `fn`'s `Annotated` return `Raises`."""
         # Forward refs, unresolved typing, or NameError in annotations all
         # mean "no readable raises closure"; lint reports separately.

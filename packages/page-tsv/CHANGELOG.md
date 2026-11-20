@@ -2,6 +2,10 @@
 
 Arrow-notation, AI-facing: `old shape ⇒ new shape`. One line per contract-shape change.
 
+## page-tsv-v0.3.0
+
+`is_basemodel(ann: Any)`, `infer_format_hint(return_type: Any)`, `build_encoding_plan(return_type: Any)` ⇒ the same with `object`. No behaviour or byte change.
+
 ## page-tsv-v0.2.1
 
 No contract-shape change and no byte change — recorded because the dependency

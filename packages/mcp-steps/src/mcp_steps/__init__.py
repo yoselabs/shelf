@@ -32,11 +32,11 @@ SOMEONE_ELSE: Final = "someone else"
 class McpWorld(Protocol):
     """What the ``mcp_world`` fixture returns for :mod:`mcp_steps.steps`."""
 
-    def prepare(self, tool: str, args: dict[str, Any]) -> dict[str, Any]:
+    def prepare(self, tool: str, args: dict[str, Any]) -> dict[str, Any]:  # Any: MCP tool arguments and results are JSON
         """The arguments as the call sends them (a suite fills placeholders here)."""
         ...
 
-    def call(self, tool: str, args: dict[str, Any], actor: str = AGENT) -> Any:
+    def call(self, tool: str, args: dict[str, Any], actor: str = AGENT) -> Any:  # Any: MCP tool arguments and results are JSON
         """Call ``tool`` as ``actor``; keep the result or the refusal."""
         ...
 
@@ -46,7 +46,7 @@ def _text(block: Any) -> str | None:
     return text if isinstance(text, str) else None
 
 
-def refusal_of(result: CallToolResult) -> dict[str, Any]:
+def refusal_of(result: CallToolResult) -> dict[str, Any]:  # Any: MCP tool arguments and results are JSON
     """The refusal in an error result: ``{"error": …}`` from the structured content or the first
     text block's JSON, or ``{"message": <text>}`` when the server sent plain text."""
     body: Any = result.structured_content
@@ -60,7 +60,7 @@ def refusal_of(result: CallToolResult) -> dict[str, Any]:
     return error if isinstance(error, dict) else {"message": str(error)}
 
 
-def result_of(result: CallToolResult) -> dict[str, Any]:
+def result_of(result: CallToolResult) -> dict[str, Any]:  # Any: MCP tool arguments and results are JSON
     """The structured value of a successful result, plus ``notices``: the text blocks after the first."""
     out: dict[str, Any] = dict(result.structured_content or {})
     out["notices"] = [text for block in result.content[1:] if (text := _text(block)) is not None]
@@ -78,7 +78,7 @@ class McpSessions:
     def __init__(
         self,
         runner: asyncio.Runner,
-        connect: Callable[[str], Client[Any]],
+        connect: Callable[[str], Client[Any]],  # Any: MCP tool arguments and results are JSON
         *,
         refusal: Callable[[CallToolResult], dict[str, Any]] = refusal_of,
     ) -> None:
@@ -89,7 +89,7 @@ class McpSessions:
         self.last: Any = None
         self.error: dict[str, Any] | None = None
 
-    def session(self, actor: str = AGENT) -> Client[Any]:
+    def session(self, actor: str = AGENT) -> Client[Any]:  # Any: MCP tool arguments and results are JSON
         """``actor``'s open session, opened now if it is the first use."""
         if actor not in self.sessions:
             client = self.connect(actor)
@@ -97,17 +97,21 @@ class McpSessions:
             self.sessions[actor] = client
         return self.sessions[actor]
 
-    def prepare(self, tool: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG002 — a hook for a suite
+    def prepare(self, tool: str, args: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG002 — a hook for a suite  # Any: MCP tool arguments and results are JSON
         return args
 
-    def ask(self, tool: str, args: dict[str, Any], actor: str = AGENT) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    def ask(
+        self, tool: str, args: dict[str, Any], actor: str = AGENT
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:  # Any: MCP tool arguments and results are JSON
         """Call ``tool`` and return ``(result, refusal)`` without keeping either."""
         result = self.runner.run(self.session(actor).call_tool(tool, args, raise_on_error=False))
         if result.is_error:
             return None, self.refusal(result)
         return result_of(result), None
 
-    def call(self, tool: str, args: dict[str, Any], actor: str = AGENT) -> dict[str, Any] | None:
+    def call(
+        self, tool: str, args: dict[str, Any], actor: str = AGENT
+    ) -> dict[str, Any] | None:  # Any: MCP tool arguments and results are JSON
         """Call ``tool`` as ``actor``; the result, or the refusal, becomes the one the steps see."""
         self.last, self.error = self.ask(tool, args, actor)
         return self.last

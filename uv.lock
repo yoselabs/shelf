@@ -2532,7 +2532,7 @@ wheels = [
 
 [[package]]
 name = "git-porcelain"
-version = "0.25.0"
+version = "0.26.0"
 source = { editable = "packages/git-porcelain" }
 dependencies = [
     { name = "child-env" },
@@ -4635,7 +4635,7 @@ wheels = [
 
 [[package]]
 name = "page-tsv"
-version = "0.2.1"
+version = "0.3.0"
 source = { editable = "packages/page-tsv" }
 dependencies = [
     { name = "lean-wire" },

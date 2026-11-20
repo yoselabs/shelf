@@ -65,7 +65,7 @@ class TermHold:
             self.old[signum](signum, None)
 
 
-def popen_held(*args: Any, **kwargs: Any) -> tuple[subprocess.Popen[bytes], TermHold]:
+def popen_held(*args: Any, **kwargs: Any) -> tuple[subprocess.Popen[bytes], TermHold]:  # Any: passed through to subprocess.Popen unchanged
     """``(Popen(*args, **kwargs), hold)``; the caller calls ``hold.replay()`` inside the ``try`` that stops the child."""
     with TermHold() as hold:
         return subprocess.Popen(*args, **kwargs), hold

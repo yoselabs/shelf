@@ -67,7 +67,7 @@ class Flow[I, O](ABC):
     name: str
 
     @abstractmethod
-    def leaves(self) -> tuple[Stage[Any, Any], ...]: ...
+    def leaves(self) -> tuple[Stage[Any, Any], ...]: ...  # Any: stages of every item type live in one tree
 
     @abstractmethod
     async def execute(self, item: I, run: Run) -> O: ...
@@ -90,7 +90,7 @@ class Stage[I, O](Flow[I, O]):
         self.name, self.fn, self.limit = name, fn, limit
 
     @override
-    def leaves(self) -> tuple[Stage[Any, Any], ...]:
+    def leaves(self) -> tuple[Stage[Any, Any], ...]:  # Any: stages of every item type live in one tree
         return (self,)
 
     @override

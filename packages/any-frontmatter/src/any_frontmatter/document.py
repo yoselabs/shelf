@@ -80,10 +80,10 @@ class FrontmatterError(ValueError):
 class Document:
     """Frontmatter plus body. ``frontmatter`` is arbitrary user YAML, so it is untyped."""
 
-    frontmatter: dict[str, Any]
+    frontmatter: dict[str, Any]  # Any: parsed YAML, foreign data
     body: str
 
-    def with_frontmatter(self, frontmatter: Mapping[str, Any], *, body: str | None = None) -> Document:
+    def with_frontmatter(self, frontmatter: Mapping[str, Any], *, body: str | None = None) -> Document:  # Any: parsed YAML, foreign data
         """This document with its frontmatter replaced, keeping its comments.
 
         ``frontmatter`` is the COMPLETE new mapping, never a patch: a key it omits is

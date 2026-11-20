@@ -46,10 +46,12 @@ class TypedError(Protocol):
 
     kind: ClassVar[str]
 
-    def to_envelope_dict(self) -> dict[str, Any]: ...
+    def to_envelope_dict(self) -> dict[str, Any]: ...  # Any: an error envelope is JSON; tool functions have any signature
 
 
-def envelope_text(envelope: Mapping[str, Any], *, details_chars: int = DETAILS_CHARS) -> str:
+def envelope_text(
+    envelope: Mapping[str, Any], *, details_chars: int = DETAILS_CHARS
+) -> str:  # Any: an error envelope is JSON; tool functions have any signature
     """What an agent reads of an error: the message, the hint, and the details as JSON.
 
     Some clients show only the text of a failed call and drop ``structured_content``, so
@@ -90,7 +92,7 @@ class ErrorWire:
         defect: Callable[[str], TypedError],
         *,
         trace_id: Callable[[BaseException], str] = _fresh_trace_id,
-        text: Callable[[TypedError, Mapping[str, Any]], str] = _envelope_only,
+        text: Callable[[TypedError, Mapping[str, Any]], str] = _envelope_only,  # Any: any tool function
         passthrough: tuple[type[BaseException], ...] = (),
         logger: logging.Logger | None = None,
     ) -> None:
@@ -113,7 +115,9 @@ class ErrorWire:
             envelope["details"] = {**(envelope.get("details") or {}), "trace_id": trace_id}
         return ToolResult(content=self._text(typed, envelope), structured_content={"error": envelope}, is_error=True)
 
-    def guard(self, fn: Callable[..., Any], *, drop_params: frozenset[str] = frozenset()) -> Callable[..., Any]:
+    def guard(
+        self, fn: Callable[..., Any], *, drop_params: frozenset[str] = frozenset()
+    ) -> Callable[..., Any]:  # Any: any tool function, signature preserved
         """Wrap an async tool function so every failure leaves as :meth:`result`.
 
         The wrapper advertises ``fn``'s signature (FastMCP builds the schema from it),

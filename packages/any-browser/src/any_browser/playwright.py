@@ -38,7 +38,7 @@ _THIN_FLOOR = 4_096
 _SCROLL_STABLE_MAX_PASSES = 8
 
 
-def camoufox_launcher() -> Any:
+def camoufox_launcher() -> Any:  # Any: a Playwright object, an optional dependency typed only at runtime
     """Yield an async-CM that launches headless Camoufox.
 
     The import is optional — ``ImportError`` (the ``camoufox`` engine is not
@@ -51,7 +51,9 @@ def camoufox_launcher() -> Any:
 
 
 @asynccontextmanager
-async def chromium_launch(async_playwright_fn: Callable[[], Any]) -> AsyncGenerator[Any]:
+async def chromium_launch(
+    async_playwright_fn: Callable[[], Any],
+) -> AsyncGenerator[Any]:  # Any: a Playwright callable and Browser, optional dependency
     """Two-step Playwright launch flattened into a one-shot CM yielding a Browser.
 
     Drop-in Chromium engines (Patchright, rebrowser-playwright) expose
@@ -218,7 +220,7 @@ class PlaywrightBackend:
 
     def __init__(
         self,
-        launch_fn: Callable[[], Any],
+        launch_fn: Callable[[], Any],  # Any: a Playwright launcher, optional dependency
         *,
         name: str = "camoufox",
         max_pool: int = 4,
@@ -555,7 +557,7 @@ class PlaywrightBackend:
         await self.close()
 
     @asynccontextmanager
-    async def acquire(self, url: str) -> AsyncGenerator[Any]:
+    async def acquire(self, url: str) -> AsyncGenerator[Any]:  # Any: a Playwright Page, optional dependency
         """Yield a fresh page for `url`'s host. Closes the page on exit.
 
         The host's BrowserContext is reused across fetches (cookie jar warm);

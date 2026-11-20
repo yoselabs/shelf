@@ -72,15 +72,15 @@ class FlagSpec:
 
     dest: str
     flag: str
-    base: Any
+    base: Any  # Any: a verb's parameters and defaults are of any type
     needs_json: bool
     required: bool
-    default: Any
+    default: Any  # Any: a verb's parameters and defaults are of any type
     help: str | None
     positional: bool = False
     variadic: bool = False
-    choices: tuple[Any, ...] | None = None
-    enum: Any = None
+    choices: tuple[Any, ...] | None = None  # Any: a verb's parameters and defaults are of any type
+    enum: Any = None  # Any: a verb's parameters and defaults are of any type
 
 
 def _strip_optional(ann: Any) -> Any:
@@ -132,7 +132,7 @@ def _analyze(pname: str, ann: Any) -> tuple[str, Any, bool, str | None, bool]:
     return flag, base, not is_scalar, help_text, positional
 
 
-def flags_of(fn: Callable[..., Any], *, choices: bool = False) -> list[FlagSpec]:
+def flags_of(fn: Callable[..., Any], *, choices: bool = False) -> list[FlagSpec]:  # Any: a verb's parameters and defaults are of any type
     """One :class:`FlagSpec` per parameter of ``fn``, in signature order.
 
     String annotations (``from __future__ import annotations``) are resolved with their
@@ -221,7 +221,7 @@ def to_argparse(parser: argparse.ArgumentParser, specs: list[FlagSpec]) -> None:
             )
 
 
-def kwargs_of(ns: argparse.Namespace, specs: list[FlagSpec]) -> dict[str, Any]:
+def kwargs_of(ns: argparse.Namespace, specs: list[FlagSpec]) -> dict[str, Any]:  # Any: a verb's parameters and defaults are of any type
     """The keyword arguments ``ns`` holds: JSON flags decoded, a model validated, a JSON flag left out omitted."""
     kwargs: dict[str, Any] = {}
     for spec in specs:

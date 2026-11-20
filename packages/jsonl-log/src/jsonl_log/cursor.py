@@ -37,7 +37,7 @@ class Entry(Generic[_T]):
     data: _T
 
 
-def decode_object(line: bytes) -> dict[str, Any]:
+def decode_object(line: bytes) -> dict[str, Any]:  # Any: a log line is a JSON object
     """A line as a JSON object; ``ValueError`` (UTF-8 and JSON errors are one) for anything else."""
     data = json.loads(line.decode("utf-8"))
     if not isinstance(data, dict):
@@ -108,7 +108,7 @@ class Jsonl:
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
 
-    def append(self, data: dict[str, Any]) -> int:
+    def append(self, data: dict[str, Any]) -> int:  # Any: a log line is a JSON object
         """Write one line, flushed; returns the offset of its first byte."""
         line = (json.dumps(data, ensure_ascii=False) + "\n").encode("utf-8")
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -121,11 +121,13 @@ class Jsonl:
     def size(self) -> int:
         return size(self.path)
 
-    def read_from(self, offset: int = 0, limit: int | None = None) -> tuple[list[Entry[dict[str, Any]]], int]:
+    def read_from(
+        self, offset: int = 0, limit: int | None = None
+    ) -> tuple[list[Entry[dict[str, Any]]], int]:  # Any: a log line is a JSON object
         """(entries from ``offset``, the cursor after them); see :func:`read_from`."""
         return read_from(self.path, decode_object, offset, limit)
 
-    def tail(self, n: int, before: int | None = None) -> list[Entry[dict[str, Any]]]:
+    def tail(self, n: int, before: int | None = None) -> list[Entry[dict[str, Any]]]:  # Any: a log line is a JSON object
         """The last ``n`` complete entries that end at or before ``before``, oldest first."""
         return tail(self.path, decode_object, n, before)
 

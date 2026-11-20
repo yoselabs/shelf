@@ -20,7 +20,7 @@ _PRICING: dict[str, dict[str, float]] = {
 }
 
 
-def extract_token_counts(usage: Mapping[str, Any] | Any) -> tuple[int, int, int, int]:
+def extract_token_counts(usage: Mapping[str, Any] | Any) -> tuple[int, int, int, int]:  # Any: a provider usage object or a mapping
     """Pull ``(prompt_total, output, cache_creation, cache_read)`` from Anthropic usage.
 
     Anthropic splits the prompt across three counters: fresh ``input_tokens`` plus

@@ -92,9 +92,9 @@ class AppError(Exception):
     _abstract: ClassVar[bool] = True
 
     base_kind: str
-    details: dict[str, Any]
+    details: dict[str, Any]  # Any: error details are caller-defined JSON
 
-    def __init_subclass__(cls, *, abstract: bool = False, **kwargs: Any) -> None:
+    def __init_subclass__(cls, *, abstract: bool = False, **kwargs: Any) -> None:  # Any: forwarded to super().__init_subclass__
         super().__init_subclass__(**kwargs)
         cls._abstract = abstract
         own = cls.__dict__
@@ -138,7 +138,7 @@ class AppError(Exception):
         *,
         retryable: bool | None = None,
         hint: str | None = None,
-        details: dict[str, Any] | None = None,
+        details: dict[str, Any] | None = None,  # Any: error details are caller-defined JSON
         cause: BaseException | None = None,
     ) -> None:
         if type(self).is_abstract():
@@ -168,7 +168,7 @@ class AppError(Exception):
             details=self.details,
         )
 
-    def to_envelope_dict(self) -> dict[str, Any]:
+    def to_envelope_dict(self) -> dict[str, Any]:  # Any: error details are caller-defined JSON
         """The wire envelope as a plain ``dict`` (``model_dump`` of :meth:`to_envelope`)."""
         return self.to_envelope().model_dump()
 

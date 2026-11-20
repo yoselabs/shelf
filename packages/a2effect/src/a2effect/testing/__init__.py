@@ -173,7 +173,7 @@ def _body(received: Any) -> dict[str, Any]:
     return _body(text)
 
 
-def envelope_of(received: Any) -> dict[str, Any]:
+def envelope_of(received: Any) -> dict[str, Any]:  # Any: whatever an MCP client returned
     """The error envelope (``code``, ``message``, ``hint``, ``details``…) in what a caller received.
 
     ``received`` is an MCP tool result (``structured_content`` or its first text block holds
@@ -188,7 +188,7 @@ def envelope_of(received: Any) -> dict[str, Any]:
     return error
 
 
-def assert_refused(received: Any, code: str) -> dict[str, Any]:
+def assert_refused(received: Any, code: str) -> dict[str, Any]:  # Any: whatever an MCP client returned
     """Assert ``received`` carries an envelope with ``code``; return the envelope.
 
     ``None`` means the call succeeded, which fails with that said."""

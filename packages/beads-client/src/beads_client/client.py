@@ -185,7 +185,7 @@ class Bd:
         assignee: str | None = None,
         description: str | None = None,
         notes: str | None = None,
-        metadata: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, Any] | None = None,  # Any: bd's JSON, foreign data
         set_metadata: Mapping[str, str] | None = None,
         unset_metadata: Sequence[str] = (),
         if_assignee: str | None = None,

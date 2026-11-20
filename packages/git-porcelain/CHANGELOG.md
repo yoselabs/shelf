@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.0
+
+- `sync_status` returns `SyncStatus` and `readiness` returns `Readiness` (TypedDicts, exported) instead of `dict[str, Any]`; the keys and values are unchanged.
+
 ## 0.25.0
 
 Consumer wave (shelf-tyld): git-porcelain now runs on the shelf's owners instead of its own copies. Behaviour change: **every git call is bounded**.

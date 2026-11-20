@@ -80,7 +80,7 @@ class Completion:
     completion_tokens: int = 0
     cost_usd: float = 0.0
     latency_ms: int = 0
-    raw: dict[str, Any] | None = None
+    raw: dict[str, Any] | None = None  # Any: provider usage and options are foreign JSON
 
 
 @runtime_checkable
@@ -140,7 +140,7 @@ class StructuredProvider(LLMProvider, Protocol):
         temperature: float = 0.0,
         thinking_disabled: bool = True,
         parts: PromptParts | None = None,
-        response_schema: Mapping[str, Any] | None = None,
+        response_schema: Mapping[str, Any] | None = None,  # Any: provider-specific options pass through
         effort: Effort | None = None,
     ) -> Completion:
         """As :meth:`LLMProvider.complete`; with ``response_schema`` ``Completion.text`` is schema-valid JSON text.

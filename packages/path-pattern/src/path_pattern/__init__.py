@@ -53,7 +53,7 @@ def placeholders(pattern: str) -> list[str]:
     return [p.name for p in parse(pattern)]
 
 
-def resolve(pattern: str, args: dict[str, Any]) -> str:
+def resolve(pattern: str, args: dict[str, Any]) -> str:  # Any: placeholder values of any type are formatted
     """Substitute ``args`` into ``pattern``.
 
     Missing keys raise ``PatternError`` so we never silently drop a placeholder.

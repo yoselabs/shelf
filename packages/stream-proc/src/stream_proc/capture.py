@@ -93,7 +93,7 @@ def capture_bytes(
     env: Mapping[str, str] | None = None,
     timeout: float,
     input: bytes | None = None,  # noqa: A002 - subprocess.run's name
-    stdin: int | IO[Any] | None = subprocess.DEVNULL,
+    stdin: int | IO[Any] | None = subprocess.DEVNULL,  # Any: passed through to subprocess unchanged
     capture: bool = True,
     grace: float = 5.0,
     drain: float = 2.0,

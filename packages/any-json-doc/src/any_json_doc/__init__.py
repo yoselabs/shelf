@@ -117,7 +117,7 @@ class Doc[T]:
     def __init__(
         self,
         path: Path,
-        load: Callable[[Any], T] = _same,
+        load: Callable[[Any], T] = _same,  # Any: the caller's JSON document shape
         dump: Callable[[T], Any] = _same,
         *,
         fsync: bool = False,
@@ -209,7 +209,7 @@ class DocSet[T]:
         self,
         folder: Path,
         suffix: str = ".json",
-        load: Callable[[Any], T] = _same,
+        load: Callable[[Any], T] = _same,  # Any: the caller's JSON document shape
         dump: Callable[[T], Any] = _same,
         *,
         fsync: bool = False,

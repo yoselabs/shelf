@@ -106,7 +106,9 @@ from git_porcelain.history import (
 from git_porcelain.lfs import lfs_available, lfs_checkout, lfs_fetch, lfs_paths, lfs_push, lfs_setup
 from git_porcelain.plumbing import Ref, Refs
 from git_porcelain.porcelain import (
+    Readiness,
     StatusEntry,
+    SyncStatus,
     dirty_rels,
     git_dir,
     git_returncode,
@@ -165,6 +167,7 @@ __all__ = [
     "Offline",
     "Pick",
     "Pushed",
+    "Readiness",
     "RealRepo",
     "RealWorktree",
     "Rebased",
@@ -193,6 +196,7 @@ __all__ = [
     "Squashed",
     "StatusEntry",
     "StillHeld",
+    "SyncStatus",
     "Synced",
     "TagExists",
     "Transient",

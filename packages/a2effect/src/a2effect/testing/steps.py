@@ -23,9 +23,9 @@ class Outcome(Protocol):
     """What the suite's ``outcome`` fixture returns: the last call's result or refusal."""
 
     @property
-    def last(self) -> Any: ...
+    def last(self) -> Any: ...  # Any: the last result of any tool call
     @property
-    def error(self) -> dict[str, Any] | None: ...
+    def error(self) -> dict[str, Any] | None: ...  # Any: error details are caller-defined JSON
 
 
 @then(parsers.parse('the call is refused with "{code}"'))
