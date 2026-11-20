@@ -60,14 +60,13 @@ FRAMEWORK_ROLES = (
     "tests",  # tests run through the framework itself (scene tree, in-memory client), headless
     "surface-integrity",  # the surface the framework exposes (scene references, tool list) cannot drift unseen
     "architecture",  # the core stays framework-free; the framework layer is thin
-    "ci",  # the framework runs in CI, version taken from the pin
     "hooks",  # what prek adds per commit for the framework
     "agent-guidance",  # the framework's conventions file agents read (docs/agents/<framework>.md)
 )
 # Cut 2026-11-20 (checkpoint-review.md): `agent-guidance` repeats agents.culture-files and the managed block; a role that is
 # `na` for the stack is not a checkpoint. The profile files keep the data; no row is projected from it.
 _NEVER_ROWS = frozenset({"agent-guidance"})
-_NA_NOT_ROWS = frozenset({"coverage", "ci", "embedded-script-lint"})
+_NA_NOT_ROWS = frozenset({"coverage", "embedded-script-lint"})
 
 
 def is_checkpoint(profile: StackProfile, role: str) -> bool:
@@ -116,47 +115,18 @@ def _offenders(ctx: Context, spec: dict[str, Any], root: str = ".") -> list[str]
     return [r for r in rels if not is_skipped(r, ctx.profile.ignore) and spec["lacks"] in (ctx.read(r) or "")]
 
 
-_CI_BUILD = re.compile(r"docker/build-push-action|docker build")
-_CI_RUN = re.compile(r"docker run|test\.sh")
-_CI_FILE = re.compile(r"(?:[\w./-]|\$\{\{[^}]*\}\})*Dockerfile")
-_EXPR = re.compile(r"\$\{\{[^}]*\}\}")
-
-
-def _names(text: str, rel: str) -> bool:
-    """`text` names `rel`, or a templated path in it (`images/${{ matrix.image }}/Dockerfile`) matches `rel`."""
-    templated = (_EXPR.split(m.group().removeprefix("./")) for m in _CI_FILE.finditer(text) if "${{" in m.group())
-    return rel in text or any(re.fullmatch("[^/]+".join(map(re.escape, parts)), rel) for parts in templated)
-
-
 def _unbuilt(ctx: Context) -> list[str]:
-    """The Dockerfiles neither the gate nor a CI job that builds an image names; a root Dockerfile is CI's default."""
+    """The Dockerfiles the gate does not name."""
     gate = gate_text(ctx)
-    ci = [t for t in _workflow_texts(ctx) if _CI_BUILD.search(t)]
-    return [r for r in _dockerfile_rels(ctx) if r not in gate and not any(r == "Dockerfile" or _names(t, r) for t in ci)]
-
-
-def _workflow_texts(ctx: Context) -> list[str]:
-    return [t for f in sorted(ctx.repo.glob(".github/workflows/*.y*ml")) if (t := ctx.read(f.relative_to(ctx.repo).as_posix()))]
+    return [r for r in _dockerfile_rels(ctx) if r not in gate]
 
 
 def _dockerfile_rels(ctx: Context) -> list[str]:
     return [p.relative_to(ctx.repo).as_posix() for p in dockerfiles(ctx.repo, ctx.profile.ignore)]
 
 
-def _shipped(ctx: Context) -> list[str]:
-    from blueprint.facts import shipped_images  # noqa: PLC0415 -- facts imports the concerns
-
-    return list(shipped_images(ctx, _dockerfile_rels(ctx)))
-
-
-def _unsmoked(ctx: Context, shipped: list[str]) -> list[str]:
-    """The shipped images no CI job that builds and runs an image names (a root Dockerfile is CI's default)."""
-    ci = [t for t in _workflow_texts(ctx) if _CI_BUILD.search(t) and _CI_RUN.search(t)]
-    return [r for r in shipped if not any(r == "Dockerfile" or _names(t, r) for t in ci)]
-
-
 _PURPOSE_FACT = {
-    "shipped-image": "a Dockerfile a `push: true` workflow step builds (with a registry login)",
+    "shipped-image": "the repo ships an image: a classified ships-image trait and a Dockerfile",
     "deployed": "the repo is deployed: high deploy evidence or a classified deployed trait",
 }
 
@@ -168,11 +138,11 @@ def purpose_fact(requires: str) -> str:
 
 def _purpose(ctx: Context, requires: str) -> tuple[bool, str]:
     """Whether the fact holds, and what it is about: the shipped files, or the deploy evidence."""
-    from blueprint.facts import is_deployed, shipped_images  # noqa: PLC0415 -- facts imports the concerns
+    from blueprint.facts import is_deployed  # noqa: PLC0415 -- facts imports the concerns
 
     if requires == "shipped-image":
-        shipped = shipped_images(ctx, _dockerfile_rels(ctx))
-        return bool(shipped), ", ".join(f"{d} (`{w}`)" for d, w in shipped.items())
+        images = _dockerfile_rels(ctx) if "ships-image" in ctx.profile.traits else []
+        return bool(images), ", ".join(images)
     deploy = [e.where for e in ctx.profile.evidence if e.claim == "deployed" and e.confidence == "high"]
     if "deployed" in ctx.profile.traits:
         deploy.insert(0, "classified trait")
@@ -217,11 +187,9 @@ def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str
 
 
 def _judge_set_up(ctx: Context, stack: str, spec: Role, role: str, gate_text: str, *, root: str) -> _Judged:
-    plain = [c for c in spec.config if not {"lacks", "built", "smoked"} & c.keys()]
+    plain = [c for c in spec.config if not {"lacks", "built"} & c.keys()]
     missing = [_describe(c).replace("{root}", root) for c in plain if not _config_holds(ctx, c, root)]
     missing += [f"nothing builds {r}" for c in spec.config if "built" in c for r in _unbuilt(ctx)]
-    shipped: list[str] = _shipped(ctx) if any("smoked" in c for c in spec.config) else []
-    missing += [f"no CI job builds and runs {r}" for c in spec.config if "smoked" in c for r in _unsmoked(ctx, shipped)]
     forbidden = [f"{hit} has {c['lacks']!r}" for c in spec.config if "lacks" in c for hit in _offenders(ctx, c, root)]
     if missing or forbidden:
         why = "; ".join([*([f"missing {'; '.join(missing)}"] if missing else []), *forbidden])

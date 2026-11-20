@@ -160,17 +160,18 @@ def test_one_script_in_a_python_repo_is_the_shell_stack_with_its_conventions_fil
     assert "shell" in templates.required(detect(repo.root, load_state(repo.root)))
 
 
-_WORKFLOW = "jobs:\n  image:\n    steps:\n      - uses: docker/build-push-action@abc # v7\n      - run: docker run --rm app:ci app --help\n"
-
-
-def test_a_ci_job_that_builds_and_runs_the_image_passes_the_tests_row(repo: Repo) -> None:
+def test_an_image_nothing_in_the_gate_builds_fails_the_tests_row(repo: Repo) -> None:
     repo.write("Dockerfile", "FROM python:3.12-slim\n")
     assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.NOT_SET_UP
-    repo.write(".github/workflows/image.yml", _WORKFLOW)
-    assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING
 
 
-def test_a_test_image_the_gate_builds_passes_the_tests_row_without_ci(repo: Repo) -> None:
+def test_a_workflow_that_builds_an_image_does_not_count_as_a_build(repo: Repo) -> None:
+    repo.write("Dockerfile", "FROM python:3.12-slim\n")
+    repo.write(".github/workflows/image.yml", "jobs:\n  image:\n    steps:\n      - uses: docker/build-push-action@abc\n")
+    assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.NOT_SET_UP
+
+
+def test_a_test_image_the_gate_builds_passes_the_tests_row(repo: Repo) -> None:
     repo.write("scripts/prune/test.Dockerfile", "FROM python:3.12-slim\n")
     repo.write("justfile", "check: test-image\ntest-image:\n    docker build -q -f scripts/prune/test.Dockerfile .\n")
     assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING
@@ -178,36 +179,12 @@ def test_a_test_image_the_gate_builds_passes_the_tests_row_without_ci(repo: Repo
 
 def test_an_image_nothing_builds_fails_the_tests_row_by_name(repo: Repo) -> None:
     repo.write("Dockerfile", "FROM python:3.12-slim\n")
-    repo.write(".github/workflows/image.yml", _WORKFLOW)
     repo.write("images/worker/Dockerfile", "FROM python:3.12-slim\n")
+    repo.write("justfile", "check: img\nimg:\n    docker build -q -f Dockerfile .\n")
     verdict, evidence = _rows(repo)["stack.dockerfile.tests"]
     assert verdict is Verdict.NOT_SET_UP
     assert "nothing builds images/worker/Dockerfile" in evidence
     assert "nothing builds Dockerfile" not in evidence
-
-
-def test_ci_that_builds_an_image_passes_the_base_tests_row_without_running_it(repo: Repo) -> None:
-    repo.write("Dockerfile", "FROM python:3.12-slim\n")
-    repo.write(".github/workflows/image.yml", "jobs:\n  image:\n    steps:\n      - uses: docker/build-push-action@abc\n")
-    assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING
-
-
-def test_ci_names_a_nested_image_by_its_file(repo: Repo) -> None:
-    repo.write("images/worker/Dockerfile", "FROM python:3.12-slim\n")
-    named = "# v7\n        with:\n          file: images/worker/Dockerfile\n"
-    repo.write(".github/workflows/image.yml", _WORKFLOW.replace("# v7\n", named))
-    assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING
-
-
-def test_a_matrix_ci_job_builds_each_image_its_template_matches(repo: Repo) -> None:
-    repo.write("images/devbox/Dockerfile", "FROM ubuntu:24.04\n")
-    repo.write("images/frigate/Dockerfile", "FROM ubuntu:24.04\n")
-    repo.write("tools/x.Dockerfile", "FROM ubuntu:24.04\n")
-    matrix = "        with:\n          file: images/${{ matrix.image }}/Dockerfile\n"
-    repo.write(".github/workflows/image.yml", _WORKFLOW.replace("# v7\n", "# v7\n" + matrix))
-    verdict, evidence = _rows(repo)["stack.dockerfile.tests"]
-    assert verdict is Verdict.NOT_SET_UP
-    assert evidence.endswith("(missing nothing builds tools/x.Dockerfile)")
 
 
 def test_bats_tests_run_by_the_gate_pass_the_shell_tests_row(repo: Repo) -> None:
@@ -273,75 +250,37 @@ def test_an_ignored_script_is_not_a_shell_stack(repo: Repo) -> None:
     assert "shell" not in templates.required(detect(repo.root, load_state(repo.root)))
 
 
-# ADR 0026: what happens to a file adds checkpoints. A shipped image (a push: true step with a registry login builds
-# it) needs a CI smoke run and a base-image updater; a deployed stack needs the compose healthcheck and architecture policy.
-_SHIP = """name: image
-jobs:
-  image:
-    steps:
-      - uses: docker/login-action@abc # v4
-      - uses: docker/build-push-action@abc # v7
-        with:
-          file: images/a/Dockerfile
-          push: {push}
-"""
-_SHIP_ROWS = ("stack.dockerfile.ship-smoke", "stack.dockerfile.ship-updater")
+# ADR 0026: what the repo does adds checkpoints. A repo classified as shipping an image needs a base-image updater;
+# a deployed stack needs the compose healthcheck and architecture policy. No repository has CI, so no workflow shows either.
+_SHIPS = '[profile]\nkind = "application"\ntraits = ["ships-image"]\n'
 
 
-def _images(repo: Repo, push: str = "true") -> None:
+def _images(repo: Repo, *, ships: bool = True) -> None:
     repo.write("images/a/Dockerfile", "FROM python:3.12-slim\n")
-    repo.write("tools/gate.Dockerfile", "FROM python:3.12-slim\n")
-    repo.write("justfile", "check: img\nimg:\n    docker build -q -f tools/gate.Dockerfile .\n")
-    repo.write(".github/workflows/image.yml", _SHIP.format(push=push))
+    repo.write("justfile", "check: img\nimg:\n    docker build -q -f images/a/Dockerfile .\n")
+    if ships:
+        repo.write("docs/blueprint/blueprint.toml", _SHIPS)
 
 
-def test_a_pushed_image_needs_a_smoke_run_and_an_updater_and_names_the_file(repo: Repo) -> None:
+def test_a_shipped_image_needs_an_updater_and_names_the_file(repo: Repo) -> None:
     _images(repo)
-    rows = _rows(repo)
-    for row in _SHIP_ROWS:
-        verdict, evidence = rows[row]
-        assert verdict is Verdict.NOT_SET_UP
-        assert "images/a/Dockerfile" in evidence
-        assert "gate.Dockerfile" not in evidence
+    verdict, evidence = _rows(repo)["stack.dockerfile.ship-updater"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "images/a/Dockerfile" in evidence
 
 
-def test_a_pushed_image_with_a_smoke_run_and_an_updater_passes(repo: Repo) -> None:
+def test_a_shipped_image_with_an_updater_passes(repo: Repo) -> None:
     _images(repo)
-    repo.write(".github/workflows/image.yml", _SHIP.format(push="true") + "      - run: docker run --rm app:ci app --help\n")
     repo.write(".github/dependabot.yml", "updates:\n  - package-ecosystem: docker\n    directory: /images/a\n")
+    assert _rows(repo)["stack.dockerfile.ship-updater"][0] is Verdict.PASSING
+
+
+def test_an_image_nobody_classified_as_shipped_needs_no_updater(repo: Repo) -> None:
+    _images(repo, ships=False)
     rows = _rows(repo)
-    assert rows["stack.dockerfile.ship-smoke"][0] is Verdict.PASSING
-    assert rows["stack.dockerfile.ship-updater"][0] is Verdict.PASSING
-
-
-def test_an_image_nothing_pushes_is_not_shipped(repo: Repo) -> None:
-    _images(repo, push="false")
-    rows = _rows(repo)
-    for row in _SHIP_ROWS:
-        assert rows[row][0] is Verdict.NOT_APPLICABLE
-        assert "push: true" in rows[row][1]
-    assert rows["stack.dockerfile.dependencies"][0] is Verdict.NOT_SET_UP
-    assert "dependabot" not in rows["stack.dockerfile.dependencies"][1]
-
-
-def test_only_the_image_the_push_step_builds_is_shipped_in_a_matrix(repo: Repo) -> None:
-    repo.write("images/a/Dockerfile", "FROM python:3.12-slim\n")
-    repo.write("images/b/Dockerfile", "FROM python:3.12-slim\n")
-    repo.write("tools/x.Dockerfile", "FROM python:3.12-slim\n")
-    repo.write(".github/workflows/image.yml", _SHIP.format(push="true").replace("images/a/", "images/${{ matrix.image }}/"))
-    evidence = _rows(repo)["stack.dockerfile.ship-smoke"][1]
-    assert "images/a/Dockerfile" in evidence
-    assert "images/b/Dockerfile" in evidence
-    assert "tools/x.Dockerfile" not in evidence
-
-
-def test_a_context_names_the_dockerfile_when_no_file_is_given(repo: Repo) -> None:
-    repo.write("images/a/Dockerfile", "FROM python:3.12-slim\n")
-    repo.write("images/b/Dockerfile", "FROM python:3.12-slim\n")
-    repo.write(".github/workflows/image.yml", _SHIP.format(push="true").replace("file: images/a/Dockerfile", "context: images/a"))
-    evidence = _rows(repo)["stack.dockerfile.ship-smoke"][1]
-    assert "images/a/Dockerfile" in evidence
-    assert "images/b/Dockerfile" not in evidence
+    assert rows["stack.dockerfile.ship-updater"][0] is Verdict.NOT_APPLICABLE
+    assert "ships-image" in rows["stack.dockerfile.ship-updater"][1]
+    assert "stack.dockerfile.ship-smoke" not in rows
 
 
 _COMPOSE_ROWS = ("stack.compose.tests", "stack.compose.architecture")
@@ -354,17 +293,6 @@ def test_a_compose_file_nothing_deploys_needs_no_healthcheck_or_architecture_pol
         assert rows[row][0] is Verdict.NOT_APPLICABLE
         assert "deployed" in rows[row][1]
     assert rows["stack.compose.linter"][0] is not Verdict.NOT_APPLICABLE
-
-
-def test_a_deploy_secret_and_a_deploy_step_make_the_compose_policy_needed(repo: Repo) -> None:
-    repo.write("compose.yml", "services:\n  db:\n    image: postgres:17\n")
-    repo.write(
-        ".github/workflows/deploy.yml",
-        "jobs:\n  d:\n    steps:\n      - env:\n          KEY: ${{ secrets.DEPLOY_KEY }}\n        run: python tools/deploy.py\n",
-    )
-    rows = _rows(repo)
-    for row in _COMPOSE_ROWS:
-        assert rows[row][0] is Verdict.NOT_SET_UP
 
 
 def test_a_declared_deployed_trait_makes_the_compose_policy_needed(repo: Repo) -> None:

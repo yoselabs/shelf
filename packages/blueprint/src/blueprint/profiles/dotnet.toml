@@ -10,9 +10,9 @@ source = "dotnet-godot-layering.md (2026-10-10 roles; 2026-10-11 linter + archit
 
 [[role]]
 role = "toolchain"
-tool = "global.json pins the SDK (rollForward latestPatch); NuGet lock files (RestorePackagesWithLockFile) committed, locked mode in CI"
+tool = "global.json pins the SDK (rollForward latestPatch); NuGet lock files (RestorePackagesWithLockFile) committed, locked mode in the gate"
 install = """dotnet new globaljson --sdk-version <x.y.z> --roll-forward latestPatch; in Directory.Build.props set \
-<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile> and <RestoreLockedMode Condition="'$(CI)' != ''">true</RestoreLockedMode>; \
+<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile> and <RestoreLockedMode>true</RestoreLockedMode>; \
 dotnet restore; commit every packages.lock.json"""
 config = [
     { path = "global.json", contains = '"version"' },
@@ -33,7 +33,7 @@ gate = "csharpier check"
 role = "linter"
 tool = """SDK analyzers at AnalysisLevel latest-all + Meziantou.Analyzer + Roslynator.Analyzers + SonarAnalyzer.CSharp, every rule switched on (`dotnet_analyzer_diagnostic.severity = warning`, IDE style category off, four IDE defect rules back on) and warnings as errors; plus Microsoft.VisualStudio.Threading.Analyzers (sync-over-async, async void, unobserved tasks), IDisposableAnalyzers (leaks, returned-disposed), ErrorProne.NET.CoreAnalyzers 0.9.0-beta.4 (unobserved Task, struct equality, swallowed exceptions, `throw e`), SharpSource (ValueTask awaited twice), Nullable.Extended.Analyzer (`!` needs a justification), ReflectionAnalyzers (misspelled reflection targets); severities only in .editorconfig"""
 install = """Directory.Build.props: <TreatWarningsAsErrors>true, <AnalysisLevel>latest-all, <EnforceCodeStyleInBuild>true, \
-<Deterministic>true, <ContinuousIntegrationBuild Condition="'$(CI)' != ''">true; PackageReference (PrivateAssets=all) Meziantou.Analyzer, Roslynator.Analyzers, SonarAnalyzer.CSharp, \
+<Deterministic>true; PackageReference (PrivateAssets=all) Meziantou.Analyzer, Roslynator.Analyzers, SonarAnalyzer.CSharp, \
 Microsoft.VisualStudio.Threading.Analyzers, IDisposableAnalyzers, ErrorProne.NET.CoreAnalyzers (Version 0.9.0-beta.4: no stable line exists, pin the beta), SharpSource, Nullable.Extended.Analyzer, ReflectionAnalyzers; \
 versions in Directory.Packages.props; just build runs `dotnet build -warnaserror`. \
 .editorconfig [*.cs]: `dotnet_analyzer_diagnostic.severity = warning` (most Meziantou/Roslynator/Sonar rules are off by default; this turns them on), then \

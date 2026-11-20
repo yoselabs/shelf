@@ -2,7 +2,7 @@
 # apply to the Unity-facing code through the generated solution (`dotnet build <name>.slnx`), and to the engine-free core
 # through a hand-written test csproj. The rows here add what is Unity's.
 # `{root}` is the folder holding ProjectSettings/ (the Unity project); repo-level files (.gitignore, .gitattributes, justfile,
-# .github/workflows, Directory.Build.props, global.json, .editorconfig) stay at the repo root. Paths may be globs (no `**`).
+# Directory.Build.props, global.json, .editorconfig) stay at the repo root. Paths may be globs (no `**`).
 # Detection (profile.py FRAMEWORK_MARKERS): ProjectSettings/ProjectVersion.txt; the root is the folder above ProjectSettings/.
 # Research: docs/research/blueprint-skill/research/unity-profile.md. Every runtime claim was seen on 6000.7.0b4 (the beta),
 # not on the 6000.3 LTS pin: re-run on 6000.3 before the status leaves provisional.
@@ -12,7 +12,7 @@ source = "unity-profile research (2026-10-11): Unity 6000.7.0b4 (6.7 beta, the o
 
 [[role]]
 role = "framework-version"
-tool = "ProjectSettings/ProjectVersion.txt pins the editor (m_EditorVersion 6000.x.y with revision), the newest LTS stream; Packages/packages-lock.json committed; CI and the justfile read the pin from ProjectVersion.txt, never retype it"
+tool = "ProjectSettings/ProjectVersion.txt pins the editor (m_EditorVersion 6000.x.y with revision), the newest LTS stream; Packages/packages-lock.json committed; the justfile reads the pin from ProjectVersion.txt, never retype it"
 install = """Pin = the newest Unity 6 LTS stream: 6000.3.x LTS on 2026-10-11 (support to Dec 2027); move to 6000.7 LTS when it ships (expected Q4 2026, the last Mono release). \
 Not 6000.0 LTS (support ends Oct 2026), not the 6.4-6.6 update releases for a product repo (supported only until the next release). Open the project once in the pinned editor: \
 Unity writes ProjectVersion.txt (`m_EditorVersion: 6000.3.x`, `m_EditorVersionWithRevision`) and Packages/packages-lock.json; commit both. \
@@ -57,7 +57,7 @@ gate = "unity_integrity.py"
 role = "binary-assets"
 tool = "Git LFS for binary asset types via .gitattributes (textures, models, audio, video, fonts, plugins, .unitypackage never committed); every binary's .meta stays a plain text file in git, only the asset goes to LFS"
 install = """.gitattributes lines `<pattern> filter=lfs diff=lfs merge=lfs -text` for: png, jpg, jpeg, tga, psd, tif, exr, hdr, fbx, obj, blend, glb, wav, mp3, ogg, mp4, mov, ttf, otf, a, dylib, dll, so, bank. Do NOT list *.meta, *.unity, *.prefab, *.asset, *.mat, *.anim, *.controller (text YAML: LFS would break merge and the integrity script). \
-`git lfs install --skip-repo` (prek owns the hooks); CI checkout with `lfs: true`. Size budget: untested (no tool run); candidate `git lfs ls-files --size` against a budget in a just recipe. \
+`git lfs install --skip-repo` (prek owns the hooks). Size budget: untested (no tool run); candidate `git lfs ls-files --size` against a budget in a just recipe. \
 Open, same as Godot: the pre-push LFS upload under prek is unproven"""
 config = [{ path = ".gitattributes", contains = "filter=lfs" }]
 
@@ -130,12 +130,6 @@ config = [
 # Judged in concerns/framework.py (a profile cannot say "for each asmdef"): every project .asmdef under {root}/Assets needs a csc.rsp
 # beside it holding -nullable:enable and -warnaserror+, and {root}/Assets/csc.rsp must not exist.
 gate = "dotnet build"
-
-[[role]]
-role = "ci"
-# License activation could not be exercised here. GameCI is live; TBD until the owner decides whether Unity projects get CI.
-tool = "TBD; when CI comes: game-ci/unity-test-runner@v4 and game-ci/unity-builder (v4.8.2 / v5.0.1), both read the editor version from ProjectSettings/ProjectVersion.txt; Library cached by hash of Assets, Packages, ProjectSettings; then the dotnet build and dotnet test steps"
-untested = "TBD by the owner: license activation is the blocker. GameCI documents a Personal .ulf file in secret UNITY_LICENSE (with UNITY_EMAIL and UNITY_PASSWORD), a Pro serial UNITY_SERIAL, or a license server input (read 2026-10-11, game.ci/docs/github/activation); none was run. Until then agents run `just check` where the pinned editor is installed"
 
 [[role]]
 role = "hooks"

@@ -114,10 +114,6 @@ config = [
 gate = "lint-imports"
 
 [[role]]
-role = "ci"
-na = "no MCP-specific CI step: the stdio and in-memory tests run inside `just check`, which the python-uv ci row already runs from the lockfile; no server binary or service to install"
-
-[[role]]
 role = "hooks"
 na = "no MCP-specific hook: the snapshot and contract tests are in the gate, and a hook that built the server per commit would repeat the gate"
 

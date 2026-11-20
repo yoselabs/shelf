@@ -41,7 +41,7 @@ source — it ties the project to one filesystem. (For local co-development of s
 ## 2. The commit guard — enforced by `just check`, accelerated by a hook
 
 The shelf ships a guard that **refuses a local `path=`/editable shelf source**, so a co-development
-override can never leak into a commit and break CI or another checkout.
+override can never leak into a commit and break another checkout.
 
 **Enforcement is the `guard` target in `just check`** (copied with the rest of the preset, §4). It
 reads `HEAD` — committed content — so it holds on any clone, with no hooks, no onboarding, and

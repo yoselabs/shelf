@@ -6,7 +6,7 @@ Stack: dotnet (.NET 10 SDK, C# 14). The gate is `just check`; this file is what 
 
 | role | tool | configured in |
 |---|---|---|
-| toolchain | `global.json` pins the SDK (`rollForward latestPatch`); NuGet lock files committed, locked mode in CI | `global.json`, `Directory.Build.props` |
+| toolchain | `global.json` pins the SDK (`rollForward latestPatch`); NuGet lock files committed, locked mode in the gate | `global.json`, `Directory.Build.props` |
 | formatter | CSharpier (layout only; no `dotnet format`) | `.config/dotnet-tools.json`, `.csharpierignore` |
 | linter | SDK analyzers `latest-all` + Meziantou + Roslynator + Sonar, warnings as errors | `Directory.Build.props`, severities in `.editorconfig` |
 | types | nullable enabled, nullable warnings are errors | `Directory.Build.props` |

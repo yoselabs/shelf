@@ -27,7 +27,7 @@ ones the change reaches (the rest already passed on the same input). `just check
 
 ```bash
 just check      # ruff + format + pyrefly (strict) + codespell + deptry + the tests the change reaches
-just check-all  # the same, every test, with the coverage floor: RARE, before a release tag only (the shelf has no CI, ADR 0027)
+just check-all  # the same, every test, with the coverage floor: RARE, before a release tag only (no repository has CI, ADR 0027)
 ```
 
 The runner is [just](https://just.systems) ([ADR 0023](docs/adr/0023-the-gate-runner-is-just.md)), pinned as the
@@ -39,7 +39,7 @@ plain commands, `mise trust --yes && mise install --locked` (the exact uv, prek 
 Both run natively on the Mac, one way. In `check` the per-file linters (ruff, codespell, shellcheck) run on the changed files only (`any-gate changed`; a changed linter config selects
 everything). The cross-file checks (types, architecture, dependencies, blueprint) always cover the whole
 repo, and the tests are narrowed to the changed packages and every package depending on them (`any-gate-python`).
-There is no CI ([ADR 0027](docs/adr/0027-the-shelf-has-no-ci.md)): the pre-push hook runs the gate, and `just check-all` is run locally before a tag.
+There is no CI, here or in any repository ([ADR 0027](docs/adr/0027-no-repository-has-ci.md)): the pre-push hook runs the gate, and `just check-all` is run locally before a tag.
 
 **No carve-outs.** "Pre-existing drift", "unrelated file", or "that's a separate change" do **not**
 satisfy Done. If `just check` is red for any reason, the task is not finished. This toolchain is the
@@ -245,7 +245,7 @@ Read a file below when its trigger applies, not before.
 |---|---|
 | [docs/agents/constitution.md](docs/agents/constitution.md) | before changing anything: how work is done here |
 | [docs/agents/working-with-agents.md](docs/agents/working-with-agents.md) | at session start and handoff: loop, rules, survey |
-| [docs/agents/gate.md](docs/agents/gate.md) | when a check fails, or you add one or touch hooks or CI |
+| [docs/agents/gate.md](docs/agents/gate.md) | when a check fails, or you add one or touch hooks |
 | [docs/agents/testing.md](docs/agents/testing.md) | before writing or changing any test |
 | [docs/agents/architecture.md](docs/agents/architecture.md) | before adding a module, dependency or layer |
 | [docs/agents/health.md](docs/agents/health.md) | before planning a bead: the trends that say slicing is failing |

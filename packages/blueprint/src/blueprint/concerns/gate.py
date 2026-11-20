@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from blueprint.concerns import gate_ci, gate_clone, gate_command, gate_git, gate_guards, gate_hooks, gate_lfs
+from blueprint.concerns import gate_clone, gate_command, gate_git, gate_guards, gate_hooks, gate_lfs, gate_no_ci
 from blueprint.model import check
 
 check("gate.one-command", "`just check` exists and every recipe it names resolves")(gate_command.one_command)
 check("gate.runner", "the gate runner is just: a justfile holds the gate, not a Makefile")(gate_command.runner)
-check("gate.ci", "CI runs the gate command; every action is pinned to a commit SHA; permissions are declared")(gate_ci.ci)
-check("gate.ci-no-manifest-edit", "no CI step before the gate rewrites a dependency manifest or lockfile")(gate_ci.ci_no_manifest_edit)
+check("gate.no-ci", "the repo holds no GitHub Actions configuration (no repository has CI, ADR 0027)")(gate_no_ci.no_ci)
 check(
     "gate.hooks-recipe",
     "prek owns the git hooks through .pre-commit-config.yaml, bd's hooks run from it, pre-push runs the gate",
@@ -31,10 +30,9 @@ check("gate.superseded-scripts", "no gate script the shelf now ships as a packag
     gate_guards.superseded_scripts
 )
 check("gate.default-branch", "the default branch is `main`", audit_only=True)(gate_git.default_branch)
-check("gate.git-remote", "an `origin` remote exists, so pushes, CI and bd's Dolt sync have somewhere to go", audit_only=True)(
+check("gate.git-remote", "an `origin` remote exists, so pushes and bd's Dolt sync have somewhere to go", audit_only=True)(
     gate_git.git_remote
 )
-check("gate.ci-green", "CI is green on the default branch's latest commit", audit_only=True)(gate_ci.ci_green)
 check("gate.lfs-binaries", "in a repo that uses LFS, every binary blob in git is an LFS pointer")(gate_lfs.lfs_binaries)
 check("gate.git-config-clean", "this clone's own git config sets neither core.worktree nor core.bare", audit_only=True)(
     gate_git.git_config_clean

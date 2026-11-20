@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import itertools
-import json
 import shutil
 import subprocess
 from datetime import date
@@ -21,19 +20,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from blueprint.testing import Repo
-
-_SHA = "11d5960a326750d5838078e36cf38b85af677262"
-_SOUND_CI = f"""name: check
-on: [push]
-permissions:
-  contents: read
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@{_SHA} # v4
-      - run: just check
-"""
 
 
 def _verdict(repo: Repo, check_id: str, *, audit: bool = True) -> tuple[Verdict, str]:
@@ -57,28 +43,37 @@ def test_one_command_fails_when_check_names_a_missing_target(repo: Repo) -> None
     assert "preset" in evidence
 
 
-def test_ci_passes_when_pinned_and_running_the_gate(repo: Repo) -> None:
-    repo.write(".github/workflows/check.yml", _SOUND_CI)
-    assert _verdict(repo, "gate.ci")[0] is Verdict.PASSING
+def test_no_ci_passes_in_a_repo_without_github_actions(repo: Repo) -> None:
+    repo.write(".github/dependabot.yml", "version: 2\n")
+    repo.write(".github/CODEOWNERS", "* @owner\n")
+    assert _verdict(repo, "gate.no-ci")[0] is Verdict.PASSING
 
 
-def test_ci_fails_on_a_tag_pinned_action(repo: Repo) -> None:
-    repo.write(".github/workflows/check.yml", _SOUND_CI.replace(f"@{_SHA} # v4", "@v4"))
-    verdict, evidence = _verdict(repo, "gate.ci")
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".github/workflows/check.yml",
+        ".github/workflows/release.yaml",
+        ".github/actions/setup/action.yml",
+        ".github/actions/setup/action.yaml",
+    ],
+)
+def test_no_ci_fails_on_github_actions_config(repo: Repo, path: str) -> None:
+    repo.write(path, "on: [push]\n")
+    repo.write(".github/workflows/ignored.txt", "not a workflow\n")
+    verdict, evidence = _verdict(repo, "gate.no-ci")
     assert verdict is Verdict.FAILING
-    assert "actions/checkout@v4" in evidence
+    assert path in evidence
+    assert "ignored.txt" not in evidence
 
 
-def test_ci_fails_without_permissions_or_the_gate_word(repo: Repo) -> None:
-    repo.write(".github/workflows/check.yml", _SOUND_CI.replace("permissions:\n  contents: read\n", "").replace("just check", "pytest"))
-    verdict, evidence = _verdict(repo, "gate.ci")
-    assert verdict is Verdict.FAILING
-    assert "permissions" in evidence
-    assert "no workflow runs the gate" in evidence
-
-
-def test_ci_is_not_set_up_without_workflows(repo: Repo) -> None:
-    assert _verdict(repo, "gate.ci")[0] is Verdict.NOT_SET_UP
+def test_no_ci_remediation_deletes_and_never_silently_keeps_a_non_ci_duty(repo: Repo) -> None:
+    repo.write(".github/workflows/publish.yml", "on: [push]\n")
+    row = {r.id: r for r in run(repo.root, concern="gate", env=repo.env).rows}["gate.no-ci"]
+    assert "delete" in row.remediation
+    assert "local command" in row.remediation
+    assert "owner decision" in row.remediation
+    assert row.fixed_by is FixedBy.OWNER
 
 
 def _recipe() -> str:
@@ -252,109 +247,42 @@ def test_clean_clone_evidence_names_the_command_that_failed(repo: Repo) -> None:
     assert "lint: 3 errors" in _verdict(repo, "gate.clean-clone", audit=True)[1]
 
 
-def _ci(steps: str, *, gate: bool = True) -> str:
-    """The sound workflow with `steps` (shell lines, one step each) before the gate step."""
-    body = "".join(f"      - name: step {i}\n        run: {line}\n" for i, line in enumerate(steps.splitlines()))
-    tail = "      - run: just check\n" if gate else ""
-    return _SOUND_CI.partition("      - uses:")[0] + f"      - uses: actions/checkout@{_SHA} # v4\n" + body + tail
-
-
-def test_ci_that_rewrites_the_manifest_before_the_gate_fails_naming_workflow_and_step(repo: Repo) -> None:
-    # a2kay: `sed -i` over pyproject.toml stripped a path source before `uv sync`, so CI gated another dependency set.
-    repo.write(".github/workflows/ci.yml", _ci("sed -i '/a2kit/d' pyproject.toml\nuv sync"))
-    verdict, evidence = _verdict(repo, "gate.ci-no-manifest-edit")
-    assert verdict is Verdict.FAILING
-    assert "ci.yml" in evidence
-    assert "step 0" in evidence
-    assert "pyproject.toml" in evidence
-
-
-def test_ci_that_runs_the_gate_on_the_committed_manifest_passes(repo: Repo) -> None:
-    repo.write(".github/workflows/ci.yml", _ci("uv sync --locked\nnpm ci\nuv lock --check\nnpm install -g pnpm\necho hi > notes.txt"))
-    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.PASSING
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "uv lock",
-        "uv sync",
-        "uv sync --all-extras",
-        "uv add requests",
-        "npm install",
-        "npm i --no-audit",
-        "tee package.json < new.json",
-        "echo x >> uv.lock",
-    ],
-)
-def test_a_lock_or_manifest_rewriting_command_before_the_gate_fails(repo: Repo, command: str) -> None:
-    repo.write(".github/workflows/ci.yml", _ci(command))
-    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.FAILING
-
-
-def test_a_rewrite_after_the_gate_step_is_not_before_it(repo: Repo) -> None:
-    text = _ci("true") + "      - run: uv lock --upgrade\n"
-    repo.write(".github/workflows/ci.yml", text)
-    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.PASSING
-
-
-def test_a_block_run_step_is_read_line_by_line(repo: Repo) -> None:
-    text = _ci("true").replace("run: true", "run: |\n          uv --version\n          sed -i s/a/b/ pyproject.toml")
-    repo.write(".github/workflows/ci.yml", text)
-    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.FAILING
-
-
-def test_with_no_gate_step_in_any_workflow_every_step_counts(repo: Repo) -> None:
-    repo.write(".github/workflows/ci.yml", _ci("sed -i s/a/b/ pyproject.toml", gate=False))
-    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.FAILING
-
-
-def test_a_job_that_is_not_the_gate_is_left_alone_when_another_job_runs_it(repo: Repo) -> None:
-    release = "  release:\n    runs-on: ubuntu-latest\n    steps:\n      - run: uv lock --upgrade\n"
-    repo.write(".github/workflows/ci.yml", _ci("true") + release)
-    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.PASSING
-
-
-def test_no_workflows_means_the_manifest_check_does_not_apply(repo: Repo) -> None:
-    assert _verdict(repo, "gate.ci-no-manifest-edit")[0] is Verdict.NOT_APPLICABLE
-
-
-_NO_CI_ADR = (
-    "---\nid: 0003\ntitle: Builds on owner machines\nstatement: No CI; the gate runs on the owner's Mac and PC through the commit hook.\n"
+_HOOKS_ADR = (
+    "---\nid: 0003\ntitle: Builds on owner machines\nstatement: Hooks are the owner's own; the repo carries no hook config.\n"
     "concerns: [gate]\nstatus: accepted\ndecided_by: owner\nupdated: 2026-10-09\n---\n# 0003\n"
 )
-_NO_CI_OVERRIDE = (
-    '[[override]]\nid = "gate.ci"\ncode = "not-applicable"\nreason = "builds and the gate run on the owner machines, no CI"\nadr = "0003"\n'
+_HOOKS_OVERRIDE = (
+    '[[override]]\nid = "gate.hooks-recipe"\ncode = "not-applicable"\nreason = "the owner installs hooks by hand on each machine"\n'
+    'adr = "0003"\n'
 )
 
 
-def _lifesim_shaped(repo: Repo) -> None:
-    """A repo with a settled no-CI decision: a gate, an accepted ADR, no workflows."""
+def _owner_hooks_shaped(repo: Repo) -> None:
+    """A repo with a settled decision: a gate, an accepted ADR, no hook config."""
     repo.write("Makefile", "check:\n\ttrue\n")
-    repo.write("docs/adr/0003-builds-on-owner-machines.md", _NO_CI_ADR)
+    repo.write("docs/adr/0003-builds-on-owner-machines.md", _HOOKS_ADR)
 
 
-def test_no_ci_is_judged_as_before_without_an_override(repo: Repo) -> None:
-    _lifesim_shaped(repo)
-    assert _verdict(repo, "gate.ci")[0] is Verdict.NOT_SET_UP
+def test_a_decided_gap_is_judged_as_before_without_an_override(repo: Repo) -> None:
+    _owner_hooks_shaped(repo)
+    assert _verdict(repo, "gate.hooks-recipe")[0] is Verdict.NOT_SET_UP
 
 
-def test_a_settled_no_ci_decision_is_an_adr_backed_override_that_never_expires(repo: Repo) -> None:
-    _lifesim_shaped(repo)
-    repo.write("docs/blueprint/blueprint.toml", _NO_CI_OVERRIDE)
+def test_a_settled_decision_is_an_adr_backed_override_that_never_expires(repo: Repo) -> None:
+    _owner_hooks_shaped(repo)
+    repo.write("docs/blueprint/blueprint.toml", _HOOKS_OVERRIDE)
     result = run(repo.root, concern="gate", env=repo.env, today=date(2099, 1, 1))
     rows = {r.id: r for r in result.rows}
-    assert rows["gate.ci"].verdict is Verdict.PASSING
-    assert "ADR 0003" in rows["gate.ci"].evidence
-    assert rows["gate.ci-no-manifest-edit"].verdict is Verdict.NOT_APPLICABLE
+    assert rows["gate.hooks-recipe"].verdict is Verdict.PASSING
+    assert "ADR 0003" in rows["gate.hooks-recipe"].evidence
     assert result.problems == ()
 
 
-def test_a_no_ci_override_naming_a_missing_adr_is_a_problem_the_gate_reports(repo: Repo) -> None:
+def test_an_override_naming_a_missing_adr_is_a_problem_the_gate_reports(repo: Repo) -> None:
     repo.write("Makefile", "check:\n\ttrue\n")
-    repo.write("docs/blueprint/blueprint.toml", _NO_CI_OVERRIDE)
+    repo.write("docs/blueprint/blueprint.toml", _HOOKS_OVERRIDE)
     result = run(repo.root, concern="gate", env=repo.env)
-    assert {r.id: r for r in result.rows}["gate.ci"].verdict is Verdict.NOT_SET_UP
+    assert {r.id: r for r in result.rows}["gate.hooks-recipe"].verdict is Verdict.NOT_SET_UP
     assert any("ADR 0003" in p for p in result.problems)
     assert result.exit_code == 1
 
@@ -401,7 +329,7 @@ def _remote_branch(repo: Repo, name: str, files: dict[str, str]) -> None:
 def test_a_gate_row_names_a_remote_branch_ahead_that_holds_gate_files(repo: Repo) -> None:
     _remote_branch(repo, "wip/bootstrap", {"justfile": "check:\n\ttrue\n", "lefthook.yml": "x: 1\n", "src/a.py": ""})
     rows = {r.id: r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows}
-    for check_id in ("gate.one-command", "gate.ci"):
+    for check_id in ("gate.one-command", "gate.hooks-recipe"):
         row = rows[check_id]
         assert row.verdict is Verdict.NOT_SET_UP
         assert "origin/wip/bootstrap" in row.evidence
@@ -434,7 +362,7 @@ def test_a_branch_already_merged_into_main_is_not_flagged(repo: Repo) -> None:
     repo.commit()
     repo.git("update-ref", "refs/remotes/origin/old", "main")
     repo.git("update-ref", "refs/remotes/origin/main", "main")
-    row = {r.id: r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows}["gate.ci"]
+    row = {r.id: r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows}["gate.hooks-recipe"]
     assert "origin/old" not in row.evidence
 
 
@@ -623,86 +551,6 @@ def test_an_edited_copy_of_a_recipe_needs_its_own_test(repo: Repo) -> None:
     repo.write("Makefile", "check: images\nimages:\n\tpython3 -I tools/check_dockerfile_pins.py\n")
     repo.write("tools/check_dockerfile_pins.py", _pins_recipe() + "\n# local change\n")
     assert _verdict(repo, "gate.guards-have-red-tests")[0] is Verdict.FAILING
-
-
-# 2026-10-12: the shelf's CI was red on every push for hours and no row said so.
-def _gh_runs(repo: Repo, runs: list[dict[str, str]]) -> None:
-    # A fake gh first on PATH, so no test asks GitHub; the origin names the repo it would ask about.
-    repo.git("remote", "add", "origin", "git@github.com:owner/app.git")
-    repo.fake_tool(repo.bin_dir / "gh", json.dumps(runs))
-
-
-def _ci_green(repo: Repo) -> tuple[Verdict, str]:
-    repo.write(".github/workflows/check.yml", "on: [push]\n")
-    rows = {r.id: r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows}
-    return rows["gate.ci-green"].verdict, rows["gate.ci-green"].evidence
-
-
-def test_the_default_branch_head_green_in_ci_passes(repo: Repo) -> None:
-    _gh_runs(
-        repo,
-        [
-            {"workflowName": "check", "headSha": "abc1234", "status": "completed", "conclusion": "success", "event": "push"},
-            {"workflowName": "check", "headSha": "old0000", "status": "completed", "conclusion": "failure", "event": "push"},
-        ],
-    )
-    assert _ci_green(repo)[0] is Verdict.PASSING
-
-
-def test_a_red_workflow_on_the_default_branch_head_fails_and_is_named(repo: Repo) -> None:
-    _gh_runs(
-        repo,
-        [
-            {"workflowName": "check", "headSha": "abc1234", "status": "completed", "conclusion": "failure", "event": "push"},
-            {"workflowName": "image", "headSha": "abc1234", "status": "completed", "conclusion": "success", "event": "push"},
-            {
-                "workflowName": "Dependabot Updates",
-                "headSha": "abc1234",
-                "status": "completed",
-                "conclusion": "failure",
-                "event": "dynamic",
-            },
-        ],
-    )
-    verdict, evidence = _ci_green(repo)
-    assert verdict is Verdict.FAILING
-    assert "check" in evidence
-    assert "abc1234" in evidence
-    assert "Dependabot" not in evidence
-
-
-def test_a_pushed_head_with_no_run_yet_is_not_judged_by_an_older_green(repo: Repo) -> None:
-    # a2kay 2026-10-12: right after a push, the newest run on main is still the previous commit's.
-    _gh_runs(repo, [{"workflowName": "check", "headSha": "old0000", "status": "completed", "conclusion": "success", "event": "push"}])
-    repo.write(".github/workflows/check.yml", "on: [push]\n")
-    repo.commit()
-    repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
-    head = repo.git("rev-parse", "--short=7", "HEAD").strip()
-    verdict, evidence = _ci_green(repo)
-    assert verdict is Verdict.NOT_CHECKED
-    assert f"no CI run on {head} yet" in evidence
-
-
-def test_a_run_still_going_is_not_checked(repo: Repo) -> None:
-    _gh_runs(repo, [{"workflowName": "check", "headSha": "abc1234", "status": "in_progress", "conclusion": "", "event": "push"}])
-    assert _ci_green(repo)[0] is Verdict.NOT_CHECKED
-
-
-def test_a_repo_not_on_github_is_not_checked_never_a_pass(repo: Repo) -> None:
-    assert _ci_green(repo)[0] is Verdict.NOT_CHECKED
-
-
-def test_gh_failing_is_not_checked_never_a_pass(repo: Repo) -> None:
-    repo.git("remote", "add", "origin", "git@github.com:owner/app.git")
-    (repo.bin_dir / "gh").write_text("#!/bin/sh\necho 'not logged in' >&2\nexit 4\n")
-    (repo.bin_dir / "gh").chmod(0o755)
-    verdict, evidence = _ci_green(repo)
-    assert verdict is Verdict.NOT_CHECKED
-    assert "gh auth login" in evidence
-
-
-def test_ci_green_is_audit_only(repo: Repo) -> None:
-    assert "gate.ci-green" not in {r.id for r in run(repo.root, concern="gate", env=repo.env).rows}
 
 
 def test_clean_clone_does_not_count_a_dirty_submodule_as_uncommitted(repo: Repo, tmp_path: Path) -> None:

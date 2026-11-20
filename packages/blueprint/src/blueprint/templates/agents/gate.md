@@ -1,12 +1,12 @@
 # The gate
 
-One command decides done. Humans, agents, hooks and CI all call the same one.
+One command decides done. Humans, agents and hooks all call the same one.
 
 | item | value |
 |---|---|
 | Command | `just check` |
 | Runs | format check, lint, types, spelling, dependency hygiene, tests with coverage, architecture rules, `just blueprint` (the stack list is in the stack file) |
-| Passes when | exit 0; cross-file checks cover the whole repo, per-file linters the changed files (CI: everything), nothing else skipped |
+| Passes when | exit 0; cross-file checks cover the whole repo, per-file linters the changed files, nothing else skipped |
 
 ## Changed files and the whole repo
 
@@ -14,7 +14,7 @@ Locally, a linter that judges one file at a time (formatter, per-file linter, sh
 the files changed against the base: committed on the branch, staged, unstaged, untracked and not ignored; never a
 deleted one. A linter with nothing to look at is skipped and says so in one line. A change to a linter's own
 config runs it over everything. A check that reads across files (types, architecture, dependencies) always
-covers the whole repo, and so does the gate in CI (`just check-all`). No base found means everything runs.
+covers the whole repo, and so does `just check-all`. No base found means everything runs.
 
 **Run `just check` while working; `just check-all` is rare.** `check` runs the tests the change reaches and skips any suite that already
 passed on the same input, so a normal change takes seconds to a minute. `check-all` runs every test in every package with the coverage floor,
@@ -37,12 +37,12 @@ lint-changed:
 ```
 
 `spell-changed` is the same with `--config .codespellrc` and `xargs -0 uv run codespell < "$list"`. Keep the whole-repo
-`lint` and `spell`; `check-all` and CI call those.
+`lint` and `spell`; `check-all` calls those.
 
 ## The runner
 
 The gate is a `justfile`, and `just` is the runner (shelf ADR 0023). Pin it per repo: Python `uv add --dev rust-just`,
-run as `uv run just check`; other stacks `uvx rust-just@<version>`, brew, or a CI setup action. A gate that is only a
+run as `uv run just check`; other stacks `uvx rust-just@<version>` or brew. A gate that is only a
 Makefile fails `gate.runner`. Three rules keep the file readable by blueprint, which dumps the graph with
 `just --dump --dump-format json`:
 
@@ -101,16 +101,12 @@ Every tool the repo runs (uv, just, prek, bd, git-lfs, an engine editor) is pinn
 `mise.lock`; never install one with brew, apt or a curl script for this repo. A bump is a commit: edit the version, run
 `mise lock`, commit both. `.python-version` (uv) and `global.json` (.NET) keep their own pins; mise does not pin them again.
 
-## CI
+## No CI
 
-CI runs `just check` and nothing else of its own. A CI step missing from `just check` is a gate gap: move it in.
-CI gates the committed dependency set: install from the lockfile (`uv sync --locked`, `npm ci`), and let no step
-before the gate edit a manifest or re-lock (`sed -i` on `pyproject.toml`, `uv lock`, `npm install`). A patch CI needs
-is a commit.
-CI reads the beads database before the gate: `bd bootstrap` with git's HTTPS rewrite of the SSH remote in its env
-(`GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0`, `GIT_CONFIG_VALUE_0=ssh://git@github.com/`). A public repo rewrites to
-`url.https://github.com/.insteadOf`; a private one carries the job token,
-`url.https://x-access-token:${{ github.token }}@github.com/.insteadOf`, or the anonymous clone asks for a username.
+No repository has GitHub Actions CI (shelf ADR 0027). The gate runs locally: the pre-push hook and `just check` on the
+machine that pushes are the only enforcement, so run `just check` before every push and never skip the hook. A
+`.github/workflows` or `.github/actions` folder fails `gate.no-ci`: delete it. A duty a workflow carried that is not CI
+(image publish, deploy, a scheduled eval) becomes a local command or waits for an owner decision; never keep a workflow to hold it.
 
 ## Exceptions
 
