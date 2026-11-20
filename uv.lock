@@ -1389,7 +1389,7 @@ wheels = [
 
 [[package]]
 name = "blueprint"
-version = "0.9.1"
+version = "0.10.0"
 source = { editable = "packages/blueprint" }
 
 [package.dev-dependencies]

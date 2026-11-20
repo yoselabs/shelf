@@ -1,8 +1,11 @@
 # Changelog
 
-## 0.9.0
+## 0.10.0
 
 - **Breaking: `secret_scan.scan(repo, mode)` and `Mode` are gone.** `scan_staged(repo)`, `scan_range(repo)` and `scan_full(repo)` are the three scans; `python -m blueprint.secret_scan staged|range|full` is unchanged.
+- `stack.shelf-sources` fails mixed shelf tags/spellings and re-pinning overrides; `init` normalizes them.
+- Gate steps declare their inputs (`gate-inputs.toml`); an unaffected step is not started; new `gate.step-inputs` audit row. `stack.agent-cli-pins` added.
+- The knowledge, ADR and agent-docs checks moved to the `any-knowledge` package.
 
 ## 0.8.0
 
