@@ -33,7 +33,7 @@ _STACKS = {
     "python": ("python", ("lint", "typecheck", "spell", "deps", "test")),
     "shell": ("shell", ("scripts",)),
 }
-_COMMON_STEPS = ("guard", "preset", "render", "blueprint")
+_COMMON_STEPS = ("guard", "preset", "render", "blueprint", "secrets")
 
 
 def _stack_parts(repo: Path) -> list[tuple[str, tuple[str, ...]]]:

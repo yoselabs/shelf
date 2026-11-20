@@ -7,7 +7,7 @@
 # The gate: every step at once (`steps`), one timing line, a warning for a step over its budget. A green run records the tree it
 # checked (any-gate), so the pre-push hook does not run it again on that tree.
 [group('gate')]
-check: gate-start beads-lint (steps "guard" "preset" "render" "blueprint" "lint" "typecheck" "spell" "deps" "test") check-extra
+check: gate-start beads-lint (steps "guard" "preset" "render" "blueprint" "secrets" "lint" "typecheck" "spell" "deps" "test") check-extra
     uv run python -m any_gate passed --gate check
 
 # Extension point: a repo defines `check-extra` in its own justfile to run one more thing in the gate (after the steps, before the record).
@@ -47,6 +47,17 @@ steps +names:
 [group('gate')]
 blueprint:
     uv run blueprint check --repo . --gate
+
+# Secrets in the code this branch changed: gitleaks (pinned in mise.toml) over the commits since the upstream merge-base plus the staged,
+# unstaged and untracked work. The commit hook scans only the index and a hook can be skipped; this is the enforcement.
+[group('gate')]
+secrets:
+    uv run python -m blueprint.secret_scan range
+
+# The same over all history: for a release gate, never per commit.
+[group('gate')]
+secrets-all:
+    uv run python -m blueprint.secret_scan full
 
 # The commit guard as a gate, not only a hook: a hook is per-clone and silently disabled by anything that claims core.hooksPath.
 # Reads HEAD (an uncommitted local override is the supported co-development workflow). Exit 2 means it could not run: never a pass.
