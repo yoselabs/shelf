@@ -36,6 +36,10 @@ any-yaml = { workspace = true }
 any-speech = { workspace = true }
 any-pipeline = { workspace = true }
 any-lease = { workspace = true }
+# any-work composes any-lease, any-failure-fp and sqlite-store.
+any-work = { workspace = true }
+any-failure-fp = { workspace = true }
+sqlite-store = { workspace = true }
 content-digest = { workspace = true }
 app-dirs = { workspace = true }
 verb-cli = { workspace = true }
@@ -297,6 +301,7 @@ testpaths = [
     "packages/any-json-doc/tests",
     "packages/any-path-glob/tests",
     "packages/any-failure-fp/tests",
+    "packages/any-work/tests",
     "packages/any-shell-policy/tests",
     "packages/any-net/tests",
     "packages/any-clock/tests",
@@ -406,6 +411,7 @@ root_packages = [
     "any_json_doc",
     "any_path_glob",
     "any_failure_fp",
+    "any_work",
     "any_shell_policy",
     "any_net",
     "any_clock",
@@ -500,6 +506,7 @@ source_modules = [
     "any_json_doc",
     "any_path_glob",
     "any_failure_fp",
+    "any_work",
     "any_shell_policy",
     "any_net",
     "any_clock",
@@ -596,6 +603,7 @@ modules = [
     "any_json_doc",
     "any_path_glob",
     "any_failure_fp",
+    "any_work",
     "any_shell_policy",
     "any_net",
     "any_clock",
@@ -637,6 +645,10 @@ ignore_imports = [
     "page_tsv.page -> lean_wire",
     "page_tsv.render -> lean_wire",
     "any_lease.leases -> process_lock",
+    "any_work.model -> any_failure_fp.fingerprint",
+    "any_work.work -> any_failure_fp.backoff",
+    "any_work.work -> any_lease",
+    "any_work.work -> sqlite_store",
     "any_yaml -> yaml_merge",
     "any_yaml.write -> yaml_merge",
     "any_yaml.write -> atomic_io",

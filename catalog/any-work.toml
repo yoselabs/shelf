@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-work"
+kind = "any-lib"
+tier = "T1"
+release = "any-work-v0.1.0"
+capability = "Stop hand-rolling the 'which keys are left, which failed, retry when' loop of a long job: a SQLite work table (add idempotent, claim the next due key under a per-key flock, finish ok or with a transient/permanent/unknown failure, progress and retry queries) and a drain loop that exits when idle."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Opus verdict 2026-11-20: three hand-rolled loops in channel-research (.fail files, retry logs, shard stalls) are the trigger. Composes sqlite-store, any-lease (>=0.2, try_claim) and any-failure-fp; does not import any-pipeline. No running status: liveness is the flock. Single host, many processes, POSIX. Handlers commit their result before returning ok (the two-truths rule, README). Capped at add/claim/finish/progress/drain: no queue, DAG, cron, watcher or dashboard. Stacks on any-lease 0.2.0, which must be merged and tagged first. Born candidate; no release tag created by this change."
