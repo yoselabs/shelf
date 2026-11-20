@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Guard: refuse a LOCAL shelf source, as a commit hook and as a gate.
 
 The shelf is consumed by git+tag so a consumer builds anywhere. A local
@@ -24,8 +23,7 @@ Note what neither mode reads: the **working tree**. An uncommitted local overrid
 is exactly the supported co-development workflow (``docs/consuming-the-shelf.md``
 §1), so failing on it would break the thing the docs tell you to do.
 
-Wire it via pre-commit (``.pre-commit-hooks.yaml`` at the shelf root), as a
-native git hook, or as ``just guard`` — see ``docs/consuming-the-shelf.md`` §2.
+Run as `blueprint guard` (the hook and `just guard` both call it).
 
 Exit codes: ``0`` clean · ``1`` offenders found · ``2`` could not check (not a
 git repository). A check that cannot run is never reported as a pass.
@@ -33,13 +31,16 @@ git repository). A check that cannot run is never reported as a pass.
 
 from __future__ import annotations
 
-import argparse
 import subprocess
 import sys
 import tomllib
 
 SHELF_MARKER = "shelf"
 COULD_NOT_CHECK = 2
+
+
+def _say(text: str) -> None:
+    sys.stderr.write(text + "\n")
 
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -55,9 +56,7 @@ def _staged_pyproject() -> str | None:
 def _committed_pyproject() -> str | None:
     """The pyproject.toml content at HEAD, or None if there is nothing to read.
 
-    None covers two legitimately-clean cases — a repo with no commits yet, and a
-    HEAD carrying no pyproject.toml. Neither is an offense: nothing has been
-    committed that could poison a checkout.
+    None covers two legitimately-clean cases: a repo with no commits yet, and a HEAD carrying no pyproject.toml. Neither is an offense.
     """
     if _git("rev-parse", "HEAD").returncode != 0:
         return None
@@ -73,19 +72,13 @@ def _is_local_shelf_source(src: object) -> bool:
     return is_local and references_shelf
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--staged", action="store_true", help="check the index (default; the hook's question)")
-    mode.add_argument("--committed", action="store_true", help="check HEAD (the gate's question)")
-    args = parser.parse_args(argv)
-
+def check(*, committed: bool) -> int:
+    """The exit code of `blueprint guard`: 0 clean, 1 offenders, 2 could not check."""
     if _git("rev-parse", "--git-dir").returncode != 0:
-        print("✖ cannot check for a local shelf source: not a git repository.", file=sys.stderr)
-        print("  This is NOT a pass — the guard could not run at all.", file=sys.stderr)
+        _say("✖ cannot check for a local shelf source: not a git repository.")
+        _say("  This is NOT a pass — the guard could not run at all.")
         return COULD_NOT_CHECK
 
-    committed = args.committed
     content = _committed_pyproject() if committed else _staged_pyproject()
     if content is None:
         return 0
@@ -94,8 +87,8 @@ def main(argv: list[str] | None = None) -> int:
         parsed = tomllib.loads(content)
     except tomllib.TOMLDecodeError as exc:
         where = "HEAD's" if committed else "the staged"
-        print(f"✖ cannot check for a local shelf source: {where} pyproject.toml is not valid TOML ({exc}).", file=sys.stderr)
-        print("  This is NOT a pass — the guard could not run at all.", file=sys.stderr)
+        _say(f"✖ cannot check for a local shelf source: {where} pyproject.toml is not valid TOML ({exc}).")
+        _say("  This is NOT a pass — the guard could not run at all.")
         return COULD_NOT_CHECK
 
     sources = parsed.get("tool", {}).get("uv", {}).get("sources", {})
@@ -104,17 +97,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     where = "HEAD carries" if committed else "refusing to commit"
-    print(f"✖ {where} a LOCAL shelf source (uncommitted co-dev only):", file=sys.stderr)
+    _say(f"✖ {where} a LOCAL shelf source (uncommitted co-dev only):")
     for name in offenders:
-        print(f"    [tool.uv.sources] {name}  →  path/editable", file=sys.stderr)
+        _say(f"    [tool.uv.sources] {name}  →  path/editable")
     if committed:
-        print("  A committed local source ties this repo to one filesystem.", file=sys.stderr)
-        print("  Repoint to a git+tag pin and commit the fix.", file=sys.stderr)
+        _say("  A committed local source ties this repo to one filesystem.")
+        _say("  Repoint to a git+tag pin and commit the fix.")
     else:
-        print("  Revert these to a git+tag pin before committing.", file=sys.stderr)
-    print("  See the shelf's docs/consuming-the-shelf.md. (This guard is not overridable by design.)", file=sys.stderr)
+        _say("  Revert these to a git+tag pin before committing.")
+    _say("  See the shelf's docs/consuming-the-shelf.md. (This guard is not overridable by design.)")
     return 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

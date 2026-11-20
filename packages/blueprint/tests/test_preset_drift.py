@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
+import tomllib
+from typing import TYPE_CHECKING
 
 import pytest
+from blueprint import preset
 
-DRIFT = Path(__file__).resolve().parents[1] / "tools" / "preset_drift.py"
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _SHELF = """\
 [tool.ruff.lint]
@@ -41,8 +44,11 @@ def _write(root: Path, pyproject: str, justfile: str = _JUSTFILE) -> Path:
 
 
 def _run(repo: Path, shelf: Path) -> subprocess.CompletedProcess[str]:
+    reference = shelf / "reference.toml"
+    if (shelf / "pyproject.toml").is_file():
+        reference.write_text(preset.render(preset.snapshot(shelf)))
     return subprocess.run(
-        [sys.executable, str(DRIFT), "--repo", str(repo), "--shelf-home", str(shelf)],
+        [sys.executable, "-m", "blueprint", "preset", "--repo", str(repo), "--reference", str(reference)],
         capture_output=True,
         text=True,
         check=False,
@@ -154,9 +160,28 @@ def test_unreadable_config_is_not_a_pass(tmp_path: Path, shelf: Path) -> None:
 
 
 def test_the_shelf_does_not_compare_against_itself(shelf: Path) -> None:
-    result = _run(shelf, shelf)
+    # The shelf is the repo holding the snapshot in its blueprint package.
+    (shelf / "packages" / "blueprint" / "src" / "blueprint").mkdir(parents=True)
+    (shelf / "packages" / "blueprint" / "src" / "blueprint" / "preset.toml").write_text("")
+    result = subprocess.run(
+        [sys.executable, "-m", "blueprint", "preset", "--repo", str(shelf)], capture_output=True, text=True, check=False
+    )
     assert result.returncode == 0
     assert "this IS the shelf" in result.stdout
+
+
+def test_a_consumer_is_compared_with_the_packaged_snapshot_by_default(tmp_path: Path) -> None:
+    consumer = _write(tmp_path / "consumer", _SHELF)
+    result = subprocess.run(
+        [sys.executable, "-m", "blueprint", "preset", "--repo", str(consumer)], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 1  # a three-rule config is far from the shelf's
+    assert "missing" in result.stderr
+
+
+def test_a_snapshot_round_trips_through_its_text(shelf: Path) -> None:
+    snap = preset.snapshot(shelf)
+    assert tomllib.loads(preset.render(snap)) == snap
 
 
 def test_a_shelf_only_target_missing_from_a_consumer_is_not_drift(tmp_path: Path) -> None:

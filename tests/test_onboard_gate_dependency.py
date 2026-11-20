@@ -18,6 +18,14 @@ SOURCE = {
 }
 
 
+def test_blueprint_is_added_the_same_way_with_its_own_tag(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "c"\nversion = "0.1.0"\n')
+    ensure_gate_dependency(tmp_path)
+    data = tomllib.loads((tmp_path / "pyproject.toml").read_text())
+    assert "blueprint" in data["dependency-groups"]["dev"]
+    assert data["tool"]["uv"]["sources"]["blueprint"] == {**SOURCE, "subdirectory": "packages/blueprint", "tag": "blueprint-v0.1.0"}
+
+
 def _wired(repo: Path) -> tuple[list[str], dict[str, object]]:
     data = tomllib.loads((repo / "pyproject.toml").read_text())
     return data["dependency-groups"]["dev"], data["tool"]["uv"]["sources"]["any-gate"]
@@ -59,8 +67,10 @@ def test_a_repo_that_pinned_it_another_way_is_left_alone(tmp_path: Path) -> None
         '[tool.uv.sources]\nany-gate = { path = "../shelf/packages/any-gate" }\n'
     )
     (tmp_path / "pyproject.toml").write_text(text)
-    assert not ensure_gate_dependency(tmp_path)
-    assert (tmp_path / "pyproject.toml").read_text() == text
+    ensure_gate_dependency(tmp_path)  # blueprint is added; the repo's own any-gate pin stays as it wrote it
+    data = tomllib.loads((tmp_path / "pyproject.toml").read_text())
+    assert data["tool"]["uv"]["sources"]["any-gate"] == {"path": "../shelf/packages/any-gate"}
+    assert data["dependency-groups"]["dev"].count("any-gate>=0.1") == 1
 
 
 def test_a_repo_without_a_pyproject_gets_nothing(tmp_path: Path) -> None:

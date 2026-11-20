@@ -10,8 +10,8 @@ Beads with acceptance criteria; tests first; Done = `just check` green over the 
       before a consumer is onboarded or re-onboarded. A repo with no python runs the gate hook plainly.
 - [ ] 5. Core: run guard and lock/slots (see `gate-test-loop` D4); extraction reads task-loop history at 5a940722b; tests written first.
 - [x] 6. Python adapter: workspace graph, `uv export` fingerprint, selection, in `any-gate-python`; `tools/affected.py` is deleted. The shelf's own path rules are `[tool.any-gate.python]` in the root pyproject.
-- [ ] 7. `blueprint` CLI verbs (`check`, `test`, `render`) over the core; the guard hook entry that needs no shelf clone.
-- [ ] 8. Move or declare every script in `tools/` and `recipes/` per the inventory; delete the duplicates in `recipes/`.
+- [~] 7. `blueprint` verbs `guard` and `preset` (with `check`) are clone-free: consumers get `blueprint` as a dev dependency pinned by git tag (`blueprint-v0.1.0`, THE TAG MUST EXIST), and the hook and recipe entries call `uv run blueprint ...`. `preset` compares against `preset.toml`, a snapshot of the shelf's own config packaged in blueprint (`blueprint preset --refresh`; a test fails when stale). Open: the `test` and `render` verbs (the rendered justfile is the `blueprint-multi-stack-contracts` mission).
+- [x] 8. `tools/preset_drift.py` and `tools/hooks/forbid-local-shelf-source.py` moved into `blueprint` (`preset.py`, `guard.py`); the shelf's `.pre-commit-hooks.yaml` is deleted (onboarding writes the consumer's hooks). No byte-identical copies remain between `tools/` and `recipes/`; what stays in `tools/` is shelf repo content (`size_caps`, `arch_rules`, `catalog`, `blueprint_fitness`, `onboard/`).
 - [ ] 9. Shelf adopts its own packages (workspace edges); `just check` and the pre-push hook call the new verbs; remove `tools/affected.py`, `changed.py`, `gate_state.py`.
 - [ ] 10. Migrate a2kay, then task-loop, then OGY (each its own session and PR in that repo; owner approves each).
 - [ ] 11. Write the second adapter's capability list for .NET against `dotnet.toml` and confirm nothing in the core is Python-shaped.

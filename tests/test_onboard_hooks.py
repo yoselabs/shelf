@@ -28,16 +28,16 @@ def repo(tmp_path: Path) -> Path:
 
 def test_the_config_runs_bd_first_then_the_shelf_checks_then_the_gate() -> None:
     text = config_text(beads=True, python=True)
-    order = [text.index(s) for s in ("bd hooks run pre-commit", "forbid-local-shelf-source", "ruff check", "-- uv run just check")]
+    order = [text.index(s) for s in ("bd hooks run pre-commit", "blueprint guard", "ruff check", "-- uv run just check")]
     assert order == sorted(order)
     assert "default_install_hook_types" in text
 
 
-def test_without_beads_or_python_the_config_carries_neither() -> None:
+def test_without_beads_or_python_the_config_carries_none_of_their_hooks() -> None:
     text = config_text(beads=False, python=False)
     assert "bd hooks run" not in text
     assert "ruff check" not in text
-    assert "forbid-local-shelf-source" in text
+    assert "blueprint guard" not in text  # the guard reads pyproject.toml: a python tool
 
 
 @pytest.mark.skipif(shutil.which("prek") is None and shutil.which("uvx") is None, reason="prek is not available")

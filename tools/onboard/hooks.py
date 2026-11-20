@@ -31,16 +31,14 @@ _CONFIG = ".pre-commit-config.yaml"
 _BEADS_MARKER = "BEGIN BEADS INTEGRATION"
 _GATE_BLOCK = "- repo: local\n  hooks:\n  - id: gate\n"
 
-# The shelf consumer's own fast checks, between bd's entries and the gate. The guard is resolved the
-# same way `just guard` does it, so a consumer needs no copy of the script.
+# The shelf consumer's own fast checks, between bd's entries and the gate. The guard is `blueprint guard`, a dev dependency,
+# so a consumer needs no shelf clone.
 _SHELF_HOOKS = """# The shelf's commit guard and ruff on staged files (shelf onboarding).
 - repo: local
   hooks:
   - id: shelf-guard
     name: no local shelf source
-    entry: >-
-      sh -c 'g="${SHELF_HOME:-../shelf}/tools/hooks/forbid-local-shelf-source.py";
-      [ -f "$g" ] || g="$HOME/Workspaces/shelf/tools/hooks/forbid-local-shelf-source.py"; python3 "$g"'
+    entry: uv run blueprint guard
     language: system
     always_run: true
     pass_filenames: false
@@ -66,54 +64,72 @@ def config_text(*, beads: bool, python: bool) -> str:
     head, gate = recipe.split(_GATE_BLOCK, 1)
     if not beads:
         head = head[: head.index("repos:")] + "repos:\n"
-    shelf = _SHELF_HOOKS if python else _SHELF_HOOKS.split("  - id: ruff-check", 1)[0]
+    shelf = _SHELF_HOOKS if python else ""  # the guard and ruff are python tools: a repo with none gets neither
     if not python:  # any-gate is a python package: a repo with none runs the gate plainly, with no skip of a tree that passed
         gate = gate.replace(_GATE_ENTRY, "just check")
     return head + shelf + _GATE_BLOCK + gate
 
 
-GATE_SPEC = '{ git = "https://github.com/yoselabs/shelf", subdirectory = "packages/any-gate", tag = "any-gate-v0.1.0" }'
+_REPO = "https://github.com/yoselabs/shelf"
+# The shelf packages a consumer's gate runs, pinned by git tag: `any-gate` (tree record, pre-push skip, test runner) and `blueprint` (the
+# `guard`, `preset` and `check` steps). A consumer needs no shelf clone.
+GATE_PACKAGES = {"any-gate": "any-gate-v0.1.0", "blueprint": "blueprint-v0.1.0"}
+
+
+def package_spec(name: str) -> str:
+    return f'{{ git = "{_REPO}", subdirectory = "packages/{name}", tag = "{GATE_PACKAGES[name]}" }}'
+
+
+GATE_SPEC = package_spec("any-gate")
 _GATE_ENTRY = "uv run python -m any_gate pre-push --gate check -- uv run just check"
 _DEV_GROUP = re.compile(r"^dev\s*=\s*\[", re.MULTILINE)
 
 
-def _into_dev_group(text: str) -> str:
-    """`text` with `"any-gate"` first in the `dev` list of `[dependency-groups]`, whether the list is on one line or several."""
+def _into_dev_group(text: str, name: str) -> str:
+    """`text` with `name` first in the `dev` list of `[dependency-groups]`, whether the list is on one line or several."""
     opened = _DEV_GROUP.search(text)
     if opened is None:
         return text
     rest_of_line = text[opened.end() :].split("\n", 1)[0]
-    entry = '"any-gate", ' if "]" in rest_of_line else '\n    "any-gate",'
+    entry = f'"{name}", ' if "]" in rest_of_line else f'\n    "{name}",'
     return text[: opened.end()] + entry + text[opened.end() :]
 
 
-def ensure_gate_dependency(repo: Path) -> bool:
-    """Make `any-gate` (the gate's tree record, pre-push skip and test runner) a dev dependency of a python+uv repo, pinned by git tag.
+def _ensure_dependency(text: str, name: str) -> str:
+    """`text` with `name` a dev dependency sourced by its git tag; unchanged when it already is."""
+    data = tomllib.loads(text)
+    group = [d for d in data.get("dependency-groups", {}).get("dev", []) if isinstance(d, str)]
+    wired = any(d.split("[")[0].split(">")[0].split("=")[0].strip() == name for d in group)
+    sourced = name in data.get("tool", {}).get("uv", {}).get("sources", {})
+    if not wired:
+        if "dependency-groups" not in data:
+            text = text.rstrip("\n") + f'\n\n[dependency-groups]\ndev = ["{name}"]\n'
+        elif "dev" not in data["dependency-groups"]:
+            text = text.replace("[dependency-groups]\n", f'[dependency-groups]\ndev = ["{name}"]\n', 1)
+        else:
+            text = _into_dev_group(text, name)
+    if not sourced:
+        if "[tool.uv.sources]" in text:
+            text = text.replace("[tool.uv.sources]\n", f"[tool.uv.sources]\n{name} = {package_spec(name)}\n", 1)
+        else:
+            text = text.rstrip("\n") + f"\n\n[tool.uv.sources]\n{name} = {package_spec(name)}\n"
+    return text
 
-    True when pyproject.toml changed. The hook entry and the `check` and `test` recipes run `uv run python -m any_gate`, which needs it.
+
+def ensure_gate_dependency(repo: Path) -> bool:
+    """Make the gate's shelf packages (`any-gate`, `blueprint`) dev dependencies of a python+uv repo, pinned by git tag.
+
+    True when pyproject.toml changed. The hook entries and the `check`, `test`, `guard`, `preset` and `blueprint` recipes run them.
     """
     pyproject = repo / "pyproject.toml"
     if not pyproject.is_file():
         return False
-    text = pyproject.read_text()
-    data = tomllib.loads(text)
-    group = [d for d in data.get("dependency-groups", {}).get("dev", []) if isinstance(d, str)]
-    wired = any(d.split("[")[0].split(">")[0].split("=")[0].strip() == "any-gate" for d in group)
-    sourced = "any-gate" in data.get("tool", {}).get("uv", {}).get("sources", {})
-    if wired and sourced:
+    before = pyproject.read_text()
+    text = before
+    for name in GATE_PACKAGES:
+        text = _ensure_dependency(text, name)
+    if text == before:
         return False
-    if not wired:
-        if "dependency-groups" not in data:
-            text = text.rstrip("\n") + '\n\n[dependency-groups]\ndev = ["any-gate"]\n'
-        elif "dev" not in data["dependency-groups"]:
-            text = text.replace("[dependency-groups]\n", '[dependency-groups]\ndev = ["any-gate"]\n', 1)
-        else:
-            text = _into_dev_group(text)
-    if not sourced:
-        if "[tool.uv.sources]" in text:
-            text = text.replace("[tool.uv.sources]\n", f"[tool.uv.sources]\nany-gate = {GATE_SPEC}\n", 1)
-        else:
-            text = text.rstrip("\n") + f"\n\n[tool.uv.sources]\nany-gate = {GATE_SPEC}\n"
     tomllib.loads(text)  # never leave a pyproject that does not parse
     pyproject.write_text(text)
     return True

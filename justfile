@@ -81,16 +81,10 @@ steps +names:
 
 # The blueprint's per-commit checkpoints (packages/blueprint): one line per one that is not
 # passing. The audit-only ones (slow, or reading this clone's bd database) run in the
-# /blueprint audit, not here. Same resolution order as `guard`.
+# /blueprint audit, not here. `blueprint` is a dev dependency, so no shelf clone is needed.
 [group('gate')]
 blueprint:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    s=packages/blueprint/src
-    [ -d "$s/blueprint" ] || s="${SHELF_HOME:-../shelf}/packages/blueprint/src"
-    [ -d "$s/blueprint" ] || s="$HOME/Workspaces/shelf/packages/blueprint/src"
-    if [ -d "$s/blueprint" ]; then PYTHONPATH="$s" python3 -m blueprint check --repo . --gate
-    else echo "blueprint: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
+    uv run blueprint check --repo . --gate
 
 # The commit guard as a GATE, not only a hook. A pre-commit hook is per-clone and
 # can be silently disabled by anything that claims core.hooksPath -- beads, husky,
@@ -101,37 +95,21 @@ blueprint:
 # --committed reads HEAD, deliberately not the working tree: an *uncommitted* local
 # override is the supported co-development workflow (docs/consuming-the-shelf.md
 # §1), and a gate that failed on it would break the thing the docs prescribe.
-#
-# Consumers copy this recipe verbatim -- it finds the guard in-repo (the shelf) or
-# via $SHELF_HOME -> ../shelf -> ~/Workspaces/shelf (a consumer). Exit 2 means the
-# guard could not run, which is never treated as a pass.
+# Exit 2 means the guard could not run, which is never treated as a pass.
 [group('gate')]
 guard:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    g=tools/hooks/forbid-local-shelf-source.py
-    [ -f "$g" ] || g="${SHELF_HOME:-../shelf}/tools/hooks/forbid-local-shelf-source.py"
-    [ -f "$g" ] || g="$HOME/Workspaces/shelf/tools/hooks/forbid-local-shelf-source.py"
-    if [ -f "$g" ]; then python3 "$g" --committed
-    else echo "guard: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
+    uv run blueprint guard --committed
 
 # The linter preset, as a GATE. ADR 0004 makes this repo's config the preset and
 # says drift is "acceptable and visible" -- it was not visible. The onboarding copy is
 # append-only, so it reports "already current" for a repo missing whole rule families.
-# This fails on any difference from the preset that the consumer has not declared, with
-# a reason, in its own [tool.shelf-preset]. Inside the shelf it is a no-op: this repo IS
-# the preset, so there is nothing to compare against.
-#
-# Consumers copy this recipe verbatim, same resolution order as `guard`.
+# This fails on any difference from the preset (the snapshot packaged in blueprint) that
+# the consumer has not declared, with a reason, in its own [tool.shelf-preset]. Inside
+# the shelf it is a no-op: this repo IS the preset. After a change to the shelf's config
+# or recipes, `uv run blueprint preset --refresh` regenerates the snapshot.
 [group('gate')]
 preset:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    g=tools/preset_drift.py
-    [ -f "$g" ] || g="${SHELF_HOME:-../shelf}/tools/preset_drift.py"
-    [ -f "$g" ] || g="$HOME/Workspaces/shelf/tools/preset_drift.py"
-    if [ -f "$g" ]; then python3 "$g" --repo .
-    else echo "preset: shelf clone not found (set SHELF_HOME) -- CANNOT VERIFY, not a pass" >&2; exit 2; fi
+    uv run blueprint preset --repo .
 
 # The pinned tools (mise.toml, locked by mise.lock; ADR 0024). The user's own config is left out: its
 # unlocked tools (`latest`) would make `--locked` refuse the whole install.
