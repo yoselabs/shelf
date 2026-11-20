@@ -62,7 +62,7 @@ class Diarizer(Protocol):
     def diarize(self, audio: Path) -> Diarized: ...
 
 
-class Embedder(Protocol):
+class VoiceEmbedder(Protocol):
     identity: Identity
 
     def embed(self, audio: Path, *, start: float | None = None, end: float | None = None) -> Voice: ...

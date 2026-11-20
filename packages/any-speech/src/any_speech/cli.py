@@ -30,7 +30,7 @@ from any_speech.speech import Slots, Speech, default_out
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-    from any_speech.ports import Diarizer, Embedder, Transcriber
+    from any_speech.ports import Diarizer, Transcriber, VoiceEmbedder
 
 EngineName = Literal["fluidaudio", "parakeet-mlx"]
 APP = "any-speech"
@@ -72,7 +72,7 @@ def make_diarizer(s: Settings) -> Diarizer | None:
     return FluidAudioDiarizer(binary, runtime=runtime_of(binary), budget_gb=s.budget_gb)
 
 
-def make_embedder(s: Settings) -> Embedder:
+def make_embedder(s: Settings) -> VoiceEmbedder:
     from any_speech.adapters import SherpaEmbedder  # noqa: PLC0415
 
     if s.voice_model is None:
@@ -99,7 +99,7 @@ def _speech(build: Callable[[Settings], Pipeline], leases_root: Callable[[], Pat
 
 
 def _verbs(
-    build: Callable[[Settings], Pipeline], embedder: Callable[[Settings], Embedder], leases_root: Callable[[], Path]
+    build: Callable[[Settings], Pipeline], embedder: Callable[[Settings], VoiceEmbedder], leases_root: Callable[[], Path]
 ) -> dict[str, Callable[..., int]]:
     def transcribe(audio: Annotated[Path, POSITIONAL], settings: Settings, out: Path | None = None) -> int:
         """Transcribe one audio file into one JSON file (default: beside the audio, `<stem>.speech.json`); --diarize adds speakers."""
@@ -156,7 +156,7 @@ def main(
     argv: Sequence[str] | None = None,
     *,
     build: Callable[[Settings], Pipeline] = make_pipeline,
-    embedder: Callable[[Settings], Embedder] = make_embedder,
+    embedder: Callable[[Settings], VoiceEmbedder] = make_embedder,
     leases_root: Callable[[], Path] = lambda: app_dirs.state_dir(APP) / "leases",
 ) -> int:
     cli = VerbCli(_verbs(build, embedder, leases_root), shared=Settings)
