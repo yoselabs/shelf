@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- breaking: `connect(..., read_only=)` removed, new `connect_read_only(target, *, extensions=None, timeout=10.0)` (`mode=ro`, creates nothing, no WAL pragmas; the old `read_only=True`); `from_text(text, *, aware=)` is `from_text(text)` (naive UTC) plus new `from_text_utc(text)`.
+
 ## 0.3.0
 
 - `integrity_ok` no longer folds every `sqlite3.Error` into `False`: `False` means damaged (failed check, corrupt, not a

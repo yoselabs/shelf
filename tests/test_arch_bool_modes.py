@@ -58,14 +58,6 @@ _ALLOWED: dict[str, str] = {
         "jsonl-log:open:read_only",
     ),
     **_rows(
-        "split: a read-only connection is another function; a2kay, anyembed, sqlite-store, fts-query consume connect()",
-        "sqlite-sidecar:connect:read_only",
-    ),
-    **_rows(
-        "split: naive vs tz-aware result is two return types; a2kay consumes from_text",
-        "sqlite-sidecar:from_text:aware",
-    ),
-    **_rows(
         "split: keep_mode picks between two permission behaviours; consumers a2kay, any-frontmatter, any-net, dir-trust",
         "atomic-io:atomic_write_bytes:keep_mode",
         "atomic-io:atomic_write_json:keep_mode",

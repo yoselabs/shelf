@@ -8,12 +8,12 @@ the same failures. This is the one place that lives. The sibling of `duckdb-side
 ```python
 from pathlib import Path
 import sqlite_vec
-from sqlite_sidecar import connect, transaction, to_text, from_text, is_corruption, set_aside
+from sqlite_sidecar import connect, connect_read_only, transaction, to_text, from_text, from_text_utc, is_corruption, set_aside
 
 conn = connect(Path("state/graph.sqlite"))                       # WAL, autocommit, parent dir made
 conn = connect(":memory:")                                       # touches no path
 conn = connect(path, extensions={"sqlite_vec": sqlite_vec.load})  # ExtensionUnavailableError names it
-reader = connect(path, read_only=True)                           # another process's last commit
+reader = connect_read_only(path)                                 # another process's last commit
 
 with transaction(conn):            # BEGIN IMMEDIATE … COMMIT; ROLLBACK on error
     with transaction(conn):        # nested: a savepoint
@@ -69,7 +69,7 @@ post-mortem.
 
 ### 4. A time column is text, and only fixed width sorts
 
-`to_text(dt)` / `from_text(text, aware=)`. `sqlite3`'s default datetime adapter is
+`to_text(dt)` / `from_text(text)` (naive UTC) / `from_text_utc(text)`. `sqlite3`'s default datetime adapter is
 deprecated (Python 3.12) and a value comes back as whatever text went in, so the store
 has to pick a format — and range predicates and `ORDER BY` compare text. `to_text` writes
 `YYYY-MM-DD HH:MM:SS.ffffff` in UTC (aware values converted, naive taken as UTC), always
@@ -87,9 +87,9 @@ one connection.
 
 ## Surface
 
-- `connect(target, *, extensions=None, read_only=False, timeout=10.0) -> sqlite3.Connection`
+- `connect(target, *, extensions=None, timeout=10.0) -> sqlite3.Connection`, `connect_read_only(...)` (same arguments, `mode=ro`)
 - `transaction(conn, *, lock=None)` — context manager
-- `to_text(datetime) -> str`, `from_text(str, *, aware=False) -> datetime`
+- `to_text(datetime) -> str`, `from_text(str) -> datetime` (naive UTC), `from_text_utc(str) -> datetime`
 - `is_corruption(exc) -> bool`, `is_busy(exc) -> bool` (result code, never message text), `unreadable(path) -> bool`
 - `integrity_ok(path, *, extra=None, timeout=5.0) -> bool`: `False` is damage; a busy, absent or unreadable file raises
 - `set_aside(path, *, at=None) -> list[Path]`, `move_aside(path, destination) -> list[Path]` (sidecars first, file last)
