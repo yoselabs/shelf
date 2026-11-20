@@ -18,7 +18,8 @@ Each use case, contract or primitive is one file, so two agents working in paral
 *by design*: each ADDS a file and git merges disjoint adds cleanly. No locks, no coordination.
 Before code goes anywhere, name its concern and its owner. Behaviour lives in a class or module that owns
 it; callers hold an instance and use its methods, never its internals (process ids, file layouts, tool or
-harness names). A caller that must know how has found a missing boundary (Article IV). Collaborators
+harness names). A caller that must know how has found a missing boundary (Article IV). One owner per resource lifetime: a pipe, lock or process is closed only by its owner, after every user of it has
+finished; a close under a reader is a defect, not a race to tune. Collaborators
 arrive as instances passed in at the edge: no module-level I/O, no global state, no constructing a
 collaborator inside the code that uses it.
 
@@ -41,6 +42,13 @@ Accumulation without consolidation is drift. Hard opinions, a breach is a defect
   This covers stored data too: a cache key, a file format or a hash may change when the right shape needs it, and
   the cache is rebuilt. Never freeze a wrong algorithm to protect old entries; batch such changes into one release
   so a store is rebuilt once. We care about consumers by knowing better for them, and by making them evolve fast.
+- **No silent failures.** Never swallow an exception. Handle it where the caller can act on it, or let it raise.
+  A failed cleanup or shutdown is reported, and the stop it belonged to still happens: a failure to record never
+  leaves a worker running.
+- **Tolerance is a handler, not a flag.** `missing_ok=`, `ignore_errors=`, `force=`, `overwrite=` and kin do not
+  exist. The call raises a typed exception, and the caller that tolerates it catches that exception. Two actions
+  that differ in kind (create versus replace) are two verbs. A `Literal` or enum parameter is the same flag in a
+  different coat. ADR 0030 records the 28 old exceptions as debt to convert, not as precedent.
 - **No redundancy.** One implementation of a behaviour per repo. A duplicate is allowed only as a recorded
   task that reconciliation (Article VIII) must resolve, never as the end state.
 Each rule names its check; where the check does not exist yet, adopting the rule includes filing it:
@@ -54,6 +62,8 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 | Async hygiene (III) | ruff `ASYNC` repo-wide (blocking calls inside `async def`) and `tests/test_arch_threads.py` hand-made threads only in reasoned files | blocking |
 | One CLI home (III) | `tests/test_arch_cli_surfaces.py` `import argparse` only in verb-cli, argparse-mcp, `__main__` modules and reasoned files | blocking |
 | No backward compatibility | shim / legacy / compat ban | task shelf-au97 |
+| No silent failures | planted-violation test for a swallowed exception (effects research, task shelf-tyld.22) | task |
+| Tolerance is a handler | bool-mode test extended to `Literal` policy parameters; the 28 C rows converted | task |
 | No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
 | Size limit (IV) | `tests/test_size_caps.py` file and function SLOC caps | blocking on changed files |
 
