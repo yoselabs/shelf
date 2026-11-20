@@ -299,6 +299,23 @@ dependencies = [
     { name = "stream-proc" },
 ]
 
+[package.metadata]
+requires-dist = [
+    { name = "any-lease", editable = "packages/any-lease" },
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "content-digest", editable = "packages/content-digest" },
+    { name = "stream-proc", editable = "packages/stream-proc" },
+]
+
+[[package]]
+name = "any-gate-python"
+version = "0.1.0"
+source = { editable = "packages/any-gate-python" }
+dependencies = [
+    { name = "any-gate" },
+    { name = "stream-proc" },
+]
+
 [package.optional-dependencies]
 pytest = [
     { name = "pytest" },
@@ -306,18 +323,11 @@ pytest = [
 
 [package.metadata]
 requires-dist = [
-    { name = "any-lease", editable = "packages/any-lease" },
-    { name = "atomic-io", editable = "packages/atomic-io" },
-    { name = "content-digest", editable = "packages/content-digest" },
+    { name = "any-gate", editable = "packages/any-gate" },
     { name = "pytest", marker = "extra == 'pytest'", specifier = ">=8" },
     { name = "stream-proc", editable = "packages/stream-proc" },
 ]
 provides-extras = ["pytest"]
-
-[[package]]
-name = "any-gate-python"
-version = "0.1.0"
-source = { editable = "packages/any-gate-python" }
 
 [[package]]
 name = "any-json-doc"

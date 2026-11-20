@@ -1,12 +1,23 @@
 [project]
 name = "any-gate-python"
 version = "0.1.0"
-description = "Which package suites a change reaches in a uv workspace, and the key each suite passed under: the Python adapter of any-gate."
+description = "Which package suites a change reaches in a uv workspace, the key each passed under, and the pytest runner (parallel, serial and quarantine lanes) that any-gate runs them with: the Python adapter of any-gate."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = []
+dependencies = [
+    "any-gate>=0.1,<1",
+    "stream-proc>=0.6,<1",
+]
+
+[project.optional-dependencies]
+# The stages load `any_gate_python.lanes_plugin` into the pytest of the project under test.
+pytest = ["pytest>=8"]
+
+[tool.uv.sources]
+any-gate = { workspace = true }
+stream-proc = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

@@ -3,9 +3,9 @@
 The Python adapter of [any-gate](../any-gate/README.md): which package suites a change reaches in a uv workspace, and the key each suite passed under.
 
 ```bash
-python -m any_gate_python --plan | python -m any_gate test --receipts .git/gate-receipts.json
-python -m any_gate_python --explain      # the pytest paths, with the changed files on stderr
-python -m any_gate_python --reach 50     # how many suites each of the last 50 commits reaches
+python -m any_gate_python plan --plan | python -m any_gate test -- python -m any_gate_python run
+python -m any_gate_python plan --explain      # the pytest paths, with the changed files on stderr
+python -m any_gate_python plan --reach 50     # how many suites each of the last 50 commits reaches
 ```
 
 A change selects the packages it touches and, through the graph (dependencies, optional dependencies, dependency groups), every package depending
@@ -22,4 +22,11 @@ The repo's own paths are read from `[tool.any-gate.python]` in the root `pyproje
 see, `repo-tests` (the whole-repo tests that always run), and `gated` tests that run only when an input they read changed. A path entry is a file,
 or a directory with a trailing `/`. With no config every path outside `packages/` selects every package.
 
-Stdlib only; shells out to `uv` and `git`.
+## The runner
+
+`run [--workers auto|N] [--wall S] [--idle S] [--pytest-args "ARGS"] PATH...` is the runner `any-gate test` calls: pytest in stages, parallel
+(xdist, sized to the tests and the box), then `serial` alone, then `quarantine` (a failing quarantined test is reported, never blocks). A stage
+selects its lane through a pytest plugin, not `-m`, so the repo's own `-m` default stays in force. A stage over the wall or idle limit has its
+whole process tree stopped. The repo declares the `serial` and `quarantine` markers itself.
+
+Selection is stdlib only and shells out to `uv` and `git`; the runner uses `any-gate` (box sizing) and `stream-proc` (the limits).

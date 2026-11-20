@@ -1,7 +1,7 @@
 [project]
 name = "any-gate"
 version = "0.1.0"
-description = "Stop re-running what already passed: green results remembered under a key of exactly what they ran on, and a test run sized to its work, guarded against hangs, with a lane for flaky tests."
+description = "Stop re-running what already passed: green results remembered under a key of exactly what they ran on, the units left run through a stack's runner under a lease and limits that stop a hang."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
@@ -12,10 +12,6 @@ dependencies = [
     "content-digest>=0.1,<1",
     "stream-proc>=0.6,<1",
 ]
-
-[project.optional-dependencies]
-# The stages load `any_gate.lanes_plugin` into the pytest of the project under test.
-pytest = ["pytest>=8"]
 
 [tool.uv.sources]
 any-lease = { workspace = true }

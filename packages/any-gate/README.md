@@ -23,14 +23,15 @@ if not receipts.has("tests", k):
 ## The command
 
 ```bash
-python -m any_gate_python --plan | python -m any_gate test --receipts .git/gate-receipts.json -- -p no:cov
+python -m any_gate_python plan --plan | python -m any_gate test --receipts .git/gate-receipts.json -- python -m any_gate_python run
 ```
 
-The plan is `path<TAB>key` per suite on stdin (empty key: never skipped). A suite whose key has a receipt is skipped; the rest run in
-stages under a lease (`--slots`, default 1, so gates started at once queue and say who holds the slot), and are recorded when the run is green.
-Exit 0: green or nothing to run; 1: a test failed or a stage hit a limit; 2: usage. Arguments after `--` go to every pytest stage. A stage
-selects its lane through a pytest plugin (`any_gate.lanes_plugin`), not `-m`, so the repo's own `-m` default stays in force; the plugin
-needs `any-gate[pytest]` in the environment of the tests.
+The plan is `unit<TAB>key` per line on stdin (empty key: never skipped). A unit whose key has a receipt is skipped; the rest are appended to
+the runner command (after `--`: any command that takes the units last and exits 0 when they are green) and run under a lease (`--slots`,
+default 1, so gates started at once queue and say who holds the slot) and under `--wall` and `--idle` limits that stop the runner's whole
+process tree. Each unit is recorded when the runner exits 0. Exit 0: green or nothing to run; 1: the runner failed or was stopped; 2: usage.
+The core knows no language: the Python adapter's runner is `python -m any_gate_python run` (pytest in parallel, serial and quarantine
+stages); a .NET one would wrap `dotnet test`.
 
 ### The gate's steps at once
 
