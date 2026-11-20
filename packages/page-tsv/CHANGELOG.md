@@ -2,6 +2,10 @@
 
 Arrow-notation, AI-facing: `old shape ⇒ new shape`. One line per contract-shape change.
 
+## page-tsv-v0.4.0 (breaking)
+
+`render(value, consumer, *, plan=)` ⇒ `render_llm(value, *, plan=)` (the `"llm"` consumer) and `render_json(value)` (`"code"` and `"machine"`, which were the same). `Consumer` is gone. Output bytes unchanged.
+
 ## page-tsv-v0.3.0
 
 `is_basemodel(ann: Any)`, `infer_format_hint(return_type: Any)`, `build_encoding_plan(return_type: Any)` ⇒ the same with `object`. No behaviour or byte change.

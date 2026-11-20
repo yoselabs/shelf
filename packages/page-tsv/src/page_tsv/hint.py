@@ -1,8 +1,8 @@
-"""The ``format_hint`` adapter — a thin hint-vocabulary shim over ``render``.
+"""The ``format_hint`` adapter — a thin hint-vocabulary shim over ``render_llm``.
 
 ``format_response`` lets callers that speak the legacy ``format_hint`` vocabulary
 (``auto`` / ``json`` / ``tsv`` / ``page-tsv``) reach the consumer-aware
-:func:`render` seam.
+:func:`render_llm` seam.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from page_tsv.inference import EncodingPlan
-from page_tsv.render import render
+from page_tsv.render import render_llm
 from page_tsv.response import Page, Response
 
 if TYPE_CHECKING:
@@ -30,14 +30,14 @@ def _plan_for_hint(format_hint: FormatHint) -> EncodingPlan:
 def format_response(raw: Any, *, format_hint: FormatHint = "auto") -> Response:  # Any: any value a tool returns is rendered
     """Encode ``raw`` per ``format_hint`` and return a :class:`Response`.
 
-    A thin ``format_hint``-shaped adapter over :func:`render` for callers that still
+    A thin ``format_hint``-shaped adapter over :func:`render_llm` for callers that still
     speak the hint vocabulary (``auto`` / ``json`` / ``tsv`` / ``page-tsv``).
     """
     if format_hint == "page-tsv" and not isinstance(raw, Page):
         msg = f"format_hint='page-tsv' requires a Page instance, got {type(raw).__name__}"
         raise TypeError(msg)
 
-    rendered = render(raw, "llm", plan=_plan_for_hint(format_hint))
+    rendered = render_llm(raw, plan=_plan_for_hint(format_hint))
     return Response(data=rendered.text, format=rendered.format)
 
 

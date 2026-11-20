@@ -16,7 +16,8 @@ from page_tsv import (
     format_response,
     infer_format_hint,
     is_basemodel,
-    render,
+    render_json,
+    render_llm,
     render_plain,
 )
 from pydantic import BaseModel
@@ -88,34 +89,32 @@ def test_encode_page_tsv_dict_matches_the_page_path() -> None:
     assert envelope["_items_format"] == "tsv"
 
 
-# --- render: consumer is a parameter, never sniffed --------------------------
+# --- one render view per consumer, never sniffed --------------------------
 
 
 def test_render_llm_compresses_page_to_tsv() -> None:
     page = Page[Row](items=[Row(id=1, title="a")])
-    rendered = render(page, "llm")
+    rendered = render_llm(page)
     assert rendered.format == "json"  # outer envelope is JSON
     assert json.loads(rendered.text)["_items_format"] == "tsv"
 
 
-def test_render_code_and_machine_never_compress() -> None:
+def test_render_json_never_compresses() -> None:
     page = Page[Row](items=[Row(id=1, title="a")])
-    for consumer in ("code", "machine"):
-        rendered = render(page, consumer)
-        body = json.loads(rendered.text)
-        # plain JSON: items is a list of objects, no TSV blob, no discriminator
-        assert isinstance(body["items"], list)
-        assert "_items_format" not in body
+    body = json.loads(render_json(page).text)
+    # plain JSON: items is a list of objects, no TSV blob, no discriminator
+    assert isinstance(body["items"], list)
+    assert "_items_format" not in body
 
 
 def test_render_llm_flat_list_is_tsv() -> None:
-    rendered = render([Row(id=1, title="a"), Row(id=2, title="b")], "llm", plan=EncodingPlan("tsv"))
+    rendered = render_llm([Row(id=1, title="a"), Row(id=2, title="b")], plan=EncodingPlan("tsv"))
     assert rendered.format == "tsv"
     assert rendered.text == "id\ttitle\n1\ta\n2\tb\n"
 
 
 def test_render_structured_payload_is_lazy_plain() -> None:
-    rendered = render(Row(id=1, title="a"), "code")
+    rendered = render_json(Row(id=1, title="a"))
     assert rendered.structured == {"id": 1, "title": "a"}
 
 

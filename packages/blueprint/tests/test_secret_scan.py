@@ -7,7 +7,7 @@ import sys
 from typing import TYPE_CHECKING
 
 import pytest
-from blueprint.secret_scan import Mode, ScanError, scan
+from blueprint.secret_scan import ScanError, scan_full, scan_range, scan_staged
 
 if TYPE_CHECKING:
     from blueprint.testing import Repo
@@ -25,11 +25,11 @@ def _branch(repo: Repo) -> None:
     repo.git("branch", "--set-upstream-to=base")
 
 
-def test_a_clean_tree_has_no_findings_in_every_mode(repo: Repo) -> None:
+def test_a_clean_tree_has_no_findings_in_every_scan(repo: Repo) -> None:
     _branch(repo)
     repo.write("a.py", "x = 1\n")
     repo.git("add", "a.py")
-    assert [scan(repo.root, mode, env=repo.env) for mode in Mode] == [[], [], []]
+    assert [scan(repo.root, env=repo.env) for scan in (scan_staged, scan_range, scan_full)] == [[], [], []]
 
 
 def test_staged_mode_sees_the_index_and_nothing_older(repo: Repo) -> None:
@@ -37,7 +37,7 @@ def test_staged_mode_sees_the_index_and_nothing_older(repo: Repo) -> None:
     repo.commit()
     repo.write("new.py", _LEAK_TOO)
     repo.git("add", "new.py")
-    found = scan(repo.root, Mode.STAGED, env=repo.env)
+    found = scan_staged(repo.root, env=repo.env)
     assert [(f.file, f.rule) for f in found] == [("new.py", "aws-access-token")]
 
 
@@ -45,7 +45,7 @@ def test_range_mode_sees_commits_since_the_upstream_base(repo: Repo) -> None:
     _branch(repo)
     repo.write("leak.py", _LEAK)
     repo.commit()
-    assert [f.file for f in scan(repo.root, Mode.RANGE, env=repo.env)] == ["leak.py"]
+    assert [f.file for f in scan_range(repo.root, env=repo.env)] == ["leak.py"]
 
 
 def test_range_mode_skips_history_the_base_already_holds(repo: Repo) -> None:
@@ -56,8 +56,8 @@ def test_range_mode_skips_history_the_base_already_holds(repo: Repo) -> None:
     repo.git("branch", "--set-upstream-to=base")
     repo.write("fine.py", "x = 1\n")
     repo.commit()
-    assert scan(repo.root, Mode.RANGE, env=repo.env) == []
-    assert [f.file for f in scan(repo.root, Mode.FULL, env=repo.env)] == ["old.py"]
+    assert scan_range(repo.root, env=repo.env) == []
+    assert [f.file for f in scan_full(repo.root, env=repo.env)] == ["old.py"]
 
 
 @pytest.mark.parametrize("stage", ["staged", "unstaged", "untracked"])
@@ -69,20 +69,20 @@ def test_range_mode_sees_uncommitted_work(repo: Repo, stage: str) -> None:
         repo.write("new.py", _LEAK)
         if stage == "staged":
             repo.git("add", "new.py")
-    found = scan(repo.root, Mode.RANGE, env=repo.env)
+    found = scan_range(repo.root, env=repo.env)
     assert [f.rule for f in found] == ["aws-access-token"]
 
 
 def test_range_mode_without_an_upstream_scans_everything(repo: Repo) -> None:
     repo.write("leak.py", _LEAK)
     repo.commit()
-    assert [f.file for f in scan(repo.root, Mode.RANGE, env=repo.env)] == ["leak.py"]
+    assert [f.file for f in scan_range(repo.root, env=repo.env)] == ["leak.py"]
 
 
 def test_a_finding_never_carries_the_secret(repo: Repo) -> None:
     repo.write("leak.py", _LEAK)
     repo.commit()
-    (finding,) = scan(repo.root, Mode.FULL, env=repo.env)
+    (finding,) = scan_full(repo.root, env=repo.env)
     assert "AKIAZ7VRSQ2WKNBTXPLM" not in repr(finding)
     assert finding.line == 1
 
@@ -92,7 +92,7 @@ def test_a_missing_scanner_is_an_error_not_a_pass(repo: Repo) -> None:
     repo.commit()
     env = {**repo.env, "PATH": str(repo.bin_dir)}
     with pytest.raises(ScanError, match="gitleaks"):
-        scan(repo.root, Mode.FULL, env=env)
+        scan_full(repo.root, env=env)
 
 
 def test_help_exits_zero_and_an_unknown_flag_exits_two() -> None:

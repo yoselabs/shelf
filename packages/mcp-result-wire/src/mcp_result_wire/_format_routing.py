@@ -10,7 +10,7 @@ from page_tsv import render_plain
 
 if TYPE_CHECKING:
     from fastmcp.server.middleware import MiddlewareContext
-    from page_tsv import Consumer, EncodingPlan
+    from page_tsv import EncodingPlan
 
 _log = logging.getLogger(__name__)
 _WARN_ONCE: set[str] = set()
@@ -23,9 +23,9 @@ class FormatRoutingMiddleware(Middleware):
     *after* any list-view projection — ``content`` is always derived from the
     final ``structured_content``.
 
-    ``plans`` maps a registered tool name to its static ``EncodingPlan``; ``consumer``
-    (``"llm"`` / ``"code"`` / ``"machine"``) is a caller parameter — only the ``llm``
-    tier compresses. Both are passed in, never sniffed from framework metadata.
+    ``plans`` maps a registered tool name to its static ``EncodingPlan``, passed in, never
+    sniffed from framework metadata. Install it only for an LLM consumer: a code or machine
+    consumer gets the tool results untouched by not having it.
 
     One behaviour: ``content`` is re-derived, ``structured_content`` stays the complete value.
     A different wire shape (no structured channel, marker-only content) is a different
@@ -36,10 +36,8 @@ class FormatRoutingMiddleware(Middleware):
         self,
         *,
         plans: dict[str, EncodingPlan],
-        consumer: Consumer,
     ) -> None:
         self._plans = plans
-        self._consumer: Consumer = consumer
 
     @override
     async def on_call_tool(
@@ -50,9 +48,8 @@ class FormatRoutingMiddleware(Middleware):
         result = await call_next(context)
 
         # Skip when: (a) error result (envelope owns structured_content, set by an
-        # error-envelope middleware), (b) consumer is not the compressing ``llm`` tier,
-        # or (c) no tool name on context.
-        if getattr(result, "is_error", False) or self._consumer != "llm":
+        # error-envelope middleware), or (b) no tool name on context.
+        if getattr(result, "is_error", False):
             return result
         tool_name = getattr(context.message, "name", None)
         if not tool_name:

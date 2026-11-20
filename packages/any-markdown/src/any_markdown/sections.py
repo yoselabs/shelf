@@ -20,16 +20,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
 ATX_HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.*?)[ \t]*#*[ \t]*$")
 """One ATX heading line, without its newline: group 1 the ``#`` run, group 2 the text."""
-
-Anchors = Literal["default", "github"]
-"""How section ids are made: ``"default"`` (:func:`slug`, deduped ``-2``) or ``"github"`` (:func:`github_slug`, deduped ``-1``)."""
 
 _LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
 _MARKS = re.compile(r"[`*~]|(?<![^\W_])_|_(?![^\W_])")
@@ -70,15 +67,20 @@ def github_slug(text: str) -> str:
     return re.sub(r"[^\w\- ]", "", shown).replace(" ", "-")
 
 
-def outline(text: str, *, anchors: Anchors = "default") -> list[Section]:
-    """Every heading section of ``text``, in document order, ids deduped.
+def outline(text: str) -> list[Section]:
+    """Every heading section of ``text``, in document order, ids are :func:`slug` deduped ``-2``, ``-3``."""
+    return _outline(text, slug, first=2)
 
-    ``anchors="github"`` makes the ids GitHub's (:func:`github_slug`, repeats ``-1``, ``-2``), so
-    ``#fragment`` links written for GitHub resolve; the default ids are unchanged.
+
+def github_outline(text: str) -> list[Section]:
+    """:func:`outline` with GitHub's own anchors (:func:`github_slug`, repeats ``-1``, ``-2``).
+
+    So ``#fragment`` links written for GitHub resolve.
     """
-    if anchors not in ("default", "github"):
-        msg = f"anchors must be 'default' or 'github', not {anchors!r}"
-        raise ValueError(msg)
+    return _outline(text, github_slug, first=1)
+
+
+def _outline(text: str, to_id: Callable[[str], str], *, first: int) -> list[Section]:
     heads: list[tuple[int, int, str]] = []  # (offset, level, heading)
     offset = 0
     fenced = False
@@ -92,12 +94,8 @@ def outline(text: str, *, anchors: Anchors = "default") -> list[Section]:
     rows: list[Section] = []
     for i, (start, level, heading) in enumerate(heads):
         end = next((s for s, lvl, _ in heads[i + 1 :] if lvl <= level), len(text))
-        if anchors == "github":
-            base = candidate = github_slug(heading)
-            n = 0
-        else:
-            base = candidate = slug(heading)
-            n = 1
+        base = candidate = to_id(heading)
+        n = first - 1
         while candidate in used:
             n += 1
             candidate = f"{base}-{n}"
@@ -106,14 +104,14 @@ def outline(text: str, *, anchors: Anchors = "default") -> list[Section]:
     return rows
 
 
-def find(text: str, id_: str, *, rows: Sequence[Section] | None = None, anchors: Anchors = "default") -> Section | None:
+def find(text: str, id_: str, *, rows: Sequence[Section] | None = None) -> Section | None:
     """Section ``id_`` of ``text`` — a heading anchor or a ``lines:`` id — or ``None`` if there is none.
 
-    ``rows`` is ``text``'s :func:`outline` (made with the same ``anchors``) when the caller already holds it.
+    ``rows`` is the outline to look in when the caller holds one (:func:`outline` by default, :func:`github_outline` for GitHub's ids).
     """
     if id_.startswith("lines:"):
         return _lines(text, id_)
-    return next((row for row in (outline(text, anchors=anchors) if rows is None else rows) if row.id == id_), None)
+    return next((row for row in (outline(text) if rows is None else rows) if row.id == id_), None)
 
 
 def line_parts(text: str, budget: int, *, measure: Callable[[str], int] = len, base_line: int = 1) -> list[Section]:
@@ -221,4 +219,4 @@ def _lines(text: str, id_: str) -> Section | None:
     return Section(id=id_, heading=id_, level=0, chars=chars, start=start, end=start + chars)
 
 
-__all__ = ["ATX_HEADING_RE", "Anchors", "Section", "clip", "find", "github_slug", "line_parts", "outline", "slug"]
+__all__ = ["ATX_HEADING_RE", "Section", "clip", "find", "github_outline", "github_slug", "line_parts", "outline", "slug"]
