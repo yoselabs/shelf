@@ -97,6 +97,6 @@ def test_just_bootstrap_does_not_clobber_a_foreign_hook_manager(repo: Path, tmp_
 
 def test_just_check_does_not_depend_on_bootstrap(repo: Path) -> None:
     """D4: content assertions (`check`) must never require environment setup (`bootstrap`)."""
-    justfile = (repo / "justfile").read_text()
+    justfile = (repo / ".blueprint" / "base.just").read_text()
     check_line = next(line for line in justfile.splitlines() if line.startswith("check:"))
     assert "bootstrap" not in check_line

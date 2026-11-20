@@ -71,9 +71,14 @@ def config_text(*, beads: bool, python: bool) -> str:
 
 
 _REPO = "https://github.com/yoselabs/shelf"
-# The shelf packages a consumer's gate runs, pinned by git tag: `any-gate` (tree record, pre-push skip, test runner) and `blueprint` (the
-# `guard`, `preset` and `check` steps). A consumer needs no shelf clone.
-GATE_PACKAGES = {"any-gate": "any-gate-v0.1.0", "blueprint": "blueprint-v0.1.0"}
+# The shelf packages a consumer's gate runs, pinned by git tag: `any-gate` (tree record, pre-push skip, test runner), `any-gate-python`
+# (the pytest planner and runner `blueprint test` calls) and `blueprint` (the `guard`, `preset`, `render`, `test` and `check` steps).
+# A consumer needs no shelf clone.
+GATE_PACKAGES = {
+    "any-gate": "any-gate-v0.1.0",
+    "any-gate-python": "any-gate-python-v0.1.0",
+    "blueprint": "blueprint-v0.1.0",
+}
 
 
 def _norm(name: str) -> str:

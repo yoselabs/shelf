@@ -12,7 +12,7 @@ Stack: python-uv. The gate is `just check`; this file is what to know before wri
 | types | pyrefly, `preset = "strict"` | `just typecheck` |
 | spelling | codespell | `just spell` |
 | dependencies | deptry (unused, missing, transitive) | `just deps` |
-| tests | pytest, strict markers, xdist | `just test` (`just test-affected` while iterating) |
+| tests | pytest, strict markers, xdist | `just test` (the tests the change reaches, `blueprint test`; `just test-all` runs every one) |
 | coverage | pytest-cov with a floor just below current | in `just test` |
 | architecture | import-linter contracts in `[tool.importlinter]`; ruff TID251 banned-api for banned APIs | `just arch` (banned APIs ride `just lint`); see [architecture.md](architecture.md) |
 | hooks | prek: ruff check and ruff format on staged `.py` | [gate.md](gate.md) |
@@ -25,7 +25,7 @@ Why: one tool per role, strictest preset.
 uv sync                  # environment from the lockfile
 just check               # the gate: whole repo, same as CI
 uv run pytest path::name # one test while iterating; the gate still decides done
-just test-affected       # the tests the change reaches
+just test                # the tests the change reaches
 ```
 
 Always `uv run <tool>`; never a global interpreter or `pip install`. Add a dependency with

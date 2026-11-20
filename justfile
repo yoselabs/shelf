@@ -3,22 +3,29 @@
 #
 # This is the reference toolchain every consumer of the shelf inherits (ADR 0004). The runner is
 # just (ADR 0023): pinned per repo as the `rust-just` dev dependency, run as `uv run just <recipe>`.
-# Each recipe is one linter doing one job; `check` is the gate.
+#
+# The gate's common recipes are the blueprint's, rendered into .blueprint/ (ADR 0029): `uv run blueprint render` rewrites them and
+# `just render` fails on any difference. This file keeps only what is the shelf's own: a recipe defined here replaces the rendered one
+# of the same name (`set allow-duplicate-recipes`). Consumers keep the same shape and own even less.
 #
 # No backticks anywhere in this file: `just --dry-run` evaluates them, and blueprint's
 # gate.one-command dry-runs `check` and reads this graph from `just --dump --dump-format json`.
 # Anything that needs a command's output lives inside a shebang recipe.
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
+set allow-duplicate-recipes
+
+import '.blueprint/base.just'
+import '.blueprint/python.just'
 
 # pytest runs one worker per core (pytest-xdist).
 pytest_par := "-n auto"
 
-# Where whole test runs queue (any-gate test, and check-all's pytest below): one slot, so gates started at once wait instead of thrashing.
+# Where whole test runs queue (check-all's pytest below; `blueprint test` queues in the same folder): one slot, so gates started at once wait instead of thrashing.
 lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACHE_HOME", env_var("HOME") + "/.cache") + "/gate-leases")
 
 # The gate. Fast, deterministic tools first; tests last. Tests cover only what the change
-# touches (`test-affected`); `check-all` runs every test with the coverage floor: rare, before a release tag, never per task.
+# touches (`test`, the rendered `blueprint test`); `check-all` runs every test with the coverage floor: rare, before a release tag, never per task.
 #
 # The per-file linters (scripts, lint-changed, spell-changed) check only the files changed against the base
 # in `check` (`any-gate changed`; a changed config file, or no base, selects everything). `check-all` runs them on every
@@ -30,34 +37,11 @@ lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACH
 # working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
 # pre-push hook then skips the gate for that exact tree.
 [group('gate')]
-check: gate-start beads-lint scripts (steps "guard" "preset" "blueprint" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test-affected")
+check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test") check-extra
     uv run python -m any_gate passed --gate check
 
 [group('gate')]
-check-all: beads-lint (scripts "all") (steps "guard" "preset" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test")
-
-# Notes the working tree as the gate starts, for `check` to record when it passes.
-[private]
-gate-start:
-    uv run python -m any_gate start
-
-# Every bead still to be started (open or blocked) carries its acceptance criteria: criteria are what make a bead
-# ready (owner, 2026-10-10); claimed work is past that gate and a deferred idea may stay unfinished. bd's database lives in this clone.
-[group('gate')]
-beads-lint:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    [ -d .beads ] || exit 0
-    command -v bd >/dev/null || { echo "beads-lint: bd is not installed -- run just tools" >&2; exit 2; }
-    # A clone with no (or an uninitialized) database lints 0 beads and exits 0; that is no pass (shelf-9g7).
-    if ! out=$(BD_DISABLE_METRICS=1 bd list --limit 1 --json 2>&1); then
-        echo "beads-lint: bd's database does not answer in this clone -- run bd bootstrap" >&2
-        case "$out" in *"not initialized"*) echo "  (bootstrap calls an uninitialized one 'nothing to do': mv .beads/embeddeddolt .beads/embeddeddolt.broken first)" >&2;; esac
-        exit 1
-    fi
-    rc=0
-    for status in open blocked; do BD_DISABLE_METRICS=1 bd lint --status "$status" || rc=1; done
-    exit "$rc"
+check-all: beads-lint (scripts "all") (steps "guard" "preset" "render" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test-all")
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
 # blueprint's for this step in every repo (stack/shell).
@@ -70,52 +54,6 @@ scripts scope="changed":
     uv run python -m any_gate changed --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
     [ -s "$list" ] || { echo "skipped scripts: no shell script changed"; exit 0; }
     xargs -0 shellcheck < "$list"
-
-# Runs the gate's steps at once (`any-gate steps`): each into its own log, then one timing line (a step over its budget is
-# marked) and the log of every step that failed. Each name is a recipe, so the gate graph still reads the edges.
-# Budgets, in seconds: GATE_STEP_BUDGET (default 60) per step, GATE_BUDGET (default 180) for the whole gate. The
-# gate runs several times within one feature, so a slow step is a cost to see and fix, not to wait out.
-[private]
-steps +names:
-    uv run python -m any_gate steps --runner {{ just_executable() }} {{ names }}
-
-# The blueprint's per-commit checkpoints (packages/blueprint): one line per one that is not
-# passing. The audit-only ones (slow, or reading this clone's bd database) run in the
-# /blueprint audit, not here. `blueprint` is a dev dependency, so no shelf clone is needed.
-[group('gate')]
-blueprint:
-    uv run blueprint check --repo . --gate
-
-# The commit guard as a GATE, not only a hook. A pre-commit hook is per-clone and
-# can be silently disabled by anything that claims core.hooksPath -- beads, husky,
-# lefthook -- which happened in this very repo and went unnoticed because the hook
-# file still existed and looked installed. So the hook is FAST FEEDBACK and this is
-# the ENFORCEMENT: it needs no onboarding, no hooks, and holds on any fresh clone.
-#
-# --committed reads HEAD, deliberately not the working tree: an *uncommitted* local
-# override is the supported co-development workflow (docs/consuming-the-shelf.md
-# §1), and a gate that failed on it would break the thing the docs prescribe.
-# Exit 2 means the guard could not run, which is never treated as a pass.
-[group('gate')]
-guard:
-    uv run blueprint guard --committed
-
-# The linter preset, as a GATE. ADR 0004 makes this repo's config the preset and
-# says drift is "acceptable and visible" -- it was not visible. The onboarding copy is
-# append-only, so it reports "already current" for a repo missing whole rule families.
-# This fails on any difference from the preset (the snapshot packaged in blueprint) that
-# the consumer has not declared, with a reason, in its own [tool.shelf-preset]. Inside
-# the shelf it is a no-op: this repo IS the preset. After a change to the shelf's config
-# or recipes, `uv run blueprint preset --refresh` regenerates the snapshot.
-[group('gate')]
-preset:
-    uv run blueprint preset --repo .
-
-# The pinned tools (mise.toml, locked by mise.lock; ADR 0024). The user's own config is left out: its
-# unlocked tools (`latest`) would make `--locked` refuse the whole install.
-tools:
-    mise trust --yes .
-    MISE_IGNORED_CONFIG_PATHS="$HOME/.config/mise" mise install --locked
 
 # One-time (idempotent, safe to re-run) setup for a CONSUMER repo: wires the commit guard,
 # resolver block, beads (opt-out), and this linter preset via the operations in
@@ -160,11 +98,6 @@ lint-changed:
 format:
     uv run ruff format packages tests tools conftest.py
 
-# A type warning fails the build (pyrefly's config). No slow rot.
-[group('gate')]
-typecheck:
-    uv run pyrefly check
-
 # the import graph against the contracts in [tool.importlinter] (pyproject.toml): no package
 # imports a consumer app, packages stay independent except their declared workspace edges.
 # Banned APIs are ruff's TID251 and ride `lint`. A violation prints the importing line.
@@ -187,20 +120,6 @@ spell-changed:
     [ -s "$list" ] || { echo "skipped spell: no file changed"; exit 0; }
     xargs -0 uv run codespell < "$list"
 
-# dependency hygiene: uv.lock matches every pyproject (`uv run` alone never notices a stale lock;
-# shelf main ran green on one, 2026-10-11), then per package (unused / missing / transitive). deptry reads each
-# package's own pyproject from its dir; --known-first-party (the src import name)
-# silences the src-layout self-import DEP003 noise. A shebang recipe: just has no loops.
-[group('gate')]
-deps:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    env -u UV_FROZEN uv lock --check
-    # One deptry per package, all cores at once; a package's output prints only when it fails.
-    printf '%s\n' packages/*/ | xargs -P "$(getconf _NPROCESSORS_ONLN)" -I{} bash -c \
-        'p={}; imp=$(ls "$p/src"); out=$(cd "$p" && uv run deptry . --known-first-party "$imp" 2>&1) || { printf -- "-- deptry %s\n%s\n" "$p" "$out"; exit 1; }'
-    echo "deptry: every package clean"
-
 # The test runs queue for one slot (`any-lease`, `lease_root` above): each takes every core, so gates started at once
 # on one box wait instead of thrashing (2026-10-20: four at once took 11-14 min each).
 #
@@ -208,19 +127,8 @@ deps:
 # Substrate adapters (docling/torch/subprocess) are legitimately hard to unit-test,
 # so the floor is a rot-guard, not a vanity number. Raise it as coverage climbs.
 [group('gate')]
-test:
+test-all:
     uv run python -m any_lease run --root {{ lease_root }} tests 1 check-all -- uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
-
-# Only the tests a change can reach: the changed packages, every package depending on them, and the fitness tests
-# (`any_gate_python` prints the plan, `path<TAB>key` per suite). `any-gate test` skips a suite whose key already passed (the receipts file in the
-# git common dir, shared by every worktree), runs the rest in stages under a lease, and records them when green. No coverage floor: it is
-# measured over the whole repo, so a partial run cannot meet it.
-[group('gate')]
-test-affected:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    receipts="$(git rev-parse --path-format=absolute --git-common-dir)/gate-receipts.json"
-    uv run python -m any_gate_python plan --explain --plan | uv run python -m any_gate test --receipts "$receipts" --lease-root {{ lease_root }} -- uv run python -m any_gate_python run --pytest-args="-p no:cov"
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. CI runs
@@ -230,10 +138,6 @@ test-affected:
 # The trailing `-m browser` overrides the pyproject `-m "not browser"` default.
 test-browser:
     uv run pytest packages/any-browser/tests -m browser -p no:cacheprovider
-
-# coverage report only (human view).
-cov:
-    uv run pytest --cov --cov-report=term-missing
 
 # The skills' eval cases (evals/<skill>/<case>/), with `claude plugin eval`. Not in `check`: live
 # runs cost money. Run from a copy without .venv and .git: plugin eval refuses a plugin dir of
@@ -255,6 +159,3 @@ eval *args:
 # test in `just test` fails if they drift.
 catalog:
     uv run python tools/catalog.py
-
-sync:
-    uv sync
