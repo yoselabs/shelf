@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-speech"
+software = "any-versioned"
+why = "any-speech's stored transcript carries a format version; format.py hand-wrote the readable set, the refusal error and a v1 branch inside the speaker reader. A second format version must not mean a second hand-written check."
+needs = "Versioned(current=2, migrations={1: ...}): read(raw) migrates a v1 body to v2 and raises one UnknownVersionError naming the readable versions; stamp(body) writes the version first, so stored bytes stay as they were."
+sponsor = "yoselabs"
+requester = "any-speech"
+status = "active" # active | retired

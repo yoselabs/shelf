@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from any_versioned import Versioned
 from atomic_io import atomic_write_text
 
 Resolve = Callable[[str, int], str]
@@ -22,6 +23,7 @@ Connect = Callable[[tuple[str, int], float], None]
 NEUTRAL = ("one.one.one.one:443",)  # a name every resolver knows: used when no host is given
 IP_LITERAL = "1.1.1.1:443"  # needs no DNS: separates "offline" from "DNS is down"
 _IPV4 = re.compile(r"\d+\.\d+\.\d+\.\d+")
+_STORED = Versioned(current=1, key="v")  # the cache file's own format version, under the key it has always had
 
 
 @dataclass(frozen=True)
@@ -110,24 +112,26 @@ def record(path: str | Path, result: Probe) -> Probe:
     prev = last(path)
     since = prev.since if prev is not None and prev.up == result.up and prev.since else result.at
     stored = Probe(result.up, result.ip_up, result.why, result.per_host, result.at, result.ms, since)
-    row = {
-        "v": 1,
-        "up": stored.up,
-        "ip_up": stored.ip_up,
-        "why": stored.why,
-        "hosts": stored.per_host,
-        "at": stored.at,
-        "ms": stored.ms,
-        "since": since,
-    }
+    row = _STORED.stamp(
+        {
+            "up": stored.up,
+            "ip_up": stored.ip_up,
+            "why": stored.why,
+            "hosts": stored.per_host,
+            "at": stored.at,
+            "ms": stored.ms,
+            "since": since,
+        }
+    )
     with contextlib.suppress(OSError, ValueError):
         atomic_write_text(Path(path), json.dumps(row), fsync=False)
     return stored
 
 
 def last(path: str | Path) -> Probe | None:
+    """The stored probe whatever its age; None when absent, unreadable, malformed or of a format version this reader does not know."""
     try:
-        d = json.loads(Path(path).read_text(encoding="utf-8"))
+        d = _STORED.read(json.loads(Path(path).read_text(encoding="utf-8")))  # UnknownVersionError is a ValueError
         return Probe(bool(d["up"]), bool(d["ip_up"]), str(d["why"]), dict(d["hosts"]), float(d["at"]), int(d.get("ms", 0)), d.get("since"))
     except (OSError, ValueError, KeyError, TypeError):
         return None

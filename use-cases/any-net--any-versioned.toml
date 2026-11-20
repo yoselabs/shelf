@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-net"
+software = "any-versioned"
+why = "any-net.record writes 'v': 1 into the probe cache and last() never read it: a file of a future format would have been read as if it were today's."
+needs = "Versioned(current=1, key='v'): stamp(body) writes the same first key; read(raw) refuses an unknown or missing 'v', which last() turns into None."
+sponsor = "yoselabs"
+requester = "any-net"
+status = "active" # active | retired

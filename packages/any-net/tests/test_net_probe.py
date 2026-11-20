@@ -3,12 +3,12 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING
 
+import pytest
+
 from any_net import Probe, View, cached, last, probe, record, view
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
 VENDOR = "api.vendor.test:443"
 
@@ -137,6 +137,27 @@ def test_stored_bytes_are_compact_ascii_json_without_a_newline(tmp_path: Path) -
     assert path.read_bytes() == (
         b'{"v": 1, "up": true, "ip_up": true, "why": "ok", "hosts": {"h\\u00e9:443": "ok"}, "at": 100.0, "ms": 7, "since": 100.0}'
     )
+
+
+@pytest.mark.parametrize("version", ["2", "0", "null"])
+def test_a_probe_stored_under_another_version_reads_as_none(tmp_path: Path, version: str) -> None:
+    path = tmp_path / "net.json"
+    path.write_text(f'{{"v": {version}, "up": true, "ip_up": true, "why": "ok", "hosts": {{}}, "at": 1.0}}', encoding="utf-8")
+    assert last(path) is None
+
+
+def test_a_probe_with_no_version_or_not_an_object_reads_as_none(tmp_path: Path) -> None:
+    path = tmp_path / "net.json"
+    path.write_text('{"up": true, "ip_up": true, "why": "ok", "hosts": {}, "at": 1.0}', encoding="utf-8")
+    assert last(path) is None
+    path.write_text("[1]", encoding="utf-8")
+    assert last(path) is None
+
+
+def test_a_version_one_probe_still_reads(tmp_path: Path) -> None:
+    path = tmp_path / "net.json"
+    path.write_text('{"v": 1, "up": true, "ip_up": true, "why": "ok", "hosts": {}, "at": 1.0}', encoding="utf-8")
+    assert last(path) == Probe(True, True, "ok", {}, 1.0)
 
 
 def test_a_crash_before_the_swap_keeps_the_old_record(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

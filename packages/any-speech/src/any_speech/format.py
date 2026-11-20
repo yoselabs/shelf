@@ -7,6 +7,7 @@ import re
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
+from any_versioned import Versioned
 from atomic_io import atomic_write_json
 from content_digest import digest
 
@@ -14,14 +15,8 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-FORMAT_VERSION = 2
-_READABLE = (1, 2)  # v1 had `speakers` as label to name only; its talk time is worked out from the words
 Source = Literal["local", "captions"]
 _SOURCES = ("local", "captions")
-
-
-class UnknownVersionError(ValueError):
-    """The file's format version is not one this reader knows."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,13 +133,11 @@ class Transcript:
         for item in (*body["words"], *body["segments"]):
             item["start"], item["end"] = round(item["start"], 3), round(item["end"], 3)
         body["provenance"]["key"] = self.provenance.key
-        return {"version": FORMAT_VERSION, **body}
+        return _STORED.stamp(body)
 
     @classmethod
     def from_json(cls, raw: Mapping[str, Any]) -> Transcript:  # Any: parsed JSON, checked field by field below
-        if raw.get("version") not in _READABLE:
-            message = f"transcript format {raw.get('version')!r}; this reader knows {_READABLE}"
-            raise UnknownVersionError(message)
+        raw = _STORED.read(raw)
         p = raw["provenance"]
         if p["source"] not in _SOURCES:
             message = f"source {p['source']!r} is not one of {_SOURCES}"
@@ -166,7 +159,7 @@ class Transcript:
         return cls(
             words=words,
             segments=tuple(Segment(s["start"], s["end"], s["text"], s["speaker"]) for s in raw["segments"]),
-            speakers=_read_speakers(raw, words),
+            speakers={label: Speaker(v["name"], v["seconds"], v["words"]) for label, v in raw["speakers"].items()},
             provenance=provenance,
         )
 
@@ -178,10 +171,13 @@ class Transcript:
         return cls.from_json(json.loads(path.read_text(encoding="utf-8")))
 
 
-def _read_speakers(raw: Mapping[str, Any], words: tuple[Word, ...]) -> dict[str, Speaker]:  # Any: parsed JSON
-    if raw["version"] == 1:
-        return speakers_of(words, dict(raw["speakers"]))
-    return {label: Speaker(v["name"], v["seconds"], v["words"]) for label, v in raw["speakers"].items()}
+def _v1_to_v2(body: dict[str, Any]) -> dict[str, Any]:  # Any: parsed JSON
+    """v1 had `speakers` as label to name only; its talk time is worked out from the words."""
+    words = tuple(Word(w["text"], w["start"], w["end"], w["probability"], w["speaker"]) for w in body["words"])
+    return {**body, "speakers": {label: asdict(s) for label, s in speakers_of(words, dict(body["speakers"])).items()}}
+
+
+_STORED = Versioned(current=2, migrations={1: _v1_to_v2})
 
 
 _PLAIN = re.compile(r"[A-Za-z][A-Za-z0-9._/+-]*(?: [A-Za-z0-9._/+-]+)*")

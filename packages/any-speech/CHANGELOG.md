@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+
+- **Breaking: `FORMAT_VERSION` and `any_speech.UnknownVersionError` are gone.** The version check is any-versioned's `Versioned`; an unknown or newer file raises `any_versioned.UnknownVersionError` (still a `ValueError`), and the v1 reader is a registered migration. Stored bytes are unchanged (golden test on a v2 file); a v1 file still loads.
+
 ## 0.5.0
 
 - `# Any: <reason>` on the public signature that names `Any`; no behaviour or stored byte changes (shelf public-any rule, tests/test_arch_public_any.py)

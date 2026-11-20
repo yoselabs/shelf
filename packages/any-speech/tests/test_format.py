@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 from any_speech import (
-    FORMAT_VERSION,
     Pipeline,
     Provenance,
     Segment,
@@ -14,12 +13,12 @@ from any_speech import (
     Speaker,
     Speech,
     Transcript,
-    UnknownVersionError,
     Word,
     job_key,
 )
 from any_speech.speech import default_out, is_current
 from any_speech.testing import FakeTranscriber
+from any_versioned import UnknownVersionError
 
 
 def _provenance(**over: object) -> Provenance:
@@ -59,13 +58,13 @@ def test_json_names_the_version_and_keeps_russian_unescaped(tmp_path: Path) -> N
     path = tmp_path / "t.json"
     _transcript().save(path)
     raw = path.read_text(encoding="utf-8")
-    assert json.loads(raw)["version"] == FORMAT_VERSION
+    assert json.loads(raw)["version"] == 2
     assert "ну да" in raw
 
 
 def test_a_reader_refuses_a_version_it_does_not_know(tmp_path: Path) -> None:
     path = tmp_path / "t.json"
-    path.write_text(json.dumps({**_transcript().to_json(), "version": FORMAT_VERSION + 1}), encoding="utf-8")
+    path.write_text(json.dumps({**_transcript().to_json(), "version": 3}), encoding="utf-8")
     with pytest.raises(UnknownVersionError):
         Transcript.load(path)
 
@@ -80,7 +79,7 @@ def test_a_v1_file_still_loads_with_talk_time_worked_out_from_its_words() -> Non
 
 def test_the_contract_shows_each_voice_with_its_talk_time() -> None:
     assert _transcript().to_json()["speakers"] == {"S1": {"name": "voice 1", "seconds": 0.2, "words": 1}}
-    assert FORMAT_VERSION == 2
+    assert _transcript().to_json()["version"] == 2
 
 
 def test_captions_are_a_source_kind() -> None:

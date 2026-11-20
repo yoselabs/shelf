@@ -1,12 +1,12 @@
 [project]
 name = "any-net"
-version = "0.2.0"
+version = "0.3.0"
 description = "Is the machine online, and does this text say a connection dropped: a DNS/TCP-split probe bounded by a join deadline, an IP-literal fallback, a drop-error matcher and a small on-disk probe cache."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = ["atomic-io>=0.2,<1"]
+dependencies = ["atomic-io>=0.2,<1", "any-versioned>=0.1,<1"]
 
 [dependency-groups]
 # The test libraries this package's suite imports, plus what the root conftest and pytest settings load (tests/test_package_tests_declare_their_dependencies.py).

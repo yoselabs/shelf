@@ -23,7 +23,7 @@ from any_speech.defaults import (
     transcribe_with_speakers,
 )
 from any_speech.drain import Drain, DrainReport, Job
-from any_speech.format import FORMAT_VERSION, Provenance, Segment, Speaker, Transcript, UnknownVersionError, Word, job_key
+from any_speech.format import Provenance, Segment, Speaker, Transcript, Word, job_key
 from any_speech.guard import DEFAULT_BUDGET_GB, MemoryBudgetError
 from any_speech.models import CARDS, ModelCard, card_for, default_card
 from any_speech.pipeline import AudioHasher, Pipeline
@@ -34,7 +34,6 @@ from any_speech.words import Piece, Turn, assign_speakers, segments_from_words, 
 __all__ = [
     "CARDS",
     "DEFAULT_BUDGET_GB",
-    "FORMAT_VERSION",
     "AudioHasher",
     "Diarized",
     "Diarizer",
@@ -56,7 +55,6 @@ __all__ = [
     "Transcriber",
     "Transcript",
     "Turn",
-    "UnknownVersionError",
     "Voice",
     "VoiceEmbedder",
     "Word",

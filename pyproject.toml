@@ -34,10 +34,12 @@ child-env = { workspace = true }
 # any-frontmatter, dir-trust and any-net compose atomic-io.
 # any-yaml composes yaml-merge and atomic-io.
 any-yaml = { workspace = true }
-# any-speech composes any-clock, any-pipeline, any-lease, process-lock, atomic-io, content-digest, app-dirs and verb-cli.
+# any-speech composes any-clock, any-pipeline, any-versioned, any-lease, process-lock, atomic-io, content-digest, app-dirs and verb-cli.
+# any-net composes any-versioned too.
 any-speech = { workspace = true }
 any-clock = { workspace = true }
 any-pipeline = { workspace = true }
+any-versioned = { workspace = true }
 any-lease = { workspace = true }
 content-digest = { workspace = true }
 app-dirs = { workspace = true }
@@ -325,6 +327,7 @@ testpaths = [
     "packages/any-yaml/tests",
     "packages/any-speech/tests",
     "packages/any-pipeline/tests",
+    "packages/any-versioned/tests",
     "packages/any-ttl-cache/tests",
     "packages/py-symbols/tests",
     "packages/test-reach/tests",
@@ -437,6 +440,7 @@ root_packages = [
     "any_yaml",
     "any_speech",
     "any_pipeline",
+    "any_versioned",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -531,6 +535,7 @@ source_modules = [
     "any_yaml",
     "any_speech",
     "any_pipeline",
+    "any_versioned",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -627,6 +632,7 @@ modules = [
     "any_yaml",
     "any_speech",
     "any_pipeline",
+    "any_versioned",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -654,6 +660,7 @@ ignore_imports = [
     "static_page_check -> content_digest",
     "dir_trust -> atomic_io",
     "any_net.probe -> atomic_io",
+    "any_net.probe -> any_versioned",
     "any_json_doc -> atomic_io",
     "any_json_doc -> process_lock",
     "content_extract -> convert_md",
@@ -679,6 +686,7 @@ ignore_imports = [
     "any_yaml.append -> atomic_io",
     "any_speech.format -> content_digest",
     "any_speech.format -> atomic_io",
+    "any_speech.format -> any_versioned",
     "any_speech.failures -> atomic_io",
     "any_speech.failures -> any_clock",
     "any_speech.pipeline -> any_clock",
@@ -927,6 +935,7 @@ packages = [
     "any-recorded-fixture",
     "any-speech",
     "any-ttl-cache",
+    "any-versioned",
     "any-yaml",
     "anyembed",
     "app-dirs",

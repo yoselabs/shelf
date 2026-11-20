@@ -36,6 +36,7 @@ members = [
     "any-shell-policy",
     "any-speech",
     "any-ttl-cache",
+    "any-versioned",
     "any-yaml",
     "anyembed",
     "anyllm",
@@ -628,9 +629,10 @@ dev = [
 
 [[package]]
 name = "any-net"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/any-net" }
 dependencies = [
+    { name = "any-versioned" },
     { name = "atomic-io" },
 ]
 
@@ -642,7 +644,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "atomic-io", editable = "packages/atomic-io" }]
+requires-dist = [
+    { name = "any-versioned", editable = "packages/any-versioned" },
+    { name = "atomic-io", editable = "packages/atomic-io" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -787,12 +792,13 @@ dev = [
 
 [[package]]
 name = "any-speech"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "packages/any-speech" }
 dependencies = [
     { name = "any-clock" },
     { name = "any-lease" },
     { name = "any-pipeline" },
+    { name = "any-versioned" },
     { name = "app-dirs" },
     { name = "atomic-io" },
     { name = "child-env" },
@@ -823,6 +829,7 @@ requires-dist = [
     { name = "any-clock", editable = "packages/any-clock" },
     { name = "any-lease", editable = "packages/any-lease" },
     { name = "any-pipeline", editable = "packages/any-pipeline" },
+    { name = "any-versioned", editable = "packages/any-versioned" },
     { name = "app-dirs", editable = "packages/app-dirs" },
     { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "child-env", editable = "packages/child-env" },
@@ -853,6 +860,27 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "aiosqlite", specifier = ">=0.20,<1" }]
+
+[[package]]
+name = "any-versioned"
+version = "0.1.0"
+source = { editable = "packages/any-versioned" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
 
 [[package]]
 name = "any-yaml"
