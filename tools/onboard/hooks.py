@@ -76,8 +76,39 @@ _REPO = "https://github.com/yoselabs/shelf"
 GATE_PACKAGES = {"any-gate": "any-gate-v0.1.0", "blueprint": "blueprint-v0.1.0"}
 
 
+def _norm(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _shelf_requirements(name: str) -> set[str]:
+    """The shelf packages `name` requires, directly."""
+    manifest = _SHELF_ROOT / "packages" / name / "pyproject.toml"
+    reqs = tomllib.loads(manifest.read_text()).get("project", {}).get("dependencies", [])
+    found = {_norm(m.group(1)) for r in reqs if (m := re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", r))}
+    return {n for n in found if (_SHELF_ROOT / "packages" / n / "pyproject.toml").is_file()}
+
+
+def shelf_closure(name: str) -> list[str]:
+    """Every shelf package `name` needs at runtime, itself excluded. A git source is not transitive in uv: the consumer lists each."""
+    seen: set[str] = set()
+    queue = [name]
+    while queue:
+        for dep in _shelf_requirements(queue.pop()) - seen:
+            seen.add(dep)
+            queue.append(dep)
+    return sorted(seen - {name})
+
+
+def release_tag(name: str) -> str:
+    """The tag a consumer pins `name` to: the gate packages' own, else the tag of the version the shelf holds now (`<name>-v<version>`)."""
+    if name in GATE_PACKAGES:
+        return GATE_PACKAGES[name]
+    manifest = _SHELF_ROOT / "packages" / name / "pyproject.toml"
+    return f"{name}-v{tomllib.loads(manifest.read_text())['project']['version']}"
+
+
 def package_spec(name: str) -> str:
-    return f'{{ git = "{_REPO}", subdirectory = "packages/{name}", tag = "{GATE_PACKAGES[name]}" }}'
+    return f'{{ git = "{_REPO}", subdirectory = "packages/{name}", tag = "{release_tag(name)}" }}'
 
 
 GATE_SPEC = package_spec("any-gate")
@@ -116,8 +147,19 @@ def _ensure_dependency(text: str, name: str) -> str:
     return text
 
 
+def _ensure_source(text: str, name: str) -> str:
+    """`text` with a git-tag source for `name` (a transitive shelf dependency); unchanged when the repo already sources it."""
+    if name in tomllib.loads(text).get("tool", {}).get("uv", {}).get("sources", {}):
+        return text
+    if "[tool.uv.sources]" in text:
+        return text.replace("[tool.uv.sources]\n", f"[tool.uv.sources]\n{name} = {package_spec(name)}\n", 1)
+    return text.rstrip("\n") + f"\n\n[tool.uv.sources]\n{name} = {package_spec(name)}\n"
+
+
 def ensure_gate_dependency(repo: Path) -> bool:
     """Make the gate's shelf packages (`any-gate`, `blueprint`) dev dependencies of a python+uv repo, pinned by git tag.
+
+    Their own shelf dependencies get a tag source too: uv does not carry a git source to the packages that need it.
 
     True when pyproject.toml changed. The hook entries and the `check`, `test`, `guard`, `preset` and `blueprint` recipes run them.
     """
@@ -128,6 +170,8 @@ def ensure_gate_dependency(repo: Path) -> bool:
     text = before
     for name in GATE_PACKAGES:
         text = _ensure_dependency(text, name)
+        for dep in shelf_closure(name):
+            text = _ensure_source(text, dep)
     if text == before:
         return False
     tomllib.loads(text)  # never leave a pyproject that does not parse
