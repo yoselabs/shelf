@@ -31,7 +31,8 @@ def _sops_repo(repo: Repo) -> None:
 
 def test_a_sealed_and_covered_repo_passes(repo: Repo) -> None:
     _sops_repo(repo)
-    assert {v for v, _ in _rows(repo).values()} == {Verdict.PASSING}
+    rows = _rows(repo)
+    assert {rows[i][0] for i in ("secrets.encrypted", "secrets.rule-coverage")} == {Verdict.PASSING}
 
 
 def test_a_repo_without_sops_is_not_applicable(repo: Repo) -> None:
@@ -82,3 +83,42 @@ def test_sops_files_without_rules_are_not_set_up(repo: Repo) -> None:
     _sops_repo(repo)
     (repo.root / ".sops.yaml").unlink()
     assert _rows(repo)["secrets.rule-coverage"][0] is Verdict.NOT_SET_UP
+
+
+_PIN = '[tools]\ngitleaks = "8.30.1"\n'
+_HOOK = "repos:\n- repo: local\n  hooks:\n  - id: secrets\n    entry: uv run python -m blueprint.secret_scan staged\n    language: system\n"
+
+
+def test_a_pinned_scanner_the_hooks_run_passes(repo: Repo) -> None:
+    repo.write("mise.toml", _PIN)
+    repo.write(".pre-commit-config.yaml", _HOOK)
+    assert _rows(repo)["secrets.scanner"][0] is Verdict.PASSING
+
+
+def test_a_pinned_scanner_the_gate_runs_passes(repo: Repo) -> None:
+    repo.write("mise.toml", '[tools]\n"aqua:gitleaks/gitleaks" = "8.30.1"\n')
+    repo.write("justfile", "secrets:\n    uv run python -m blueprint.secret_scan range\n")
+    assert _rows(repo)["secrets.scanner"][0] is Verdict.PASSING
+
+
+def test_a_repo_with_no_scanner_pin_fails(repo: Repo) -> None:
+    repo.write(".pre-commit-config.yaml", _HOOK)
+    verdict, evidence = _rows(repo)["secrets.scanner"]
+    assert verdict is Verdict.FAILING
+    assert "pin" in evidence
+
+
+def test_a_pinned_scanner_nothing_runs_fails(repo: Repo) -> None:
+    repo.write("mise.toml", _PIN)
+    repo.write("justfile", "check:\n    echo ok\n")
+    verdict, evidence = _rows(repo)["secrets.scanner"]
+    assert verdict is Verdict.FAILING
+    assert "runs" in evidence
+
+
+def test_a_full_history_scan_in_a_commit_hook_fails(repo: Repo) -> None:
+    repo.write("mise.toml", _PIN)
+    repo.write(".pre-commit-config.yaml", _HOOK.replace("secret_scan staged", "secret_scan full"))
+    verdict, evidence = _rows(repo)["secrets.scanner"]
+    assert verdict is Verdict.FAILING
+    assert "full" in evidence

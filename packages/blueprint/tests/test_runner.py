@@ -134,7 +134,7 @@ def test_the_profile_reads_stacks_and_takes_declared_values(repo: Repo) -> None:
 def test_write_produces_one_table_per_concern(repo: Repo) -> None:
     result = run(repo.root, env=repo.env)
     paths = report.write(result, repo.root, date(2026, 10, 10))
-    concerns = ("gate", "backlog", "knowledge", "secrets", "stack", "agents")
+    concerns = ("gate", "backlog", "knowledge", "secrets", "hooks", "stack", "agents")
     assert {p.name for p in paths} == {"README.md", "checkpoints.txt", *(f"{c}.md" for c in concerns)}
     text = (repo.root / "docs/blueprint/gate.md").read_text()
     assert "| | checkpoint | set up | working | evidence | remediation | fixed by |" in text

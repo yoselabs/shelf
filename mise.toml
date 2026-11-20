@@ -6,6 +6,7 @@ uv = "0.13.0"
 prek = "0.5.5"
 conftest = "0.71.1"
 shellcheck = "0.11.0"
+gitleaks = "8.30.1"
 "github:gastownhall/beads" = { version = "1.3.1", bin = "bd" }
 # any-speech reads and cuts audio with ffprobe and ffmpeg (conda-forge builds: the same binaries on linux and macOS).
 "conda:ffmpeg" = "8.0.1"

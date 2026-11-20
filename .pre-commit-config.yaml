@@ -54,6 +54,16 @@ repos:
 # keeps commits fast: the local-source guard, ruff on staged files, preset drift on pyproject.
 - repo: local
   hooks:
+  - id: secret-scan
+    name: secrets in the staged changes
+    # gitleaks (pinned in mise.toml) over the index only, so it costs a fraction of a second; the gate scans the changed range.
+    entry: uv run python -m blueprint.secret_scan staged
+    language: system
+    always_run: true
+    pass_filenames: false
+    stages: [pre-commit]
+- repo: local
+  hooks:
   - id: shelf-guard
     name: no local shelf source
     entry: uv run blueprint guard
