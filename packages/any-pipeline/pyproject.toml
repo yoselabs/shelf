@@ -1,12 +1,12 @@
 [project]
 name = "any-pipeline"
-version = "0.1.0"
-description = "A pipeline as a typed value: async stages composed with >> and gather, every stage bounded by a required Limit, failures recorded per item, never swallowed. Stdlib only."
+version = "0.2.0"
+description = "A pipeline as a typed value: async stages composed with >> and gather, every stage bounded by a required Limit, failures recorded per item, never swallowed. Stdlib plus atomic-io for its FileStore."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = []
+dependencies = ["atomic-io>=0.2,<1"]
 
 [dependency-groups]
 # The test libraries this package's suite imports, plus what the root conftest and pytest settings load (tests/test_package_tests_declare_their_dependencies.py).
