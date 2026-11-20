@@ -2,14 +2,9 @@
 # gets tagged, or goes away, fails the check until it is deleted. Tag a package when it is first released, then delete its line.
 [allow]
 any-breaker = "candidate, never released: catalog status candidate, no tag yet"
-any-clock = "candidate, never released: catalog status candidate, no tag yet"
 any-contract = "candidate, never released: catalog status candidate, no tag yet"
 any-failure-fp = "candidate, never released: catalog status candidate, no tag yet"
-any-json-doc = "candidate, never released: catalog status candidate, no tag yet"
 any-mailbox = "candidate, never released: catalog status candidate, no tag yet"
-any-net = "candidate, never released: catalog status candidate, no tag yet"
 any-plugin-cache = "candidate, never released: catalog status candidate, no tag yet"
-any-recorded-fixture = "candidate, never released: catalog status candidate, no tag yet"
 any-shell-policy = "candidate, never released: catalog status candidate, no tag yet"
-shelf-vendor = "candidate, never released: catalog status candidate, no tag yet"
 task-spec = "candidate, never released: catalog status candidate, no tag yet"

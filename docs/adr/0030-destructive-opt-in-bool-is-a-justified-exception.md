@@ -1,7 +1,7 @@
 ---
 id: 0030
 title: A destructive opt-in bool is a justified exception
-statement: A bool parameter that opts one call into a destructive or history-changing act (force, allow_delete, ignored, nested, allow_empty, hooks, keep_ignored, any_replica) is allowed when the default is the safe act and the caller must name the flag.
+statement: A bool that opts one call into a destructive or history-changing act (force, allow_delete, ignored, nested, allow_empty, hooks, keep_ignored) is allowed when the safe act is the default.
 concerns: [doctrine]
 status: accepted
 decided_by: owner

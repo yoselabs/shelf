@@ -784,7 +784,7 @@ project-includes = ["packages", "tools"]
 # (an excluded path Claude Code adds) it matched no file and passed (homelab, 2026-10-11).
 use-ignore-files = false
 # tools/ scripts import their siblings by path (onboard.*).
-search-path = ["tools"]
+search-path = ["tools", "packages/git-porcelain/tests"]
 preset = "strict"
 
 # convert-md's bench probe runners for marker/unstructured/docling/pandoc (D4):
