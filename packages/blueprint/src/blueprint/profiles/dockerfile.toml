@@ -3,6 +3,8 @@
 # Dockerfile.<suffix> or Containerfile within three levels (not *.dockerignore). A stack of its own, not a compose role: a repo
 # with images and no compose file (a2kay) is still linted.
 stack = "dockerfile"
+# language: carries code that grows layers, so it needs a layering tool; artifact: a file format with no layers of code (its architecture row says why).
+family = "artifact"
 status = "provisional"
 source = "hadolint-and-ci-uv.md and dockerfile-gaps.md (2026-10-11): hadolint 2.15.1 red (exit 1) on 4 of 4 real Dockerfiles from two consumers and on a planted file; failure-threshold and ignored seen working in .hadolint.yaml"
 

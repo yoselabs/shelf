@@ -2,6 +2,8 @@
 # Research: docs/research/blueprint-skill/research/node-go-rust-layering.md (architecture: tool, evidence URL, date, verdict).
 # The other roles are the current defaults, documented but never run here: provisional until a consumer runs the set red and green.
 stack = "go"
+# language: carries code that grows layers, so it needs a layering tool; artifact: a file format with no layers of code (its architecture row says why).
+family = "language"
 status = "provisional"
 source = "node-go-rust-layering.md (2026-11-20, web research only, nothing run); no consumer yet"
 

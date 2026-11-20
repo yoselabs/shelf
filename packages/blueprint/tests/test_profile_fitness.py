@@ -8,24 +8,28 @@ from blueprint.concerns.stack import ROLES, load_profiles
 _PROFILES = load_profiles()
 
 
-# Stacks that carry no layered code: their architecture role is `na`, and the reason must be written (owner to confirm, shelf-jc7r.4).
-_NOT_LAYERED = {"dockerfile": "image build files", "nix": "host configuration", "shell": "leaf scripts"}
+def _of(family: str) -> list[str]:
+    return sorted(s for s, p in _PROFILES.items() if p.family == family)
 
 
-@pytest.mark.parametrize("stack", sorted(_NOT_LAYERED))
-def test_a_stack_without_layered_code_says_why_its_architecture_is_na(stack: str) -> None:
-    role = _PROFILES[stack].roles.get("architecture")
-    assert role is not None
-    assert role.na.strip(), f"{stack}: architecture needs a tool or a written `na` reason"
+def test_every_profile_declares_its_family() -> None:
+    assert [s for s, p in _PROFILES.items() if p.family not in {"language", "artifact"}] == []
 
 
-@pytest.mark.parametrize("stack", sorted(set(_PROFILES) - set(_NOT_LAYERED)))
-def test_every_layered_stack_has_an_architecture_role_that_is_not_na(stack: str) -> None:
+@pytest.mark.parametrize("stack", _of("language"))
+def test_every_language_profile_has_an_architecture_role_that_is_not_na(stack: str) -> None:
     role = _PROFILES[stack].roles.get("architecture")
     assert role is not None, f"{stack} has no architecture role"
-    assert not role.na, f"{stack}: architecture is na ({role.na}); a stack with no layering tool is not supported"
+    assert not role.na, f"{stack}: architecture is na ({role.na}); a language stack with no layering tool is not supported"
     assert not role.untested, f"{stack}: architecture is untested"
     assert role.tool, f"{stack}: architecture names no tool"
+
+
+@pytest.mark.parametrize("stack", _of("artifact"))
+def test_an_artifact_profile_says_why_it_has_no_layers_or_names_its_policy_tool(stack: str) -> None:
+    role = _PROFILES[stack].roles.get("architecture")
+    assert role is not None
+    assert role.na.strip() or role.tool, f"{stack}: architecture needs a written `na` reason or a tool"
 
 
 @pytest.mark.parametrize("stack", ["node", "go", "rust"])

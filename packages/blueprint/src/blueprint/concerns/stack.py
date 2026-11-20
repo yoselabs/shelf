@@ -106,6 +106,8 @@ class StackProfile:
     status: str
     source: str
     roles: dict[str, Role] = field(default_factory=dict)
+    # `language` (code that grows layers: needs a layering tool) or `artifact` (a file format: architecture is `na` with its reason).
+    family: str = ""
 
 
 def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
@@ -131,7 +133,9 @@ def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
             )
             for r in data.get("role", [])
         }
-        profiles[data["stack"]] = StackProfile(data["stack"], data.get("status", "provisional"), data.get("source", ""), roles)
+        profiles[data["stack"]] = StackProfile(
+            data["stack"], data.get("status", "provisional"), data.get("source", ""), roles, data.get("family", "")
+        )
     return profiles
 
 
@@ -486,13 +490,11 @@ def roles(ctx: Context) -> list[Sub]:
     return subs
 
 
-# Stacks that hold code which can call across a language boundary; a compose file or a Dockerfile is not one.
-CODE_STACKS = frozenset({"python-uv", "python", "dotnet", "node", "go", "rust"})
-
-
 def _edges_row(ctx: Context) -> Sub | None:
     """Two code stacks in one repo touch only through a declared `[[edge]]` (from, to, via a contract file that exists)."""
-    present = [s for s in ctx.profile.stacks if s in CODE_STACKS]
+    profiles = load_profiles()
+    # A language stack, or one with no profile yet (python without a lock): code that can call across a language boundary.
+    present = [s for s in ctx.profile.stacks if s not in profiles or profiles[s].family == "language"]
     if len(present) < 2:
         return None
     statement = "stacks sharing the repo touch only through a declared [[edge]] with a contract file"

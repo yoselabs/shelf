@@ -10,6 +10,8 @@
 # it is abandoned: archived, broken on the current toolchain, or its users have moved to a successor.
 # Ecosystems differ (C# and Java tools release rarely); judge by use and compatibility, not by date.
 stack = "python-uv"
+# language: carries code that grows layers, so it needs a layering tool; artifact: a file format with no layers of code (its architecture row says why).
+family = "language"
 status = "evidenced"  # evidenced: the shelf and a2kay run it | provisional: written, not yet proven
 source = "the shelf's own gate (pyproject.toml, justfile; ADR 0004, 0023)"
 
