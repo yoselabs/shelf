@@ -424,7 +424,9 @@ def finish_rebase(wt: RealWorktree, action: Literal["continue", "abort"], restor
 
 def has_markers(path: Path) -> bool:
     try:
-        return _MARKERS.search(path.read_text(encoding="utf-8", errors="replace")) is not None
+        return (
+            _MARKERS.search(path.read_text(encoding="utf-8", errors="replace")) is not None
+        )  # lossy-ok: detect: marker search, never written back
     except OSError:
         return False
 

@@ -59,7 +59,7 @@ def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
             str(int(rest[19])),
             rest[0],
             cpu,
-            command.decode("utf-8", errors="replace"),
+            command.decode("utf-8", errors="replace"),  # lossy-ok: display: a process name for a row
             uid,
             int(rest[21]) * PAGE,
         )

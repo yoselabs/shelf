@@ -109,6 +109,10 @@ output-format = "concise"
 exclude = ["*.md"]
 
 [tool.ruff.lint]
+# PLW1514 (unspecified-encoding) is a preview rule: `explicit-preview-rules` turns on only the preview
+# rules named in `select`, never the whole preview set.
+preview = true
+explicit-preview-rules = true
 select = [
     # correctness & the core
     "F",    # pyflakes — real bugs (undefined names, unused imports)
@@ -159,6 +163,7 @@ select = [
     "ERA",  # no commented-out code (leave it smaller, constitution III/VIII)
     "ARG",  # no unused arguments
     "PERF", # obvious performance footguns
+    "PLW1514", # text IO names its encoding: the platform default is not a contract
     "RUF",  # ruff's own rules (RUF100 catches stale noqa)
 ]
 ignore = [
@@ -199,6 +204,11 @@ builtins-allowed-modules = ["types"]
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.ruff.lint.per-file-ignores]
+# blueprint's recipes are standalone scripts a repo copies alone into tools/, and blueprint is another
+# owner's package: its text IO is read with the platform default until that owner adds encoding=.
+# tools/gate_state.py is the byte-identical copy of blueprint's recipe, so it stays in step.
+"packages/blueprint/**" = ["PLW1514"]
+"tools/gate_state.py" = ["PLW1514"]
 # The isolated gate must exec-replace itself to retain the durably registered PID.
 # Its validated private payload is explicit caller argv, never shell text (shelf-4426).
 # S606 flags the required exec primitive itself; keep it enabled everywhere else.

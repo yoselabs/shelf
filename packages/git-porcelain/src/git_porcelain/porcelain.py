@@ -66,7 +66,7 @@ def _run(
             capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="replace",
+            errors="replace",  # lossy-ok: display: git output returned to the caller
             env=child,
             timeout=timeout,
             input=stdin,
@@ -241,7 +241,7 @@ def unmerged_paths(vault: Path, *, env: Mapping[str, str] | None = None) -> list
 def has_conflict_markers(path: Path) -> bool:
     """Return True if ``path`` contains git conflict markers (unreadable files are False)."""
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
+        text = path.read_text(encoding="utf-8", errors="replace")  # lossy-ok: detect: marker search, never written back
     except OSError:
         return False
     return "<<<<<<<" in text and ">>>>>>>" in text

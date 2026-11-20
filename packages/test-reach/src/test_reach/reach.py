@@ -61,7 +61,7 @@ class _PerTest:
 
 
 def _hit(path: Path, lines: set[int]) -> set[str]:
-    spans = functions(path.read_text())
+    spans = functions(path.read_text(encoding="utf-8"))
     return {name for line in lines if (name := innermost(spans, line)) is not None}
 
 

@@ -663,7 +663,9 @@ def sniff_json_body(body: bytes) -> bool:
     # multi-MB) body. Real HTML opens with `<`; only a JSON prefix is decoded.
     if body[:64].lstrip()[:1] not in (b"{", b"["):
         return False
-    return parse_json_response(body.decode("utf-8", errors="replace")) is not None
+    return (
+        parse_json_response(body.decode("utf-8", errors="replace")) is not None
+    )  # lossy-ok: detect: parses for a yes/no, the text is dropped
 
 
 def parse_json_response(text: str) -> JsonPayload | None:

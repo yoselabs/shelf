@@ -203,7 +203,7 @@ def _write(fd: int, record: dict[str, object]) -> None:
 
 
 def _parse(raw: bytes) -> Holder | None:
-    text = raw.decode(errors="replace").strip()
+    text = raw.decode(errors="replace").strip()  # lossy-ok: parse: a corrupt lock file reads as no holder, never stored
     if not text:
         return None
     if text.isdigit():  # v0.1 wrote the bare pid

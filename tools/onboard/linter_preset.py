@@ -270,7 +270,7 @@ def _verify(repo: Path, applied: list[str], to_copy: list[str], justfile: Path) 
         tomllib.loads(pyproject_text)
     except tomllib.TOMLDecodeError as exc:
         return Result(Outcome.FAILED, verified=False, message=f"{pyproject} is not valid TOML after writing: {exc}")
-    written = {name for name, _ in _split_just_recipes(justfile.read_text())} if justfile.exists() else set()
+    written = {name for name, _ in _split_just_recipes(justfile.read_text(encoding="utf-8"))} if justfile.exists() else set()
     if missing := set(to_copy) - written:
         return Result(Outcome.FAILED, verified=False, message=f"{justfile.name} still missing recipes after write: {missing}")
     if justfile.exists() and (complaint := _gate_resolves(repo)):

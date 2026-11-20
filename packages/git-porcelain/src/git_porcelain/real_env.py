@@ -51,7 +51,7 @@ def git_dir(checkout: Path) -> Path | None:
     if entry.is_dir():
         return entry
     try:
-        text = entry.read_text(encoding="utf-8", errors="replace")
+        text = entry.read_text(encoding="utf-8", errors="replace")  # lossy-ok: parse: gitdir path in a .git file, never stored
     except OSError:
         return None
     found = _GITDIR_FILE.match(text.strip())

@@ -76,7 +76,7 @@ def convert_html(
         nothing, a ``failed``-fidelity empty result is returned so the caller can
         still proceed.
     """
-    source_size = len(html.encode("utf-8", errors="replace"))
+    source_size = len(html.encode("utf-8", errors="replace"))  # lossy-ok: measure: a size only, nothing stored from the bytes
 
     if source_kind == "web_page":
         markdown = _extract_trafilatura(

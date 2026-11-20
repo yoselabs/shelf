@@ -23,7 +23,7 @@ def discover_rules() -> dict[str, Callable[..., Any]]:
 def lint_path(target: Path) -> list[LintMessage]:
     """Run all discovered rules over `target` (a file or a directory tree)."""
     rules = discover_rules()
-    files = [target] if target.is_file() else [p for p in target.rglob("*.py") if p.is_file()]
+    files = [target] if target.is_file() else sorted(p for p in target.rglob("*.py") if p.is_file())
     messages: list[LintMessage] = []
     for path in files:
         try:
