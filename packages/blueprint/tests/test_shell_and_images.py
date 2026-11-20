@@ -155,7 +155,7 @@ def test_one_script_in_a_python_repo_is_the_shell_stack_with_its_conventions_fil
     rows = _rows(repo)
     assert "packaging/macos/build_app.sh" in rows["stack.shell.profile"][1]
     assert rows["stack.shell.strict-mode"][0] is Verdict.FAILING
-    assert rows["stack.shell.agent-guidance"][0] is not Verdict.NOT_APPLICABLE
+    assert "stack.shell.agent-guidance" not in rows  # cut: agents.culture-files covers it
     assert not any(row.startswith("stack.shell-scripts.") for row in rows)
     assert "shell" in templates.required(detect(repo.root, load_state(repo.root)))
 
@@ -219,7 +219,7 @@ def test_bats_tests_run_by_the_gate_pass_the_shell_tests_row(repo: Repo) -> None
     repo.write("justfile", "check: shell-test\nshell-test:\n    bats tests/shell\n")
     rows = _rows(repo)
     assert rows["stack.shell.tests"][0] is Verdict.PASSING
-    assert rows["stack.shell.coverage"][0] is Verdict.NOT_APPLICABLE
+    assert "stack.shell.coverage" not in rows  # na for the stack: not a checkpoint
 
 
 def test_the_compose_policy_in_the_gate_passes_architecture_and_tests(repo: Repo) -> None:

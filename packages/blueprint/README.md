@@ -72,9 +72,9 @@ adr = "0003"              # an accepted ADR in docs/adr/ records the durable dec
 # code = "not-applicable" # optional, legacy: test-data | remediated | not-applicable | not-supported | not-detected
 
 [[override]]              # with a scope the check still runs; only the offenders the scope names are dropped
-id = "stack.python-uv.cli-parse"
-scope = "tools/verbs.py:12"   # a path glob, "path:line", or "service:<compose service>"
-reason = "globals pre-parser; the rest goes to a strict parse_args"
+id = "stack.python-uv.tests"
+scope = "tools/legacy_tests"   # a path glob, "path:line", or "service:<compose service>"
+reason = "vendored suite, run by its owner"
 expires = 2027-04-01
 
 [[override]]              # a throwaway or vendored path: stack detection and role globs skip it
@@ -87,7 +87,7 @@ expires = 2027-04-01
 Excusing a file or folder from detection (`id = "detection"`) is also how to except a whole stack for it: a script kept out of detection is judged by no `stack.shell.*` row.
 
 Replaced shapes: `[[profile.ignore]]` still works and is reported with the `[[override]]` to write instead;
-`# lenient:` (cli-parse), `# strict: no -e` (shell strict mode) and the compose policy's `x-policy-exempt` still
+`# strict: no -e` (shell strict mode) and the compose policy's `x-policy-exempt` still
 work for now, each reported (a notice, a conftest warning) with the override to paste; they will stop being honoured. The compose policy reads this same file:
 `conftest test --combine --policy policy docs/blueprint/blueprint.toml <compose files>` with ids `compose.<rule>`
 (`privileged`, `host_network`, `docker_socket`, `unbound_port`, `default_network`, `healthcheck`) and
@@ -108,7 +108,7 @@ and the scope: concerns checked, concerns not run, and whether the audit-only ch
 | generic | gate | `one-command` · `runner` (a Makefile-only gate fails: the runner is just, ADR 0023; the graph is read from `just --dump --dump-format json`, a Makefile still being judged) · `runs-blueprint` · `ci` · `ci-no-manifest-edit` · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` (follows `just check` into pre-commit hooks) · `checkers-wired` · `lfs-binaries` (a repo with LFS patterns: every binary blob is a pointer, read from the blob since `--eol` cannot judge a `-text` file) · `lfs-installed` (audit only: git-lfs and its filter in this clone) · `default-branch` (audit only) · `git-remote` (audit only) · `clean-clone` (audit only) |
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
 | stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional; the toolchain row also checks every dotnet install against global.json); `python-uv.uv-tool` (audit only): an application's installed uv tool matches uv.lock; `tool-pins`: every tool the repo runs (uv, just, prek, bd, git-lfs, godot) is pinned exactly in mise.toml, locked in mise.lock and installed by a `mise install --locked` recipe, with no second pin beside .python-version, global.json or rust-just (ADR 0024); `tools-installed` (audit only): each pinned tool on PATH is its pinned version |
-| framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, unity, mcp, provisional: framework-version · project-hygiene · binary-assets · embedded-script-lint · build · tests · surface-integrity · architecture · ci · hooks · agent-guidance); paths may use `{root}` (the project folder) and globs |
+| framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, unity, mcp, provisional: framework-version · project-hygiene · binary-assets · build · tests · surface-integrity · architecture · hooks; `ci`, `embedded-script-lint` and `agent-guidance` project no row); paths may use `{root}` (the project folder) and globs |
 | agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `worktrees` · `culture-files` (placeholders in docs/agents/, AGENTS.md and CLAUDE.md; a domain.md naming a file the repo lacks) · `managed-block` |
 
 With `--audit`, a gate row that is failing or not set up (`one-command`, `runner`, `ci`, `ci-no-manifest-edit`, `hooks-recipe`, `runs-blueprint`, `clean-clone`) also names any remote-tracking branch (`origin/*`, local refs, no fetch) ahead of the default branch that changes a gate file (justfile, Makefile, `.github/workflows/*`, hook config), and hands the fix to the owner: merge that branch or remediate on main, not a parallel gate. The branch itself is never checked.

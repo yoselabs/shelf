@@ -83,3 +83,19 @@ Cut: `cli-parse` (1), `*.agent-guidance` (9), `*.profile` rows (11), compose/doc
 - Time was measured on the shelf, a Python repo with no LFS/compose/dotnet; other stacks' `stack.*` rows are known cheap (file reads)
   but their real cost is the gate steps they require, not blueprint.
 - Which checkpoints a2kay's gate fails today is task 10, not here.
+
+## Applied 2026-11-20 (owner: "apply the cuts")
+
+Done: `stack.python-uv.cli-parse` (the lenient-parsing row; `cli-help-tested` stays); `agents.pocock-skills`; the nine
+`*.agent-guidance` rows; `stack.{compose,dockerfile,nix,shell}.coverage`; `framework.{godot,unity,mcp}.ci` and `embedded-script-lint`.
+That is 1 + 1 + 9 + 4 + 6 = 21 rows. The profile files keep the role data; `is_checkpoint` in `concerns/stack.py` decides which roles project a row.
+
+**Not applied, with the reason:**
+- The 11 `*.profile` rows. The review said they restate that a profile exists; in fact they carry the *detection evidence* (the file or folder that set
+  the stack or framework, the framework root). 23 tests and the report read it. Cutting needs that evidence moved to the report header first.
+- `stack.*.hooks` and godot/unity (marked "justify", owner's answer needed), `python-pin` speed, `bd-metrics-off`, `default-branch`: "justify", not "cut".
+- The backlog merge (5 rows into 1) and the `gate.ci*` become-`na` change: they change behaviour, not just remove rows; left for their own beads.
+- The `untested` mechanism (a role the profile marks `untested` becomes a blueprint gap) now has no profile exercising it, so its test was
+  replaced; the code stays.
+
+a2kay's two `cli-parse` overrides now excuse nothing; the run's unused-override notice will say so.
