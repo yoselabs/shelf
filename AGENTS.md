@@ -22,12 +22,12 @@ If you catch this file naming a specific package count or roster, that's a bug â
 
 ### Definition of Done
 
-A task is **done** only when the full quality gate passes across the **entire repo** â€”
-not just the files the task touched:
+A task is **done** only when `just check` passes: its linters, types and architecture rules cover the **entire repo**, and its tests are the
+ones the change reaches (the rest already passed on the same input). `just check-all` is not part of a task's Done; it is the release gate:
 
 ```bash
 just check      # ruff + format + pyrefly (strict) + codespell + deptry + the tests the change reaches
-just check-all  # the same, every test, with the coverage floor (run locally; the shelf has no CI, ADR 0027)
+just check-all  # the same, every test, with the coverage floor: RARE, before a release tag only (the shelf has no CI, ADR 0027)
 ```
 
 The runner is [just](https://just.systems) ([ADR 0023](docs/adr/0023-the-gate-runner-is-just.md)), pinned as the

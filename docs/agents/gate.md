@@ -16,6 +16,11 @@ deleted one. A linter with nothing to look at is skipped and says so in one line
 config runs it over everything. A check that reads across files (types, architecture, dependencies) always
 covers the whole repo, and so does the gate in CI (`just check-all`). No base found means everything runs.
 
+**Run `just check` while working; `just check-all` is rare.** `check` runs the tests the change reaches and skips any suite that already
+passed on the same input, so a normal change takes seconds to a minute. `check-all` runs every test in every package with the coverage floor,
+two minutes or more, and is the release gate: run it before a release tag. Do not run it per task, per
+commit or per PR: it re-proves what `check` already proved.
+
 `python -m any_gate changed` is the selector (`any-gate`, a dev dependency pinned by git tag; `--help` documents it). It prints the
 changed files matching its globs, NUL-separated, or everything on `--scope all`, when a `--config` file changed, or with
 no base. A repo adds a `-changed` twin of each per-file recipe and `check` calls the twins:
