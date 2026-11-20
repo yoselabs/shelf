@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -91,3 +93,24 @@ def test_a_missing_scanner_is_an_error_not_a_pass(repo: Repo) -> None:
     env = {**repo.env, "PATH": str(repo.bin_dir)}
     with pytest.raises(ScanError, match="gitleaks"):
         scan(repo.root, Mode.FULL, env=env)
+
+
+def test_help_exits_zero_and_an_unknown_flag_exits_two() -> None:
+    run = lambda *a: subprocess.run([sys.executable, "-m", "blueprint.secret_scan", *a], capture_output=True, text=True, check=False)  # noqa: E731
+    helped = run("--help")
+    assert helped.returncode == 0
+    assert "staged" in helped.stdout
+    assert run("--bogus").returncode == 2
+
+
+def test_the_command_line_exits_one_on_a_finding_and_zero_when_clean(repo: Repo) -> None:
+    repo.write("a.py", "x = 1\n")
+    repo.commit()
+    cmd = [sys.executable, "-m", "blueprint.secret_scan", "full", "--repo", str(repo.root)]
+    assert subprocess.run(cmd, env=repo.env, capture_output=True, check=False).returncode == 0
+    repo.write("leak.py", _LEAK)
+    repo.commit()
+    done = subprocess.run(cmd, env=repo.env, capture_output=True, text=True, check=False)
+    assert done.returncode == 1
+    assert "leak.py:1 aws-access-token" in done.stderr
+    assert "AKIAZ7VRSQ2WKNBTXPLM" not in done.stderr

@@ -79,7 +79,11 @@ def test_a_pre_push_hook_that_is_not_the_gate_fails(repo: Repo) -> None:
 
 
 def test_bds_pre_push_hooks_are_not_a_second_gate(repo: Repo) -> None:
-    config = _GOOD + _hook("bd-pre-push", "bd hooks run pre-push", stages="[pre-push]") + _hook("bd-dolt-push", "bd dolt push", stages="[pre-push]")
+    config = (
+        _GOOD
+        + _hook("bd-pre-push", "bd hooks run pre-push", stages="[pre-push]")
+        + _hook("bd-dolt-push", "bd dolt push", stages="[pre-push]")
+    )
     assert _rows(repo, config)["hooks.pre-push-is-the-gate"][0] is Verdict.PASSING
 
 
@@ -98,7 +102,9 @@ def test_bds_dolt_push_that_exits_zero_on_success_is_fail_closed(repo: Repo) -> 
     assert _rows(repo, _GOOD + _hook("bd-dolt-push", entry, stages="[pre-push]"))["hooks.fail-closed"][0] is Verdict.PASSING
 
 
-@pytest.mark.parametrize("path", ["$SHELF_HOME/tools/guard.py", "../shelf/tools/guard.py", "~/Workspaces/shelf/tools/guard.py", "$HOME/Workspaces/shelf/x"])
+@pytest.mark.parametrize(
+    "path", ["$SHELF_HOME/tools/guard.py", "../shelf/tools/guard.py", "~/Workspaces/shelf/tools/guard.py", "$HOME/Workspaces/shelf/x"]
+)
 def test_a_hook_resolved_through_a_shelf_clone_fails(repo: Repo, path: str) -> None:
     verdict, evidence = _rows(repo, _GOOD + _hook("guard", f"python3 {path}"))["hooks.no-clone-path"]
     assert verdict is Verdict.FAILING

@@ -56,7 +56,8 @@ def _git(repo: Path, env: Mapping[str, str] | None, *args: str) -> str | None:
 def _run(repo: Path, env: Mapping[str, str] | None, args: Sequence[str]) -> list[Leak]:
     """One gitleaks run; its JSON report holds the findings (exit 1 is "leaks found", anything else above 1 is a failure)."""
     if shutil.which("gitleaks", path=(env or os.environ).get("PATH")) is None:
-        raise ScanError("gitleaks is not installed: run `just tools` (pinned in mise.toml)")
+        missing = "gitleaks is not installed: run `just tools` (pinned in mise.toml)"
+        raise ScanError(missing)
     with tempfile.TemporaryDirectory() as tmp:
         report = Path(tmp) / "report.json"
         done = subprocess.run(
@@ -68,9 +69,10 @@ def _run(repo: Path, env: Mapping[str, str] | None, args: Sequence[str]) -> list
             check=False,
         )
         if done.returncode not in (0, 1):
-            raise ScanError(f"gitleaks failed ({done.returncode}): {done.stderr.strip()[:300]}")
-        found = json.loads(report.read_text() or "[]") if report.exists() else []
-    return [Leak(str(f["File"]), int(f["StartLine"]), str(f["RuleID"])) for f in found]
+            failed = f"gitleaks failed ({done.returncode}): {done.stderr.strip()[:300]}"
+            raise ScanError(failed)
+        found: list[dict[str, object]] = json.loads(report.read_text() or "[]") if report.exists() else []
+    return [Leak(str(f["File"]), int(str(f["StartLine"])), str(f["RuleID"])) for f in found]
 
 
 def _base(repo: Path, env: Mapping[str, str] | None) -> str | None:
@@ -102,12 +104,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         leaks = scan(args.repo, Mode(args.mode))
     except ScanError as error:
-        print(f"secret scan: {error}", file=sys.stderr)
+        sys.stderr.write(f"secret scan: {error}\n")
         return 2
     for leak in leaks:
-        print(f"secret scan: {leak}", file=sys.stderr)
+        sys.stderr.write(f"secret scan: {leak}\n")
     if leaks:
-        print("secret scan: rotate what leaked (it is in git history once committed); a false positive goes in .gitleaks.toml", file=sys.stderr)
+        sys.stderr.write("secret scan: rotate what leaked (it is in git history once committed); a false positive goes in .gitleaks.toml\n")
     return 1 if leaks else 0
 
 
