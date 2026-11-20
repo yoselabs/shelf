@@ -29,7 +29,6 @@ from git_porcelain import (
     GitUnavailable,
     Identity,
     RealRepo,
-    Rebased,
     Worktree,
     WorktreeRemoveRefused,
     real_env,
@@ -866,19 +865,9 @@ def _squash_fails(world: World, name: str) -> None:
     world.monkeypatch.setattr(repo, "try_run", fail_commit)
 
 
-@then(parsers.parse('the squash policy outcome is "{outcome}"'))
-def _squash_outcome(world: World, outcome: str) -> None:
-    wt = world.wts["r"]
-    if outcome == "raised":
-        assert isinstance(world.error, GitUnavailable)
-        assert world.rig.head(wt) == world.memory["before"]
-    else:
-        assert world.error is None
-        assert type(world.result).__name__ == "Rebased"
-        assert isinstance(world.result, Rebased)
-        assert world.result.squash_failure == "squash failed"
-        assert world.result.squashed is False
-        assert [row.subject for row in wt.repo.history(["HEAD"], limit=2)] == ["second", "first"]
+@then(parsers.parse('the head of "{name}" is "{expected}"'))
+def _head_is(world: World, name: str, expected: str) -> None:
+    assert world.rig.head(world.wts[name]) == _expand(world, expected)
 
 
 @then(parsers.parse('the branch "{branch}" of "{name}" rewritten is {expected}'))

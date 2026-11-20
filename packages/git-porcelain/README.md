@@ -103,7 +103,7 @@ def land(wt: Worktree) -> bool:
         case Rebased():
             return isinstance(wt.push("main"), Pushed)
         case _:
-            return False                        # Conflict: finish_rebase("continue" | "abort")
+            return False                        # Conflict: resolve_and_continue() | abort_rebase()
 
 land(RealRepo(path, ambient=env).worktree(path))             # the binary, memoized
 land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no subprocess
@@ -111,8 +111,8 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
 
 - **`Repo`**: `identity sync fetch remote_url remote_push_url remote_urls remote_push_urls ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch commit tree squash commit_tree update_ref worktrees add_worktree drop_worktree discard_worktree
   prune_worktrees worktree_state exclude_locally worktree`.
-- **`Worktree`**: `health branch checkout checkout_new clean clean_ignored reset checkout_force snapshot diff dirty stage stage_tracked record record_with_hooks record_empty merge_ff take_branch release_branch park exclude capture start_merge merging finish_merge abort_merge rebase_onto
-  finish_rebase rebase continue_rebase abort_rebase rebasing unmerged push push_refspecs push_request push_lease lfs_push landed grep_tracked`.
+- **`Worktree`**: `health branch checkout checkout_new clean clean_ignored reset checkout_force snapshot diff dirty stage stage_tracked record record_with_hooks record_empty amend merge_ff take_branch restart_branch release_branch park exclude capture start_merge merging finish_merge abort_merge rebase_onto
+  rebase continue_rebase abort_rebase rebasing unmerged push push_refspecs push_request push_lease lfs_push landed grep_tracked`.
 - **Reading files, commit or disk** (0.24): `Repo.commit(rev)` is the commit id (`MissingRevision` if none); `Repo.tree("rev:folder")` and `worktree_tree(root, folder)` both give a `Tree` (`files` path to `(mode, blob sha)`, `read`, `read_many`, `sha`), so a commit's folder and the same folder on disk compare entry by entry; `blob_sha(data)` is Git's id for bytes.
 - **Results are frozen unions** (`Recorded | NothingToRecord | HookRejected`, `BranchTaken |
   BranchHeld`, `UpToDate | Rebased | Conflict`, `Squashed | Conflicted`, `Pushed | Rejected | Transient`, `Synced | Offline`,
@@ -141,12 +141,12 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   compare-and-delete (`update-ref -d`); a moved or missing tip raises non-retryable `RefRace`.
   A branch checked out in any worktree raises `BranchPinned`, preserving its tip and HEAD.
   There is no merged check. No retry can delete a newly advanced tip.
-- **Recording scopes**: `record(message, paths="own", base=None, mode="new", squash_to=None)` keeps the original `own` and `all` behavior. `tracked` stages
+- **Recording scopes**: `record(message, paths="own", base=None)` keeps the original `own` and `all` behavior. `tracked` stages
   modifications/deletions of index-tracked paths and commits them with already staged additions;
   untracked files stay out. `staged` commits the existing index contents, preserving staged blob
-  contents and leaving unstaged edits and untracked files alone. `mode="amend"` replaces HEAD
-  rather than adding a child, including message-only amendments; an empty message keeps HEAD's
-  message. An unborn HEAD cannot be amended. `squash_to` retains its existing soft-reset behavior.
+  contents and leaving unstaged edits and untracked files alone. `amend(message="")` replaces HEAD
+  with the index as it is (stage first), including message-only amendments; an empty message keeps HEAD's
+  message; hooks are skipped. An unborn HEAD cannot be amended. To fold commits above a point into one, `reset(fork, mode="soft")` then `record(message, paths="staged")`.
   `record` skips hooks; `record_with_hooks(...)` (same arguments) runs them and a refusal returns `HookRejected`.
   An unchanged index returns `NothingToRecord` for a new commit; `record_empty(message)` commits the index anyway.
   `Recorded.output` contains complete stripped stdout plus stderr, including successful hook output.
@@ -265,12 +265,11 @@ and transport limitations.
 
 ### Rebase and landing operations
 
-`Worktree.rebase_onto(base, squash_message=None, squash_failure="raise", update_refs=None)`
+`Worktree.rebase_onto(base, squash_message=None, update_refs=None)`
 inherits `rebase.updateRefs` when `update_refs` is `None`; `True` enables it and `False`
-overrides configuration. Failed squash commits restore the original HEAD and work before
-raising. `squash_failure="continue_unsquashed"` instead replays the original commits and
-returns the complete squash diagnostic in `Rebased.squash_failure` or
-`Conflict.squash_failure`. Conflicts remain paused; `abort_rebase(restore_to=original)`
+overrides configuration. A failed squash commit restores the original HEAD and work, then
+raises `GitUnavailable`; call `rebase_onto(base)` again to replay the commits unsquashed.
+Conflicts remain paused; `abort_rebase(restore_to=original)`
 can restore the pre-squash HEAD.
 
 `rebase(base, update_refs=None)`, `continue_rebase()`, `resolve_and_continue()` (refuses while conflict markers remain, else stages every unmerged file and continues) and `abort_rebase(restore_to=None)` (idempotent: with no rebase paused it only restores)

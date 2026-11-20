@@ -48,7 +48,6 @@ if TYPE_CHECKING:
         CommandResult,
         Diff,
         Dirty,
-        FinishResult,
         Health,
         LogEntry,
         MergeStarted,
@@ -413,10 +412,8 @@ class RealWorktree:
         *,
         paths: Literal["own", "all", "tracked", "staged"] = "own",
         base: str | None = None,
-        mode: Literal["new", "amend", "squash_to"] = "new",
-        squash_to: Sha | None = None,
     ) -> RecordResult:
-        return real_write.record(self, message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=False, allow_empty=False)
+        return real_write.record(self, message, paths=paths, base=base, hooks=False, allow_empty=False)
 
     def record_with_hooks(
         self,
@@ -424,24 +421,22 @@ class RealWorktree:
         *,
         paths: Literal["own", "all", "tracked", "staged"] = "own",
         base: str | None = None,
-        mode: Literal["new", "amend", "squash_to"] = "new",
-        squash_to: Sha | None = None,
     ) -> RecordResult:
-        return real_write.record(self, message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=True, allow_empty=False)
+        return real_write.record(self, message, paths=paths, base=base, hooks=True, allow_empty=False)
 
     def record_empty(self, message: str) -> RecordResult:
-        return real_write.record(self, message, paths="staged", base=None, mode="new", squash_to=None, hooks=False, allow_empty=True)
+        return real_write.record(self, message, paths="staged", base=None, hooks=False, allow_empty=True)
 
-    def take_branch(
-        self,
-        branch: str,
-        base: str,
-        *,
-        mode: Literal["resume", "fresh", "restart"],
-        keep_aside_as: str | None = None,
-        clean_keep: Sequence[str] | None = None,
+    def amend(self, message: str = "") -> RecordResult:
+        return real_write.amend(self, message)
+
+    def take_branch(self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None) -> TakeResult:
+        return real_write.take_branch(self, branch=branch, base=base, clean_keep=clean_keep)
+
+    def restart_branch(
+        self, branch: str, base: str, *, keep_aside_as: str | None = None, clean_keep: Sequence[str] | None = None
     ) -> TakeResult:
-        return real_write.take_branch(self, branch=branch, base=base, mode=mode, keep_aside_as=keep_aside_as, clean_keep=clean_keep)
+        return real_write.restart_branch(self, branch=branch, base=base, keep_aside_as=keep_aside_as, clean_keep=clean_keep)
 
     def release_branch(self, holder: Path) -> Released | StillHeld:
         return real_write.release_branch(self, holder)
@@ -454,10 +449,9 @@ class RealWorktree:
         base: str,
         *,
         squash_message: str | None = None,
-        squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
         update_refs: bool | None = None,
     ) -> RebaseResult:
-        return real_write.rebase_onto(self, base, squash_message, squash_failure=squash_failure, update_refs=update_refs)
+        return real_write.rebase_onto(self, base, squash_message, update_refs=update_refs)
 
     def rebase(self, base: str, *, update_refs: bool | None = None) -> CommandResult:
         return real_commands.rebase(self, base, update_refs=update_refs)
@@ -517,9 +511,6 @@ class RealWorktree:
 
     def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         return real_commands.command(self, ["lfs", "push", remote, *refs], timeout=timeout, timed_out="git lfs timed out after 60 min")
-
-    def finish_rebase(self, action: Literal["continue", "abort"], *, restore_to: Sha | None = None) -> FinishResult:
-        return real_write.finish_rebase(self, action, restore_to)
 
     def push(self, dst: str, *, remote: str = "origin", hook_env: Mapping[str, str] | None = None, head: Sha | None = None) -> PushResult:
         return real_write.push(self, dst, remote, hook_env, head)

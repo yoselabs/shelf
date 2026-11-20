@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from git_porcelain.api import (
     DEFAULT_TIMEOUT,
-    Aborted,
     BranchHeld,
     BranchTaken,
     Change,
@@ -135,7 +134,6 @@ from git_porcelain.worktree_tree import blob_sha, worktree_tree
 
 __all__ = [
     "DEFAULT_TIMEOUT",
-    "Aborted",
     "BranchExists",
     "BranchHeld",
     "BranchPinned",

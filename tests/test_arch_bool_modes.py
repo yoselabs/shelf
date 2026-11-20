@@ -216,23 +216,9 @@ def policy_params(root: Path) -> dict[str, int]:
 
 _POLICY_ALLOWED: dict[str, str] = {
     **_rows(
-        "debt: a Literal that picks between behaviours of one operation (the flag in a coat); convert to separate verbs "
-        "(ADR 0030, Article III); not part of the 2026-11-20 tolerance conversion",
-        "git-porcelain:finish_rebase:action",
-        "git-porcelain:rebase_onto:squash_failure",
-        "git-porcelain:record:mode",
-        "git-porcelain:record_with_hooks:mode",
-        "git-porcelain:record_args:mode",
-        "git-porcelain:record_commit:mode",
-        "git-porcelain:record_needed:mode",
-        "git-porcelain:record_prepare:mode",
-        "git-porcelain:take_branch:mode",
-    ),
-    **_rows(
         "fact: which part of the checkout one `record` stages is a selection of data, not a second behaviour",
         "git-porcelain:record:paths",
         "git-porcelain:record_with_hooks:paths",
-        "git-porcelain:record_prepare:paths",
         "git-porcelain:record_stage:paths",
     ),
     **_rows(

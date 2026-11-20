@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 __all__ = [
-    "Aborted",
     "BranchHeld",
     "BranchTaken",
     "Change",
@@ -21,7 +20,6 @@ __all__ = [
     "Conflicted",
     "Diff",
     "Dirty",
-    "FinishResult",
     "Health",
     "HookRejected",
     "LogEntry",
@@ -323,18 +321,16 @@ class Rebased(_Output):
     old_head: Sha
     new_head: Sha
     squashed: bool
-    squash_failure: str | None = None
     output: str = ""
 
 
 @dataclass(frozen=True)
 class Conflict:
-    """A rebase stopped on conflicts (or ``finish_rebase("continue")`` found markers left). It stays paused."""
+    """A rebase stopped on conflicts. It stays paused."""
 
     files: tuple[str, ...]
     tail: str
     old_head: Sha
-    squash_failure: str | None = None
     output: str = ""
 
     def __post_init__(self) -> None:
@@ -355,12 +351,6 @@ class Conflicted:
     """``Repo.squash`` could not merge ``head`` onto ``onto``: the conflicted paths, each once. Nothing was made."""
 
     paths: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class Aborted(_Output):
-    head: Sha
-    output: str = ""
 
 
 @dataclass(frozen=True)
@@ -435,7 +425,6 @@ class RemoteRefs(tuple[RemoteRef, ...]):
 RecordResult = Recorded | NothingToRecord | HookRejected
 TakeResult = BranchTaken | BranchHeld
 RebaseResult = UpToDate | Rebased | Conflict
-FinishResult = Rebased | Conflict | Aborted
 PushResult = Pushed | Rejected | Transient | HookRejected | RemoteRejected
 SyncResult = Synced | Offline
 SquashResult = Squashed | Conflicted

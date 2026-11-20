@@ -175,16 +175,14 @@ Feature: One Repo and Worktree, real or fake
     And "r" writes a="new"
     And "r" stages ["a"]
     And the verbose commit hook of "r" <outcome>
-    When "r" calls record_with_hooks("work", paths="<scope>", mode="<mode>")
+    When "r" calls record_with_hooks("work", paths="staged")
     Then the result is a <kind>
     And the complete hook output is preserved
 
     Examples:
-      | outcome  | scope   | mode  | kind         |
-      | accepts  | staged  | new   | Recorded     |
-      | refuses  | staged  | new   | HookRejected |
-      | accepts  | tracked | amend | Recorded     |
-      | refuses  | tracked | amend | HookRejected |
+      | outcome  | kind         |
+      | accepts  | Recorded     |
+      | refuses  | HookRejected |
 
   Scenario: Non hook commit failures also preserve complete combined output
     Given a repository "r"
@@ -200,22 +198,21 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "root" with a="old"
     And "r" writes a="<<<<<<< ours\nmine\n=======\ntheirs\n>>>>>>> theirs\n"
     And "r" stages ["a"]
-    When "r" calls record("markers", paths="<scope>", mode="<mode>")
+    When "r" calls <verb>
     Then the result is a Recorded
     When "r" calls tree("HEAD")
     Then the tree reads "a" as "<<<<<<< ours\nmine\n=======\ntheirs\n>>>>>>> theirs\n"
 
     Examples:
-      | scope   | mode  |
-      | staged  | new   |
-      | tracked | amend |
+      | verb                                  |
+      | record("markers", paths="staged")      |
+      | amend("markers")                       |
 
   Scenario: Amending an unborn branch exposes git's refusal after staging
     Given a repository "r"
     And "r" writes a="pending"
-    When "r" tries record_with_hooks("amend", paths="tracked", mode="amend")
-    Then the call raises GitUnavailable
-    When "r" tries record("amend", paths="staged", mode="amend")
+    And "r" stages ["a"]
+    When "r" tries amend("amend")
     Then the call raises GitUnavailable
 
   Scenario: Rebase still runs against an ancestor and lets git refuse dirty work
@@ -377,8 +374,8 @@ Feature: One Repo and Worktree, real or fake
 
     Examples:
       | operation                                                  | error           |
-      | take_branch(branch="topic", base="--orphan", mode="restart") | ValueError      |
-      | take_branch(branch="main", base="missing", mode="resume")    | MissingRevision |
+      | restart_branch(branch="topic", base="--orphan")                | ValueError      |
+      | take_branch(branch="main", base="missing")                     | MissingRevision |
       | rebase_onto("--exec=false", squash_message="squash")          | ValueError      |
 
   Scenario Outline: Other revision consumers reject options before changing the checkout
@@ -418,10 +415,8 @@ Feature: One Repo and Worktree, real or fake
       | count(["--all"])                                                     |
       | count(["HEAD"], exclude=["--all"])                                    |
       | add_worktree("<root>/injected", "--orphan")                            |
-      | take_branch(branch="--orphan", base="HEAD", mode="resume")            |
+      | take_branch(branch="--orphan", base="HEAD")                           |
       | abort_rebase(restore_to="--hard")                                     |
-      | finish_rebase("abort", restore_to="--hard")                           |
-      | record("squash", paths="all", mode="squash_to", squash_to="--hard")    |
 
   Scenario: A signer failure is infrastructure failure rather than hook rejection
     Given a repository "r"
@@ -744,7 +739,7 @@ Feature: One Repo and Worktree, real or fake
       | False  | False     |
       | True   | True      |
 
-  Scenario Outline: A failed squash restores the original work before applying its failure policy
+  Scenario: A failed squash restores the original work and raises
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
@@ -754,15 +749,11 @@ Feature: One Repo and Worktree, real or fake
     And the origin "o" advances "main" with d="base"
     And "r" calls fetch()
     And the squash commit of "r" will fail
-    When "r" tries rebase_onto("origin/main", squash_message="combined", squash_failure="<policy>")
-    Then the squash policy outcome is "<outcome>"
+    When "r" tries rebase_onto("origin/main", squash_message="combined")
+    Then the call raises GitUnavailable
+    And the head of "r" is "<mem:before>"
     And the file "b" of "r" holds "first"
     And the file "c" of "r" holds "second"
-
-    Examples:
-      | policy             | outcome |
-      | raise              | raised  |
-      | continue_unsquashed | rebased |
 
   Scenario: Raw rebase continuation uses only the caller's staged resolution
     Given an origin "o"
@@ -1185,14 +1176,14 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "root" with a="one"
     And "r" commits "original" with a="two"
-    When "r" calls record("renamed", paths="staged", mode="amend")
+    When "r" calls amend("renamed")
     Then the result is a Recorded
     When "r" calls history(["HEAD"])
     Then the subject of each result entry is ["renamed", "root"]
     When "r" writes a="staged"
     And "r" stages ["a"]
     And "r" writes a="unstaged"
-    And "r" calls record("", paths="staged", mode="amend")
+    And "r" calls amend()
     Then the result is a Recorded
     And the file "a" of "r" holds "unstaged"
     When "r" calls history(["HEAD"])
@@ -1574,22 +1565,25 @@ Feature: One Repo and Worktree, real or fake
     And "r" commits "one" with a.txt="1\n"
     And "r" commits "two" with a.txt="2\n"
     When "r" writes a.txt="3\n"
-    And "r" calls record("", mode="amend")
+    And "r" calls stage_tracked()
+    And "r" calls amend()
     Then the result is a Recorded
     When "r" calls history(["HEAD"])
     Then the subject of each result entry is ["two", "one"]
     When "r" writes a.txt="4\n"
-    And "r" calls record("two, fixed", mode="amend")
+    And "r" calls stage_tracked()
+    And "r" calls amend("two, fixed")
     And "r" calls history(["HEAD"])
     Then the subject of each result entry is ["two, fixed", "one"]
 
-  Scenario: Squash-to folds the commits above a point into one
+  Scenario: A soft reset then a record folds the commits above a point into one
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" remembers its head as "fork"
     And "r" commits "two" with b.txt="2\n"
     And "r" commits "three" with c.txt="3\n"
-    When "r" calls record("squashed", mode="squash_to", squash_to="<mem:fork>")
+    When "r" calls reset("<mem:fork>", mode="soft")
+    And "r" calls record("squashed", paths="staged")
     Then the result is a Recorded
     When "r" calls history(["HEAD"])
     Then the subject of each result entry is ["squashed", "one"]
@@ -1637,15 +1631,15 @@ Feature: One Repo and Worktree, real or fake
   Scenario: Resume takes an existing branch as it is, and makes a missing one at the base
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
-    When "r" calls take_branch("task/x", "HEAD", mode="resume")
+    When "r" calls take_branch("task/x", "HEAD")
     Then the result is a BranchTaken
     And the result's created is True
     When "r" commits "two" with b.txt="2\n"
     And "r" remembers its head as "two"
-    And "r" calls take_branch("main", "HEAD", mode="resume")
+    And "r" calls take_branch("main", "HEAD")
     Then the result's created is False
     And the file "b.txt" of "r" is absent
-    When "r" calls take_branch("task/x", "main", mode="resume")
+    When "r" calls take_branch("task/x", "main")
     Then the result's created is False
     And the result's head is "<mem:two>"
     And the result's kept_aside is None
@@ -1655,10 +1649,10 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" commits "work" with b.txt="2\n"
     And "r" remembers its head as "work"
-    When "r" calls take_branch("task/x", "main", mode="fresh", keep_aside_as="task/x-stale")
+    When "r" calls restart_branch("task/x", "main", keep_aside_as="task/x-stale")
     Then the result's created is True
     And the result's head is "<mem:base>"
     And the result's kept_aside is "task/x-stale"
@@ -1670,8 +1664,8 @@ Feature: One Repo and Worktree, real or fake
   Scenario: Fresh over a branch with no work beyond the base keeps nothing aside
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
-    When "r" calls take_branch("task/x", "main", mode="fresh", keep_aside_as="task/x-stale")
+    And "r" calls take_branch("task/x", "HEAD")
+    When "r" calls restart_branch("task/x", "main", keep_aside_as="task/x-stale")
     Then the result's kept_aside is None
     When "r" calls branches("task/")
     Then the first item of each result entry is ["task/x"]
@@ -1680,9 +1674,9 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" commits "work" with b.txt="2\n"
-    When "r" calls take_branch("task/x", "main", mode="restart")
+    When "r" calls restart_branch("task/x", "main")
     Then the result's head is "<mem:base>"
     And the result's kept_aside is None
     And the result's created is False
@@ -1690,9 +1684,9 @@ Feature: One Repo and Worktree, real or fake
   Scenario: A branch another worktree holds is not taken
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" adds a worktree "w" at "main" as "w"
-    When "w" calls take_branch("task/x", "main", mode="fresh")
+    When "w" calls restart_branch("task/x", "main")
     Then the result is a BranchHeld
     And the result's holders.0.path is "<root>/r"
     And the result's holders.0.branch is "task/x"
@@ -1701,7 +1695,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     When "r" writes keep.out="k\n", junk.txt="j\n"
-    And "r" calls take_branch("task/x", "HEAD", mode="fresh", clean_keep=["*.out"])
+    And "r" calls restart_branch("task/x", "HEAD", clean_keep=["*.out"])
     And "r" calls dirty()
     Then the result's untracked is ["keep.out"]
 
@@ -1710,7 +1704,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" adds a worktree "w" at "main" as "w"
-    And "w" calls take_branch("task/x", "main", mode="fresh")
+    And "w" calls restart_branch("task/x", "main")
     When "r" calls release_branch("<root>/w")
     Then the result is a Released
     And the result's how is "removed"
@@ -1721,7 +1715,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" adds a worktree "w" at "main" as "w"
-    And "w" calls take_branch("task/x", "main", mode="fresh")
+    And "w" calls restart_branch("task/x", "main")
     And "w" writes junk.txt="j\n"
     When "r" calls release_branch("<root>/w")
     Then the result's how is "detached"
@@ -1740,7 +1734,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" commits "work" with b.txt="2\n"
     When "r" calls park("main")
     Then the result is "<mem:base>"
@@ -1817,8 +1811,8 @@ Feature: One Repo and Worktree, real or fake
     And "r" tries rebase_onto("origin/main")
     Then the call raises ValueError
 
-  # -- finish_rebase -----------------------------------------------------------------------------------
-  Scenario: Continuing with markers left reports the files and stays paused
+  # -- resolve_and_continue, abort_rebase ---------------------------------------------------------------
+  Scenario: Continuing with markers left refuses and stays paused
     Given an origin "o"
     And the origin "o" holds a.txt="1\n"
     And "r" is a clone of the origin "o"
@@ -1826,24 +1820,23 @@ Feature: One Repo and Worktree, real or fake
     And the origin "o" advances "main" with a.txt="theirs\n"
     And "r" calls sync()
     And "r" calls rebase_onto("origin/main")
-    When "r" calls finish_rebase("continue")
-    Then the result is a Conflict
-    And the result's files are ["a.txt"]
+    When "r" calls resolve_and_continue()
+    Then the result's ok is False
     And the file "a.txt" of "r" has conflict markers
+    When "r" calls rebasing()
+    Then the result is True
 
   Scenario: Continuing after the markers are gone finishes the rebase
     Given an origin "o"
     And the origin "o" holds a.txt="1\n"
     And "r" is a clone of the origin "o"
     And "r" commits "mine" with a.txt="mine\n"
-    And "r" remembers its head as "mine"
     And the origin "o" advances "main" with a.txt="theirs\n"
     And "r" calls sync()
     And "r" calls rebase_onto("origin/main")
     When "r" writes a.txt="resolved\n"
-    And "r" calls finish_rebase("continue")
-    Then the result is a Rebased
-    And the result's old_head is "<mem:mine>"
+    And "r" calls resolve_and_continue()
+    Then the result's ok is True
     And the file "a.txt" of "r" holds "resolved\n"
     When "r" calls history(["HEAD"], not_on=["origin/main"])
     Then the subject of each result entry is ["mine"]
@@ -1859,9 +1852,9 @@ Feature: One Repo and Worktree, real or fake
     And the origin "o" advances "main" with a.txt="theirs\n"
     And "r" calls sync()
     And "r" calls rebase_onto("origin/main")
-    When "r" calls finish_rebase("abort")
-    Then the result is a Aborted
-    And the result's head is "<mem:mine>"
+    When "r" calls abort_rebase()
+    Then the result's ok is True
+    And the head of "r" is "<mem:mine>"
     And the file "a.txt" of "r" holds "mine\n"
 
   Scenario: Aborting a squashed rebase can restore the work as it was before the squash
@@ -1874,20 +1867,19 @@ Feature: One Repo and Worktree, real or fake
     And the origin "o" advances "main" with a.txt="theirs\n"
     And "r" calls sync()
     And "r" calls rebase_onto("origin/main", squash_message="squashed")
-    When "r" calls finish_rebase("abort", restore_to="<mem:before>")
-    Then the result's head is "<mem:before>"
+    When "r" calls abort_rebase(restore_to="<mem:before>")
+    Then the head of "r" is "<mem:before>"
     When "r" calls history(["HEAD"], not_on=["origin/main"])
     Then the subject of each result entry is ["wip two", "wip one"]
 
-  Scenario: With nothing paused, finishing is a no-op
+  Scenario: With nothing paused, aborting is a no-op and continuing refuses
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
-    When "r" calls finish_rebase("abort")
-    Then the result is a Aborted
-    And the result's head is "<head:r>"
-    When "r" calls finish_rebase("continue")
-    Then the result is a Rebased
-    And the result's new_head equals its old_head
+    When "r" calls abort_rebase()
+    Then the result's ok is True
+    And the head of "r" is "<head:r>"
+    When "r" calls resolve_and_continue()
+    Then the result's ok is False
 
   # -- push --------------------------------------------------------------------------------------------
   Scenario: A push of new work lands it on the origin's branch
@@ -2070,9 +2062,9 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/a", "main", mode="resume")
-    And "r" calls take_branch("task/b", "main", mode="resume")
-    And "r" calls take_branch("wip/c", "main", mode="resume")
+    And "r" calls take_branch("task/a", "main")
+    And "r" calls take_branch("task/b", "main")
+    And "r" calls take_branch("wip/c", "main")
     When "r" calls branches("task/")
     Then the first item of each result entry is ["task/a", "task/b"]
     When "r" calls branches()
@@ -2541,7 +2533,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "base" with a.txt="1\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" commits "rules" with .gitignore="*.cache\n", b.txt="2\n"
     And "r" writes junk.cache="junk\n", weird[1]*.out="w\n"
     When "r" calls park("<mem:base>")
@@ -2555,7 +2547,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "base" with a.txt="1\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" commits "rules" with .gitignore="*.cache\n", b.txt="2\n"
     And "r" writes junk.cache="junk\n"
     When "r" calls park("<mem:base>")
@@ -2568,7 +2560,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "base" with a.txt="1\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" commits "rules" with .gitignore="*.cache\n"
     And "r" writes we*ird.cache="a\n"
     When "r" calls park("<mem:base>")
@@ -2580,7 +2572,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "base" with a.txt="1\n", keep.cache="tracked\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" commits "rules" with .gitignore="*.cache\n"
     And "r" removes "keep.cache"
     And "r" stages ["keep.cache"]
@@ -2729,7 +2721,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "base" with a.txt="1\n", b.txt="b\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" writes a.txt="staged\n"
     And "r" stages ["a.txt"]
     And "r" writes a.txt="final\n", new.txt="n\n", keep.log="log\n"
@@ -2752,7 +2744,7 @@ Feature: One Repo and Worktree, real or fake
     Given a repository "r"
     And "r" commits "base" with a.txt="1\n"
     And "r" remembers its head as "base"
-    And "r" calls take_branch("task/x", "HEAD", mode="resume")
+    And "r" calls take_branch("task/x", "HEAD")
     And "r" calls park("<mem:base>")
     And "r" writes a.txt="mine\n", new.txt="n\n"
     And "r" remembers the result of capture() as "t"

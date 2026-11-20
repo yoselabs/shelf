@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Final, Literal
 
 from git_porcelain import real_checkout, real_observe, real_read, real_remote
 from git_porcelain.api import (
-    Aborted,
     BranchHeld,
     BranchTaken,
     Conflict,
@@ -36,7 +35,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from git_porcelain.api import (
-        FinishResult,
         PushResult,
         RebaseResult,
         RecordResult,
@@ -47,14 +45,15 @@ if TYPE_CHECKING:
     from git_porcelain.real_done import Done
 
 __all__ = [
+    "amend",
     "exclude_locally",
     "exclude_worktree",
-    "finish_rebase",
     "park",
     "push",
     "rebase_onto",
     "record",
     "release_branch",
+    "restart_branch",
     "sync",
     "take_branch",
 ]
@@ -132,66 +131,51 @@ def _stage(wt: RealWorktree, paths: Literal["own", "all", "tracked", "staged"], 
         wt.run("--literal-pathspecs", "add", "-A", "--pathspec-from-file=-", "--pathspec-file-nul", stdin="\0".join(picks))
 
 
+def _delta(wt: RealWorktree, paths: Literal["own", "all", "tracked", "staged"], base: str | None, old: Sha | None) -> bool:
+    """Stage the selected scope; whether the index now differs from HEAD."""
+    _stage(wt, paths, base)
+    against = str(old) if old is not None else "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    delta = wt.try_run("diff", "--cached", "--quiet", against)
+    if delta.rc not in {0, 1}:
+        raise unavailable(("diff",), delta)
+    return delta.rc != 0
+
+
 def record(
     wt: RealWorktree,
     message: str,
     *,
     paths: Literal["own", "all", "tracked", "staged"],
     base: str | None,
-    mode: Literal["new", "amend", "squash_to"],
-    squash_to: Sha | None,
     hooks: bool,
     allow_empty: bool,
 ) -> RecordResult:
-    validate_revisions(*([base] if base is not None else []), *([str(squash_to)] if squash_to is not None else []))
-    if mode == "squash_to" and squash_to is None:
-        msg = "mode='squash_to' needs squash_to"
-        raise ValueError(msg)
+    validate_revisions(*([base] if base is not None else []))
     wt.run("rev-parse", "--git-dir")
-    old = real_read.head_of(wt)
     try:
-        if not record_prepare(wt, paths, base, mode, old, squash_to=squash_to, allow_empty=allow_empty):
+        if not _delta(wt, paths, base, real_read.head_of(wt)) and not allow_empty:
             return NothingToRecord()
-        if mode == "squash_to":
-            wt.run("reset", "-q", "--soft", str(squash_to))
-        args = record_args(message, mode, hooks=hooks, allow_empty=allow_empty)
-        done = wt.repo.try_run(wt.path, *_identity_args(wt.repo), *args)
-        if done.rc != 0:
-            if mode == "squash_to" and old is not None:
-                wt.run("reset", "-q", "--soft", str(old))
-            return record_failure(args, done, hooks=hooks)
-        head = real_read.head_of(wt)
-        head = some(head)
-        return Recorded(head, output=done.output)
+        args = ["commit", "-q", *([] if hooks else ["--no-verify"]), *(["--allow-empty"] if allow_empty else []), "-m", message]
+        return _commit(wt, args, hooks=hooks)
     finally:
         wt.repo.invalidate()
 
 
-def record_prepare(
-    wt: RealWorktree,
-    paths: Literal["own", "all", "tracked", "staged"],
-    base: str | None,
-    mode: Literal["new", "amend", "squash_to"],
-    old: Sha | None,
-    *,
-    squash_to: Sha | None,
-    allow_empty: bool,
-) -> bool:
-    """Stage the selected scope and decide whether a commit command is needed."""
-    _stage(wt, paths, base)
-    target = squash_to if mode == "squash_to" else old
-    against = str(target) if target is not None else "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-    delta = wt.try_run("diff", "--cached", "--quiet", against)
-    if delta.rc not in {0, 1}:
-        raise unavailable(("diff",), delta)
-    return delta.rc != 0 or allow_empty or mode == "amend"
+def amend(wt: RealWorktree, message: str) -> RecordResult:
+    """Fold the index into HEAD, even when it is unchanged; an empty message keeps HEAD's."""
+    wt.run("rev-parse", "--git-dir")
+    try:
+        args = ["commit", "-q", "--no-verify", "--amend", *(["-m", message] if message else ["--no-edit"])]
+        return _commit(wt, args, hooks=False)
+    finally:
+        wt.repo.invalidate()
 
 
-def record_args(message: str, mode: Literal["new", "amend", "squash_to"], *, hooks: bool, allow_empty: bool) -> list[str]:
-    """Build commit arguments without changing the selected index."""
-    args = ["commit", "-q", *([] if hooks else ["--no-verify"]), *(["--allow-empty"] if allow_empty else [])]
-    args += ["--amend", *(["-m", message] if message else ["--no-edit"])] if mode == "amend" else ["-m", message]
-    return args
+def _commit(wt: RealWorktree, args: list[str], *, hooks: bool) -> RecordResult:
+    done = wt.repo.try_run(wt.path, *_identity_args(wt.repo), *args)
+    if done.rc != 0:
+        return record_failure(args, done, hooks=hooks)
+    return Recorded(some(real_read.head_of(wt)), output=done.output)
 
 
 def record_failure(args: Sequence[str], done: Done, *, hooks: bool) -> RecordResult:
@@ -229,38 +213,42 @@ def _same(a: Path, b: Path) -> bool:
     return a.resolve() == b.resolve()
 
 
-def take_branch(
-    wt: RealWorktree,
-    *,
-    branch: str,
-    base: str,
-    mode: Literal["resume", "fresh", "restart"],
-    keep_aside_as: str | None,
-    clean_keep: Sequence[str] | None,
-) -> TakeResult:
-    validate_revisions(branch, base)
+def _held(wt: RealWorktree, branch: str) -> BranchHeld | None:
     holders = tuple(w for w in wt.repo.worktrees() if w.branch == branch and not _same(w.path, wt.path))
-    if holders:
-        return BranchHeld(holders)
+    return BranchHeld(holders) if holders else None
+
+
+def take_branch(wt: RealWorktree, *, branch: str, base: str, clean_keep: Sequence[str] | None) -> TakeResult:
+    validate_revisions(branch, base)
+    if (held := _held(wt, branch)) is not None:
+        return held
     base = real_checkout.resolve_commit(wt, base)
-    ref = f"refs/heads/{branch}"
-    exists = wt.try_run("rev-parse", "--verify", "-q", ref).rc == 0
+    exists = wt.try_run("rev-parse", "--verify", "-q", f"refs/heads/{branch}").rc == 0
+    try:
+        wt.run("checkout", "-q", branch, "--") if exists else wt.run("checkout", "-q", "-b", branch, "--end-of-options", base, "--")
+        _clean(wt, clean_keep)
+        return BranchTaken(branch, some(real_read.head_of(wt)), created=not exists, kept_aside=None)
+    finally:
+        wt.repo.invalidate()
+
+
+def restart_branch(wt: RealWorktree, *, branch: str, base: str, keep_aside_as: str | None, clean_keep: Sequence[str] | None) -> TakeResult:
+    validate_revisions(branch, base)
+    if (held := _held(wt, branch)) is not None:
+        return held
+    base = real_checkout.resolve_commit(wt, base)
+    exists = wt.try_run("rev-parse", "--verify", "-q", f"refs/heads/{branch}").rc == 0
     kept: str | None = None
     try:
-        if mode == "resume":
-            wt.run("checkout", "-q", branch, "--") if exists else wt.run("checkout", "-q", "-b", branch, "--end-of-options", base, "--")
-        else:
-            if mode == "fresh" and exists and keep_aside_as is not None and int(wt.run("rev-list", "--count", f"{base}..{branch}").out) > 0:
-                if wt.try_run("rev-parse", "--verify", "-q", f"refs/heads/{keep_aside_as}").rc == 0:
-                    msg = f"keep_aside_as {keep_aside_as!r} already exists"
-                    raise ValueError(msg)
-                wt.run("branch", "-m", "--", branch, keep_aside_as)
-                kept = keep_aside_as
-            wt.run("checkout", "-q", "-B", branch, "--end-of-options", base, "--")
+        if exists and keep_aside_as is not None and int(wt.run("rev-list", "--count", f"{base}..{branch}").out) > 0:
+            if wt.try_run("rev-parse", "--verify", "-q", f"refs/heads/{keep_aside_as}").rc == 0:
+                msg = f"keep_aside_as {keep_aside_as!r} already exists"
+                raise ValueError(msg)
+            wt.run("branch", "-m", "--", branch, keep_aside_as)
+            kept = keep_aside_as
+        wt.run("checkout", "-q", "-B", branch, "--end-of-options", base, "--")
         _clean(wt, clean_keep)
-        head = real_read.head_of(wt)
-        head = some(head)
-        return BranchTaken(branch, head, created=not exists or kept is not None, kept_aside=kept)
+        return BranchTaken(branch, some(real_read.head_of(wt)), created=not exists or kept is not None, kept_aside=kept)
     finally:
         wt.repo.invalidate()
 
@@ -314,21 +302,17 @@ def _count(wt: RealWorktree, spec: str) -> int:
     return int(wt.run("rev-list", "--count", spec).out.strip())
 
 
-def _squash_before_rebase(
-    wt: RealWorktree, base: str, message: str, old: Sha, *, squash_failure: Literal["raise", "continue_unsquashed"]
-) -> tuple[bool, str | None]:
+def _squash_before_rebase(wt: RealWorktree, base: str, message: str, old: Sha) -> bool:
     base = real_checkout.resolve_commit(wt, base)
     fork = wt.try_run("merge-base", "--end-of-options", "HEAD", base).out.strip()
     if not fork or _count(wt, f"{fork}..HEAD") <= 1:
-        return False, None
+        return False
     wt.run("reset", "-q", "--soft", fork)
     made = wt.repo.try_run(wt.path, *_identity_args(wt.repo), "commit", "-q", "--no-verify", "--allow-empty", "-m", message)
     if made.rc == 0:
-        return True, None
+        return True
     wt.run("reset", "-q", "--hard", str(old))
-    if squash_failure == "raise":
-        raise unavailable(("commit",), made)
-    return False, made.output
+    raise unavailable(("commit",), made)
 
 
 def rebase_onto(
@@ -336,14 +320,11 @@ def rebase_onto(
     base: str,
     squash_message: str | None,
     *,
-    squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
     update_refs: bool | None = None,
 ) -> RebaseResult:
     validate_revisions(base)
-    if squash_failure not in {"raise", "continue_unsquashed"}:
-        raise ValueError(squash_failure)
     if _paused(wt):
-        msg = "a rebase is already paused here: finish_rebase first"
+        msg = "a rebase is already paused here: abort_rebase or resolve_and_continue first"
         raise ValueError(msg)
     if real_read.dirty(wt, None, ()).tracked:
         msg = "dirty: the tree has tracked changes"
@@ -356,66 +337,19 @@ def rebase_onto(
     if _count(wt, f"HEAD..{base}") == 0:
         return UpToDate()
     squashed = False
-    squash_diagnostic: str | None = None
     try:
         if squash_message is not None:
-            squashed, squash_diagnostic = _squash_before_rebase(wt, base, squash_message, old, squash_failure=squash_failure)
+            squashed = _squash_before_rebase(wt, base, squash_message, old)
         flags = [] if update_refs is None else ["--update-refs" if update_refs else "--no-update-refs"]
         done = wt.try_run("-c", "core.editor=true", "rebase", "-q", *flags, "--end-of-options", base)
         if done.rc == 0:
             new = real_read.head_of(wt)
             new = some(new)
-            return Rebased(old, new, squashed, squash_diagnostic, output=done.output)
+            return Rebased(old, new, squashed, output=done.output)
         if _paused(wt):
-            return Conflict(real_observe.unmerged(wt), done.tail, old, squash_diagnostic, output=done.output)
+            return Conflict(real_observe.unmerged(wt), done.tail, old, output=done.output)
         if squashed:
             wt.run("reset", "-q", "--hard", str(old))
-        raise unavailable(("rebase",), done)
-    finally:
-        wt.repo.invalidate()
-
-
-def _orig_head(wt: RealWorktree) -> Sha:
-    gd = real_read.git_dir_of(wt)
-    for name in ("rebase-merge", "rebase-apply"):
-        try:
-            return Sha((gd / name / "orig-head").read_text(encoding="utf-8").strip())
-        except OSError:
-            continue
-    return real_read.head_of(wt) or Sha("")
-
-
-def finish_rebase(wt: RealWorktree, action: Literal["continue", "abort"], restore_to: Sha | None) -> FinishResult:
-    target = real_checkout.resolve_commit(wt, str(restore_to)) if restore_to is not None else None
-    paused = _paused(wt)
-    try:
-        if action == "abort":
-            output = ""
-            if paused:
-                output = wt.run("rebase", "--abort").output
-            if target is not None:
-                output = (output + "\n" + wt.run("reset", "-q", "--hard", target).output).strip()
-            head = real_read.head_of(wt)
-            head = some(head)
-            return Aborted(head, output=output)
-        head = real_read.head_of(wt)
-        head = some(head)
-        if not paused:
-            return Rebased(head, head, squashed=False)
-        orig = _orig_head(wt)
-        files = real_read.unmerged(wt)
-        marked = tuple(f for f in files if has_markers(wt.path / f))
-        if marked:
-            return Conflict(marked, "conflict markers remain", orig)
-        if files:
-            wt.run("--literal-pathspecs", "add", "-A", "--pathspec-from-file=-", "--pathspec-file-nul", stdin="\0".join(files))
-        done = wt.try_run("-c", "core.editor=true", "rebase", "--continue")
-        if done.rc == 0:
-            new = real_read.head_of(wt)
-            new = some(new)
-            return Rebased(orig, new, squashed=False, output=done.output)
-        if _paused(wt):
-            return Conflict(real_read.unmerged(wt), done.tail, orig, output=done.output)
         raise unavailable(("rebase",), done)
     finally:
         wt.repo.invalidate()
