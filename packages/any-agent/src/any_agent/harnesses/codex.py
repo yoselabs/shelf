@@ -301,7 +301,7 @@ class CodexHarness(Quiet):
             work=e.work,
             stands=final and not e.error,
             tail=err or text,
-            model_resolved=meta.model,
+            model=meta.model,
             harness_version=meta.cli_version,
             harness=self.kind,
             effort=meta.effort or e.effort,  # the rollout says what the turn really ran with

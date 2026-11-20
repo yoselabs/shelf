@@ -97,7 +97,7 @@ class Summary:
     data: Json = None  # the harness's own structured answer (claude --json-schema), else the caller parses `text`
     facts: dict[str, Json] = field(default_factory=dict)  # measured facts for the ladder (http_status)
     cost: float = 0.0
-    model_resolved: str = ""  # the model id that actually answered (resolved, not the requested alias); "" = the harness cannot tell
+    model: str = ""  # the model id that actually answered (resolved, not the requested alias); "" = the harness cannot tell
     harness_version: str = ""  # the CLI's own version; "" = the harness cannot tell
     harness: str = ""  # the CLI's name (`Harness.kind`: claude, codex, opencode)
     effort: str = ""  # the reasoning effort the run used: what the CLI reports (codex rollout), else what the launch asked for; "" = none

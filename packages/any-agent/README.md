@@ -101,7 +101,7 @@ valid JSON does not establish execution success, and existing answer-grace/stand
 facts must not be replaced with an rc-only decision. Usage absent from the harness
 remains unknown; Summary.cost's default zero is not measured free cost.
 
-`Summary.model_resolved` is the model id that actually answered (resolved, not the requested
+`Summary.model` is the model id that actually answered (resolved, not the requested
 alias) and `Summary.harness_version` the CLI's own version; both are typed `str` fields (not `res` keys), `""` when the
 harness cannot tell. Claude reads them from the stream's `system/init` event, codex from
 the thread's rollout file, opencode always reports `""`. `Summary.harness` names the CLI (`claude`, `codex`, `opencode`) and `Summary.effort` is the

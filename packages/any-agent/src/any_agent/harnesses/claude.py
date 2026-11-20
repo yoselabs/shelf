@@ -348,7 +348,7 @@ class ClaudeHarness(Quiet):
             tail=text,
             data=container(j.get("structured_output")),
             facts={"http_status": j.get("api_error_status")},
-            model_resolved=e.model,
+            model=e.model,
             harness_version=e.harness_version,
             harness=self.kind,
             effort=e.effort,
