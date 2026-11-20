@@ -651,6 +651,7 @@ ignore_imports = [
     "any_speech.defaults -> app_dirs",
     "any_speech.setup -> app_dirs",
     "any_speech.pipeline -> any_pipeline",
+    "any_pipeline.filestore -> atomic_io",
     "any_speech.cli -> verb_cli",
     "any_agent.procs -> stream_proc",
     "any_gate.cli -> any_lease",

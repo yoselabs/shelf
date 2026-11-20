@@ -7,12 +7,14 @@ item are rejected by the type checker; see the README for what is checked when a
 
 from __future__ import annotations
 
+from any_pipeline.filestore import FileStore
 from any_pipeline.outcome import Failed, Ok, Outcome, Report, StageFailed, StageRecord
 from any_pipeline.run import run, run_one
 from any_pipeline.stage import Flow, Limit, MemoryStore, Persistent, Stage, Store, blocking, gather, gather3, gather4
 
 __all__ = [
     "Failed",
+    "FileStore",
     "Flow",
     "Limit",
     "MemoryStore",

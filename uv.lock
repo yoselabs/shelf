@@ -675,8 +675,11 @@ dev = [
 
 [[package]]
 name = "any-pipeline"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-pipeline" }
+dependencies = [
+    { name = "atomic-io" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -688,6 +691,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "atomic-io", editable = "packages/atomic-io" }]
 
 [package.metadata.requires-dev]
 dev = [

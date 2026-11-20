@@ -1,7 +1,7 @@
 # any-pipeline
 
 **Stop hand-writing pipelines.** A pipeline is a typed value: async stages composed with `>>` (then) and `gather` (at the same time),
-each bounded by a `Limit` it cannot omit, failures recorded per item and never swallowed. Stdlib only, asyncio-native.
+each bounded by a `Limit` it cannot omit, failures recorded per item and never swallowed. Asyncio-native; stdlib plus `atomic-io` (for `FileStore` only).
 
 ```python
 from any_pipeline import Limit, Stage, gather, run
@@ -20,6 +20,24 @@ One item never stops another: a stage that raises, times out or returns somethin
 `gather` runs its branches in a `TaskGroup`, so a failed branch cancels its sibling. `Limit.seconds` is an `asyncio.timeout`, a real one for
 anything that awaits. A plain function goes in through `blocking(fn)` (a thread, which a timeout abandons rather than stops).
 `stage.otherwise(lambda why: fallback)` makes a failure a typed value instead of a failed item (the record still shows it); `run_one(flow, item, key=...)` returns the value and raises the stage's own exception. `Persistent(name, fn, limit, key=..., store=...)` keeps a result under `key(item)` and skips the call next time. Fan-out is `gather`, `gather3`, `gather4`.
+`FileStore(directory)` is a `Store[str]` of one file per key (atomic write through `atomic-io`, the key hashed to a safe name, the directory made on the first `put`), so a `Persistent` step survives the process: `Persistent(..., store=FileStore(Path("cache")))`.
+
+## Pattern: re-ask a source for new items
+
+There is no watcher or scheduler here, on purpose: the caller's loop asks the source again and `run` skips what a `Persistent` stage already holds.
+
+```python
+seen = -1
+while True:
+    items = read_source()                                           # a file, a list, a query: whatever grows
+    report = await run(pipeline, items, key=item_key, workers=4)    # a finished item costs a store read, not a call
+    if len(items) == seen and not report.failed:
+        break                                                       # nothing new, nothing to retry
+    seen = len(items)
+    await asyncio.sleep(60)
+```
+
+Failed items are retried on the next pass (nothing is stored for them); count passes per key in the caller to give up after N.
 
 ## What is checked, and when
 
