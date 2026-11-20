@@ -25,7 +25,7 @@ def test_blueprint_is_added_the_same_way_with_its_own_tag(tmp_path: Path) -> Non
     ensure_gate_dependency(tmp_path)
     data = tomllib.loads((tmp_path / "pyproject.toml").read_text())
     assert "blueprint" in data["dependency-groups"]["dev"]
-    assert data["tool"]["uv"]["sources"]["blueprint"] == {**SOURCE, "subdirectory": "packages/blueprint", "tag": "blueprint-v0.4.0"}
+    assert data["tool"]["uv"]["sources"]["blueprint"] == {**SOURCE, "subdirectory": "packages/blueprint", "tag": "blueprint-v0.5.0"}
 
 
 def _wired(repo: Path) -> tuple[list[str], dict[str, object]]:
