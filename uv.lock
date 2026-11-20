@@ -225,7 +225,7 @@ wheels = [
 
 [[package]]
 name = "any-agent"
-version = "0.15.0"
+version = "0.16.0"
 source = { editable = "packages/any-agent" }
 dependencies = [
     { name = "stream-proc" },
@@ -937,7 +937,7 @@ wheels = [
 
 [[package]]
 name = "anyllm"
-version = "0.8.1"
+version = "0.9.0"
 source = { editable = "packages/anyllm" }
 
 [package.optional-dependencies]

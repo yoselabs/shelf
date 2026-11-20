@@ -145,6 +145,19 @@ def test_codex_sealed_argv_ignores_user_config_and_rules(tmp_path):
         harness.cleanup()
 
 
+@pytest.mark.parametrize(("effort", "schema"), [("low", None), ("high", "/s.json"), ("", "/s.json"), ("", None)])
+def test_codex_sealed_honours_effort_and_schema_when_given(tmp_path, effort, schema):
+    _, project, _ = hostile(tmp_path)
+    harness = CodexHarness()
+    try:
+        argv = harness.launch_spec(codex_inputs(project, effort=effort, schema=schema)).argv
+    finally:
+        harness.cleanup()
+    assert (argv[argv.index("-c") + 1] if "-c" in argv else None) == (f'model_reasoning_effort="{effort}"' if effort else None)
+    assert (argv[argv.index("--output-schema") + 1] if "--output-schema" in argv else None) == schema
+    assert all(flag in argv for flag in SEALED_CODEX)
+
+
 def test_codex_sealed_runs_in_an_empty_directory_that_cleanup_removes(tmp_path):
     """AGENTS.md of the project is never discovered, and the answer file is cleaned up with the directory."""
     _, project, _ = hostile(tmp_path)

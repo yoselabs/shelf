@@ -4,8 +4,12 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see `ledger/0032-anyllm-v2-delivered.toml` for why). Read this before source/README when
 reconciling a pin (agent-loop.md WORKFLOW: RECEIVE).
 
-## Unreleased
+## 0.9.0
 
+- codex-cli: `CodexCliAdapter.complete(..., response_schema: Mapping | None = None, effort: Effort | None = None)`; schema ⇒ codex `--output-schema`, `Completion.text` is schema-valid JSON; effort `low|medium|high`, `None` ⇒ `low` (the sealed launch used to ignore it, so codex's own default ran); other values ⇒ `AnyLLMError(retryable=False)`
+- new `anyllm.StructuredProvider` (Protocol, `supports_structured`; only codex-cli), `anyllm.require_structured(provider)` ⇒ `AnyLLMError(retryable=False, hint)` for a provider that cannot; `LLMProvider.complete` unchanged; no top-level `complete(provider=...)`: `CodexCliAdapter().complete(...)`
+- `with_cost_guard` and `resolve_provider` wrappers do not forward `response_schema` / `effort` and have no `supports_structured`: `require_structured(wrapper)` raises; use the bare `CodexCliAdapter`
+- claude-code-cli, codex-cli: cancelling the awaiting task kills the child's process group (SIGKILL), waits for the supervisor thread, re-raises `CancelledError` (was: child kept running); `any_agent.run` is now called with a fourth positional `hooks` (RunHooks): a test fake of `run` takes `(harness, spec, timeout, hooks=None)`; needs any-agent>=0.16.0
 - claude-code-sdk: `thinking_disabled=True` (the default) also passes `effort="low"` to the SDK; Haiku 5.5 otherwise thinks (about 4x output tokens, same answer)
 
 ## 0.8.1

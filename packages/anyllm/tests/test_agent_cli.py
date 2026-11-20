@@ -37,7 +37,7 @@ def test_success_and_launch_safeguards(backend, monkeypatch):
     monkeypatch.setenv("CLAUDE_CODE_SIMPLE", "1")  # what --bare sets: it would hide the subscription login from claude
     specs = []
 
-    def run(harness, spec, timeout):
+    def run(harness, spec, timeout, hooks=None):
         specs.append(spec)
         assert spec.stdin == "question" if binary == "claude" else "rules\n\nquestion" in spec.stdin
         if binary == "claude":
@@ -81,7 +81,7 @@ def test_pure_completion_closes_the_same_doors_on_every_cli(backend, monkeypatch
     provider, adapter, binary = backend
     seen: dict[str, Any] = {}
 
-    def run(harness, spec, timeout):
+    def run(harness, spec, timeout, hooks=None):
         seen["argv"], seen["cwd"] = spec.argv, spec.cwd
         seen["empty"] = list(Path(spec.cwd).iterdir()) == []
         return provider.any_agent.RunOutcome(rc=0, summary=harness.summary(0, "", "", None, False))
@@ -163,13 +163,13 @@ assert not anyllm.CodexCliAdapter().available()
     subprocess.run([sys.executable, "-c", code], check=True, capture_output=True)
     project = tomllib.loads((Path(__file__).parents[1] / "pyproject.toml").read_text())["project"]
     assert project["dependencies"] == []
-    assert project["optional-dependencies"]["agent"] == ["any-agent>=0.1.4,<1"]
+    assert project["optional-dependencies"]["agent"] == ["any-agent>=0.16.0,<1"]
 
 
 def test_invalid_output_fails_loud(backend, monkeypatch):
     provider, adapter, _ = backend
 
-    def run(harness, spec, timeout):
+    def run(harness, spec, timeout, hooks=None):
         return provider.any_agent.RunOutcome(rc=0, summary=harness.summary(0, "not json", "", None, False))
 
     monkeypatch.setattr(provider.any_agent, "run", run)
