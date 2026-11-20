@@ -27,7 +27,7 @@ need exists is not.
 ## The philosophy of use: how every shelf package is shaped
 
 > **⚠️ THIS IS THE SHELF'S FOUNDING PHILOSOPHY. NO MATTER WHAT, FOLLOW IT.**
-> **⚠️ A package that breaks these five points is defective, however well it works.**
+> **⚠️ A package that breaks these eight points is defective, however well it works.**
 > **⚠️ Owner's words: "It's like a Bible of how shelf works." (Denis, 2026-11-20)**
 
 Most people use a package through its defaults, and most of them in the same way. So the default must be the best
@@ -49,6 +49,17 @@ thing for that common use, and everything else must stay reachable by calling so
 5. **The default serves the common reader; the value serves every reader.** Today the common reader is an AI
    (tokens are money), so the default view is compact. The stored value stays complete. These two never trade off,
    because they live in different layers: value below, view above.
+
+6. **Breaking is free.** The cost of changing a shape is a loud failure and a fast fix, never a reason to keep a wrong shape.
+   Shelf is never held back by a caller it can break (Article III).
+
+7. **Failures are loud.** An exception is handled where someone can act on it, or it raises. Tolerance is the caller's
+   `except`, never a flag; a failed shutdown is reported and the stop still happens (Article III).
+
+8. **A small surface; the shelf is the standard library.** Every public name and parameter costs tokens for every AI that
+   learns it. Prefer one idempotent verb and a typed exception over a verb-plus-flag matrix; add a name only when it is a
+   different thing. A common library (stream-proc for processes, atomic-io for files) is the soul of the shelf: one owner,
+   one small, consistent API that every app reaches for first.
 
 *Worked example:* any-speech stores one `<name>.speech.json` holding words, times, probabilities, speakers and
 provenance. `to_markdown()` and `any-speech text` give the compact, token-cheap turn lines an AI should read.
