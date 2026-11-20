@@ -37,11 +37,22 @@ lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACH
 # working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
 # pre-push hook then skips the gate for that exact tree.
 [group('gate')]
-check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test") check-extra
+check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "test") check-extra
     uv run python -m any_gate passed --gate check
 
 [group('gate')]
-check-all: beads-lint (scripts "all") (steps "guard" "preset" "render" "blueprint" "lint" "typecheck" "arch" "spell" "deps" "test-all")
+check-all: beads-lint (scripts "all") (steps "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "arch" "spell" "deps" "test-all")
+
+# Secrets in the code this branch changed: gitleaks (pinned in mise.toml) over the commits since the upstream merge-base plus the
+# staged, unstaged and untracked work. The commit hook scans only the index and a hook can be skipped; this is the enforcement.
+[group('gate')]
+secrets:
+    uv run python -m blueprint.secret_scan range
+
+# The same over all history: `check-all`, before a release tag.
+[group('gate')]
+secrets-all:
+    uv run python -m blueprint.secret_scan full
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
 # blueprint's for this step in every repo (stack/shell).

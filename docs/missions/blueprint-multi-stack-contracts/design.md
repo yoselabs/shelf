@@ -60,7 +60,7 @@ the secret. The existing sops-sealed check is unchanged.
 
 ### D6. Hook anti-pattern checkpoints
 
-Each reads `.pre-commit-config.yaml` and `.git/hooks`: tests in `pre-commit`; `pre-push` running anything other than the gate; the gate also
+Built as concern `hooks` (`hooks.no-tests-at-commit`, `hooks.pre-push-is-the-gate`, `hooks.fail-closed`, `hooks.no-clone-path`, `hooks.gate-always-runs`; the injection and `core.hooksPath` cases were already `gate.hooks-installed`). A post-merge gate is allowed (any-gate skips a tree that already passed; the shelf runs one on purpose), so "the gate also called by another hook" means a commit-time call only. Each reads `.pre-commit-config.yaml` and `.git/hooks`: tests in `pre-commit`; `pre-push` running anything other than the gate; the gate also
 called by another hook; `core.hooksPath` not the hook manager's; a hook that always exits 0; a guard or drift script resolved through
 `SHELF_HOME`, `../shelf` or `~/Workspaces/shelf` instead of a pinned dependency. Each finding names the line to delete or change.
 
