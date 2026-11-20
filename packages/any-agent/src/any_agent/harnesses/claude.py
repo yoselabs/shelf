@@ -206,6 +206,7 @@ class ClaudeHarness(Quiet):
             self.sealed_dir = SealedDir("claude-sealed-")
             return LaunchSpec(argv=sealed_argv(i), env=launch_env(i.env, i.auth), cwd=str(self.sealed_dir.path), stdin=i.prompt)
         argv = launch_argv(i)
+        self.evidence.effort = i.effort
         self.evidence.ref = i.resume or i.session  # claude takes the session id from us: known before the first event
         return LaunchSpec(argv=argv, env=launch_env(i.env, i.auth), cwd=i.cwd, stdin=i.prompt)
 
@@ -228,6 +229,9 @@ class ClaudeHarness(Quiet):
             return self._user(blocks)
         if kind == "result":
             return self._result(raw)
+        if kind == "system" and raw.get("subtype") == "init":
+            e.model = text(raw.get("model")) or e.model
+            e.harness_version = text(raw.get("claude_code_version")) or e.harness_version
         return [] if kind in ("system", "stream_event", "rate_limit_event") else [ev.Unknown(type=kind[:60])]
 
     def _assistant(self, raw: dict[str, Json], msg: dict[str, Json], blocks: list[dict[str, Json]]) -> list[ev.HarnessEvent]:
@@ -243,6 +247,9 @@ class ClaudeHarness(Quiet):
                 out.append(ev.Think(text=text(b["thinking"])))
             elif kind == "tool_use":
                 out.append(self._tool_call(b, raw.get("cwd")))
+        answered = text(msg.get("model"))
+        if answered and not answered.startswith("<") and not self.evidence.model:
+            self.evidence.model = answered  # no init event: the first real reply names the model ("<synthetic>" is the CLI's own)
         u = msg.get("usage")
         if isinstance(u, dict):  # one model request: its whole input is the context size
             self.evidence.context_k = round(input_of(u) / 1000, 1)
@@ -341,6 +348,10 @@ class ClaudeHarness(Quiet):
             tail=text,
             data=container(j.get("structured_output")),
             facts={"http_status": j.get("api_error_status")},
+            model=e.model,
+            harness_version=e.harness_version,
+            harness=self.kind,
+            effort=e.effort,
         )
 
     def vendor_error(self, rc: int | None) -> str:

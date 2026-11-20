@@ -173,6 +173,7 @@ class OpenCodeHarness(Quiet):
             i.cwd,
         ]
         argv += ["--session", i.resume] if i.resume else []
+        self.evidence.effort = i.effort
         self.evidence.ref = i.resume
         return LaunchSpec(argv=argv, env=env, cwd=i.cwd, stdin=i.prompt)
 
@@ -371,6 +372,10 @@ class OpenCodeHarness(Quiet):
             stands=bool(text) and not e.error,
             cost=float(cost),
             tail=err or text,
+            model=e.model,  # "": `opencode run --format json` names neither the model nor its own version
+            harness_version=e.harness_version,
+            harness=self.kind,
+            effort=e.effort,
         )
 
     def vendor_error(self, rc: int | None) -> str:

@@ -118,6 +118,7 @@ class CodexHarness(Quiet):
             argv += ["-m", i.model]
         if i.effort:
             argv += ["-c", "model_reasoning_effort=" + json.dumps(i.effort)]
+        self.evidence.effort = i.effort
         if sandbox:
             argv += ["-c", "sandbox_mode=" + json.dumps(sandbox)] if i.resume is not None else ["-s", sandbox]
         argv += (access.flags() + access.config() if access is not None else []) + i.access + i.isolation + ["--json"]
@@ -139,6 +140,7 @@ class CodexHarness(Quiet):
         argv = [i.exe, "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral"]
         argv += ["--model", i.model] if i.model else []
         argv += ["-c", "model_reasoning_effort=" + json.dumps(i.effort)] if i.effort else []
+        self.evidence.effort = i.effort
         argv += ["--output-schema", i.schema] if i.schema else []
         argv += ["--json", "-o", self.out_file, "-"]
         return LaunchSpec(argv=argv, env=i.env, cwd=str(self.sealed_dir.path), stdin=i.prompt)
@@ -277,6 +279,7 @@ class CodexHarness(Quiet):
         final = bool(text) or bool(e.last and (e.turns or stop == "answer"))  # the turn finished: codex writes -o only at its end
         text = text or e.last
         used = rollout.read(self.sessions or self._home(self.env) / "sessions", e.ref or "", self.began) if e.ref else None
+        meta = rollout.meta(self.sessions or self._home(self.env) / "sessions", e.ref or "") if e.ref else rollout.Meta()
         res: dict[str, Json] = {
             "text": text,
             "ref": e.ref,
@@ -290,7 +293,18 @@ class CodexHarness(Quiet):
             "cumulative": e.cumulative or (used.tokens() if used and used.requests else None),
         }
         return Summary(
-            text=text, rc=rc, res=res, vendor=self.vendor_error(rc), stderr=err, work=e.work, stands=final and not e.error, tail=err or text
+            text=text,
+            rc=rc,
+            res=res,
+            vendor=self.vendor_error(rc),
+            stderr=err,
+            work=e.work,
+            stands=final and not e.error,
+            tail=err or text,
+            model=meta.model,
+            harness_version=meta.cli_version,
+            harness=self.kind,
+            effort=meta.effort or e.effort,  # the rollout says what the turn really ran with
         )
 
     def vendor_error(self, rc: int | None) -> str:
