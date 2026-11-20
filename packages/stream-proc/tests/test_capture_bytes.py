@@ -190,3 +190,48 @@ def test_raising_sigterm_handler_during_spawn_propagates_and_child_is_gone(
         run(["sleep", "60"], timeout=30)
     assert len(sigterm_during_spawn) == 1
     assert not alive(sigterm_during_spawn[0])
+
+
+def _hog(mib: int) -> list[str]:
+    return py(f"b = bytearray({mib} * 1024 * 1024); b[::4096] = b'x' * len(b[::4096])")
+
+
+def test_peak_rss_is_the_childs_own_high_water_mark_in_bytes() -> None:
+    small = capture_bytes(py("pass"), timeout=30)
+    big = capture_bytes(_hog(200), timeout=30)
+    assert small.peak_rss is not None
+    assert big.peak_rss is not None
+    assert big.peak_rss >= 200 * 1024 * 1024
+    assert big.peak_rss < 600 * 1024 * 1024
+    assert small.peak_rss < big.peak_rss / 2
+
+
+def test_peak_rss_is_per_child_not_the_callers_children_total() -> None:
+    capture_bytes(_hog(300), timeout=30)  # an earlier, bigger child must not show in the next one
+    small = capture_bytes(py("pass"), timeout=30)
+    assert small.peak_rss is not None
+    assert small.peak_rss < 100 * 1024 * 1024
+
+
+def test_peak_rss_counts_a_waited_for_grandchild() -> None:
+    code = (
+        "import subprocess, sys; subprocess.run([sys.executable, '-c', 'b = bytearray(200*1024*1024); b[::4096] = b\"x\"*len(b[::4096])'])"
+    )
+    got = capture_bytes(py(code), timeout=60)
+    assert got.peak_rss is not None
+    assert got.peak_rss >= 200 * 1024 * 1024
+
+
+def test_peak_rss_survives_a_timeout_stop() -> None:
+    got = capture_bytes(
+        py("import time; b = bytearray(100*1024*1024); b[::4096] = b'x'*len(b[::4096]); time.sleep(60)"), timeout=2, grace=1
+    )
+    assert got.timed_out
+    assert got.peak_rss is not None
+    assert got.peak_rss >= 100 * 1024 * 1024
+
+
+def test_capture_text_carries_peak_rss_too() -> None:
+    got = capture(_hog(100), timeout=30)
+    assert got.peak_rss is not None
+    assert got.peak_rss >= 100 * 1024 * 1024

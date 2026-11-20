@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import stream_proc
 from stream_proc import Proc, Result, proctable, run, runner, stop_tree
+from stream_proc import hold as hold_module
 from stream_proc.hold import TermHold, popen_held
 
 if TYPE_CHECKING:
@@ -178,7 +179,7 @@ def test_term_hold_defers_the_signal_until_replay(raising_term: None) -> None:
 
 def test_sigterm_between_fork_and_assignment_still_stops_the_child(raising_term: None, monkeypatch: pytest.MonkeyPatch) -> None:
     spawned: list[subprocess.Popen[Any]] = []
-    real = subprocess.Popen
+    real = hold_module.MeasuredPopen
 
     def popen_then_term(*args: Any, **kwargs: Any) -> subprocess.Popen[Any]:
         child = real(*args, **kwargs)
@@ -186,7 +187,7 @@ def test_sigterm_between_fork_and_assignment_still_stops_the_child(raising_term:
         os.kill(os.getpid(), signal.SIGTERM)  # lands before the caller holds the Popen
         return child
 
-    monkeypatch.setattr(subprocess, "Popen", popen_then_term)
+    monkeypatch.setattr(hold_module, "MeasuredPopen", popen_then_term)
     with pytest.raises(StopSignalError):
         run(py("import time; time.sleep(60)"), grace=1)
     monkeypatch.undo()
@@ -197,7 +198,7 @@ def test_sigterm_between_fork_and_assignment_still_stops_the_child(raising_term:
 
 def test_ctrl_c_during_the_spawn_still_stops_the_whole_tree(monkeypatch: pytest.MonkeyPatch) -> None:
     spawned: list[subprocess.Popen[Any]] = []
-    real = subprocess.Popen
+    real = hold_module.MeasuredPopen
 
     def popen_then_int(*args: Any, **kwargs: Any) -> subprocess.Popen[Any]:
         child = real(*args, **kwargs)
@@ -205,7 +206,7 @@ def test_ctrl_c_during_the_spawn_still_stops_the_whole_tree(monkeypatch: pytest.
         os.kill(os.getpid(), signal.SIGINT)  # a Ctrl-C before the caller holds the Popen
         return child
 
-    monkeypatch.setattr(subprocess, "Popen", popen_then_int)
+    monkeypatch.setattr(hold_module, "MeasuredPopen", popen_then_int)
     tree = "import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(300)']); time.sleep(300)"
     try:
         with pytest.raises(KeyboardInterrupt):
@@ -223,7 +224,7 @@ def test_a_signal_held_during_a_failed_spawn_is_not_lost(monkeypatch: pytest.Mon
         os.kill(os.getpid(), signal.SIGINT)
         raise FileNotFoundError
 
-    monkeypatch.setattr(subprocess, "Popen", int_then_fail)
+    monkeypatch.setattr(hold_module, "MeasuredPopen", int_then_fail)
     with pytest.raises(KeyboardInterrupt):
         popen_held(["no-such-program"])
     assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
