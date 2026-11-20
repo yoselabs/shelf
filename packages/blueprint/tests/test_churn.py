@@ -121,3 +121,41 @@ def test_converge_is_one_batch_in_a_stable_order_not_one_per_checkpoint() -> Non
     assert batch.commit_message.count("\n") == 0
     assert "a.one" in batch.commit_message
     assert "b.two" in batch.commit_message
+
+
+def _override(repo: Repo, check_id: str, expires: str = "2027-06-01") -> None:
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        f'[[override]]\nid = "{check_id}"\ncode = "not-applicable"\nreason = "x"\nexpires = {expires}\n',
+    )
+
+
+def test_an_override_whose_checkpoint_passes_without_it_is_named_as_dead(repo: Repo, scratch: None) -> None:
+    @check("scratch.fine", "passes on its own")
+    def _fine(_ctx: object) -> Finding:
+        return passing("fine")
+
+    _override(repo, "scratch.fine")
+    result = run(repo.root, concern="scratch", env=repo.env, today=date(2026, 11, 20))
+    assert any("scratch.fine" in n and "passes without it" in n for n in result.notices)
+    assert "scratch.fine" in report.gate(result)
+
+
+def test_an_override_that_is_still_needed_is_not_named_dead(repo: Repo, scratch: None) -> None:
+    @check("scratch.red", "red")
+    def _red(_ctx: object) -> Finding:
+        return failing("red", "fix")
+
+    _override(repo, "scratch.red")
+    result = run(repo.root, concern="scratch", env=repo.env, today=date(2026, 11, 20))
+    assert not any("passes without it" in n for n in result.notices)
+
+
+def test_an_override_for_a_checkpoint_that_did_not_run_is_not_judged(repo: Repo, scratch: None) -> None:
+    @check("scratch.slow", "audit only", audit_only=True)
+    def _slow(_ctx: object) -> Finding:
+        return passing("fine")
+
+    _override(repo, "scratch.slow")
+    result = run(repo.root, concern="scratch", env=repo.env, today=date(2026, 11, 20))
+    assert not any("passes without it" in n for n in result.notices)

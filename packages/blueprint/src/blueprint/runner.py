@@ -132,11 +132,13 @@ def _judge(chk: Check, ctx: Context) -> list[Sub]:
     return [Sub(s.concern, s.id, s.statement, _refused(s.finding)) for s in result]
 
 
-def _row(chk: Check, sub: Sub, state: State, today: date) -> Row:
+def _row(chk: Check, sub: Sub, state: State, today: date, dead: list[str]) -> Row:
     finding = sub.finding
     verdict, evidence = finding.verdict, finding.evidence
     # A scoped override acts inside its check (Context.excused); only an unscoped one overrides the whole row.
     override = next((o for o in state.overrides if o.id == sub.id and not o.scope), None)
+    if override is not None and verdict in {Verdict.PASSING, Verdict.NOT_APPLICABLE} and override.problem(today) is None:
+        dead.append(f"override `{override.id}` is dead: its checkpoint passes without it; delete it from docs/blueprint/blueprint.toml")
     if override is not None and verdict is not Verdict.PASSING:
         problem = override.problem(today)
         if problem is None:
@@ -181,7 +183,8 @@ def run(
     if env is not None:
         ctx.env = env
     checks = active(profile, concern)
-    rows = tuple(_row(c, sub, state, today) for c in checks if audit or not c.audit_only for sub in _judge(c, ctx))
+    dead: list[str] = []
+    rows = tuple(_row(c, sub, state, today, dead) for c in checks if audit or not c.audit_only for sub in _judge(c, ctx))
     accepted = _accepted(repo)
     if accepted is not None:
         rows = tuple(replace(r, new=True) if r.key not in accepted and r.verdict is not Verdict.PASSING else r for r in rows)
@@ -195,5 +198,5 @@ def run(
         problems=state.problems,
         skipped_audit=skipped,
         overrides=state.overrides,
-        notices=(*state.notices, *ctx.notices, *expiry_notices(state.overrides, today)),
+        notices=(*state.notices, *ctx.notices, *expiry_notices(state.overrides, today), *dead),
     )
