@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+
+- `# Any: <reason>` on the public signature that names `Any`; no behaviour or stored byte changes (shelf public-any rule, tests/test_arch_public_any.py)
+
 ## 0.5.0
 
 - The stored `at` stamp (failure record, provenance) is written by any-clock `utc_stamp`; the bytes are unchanged (`2026-11-20T07:05:09Z`).

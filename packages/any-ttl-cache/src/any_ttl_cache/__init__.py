@@ -40,7 +40,7 @@ class Entry:
     """One fresh row: its value columns in declared order, when it was written, when it expires."""
 
     # sqlite columns are dynamically typed; each caller narrows its own values.
-    values: tuple[Any, ...]
+    values: tuple[Any, ...]  # Any: sqlite's own dynamic column types
     stamped: int
     expires_at: int
 

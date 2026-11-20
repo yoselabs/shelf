@@ -1,6 +1,6 @@
 [project]
 name = "anyembed"
-version = "0.6.0"
+version = "0.7.0"
 description = "Stop caring which embedding backend is underneath — a neutral Embedder interface with local transformers (BGE) and llama.cpp (GGUF) backends."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

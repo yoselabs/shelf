@@ -4,6 +4,10 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see the ledger for why). Read this before source/README when reconciling a pin
 (agent-loop.md WORKFLOW: RECEIVE).
 
+## 0.7.0
+
+- `# Any: <reason>` on the public signature that names `Any`; no behaviour or stored byte changes (shelf public-any rule, tests/test_arch_public_any.py)
+
 ## 0.6.0
 
 - `LocalEmbedder(offline=True)` set `HF_HUB_OFFLINE` / `TRANSFORMERS_OFFLINE` in `os.environ`  ⇒  passes `local_files_only=True` to `from_pretrained`; the process environment is never touched
