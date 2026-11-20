@@ -32,9 +32,9 @@ def rebase(repo: RepoState, state: CheckoutState, base: str, *, update_refs: boo
     return CommandResult(ok=not isinstance(done, Conflict), output=done.output)
 
 
-def continue_rebase(repo: RepoState, state: CheckoutState, *, missing_ok: bool) -> CommandResult:
+def continue_rebase(repo: RepoState, state: CheckoutState) -> CommandResult:
     if state.rebase is None:
-        return CommandResult(ok=missing_ok, output="" if missing_ok else "fatal: No rebase in progress?")
+        return CommandResult(ok=False, output="fatal: No rebase in progress?")
     return _continue(repo, state)
 
 
@@ -61,10 +61,8 @@ def _continue(repo: RepoState, state: CheckoutState) -> CommandResult:
     return CommandResult(ok=not isinstance(result, Conflict), output=result.output)
 
 
-def abort_rebase(repo: RepoState, state: CheckoutState, *, missing_ok: bool, restore_to: Sha | None) -> CommandResult:
+def abort_rebase(repo: RepoState, state: CheckoutState, *, restore_to: Sha | None) -> CommandResult:
     target = resolve_commit(repo, state, str(restore_to)) if restore_to is not None else None
-    if state.rebase is None and not missing_ok:
-        return CommandResult(ok=False, output="fatal: No rebase in progress?")
     try:
         if state.rebase is not None:
             require_index(state)

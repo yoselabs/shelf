@@ -5,10 +5,10 @@ Method: each row read in its code, not from the old reason. Verdicts:
 
 - **A** split: the flag picks between two behaviours of one operation; the proposal names the separate type or function.
 - **B** fact: data about a call, a value or an error, or a third-party library's own option; not a code path.
-- **C** exception: Article IX allows a flag that opts into a cost, and a named safety or durability opt-in is the default-safe pit of success; kept as a justified row, made durable by ADR 0030.
+- **C** cost opt-in or construction config (Article IX): the default is the complete or durable answer and the flag skips or adds one named cost, or is chosen once at construction; kept as a row, ADR 0030. The tolerance and destructive C rows (`missing_ok`, `force`, `allow_delete`, `ignored`, `nested`, `allow_empty`, `hooks`, `keep_ignored`, `any_replica`) were debt, converted in shelf-tyld.26 (ADR 0030 rewritten) and are deleted from this table.
 - **FIXED**: an A row private to one package with no external consumer, cheap and test-covered; fixed in this change.
 
-Counts: 114 rows at the start. Now FIXED 41 (4 earlier + 37 split in shelf-tyld.13); A left 1 (blueprint:run:audit, skipped); B 44; C 28 (24 + 4 reclassified from A). Rows added by new split functions: `atomic_replace_*` repeat the `fsync` (C) and `sort_keys` (B) rows, `try_run` repeats `pin` (C).
+Counts: 114 rows at the start. FIXED 41 (4 earlier + 37 split in shelf-tyld.13); A left 1 (blueprint:run:audit, skipped); B 44; C 8 kept here (fsync x4, with_dirty, check_push, memoize, pin; the `atomic_replace_*` and `try_run` repeats are the rest); 20 tolerance and destructive C rows converted to exceptions and verbs in shelf-tyld.26. Rows added by new split functions: `atomic_replace_*` repeat the `fsync` (C) and `sort_keys` (B) rows, `try_run` repeats `pin` (C).
 
 External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: the splits below break their calls (major/minor bump + CHANGELOG each).
 
@@ -37,12 +37,8 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: the split
 | `child-env:scrub_current:strip_venv` | FIXED (A) | split in child-env 0.3.0: `scrub(without_venv(env))` (venv stripped first, same result) |
 | `convert-md:_result:check_yield` | FIXED (A) | split in convert-md 0.12.0: `grade` and `grade_container` (the structure check still reads the size, so `None` was wrong) |
 | `convert-md:grade:check_yield` | FIXED (A) | split in convert-md 0.12.0: `grade` and `grade_container` (the structure check still reads the size, so `None` was wrong) |
-| `git-porcelain:abort_rebase:missing_ok` | C (was A) | Absence tolerance named by the caller, as `Path.unlink(missing_ok=)`; a split needs an outcome value on three result shapes. ADR 0030. |
 | `git-porcelain:continue_rebase:check_markers` | FIXED (A) | split in git-porcelain 0.26.0: `resolve_and_continue()` |
-| `git-porcelain:continue_rebase:missing_ok` | C (was A) | Absence tolerance named by the caller, as `Path.unlink(missing_ok=)`; a split needs an outcome value on three result shapes. ADR 0030. |
 | `git-porcelain:continue_rebase:stage_conflicts` | FIXED (A) | split in git-porcelain 0.26.0: `resolve_and_continue()` |
-| `git-porcelain:delete_remote_at:missing_ok` | C (was A) | Absence tolerance named by the caller, as `Path.unlink(missing_ok=)`; a split needs an outcome value on three result shapes. ADR 0030. |
-| `git-porcelain:drop_worktree:missing_ok` | C (was A) | Absence tolerance named by the caller, as `Path.unlink(missing_ok=)`; a split needs an outcome value on three result shapes. ADR 0030. |
 | `git-porcelain:fetch:retry` | FIXED (A) | split in git-porcelain 0.26.0: `fetch` and `fetch_once` (fake) |
 | `git-porcelain:memo:forever` | FIXED (A) | split in git-porcelain 0.26.0: `memo` and `memo_until_write` |
 | `git-porcelain:remote_url:push` | FIXED (A) | split in git-porcelain 0.26.0: `remote_url` and `remote_push_url` |
@@ -60,30 +56,14 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: the split
 | `stream-proc:_hit:group` | FIXED (A) | split in stream-proc 0.11.0 |
 | `stream-proc:capture_bytes:capture` | FIXED (A) | split in stream-proc 0.11.0 |
 | `verb-cli:flags_of:choices` | FIXED (A) | split in verb-cli 0.3.0: `flags_of` and `choice_flags_of` |
-| `any-json-doc:__init__:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. ADR 0030. |
-| `atomic-io:atomic_write_bytes:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. ADR 0030. |
-| `atomic-io:atomic_write_json:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. ADR 0030. |
-| `atomic-io:atomic_write_text:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. ADR 0030. |
-| `beads-client:reclaim:any_replica` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `beads-client:unclaim:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:__init__:memoize` | C | Object configuration (injected once), not a per-call branch. ADR 0030. |
-| `git-porcelain:add_worktree:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:clean:ignored` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:clean:nested` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:drop_worktree:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:park:keep_ignored` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:push_refspecs:allow_delete` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:push_refspecs:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:push_request:allow_delete` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:push_request:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:readiness:check_push` | C | Article IX cost opt-in. ADR 0030. |
-| `git-porcelain:record:allow_empty` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:record:hooks` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:run:pin` | C | Internal runner opt-out; folds into the `run`/`try_run` split when git-porcelain is next opened. |
-| `git-porcelain:validate_push:allow_delete` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:validate_push:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:worktree_add:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
-| `git-porcelain:worktrees:with_dirty` | C | Article IX allows a flag that asks for a costly capability. ADR 0030. |
+| `any-json-doc:__init__:fsync` | C | KEPT: cost opt-in, Article IX: the default is the complete or durable answer; the flag skips or adds one named cost (ADR 0030) |
+| `atomic-io:atomic_write_bytes:fsync` | C | KEPT: cost opt-in, Article IX: the default is the complete or durable answer; the flag skips or adds one named cost (ADR 0030) |
+| `atomic-io:atomic_write_json:fsync` | C | KEPT: cost opt-in, Article IX: the default is the complete or durable answer; the flag skips or adds one named cost (ADR 0030) |
+| `atomic-io:atomic_write_text:fsync` | C | KEPT: cost opt-in, Article IX: the default is the complete or durable answer; the flag skips or adds one named cost (ADR 0030) |
+| `git-porcelain:__init__:memoize` | C | KEPT: construction config, chosen once when the object is built (ADR 0030) |
+| `git-porcelain:readiness:check_push` | C | KEPT: cost opt-in, Article IX: the default is the complete or durable answer; the flag skips or adds one named cost (ADR 0030) |
+| `git-porcelain:run:pin` | C | KEPT: cost opt-in, Article IX: the default is the complete or durable answer; the flag skips or adds one named cost (ADR 0030) |
+| `git-porcelain:worktrees:with_dirty` | C | KEPT: cost opt-in, Article IX: the default is the complete or durable answer; the flag skips or adds one named cost (ADR 0030) |
 | `a2effect:__init__:retryable` | B | Data on the error value. |
 | `a2effect:__init_subclass__:abstract` | B | Test-support opt-ins mirroring pytest's signature (`raising`) or selecting contract checks. |
 | `a2effect:contract_tests:dead_enricher` | B | Test-support opt-ins mirroring pytest's signature (`raising`) or selecting contract checks. |
@@ -131,6 +111,7 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: the split
 
 ## Outcome
 
-- Every A row except the blueprint one is split, or reclassified (the four git-porcelain `missing_ok` rows: an idempotency tolerance named by the caller, ADR 0030).
+- Every A row except the blueprint one is split. The four git-porcelain `missing_ok` rows, once reclassified as a justified tolerance, are converted: `drop_worktree` raises `NotAWorktree`, `abort_rebase` is idempotent, `delete_remote_at` raises on refusal, `continue_rebase` returns `ok=False`.
+- The 2026-11-20 policy check (`policy_params` in the arch test) also lists public `Literal`/Enum parameters: `debt:` rows there (`record(mode=)`, `finish_rebase(action=)`, `rebase_onto(squash_failure=)`, `take_branch(mode=)`, any-markdown `anchors`, page-tsv `consumer`, blueprint `scan(mode=)`) are the next conversions.
 - Two triage proposals were wrong and changed: `convert-md` `grade(source_size=None)` would also have switched off the structure check, so it is `grade` and `grade_container`; `child-env` composes as `scrub(without_venv(env))` (venv first), which needs no `venv=` argument.
 - `git-porcelain` `continue_rebase(stage_conflicts, check_markers)` became `resolve_and_continue()` (both together, the only combination any caller used).

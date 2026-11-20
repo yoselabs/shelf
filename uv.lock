@@ -1320,7 +1320,7 @@ dev = [
 
 [[package]]
 name = "beads-client"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "packages/beads-client" }
 dependencies = [
     { name = "child-env" },
@@ -2530,7 +2530,7 @@ wheels = [
 
 [[package]]
 name = "git-porcelain"
-version = "0.26.0"
+version = "0.27.0"
 source = { editable = "packages/git-porcelain" }
 dependencies = [
     { name = "child-env" },

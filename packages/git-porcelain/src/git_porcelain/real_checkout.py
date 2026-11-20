@@ -56,9 +56,17 @@ def checkout_new(wt: RealWorktree, branch: str, start: str) -> None:
         wt.repo.invalidate()
 
 
-def clean(wt: RealWorktree, keep: Sequence[str], *, ignored: bool, nested: bool) -> None:
-    """Remove untracked files, preserving the supplied exclusion patterns; a second ``-f`` takes nested repositories."""
-    flags = "-f" + ("f" if nested else "") + "d" + ("x" if ignored else "") + "q"
+def clean(wt: RealWorktree, keep: Sequence[str]) -> None:
+    """Remove untracked files, preserving the supplied exclusion patterns."""
+    _git_clean(wt, keep, "-fdq")
+
+
+def clean_ignored(wt: RealWorktree, keep: Sequence[str]) -> None:
+    """``clean`` that takes ignored files too; a nested repository (one holding its own ``.git``) is left, as git does."""
+    _git_clean(wt, keep, "-fdxq")
+
+
+def _git_clean(wt: RealWorktree, keep: Sequence[str], flags: str) -> None:
     try:
         wt.run("clean", flags, *(arg for pattern in keep for arg in ("-e", pattern)))
     finally:

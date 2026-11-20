@@ -6,7 +6,7 @@ import re
 from typing import TYPE_CHECKING, Final
 
 from git_porcelain.api import Conflict, HookRejected, Offline, Pushed, Rebased, RefRejected, Sha, Synced, Transient
-from git_porcelain.errors import GitUnavailable, RefRace, WorktreeRemoveRefused, some
+from git_porcelain.errors import GitUnavailable, NotAWorktree, RefRace, WorktreeRemoveRefused, some
 from git_porcelain.fake_merge import merge_trees, replay_list
 from git_porcelain.fake_ops import hard_to, is_clean, make_commit, require_index, switch_tree
 from git_porcelain.fake_store import CheckoutState, Rebase, ancestors
@@ -114,10 +114,9 @@ def rebase_abort(repo: RepoState, wt: CheckoutState) -> None:
     wt.rebase = None
 
 
-def worktree_add(repo: RepoState, path: Path, sha: str | None, *, force: bool = False) -> CheckoutState:
+def worktree_add(repo: RepoState, path: Path, sha: str | None) -> CheckoutState:
     """A new linked worktree at ``path``, detached at the commit."""
-    target = repo.worktrees.get(path)
-    if (target is not None and not (force and target.missing and not target.main)) or sha is None:
+    if path in repo.worktrees or sha is None:
         msg = f"git worktree add exited 128: '{path}' already exists or the revision is unknown"
         raise GitUnavailable(msg)
     files = repo.store.commits[sha].files
@@ -126,17 +125,27 @@ def worktree_add(repo: RepoState, path: Path, sha: str | None, *, force: bool = 
     return made
 
 
-def worktree_remove(repo: RepoState, path: Path, *, force: bool) -> None:
+def _linked(repo: RepoState, path: Path) -> CheckoutState:
     target = repo.worktrees.get(path)
     if target is None:
         msg = f"fatal: '{path}' is not a working tree"
-        raise WorktreeRemoveRefused(msg)
+        raise NotAWorktree(msg)
     if target.main:
         msg = f"fatal: '{path}' is a main working tree"
         raise WorktreeRemoveRefused(msg)
-    if not force and not target.missing and not is_clean(repo, target):
+    return target
+
+
+def worktree_remove(repo: RepoState, path: Path) -> None:
+    target = _linked(repo, path)
+    if not target.missing and not is_clean(repo, target):
         msg = f"fatal: '{path}' contains modified or untracked files, use --force to delete it"
         raise WorktreeRemoveRefused(msg)
+    del repo.worktrees[path]
+
+
+def worktree_discard(repo: RepoState, path: Path) -> None:
+    _linked(repo, path)
     del repo.worktrees[path]
 
 

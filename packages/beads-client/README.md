@@ -24,7 +24,7 @@ if bd.claim(bead_id):                    # False: someone else holds it
 ## Verbs
 
 `show`, `comments`, `find`, `ready`, `create`, `create_with_sections`, `update` (with `if_assignee`/`if_status` fences),
-`claim`, `unclaim`, `reclaim`, `heartbeat`, `close`, `comment`, `add_label`, `remove_label`, `add_dep`, `remove_dep`, `provenance`, `sync`, `version`,
+`claim`, `unclaim`, `evict`, `reclaim`, `reclaim_foreign`, `heartbeat`, `close`, `comment`, `add_label`, `remove_label`, `add_dep`, `remove_dep`, `provenance`, `sync`, `version`,
 `check_version`, `at(cwd)`.
 
 ## Fails loud

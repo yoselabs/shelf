@@ -38,6 +38,7 @@ from git_porcelain.api import DEFAULT_TIMEOUT
 from git_porcelain.errors import GitTimeout, GitUnavailable, NotARepo
 from git_porcelain.real_done import Done, unavailable
 from git_porcelain.real_trace import trace_hooks
+from git_porcelain.remote_validation import validate_push
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -280,8 +281,8 @@ class RealRepo:
     def fetch(self, remote: str = "origin", *, refspecs: Sequence[str] = (), timeout: float | None = None) -> CommandResult:
         return real_remote.fetch(self, remote, refspecs, timeout)
 
-    def delete_remote_at(self, remote: str, ref: str, expected: Sha, *, missing_ok: bool = True) -> CommandResult:
-        return real_remote.delete_remote_at(self, remote, ref, expected, missing_ok=missing_ok)
+    def delete_remote_at(self, remote: str, ref: str, expected: Sha) -> CommandResult:
+        return real_remote.delete_remote_at(self, remote, ref, expected)
 
     def identity(self) -> RepoIdentity:
         return real_read.identity(self)
@@ -320,11 +321,14 @@ class RealRepo:
     def worktrees(self, *, with_dirty: bool = False) -> tuple[WorktreeInfo, ...]:
         return real_read.worktrees(self, with_dirty=with_dirty)
 
-    def add_worktree(self, path: Path, rev: str, *, force: bool = False) -> RealWorktree:
-        return real_worktrees.add_worktree(self, path, rev, force=force)
+    def add_worktree(self, path: Path, rev: str) -> RealWorktree:
+        return real_worktrees.add_worktree(self, path, rev)
 
-    def drop_worktree(self, path: Path, *, force: bool = False, missing_ok: bool = True) -> None:
-        real_worktrees.drop_worktree(self, path, force=force, missing_ok=missing_ok)
+    def drop_worktree(self, path: Path) -> None:
+        real_worktrees.drop_worktree(self, path)
+
+    def discard_worktree(self, path: Path) -> None:
+        real_worktrees.discard_worktree(self, path)
 
     def prune_worktrees(self) -> None:
         real_worktrees.prune_worktrees(self)
@@ -376,8 +380,11 @@ class RealWorktree:
     def checkout_new(self, branch: str, start: str = "HEAD") -> None:
         real_checkout.checkout_new(self, branch, start)
 
-    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False, nested: bool = False) -> None:
-        real_checkout.clean(self, keep, ignored=ignored, nested=nested)
+    def clean(self, keep: Sequence[str] = ()) -> None:
+        real_checkout.clean(self, keep)
+
+    def clean_ignored(self, keep: Sequence[str] = ()) -> None:
+        real_checkout.clean_ignored(self, keep)
 
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
         real_checkout.reset(self, rev, mode=mode)
@@ -408,12 +415,22 @@ class RealWorktree:
         base: str | None = None,
         mode: Literal["new", "amend", "squash_to"] = "new",
         squash_to: Sha | None = None,
-        hooks: bool = False,
-        allow_empty: bool = False,
     ) -> RecordResult:
-        return real_write.record(
-            self, message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=hooks, allow_empty=allow_empty
-        )
+        return real_write.record(self, message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=False, allow_empty=False)
+
+    def record_with_hooks(
+        self,
+        message: str,
+        *,
+        paths: Literal["own", "all", "tracked", "staged"] = "own",
+        base: str | None = None,
+        mode: Literal["new", "amend", "squash_to"] = "new",
+        squash_to: Sha | None = None,
+    ) -> RecordResult:
+        return real_write.record(self, message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=True, allow_empty=False)
+
+    def record_empty(self, message: str) -> RecordResult:
+        return real_write.record(self, message, paths="staged", base=None, mode="new", squash_to=None, hooks=False, allow_empty=True)
 
     def take_branch(
         self,
@@ -429,8 +446,8 @@ class RealWorktree:
     def release_branch(self, holder: Path) -> Released | StillHeld:
         return real_write.release_branch(self, holder)
 
-    def park(self, base: str, *, clean_keep: Sequence[str] | None = None, keep_ignored: bool = False) -> Sha:
-        return real_write.park(self, base, clean_keep, keep_ignored=keep_ignored)
+    def park(self, base: str, *, clean_keep: Sequence[str] | None = None) -> Sha:
+        return real_write.park(self, base, clean_keep)
 
     def rebase_onto(
         self,
@@ -463,14 +480,14 @@ class RealWorktree:
     def unmerged(self) -> tuple[str, ...]:
         return real_observe.unmerged(self)
 
-    def continue_rebase(self, *, missing_ok: bool = False) -> CommandResult:
-        return real_commands.continue_rebase(self, missing_ok=missing_ok)
+    def continue_rebase(self) -> CommandResult:
+        return real_commands.continue_rebase(self)
 
     def resolve_and_continue(self) -> CommandResult:
         return real_commands.resolve_and_continue(self)
 
-    def abort_rebase(self, *, missing_ok: bool = True, restore_to: Sha | None = None) -> CommandResult:
-        return real_commands.abort_rebase(self, missing_ok=missing_ok, restore_to=restore_to)
+    def abort_rebase(self, *, restore_to: Sha | None = None) -> CommandResult:
+        return real_commands.abort_rebase(self, restore_to=restore_to)
 
     def push_request(
         self,
@@ -478,29 +495,25 @@ class RealWorktree:
         refspecs: Sequence[str],
         *,
         options: Sequence[str] = (),
-        force: bool = False,
-        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> CommandResult:
-        return real_remote.push_request(
-            self, remote, refspecs, options=options, force=force, allow_delete=allow_delete, hook_env=hook_env, timeout=timeout
-        )
+        validate_push(remote, refspecs, options)
+        return real_remote.push_request(self, remote, refspecs, options=options, hook_env=hook_env, timeout=timeout)
 
     def push_refspecs(
         self,
         remote: str,
         refspecs: Sequence[str],
         *,
-        force: bool = False,
-        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> PushResult:
-        return real_remote.push_refspecs(self, remote, refspecs, force=force, allow_delete=allow_delete, hook_env=hook_env, timeout=timeout)
+        validate_push(remote, refspecs)
+        return real_remote.push_refspecs(self, remote, refspecs, hook_env=hook_env, timeout=timeout)
 
     def push_lease(self, remote: str, refspec: str, *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
-        return self.push_request(remote, [refspec], options=["--force-with-lease"], timeout=timeout)
+        return real_remote.push_request(self, remote, [refspec], options=["--force-with-lease"], hook_env=None, timeout=timeout)
 
     def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         return real_commands.command(self, ["lfs", "push", remote, *refs], timeout=timeout, timed_out="git lfs timed out after 60 min")
