@@ -65,6 +65,20 @@ FRAMEWORK_ROLES = (
     "hooks",  # what prek adds per commit for the framework
     "agent-guidance",  # the framework's conventions file agents read (docs/agents/<framework>.md)
 )
+# Cut 2026-11-20 (checkpoint-review.md): `agent-guidance` repeats agents.culture-files and the managed block; a role that is
+# `na` for the stack is not a checkpoint. The profile files keep the data; no row is projected from it.
+_NEVER_ROWS = frozenset({"agent-guidance"})
+_NA_NOT_ROWS = frozenset({"coverage", "ci", "embedded-script-lint"})
+
+
+def is_checkpoint(profile: StackProfile, role: str) -> bool:
+    """Whether a role of this profile becomes a row: not a cut role, and not a cut role the profile marks `na`."""
+    if role in _NEVER_ROWS:
+        return False
+    spec = profile.roles.get(role)
+    return not (role in _NA_NOT_ROWS and spec is not None and bool(spec.na or spec.untested))
+
+
 _RESEARCH = (
     "research the tools for each role ({roles}) and write blueprint/profiles/{stack}.toml in the shelf "
     "(`blueprint lacks: profile for {stack}` bead); the rows for this stack stay unjudged until then"
@@ -443,6 +457,8 @@ def roles(ctx: Context) -> list[Sub]:
         if prof is None:
             continue
         for role in (*ROLES, *(r for r in prof.roles if r not in ROLES)):
+            if not is_checkpoint(prof, role):
+                continue
             judged = judge_role(ctx, stack, prof, role, reached)
             statement = f"{stack} {role}: the profile's tool is set up and run by `just check`"
             subs.append(Sub(f"stack/{stack}", f"stack.{stack}.{role}", statement, provisional_finding(prof.status, finding_for(judged))))

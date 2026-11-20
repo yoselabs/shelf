@@ -73,6 +73,24 @@ class Run:
         return 2 if Verdict.NOT_CHECKED in verdicts else 0
 
 
+# An override whose expiry is this near, or past, is named in every run's output (never silent).
+EXPIRY_NOTICE_DAYS = 14
+
+
+def expiry_notices(overrides: tuple[Override, ...], today: date, days: int = EXPIRY_NOTICE_DAYS) -> tuple[str, ...]:
+    """One notice per override that expired or expires within `days`. Dated, not counted down, so a report holding it stays still."""
+    out = []
+    for o in overrides:
+        if o.expires is None:
+            continue
+        scope = f" (scope `{o.scope}`)" if o.scope else ""
+        if o.expires < today:
+            out.append(f"override `{o.id}`{scope} expired {o.expires.isoformat()}: it excuses nothing now; renew it or fix the checkpoint")
+        elif (o.expires - today).days <= days:
+            out.append(f"override `{o.id}`{scope} expires {o.expires.isoformat()} (within {days} days): renew it or fix the checkpoint")
+    return tuple(out)
+
+
 ACCEPTED = "docs/blueprint/checkpoints.txt"
 
 
@@ -177,5 +195,5 @@ def run(
         problems=state.problems,
         skipped_audit=skipped,
         overrides=state.overrides,
-        notices=(*state.notices, *ctx.notices),
+        notices=(*state.notices, *ctx.notices, *expiry_notices(state.overrides, today)),
     )

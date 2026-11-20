@@ -10,7 +10,7 @@ Beads with acceptance criteria; tests first; Done = `just check` green over the 
 - [x] 6. Secret scanning: read task-loop d6e223b71 and 739474b82; pin the scanner in `mise.toml`; staged, range and full modes; checkpoint.
 - [x] 7. Hook anti-pattern checkpoints (design D6), each with a failing fixture and a passing fixture.
 - [ ] 8. Rendered justfile: choose `import` versus `mod` with a throwaway fixture of two stacks; `blueprint render` and drift check; retire the justfile part of `tools/preset_drift.py`.
-- [ ] 9. Churn: verdict-change-only reports, per-checkpoint fingerprints, expiry notice, converge batching.
-- [ ] 10. Check a2kay's current gate result against the expired coverage override (read-only), and record.
+- [x] 9. Churn: verdict-change-only reports, per-checkpoint fingerprints, expiry notice, converge batching.
+- [x] 10. Check a2kay's current gate result against the expired coverage override (read-only), and record.
 - [ ] 11. Update `skills/blueprint/SKILL.md` and `agentic-delivery.md`; keep them as short as the contracts allow.
 - [ ] 12. `just check` green; `just check-all` once; archive.

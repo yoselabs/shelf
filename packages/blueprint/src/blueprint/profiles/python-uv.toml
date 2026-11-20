@@ -82,7 +82,7 @@ gate = "pytest"
 [[role]]
 role = "coverage"
 tool = "pytest-cov with a floor"
-install = "uv add --dev pytest-cov; run pytest with --cov-fail-under=<just below current>"
+install = "uv add --dev pytest-cov; run pytest with --cov-fail-under=65 (the default floor: low on purpose, a backstop; set it higher only when the owner asks)"
 # Coverage is set up when something measures it; a gate that measures without a floor is the failing case.
 config = [{ any = [
     { path = "pyproject.toml", contains = "pytest-cov" },

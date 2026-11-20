@@ -39,7 +39,7 @@ first, each with its fix; the fixes become beads.
 | T3 | Domain code does IO only through ports (Git, task store, checks, delegate) and typed stores, each with an in-memory fake in the port's own package. No filesystem-mocking library. | Patching builtins hides where IO happens; a port names it | a rule test: no `tempfile` / `subprocess` import under `tests/domain/**` |
 | T4 | Every fake is pinned by the @contract suite the real adapter also passes. | An unchecked fake drifts (shelf git-porcelain: 74 scenarios, run against real git and FakeGit) | each fake has its contract suite |
 | T5 | The writer does not free-write unit tests. Unit tests exist for one function's rule (tables), property tests for maths. Behavioural tests stay; tests that pin internals go. | Test count is not coverage of behaviour; pinned internals break on every refactor | sample 20 new tests: each names a behaviour |
-| T6 | Coverage floors stay low (line 75, diff 60, no branch floor): a backstop against untested code, never a target. | 92/90 floors once drove a repo to ~4,000 slow tests | the floor values in the gate |
+| T6 | Coverage floors stay low (line 65, diff 60, no branch floor): a backstop against untested code, never a target. | 92/90 floors once drove a repo to ~4,000 slow tests | the floor values in the gate |
 
 ## 4. Test count and cost
 

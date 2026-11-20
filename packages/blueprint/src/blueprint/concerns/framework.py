@@ -13,6 +13,7 @@ from blueprint.concerns.stack import (
     PROFILE_DIR,
     finding_for,
     gate_text,
+    is_checkpoint,
     judge_role,
     load_profiles,
     provisional_finding,
@@ -53,6 +54,8 @@ def roles(ctx: Context) -> list[Sub]:
         note = "" if prof.status == "evidenced" else "; provisional: written, not yet proven in a second repo"
         subs.append(Sub(concern, f"framework.{key}.profile", statement, passing(f"{prof.status} profile, in {root}: {tools}{note}")))
         for role in FRAMEWORK_ROLES:
+            if not is_checkpoint(prof, role):
+                continue
             judged = judge_role(ctx, name, prof, role, reached, root=root)
             finding = finding_for(judged)
             if name == "unity" and role == "architecture" and judged.verdict in {"pass", "not-set-up"}:
