@@ -102,6 +102,7 @@ starts per test.
 |---|---|---|---|
 | G1 | The local gate is the only gate. CI is a non-blocking backstop after landing. | A blocking remote CI that is red on every OS blocks nothing useful and stalls everything | CI is not a required check |
 | G2 | One command is the gate; landing holds a lock; the release suite runs on the rebased result before push. | Two loops race to land on one main; the race is tested with real processes (task-loop `test_race`) | the land lock and its test |
+| G4 | Agents run the selecting gate (`just check`) per task, and the full suite (`check-all`) only before a release tag. | Agents re-ran the full suite per task and per PR: minutes each time, re-proving what the selected gate and its receipts already proved. | agents' gate calls in the last 20 task records |
 | G3 | A scanner of all history (secrets across every commit and branch) does not run in the gate. | 34 s per run for the same history every time | gate steps |
 | G4 | Rebase at land, squashed to one commit; after a stop, squash the WIP commits and try a conflict fix before restarting the branch. | A merge gives the same conflicts; restarting loses work | the land path |
 | G5 | Every run is classified against a failure taxonomy (MAST, arXiv 2503.13657) and the result is shown with the run. | Without a class per failure, the same failure repeats unnoticed | the run report has the class |
