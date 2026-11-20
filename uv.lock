@@ -36,6 +36,7 @@ members = [
     "any-recorded-fixture",
     "any-shell-policy",
     "any-speech",
+    "any-work",
     "any-yaml",
     "anyembed",
     "anyllm",
@@ -830,6 +831,37 @@ requires-dist = [
     { name = "verb-cli", editable = "packages/verb-cli" },
 ]
 provides-extras = ["parakeet", "embed"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
+[[package]]
+name = "any-work"
+version = "0.1.0"
+source = { editable = "packages/any-work" }
+dependencies = [
+    { name = "any-failure-fp" },
+    { name = "any-lease" },
+    { name = "sqlite-store" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "any-failure-fp", editable = "packages/any-failure-fp" },
+    { name = "any-lease", editable = "packages/any-lease" },
+    { name = "sqlite-store", editable = "packages/sqlite-store" },
+]
 
 [package.metadata.requires-dev]
 dev = [
