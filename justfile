@@ -18,7 +18,7 @@ pytest_par := "-n auto"
 lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACHE_HOME", env_var("HOME") + "/.cache") + "/gate-leases")
 
 # The gate. Fast, deterministic tools first; tests last. Tests cover only what the change
-# touches (`test-affected`); `check-all` runs every test with the coverage floor.
+# touches (`test-affected`); `check-all` runs every test with the coverage floor: rare, before a release tag, never per task.
 #
 # The per-file linters (scripts, lint-changed, spell-changed) check only the files changed against the base
 # in `check` (`any-gate changed`; a changed config file, or no base, selects everything). `check-all` runs them on every
