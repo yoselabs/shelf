@@ -289,7 +289,8 @@ def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path
             path.write_text(body.replace("{stamp}", f"{stamp}\n\n{_FP_OPENING}{fp}", 1))
         written.append(path)
 
-    emit(out_dir / "README.md", run.rows, f"# Blueprint\n\n{{stamp}}\n\n{_header(run)}\n\n{overrides_section(run, today)}\n\n{summary(run)}\n")
+    head = f"{_header(run)}\n\n{overrides_section(run, today)}"
+    emit(out_dir / "README.md", run.rows, f"# Blueprint\n\n{{stamp}}\n\n{head}\n\n{summary(run)}\n")
     # The audit record: what the gate enforces until the next audit (runner.ACCEPTED).
     accepted = repo / ACCEPTED
     record = "".join(f"{r.key}\n" for r in sorted(run.rows, key=lambda r: r.key))
@@ -300,7 +301,7 @@ def write(run: Run, repo: Path, today: date, *, prune: bool = True) -> list[Path
         rows = [r for r in run.rows if r.concern == concern]
         path = out_dir / f"{concern.replace('/', '-')}.md"
         title = f"# Blueprint: {concern} ({LAYER_TITLES.get(layer, layer)})"
-        emit(path, rows, f"{title}\n\n{{stamp}}\n\n{_header(run)}\n\n{overrides_section(run, today)}\n\n{table(rows)}\n")
+        emit(path, rows, f"{title}\n\n{{stamp}}\n\n{head}\n\n{table(rows)}\n")
     if prune:
         for stale in sorted(set(out_dir.glob("*.md")) - set(written)):
             if stale.read_text(errors="replace").startswith("# Blueprint: ") and _STAMP_OPENING in stale.read_text(errors="replace"):

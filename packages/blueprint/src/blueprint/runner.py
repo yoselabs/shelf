@@ -85,9 +85,9 @@ def expiry_notices(overrides: tuple[Override, ...], today: date, days: int = EXP
             continue
         scope = f" (scope `{o.scope}`)" if o.scope else ""
         if o.expires < today:
-            out.append(f"override `{o.id}`{scope} expired {o.expires.isoformat()}: it no longer excuses anything; renew it with a reason or fix the checkpoint")
+            out.append(f"override `{o.id}`{scope} expired {o.expires.isoformat()}: it excuses nothing now; renew it or fix the checkpoint")
         elif (o.expires - today).days <= days:
-            out.append(f"override `{o.id}`{scope} expires {o.expires.isoformat()} (within {days} days): renew it with a reason or fix the checkpoint")
+            out.append(f"override `{o.id}`{scope} expires {o.expires.isoformat()} (within {days} days): renew it or fix the checkpoint")
     return tuple(out)
 
 
