@@ -7,7 +7,6 @@ import re
 import subprocess
 import sys
 import textwrap
-import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -21,8 +20,8 @@ FAKE = textwrap.dedent(
     #!/bin/sh
     case "$1" in
       ok) echo "ok output" ;;
-      one) sleep 1; echo one ;;
-      two) sleep 1; echo two ;;
+      one) touch "$MEET/a"; n=0; while [ ! -e "$MEET/b" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done; [ -e "$MEET/b" ] && echo one ;;
+      two) touch "$MEET/b"; n=0; while [ ! -e "$MEET/a" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done; [ -e "$MEET/a" ] && echo two ;;
       slow) sleep 2; echo slow output ;;
       fail) echo "boom: the reason"; exit 3 ;;
       skip) echo "skipped lint: no file changed" ;;
@@ -53,11 +52,11 @@ def test_every_step_passing_makes_a_pass_and_one_timing_line(fake: str) -> None:
     assert re.search(r"gate: ok \d+s · skip \d+s -- total \d+s", done.stderr)
 
 
-def test_the_steps_run_at_once(fake: str) -> None:
-    began = time.monotonic()
-    done = _steps(fake, "one", "two")
+def test_the_steps_run_at_once(fake: str, tmp_path: Path) -> None:
+    # Each step waits for the other's marker (up to 10 s), so they pass only if both run at the same time. A wall-clock bound
+    # failed on a loaded machine (2.0 s against a 1.8 s limit, 2026-11-20) while the steps were in fact parallel.
+    done = _steps(fake, "one", "two", MEET=str(tmp_path))
     assert done.returncode == 0
-    assert time.monotonic() - began < 1.8  # two one-second steps, not two seconds in a row
 
 
 def test_a_failing_step_fails_the_gate_and_prints_its_log_and_marks_it(fake: str) -> None:
