@@ -573,10 +573,9 @@ dev = [
 
 [[package]]
 name = "any-lease"
-version = "0.3.1"
+version = "0.3.2"
 source = { editable = "packages/any-lease" }
 dependencies = [
-    { name = "child-env" },
     { name = "content-digest" },
     { name = "process-lock" },
 ]
@@ -590,7 +589,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "child-env", editable = "packages/child-env" },
     { name = "content-digest", editable = "packages/content-digest" },
     { name = "process-lock", editable = "packages/process-lock" },
 ]

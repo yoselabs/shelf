@@ -4,6 +4,7 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see the ledger for why). Read this before source/README when reconciling a pin
 (agent-loop.md WORKFLOW: RECEIVE).
 
+- 0.3.2: `python -m any_lease run` hands its command `{**os.environ, ANY_LEASE_HELD}` again (reverses the 0.3.0 child-env note): credentials and agent-session variables (`*TOKEN*`, `*SECRET*`, `AWS_*`, `GH_*`, `CLAUDE_*`, `ANTHROPIC_*`, `MCP_*`) reach the command; a lock around a command must not change it; compatible with 0.3.0 callers; drops dependency `child-env`
 - 0.3.0: `python -m any_lease run` handed its command `{**os.environ, ANY_LEASE_HELD}`  ⇒  `child_env.build_env(os.environ, allow=("*",), extra={ANY_LEASE_HELD})`: every variable except credentials (`*TOKEN*`, `*SECRET*`, `AWS_*`, `GH_*`, ...) and agent-session ones (`CLAUDE_*`, `ANTHROPIC_*`, `MCP_*`, ...), which the command no longer inherits
 - 0.3.0: the poll between flock attempts waits on a `threading.Event` (the caller's `cancel`, or a private one) instead of `time.sleep`; same wake-up on cancel, no behaviour change
 - 0.3.0: `claims/` and `.pace` file names hash through `content_digest.digest_text(key, length=16)`: same names, same bytes (golden-tested)

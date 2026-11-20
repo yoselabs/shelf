@@ -111,10 +111,10 @@ def test_a_second_run_waits_for_the_first_and_says_who_it_waits_for(tmp_path: Pa
     first.wait(timeout=30)
 
 
-def test_the_command_gets_the_environment_minus_secrets_and_the_held_names(tmp_path: Path) -> None:
-    """The child's env is child_env.build_env of ours: ordinary variables pass, credentials do not, and the held list is added."""
-    env = {**os.environ, "KEEP_ME": "k", "MY_SERVICE_TOKEN": "s3cret"}
-    show = "import os; print(os.environ.get('KEEP_ME'), os.environ.get('MY_SERVICE_TOKEN'), os.environ.get('ANY_LEASE_HELD'))"
+def test_the_command_gets_the_callers_whole_environment_and_the_held_names(tmp_path: Path) -> None:
+    """A lock around a command is transparent: credentials and agent-session variables pass, and the held list is added."""
+    env = {**os.environ, "GH_TOKEN": "gh", "ANTHROPIC_API_KEY": "key", "MY_SERVICE_TOKEN": "s3cret"}
+    show = "import os; print(*(os.environ.get(k) for k in ('GH_TOKEN', 'ANTHROPIC_API_KEY', 'MY_SERVICE_TOKEN', 'ANY_LEASE_HELD')))"
     proc = _run(tmp_path / "locks", "unity", 1, "job", sys.executable, "-c", show, env=env)
     out, _ = proc.communicate(timeout=30)
-    assert out.split() == ["k", "None", "unity"]
+    assert out.split() == ["gh", "key", "s3cret", "unity"]
