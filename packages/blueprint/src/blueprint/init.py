@@ -7,7 +7,7 @@ Four phases, in this order, each printed under its own name:
 2. audit: run every checkpoint, so the plan starts from what the repo already has.
 3. plan: the steps that are missing, and only those.
 4. apply: write them. A file the repo already has is never overwritten: `ruff.toml`, `pyrefly.toml`, a `[tool.ruff]` table, the
-   `.pre-commit-config.yaml`, the justfile's own recipes stay as written. The one rewritten thing is the AGENTS.md managed block.
+   `.pre-commit-config.yaml`, the justfile's own recipes stay as written.
 
 It ends with `left:`, the checkpoints that still do not pass, each with its remediation: what init could not set up. Exit 0 when none
 is left, 1 when some are, 2 when it could not start. A second run on a finished repo writes nothing.
@@ -23,7 +23,7 @@ import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from blueprint import preset, render, shelf_sources, templates
+from blueprint import preset, render, shelf_sources
 from blueprint.concerns import tool_pins
 from blueprint.concerns.profile_data import load_profiles, profile_for
 from blueprint.model import Context, Verdict
@@ -194,10 +194,6 @@ def _shelf_sources_drift(repo: Path) -> bool:
 def _plan(repo: Path, stacks: tuple[str, ...], env: Mapping[str, str], *, hooks: bool, beads: bool) -> list[str]:
     profile = detect(repo, load_state(repo))
     steps: list[str] = []
-    missing_docs = [n for n in templates.required(profile) if not (repo / "docs" / "agents" / f"{n}.md").is_file()]
-    agents = repo / "AGENTS.md"
-    if missing_docs or not agents.is_file() or templates.block(profile) not in agents.read_text(encoding="utf-8"):
-        steps.append("docs/agents files and the AGENTS.md block")
     if render.drift(repo):
         steps.append("the justfile parts (.blueprint/*.just)")
     if _PYTHON & set(stacks) and _preset_text(repo)[1]:
@@ -217,8 +213,6 @@ def _plan(repo: Path, stacks: tuple[str, ...], env: Mapping[str, str], *, hooks:
 
 def _apply(repo: Path, stacks: tuple[str, ...], steps: list[str], env: Mapping[str, str], *, hooks: bool) -> list[str]:
     written: list[str] = []
-    if any(s.startswith("docs/agents") for s in steps):
-        written += templates.install(repo, detect(repo, load_state(repo)))
     if any(s.startswith("the justfile") for s in steps):
         written += render.write(repo)
     if any(s.startswith("the linter") for s in steps) and _PYTHON & set(stacks):

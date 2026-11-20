@@ -24,7 +24,7 @@ def test_the_top_level_help_names_three_verbs_and_calls_gate_the_steps_of_just_c
 def test_the_gate_help_says_what_each_step_does_and_that_the_justfile_runs_them(capsys: pytest.CaptureFixture[str]) -> None:
     out = _help(capsys, "gate")
     assert "justfile" in out
-    for step in ("guard", "preset", "render", "test", "adr-index"):
+    for step in ("guard", "preset", "render", "test"):
         assert step in out
 
 

@@ -23,7 +23,7 @@
 - Found an ADR that amends another (imported records often do): fold it into the earlier file, which
   gets the decision as it now stands and a History entry naming the amending ADR; mark the amender superseded.
 - Write one when a choice has two defensible answers and a cost, or when you overrule a default.
-- After any ADR change: `blueprint gate adr-index --repo . --write`; the gate fails on a stale index.
+- After any ADR change: `python -m any_knowledge index --write`; the gate fails on a stale index.
 
 Ask the owner before recording a decision as accepted; draft it as `proposed`.
 
@@ -34,4 +34,4 @@ meet this layout, this layout wins:
 
 - `CONTEXT.md` is the glossary. Read and extend it; do not create a second glossary file (GLOSSARY.md or any other).
 - `docs/adr/` keeps the format above (frontmatter, decision on top, `## History`), not the skills' own ADR format.
-- Do not run `setup-matt-pocock-skills` over this repo: it rewrites the files in `docs/agents/` (issue-tracker, domain and the rest), which blueprint manages. Change those through the blueprint template, not the skill.
+- Do not run `setup-matt-pocock-skills` over this repo: it rewrites the files in `docs/agents/` (issue-tracker, domain and the rest), which any-knowledge seeds. Change those through its template, not the skill.

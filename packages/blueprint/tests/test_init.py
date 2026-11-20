@@ -37,7 +37,6 @@ def test_detect_names_the_stacks_and_the_files_it_read_before_anything_is_writte
 def test_it_writes_what_is_missing_and_a_second_run_writes_nothing(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
     _python_repo(repo)
     _init(repo, capsys)
-    assert (repo.root / "docs/agents/gate.md").is_file()
     assert (repo.root / ".blueprint/base.just").is_file()
     assert "import '.blueprint/base.just'" in (repo.root / "justfile").read_text()
     before = {p: p.read_bytes() for p in repo.root.rglob("*") if p.is_file() and ".git/" not in p.as_posix()}

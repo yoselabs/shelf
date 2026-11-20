@@ -91,9 +91,3 @@ role = "hooks"
 tool = "prek runs golangci-lint fmt and typos on staged files (pre-commit); just check on pre-push"
 install = "add local hooks (types: [go]) to .pre-commit-config.yaml after bd's; the gate on pre-push"
 config = [{ path = ".pre-commit-config.yaml", contains = "golangci-lint" }, { path = ".pre-commit-config.yaml", contains = "typos" }]
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/go.md: commands, layering table, lint policy, test naming; linked from AGENTS.md"
-install = "create docs/agents/go.md (<= 150 lines) and link it from AGENTS.md"
-config = [{ path = "docs/agents/go.md" }, { path = "AGENTS.md", contains = "docs/agents/go.md" }]

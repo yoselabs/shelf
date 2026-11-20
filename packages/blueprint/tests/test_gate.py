@@ -271,10 +271,6 @@ def test_clean_clone_evidence_names_the_command_that_failed(repo: Repo) -> None:
     assert "lint: 3 errors" in _verdict(repo, "gate.clean-clone", audit=True)[1]
 
 
-_HOOKS_ADR = (
-    "---\nid: 0003\ntitle: Builds on owner machines\nstatement: Hooks are the owner's own; the repo carries no hook config.\n"
-    "concerns: [gate]\nstatus: accepted\ndecided_by: owner\nupdated: 2026-10-09\n---\n# 0003\n"
-)
 _HOOKS_OVERRIDE = (
     '[[override]]\nid = "gate.hooks-recipe"\ncode = "not-applicable"\nreason = "the owner installs hooks by hand on each machine"\n'
     'adr = "0003"\n'
@@ -282,9 +278,8 @@ _HOOKS_OVERRIDE = (
 
 
 def _owner_hooks_shaped(repo: Repo) -> None:
-    """A repo with a settled decision: a gate, an accepted ADR, no hook config."""
+    """A repo with a settled decision: a gate, no hook config."""
     repo.write("Makefile", "check:\n\ttrue\n")
-    repo.write("docs/adr/0003-builds-on-owner-machines.md", _HOOKS_ADR)
 
 
 def test_a_decided_gap_is_judged_as_before_without_an_override(repo: Repo) -> None:
@@ -300,15 +295,6 @@ def test_a_settled_decision_is_an_adr_backed_override_that_never_expires(repo: R
     assert rows["gate.hooks-recipe"].verdict is Verdict.PASSING
     assert "ADR 0003" in rows["gate.hooks-recipe"].evidence
     assert result.problems == ()
-
-
-def test_an_override_naming_a_missing_adr_is_a_problem_the_gate_reports(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\ttrue\n")
-    repo.write("docs/blueprint/blueprint.toml", _HOOKS_OVERRIDE)
-    result = run(repo.root, concern="gate", env=repo.env)
-    assert {r.id: r for r in result.rows}["gate.hooks-recipe"].verdict is Verdict.NOT_SET_UP
-    assert any("ADR 0003" in p for p in result.problems)
-    assert result.exit_code == 1
 
 
 def test_the_default_branch_must_be_main(repo: Repo) -> None:

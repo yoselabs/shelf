@@ -116,13 +116,3 @@ gate = "lint-imports"
 [[role]]
 role = "hooks"
 na = "no MCP-specific hook: the snapshot and contract tests are in the gate, and a hook that built the server per commit would repeat the gate"
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/mcp.md (tool descriptions are for models, annotations, error shape, stdout rule, snapshot regeneration, what never to hand-edit), linked from AGENTS.md"
-install = """create docs/agents/mcp.md (<= 120 lines): the FastMCP pin and why; tool naming and description rules; annotations on every tool; errors as is_error results with an actionable message; \
-never print to stdout; regenerate the tool-list snapshot only on purpose and read the diff; the in-memory client for tests. Link from AGENTS.md: `MCP conventions: docs/agents/mcp.md`"""
-config = [
-    { path = "docs/agents/mcp.md" },
-    { path = "AGENTS.md", contains = "docs/agents/mcp.md" },
-]

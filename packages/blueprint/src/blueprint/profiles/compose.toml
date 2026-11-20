@@ -107,13 +107,3 @@ role = "hooks"
 tool = "prek per commit on staged compose files: docker compose config --no-interpolate, dclint, and the digest-pin filter"
 install = """.pre-commit-config.yaml local hooks (language: system, files: compose.*\\.ya?ml$): id compose-config / entry sh -c 'for f in "$@"; do docker compose -f "$f" config --no-interpolate -q || exit 1; done' -- ; id dclint / entry npx --no-install dclint --max-warnings 0;"""
 config = [{ path = ".pre-commit-config.yaml", contains = "dclint" }]
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/compose.md (how a stack is validated, the pin rule, how to bump an image, what never to hand-edit), linked from AGENTS.md"
-install = """create docs/agents/compose.md (<= 100 lines): the recipes; images are pinned `tag@digest`, bump with the repo's updater and re-run the config check; never paste a secret into a compose file (use `${VAR:?}` and the sealed env); \
-rendered/generated compose files are edited at their source. Link from AGENTS.md: `Compose conventions: docs/agents/compose.md`"""
-config = [
-    { path = "docs/agents/compose.md" },
-    { path = "AGENTS.md", contains = "docs/agents/compose.md" },
-]

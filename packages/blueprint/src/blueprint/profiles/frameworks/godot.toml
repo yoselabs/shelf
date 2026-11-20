@@ -113,14 +113,3 @@ tool = "prek local hook godot-uid: every staged .cs/.gd in the Godot folder has 
 install = """.pre-commit-config.yaml local hook: id: godot-uid / entry: sh -c 'rc=0; for f in "$@"; do [ -f "$f.uid" ] || { echo "missing $f.uid: open the project in the Godot editor and commit it" >&2; rc=1; }; done; exit $rc' -- \
 / language: system / files: ^{root}/.*\\.(cs|gd)$ (escape the dots; {root} as the folder path)"""
 config = [{ path = ".pre-commit-config.yaml", contains = "godot-uid" }]
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/godot.md (engine pin, headless commands, partial/GlobalClass/Signal rules, scene conventions, what never to edit), linked from AGENTS.md"
-install = """create docs/agents/godot.md (<= 120 lines): the just recipes; never hand-edit .godot/ or *.uid; scripts must be `partial` (GD0001 is an error), signals are `[Signal] delegate void NameEventHandler`; \
-scene-wired callbacks stay instance methods (analyzer exemption lives in .editorconfig); views read snapshots and send commands, no game rules in nodes; \
-after editing a .tscn run `just godot-build`; new script means commit its .uid. Link from AGENTS.md: `Godot conventions: docs/agents/godot.md`"""
-config = [
-    { path = "docs/agents/godot.md" },
-    { path = "AGENTS.md", contains = "docs/agents/godot.md" },
-]

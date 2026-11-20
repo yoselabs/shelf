@@ -61,9 +61,3 @@ role = "hooks"
 tool = "prek per commit on staged *.sh: shellcheck and shfmt -d, the commands the gate runs"
 install = ".pre-commit-config.yaml: the koalaman/shellcheck-precommit hook (pinned by rev, same version as mise.toml) and a local `shfmt` hook (language: system, files: \\.sh$, entry: shfmt -d)"
 config = [{ path = ".pre-commit-config.yaml", contains = "shellcheck" }]
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/shell.md (strict-mode header, quoting, the waiver rules, when a script becomes the main language), linked from AGENTS.md"
-install = "`blueprint init` writes docs/agents/shell.md; link it from AGENTS.md"
-config = [{ path = "docs/agents/shell.md" }, { path = "AGENTS.md", contains = "docs/agents/shell.md" }]
