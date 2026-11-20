@@ -12,6 +12,10 @@ license = "Apache-2.0"
 # async-scope stays dependency-free and the submodule imports uvicorn lazily.
 asgi = ["uvicorn>=0.30,<1"]
 
+[dependency-groups]
+# The test libraries this package's suite imports, plus what the root conftest and pytest settings load (tests/test_package_tests_declare_their_dependencies.py).
+dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "hypothesis>=6.100,<7", "httpx>=0.28,<1", "sse-starlette>=3.4,<4", "async-scope[asgi]"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -119,3 +120,10 @@ def test_the_repos_own_marker_default_still_holds_in_every_stage(project: Callab
     outcome = _run(root)
     assert outcome.ok
     assert outcome.tests == 1
+
+
+def test_a_niced_run_starts_pytest_at_that_priority(project: Callable[..., Path]) -> None:
+    base = os.nice(0)
+    root = project(a=f"import os\n\ndef test_a():\n    assert os.nice(0) == {base + 5}\n")
+    assert _run(root, nice=5).ok
+    assert not _run(root).ok  # without it pytest keeps the caller's priority, so the same assertion fails

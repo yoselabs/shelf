@@ -239,3 +239,13 @@ def test_without_uv_the_lock_and_root_pyproject_stand_in_for_every_suites_key(co
     (committed / "uv.lock").write_text("changed\n")
     after = dict(affected.plan(committed, paths, _no_uv))
     assert all(before[p] != after[p] for p in paths)
+
+
+def test_a_selection_over_half_the_suites_gets_an_alarm_that_names_the_count(repo: Path) -> None:
+    wide = ["packages/base/tests", "packages/middle/tests", "packages/top/tests"]  # 3 of the 5 suites
+    narrow = ["packages/leaf/tests", "packages/plug/tests"]
+    alarm = affected.wide_alarm(repo, wide)
+    assert alarm is not None
+    assert "3 of 5" in alarm
+    assert affected.wide_alarm(repo, narrow) is None
+    assert affected.wide_alarm(repo, [*narrow, "tests"]) is None  # the repo's own tests are no package suite

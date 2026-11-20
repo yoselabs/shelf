@@ -12,6 +12,8 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from any_gate.plan import too_wide
+
 from any_gate_python.graph import (
     LOCK_FILES,
     Exporter,
@@ -162,6 +164,15 @@ def plan(repo: Path, paths: list[str], exporter: Exporter = package_exports) -> 
     graph, _ = workspace(repo)
     exports = _exports(repo, graph, exporter)
     return [(p, fingerprint(repo, graph, p.split("/")[1], exports) if p.startswith("packages/") else "") for p in paths]
+
+
+def wide_alarm(repo: Path, paths: list[str]) -> str | None:
+    """A warning when `paths` hold over half the package suites (`any_gate.too_wide`), else None: a hub, or a rule that fans out."""
+    total = len(workspace(repo)[0])
+    suites = sum(1 for p in paths if p.startswith("packages/"))
+    if too_wide(suites, total):
+        return f"this change reaches {suites} of {total} package suites (over half): a hub, a bump or a config change; meant?"
+    return None
 
 
 def _git(repo: Path, *args: str) -> str:

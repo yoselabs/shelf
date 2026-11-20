@@ -2,7 +2,7 @@
 
 `plan [--plan] [--explain] [--reach N]` prints the pytest paths the change reaches, or with `--plan` one `path<TAB>key` per suite.
 
-`run [--workers auto|N] [--wall S] [--idle S] [--pytest-args "ARGS"] PATH...` runs the paths in pytest stages (parallel, serial,
+`run [--workers auto|N] [--wall S] [--idle S] [--nice N] [--pytest-args "ARGS"] PATH...` runs the paths in pytest stages (parallel, serial,
 quarantine); exit 0 when none failed (a failing quarantined test is reported, not blocking), 1 otherwise.
 """
 
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from any_gate_python.graph import lock_touched, workspace
-from any_gate_python.select import affected, changed_files, merge_base, plan, reach
+from any_gate_python.select import affected, changed_files, merge_base, plan, reach, wide_alarm
 from any_gate_python.stages import run_tests
 
 
@@ -25,7 +25,14 @@ def _run(args: argparse.Namespace) -> int:
 
     workers = None if args.workers == "auto" else int(args.workers)
     outcome = run_tests(
-        args.paths, cwd=Path.cwd(), workers=workers, wall=args.wall, idle=args.idle, on_output=show, extra=shlex.split(args.pytest_args)
+        args.paths,
+        cwd=Path.cwd(),
+        workers=workers,
+        wall=args.wall,
+        idle=args.idle,
+        on_output=show,
+        extra=shlex.split(args.pytest_args),
+        nice=args.nice,
     )
     for stage in outcome.stages:
         if stage.stopped:
@@ -49,6 +56,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     run.add_argument("--wall", type=float, default=3600.0, help="seconds a stage may take before its tree is stopped")
     run.add_argument("--idle", type=float, default=600.0, help="seconds a stage may stay silent before its tree is stopped")
+    run.add_argument(
+        "--nice",
+        type=int,
+        default=10,
+        help="raise the test processes' niceness by this much (default 10; 0 leaves it): a gate yields the box to what the owner waits on",
+    )
     run.add_argument("--pytest-args", default="", help="extra arguments for every stage's pytest, as one string")
     run.add_argument("paths", nargs="+", metavar="PATH")
     args = parser.parse_args(argv)
@@ -67,6 +80,8 @@ def main(argv: list[str] | None = None) -> int:
     paths = affected(repo, changed, lambda: lock_touched(repo, merge_base(repo)))
     if args.explain:
         sys.stderr.write(f"affected: {len(changed)} changed file(s): {' '.join(changed) or '-'}\n")
+    if (alarm := wide_alarm(repo, paths)) is not None:
+        sys.stderr.write(f"any-gate-python: {alarm}\n")
     lines = [f"{path}\t{key}" for path, key in plan(repo, paths)] if args.plan else paths
     sys.stdout.write("".join(f"{line}\n" for line in lines))
     return 0

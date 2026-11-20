@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from any_gate.cli import main
+from any_gate.receipts import Receipts
 from any_lease import Leases
 
 if TYPE_CHECKING:
@@ -135,6 +136,21 @@ def test_a_run_waits_for_a_free_slot_and_says_who_holds_it(root: Path, capsys: p
     assert time.monotonic() - began >= 0.9
     assert "waiting for a test slot" in err
     assert "another gate" in err
+
+
+def test_a_gate_that_waited_for_the_slot_skips_what_the_holder_passed_meanwhile(root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    receipts = Receipts(root / "receipts.json")
+    held = Leases(root / "leases").acquire("tests", 1, label="another gate")
+
+    def finish() -> None:  # the holder's run ends green: it records `a` and lets the slot go
+        receipts.record("a", "k1")
+        held.release()
+
+    threading.Timer(1.0, finish).start()
+    code, _out, err = _go(root, "a\tk1\nb\tk2\n", capsys=capsys)
+    assert code == 0
+    assert _ran(root) == ["b"]  # `a` passed while this gate queued: it is not run again
+    assert "skipped, unchanged since they passed" in err
 
 
 def test_a_malformed_plan_line_is_a_usage_error(root: Path, capsys: pytest.CaptureFixture[str]) -> None:

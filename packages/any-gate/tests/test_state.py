@@ -6,6 +6,7 @@ gate, keyed by the tree and the upstream merge-base; any doubt runs the gate.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from typing import TYPE_CHECKING, Protocol
@@ -50,6 +51,24 @@ def test_a_clean_tree_that_passed_the_gate_may_skip_it(state: GateState) -> None
 def test_a_tree_checked_dirty_then_committed_whole_is_the_tree_that_passed(repo: Git, state: GateState) -> None:
     repo.write("app.py", "x = 2\n")
     repo.write("new.py", "y = 1\n")
+    _green(state)
+    repo.commit()
+    assert state.green("check")
+
+
+def test_a_same_size_edit_in_the_same_timestamp_tick_still_counts_as_an_edit(repo: Git, state: GateState) -> None:
+    """Git trusts a file's recorded stat unless the entry is "racily clean" (not older than the index file). The tree comes from a copy of
+    the index, and a copy made now looks newer than every entry: an edit that keeps the size and lands in the entry's tick would be missed
+    and the wrong tree recorded (seen once in 40 loaded runs, 2026-11-20)."""
+    tick = 1_700_000_000_000_000_000
+    repo.git("config", "core.trustctime", "false")
+    repo.git("config", "core.checkstat", "minimal")  # size and mtime only: the stat a same-tick edit cannot change
+    repo.write("app.py", "x = 1\n")
+    os.utime(repo.root / "app.py", ns=(tick, tick))
+    repo.git("add", "-A")  # the entry now carries the tick
+    os.utime(repo.root / ".git" / "index", ns=(tick, tick))  # and the index is no newer than it: racily clean
+    repo.write("app.py", "x = 2\n")  # same size
+    os.utime(repo.root / "app.py", ns=(tick, tick))
     _green(state)
     repo.commit()
     assert state.green("check")

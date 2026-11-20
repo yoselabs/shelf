@@ -40,7 +40,7 @@ from any_gate.state import GateState, common_dir
 from any_gate.steps import GATE_BUDGET, STEP_BUDGET, run_and_report
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from any_lease import Waiting
 
@@ -100,8 +100,10 @@ def _lease_root(given: str | None) -> Path:
     return Path(os.environ.get("GATE_LEASE_ROOT") or Path(cache) / "gate-leases")
 
 
-def _run_under_lease(args: argparse.Namespace, units: list[str]) -> RunResult:
-    """Queue for a test slot, saying who holds it, then run `units` through the runner while holding it."""
+def _run_under_lease(args: argparse.Namespace, left: Callable[[], list[tuple[str, str]]]) -> tuple[list[tuple[str, str]], RunResult | None]:
+    """Queue for a test slot, saying who holds it; then ask `left` again, since the holder may have passed suites meanwhile, and run those.
+
+    Returns the units run and the runner's result; no result when nothing was left once the slot came."""
     cwd = Path(args.cwd).resolve()
     said = False
 
@@ -115,7 +117,10 @@ def _run_under_lease(args: argparse.Namespace, units: list[str]) -> RunResult:
     with Leases(_lease_root(args.lease_root)).acquire(LEASE_NAME, args.slots, label=f"gate in {cwd}", on_wait=waiting) as held:
         if held.waited >= 1:
             notice(f"got a test slot after {held.waited:.0f}s")
-        return run_runner(args.runner, units, cwd=cwd, wall=args.wall, idle=args.idle, on_output=_show)
+        todo = left()
+        if not todo:
+            return todo, None
+        return todo, run_runner(args.runner, [path for path, _ in todo], cwd=cwd, wall=args.wall, idle=args.idle, on_output=_show)
 
 
 def _test(args: argparse.Namespace, stdin: TextIO) -> int:
@@ -131,13 +136,28 @@ def _test(args: argparse.Namespace, stdin: TextIO) -> int:
     if receipts is None:
         notice("not in a git repository: give --receipts")
         return 2
-    todo = [(path, key) for path, key in plan if not (key and receipts.has(path, key))]
-    if len(todo) < len(plan):
-        notice(f"{len(plan) - len(todo)} suite(s) skipped, unchanged since they passed")
-    if not todo:
+    return _run_planned(args, plan, receipts)
+
+
+def _run_planned(args: argparse.Namespace, plan: list[tuple[str, str]], receipts: Receipts) -> int:
+    """Run the suites of `plan` that have no receipt, and record them when they pass."""
+    reported = 0
+
+    def left() -> list[tuple[str, str]]:
+        nonlocal reported
+        todo = [(path, key) for path, key in plan if not (key and receipts.has(path, key))]
+        if len(plan) - len(todo) > reported:
+            reported = len(plan) - len(todo)
+            notice(f"{reported} suite(s) skipped, unchanged since they passed")
+        return todo
+
+    if not left():  # nothing to run: no reason to queue
         notice("nothing to run")
         return 0
-    outcome = _run_under_lease(args, [path for path, _ in todo])
+    todo, outcome = _run_under_lease(args, left)
+    if outcome is None:
+        notice("nothing to run")
+        return 0
     if outcome.stopped:
         notice(f"the runner was stopped by the {outcome.stopped} limit")
     if not outcome.ok:

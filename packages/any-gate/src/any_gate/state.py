@@ -55,7 +55,9 @@ def working_key(repo: Path) -> str | None:
     with tempfile.TemporaryDirectory() as scratch:
         temp_index = Path(scratch) / "index"
         if index.is_file():
-            shutil.copyfile(index, temp_index)  # its stat cache keeps `add -A` from rehashing every file
+            # Its stat cache keeps `add -A` from rehashing every file. The copy keeps the index's mtime: git trusts an entry's recorded stat
+            # unless the entry is not older than the index file (racily clean); a copy stamped now would hide a same-tick edit.
+            shutil.copy2(index, temp_index)
         env = {**os.environ, "GIT_INDEX_FILE": str(temp_index)}
         if _git(repo, "add", "-A", env=env) is None:
             return None

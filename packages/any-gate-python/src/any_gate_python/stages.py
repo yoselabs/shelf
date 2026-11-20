@@ -7,6 +7,7 @@ that is not a failure. A repo declares the `serial` and `quarantine` markers its
 
 from __future__ import annotations
 
+import shutil
 import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
@@ -58,8 +59,14 @@ def _ok(stage: Stage) -> bool:
     return stage.stopped is None and stage.returncode in (0, _NO_TESTS)
 
 
+def _niced(cmd: list[str], nice: int) -> list[str]:
+    """`cmd` started `nice` steps nicer than the caller, so a gate yields the box to the owner's; unchanged for 0 or without `nice`."""
+    found = shutil.which("nice") if nice else None
+    return [found, "-n", str(nice), *cmd] if found else cmd
+
+
 def _collect(
-    paths: Sequence[str], *, cwd: Path, python: str, wall: float, idle: float, env: Mapping[str, str] | None
+    paths: Sequence[str], *, cwd: Path, python: str, wall: float, idle: float, env: Mapping[str, str] | None, nice: int = 0
 ) -> tuple[int, set[str]]:
     """The number of selected tests and the lanes some are marked for: one collection, so an empty lane costs no process."""
     heard: list[str] = []
@@ -81,7 +88,7 @@ def _collect(
         if line.startswith(PREFIX):
             heard.extend(line.removeprefix(PREFIX).split())
 
-    run_process(cmd, cwd=cwd, env=env, on_stdout=hear, timeout=wall, idle=idle)
+    run_process(_niced(cmd, nice), cwd=cwd, env=env, on_stdout=hear, timeout=wall, idle=idle)
     return (int(heard[0]), set(heard[1:])) if heard and heard[0].isdigit() else (0, set())
 
 
@@ -96,14 +103,16 @@ def run_tests(
     env: Mapping[str, str] | None = None,
     on_output: Callable[[str], None] | None = None,
     extra: Sequence[str] = (),
+    nice: int = 0,
 ) -> Outcome:
     """Run `paths` with pytest in stages; `workers` > 1 spreads the parallel stage over that many xdist workers.
 
     `workers=None` sizes the pool to the number of selected tests and this box (`plan.workers` and `plan.detect`).
 
-    `extra` is passed to every stage's pytest. Output lines (newline kept) go to `on_output`.
+    `nice` raises every pytest process's niceness by that much (0 leaves it). `extra` is passed to every stage's pytest.
+    Output lines (newline kept) go to `on_output`.
     """
-    count, lanes = _collect(paths, cwd=cwd, python=python, wall=wall, idle=idle, env=env)
+    count, lanes = _collect(paths, cwd=cwd, python=python, wall=wall, idle=idle, env=env, nice=nice)
     pool = plan_workers(count, detect()) if workers is None else workers
     stages: list[Stage] = []
     for name, alone in _STAGES:
@@ -123,7 +132,9 @@ def run_tests(
         ]
         if pool > 1 and not alone:
             cmd += ["-n", str(pool)]
-        result = run_process([*cmd, *paths], cwd=cwd, env=env, on_stdout=on_output, on_stderr=on_output, timeout=wall, idle=idle)
+        result = run_process(
+            _niced([*cmd, *paths], nice), cwd=cwd, env=env, on_stdout=on_output, on_stderr=on_output, timeout=wall, idle=idle
+        )
         stages.append(Stage(name, result.returncode, result.secs, result.timed_out))
         if result.timed_out and name == "parallel":
             break  # a stopped run says nothing about the stages after it
