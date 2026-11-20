@@ -39,7 +39,7 @@ from anyllm.providers import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable, Iterator, Mapping, Sequence
 
     from anyllm.base import Completion, LLMProvider, PromptParts
 
@@ -168,7 +168,6 @@ def resolve_provider(
     *,
     env: Mapping[str, str],
     wrap: Callable[[LLMProvider], LLMProvider] | None = None,
-    fallback: bool = True,
 ) -> LLMProvider | None:
     """Resolve an ordered candidate list into one usable provider, or ``None``.
 
@@ -181,9 +180,8 @@ def resolve_provider(
       no-provider error);
     - the bare provider — exactly one survivor (no wrapper, nothing to fall back
       to);
-    - a runtime-fallback provider — two or more survivors and ``fallback`` is
-      true (the default); with ``fallback=False`` the first survivor is returned
-      and the rest ignored (construction-time selection only).
+    - a runtime-fallback provider — two or more survivors (:func:`resolve_first`
+      returns just the first survivor instead: construction-time selection only).
 
     ``wrap`` is applied to **each** surviving backend before composition — this
     is where a host attaches per-backend concerns (most importantly
@@ -191,18 +189,41 @@ def resolve_provider(
     id rather than the fallback's primary-name proxy). ``config`` is threaded to
     every :func:`build_adapter` call (see its docstring for the shape), as is ``env``.
     """
-    built: list[LLMProvider] = []
+    built = list(_survivors(order, config, env=env, wrap=wrap))
+    if not built:
+        return None
+    if len(built) == 1:
+        return built[0]
+    return _FallbackProvider(built)
+
+
+def resolve_first(
+    order: Sequence[ProviderName | str] = DEFAULT_ORDER,
+    config: dict[str, object] | None = None,
+    *,
+    env: Mapping[str, str],
+    wrap: Callable[[LLMProvider], LLMProvider] | None = None,
+) -> LLMProvider | None:
+    """The first usable provider of ``order`` (built as :func:`resolve_provider` does), or ``None``.
+
+    No runtime fallback: the later candidates are neither built nor wrapped.
+    """
+    return next(_survivors(order, config, env=env, wrap=wrap), None)
+
+
+def _survivors(
+    order: Sequence[ProviderName | str],
+    config: dict[str, object] | None,
+    *,
+    env: Mapping[str, str],
+    wrap: Callable[[LLMProvider], LLMProvider] | None,
+) -> Iterator[LLMProvider]:
     for name in order:
         try:
             provider = build_adapter(str(name), config, env=env)
         except AnyLLMError:
             continue
-        built.append(wrap(provider) if wrap is not None else provider)
-    if not built:
-        return None
-    if len(built) == 1 or not fallback:
-        return built[0]
-    return _FallbackProvider(built)
+        yield wrap(provider) if wrap is not None else provider
 
 
-__all__ = ["DEFAULT_ORDER", "DEFAULT_PROVIDER", "build_adapter", "resolve_provider"]
+__all__ = ["DEFAULT_ORDER", "DEFAULT_PROVIDER", "build_adapter", "resolve_first", "resolve_provider"]

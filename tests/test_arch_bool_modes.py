@@ -58,10 +58,6 @@ _ALLOWED: dict[str, str] = {
         "verb-cli:flags_of:choices",
     ),
     **_rows(
-        "split: fallback=False returns the first survivor instead of the composed provider; a2kay and a2web consume resolve_provider",
-        "anyllm:resolve_provider:fallback",
-    ),
-    **_rows(
         "split: capture=False inherits stdio instead of capturing; a second operation",
         "stream-proc:capture_bytes:capture",
     ),

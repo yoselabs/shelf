@@ -48,7 +48,7 @@ from anyllm.providers import (
     CodexCliAdapter,
     OpenAICompatibleAdapter,
 )
-from anyllm.select import DEFAULT_ORDER, DEFAULT_PROVIDER, build_adapter, resolve_provider
+from anyllm.select import DEFAULT_ORDER, DEFAULT_PROVIDER, build_adapter, resolve_first, resolve_provider
 
 __all__ = [
     "DEFAULT_COST_POLICY",
@@ -73,6 +73,7 @@ __all__ = [
     "build_adapter",
     "extract_token_counts",
     "require_structured",
+    "resolve_first",
     "resolve_provider",
     "with_cost_guard",
 ]

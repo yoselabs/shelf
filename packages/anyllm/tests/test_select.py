@@ -17,7 +17,7 @@ the fakes raise exactly the errors real backends would.
 from __future__ import annotations
 
 import pytest
-from anyllm import Completion, LLMProvider, ProviderName, resolve_provider
+from anyllm import Completion, LLMProvider, ProviderName, resolve_first, resolve_provider
 from anyllm.cost import CostViolation
 from anyllm.errors import AnyLLMError
 from anyllm.select import _FallbackProvider
@@ -96,16 +96,14 @@ def test_resolve_fallback_provider_for_multiple(monkeypatch: pytest.MonkeyPatch)
     assert resolved.name == ProviderName.CLAUDE_CODE_CLI  # primary
 
 
-def test_resolve_fallback_false_returns_first_only(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_first_returns_the_first_survivor_and_builds_no_more(monkeypatch: pytest.MonkeyPatch) -> None:
     first = _FakeProvider(ProviderName.CLAUDE_CODE_CLI)
     second = _FakeProvider(ProviderName.ANTHROPIC_API)
     _patch_builds(monkeypatch, {"claude-code-cli": first, "anthropic-api": second})
-    resolved = resolve_provider(
-        [ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API],
-        env={},
-        fallback=False,
-    )
+    resolved = resolve_first([ProviderName.CLAUDE_CODE_CLI, ProviderName.ANTHROPIC_API], env={})
     assert resolved is first
+    assert resolve_first([ProviderName.CLAUDE_CODE_CLI], env={}, wrap=lambda p: p) is first
+    assert resolve_first([], env={}) is None
 
 
 def test_resolve_applies_wrap_per_candidate(monkeypatch: pytest.MonkeyPatch) -> None:

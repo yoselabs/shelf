@@ -4,6 +4,10 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see `ledger/0032-anyllm-v2-delivered.toml` for why). Read this before source/README when
 reconciling a pin (agent-loop.md WORKFLOW: RECEIVE).
 
+## 0.11.0
+
+- BREAKING: `resolve_provider(..., fallback=True)` loses `fallback`; new `resolve_first(order, config, *, env, wrap)` (the old `fallback=False`: the first usable provider, later candidates are not built or wrapped); `resolve_provider` always composes runtime fallback over two or more survivors.
+
 ## 0.10.0
 
 - BREAKING: every adapter takes `env: Mapping[str, str]` (required keyword); `build_adapter(provider, config, *, env)`, `resolve_provider(order, config, *, env, ...)`. The library no longer reads `os.environ`: the caller's edge passes it (`env=os.environ`). `hermetic_llm_env` unchanged
