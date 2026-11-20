@@ -532,7 +532,7 @@ dev = [
 
 [[package]]
 name = "any-lease"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-lease" }
 dependencies = [
     { name = "process-lock" },
