@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from any_markdown import ATX_HEADING_RE, Markdown, Section, clip, line_parts, slug
+from any_markdown import ATX_HEADING_RE, Markdown, Section, clip, find, github_outline, line_parts, slug
 
 
 def _ids(text: str) -> list[str]:
@@ -157,7 +157,7 @@ def test_clip_of_one_word_over_the_budget_is_never_empty() -> None:
 
 
 def _github(text: str) -> list[str]:
-    return [s.id for s in Markdown(text).outline(anchors="github")]
+    return [s.id for s in Markdown(text).github_sections]
 
 
 def test_github_anchors_dedupe_with_dash_one_dash_two() -> None:
@@ -180,8 +180,8 @@ def test_github_anchors_skip_fenced_headings() -> None:
 
 def test_a_section_is_found_by_its_github_anchor() -> None:
     body = "# T\n\n## Same\n\none\n\n## Same\n\ntwo\n"
-    found = Markdown(body).section("same-1", anchors="github")
+    found = find(body, "same-1", rows=github_outline(body))
     assert found is not None
     assert body[found.start : found.end].strip() == "## Same\n\ntwo"
     assert Markdown(body).section("same-1") is None
-    assert Markdown(body).section("lines:1-2", anchors="github") is not None
+    assert find(body, "lines:1-2", rows=github_outline(body)) is not None

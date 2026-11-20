@@ -252,14 +252,6 @@ _POLICY_ALLOWED: dict[str, str] = {
         "convert-md:convert_html:source_kind",
         "http-fetch:__init__:opener",
     ),
-    **_rows(
-        "debt: an enum or Literal that picks between behaviours or output forms of one function; convert to separate functions "
-        "(ADR 0030, Article III, IX); not part of the 2026-11-20 tolerance conversion",
-        "any-markdown:find:anchors",
-        "any-markdown:outline:anchors",
-        "blueprint:scan:mode",
-        "page-tsv:render:consumer",
-    ),
 }
 
 

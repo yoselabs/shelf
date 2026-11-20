@@ -4,11 +4,11 @@ FastMCP result middleware for token-lean, projected tool output. Two middlewares
 both driven by **explicit per-tool registries** (never sniffed from framework tool
 metadata), composing [`page-tsv`](../page-tsv) for the encoding.
 
-## `FormatRoutingMiddleware(plans, consumer)`
+## `FormatRoutingMiddleware(plans)`
 
 Re-derives a tool's `content` channel from its `EncodingPlan` (TSV / page-tsv /
-envelope) for the `llm` consumer, leaving `structured_content` canonical. `code` /
-`machine` consumers pass through untouched.
+envelope) for an LLM consumer, leaving `structured_content` canonical. A code or
+machine consumer does not install it.
 
 ```python
 from mcp_result_wire import FormatRoutingMiddleware
@@ -16,7 +16,6 @@ from page_tsv import EncodingPlan
 
 server.add_middleware(FormatRoutingMiddleware(
     plans={"search": EncodingPlan("page-tsv")},
-    consumer="llm",
 ))
 ```
 

@@ -1,7 +1,8 @@
 """Scan for committed secrets with gitleaks, over only the code that changed.
 
-Three modes: `staged` (the index, for a pre-commit hook), `range` (every commit since the upstream merge-base, plus the
-uncommitted work: staged, unstaged and untracked; the gate's mode, like `any-gate changed`), `full` (all history, before a tag).
+Three scans: `staged` (the index, for a pre-commit hook), `range` (every commit since the upstream merge-base, plus the
+uncommitted work: staged, unstaged and untracked; the gate's scan, like `any-gate changed`), `full` (all history, before a tag):
+`scan_staged`, `scan_range`, `scan_full`.
 A range with no upstream is the full scan: run too much, never too little. A finding names the file, line and rule and
 never the secret (`--redact`). A missing scanner is an error, never a pass.
 
@@ -16,7 +17,6 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -24,12 +24,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
 _BASE = ("gitleaks", "--no-banner", "--no-color", "--redact", "--log-level", "error")
-
-
-class Mode(StrEnum):
-    STAGED = "staged"
-    RANGE = "range"
-    FULL = "full"
 
 
 class ScanError(RuntimeError):
@@ -84,15 +78,23 @@ def _base(repo: Path, env: Mapping[str, str] | None) -> str | None:
     return found.strip() or None if found else None
 
 
-def scan(repo: Path, mode: Mode, *, env: Mapping[str, str] | None = None) -> list[Leak]:
-    """The findings of `mode` over `repo`, each once."""
-    if mode is Mode.STAGED:
-        return _run(repo, env, ["git", "--pre-commit", "--staged"])
-    base = _base(repo, env) if mode is Mode.RANGE else None
+def scan_staged(repo: Path, *, env: Mapping[str, str] | None = None) -> list[Leak]:
+    """The findings in the index of `repo`, each once."""
+    return _run(repo, env, ["git", "--pre-commit", "--staged"])
+
+
+def scan_full(repo: Path, *, env: Mapping[str, str] | None = None) -> list[Leak]:
+    """The findings in all history of `repo`, each once."""
+    return _run(repo, env, ["git"])
+
+
+def scan_range(repo: Path, *, env: Mapping[str, str] | None = None) -> list[Leak]:
+    """The findings since the upstream merge-base plus the uncommitted work; with no upstream, :func:`scan_full`."""
+    base = _base(repo, env)
     if base is None:
-        return _run(repo, env, ["git"])
+        return scan_full(repo, env=env)
     leaks = _run(repo, env, ["git", "--log-opts", f"{base}..HEAD"])
-    leaks += _run(repo, env, ["git", "--pre-commit", "--staged"])
+    leaks += scan_staged(repo, env=env)
     leaks += _run(repo, env, ["git", "--pre-commit"])
     untracked = (_git(repo, env, "ls-files", "-z", "--others", "--exclude-standard") or "").split("\0")
     for rel in filter(None, untracked):
@@ -100,13 +102,16 @@ def scan(repo: Path, mode: Mode, *, env: Mapping[str, str] | None = None) -> lis
     return sorted(set(leaks), key=lambda leak: (leak.file, leak.line, leak.rule))
 
 
+_SCANS = {"staged": scan_staged, "range": scan_range, "full": scan_full}
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m blueprint.secret_scan", description=__doc__)
-    parser.add_argument("mode", choices=[m.value for m in Mode])
+    parser.add_argument("mode", choices=list(_SCANS))
     parser.add_argument("--repo", type=Path, default=Path())
     args = parser.parse_args(argv)
     try:
-        leaks = scan(args.repo, Mode(args.mode))
+        leaks = _SCANS[args.mode](args.repo)
     except ScanError as error:
         sys.stderr.write(f"secret scan: {error}\n")
         return 2

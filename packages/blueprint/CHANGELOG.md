@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0
+
+- **Breaking: `secret_scan.scan(repo, mode)` and `Mode` are gone.** `scan_staged(repo)`, `scan_range(repo)` and `scan_full(repo)` are the three scans; `python -m blueprint.secret_scan staged|range|full` is unchanged.
+
 ## 0.8.0
 
 - **Breaking: `runner.run` lost its `audit` flag.** `run(...)` is the per-commit gate, `run_audit(...)` also runs the audit-only checks (the CLI picks one by `--audit`). What is checked and rendered is unchanged.

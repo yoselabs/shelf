@@ -6,7 +6,7 @@ one owner**, so an LLM-facing renderer and a code/machine one can't drift.
 ## The seam
 
 ```python
-from page_tsv import Page, render
+from page_tsv import Page, render_json, render_llm
 
 class Task(BaseModel):
     id: int
@@ -14,14 +14,13 @@ class Task(BaseModel):
 
 page = Page[Task](items=[Task(id=1, title="ship it")])
 
-render(page, "llm")     # JSON envelope, items compressed to an embedded TSV string
-render(page, "code")    # plain JSON — items stays a list of objects
+render_llm(page)        # JSON envelope, items compressed to an embedded TSV string
+render_json(page)       # plain JSON, for a code or machine consumer — items stays a list of objects
 ```
 
-`consumer` (`"llm"` / `"code"` / `"machine"`) is always a **caller-supplied
-parameter**, never sniffed from ambient context. That is the whole trick: the
-compression decision lives with the caller, and one implementation serves every
-consumer.
+The caller picks the view, never sniffed from ambient context. That is the whole
+trick: the compression decision lives with the caller, and one implementation
+serves every consumer.
 
 ## Type routing
 

@@ -1,16 +1,16 @@
-"""The consumer-aware rendering seam: ``render(value, consumer)`` for the llm / code / machine profiles.
+"""The rendering seam, one view per consumer: ``render_llm(value, plan=)`` compresses, ``render_json(value)`` never does.
 
-``consumer`` is always a **caller-supplied parameter** — the renderer never sniffs
-it from ambient call context. That is what keeps the whole wire format in one
-owner: a caller that wants LLM-compressed output passes ``consumer="llm"``, a
-code/machine caller passes its own value, and neither can drift from the other.
+The caller picks the view; the renderer never sniffs the consumer from ambient call
+context. That keeps the whole wire format in one owner: an LLM-facing caller calls
+``render_llm``, a code/machine caller calls ``render_json``, and neither can drift
+from the other.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import json
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from lean_wire import derive_columns, dump_model_for_wire, encode_tsv
 from pydantic import BaseModel
@@ -21,10 +21,6 @@ from page_tsv.response import Page
 
 if TYPE_CHECKING:
     from page_tsv.formats import FormatName
-
-Consumer = Literal["llm", "code", "machine"]
-"""A rendering consumer profile. Fixed by the caller (e.g. at server-build time
-from a ``code_mode`` flag) — never sniffed from call context."""
 
 _UNSET: Any = object()
 
@@ -185,18 +181,17 @@ class Rendered:
         return f"Rendered(format={self.format!r}, text=<{len(self.text)} chars>)"
 
 
-def render(value: Any, consumer: Consumer, *, plan: EncodingPlan | None = None) -> Rendered:  # Any: any value a tool returns is rendered
-    """Render ``value`` for ``consumer`` — the one rendering seam.
+def render_json(value: Any) -> Rendered:  # Any: any value a tool returns is rendered
+    """Render ``value`` for a code or machine consumer: plain JSON and the structured payload, never compressed."""
+    return Rendered(_encode_json(value), "json", value)
 
-    The ``llm`` consumer compresses per ``plan`` (an :class:`EncodingPlan`); when
-    no plan is supplied it is derived from the runtime type, which only detects a
-    top-level tabular shape. The ``code`` and ``machine`` consumers never compress
-    — they yield plain JSON and the structured payload.
+
+def render_llm(value: Any, *, plan: EncodingPlan | None = None) -> Rendered:  # Any: any value a tool returns is rendered
+    """Render ``value`` for an LLM consumer, compressed per ``plan`` (an :class:`EncodingPlan`).
+
+    When no plan is supplied it is derived from the runtime type, which only detects a
+    top-level tabular shape.
     """
-    if consumer != "llm":
-        # code / machine — structured, never compressed.
-        return Rendered(_encode_json(value), "json", value)
-
     if plan is None:
         plan = build_encoding_plan(type(value))
 
@@ -246,11 +241,11 @@ def render_execute(value: Any) -> Rendered:  # Any: any value a tool returns is 
 
 
 __all__ = [
-    "Consumer",
     "Rendered",
     "encode_envelope",
     "encode_page_tsv_dict",
-    "render",
     "render_execute",
+    "render_json",
+    "render_llm",
     "render_plain",
 ]

@@ -3,10 +3,9 @@
 The whole wire format in one owner, so it can't drift:
 
 - ``Page[T]`` / ``Response`` — the paginated-result contract + encoded envelope.
-- ``render(value, consumer, *, plan)`` — the one rendering seam. ``consumer``
-  (``"llm"`` / ``"code"`` / ``"machine"``) is a **caller parameter**, never
-  sniffed; the ``llm`` profile compresses scalar tables to lean-wire TSV, the
-  others stay plain JSON.
+- ``render_llm(value, *, plan)`` / ``render_json(value)`` — one rendering view per
+  consumer, picked by the caller and never sniffed; ``render_llm`` compresses
+  scalar tables to lean-wire TSV, ``render_json`` (code / machine) stays plain JSON.
 - ``infer_format_hint`` / ``build_encoding_plan`` / ``EncodingPlan`` — the static
   type→format routing (``tsv`` / ``page-tsv`` / ``envelope`` / ``json``).
 - ``encode_page_tsv`` + the ``render_plain`` / ``encode_*_dict`` family — the
@@ -29,18 +28,17 @@ from page_tsv.inference import (
 )
 from page_tsv.page import assemble_page_envelope, encode_page_tsv
 from page_tsv.render import (
-    Consumer,
     Rendered,
     encode_envelope,
     encode_page_tsv_dict,
-    render,
     render_execute,
+    render_json,
+    render_llm,
     render_plain,
 )
 from page_tsv.response import Page, Response
 
 __all__ = [
-    "Consumer",
     "EncodingPlan",
     "FormatHint",
     "FormatHintInferred",
@@ -56,7 +54,8 @@ __all__ = [
     "format_response",
     "infer_format_hint",
     "is_basemodel",
-    "render",
     "render_execute",
+    "render_json",
+    "render_llm",
     "render_plain",
 ]

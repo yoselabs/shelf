@@ -14,8 +14,8 @@ for link in doc.wikilinks:              # code-span examples are not here
 doc.replace_wikilinks(retitle).text     # same exclusion on the way out
 
 doc.sections                            # every heading's subtree, GitHub-slug ids
-doc.outline(anchors="github")           # the same, ids exactly as GitHub anchors them (-1, -2)
-doc.section("notes-1", anchors="github")
+doc.github_sections                     # the same, ids exactly as GitHub anchors them (-1, -2)
+find(doc.text, "notes-1", rows=doc.github_sections)
 s = doc.section("scope--goals")         # or "lines:40-80", "lines:3:0-9000"
 doc.text[s.start:s.end]
 line_parts(transcript, 11_000, measure=wire_bytes)  # no headings: cut at blank lines
@@ -83,7 +83,7 @@ The sizes are the caller's: `measure` for text, `row_cost` for one outline row a
 | `.code_spans` · `.is_code(pos)` | the code regions themselves |
 | `.tokens` | the markdown-it token stream — the escape hatch |
 | `.sections` · `.section(id)` | heading subtrees in order; one by slug or `lines:` id, else `None` |
-| `.outline(anchors=)` · `.section(id, anchors=)` | `anchors="github"`: GitHub's slug of the rendered heading, repeats `-1`, `-2`; default ids never change |
+| `.github_sections` · `find(text, id, rows=)` · `github_outline(text)` | GitHub's slug of the rendered heading, repeats `-1`, `-2`; `.sections` ids never change |
 | `Section` | `.id` `.heading` `.level` (0 = line part) `.chars` `.start` `.end` |
 | `.chunks(size, overlap, part=None, measure=len)` | `Chunk` `.line` `.text` `.section` `.headings` |
 | `line_parts(text, budget, measure=len, base_line=1)` | `text` cut into `lines:` parts that cover it |

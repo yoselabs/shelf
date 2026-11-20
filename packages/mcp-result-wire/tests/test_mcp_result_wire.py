@@ -24,7 +24,7 @@ async def _call(server: FastMCP, name: str, args: dict) -> Any:
 
 async def test_page_tsv_plan_recompresses_content_for_llm() -> None:
     server = FastMCP("t")
-    server.add_middleware(FormatRoutingMiddleware(plans={"page_tool": EncodingPlan("page-tsv")}, consumer="llm"))
+    server.add_middleware(FormatRoutingMiddleware(plans={"page_tool": EncodingPlan("page-tsv")}))
 
     @server.tool(name="page_tool")
     def page_tool() -> dict:
@@ -37,22 +37,9 @@ async def test_page_tsv_plan_recompresses_content_for_llm() -> None:
     assert envelope["items"] == "id\ttitle\n1\ta\n"
 
 
-async def test_code_consumer_does_not_compress() -> None:
-    server = FastMCP("t")
-    server.add_middleware(FormatRoutingMiddleware(plans={"page_tool": EncodingPlan("page-tsv")}, consumer="code"))
-
-    @server.tool(name="page_tool")
-    def page_tool() -> dict:
-        return {"items": [{"id": 1, "title": "a"}], "next_cursor": None}
-
-    res = await _call(server, "page_tool", {})
-    # code consumer passes through — content is not a page-tsv envelope.
-    assert "_items_format" not in res.content[0].text
-
-
 async def test_json_plan_passes_through() -> None:
     server = FastMCP("t")
-    server.add_middleware(FormatRoutingMiddleware(plans={"j": EncodingPlan("json")}, consumer="llm"))
+    server.add_middleware(FormatRoutingMiddleware(plans={"j": EncodingPlan("json")}))
 
     @server.tool(name="j")
     def j() -> dict:
@@ -94,7 +81,7 @@ async def test_format_routing_after_list_view_derives_from_projected() -> None:
     # format-routing registered first (outermost) so its content derivation runs after
     # list-view has projected structured_content.
     server = FastMCP("t")
-    server.add_middleware(FormatRoutingMiddleware(plans={"rows": EncodingPlan("tsv")}, consumer="llm"))
+    server.add_middleware(FormatRoutingMiddleware(plans={"rows": EncodingPlan("tsv")}))
     server.add_middleware(ListViewMiddleware({"rows": ListViewSettings(default_fields=("id",))}))
 
     @server.tool(name="rows")
@@ -108,7 +95,7 @@ async def test_format_routing_after_list_view_derives_from_projected() -> None:
 
 async def test_format_routing_has_one_wire_behaviour() -> None:
     """Article IX: no constructor switch picks a different wire result; the middleware has one behaviour."""
-    assert set(inspect.signature(FormatRoutingMiddleware).parameters) == {"plans", "consumer"}
+    assert set(inspect.signature(FormatRoutingMiddleware).parameters) == {"plans"}
 
 
 async def test_llm_result_keeps_both_channels() -> None:
@@ -118,7 +105,7 @@ async def test_llm_result_keeps_both_channels() -> None:
     def rows() -> list[dict]:
         return [{"a": 1}]
 
-    server.add_middleware(FormatRoutingMiddleware(plans={"rows": EncodingPlan("tsv")}, consumer="llm"))
+    server.add_middleware(FormatRoutingMiddleware(plans={"rows": EncodingPlan("tsv")}))
     result = await _call(server, "rows", {})
     assert result.structured_content == {"result": [{"a": 1}]}
     assert result.content
