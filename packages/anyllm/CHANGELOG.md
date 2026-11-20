@@ -4,7 +4,7 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see `ledger/0032-anyllm-v2-delivered.toml` for why). Read this before source/README when
 reconciling a pin (agent-loop.md WORKFLOW: RECEIVE).
 
-## Unreleased
+## 0.8.2
 
 - claude-code-sdk: `thinking_disabled=True` (the default) also passes `effort="low"` to the SDK; Haiku 5.5 otherwise thinks (about 4x output tokens, same answer)
 
