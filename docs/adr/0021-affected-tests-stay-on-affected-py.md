@@ -16,7 +16,7 @@ distilled_into: docs/missions/gate-kit-package; packages/any-gate, packages/any-
 Narrowing the gate to what a change reaches, remembering green results, and guarding the run are done by a shelf-owned,
 language-neutral core (`docs/missions/gate-kit-package`) with one adapter per stack. The Python adapter builds the unit graph from
 `pyproject.toml` and fingerprints each package with `uv export` (measured 2026-11-19: median 1.5 suites per commit instead of 79). The
-`blueprint` CLI is the one entry point and dispatches on the repo's declared stacks. The shelf's `test-affected` recipe runs the Python adapter (`any-gate-python`).
+`blueprint` CLI is the one entry point and dispatches on the repo's declared stacks. The `test` recipe (rendered, ADR 0029) runs `blueprint test`, which runs the Python adapter (`any-gate-python`).
 
 The owner expects blueprint itself may later be rewritten in Rust. So the core's contracts stay plain: a CLI, declarative config, and
 receipt and render files in a documented text format, never a Python-only object or pickle.
