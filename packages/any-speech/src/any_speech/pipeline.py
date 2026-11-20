@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from any_clock import utc_stamp
 from any_pipeline import Limit, Stage, blocking, gather, run_one
 from content_digest import digest_file
 from stream_proc import capture
@@ -64,7 +65,7 @@ def probe_seconds(audio: Path) -> float:
 
 
 def _utc_now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return utc_stamp(datetime.now(UTC))
 
 
 class AudioHasher:

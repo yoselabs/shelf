@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+
+- The stored `at` stamp (failure record, provenance) is written by any-clock `utc_stamp`; the bytes are unchanged (`2026-11-20T07:05:09Z`).
+
 ## 0.5.0
 
 - **Breaking: the default file is `<stem>.speech.json`** (`talk.m4a` -> `talk.speech.json`, was `talk.m4a.speech.json`). Existing `<name>.speech.json` files are not found by the default name and are redone; pass `out` to keep one. `talk.m4a` and `talk.wav` now share a name.

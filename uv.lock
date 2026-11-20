@@ -249,7 +249,7 @@ provides-extras = ["patchright", "zendriver"]
 
 [[package]]
 name = "any-clock"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/any-clock" }
 
 [[package]]
@@ -404,9 +404,10 @@ source = { editable = "packages/any-shell-policy" }
 
 [[package]]
 name = "any-speech"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "packages/any-speech" }
 dependencies = [
+    { name = "any-clock" },
     { name = "any-lease" },
     { name = "any-pipeline" },
     { name = "app-dirs" },
@@ -429,6 +430,7 @@ parakeet = [
 
 [package.metadata]
 requires-dist = [
+    { name = "any-clock", editable = "packages/any-clock" },
     { name = "any-lease", editable = "packages/any-lease" },
     { name = "any-pipeline", editable = "packages/any-pipeline" },
     { name = "app-dirs", editable = "packages/app-dirs" },

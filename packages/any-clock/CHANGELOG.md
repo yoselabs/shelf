@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- `utc_stamp(now) -> str` and `parse_stamp(text) -> datetime`: the stored UTC stamp, `2026-11-20T07:05:09Z` (whole seconds, always UTC). Byte-identical to the format any-speech wrote itself. A naive datetime or a text of any other shape raises `ValueError`.
+
 ## 0.3.0
 
 - Thread-safe: one lock around all state. The "another thread raises `RuntimeError`" rule is gone. The phase stack is
