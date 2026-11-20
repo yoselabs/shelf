@@ -125,10 +125,10 @@ copy list: **[linting.md](linting.md)**. `just check` green (whole-repo, no carv
 
 ## 5. Pin the tools (mise)
 
-Every tool the repo runs (uv, just, prek, bd, git-lfs, an engine editor) is pinned exactly in a committed `mise.toml`
+Every tool that builds or tests the repo (uv, just, prek, bd, an engine editor) is pinned exactly in a committed `mise.toml`
 and locked with per-platform checksums in `mise.lock` ([ADR 0024](adr/0024-mise-pins-every-repo-tool.md)). The preset's
 `tools` recipe installs them with `mise install --locked`, leaving the user's own mise config out. After a fresh
 clone run `mise trust --yes && mise install --locked` as plain commands (until the trust every mise shim refuses, uv
 included), then the stack's sync and `bd bootstrap`; after a pin bump, `just tools`. `gate.clean-clone` runs the same steps. blueprint's `stack.tool-pins` checks the pins on every commit and
-`stack.tools-installed` checks this machine's versions in the audit. A repo that declares LFS patterns is also checked
+`stack.tools-installed` checks this machine's versions in the audit. Agent CLIs (codex, claude code, opencode, gemini) are never pinned: they update themselves per machine, and `stack.agent-cli-pins` flags a pin (the list is `blueprint/tools.toml`); a machine-owned tool such as git gets a minimum (`git = ">=2.40"`), not an exact pin. A repo that declares LFS patterns is also checked
 for binaries outside LFS (`gate.lfs-binaries`) and, in the audit, for this clone's LFS filter (`gate.lfs-installed`); `gate.git-config-clean` flags a stray `core.worktree` or `core.bare` in the clone's config.

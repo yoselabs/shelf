@@ -10,6 +10,8 @@ Research: docs/research/blueprint-skill/research/toolchain-installer.md.
 from __future__ import annotations
 
 import re
+import tomllib
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
@@ -36,7 +38,9 @@ VERSION_ARGV = {
     "bd": ("bd", "--version"),
     "git-lfs": ("git", "lfs", "version"),
     "godot": ("godot", "--version"),
+    "git": ("git", "--version"),
 }
+_TOOLS = Path(__file__).resolve().parent.parent / "tools.toml"
 _INSTALL = 'a recipe (`just tools`) that runs `MISE_IGNORED_CONFIG_PATHS="$HOME/.config/mise" mise install --locked`'
 
 
@@ -64,6 +68,17 @@ def needed(ctx: Context) -> dict[str, str]:
     if any(name == "godot" for name, _ in ctx.profile.frameworks):
         needed["godot"] = "project.godot"
     return needed
+
+
+def agent_clis() -> dict[str, str]:
+    """Each self-updating agent CLI's tool name -> why it is never pinned (`tools.toml`)."""
+    rows = tomllib.loads(_TOOLS.read_text(encoding="utf-8")).get("agent-cli", [])
+    return {str(name): str(row["why"]) for row in rows for name in row["names"]}
+
+
+def floored() -> frozenset[str]:
+    """The machine-owned tools mise.toml states a minimum for, not an exact pin."""
+    return frozenset(tomllib.loads(_TOOLS.read_text(encoding="utf-8")).get("floor", {}).get("tools", []))
 
 
 def _name(key: str, spec: object) -> str:
@@ -146,7 +161,12 @@ def tool_pins(ctx: Context) -> Finding:
         )
     pins = _pins(ctx)
     problems = [f"{tool} is not pinned (the repo runs it: {why})" for tool, why in wanted_tools.items() if tool not in pins]
-    problems += [f"{tool} {version!r} is not an exact version" for tool, (_, version) in pins.items() if not _EXACT.match(version)]
+    machine_owned = floored()
+    problems += [
+        f"{tool} {version!r} is not an exact version"
+        for tool, (_, version) in pins.items()
+        if not _EXACT.match(version) and not (tool in machine_owned and _FLOOR.match(version))
+    ]
     problems += _cross_file(ctx, pins)
     if "git-lfs" in pins:
         problems.append(
@@ -160,13 +180,32 @@ def tool_pins(ctx: Context) -> Finding:
         problems += [
             f"{tool} {version} is not in mise.lock (run `mise lock`)"
             for tool, (key, version) in pins.items()
-            if version not in locked.get(key, set())
+            if version not in locked.get(key, set()) and not (tool in machine_owned and _FLOOR.match(version))
         ]
     if not _installs_locked(ctx):
         problems.append(f"no {_INSTALL}: the user's own `latest` tools would make `--locked` fail")
     if problems:
         return failing("; ".join(problems), "fix each pin in mise.toml, then `mise lock` and commit both (ADR 0024)")
     return passing(f"{len(pins)} tools pinned and locked: " + ", ".join(f"{t} {v}" for t, (_, v) in sorted(pins.items())))
+
+
+@check(
+    "stack.agent-cli-pins",
+    "mise.toml pins no agent CLI (codex, claude code, opencode, gemini): they update themselves on each machine",
+    layer="stack",
+)
+def agent_cli_pins(ctx: Context) -> Finding:
+    """Read mise.toml for a pinned tool `tools.toml` lists as self-updating; no network. New checkpoints warn first (ADR 0018)."""
+    if ctx.read(_MISE) is None:
+        return not_applicable("no mise.toml")
+    known = agent_clis()
+    found = {tool: known[tool] for tool in _pins(ctx) if tool in known}
+    if found:
+        return failing(
+            "; ".join(f"{tool} is pinned in mise.toml, but {why}: an exact pin is false the day it updates" for tool, why in found.items()),
+            "remove the pin and its mise.lock entry (`mise lock`); each person installs and updates their own agent CLI (ADR 0024)",
+        )
+    return passing("no self-updating agent CLI is pinned")
 
 
 @check(
@@ -195,6 +234,9 @@ def tools_installed(ctx: Context) -> Finding:
         said = _SAID.search(done.stdout) if done.returncode == 0 else None
         if said is None:
             drift.append(f"{tool} is not installed")
+        elif (floor := _FLOOR.match(pinned)) and tool in floored():
+            if _numbers(said.group()) < _numbers(floor.group(1)):
+                drift.append(f"{tool} {said.group()} (floor {floor.group()})")
         elif _numbers(said.group()) != _numbers(pinned.removeprefix("v")):
             drift.append(f"{tool} {said.group()} (pin {pinned})")
     if untrusted:

@@ -1,0 +1,23 @@
+# Tools mise.toml must not pin exactly (ADR 0024, amended 2026-11-20). Plain data: add a row, no code.
+
+# Agent CLIs update themselves on each person's machine, so an exact pin is false the day they do.
+# `names` are matched against the tool a mise entry installs (its bin, else the last part of its key).
+[[agent-cli]]
+names = ["codex"]
+why = "codex updates itself on each machine"
+
+[[agent-cli]]
+names = ["claude", "claude-code"]
+why = "claude code updates itself on each machine"
+
+[[agent-cli]]
+names = ["opencode"]
+why = "opencode updates itself on each machine"
+
+[[agent-cli]]
+names = ["gemini", "gemini-cli"]
+why = "gemini updates itself on each machine"
+
+# The system package manager owns these: mise.toml may state a minimum (`>=2.40`), never an exact pin.
+[floor]
+tools = ["git"]
