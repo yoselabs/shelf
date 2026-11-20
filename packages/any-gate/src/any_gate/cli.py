@@ -3,6 +3,9 @@
 `steps [--runner just] STEP...` runs the gate's steps at once, each into its own log, then prints one timing line and the log of every step
 that failed (see `any_gate.steps`); exit 1 when one failed. `$GATE_STEP_BUDGET` (default 60) and `$GATE_BUDGET` (default 180) are seconds.
 
+A step that declares its input files in `gate-inputs.toml` and whose inputs did not change is not started (`any_gate.inputs`);
+`--all` runs every step.
+
 `changed [--scope all] [--config FILE]... [--not GLOB]... GLOB...` prints the files a per-file linter must check, NUL-separated
 (`xargs -0`): those changed against the upstream merge-base matching a glob, or every matching file when `--scope all`, a `--config` file
 changed, or there is no base (see `any_gate.changed`).
@@ -34,6 +37,7 @@ from typing import TYPE_CHECKING, TextIO
 from any_lease import Leases
 
 from any_gate import changed as changed_files
+from any_gate import inputs
 from any_gate.receipts import Receipts
 from any_gate.runner import RunResult, run_runner
 from any_gate.state import GateState, common_dir
@@ -180,8 +184,9 @@ def _say(line: str) -> None:
 
 
 def _steps(args: argparse.Namespace) -> int:
+    skip = {} if args.all else inputs.unaffected(Path(args.repo).resolve(), args.names)
     return run_and_report(
-        args.names, env=os.environ, runner=args.runner, step_budget=args.step_budget, gate_budget=args.gate_budget, say=_say
+        args.names, env=os.environ, runner=args.runner, step_budget=args.step_budget, gate_budget=args.gate_budget, say=_say, skip=skip
     )
 
 
@@ -256,6 +261,8 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
     st.add_argument(
         "--gate-budget", type=float, default=float(os.environ.get("GATE_BUDGET") or GATE_BUDGET), help="seconds the gate may take"
     )
+    st.add_argument("--all", action="store_true", help="run every step, whatever changed (the release gate)")
+    st.add_argument("--repo", default=".", help="the repo whose gate-inputs.toml and changes decide what is skipped")
     st.add_argument("names", nargs="+", metavar="STEP")
     args = parser.parse_args(argv)
     if args.command == "steps":

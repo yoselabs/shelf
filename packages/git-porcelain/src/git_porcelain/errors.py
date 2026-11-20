@@ -112,6 +112,15 @@ class WorktreeRemoveRefused(GitUnavailable):
         self.reason = reason
 
 
+class PushRefused(GitError):
+    """``push_refspecs`` / ``push_request`` never force or delete: the refused form is named in the message
+    (``+src:dst``, ``:dst``, ``--force``, ``--delete``, ``--mirror``, ``--prune``, ``--force-with-lease``; the lease is ``push_lease``)."""
+
+
+class NotAWorktree(WorktreeRemoveRefused):
+    """The path is not a registered linked worktree; a caller that wants "gone is fine" catches this."""
+
+
 class IndexLocked(GitUnavailable):
     """Another writer holds the index lock."""
 

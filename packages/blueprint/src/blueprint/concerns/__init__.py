@@ -17,6 +17,7 @@ MODULES = (
     "uv_tool",
     "tool_pins",
     "owners",
+    "shelf_sources",
     "framework",
     "agents",
 )

@@ -13,7 +13,7 @@ import pytest
 from any_agent import ClaudeHarness, CodexHarness, LaunchSpec, Limits, LogWatcher, NullSink, RunHooks, run
 from any_agent import events as ev
 from any_agent.procs import Worker
-from any_agent.supervisor import StopIntent, Supervisor, end_status
+from any_agent.supervisor import IntentNotRecordedError, StopIntent, Supervisor, end_status
 
 pytestmark = pytest.mark.skipif(os.name == "nt", reason="fake CLIs are shell scripts")
 
@@ -90,14 +90,15 @@ def test_before_stop_hears_the_intent_and_after_stop_the_report(tmp_path):
     assert (rep.reason, rep.term_sent, rep.term_delivered, rep.kill_sent, rep.kill_delivered) == ("answer", True, True, False, False)
 
 
-def test_a_refused_intent_stops_nothing_and_propagates_without_a_cleanup_stop(tmp_path):
+def test_a_failed_intent_record_does_not_forbid_the_stop_and_the_error_names_both(tmp_path):
     def refuse(_intent: StopIntent) -> None:
         msg = "store is busy"
         raise RuntimeError(msg)
 
     pidfile = tmp_path / "pid"
-    hooks = RunHooks(before_stop=refuse)
-    with pytest.raises(RuntimeError, match="store is busy"):
+    heard: list[str] = []
+    hooks = RunHooks(before_stop=refuse, after_stop=lambda i, r: heard.append(i.reason))
+    with pytest.raises(IntentNotRecordedError) as info:
         run(
             ClaudeHarness(env={}),
             spec(tmp_path, f"echo $$ > {pidfile}; exec sleep 60"),
@@ -105,12 +106,14 @@ def test_a_refused_intent_stops_nothing_and_propagates_without_a_cleanup_stop(tm
             hooks,
             limits=Limits(first_event_s=60, silence_s=60),
         )
-    pid = int(pidfile.read_text())
-    try:
-        assert hooks.stops == []  # no stop of any name was issued
-        os.kill(pid, 0)  # the worker is still up: custody is the caller's
-    finally:
-        os.kill(pid, signal.SIGKILL)
+    err = info.value
+    assert isinstance(err.__cause__, RuntimeError) and str(err.__cause__) == "store is busy"  # the write failure
+    assert len(hooks.stops) == 1 and err.report is hooks.stops[0]  # the stop report
+    assert err.report.term_sent and err.intent.reason == "timeout"
+    assert "store is busy" in str(err) and "timeout" in str(err)
+    assert heard == ["timeout"]  # the other half of the record is still offered
+    with pytest.raises(ProcessLookupError):
+        os.kill(int(pidfile.read_text()), 0)  # the worker is gone: the stop always happens
 
 
 def test_an_entry_sigterm_is_told_apart_from_the_signal_sent_to_the_agent(tmp_path):

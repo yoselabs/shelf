@@ -33,10 +33,11 @@ from git_porcelain.api import DEFAULT_TIMEOUT, CommandResult, Sha
 from git_porcelain.errors import GitReadFailure, GitUnavailable, MissingRevision, NotARepo
 from git_porcelain.fake_bare import FakeRemote
 from git_porcelain.fake_diff import grep_files
-from git_porcelain.fake_ops import branch_ref, clean, hard_to
+from git_porcelain.fake_ops import branch_ref, clean, clean_ignored, hard_to
 from git_porcelain.fake_plumbing import FakePlumbing
 from git_porcelain.fake_store import CheckoutState, Hooks, RepoState
 from git_porcelain.fake_worktrees import worktree_state
+from git_porcelain.remote_validation import validate_push
 from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
@@ -196,9 +197,9 @@ class FakeRepo:
         self._anchor()
         return fake_remote.fetch(self._state, remote, refspecs)
 
-    def delete_remote_at(self, remote: str, ref: str, expected: Sha, *, missing_ok: bool = True) -> CommandResult:
+    def delete_remote_at(self, remote: str, ref: str, expected: Sha) -> CommandResult:
         self._anchor()
-        return fake_remote.delete_remote_at(self._state, remote, ref, expected, missing_ok=missing_ok)
+        return fake_remote.delete_remote_at(self._state, remote, ref, expected)
 
     def _anchor(self) -> CheckoutState:
         return FakeWorktree(self, self.path).state()
@@ -251,18 +252,18 @@ class FakeRepo:
         self._anchor()
         return read.worktrees(self._state, with_dirty=with_dirty)
 
-    def add_worktree(self, path: Path, rev: str, *, force: bool = False) -> FakeWorktree:
+    def add_worktree(self, path: Path, rev: str) -> FakeWorktree:
         wt = self._anchor()
-        flow.worktree_add(self._state, path, read.resolve_commit(self._state, wt, rev), force=force)
+        flow.worktree_add(self._state, path, read.resolve_commit(self._state, wt, rev))
         return FakeWorktree(self, path)
 
-    def drop_worktree(self, path: Path, *, force: bool = False, missing_ok: bool = True) -> None:
+    def drop_worktree(self, path: Path) -> None:
         self._anchor()
-        target = self._state.worktrees.get(path)
-        if not missing_ok or (target is not None and not target.missing):
-            flow.worktree_remove(self._state, path, force=force)
-        if missing_ok:
-            self.prune_worktrees()
+        flow.worktree_remove(self._state, path)
+
+    def discard_worktree(self, path: Path) -> None:
+        self._anchor()
+        flow.worktree_discard(self._state, path)
 
     def prune_worktrees(self) -> None:
         self._anchor()
@@ -355,8 +356,11 @@ class FakeWorktree:
     def checkout_new(self, branch: str, start: str = "HEAD") -> None:
         checkout_ops.checkout_new(self._repo, self.state(), branch, start)
 
-    def clean(self, keep: Sequence[str] = (), *, ignored: bool = False, nested: bool = False) -> None:
-        clean(self._repo, self.state(), keep, ignored=ignored, nested=nested)
+    def clean(self, keep: Sequence[str] = ()) -> None:
+        clean(self._repo, self.state(), keep)
+
+    def clean_ignored(self, keep: Sequence[str] = ()) -> None:
+        clean_ignored(self.state(), keep)
 
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
         checkout_ops.reset(self._repo, self.state(), rev, mode=mode)
@@ -400,11 +404,27 @@ class FakeWorktree:
         base: str | None = None,
         mode: Literal["new", "amend", "squash_to"] = "new",
         squash_to: Sha | None = None,
-        hooks: bool = False,
-        allow_empty: bool = False,
     ) -> RecordResult:
         return write.record(
-            self._repo, self.state(), message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=hooks, allow_empty=allow_empty
+            self._repo, self.state(), message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=False, allow_empty=False
+        )
+
+    def record_with_hooks(
+        self,
+        message: str,
+        *,
+        paths: Literal["own", "all", "tracked", "staged"] = "own",
+        base: str | None = None,
+        mode: Literal["new", "amend", "squash_to"] = "new",
+        squash_to: Sha | None = None,
+    ) -> RecordResult:
+        return write.record(
+            self._repo, self.state(), message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=True, allow_empty=False
+        )
+
+    def record_empty(self, message: str) -> RecordResult:
+        return write.record(
+            self._repo, self.state(), message, paths="staged", base=None, mode="new", squash_to=None, hooks=False, allow_empty=True
         )
 
     def take_branch(
@@ -423,8 +443,8 @@ class FakeWorktree:
     def release_branch(self, holder: Path) -> Released | StillHeld:
         return write.release_branch(self._repo, self.state(), holder)
 
-    def park(self, base: str, *, clean_keep: Sequence[str] | None = None, keep_ignored: bool = False) -> Sha:
-        return write.park(self._repo, self.state(), base, clean_keep, keep_ignored=keep_ignored)
+    def park(self, base: str, *, clean_keep: Sequence[str] | None = None) -> Sha:
+        return write.park(self._repo, self.state(), base, clean_keep)
 
     def rebase_onto(
         self,
@@ -451,14 +471,14 @@ class FakeWorktree:
         except GitUnavailable as exc:
             raise GitReadFailure(str(exc)) from exc
 
-    def continue_rebase(self, *, missing_ok: bool = False) -> CommandResult:
-        return fake_commands.continue_rebase(self._repo, self.state(), missing_ok=missing_ok)
+    def continue_rebase(self) -> CommandResult:
+        return fake_commands.continue_rebase(self._repo, self.state())
 
     def resolve_and_continue(self) -> CommandResult:
         return fake_commands.resolve_and_continue(self._repo, self.state())
 
-    def abort_rebase(self, *, missing_ok: bool = True, restore_to: Sha | None = None) -> CommandResult:
-        return fake_commands.abort_rebase(self._repo, self.state(), missing_ok=missing_ok, restore_to=restore_to)
+    def abort_rebase(self, *, restore_to: Sha | None = None) -> CommandResult:
+        return fake_commands.abort_rebase(self._repo, self.state(), restore_to=restore_to)
 
     def push_request(
         self,
@@ -466,33 +486,28 @@ class FakeWorktree:
         refspecs: Sequence[str],
         *,
         options: Sequence[str] = (),
-        force: bool = False,
-        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> CommandResult:
         _ = timeout  # In-memory operations have no elapsed process time.
-        return fake_remote.push_request(
-            self._repo, self.state(), remote, refspecs, options=options, force=force, allow_delete=allow_delete, hook_env=hook_env
-        )
+        validate_push(remote, refspecs, options)
+        return fake_remote.push_request(self._repo, self.state(), remote, refspecs, options=options, hook_env=hook_env)
 
     def push_refspecs(
         self,
         remote: str,
         refspecs: Sequence[str],
         *,
-        force: bool = False,
-        allow_delete: bool = False,
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> PushResult:
         _ = timeout  # In-memory operations have no elapsed process time.
-        return fake_remote.push_refspecs(
-            self._repo, self.state(), remote, refspecs, force=force, allow_delete=allow_delete, hook_env=hook_env
-        )
+        validate_push(remote, refspecs)
+        return fake_remote.push_refspecs(self._repo, self.state(), remote, refspecs, hook_env=hook_env)
 
     def push_lease(self, remote: str, refspec: str, *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
-        return self.push_request(remote, [refspec], options=["--force-with-lease"], timeout=timeout)
+        _ = timeout
+        return fake_remote.push_request(self._repo, self.state(), remote, [refspec], options=["--force-with-lease"], hook_env=None)
 
     def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         _ = remote, refs, timeout  # LFS outcomes are controlled by hooks, without transferring objects.

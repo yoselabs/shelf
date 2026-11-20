@@ -38,6 +38,8 @@ _WHICH_ALLOWED = {
 _WHOLE_ENV_ALLOWED: set[str] = {
     # the gate passes the caller's own environment to the recipes and pytest it launches (UV_*, MISE_*, GIT_*, PRE_COMMIT_*)
     # the edge hands `blueprint init` the user's environment: prek, mise and bd it launches need PATH, HOME and their own settings
+    # `python -m any_lease run` is a lock around a command: it must behave as running the command directly, whole environment included
+    "packages/any-lease/src/any_lease/__main__.py",
     "packages/blueprint/src/blueprint/__main__.py",
     "packages/any-gate/src/any_gate/cli.py",
     "packages/any-gate-python/src/any_gate_python/cli.py",

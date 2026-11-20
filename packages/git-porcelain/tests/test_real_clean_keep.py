@@ -1,4 +1,4 @@
-"""`Worktree.clean(keep=[...], ignored=True)` against real git: the reset-path guarantee a caller relies on to keep a folder (a `.venv`)
+"""`Worktree.clean_ignored(keep=[...])` against real git: the reset-path guarantee a caller relies on to keep a folder (a `.venv`)
 while everything else untracked or ignored goes."""
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def work(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
 
 def test_an_anchored_keep_survives_the_ignored_clean_and_everything_else_goes(work: tuple[Path, Path]) -> None:
     root, _ = work
-    RealRepo(root, ambient=dict(os.environ)).worktree(root).clean(["/.venv"], ignored=True)
+    RealRepo(root, ambient=dict(os.environ)).worktree(root).clean_ignored(["/.venv"])
     left = sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if ".git" not in p.relative_to(root).parts and p.is_file())
     assert left == [".gitignore", ".venv/lib/x", "tracked.txt"]  # the nested sub/.venv is not the kept one
 
@@ -49,7 +49,7 @@ def test_the_clean_removes_a_symlink_and_never_follows_it_out_of_the_worktree(wo
     root, outside = work
     (root / "link-out").symlink_to(outside)
     (root / "build" / "link-out").symlink_to(outside)
-    RealRepo(root, ambient=dict(os.environ)).worktree(root).clean(["/.venv"], ignored=True)
+    RealRepo(root, ambient=dict(os.environ)).worktree(root).clean_ignored(["/.venv"])
     assert not (root / "link-out").is_symlink() and not (root / "build").exists()
     assert (outside / "precious").read_text() == "outside\n"
 
@@ -57,5 +57,5 @@ def test_the_clean_removes_a_symlink_and_never_follows_it_out_of_the_worktree(wo
 def test_a_kept_folder_holding_a_symlink_out_is_left_whole(work: tuple[Path, Path]) -> None:
     root, outside = work
     (root / ".venv" / "out").symlink_to(outside)
-    RealRepo(root, ambient=dict(os.environ)).worktree(root).clean(["/.venv"], ignored=True)
+    RealRepo(root, ambient=dict(os.environ)).worktree(root).clean_ignored(["/.venv"])
     assert (root / ".venv" / "out").is_symlink() and (outside / "precious").exists()

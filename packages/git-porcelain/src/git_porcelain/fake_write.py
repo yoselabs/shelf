@@ -210,7 +210,7 @@ def release_branch(repo: RepoState, wt: CheckoutState, holder: Path) -> Released
     if other.main:
         return StillHeld(holder, "the main checkout holds it")
     if other.missing or is_clean(repo, other):
-        flow.worktree_remove(repo, holder, force=False)
+        flow.worktree_remove(repo, holder)
         return Released(holder, "removed")
     sha = repo.head_sha(other)
     if sha is None:
@@ -229,11 +229,10 @@ def _pin_ignored(repo: RepoState, wt: CheckoutState, sha: str) -> None:
     wt.exclude += [q for q in dict.fromkeys(literal_pattern(p) for p in ignored) if q not in wt.exclude]
 
 
-def park(repo: RepoState, wt: CheckoutState, base: str, clean_keep: Sequence[str] | None, *, keep_ignored: bool = False) -> Sha:
+def park(repo: RepoState, wt: CheckoutState, base: str, clean_keep: Sequence[str] | None) -> Sha:
     require_index(wt)
     sha = resolve_commit(repo, wt, base)
-    if keep_ignored:
-        _pin_ignored(repo, wt, sha)
+    _pin_ignored(repo, wt, sha)
     _land(repo, wt, sha, None)
     if clean_keep is not None:
         clean(repo, wt, clean_keep)

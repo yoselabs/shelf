@@ -12,6 +12,7 @@
   and :func:`run_inherited` for a child that writes to our stdout/stderr.
 - :func:`stop_pid`, :class:`PidHandle` — stop a process we did not spawn, only while its start token matches.
 - :class:`TermHold`, :func:`popen_held` — a SIGTERM landing during a spawn still stops the child.
+- :class:`Pump` — the readers, stdin feeder and pipe lifetime of a held ``Popen`` (what :func:`run` and :func:`capture_bytes` use).
 - :func:`popen_registered` — the command executes only after a callback durably registered its identity;
   :func:`run_registered` — that gate plus :func:`run`'s supervision, stdin /dev/null, stderr merged into one log.
 
@@ -24,6 +25,7 @@ from stream_proc.owned import IdentityUnavailableError, OwnedProcess, ProcessObs
 from stream_proc.pid import PidHandle, stop_pid
 from stream_proc.procfs import Proc
 from stream_proc.proctable import alive, descendants, group_alive, group_rss, proc_start, table
+from stream_proc.pump import Pump
 from stream_proc.registered import RegisteredStartUncertainError, popen_registered
 from stream_proc.runner import Kind, Result, run, run_registered
 from stream_proc.tree import StopReport, stop_tree, stop_tree_report
@@ -37,6 +39,7 @@ __all__ = [
     "PidHandle",
     "Proc",
     "ProcessObservation",
+    "Pump",
     "RegisteredStartUncertainError",
     "Result",
     "StopReport",

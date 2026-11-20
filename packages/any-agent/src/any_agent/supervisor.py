@@ -17,7 +17,9 @@ import time
 from collections.abc import Callable, Generator
 from dataclasses import field
 from pathlib import Path
-from typing import IO, Literal, Protocol
+from typing import Literal, Protocol
+
+from stream_proc import Pump
 
 from any_agent import events as ev
 from any_agent import procs, watch
@@ -28,6 +30,8 @@ from any_agent.watch import Limits
 LANE_GONE_EVERY = 10  # seconds between looks at whether the lane was marked out by someone else
 NET_GRACE_S = 15  # how long a worker may say "waiting for network" before one probe decides whether to stop it
 POLL_S = 0.5
+LINE_CAP_BYTES = 16 << 20  # a worker line longer than this reaches the parser in pieces (a stream-json event is far smaller)
+DRAIN_S = 5  # how long the last output of a worker that ended is waited for
 
 
 type EndStatus = Literal["done", "error", "killed", "timeout"]
@@ -94,8 +98,20 @@ class RunHooks:
     idle_s: float | None = None  # seconds of silence before the worker is hung (None = the harness's limit)
     unattended: bool = False  # the caller is an engine: stop when it dies
     stops: list[procs.StopReport] = field(default_factory=list)  # one report per tree stop made for this run
-    before_stop: Callable[[StopIntent], None] | None = None  # the intent, durably, BEFORE any signal; a raise forbids the stop (see run())
+    before_stop: Callable[[StopIntent], None] | None = None  # the intent, durably, BEFORE any signal; a raise does not forbid the stop
     after_stop: Callable[[StopIntent, procs.StopReport], None] | None = None  # what the signal calls did; a raise propagates from run()
+
+
+class IntentNotRecordedError(RuntimeError):
+    """The worker's tree WAS stopped, but `before_stop` failed to record the intent: `__cause__` is the write failure, `report` the
+    stop's own report, `intent` what was to be recorded. A stop is never forbidden by its record."""
+
+    def __init__(self, intent: StopIntent, report: procs.StopReport, cause: BaseException) -> None:
+        super().__init__(
+            f"worker {intent.worker.pid} was stopped ({intent.reason}; term_sent={report.term_sent}, kill_sent={report.kill_sent}, "
+            f"survivors={len(report.survivors)}) but its intent record failed: {cause!r}"
+        )
+        self.intent, self.report = intent, report
 
 
 class EntrySignal(SystemExit):
@@ -216,7 +232,7 @@ class Supervisor:
         self.asked = False
         self.stop_lock = threading.Lock()  # one stop initiator at a time: the first cause is the stored one
         self.stopped: procs.StopReport | None = None
-        self.refusal: BaseException | None = None  # a stop callback raised: surfaced by run(), no further stop is made
+        self.failure: BaseException | None = None  # a stop callback failed after the stop was made: surfaced by run()
 
     # -- the lines of the worker ----------------------------------------------------------------------------------------------------------
     def feed(self, events: list[ev.HarnessEvent]) -> bool:
@@ -272,49 +288,64 @@ class Supervisor:
         return False
 
     # -- the run -------------------------------------------------------------------------------------------------------------------------
-    def _pump(
-        self,
-        stream: IO[bytes],
-        sink: list[str],
-        cb: Callable[[str], bool],
-        p: subprocess.Popen[bytes],
-        killed: list[int],
-        tick: Callable[[], None],
-    ) -> None:
-        for raw in iter(stream.readline, b""):
+    def _line(self, sink: list[str], cb: Callable[[str], bool], p: subprocess.Popen[bytes], killed: list[int]) -> Callable[[bytes], None]:
+        """The pump callback of one stream: keep the line, feed the harness, stop the worker when the policy asks."""
+
+        def on_line(raw: bytes) -> None:
             # lossy-ok: parse: the log is scanned for rate-limit phrases, never stored
             line = raw.decode("utf-8", "replace")
             sink.append(line)
-            with contextlib.suppress(Exception):
-                tick()
             if cb(line):  # the policy asks to stop the worker now
                 killed.append(1)
-                with contextlib.suppress(Exception):  # a refusal is kept in self.refusal and raised by the waiting thread
-                    self._halt(p, "secret")
+                self._halt(p, "secret")  # a failure is kept in self.failure and raised by the waiting thread; the pump ignores it
+
+        return on_line
 
     def _halt(self, p: subprocess.Popen[bytes], reason: str, trigger_signal: int | None = None) -> None:
-        """Stop the tree once. The first initiator wins (later ones, or a repeated cleanup, do nothing). `before_stop` gets the intent
-        before any signal; if it raises, nothing is signalled, no cleanup stop follows and the error propagates (the worker stays up and
-        is the caller's to resolve). `after_stop` gets the report of what the signal calls did; a raise propagates."""
+        """Stop the tree once. The first initiator wins (later ones, or a repeated cleanup, do nothing). The stop ALWAYS happens:
+        `before_stop` gets the intent first, but a raise from it does not forbid the signals; after the stop (and `after_stop`, still
+        offered) one `IntentNotRecordedError` carries the write failure as its cause and the stop report. A raise from `after_stop`
+        alone propagates as is."""
         with self.stop_lock:
-            if self.stopped is not None or self.refusal is not None:
+            if self.stopped is not None or self.failure is not None:
                 return
             if self.out.worker is None:
                 msg = "no worker to stop"
                 raise RuntimeError(msg)
             intent = StopIntent(worker=self.out.worker, reason=reason, trigger_signal=trigger_signal)
-            try:
-                if self.hooks.before_stop:
-                    self.hooks.before_stop(intent)
-                rep = procs.kill_tree(p)
-                rep.reason = reason
-                self.hooks.stops.append(rep)
-                self.stopped = rep
-                if self.hooks.after_stop:
-                    self.hooks.after_stop(intent, rep)
-            except BaseException as e:
-                self.refusal = e
-                raise
+            write_error = self._try(self.hooks.before_stop, intent)
+            rep = procs.kill_tree(p)
+            rep.reason = reason
+            self.hooks.stops.append(rep)
+            self.stopped = rep
+            after_error = self._try(self.hooks.after_stop, intent, rep)
+            failure = self._stop_error(intent, rep, write_error, after_error)
+            if failure is not None:
+                self.failure = failure
+                raise failure from write_error
+
+    @staticmethod
+    def _try(hook: Callable[..., None] | None, *args: object) -> BaseException | None:
+        if hook is None:
+            return None
+        try:
+            hook(*args)
+        except BaseException as e:  # noqa: BLE001 - kept to be raised after the stop, which a hook never forbids
+            return e
+        return None
+
+    @staticmethod
+    def _stop_error(
+        intent: StopIntent, rep: procs.StopReport, write_error: BaseException | None, after_error: BaseException | None
+    ) -> BaseException | None:
+        if write_error is None:
+            return after_error
+        if not isinstance(write_error, Exception):
+            return write_error  # the caller leaving (KeyboardInterrupt, SystemExit) keeps its own type, the stop is done
+        error = IntentNotRecordedError(intent, rep, write_error)
+        if after_error is not None:
+            error.add_note(f"after_stop also failed: {after_error!r}")
+        return error
 
     def _why(self) -> str:
         """Who made `poll()` say stop: the lane, the log, a deadline, the answer grace, the network."""
@@ -325,8 +356,10 @@ class Supervisor:
 
     def _stop(self, p: subprocess.Popen[bytes], killed: list[int], reason: str) -> None:
         killed.append(1)
-        self._halt(p, reason)
-        p.wait()
+        try:
+            self._halt(p, reason)
+        finally:
+            p.wait()
 
     @contextlib.contextmanager
     def _entry_signals(self) -> Generator[None]:
@@ -362,39 +395,34 @@ class Supervisor:
 
         p, worker = procs.spawn(spec.argv, spec.cwd, spec.env, registered=register)
         self.out.worker = worker
-        try:  # a signal between the spawn's return and the wait is the caller leaving too: the tree is ours to stop
-            out: list[str] = []
-            err: list[str] = []
-            killed: list[int] = []
-
-            def feed_stdin() -> None:
-                with contextlib.suppress(OSError):
-                    if p.stdin is None:
-                        return
-                    p.stdin.write(spec.stdin.encode("utf-8"))
-                    p.stdin.close()
-
-            threads = [
-                threading.Thread(target=self._pump, args=(p.stdout, out, self._on_out, p, killed, self.dog.touch), daemon=True),
-                threading.Thread(target=self._pump, args=(p.stderr, err, self._on_err, p, killed, self.dog.touch), daemon=True),
-                threading.Thread(target=feed_stdin, daemon=True),
-            ]
-            for th in threads:
-                th.start()
-            self._wait(p, killed, timeout)
-            for th in threads:
-                th.join(5)
-            for f in (p.stdin, p.stdout, p.stderr):
-                with contextlib.suppress(OSError):
-                    f and f.close()
-            if self.refusal is not None:
-                raise self.refusal  # noqa: TRY301 - a stop callback refused: surfaced here, the worker is the caller's
-            return self.finish(p.returncode, "".join(out), "".join(err), bool(killed))
-        except BaseException as exc:
-            if self.refusal is None:
-                self._halt(p, *caller_cause(exc))
-                p.wait()
-            raise
+        out: list[str] = []
+        err: list[str] = []
+        killed: list[int] = []
+        pump = Pump(
+            p,
+            on_stdout=self._line(out, self._on_out, p, killed),
+            on_stderr=self._line(err, self._on_err, p, killed),
+            stdin=spec.stdin.encode("utf-8"),
+            touch=self.dog.touch,
+            max_line=LINE_CAP_BYTES,
+        )
+        try:
+            try:  # a signal between the spawn's return and the wait is the caller leaving too: the tree is ours to stop
+                pump.start()
+                self._wait(p, killed, timeout)
+                pump.drain(DRAIN_S)
+                pump.release()  # every reader is out: what they collected is whole
+                if self.failure is not None:
+                    raise self.failure  # noqa: TRY301 - a stop callback failed after the stop was made
+                return self.finish(p.returncode, "".join(out), "".join(err), bool(killed))
+            except BaseException as exc:
+                try:
+                    self._halt(p, *caller_cause(exc))
+                finally:
+                    p.wait()
+                raise
+        finally:
+            pump.release()
 
     def _wait(self, p: subprocess.Popen[bytes], killed: list[int], timeout: float) -> None:
         ppid, end = os.getppid(), self.clock() + timeout if timeout else None
@@ -408,8 +436,8 @@ class Supervisor:
                     self.out.timed_out = True
                     self._stop(p, killed, "timeout")
                     break
-                if self.refusal is not None:
-                    raise self.refusal from None
+                if self.failure is not None:
+                    raise self.failure from self.failure.__cause__
                 if self.poll():
                     self._stop(p, killed, self._why())
                     break

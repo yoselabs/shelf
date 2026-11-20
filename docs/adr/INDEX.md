@@ -13,7 +13,7 @@ the file holds the reasons, the rejected options and the history.
 - [0002](0002-doctrine-homes-in-the-shelf.md) **Doctrine homes in the shelf**: The shelf is the single self-contained home of its own operating model; consumers only point to it, and no external knowledge base is needed to use it.
 - [0003](0003-ontology-lives-as-flat-files.md) **The ontology lives as flat files**: The shelf's catalog, use-cases and ledger are plain files under version control, one per instance, with every rollup derived; they are never a2kay EntityTypes.
 - [0028](0028-hard-opinions.md) **The shelf and everything built on it are hard opinionated**: No optionality, no backward compatibility in code, no redundancy; behaviour is decomposed behind owners, injected as instances, and checked against the shelf first. Constitution Articles II and III.
-- [0030](0030-destructive-opt-in-bool-is-a-justified-exception.md) **A destructive opt-in bool is a justified exception**: A bool that opts one call into a destructive or history-changing act (force, allow_delete, ignored, nested, allow_empty, hooks, keep_ignored) is allowed when the safe act is the default.
+- [0030](0030-tolerance-and-destructive-flags-are-debt.md) **Tolerance and destructive flags are debt, converted to exceptions and verbs**: force, missing_ok, ignore_errors, overwrite and kin are not a justified exception; the call raises a typed exception and the caller that tolerates it catches it.
 
 ## gate
 
@@ -26,6 +26,7 @@ the file holds the reasons, the rejected options and the history.
 - [0023](0023-the-gate-runner-is-just.md) **The gate runner is just**: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`.
 - [0027](0027-no-repository-has-ci.md) **No repository has GitHub Actions CI; the local gate is the gate**: No repository holds GitHub Actions configuration. Done is the local `just check` green on the tree pushed and on a merged tree; blueprint's `gate.no-ci` fails a repo with workflows.
 - [0029](0029-the-justfile-imports-blueprint-rendered-parts.md) **A repo's justfile imports blueprint-rendered parts; `import`, not `mod`**: The gate's common recipes are files `blueprint gate render` writes per stack; the repo's justfile imports them (`import`, not `mod`) and owns the rest; `render --check` is the drift check.
+- [0031](0031-gate-steps-declare-their-inputs.md) **Every gate step declares the files it reads; a step whose inputs did not change is not started**: gate-inputs.toml lists each step's input globs; any-gate does not start a step none of whose inputs changed; blueprint checkpoints stay one step reading the whole repo.
 
 ## knowledge
 

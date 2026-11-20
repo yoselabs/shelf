@@ -134,17 +134,19 @@ def test_unclaim_outcomes(bd: Bd, script: Script) -> None:
     script.say("[]")
     script.say(err="Error unclaiming zz-zz6: issue claimed by a different actor: held by tester", code=1)
     script.say(err='Error unclaiming zz-zz6: assignee mismatch: held by "tester", expected "nobody"', code=1)
-    assert bd.unclaim("a-1", force=True, if_assignee="me") is True
-    assert argv(script) == ["unclaim", "a-1", "--force", "--if-assignee", "me"]
+    assert bd.evict("a-1") is True
+    assert argv(script) == ["unclaim", "a-1", "--force"]
     assert bd.unclaim("a-1") is False
     assert bd.unclaim("a-1", if_assignee="nobody") is False
+    assert argv(script, 2) == ["unclaim", "a-1", "--if-assignee", "nobody"]
 
 
 def test_reclaim(bd: Bd, script: Script) -> None:
     script.say(fixture("reclaim.json")).say('{"count": 0, "reclaimed": null}')
-    assert bd.reclaim("10m", ids=["zz-6q8"], labels=["l"], any_replica=True) == ["zz-6q8"]
+    assert bd.reclaim_foreign("10m", ids=["zz-6q8"], labels=["l"]) == ["zz-6q8"]
     assert argv(script) == ["reclaim", "--older-than", "10m", "--id", "zz-6q8", "--label", "l", "--any-replica"]
     assert bd.reclaim() == []
+    assert argv(script, 1) == ["reclaim"]
 
 
 def test_heartbeat_raises_when_the_lease_is_gone(bd: Bd, script: Script) -> None:
