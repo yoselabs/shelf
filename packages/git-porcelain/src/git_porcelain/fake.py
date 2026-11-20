@@ -37,6 +37,7 @@ from git_porcelain.fake_ops import branch_ref, clean, clean_ignored, hard_to
 from git_porcelain.fake_plumbing import FakePlumbing
 from git_porcelain.fake_store import CheckoutState, Hooks, RepoState
 from git_porcelain.fake_worktrees import worktree_state
+from git_porcelain.remote_validation import validate_push
 from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
@@ -489,6 +490,7 @@ class FakeWorktree:
         timeout: float | None = None,
     ) -> CommandResult:
         _ = timeout  # In-memory operations have no elapsed process time.
+        validate_push(remote, refspecs, options)
         return fake_remote.push_request(self._repo, self.state(), remote, refspecs, options=options, hook_env=hook_env)
 
     def push_refspecs(
@@ -500,10 +502,12 @@ class FakeWorktree:
         timeout: float | None = None,
     ) -> PushResult:
         _ = timeout  # In-memory operations have no elapsed process time.
+        validate_push(remote, refspecs)
         return fake_remote.push_refspecs(self._repo, self.state(), remote, refspecs, hook_env=hook_env)
 
     def push_lease(self, remote: str, refspec: str, *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
-        return self.push_request(remote, [refspec], options=["--force-with-lease"], timeout=timeout)
+        _ = timeout
+        return fake_remote.push_request(self._repo, self.state(), remote, [refspec], options=["--force-with-lease"], hook_env=None)
 
     def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         _ = remote, refs, timeout  # LFS outcomes are controlled by hooks, without transferring objects.

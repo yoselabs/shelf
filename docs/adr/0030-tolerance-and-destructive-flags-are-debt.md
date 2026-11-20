@@ -25,8 +25,9 @@ were debt, and they are converted (shelf-tyld.26). Article III now says it: **to
 - **Two actions that differ in kind are two verbs** (`drop_worktree` / `discard_worktree`, `unclaim` / `evict`,
   `record` / `record_with_hooks` / `record_empty`), or ONE idempotent verb when that is the honest meaning
   (`abort_rebase` with nothing paused only restores). The smaller API wins: every public name costs tokens.
-- **A flag the form already states is deleted, not renamed.** `push_request("origin", ["+main"])` forces because git's
-  `+` says so; `force=True` only repeated it.
+- **A dangerous form is refused, not confirmed.** `push_refspecs` / `push_request` raise `PushRefused` for `+`, `:dst`,
+  `--force`, `--delete`, `--mirror`, `--prune`; a caller who really needs one gets one named verb (`delete_remote_at`,
+  `push_lease`), never a flag. A `force=True` beside `"+main"` only repeated the form.
 - **A `Literal` or enum parameter is the same flag in a coat** and is not the answer.
 - **What stays as a flag** (rows in `tests/test_arch_bool_modes.py`, each with a reason that names its class):
   - `cost:` the default is the complete or durable answer and the flag skips or adds one named cost (Article IX):
@@ -49,8 +50,8 @@ Why: a flag that makes a failure acceptable hides a second mode in one signature
   hidden second mode Article III forbids, and `git push --force` as a word is not a reason to copy it into every
   signature.
 - A `Literal` policy parameter (`on_missing="ignore" | "raise"`): the same flag in a coat.
-- Keep a guard flag that confirms what the argument already says (`force=True` beside `"+main"`): ceremony; it adds a
-  name and no safety.
+- Keep a guard flag that confirms the dangerous form (`force=True` beside `"+main"`), or send the form as written: the
+  first is ceremony, the second drops the pit of success.
 - Convert the cost opt-ins too: separate `*_nofsync` functions would double atomic-io's surface for a named cost;
   they stay rows until a second cost class shows up.
 

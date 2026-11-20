@@ -319,96 +319,36 @@ Feature: One Repo and Worktree, real or fake
     When "linked" calls branch()
     Then the result is "topic"
 
-  Scenario Outline: Push forms carry their own opt ins
+  Scenario Outline: A push never forces or deletes: those forms are refused before git runs
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
-    When "r" calls <operation>
-    Then the push succeeded
+    When "r" tries <operation>
+    Then the call raises PushRefused
 
     Examples:
-      | operation                                                                                  |
-      | push_refspecs("origin", ["+HEAD:refs/heads/main"])                                |
-      | push_request("origin", ["+HEAD:refs/heads/main"])                                 |
-      | push_refspecs("origin", [":refs/heads/main"])                              |
-      | push_request("origin", [":refs/heads/main"])                               |
-      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force"])              |
-      | push_request("origin", ["HEAD:refs/heads/main"], options=["-f"])                   |
-      | push_request("origin", ["main"], options=["--delete"])                     |
-      | push_request("origin", ["main"], options=["-d"])                           |
-      | push_request("origin", [], options=["--mirror"])               |
-      | push_request("origin", ["HEAD:refs/heads/main"], options=["--prune"])       |
-      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease"])               |
-      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease=refs/heads/main:<head:r>"]) |
+      | operation                                                                                                  |
+      | push_refspecs("origin", ["+HEAD:refs/heads/main"])                                                         |
+      | push_request("origin", ["+HEAD:refs/heads/main"])                                                          |
+      | push_refspecs("origin", [":refs/heads/main"])                                                              |
+      | push_request("origin", [":refs/heads/main"])                                                               |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force"])                                      |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["-f"])                                           |
+      | push_request("origin", ["main"], options=["--delete"])                                                     |
+      | push_request("origin", ["main"], options=["-d"])                                                           |
+      | push_request("origin", [], options=["--mirror"])                                                           |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--prune"])                                      |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease"])                           |
+      | push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease=refs/heads/main:<head:r>"])  |
 
-  Scenario: An explicit lease remains allowed and refuses a stale expected tip
+  Scenario: A refused push form changes nothing on the remote
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
-    And "r" remembers its head as "root"
-    And "r" commits "local" with b="local"
-    And the origin "o" advances "main" with c="remote"
-    When "r" calls push_request("origin", ["HEAD:refs/heads/main"], options=["--force-with-lease=refs/heads/main:<mem:root>"])
-    Then the result's ok is False
-    And the command output contains "stale info"
-
-  Scenario: A deletion only push returns an empty sha
-    Given an origin "o"
-    And the origin "o" holds a="root"
-    And "r" is a clone of the origin "o"
-    When "r" calls push_refspecs("origin", [":refs/heads/main"])
-    Then the result is a Pushed
-    And the result's sha is ""
-    When "r" tries fetch("origin", refspecs=["refs/heads/main"])
-    Then the call raises GitUnavailable
-
-  Scenario Outline: Force options replace a remote tip
-    Given an origin "o"
-    And the origin "o" holds a="root"
-    And "r" is a clone of the origin "o"
-    And "r" remembers its head as "root"
-    And the origin "o" advances "main" with b="remote"
-    When "r" calls push_request("origin", ["HEAD:refs/heads/main"], options=["<option>"])
-    Then the result's ok is True
-    When "r" calls fetch("origin")
-    And "r" calls history(["origin/main"], limit=1)
-    Then the result's 0.sha is "<mem:root>"
-
-    Examples:
-      | option  |
-      | --force |
-      | -f      |
-
-  Scenario Outline: Deletion options remove the advertised ref
-    Given an origin "o"
-    And the origin "o" holds a="root"
-    And "r" is a clone of the origin "o"
-    When "r" calls push_request("origin", ["main"], options=["<option>"])
-    Then the result's ok is True
-    When "r" tries fetch("origin", refspecs=["refs/heads/main"])
-    Then the call raises GitUnavailable
-
-    Examples:
-      | option   |
-      | --delete |
-      | -d       |
-
-  Scenario Outline: Mirror and prune delete refs absent from their local scope
-    Given an origin "o"
-    And the origin "o" holds a="root"
-    And "r" is a clone of the origin "o"
-    And "r" calls push_refspecs("origin", ["HEAD:refs/heads/stale"])
-    When "r" calls push_request("origin", <refspecs>, options=["<option>"])
-    Then the result's ok is True
-    When "r" tries fetch("origin", refspecs=["refs/heads/stale"])
-    Then the call raises GitUnavailable
+    When "r" tries push_refspecs("origin", [":refs/heads/main"])
+    Then the call raises PushRefused
     When "r" calls fetch("origin", refspecs=["refs/heads/main"])
     Then the result's ok is True
-
-    Examples:
-      | option   | refspecs                      |
-      | --mirror | []                            |
-      | --prune  | ["refs/heads/*:refs/heads/*"]   |
 
   Scenario Outline: Remote option injection is rejected
     Given a repository "r"
@@ -656,13 +596,11 @@ Feature: One Repo and Worktree, real or fake
     When "r" tries delete_remote_at("origin", "refs/heads/pinned", "<mem:root>")
     Then the call raises GitUnavailable
 
-  Scenario: Push requests preserve namespaces multiple refs and deletion
+  Scenario: Push requests preserve namespaces and multiple refs
     Given an origin "o"
     And the origin "o" holds a="root"
     And "r" is a clone of the origin "o"
-    When "r" calls push_request("origin", ["HEAD:refs/heads/one", "+HEAD:refs/tags/two"])
-    Then the result's ok is True
-    When "r" calls push_request("origin", [":refs/heads/one", ":refs/tags/two"])
+    When "r" calls push_request("origin", ["HEAD:refs/heads/one", "HEAD:refs/tags/two"])
     Then the result's ok is True
 
   Scenario: A lease refuses a branch changed since fetching
@@ -687,21 +625,9 @@ Feature: One Repo and Worktree, real or fake
       | remote   | refspecs          | options        |
       | "origin" | ["HEAD"]          | []             |
       | "origin" | ["HEAD:main"]     | []             |
-      | "origin" | ["+HEAD:main"]    | []             |
       | "origin" | []                | []             |
       | None     | []                | []             |
       | None     | ["HEAD:main"]     | ["--dry-run"]  |
-
-  Scenario: Remote policy refusal is distinct from a ref race
-    Given an origin "o"
-    And the origin "o" holds a="root"
-    And "r" is a clone of the origin "o"
-    And "r" remembers its head as "before"
-    And "r" commits "local" with b="local"
-    And "r" calls push_request("origin", ["HEAD:refs/heads/main"])
-    And the origin "o" refuses non fast forward pushes
-    When "r" calls push_refspecs("origin", ["+<mem:before>:refs/heads/main"])
-    Then the result is a RemoteRejected
 
   Scenario: An explicit push reports a ref race separately
     Given an origin "o"

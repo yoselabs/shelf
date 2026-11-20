@@ -349,9 +349,10 @@ sources are resolved by the push process itself; force prefixes and explicit des
 A bare HEAD retains Git's symbolic branch destination. For an explicit refspec with omitted
 remote, selection follows branch pushRemote, remote.pushDefault, branch remote, then origin.
 Normal pre-push hooks, checkout pinning and the repository's injected environment remain
-in force. Both push methods send the forms exactly as written: a leading `+`, an empty-source deletion
-refspec (`:destination`), `--force`/`-f`, `--delete`/`-d`, `--prune` and `--mirror` are git's own opt ins and
-there is no second flag to confirm them (`push(dst)` and `push_lease` never force or delete).
+in force. Both push methods refuse force and deletion forms before invoking git, raising `PushRefused` (a
+`GitError`) that names the form: a leading `+`, an empty-source deletion refspec (`:destination`), `--force`/`-f`,
+`--delete`/`-d`, `--prune`, `--mirror` and `--force-with-lease` (the lease is `push_lease`; a deletion is
+`delete_remote_at`). No flag and no named force-push verb exists: no caller needs one.
 Remote arguments starting with `-` raise `ValueError` in push, fetch, sync and guarded
 remote deletion. Other options pass to git without changing configuration or upstream settings.
 `push_lease(remote, refspec, timeout=3600)` uses plain `--force-with-lease`, preserving

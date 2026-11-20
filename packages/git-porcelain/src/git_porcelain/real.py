@@ -38,6 +38,7 @@ from git_porcelain.api import DEFAULT_TIMEOUT
 from git_porcelain.errors import GitTimeout, GitUnavailable, NotARepo
 from git_porcelain.real_done import Done, unavailable
 from git_porcelain.real_trace import trace_hooks
+from git_porcelain.remote_validation import validate_push
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -497,6 +498,7 @@ class RealWorktree:
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> CommandResult:
+        validate_push(remote, refspecs, options)
         return real_remote.push_request(self, remote, refspecs, options=options, hook_env=hook_env, timeout=timeout)
 
     def push_refspecs(
@@ -507,10 +509,11 @@ class RealWorktree:
         hook_env: Mapping[str, str] | None = None,
         timeout: float | None = None,
     ) -> PushResult:
+        validate_push(remote, refspecs)
         return real_remote.push_refspecs(self, remote, refspecs, hook_env=hook_env, timeout=timeout)
 
     def push_lease(self, remote: str, refspec: str, *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
-        return self.push_request(remote, [refspec], options=["--force-with-lease"], timeout=timeout)
+        return real_remote.push_request(self, remote, [refspec], options=["--force-with-lease"], hook_env=None, timeout=timeout)
 
     def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         return real_commands.command(self, ["lfs", "push", remote, *refs], timeout=timeout, timed_out="git lfs timed out after 60 min")
