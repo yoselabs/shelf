@@ -80,8 +80,8 @@ _REPO = "https://github.com/yoselabs/shelf"
 # A consumer needs no shelf clone.
 GATE_PACKAGES = {
     "any-gate": "any-gate-v0.1.1",
-    "any-gate-python": "any-gate-python-v0.1.1",
-    "blueprint": "blueprint-v0.2.0",
+    "any-gate-python": "any-gate-python-v0.1.2",
+    "blueprint": "blueprint-v0.3.0",
 }
 
 

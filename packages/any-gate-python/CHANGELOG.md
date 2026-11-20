@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- The `pytest` extra declares `pytest-xdist` (the runner passes `-n` to the pytest of the project under test).
+
 ## Unreleased
 
 - `plan` prints an alarm to stderr when the change reaches more than half of the package suites (`wide_alarm`, on `any_gate.too_wide`); it does not fail.
