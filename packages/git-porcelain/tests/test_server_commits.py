@@ -61,7 +61,7 @@ def test_commit_paths_runs_the_post_commit_hook_by_default(tmp_path: Path) -> No
     marker = _post_commit_hook(repo, tmp_path)
     (repo / "a.md").write_text("a\n", encoding="utf-8")
 
-    git.commit_paths(repo, ["a.md"], "write", author=ROBIN, committer=BOT)
+    git.commit_paths(repo, ["a.md"], "write", author=ROBIN, committer=BOT, ambient=dict(os.environ))
 
     assert marker.exists()
 
@@ -71,7 +71,7 @@ def test_commit_paths_with_hooks_path_dev_null_runs_no_hook(tmp_path: Path) -> N
     marker = _post_commit_hook(repo, tmp_path)
     (repo / "a.md").write_text("a\n", encoding="utf-8")
 
-    assert git.commit_paths(repo, ["a.md"], "write", author=ROBIN, committer=BOT, config=QUIET) is not None
+    assert git.commit_paths(repo, ["a.md"], "write", author=ROBIN, committer=BOT, config=QUIET, ambient=dict(os.environ)) is not None
 
     assert not marker.exists()
 
@@ -80,7 +80,7 @@ def _traced_commit(repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, 
     trace = tmp_path / "trace"
     monkeypatch.setenv("GIT_TRACE", str(trace))
     (repo / "a.md").write_text("a\n", encoding="utf-8")
-    git.commit_paths(repo, ["a.md"], "write", author=ROBIN, committer=BOT, config=config)
+    git.commit_paths(repo, ["a.md"], "write", author=ROBIN, committer=BOT, config=config, ambient=dict(os.environ))
     return trace.read_text(encoding="utf-8")
 
 
@@ -109,11 +109,11 @@ def test_merge_and_finish_merge_take_config(tmp_path: Path) -> None:
         _git(clone, "-c", "user.name=S", "-c", "user.email=s@example.com", "commit", "-qam", "edit")
     _git(other, "push", "-q")
     marker = _post_commit_hook(repo, tmp_path)
-    git.fetch(repo)
+    git.fetch(repo, ambient=dict(os.environ))
 
-    assert git.merge(repo, "origin/main", author=ROBIN, committer=BOT, config=QUIET).state == "conflict"
+    assert git.merge(repo, "origin/main", author=ROBIN, committer=BOT, config=QUIET, ambient=dict(os.environ)).state == "conflict"
     (repo / "seed.md").write_text("resolved\n", encoding="utf-8")
-    assert git.finish_merge(repo, ["seed.md"], author=ROBIN, committer=BOT, config=QUIET).state == "merged"
+    assert git.finish_merge(repo, ["seed.md"], author=ROBIN, committer=BOT, config=QUIET, ambient=dict(os.environ)).state == "merged"
 
     assert not marker.exists()
 
@@ -131,9 +131,9 @@ def test_config_cannot_override_the_merge_conflict_style(tmp_path: Path) -> None
         (clone / "seed.md").write_text(text, encoding="utf-8")
         _git(clone, "-c", "user.name=S", "-c", "user.email=s@example.com", "commit", "-qam", "edit")
     _git(other, "push", "-q")
-    git.fetch(repo)
+    git.fetch(repo, ambient=dict(os.environ))
 
-    git.merge(repo, "origin/main", author=ROBIN, committer=BOT, config={"merge.conflictStyle": "merge"})
+    git.merge(repo, "origin/main", author=ROBIN, committer=BOT, config={"merge.conflictStyle": "merge"}, ambient=dict(os.environ))
 
     assert "|||||||" in (repo / "seed.md").read_text(encoding="utf-8")
 
@@ -159,7 +159,7 @@ def test_a_commit_of_one_file_costs_three_git_processes(tmp_path: Path, monkeypa
     (repo / name).write_text(text, encoding="utf-8")
     calls = _count_forks(monkeypatch)
 
-    sha = git.commit_paths(repo, [name], "write", author=ROBIN, committer=BOT, config=QUIET)
+    sha = git.commit_paths(repo, [name], "write", author=ROBIN, committer=BOT, config=QUIET, ambient=dict(os.environ))
 
     assert len(calls) == 3, [c[3:5] for c in calls]
     monkeypatch.undo()
@@ -170,7 +170,7 @@ def test_nothing_to_commit_costs_two_git_processes(tmp_path: Path, monkeypatch: 
     repo = _repo(tmp_path)
     calls = _count_forks(monkeypatch)
 
-    assert git.commit_paths(repo, ["seed.md"], "noop", author=ROBIN, committer=BOT) is None
+    assert git.commit_paths(repo, ["seed.md"], "noop", author=ROBIN, committer=BOT, ambient=dict(os.environ)) is None
 
     assert len(calls) == 2
 
@@ -183,7 +183,7 @@ def test_commit_paths_returns_the_sha_on_a_detached_head(tmp_path: Path) -> None
     _git(repo, "checkout", "-q", "--detach")
     (repo / "a.md").write_text("a\n", encoding="utf-8")
 
-    sha = git.commit_paths(repo, ["a.md"], "write", author=ROBIN, committer=BOT)
+    sha = git.commit_paths(repo, ["a.md"], "write", author=ROBIN, committer=BOT, ambient=dict(os.environ))
 
     assert sha == _git(repo, "rev-parse", "HEAD").strip()
 
@@ -195,7 +195,7 @@ def test_commit_paths_returns_the_sha_in_a_linked_worktree(tmp_path: Path) -> No
     _git(repo, "pack-refs", "--all")  # the main branch now lives only in packed-refs
     (tree / "a.md").write_text("a\n", encoding="utf-8")
 
-    sha = git.commit_paths(tree, ["a.md"], "write", author=ROBIN, committer=BOT)
+    sha = git.commit_paths(tree, ["a.md"], "write", author=ROBIN, committer=BOT, ambient=dict(os.environ))
 
     assert sha == _git(tree, "rev-parse", "HEAD").strip()
     assert sha != _git(repo, "rev-parse", "HEAD").strip()
@@ -207,7 +207,7 @@ def test_commit_paths_returns_the_sha_when_refs_are_not_loose_files(tmp_path: Pa
     _git(repo, "init", "-q", "-b", "main", "--ref-format=reftable")
     (repo / "a.md").write_text("a\n", encoding="utf-8")
 
-    sha = git.commit_paths(repo, ["a.md"], "first", author=ROBIN, committer=BOT)
+    sha = git.commit_paths(repo, ["a.md"], "first", author=ROBIN, committer=BOT, ambient=dict(os.environ))
 
     assert sha == _git(repo, "rev-parse", "HEAD").strip()
 
@@ -219,7 +219,7 @@ def test_commit_paths_first_commit_on_an_unborn_branch(tmp_path: Path) -> None:
     (repo / "a.md").write_text("a\n", encoding="utf-8")
     _git(repo, "add", "a.md")  # tracked but never committed: the change check has no HEAD
 
-    sha = git.commit_paths(repo, ["a.md"], "first", author=ROBIN, committer=BOT)
+    sha = git.commit_paths(repo, ["a.md"], "first", author=ROBIN, committer=BOT, ambient=dict(os.environ))
 
     assert sha == _git(repo, "rev-parse", "HEAD").strip()
 
@@ -233,7 +233,7 @@ def test_a_rewrite_with_the_same_bytes_is_nothing_to_commit(tmp_path: Path) -> N
     os.utime(tmp, (1_000_000_000, 1_000_000_000))
     tmp.replace(repo / "seed.md")
 
-    assert git.commit_paths(repo, ["seed.md"], "noop", author=ROBIN, committer=BOT) is None
+    assert git.commit_paths(repo, ["seed.md"], "noop", author=ROBIN, committer=BOT, ambient=dict(os.environ)) is None
 
 
 # --- config= reaches the remote calls ----------------------------------------------
@@ -268,7 +268,7 @@ def _fetch_traced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config: dict[
     _publish(other)
     trace = tmp_path / "trace.log"
     monkeypatch.setenv("GIT_TRACE", str(trace))
-    git.fetch(repo, "origin", config=config)
+    git.fetch(repo, "origin", config=config, ambient=dict(os.environ))
     monkeypatch.delenv("GIT_TRACE")
     return _maintenance_runs(trace)
 
@@ -294,7 +294,7 @@ def _pre_push_hook(repo: Path, tmp_path: Path) -> Path:
 
 def _commit_more(repo: Path) -> None:
     (repo / "more.md").write_text("more\n", encoding="utf-8")
-    assert git.commit_paths(repo, ["more.md"], "more", author=ROBIN, committer=BOT, config=QUIET)
+    assert git.commit_paths(repo, ["more.md"], "more", author=ROBIN, committer=BOT, config=QUIET, ambient=dict(os.environ))
 
 
 def test_push_runs_the_pre_push_hook_by_default(tmp_path: Path) -> None:
@@ -302,7 +302,7 @@ def test_push_runs_the_pre_push_hook_by_default(tmp_path: Path) -> None:
     marker = _pre_push_hook(repo, tmp_path)
     _commit_more(repo)
 
-    git.push(repo)
+    git.push(repo, ambient=dict(os.environ))
 
     assert marker.exists()
 
@@ -312,7 +312,7 @@ def test_push_config_skips_the_pre_push_hook(tmp_path: Path) -> None:
     marker = _pre_push_hook(repo, tmp_path)
     _commit_more(repo)
 
-    git.push(repo, config={"core.hooksPath": "/dev/null"})
+    git.push(repo, config={"core.hooksPath": "/dev/null"}, ambient=dict(os.environ))
 
     assert not marker.exists()
     assert _git(origin, "log", "-1", "--format=%s", "main").strip() == "more"

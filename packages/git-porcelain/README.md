@@ -5,13 +5,15 @@ Every function takes a repo path and returns git data; failures raise `GitError`
 which you translate into your own error type at the seam.
 
 ```python
+import os
 import git_porcelain as git
 
+env = dict(os.environ)                  # read once, at your edge: the library never reads the process environment
 if git.is_repo(repo):
-    st = git.sync_status(repo)          # branch / clean / ahead / behind / conflict_paused
-    ready = git.readiness(repo)         # repo / identity / remote / push_access
-    for rel in git.unmerged_paths(repo):
-        ours = git.show_stage(repo, 2, rel)   # clean stage-2 blob (marker-free)
+    st = git.sync_status(repo, ambient=env)    # branch / clean / ahead / behind / conflict_paused
+    ready = git.readiness(repo, ambient=env)   # repo / identity / remote / push_access
+    for rel in git.unmerged_paths(repo, ambient=env):
+        ours = git.show_stage(repo, 2, rel, ambient=env)   # clean stage-2 blob (marker-free)
 ```
 
 ## Why the binary, not a library
@@ -103,7 +105,7 @@ def land(wt: Worktree) -> bool:
         case _:
             return False                        # Conflict: finish_rebase("continue" | "abort")
 
-land(RealRepo(path).worktree(path))             # the binary, memoized
+land(RealRepo(path, ambient=env).worktree(path))             # the binary, memoized
 land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no subprocess
 ```
 

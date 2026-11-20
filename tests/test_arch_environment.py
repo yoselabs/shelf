@@ -24,8 +24,6 @@ _ALLOWLIST = {
     "blueprint/src/blueprint/model.py": "Context.env defaults to dict(os.environ)",
     "blueprint/src/blueprint/report.py": "passes os.environ (minus git location) to a git child",
     "blueprint/src/blueprint/testing.py": "test double builds PATH from os.environ",
-    "git-porcelain/src/git_porcelain/porcelain.py": "filters os.environ for git children and reads GIT_DIR",
-    "git-porcelain/src/git_porcelain/real_env.py": "default source for the git child environment is os.environ",
     "stream-proc/src/stream_proc/registered.py": "falls back to os.environ for the child environment",
     "child-env/src/child_env/__init__.py": "scrub_current() reads os.environ (callers should pass the mapping to scrub)",
 }

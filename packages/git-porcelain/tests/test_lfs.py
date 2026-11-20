@@ -7,6 +7,7 @@ standalone transfer agent); no subprocess mocking.
 
 from __future__ import annotations
 
+import os
 import shutil
 from typing import TYPE_CHECKING
 
@@ -19,7 +20,7 @@ from git_porcelain.testing import git as _git
 if TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = pytest.mark.skipif(not git.lfs_available(), reason="git-lfs is not installed")
+pytestmark = pytest.mark.skipif(not git.lfs_available(ambient=dict(os.environ)), reason="git-lfs is not installed")
 
 ROBIN = Identity("Robin Vale", "robin@example.com")
 BOT = Identity("a2kay", "a2kay@example.invalid")
@@ -47,7 +48,7 @@ def _repo(tmp_path: Path, name: str = "repo") -> Path:
 
 def _commit_png(repo: Path, name: str = "scan.png", data: bytes = PNG) -> str:
     (repo / name).write_bytes(data)
-    sha = git.commit_paths(repo, [".gitattributes", name], name, author=ROBIN, committer=BOT)
+    sha = git.commit_paths(repo, [".gitattributes", name], name, author=ROBIN, committer=BOT, ambient=dict(os.environ))
     assert sha is not None
     return sha
 
@@ -56,10 +57,10 @@ def _with_remote(tmp_path: Path) -> tuple[Path, Path]:
     remote = tmp_path / "remote.git"
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(remote))
     repo = _repo(tmp_path)
-    git.lfs_setup(repo)
+    git.lfs_setup(repo, ambient=dict(os.environ))
     _commit_png(repo)
     _git(repo, "remote", "add", "origin", str(remote))
-    git.lfs_push(repo, "origin", "main")
+    git.lfs_push(repo, "origin", "main", ambient=dict(os.environ))
     _git(repo, "push", "-q", "-u", "origin", "main")
     return repo, remote
 
@@ -68,13 +69,13 @@ def _clone(tmp_path: Path, remote: Path, name: str) -> Path:
     """A clone made with LFS configured (as the server configures it on start)."""
     target = tmp_path / name
     _git(tmp_path, "clone", "-q", "--no-checkout", str(remote), str(target))
-    git.lfs_setup(target)
+    git.lfs_setup(target, ambient=dict(os.environ))
     _git(target, "checkout", "-q", "main")
     return target
 
 
 def test_lfs_available_is_true_here() -> None:
-    assert git.lfs_available() is True
+    assert git.lfs_available(ambient=dict(os.environ)) is True
 
 
 def test_lfs_available_is_false_without_git_lfs_on_the_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -85,15 +86,15 @@ def test_lfs_available_is_false_without_git_lfs_on_the_path(tmp_path: Path, monk
     (bin_dir / "git").symlink_to(real_git)
     monkeypatch.setenv("PATH", str(bin_dir))
 
-    assert git.lfs_available() is False
-    assert git.lfs_setup(tmp_path) is False
+    assert git.lfs_available(ambient=dict(os.environ)) is False
+    assert git.lfs_setup(tmp_path, ambient=dict(os.environ)) is False
 
 
 def test_setup_makes_a_commit_store_a_pointer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _isolate(tmp_path, monkeypatch)
     repo = _repo(tmp_path)
 
-    assert git.lfs_setup(repo) is True
+    assert git.lfs_setup(repo, ambient=dict(os.environ)) is True
     _commit_png(repo)
 
     committed = _git(repo, "show", "HEAD:scan.png")
@@ -105,7 +106,7 @@ def test_setup_marks_the_filter_required_and_installs_no_hooks(tmp_path: Path, m
     _isolate(tmp_path, monkeypatch)
     repo = _repo(tmp_path)
 
-    git.lfs_setup(repo)
+    git.lfs_setup(repo, ambient=dict(os.environ))
 
     assert _git(repo, "config", "--local", "filter.lfs.required").strip() == "true"
     hooks = repo / ".git" / "hooks"
@@ -116,9 +117,9 @@ def test_setup_is_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     _isolate(tmp_path, monkeypatch)
     repo = _repo(tmp_path)
 
-    git.lfs_setup(repo)
+    git.lfs_setup(repo, ambient=dict(os.environ))
     config = (repo / ".git" / "config").read_text(encoding="utf-8")
-    git.lfs_setup(repo)
+    git.lfs_setup(repo, ambient=dict(os.environ))
 
     assert (repo / ".git" / "config").read_text(encoding="utf-8") == config
 
@@ -130,10 +131,10 @@ def test_checkout_after_fetch_replaces_pointer_files_with_their_bytes(tmp_path: 
     _git(tmp_path, "clone", "-q", str(remote), str(plain))  # no filter: pointers on disk
     assert (plain / "scan.png").read_bytes().startswith(b"version https://git-lfs")
 
-    git.lfs_setup(plain)  # touches no working-tree file
+    git.lfs_setup(plain, ambient=dict(os.environ))  # touches no working-tree file
     assert (plain / "scan.png").read_bytes().startswith(b"version https://git-lfs")
-    git.lfs_fetch(plain, "origin", "main")
-    git.lfs_checkout(plain)
+    git.lfs_fetch(plain, "origin", "main", ambient=dict(os.environ))
+    git.lfs_checkout(plain, ambient=dict(os.environ))
 
     assert (plain / "scan.png").read_bytes() == PNG
     assert _git(plain, "status", "--porcelain") == ""
@@ -143,10 +144,10 @@ def test_lfs_paths_names_the_paths_the_filter_owns(tmp_path: Path, monkeypatch: 
     _isolate(tmp_path, monkeypatch)
     repo = _repo(tmp_path)
 
-    owned = git.lfs_paths(repo, ["a/scan.png", "notes.md", "dir with space/b.png"])
+    owned = git.lfs_paths(repo, ["a/scan.png", "notes.md", "dir with space/b.png"], ambient=dict(os.environ))
 
     assert owned == {"a/scan.png", "dir with space/b.png"}
-    assert git.lfs_paths(repo, []) == set()
+    assert git.lfs_paths(repo, [], ambient=dict(os.environ)) == set()
 
 
 def test_push_after_lfs_push_gives_a_clone_the_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -164,12 +165,12 @@ def test_lfs_fetch_before_merge_brings_bytes_not_pointers(tmp_path: Path, monkey
     other = _clone(tmp_path, remote, "other")
     deck = bytes(reversed(PNG))
     _commit_png(other, "deck.png", deck)
-    git.lfs_push(other, "origin", "main")
+    git.lfs_push(other, "origin", "main", ambient=dict(os.environ))
     _git(other, "push", "-q", "origin", "main")
 
-    git.fetch(repo, "origin")
-    git.lfs_fetch(repo, "origin", "origin/main")
-    result = git.merge(repo, "origin/main", author=BOT, committer=BOT, message="sync")
+    git.fetch(repo, "origin", ambient=dict(os.environ))
+    git.lfs_fetch(repo, "origin", "origin/main", ambient=dict(os.environ))
+    result = git.merge(repo, "origin/main", author=BOT, committer=BOT, message="sync", ambient=dict(os.environ))
 
     assert result.state == "fast_forward"
     assert (repo / "deck.png").read_bytes() == deck
@@ -180,13 +181,13 @@ def test_lfs_fetch_of_a_missing_object_raises_remote_error(tmp_path: Path, monke
     repo, remote = _with_remote(tmp_path)
     other = _clone(tmp_path, remote, "other")
     _commit_png(other, "deck.png", bytes(reversed(PNG)))
-    git.lfs_push(other, "origin", "main")
+    git.lfs_push(other, "origin", "main", ambient=dict(os.environ))
     _git(other, "push", "-q", "origin", "main")
     shutil.rmtree(remote / "lfs" / "objects")
 
-    git.fetch(repo, "origin")
+    git.fetch(repo, "origin", ambient=dict(os.environ))
     with pytest.raises(RemoteError):
-        git.lfs_fetch(repo, "origin", "origin/main")
+        git.lfs_fetch(repo, "origin", "origin/main", ambient=dict(os.environ))
 
     assert not (repo / "deck.png").exists()
 
@@ -200,10 +201,10 @@ def test_lfs_calls_pass_config_to_git(tmp_path: Path, monkeypatch: pytest.Monkey
     nowhere = {"lfs.url": str(tmp_path / "nowhere")}
 
     with pytest.raises(RemoteError):
-        git.lfs_push(other, "origin", "main", config=nowhere)
-    git.lfs_push(other, "origin", "main")  # without config, the same call works
+        git.lfs_push(other, "origin", "main", config=nowhere, ambient=dict(os.environ))
+    git.lfs_push(other, "origin", "main", ambient=dict(os.environ))  # without config, the same call works
     _git(other, "push", "-q", "origin", "main")
-    git.fetch(repo, "origin")
+    git.fetch(repo, "origin", ambient=dict(os.environ))
     with pytest.raises(RemoteError):
-        git.lfs_fetch(repo, "origin", "origin/main", config=nowhere)
-    git.lfs_fetch(repo, "origin", "origin/main")
+        git.lfs_fetch(repo, "origin", "origin/main", config=nowhere, ambient=dict(os.environ))
+    git.lfs_fetch(repo, "origin", "origin/main", ambient=dict(os.environ))

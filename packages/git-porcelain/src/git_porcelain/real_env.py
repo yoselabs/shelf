@@ -11,7 +11,6 @@ and signing must keep working); the hermetic test env is ``git_porcelain.testing
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
@@ -34,9 +33,9 @@ LEAKS: Final = (
 _GITDIR_FILE: Final = re.compile(r"gitdir:\s*(.+)")
 
 
-def base(extra: Mapping[str, str] | None = None, *, source: Mapping[str, str] | None = None) -> dict[str, str]:
-    """The ambient environment of a git child (``source``, default ``os.environ`` read now), plus ``extra``."""
-    env = {k: v for k, v in (os.environ if source is None else source).items() if k not in LEAKS}
+def base(source: Mapping[str, str], extra: Mapping[str, str] | None = None) -> dict[str, str]:
+    """The ambient environment of a git child: ``source`` (the caller's environment) minus ``LEAKS``, plus ``extra``."""
+    env = {k: v for k, v in source.items() if k not in LEAKS}
     env["GIT_TERMINAL_PROMPT"] = "0"
     env.setdefault("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
     env["LC_ALL"] = "C"

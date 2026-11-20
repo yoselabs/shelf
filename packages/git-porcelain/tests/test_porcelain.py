@@ -7,6 +7,7 @@ git is present in CI), plus the host-agnostic boundary invariant.
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 
 import pytest
@@ -63,7 +64,7 @@ def test_is_repo_is_a_filesystem_probe_not_a_git_process(tmp_path: Path, monkeyp
     _init_repo(repo)
     monkeypatch.setenv("PATH", "")
     assert git.is_repo(repo) is True
-    assert git.readiness(repo)["is_repo"] is False  # no git binary: nothing is usable, and it never raises
+    assert git.readiness(repo, ambient=dict(os.environ))["is_repo"] is False  # no git binary: nothing is usable, and it never raises
 
 
 def test_run_git_returns_stdout_and_fails_loud(tmp_path: Path) -> None:
@@ -72,10 +73,10 @@ def test_run_git_returns_stdout_and_fails_loud(tmp_path: Path) -> None:
     (repo / "seed.md").write_text("seed\n", encoding="utf-8")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "seed")
-    branch = git.run_git(repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
+    branch = git.run_git(repo, "rev-parse", "--abbrev-ref", "HEAD", ambient=dict(os.environ)).strip()
     assert branch == "main"
     with pytest.raises(GitError):
-        git.run_git(repo, "not-a-real-subcommand")
+        git.run_git(repo, "not-a-real-subcommand", ambient=dict(os.environ))
 
 
 @pytest.mark.parametrize(
@@ -110,14 +111,14 @@ def test_sync_status_clean_then_dirty(tmp_path: Path) -> None:
     (repo / "a.md").write_text("hi\n", encoding="utf-8")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "init")
-    st = git.sync_status(repo)
+    st = git.sync_status(repo, ambient=dict(os.environ))
     assert st["branch"] == "main"
     assert st["clean"] is True
     assert st["changed_files"] == 0
     assert st["conflict_paused"] is False
 
     (repo / "a.md").write_text("changed\n", encoding="utf-8")
-    st2 = git.sync_status(repo)
+    st2 = git.sync_status(repo, ambient=dict(os.environ))
     assert st2["clean"] is False
     assert st2["changed_files"] == 1
 
@@ -125,7 +126,7 @@ def test_sync_status_clean_then_dirty(tmp_path: Path) -> None:
 def test_readiness_local_only(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
-    r = git.readiness(repo, check_push=False)
+    r = git.readiness(repo, check_push=False, ambient=dict(os.environ))
     assert r["is_repo"] is True
     assert r["identity"] is True  # user.email set
     assert r["remote"] is False
@@ -137,14 +138,14 @@ def test_dirty_rels_lists_untracked_files(tmp_path: Path) -> None:
     _init_repo(repo)
     (repo / "sub").mkdir()
     (repo / "sub" / "new.md").write_text("x\n", encoding="utf-8")
-    rels = git.dirty_rels(repo)
+    rels = git.dirty_rels(repo, ambient=dict(os.environ))
     assert "sub/new.md" in rels  # -uall expands the untracked dir to the file
 
 
 def test_unmerged_paths_empty_when_no_conflict(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     _init_repo(repo)
-    assert git.unmerged_paths(repo) == []
+    assert git.unmerged_paths(repo, ambient=dict(os.environ)) == []
 
 
 def test_has_conflict_markers(tmp_path: Path) -> None:
@@ -182,15 +183,15 @@ def test_a_leaked_git_dir_never_redirects_a_call(tmp_path: Path, monkeypatch: py
     monkeypatch.setenv("GIT_DIR", str(other / ".git"))
     monkeypatch.setenv("GIT_WORK_TREE", str(other))
     monkeypatch.setenv("GIT_INDEX_FILE", str(other / ".git/index"))
-    assert Path(git.run_git(repo, "rev-parse", "--show-toplevel").strip()).resolve() == repo.resolve()
-    assert git.git_returncode(repo, "rev-parse", "--is-inside-work-tree") == 0
+    assert Path(git.run_git(repo, "rev-parse", "--show-toplevel", ambient=dict(os.environ)).strip()).resolve() == repo.resolve()
+    assert git.git_returncode(repo, "rev-parse", "--is-inside-work-tree", ambient=dict(os.environ)) == 0
 
 
 def test_an_explicit_env_still_wins(tmp_path: Path) -> None:
     repo, other = tmp_path / "repo", tmp_path / "other"
     _init_repo(repo)
     _init_repo(other)
-    top = git.run_git(repo, "rev-parse", "--absolute-git-dir", env={"GIT_DIR": str(other / ".git")}).strip()
+    top = git.run_git(repo, "rev-parse", "--absolute-git-dir", env={"GIT_DIR": str(other / ".git")}, ambient=dict(os.environ)).strip()
     assert Path(top).resolve() == (other / ".git").resolve()
 
 

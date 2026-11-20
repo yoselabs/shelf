@@ -10,8 +10,10 @@ can already stop the child.
 
 from __future__ import annotations
 
+import os
 import signal
 import subprocess
+import sys
 import threading
 from typing import TYPE_CHECKING, Any, Literal, Self
 
@@ -65,7 +67,38 @@ class TermHold:
             self.old[signum](signum, None)
 
 
-def popen_held(*args: Any, **kwargs: Any) -> tuple[subprocess.Popen[bytes], TermHold]:
-    """``(Popen(*args, **kwargs), hold)``; the caller calls ``hold.replay()`` inside the ``try`` that stops the child."""
+_RSS_UNIT = 1 if sys.platform == "darwin" else 1024  # ru_maxrss is bytes on macOS, kilobytes on Linux
+
+
+class MeasuredPopen(subprocess.Popen[bytes]):
+    """A ``Popen`` whose reaping is ``os.wait4``, so the kernel's resource usage of exactly this child is kept.
+
+    ``peak_rss`` (bytes) is the child's high-water resident set, the largest of it and of the descendants it
+    waited for itself; None until the child is reaped here. It is per child (``RUSAGE_CHILDREN`` would be the largest
+    of every child this process ever waited for). A descendant that was never waited for by its parent
+    (killed with the tree, or orphaned to init) is not in it, so for a tree it is a lower bound. Overrides
+    ``Popen._try_wait`` and ``_internal_poll``, the two places CPython reaps on POSIX.
+    """
+
+    peak_rss: int | None = None
+
+    def _reap(self, pid: int, flags: int) -> tuple[int, int]:
+        pid, status, usage = os.wait4(pid, flags)
+        if pid == self.pid:
+            self.peak_rss = usage.ru_maxrss * _RSS_UNIT
+        return pid, status
+
+    def _try_wait(self, wait_flags: int) -> tuple[int, int]:
+        try:
+            return self._reap(self.pid, wait_flags)
+        except ChildProcessError:
+            return self.pid, 0  # CPython's own answer when something else reaped it: dead, no status
+
+    def _internal_poll(self, _deadstate: int | None = None, **_: Any) -> int | None:
+        return super()._internal_poll(_deadstate, _waitpid=self._reap)  # type: ignore[call-arg]
+
+
+def popen_held(*args: Any, **kwargs: Any) -> tuple[MeasuredPopen, TermHold]:
+    """``(MeasuredPopen(*args, **kwargs), hold)``; the caller calls ``hold.replay()`` inside the ``try`` that stops the child."""
     with TermHold() as hold:
-        return subprocess.Popen(*args, **kwargs), hold
+        return MeasuredPopen(*args, **kwargs), hold

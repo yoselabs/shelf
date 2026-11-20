@@ -11,12 +11,13 @@ from git_porcelain.real import RealRepo
 from git_porcelain.real_done import Done, unavailable
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
 
-def ls_remote(repo: Path, remote: str, *patterns: str) -> Refs:
+def ls_remote(repo: Path, remote: str, *patterns: str, ambient: Mapping[str, str]) -> Refs:
     """Advertised remote refs (including HEAD and peeled tags), filtered by git's tail globs."""
-    proc = _run(repo, ("ls-remote", "--", remote, *patterns), None, None)
+    proc = _run(repo, ("ls-remote", "--", remote, *patterns), ambient, None, None)
     done = Done(proc.returncode, proc.stdout.encode("utf-8", "surrogateescape"), proc.stderr)
     if done.rc:
         raise unavailable(("ls-remote",), done)
@@ -27,21 +28,21 @@ def ls_remote(repo: Path, remote: str, *patterns: str) -> Refs:
         raise GitReadFailure(msg, output=done.output) from exc
 
 
-def branches(repo: Path, remote: str | None = None) -> list[Ref]:
+def branches(repo: Path, remote: str | None = None, *, ambient: Mapping[str, str]) -> list[Ref]:
     """Local branches, or one remote's tracking branches; names omit the namespace and remote."""
     prefix = "refs/heads/" if remote is None else f"refs/remotes/{remote}/"
-    out = run_git(repo, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(symref)", prefix)
+    out = run_git(repo, "for-each-ref", "--format=%(refname)%00%(objectname)%00%(symref)", prefix, ambient=ambient)
     return [Ref(name.removeprefix(prefix), oid) for name, oid, symbolic in (line.split("\0") for line in out.splitlines()) if not symbolic]
 
 
-def delete_ref_at(repo: Path, ref: str, oid: str) -> None:
+def delete_ref_at(repo: Path, ref: str, oid: str, *, ambient: Mapping[str, str]) -> None:
     """Delete ``ref`` only if it still equals ``oid``; a moved ref raises ``RefRace``."""
-    run_git(repo, "update-ref", "-d", ref, oid)
+    run_git(repo, "update-ref", "-d", ref, oid, ambient=ambient)
 
 
-def symbolic_ref(repo: Path, name: str) -> str | None:
+def symbolic_ref(repo: Path, name: str, *, ambient: Mapping[str, str]) -> str | None:
     """The target of a symbolic ref; None for an ordinary or detached ref."""
-    runner = RealRepo(repo)
+    runner = RealRepo(repo, ambient=ambient)
     done = runner.try_run(repo, "symbolic-ref", "--quiet", name)
     if done.rc == 1 and not done.out and not done.err:
         return None

@@ -378,7 +378,7 @@ class FakeWorktree:
         fake_operations.stage(self._repo, wt, list(wt.index))
 
     def merge_ff(self, rev: str) -> None:
-        self.repo.plumbing().merge_ff(self.path, rev)
+        self.repo.plumbing().merge_ff(self.path, rev, ambient={})
 
     def branch(self) -> str | None:
         return checkout_ops.branch(self.state())

@@ -122,16 +122,17 @@ class RealRepo:
     caller's check is not followed; a call in a checkout with no pin raises :class:`NotARepo` before any git process
     runs (no discovery either). ``read_timeout`` (seconds; default none) bounds every read-only command (``real_reads``): on
     expiry the command is killed and :class:`GitTimeout` raised; those commands also run with ``GIT_OPTIONAL_LOCKS=0``.
-    Without ``pins``, each call reads the checkout's ``.git`` entry as it is then.
+    Without ``pins``, each call reads the checkout's ``.git`` entry as it is then. ``ambient`` (required) is the
+    environment every git child starts from, read once by the caller at its edge (the library never reads ``os.environ``).
     """
 
     def __init__(
         self,
         path: Path,
         *,
+        ambient: Mapping[str, str],
         identity: Identity | None = None,
         env: Mapping[str, str] | None = None,
-        ambient: Mapping[str, str] | None = None,
         memoize: bool = True,
         remote_timeout: float = 600.0,
         read_timeout: float | None = None,
@@ -143,10 +144,10 @@ class RealRepo:
         self.pins = None if pins is None else dict(pins)
         self.who = identity
         self.extra_env = dict(env or {})
-        # A snapshot of the ambient environment, taken once: every call then skips the os.environ scan and the PATH
-        # search. Without one, each call reads os.environ and PATH as they are at that moment.
-        self._ambient = None if ambient is None else real_env.base(source=ambient)
-        self._git = None if self._ambient is None else _find_git(self._ambient)
+        # A snapshot of the ambient environment, taken once by the caller at its edge: no call scans it again or
+        # searches PATH again.
+        self._ambient = real_env.base(ambient)
+        self._git = _find_git(self._ambient)
         self.memoize = memoize
         self.remote_timeout = remote_timeout
         self.read_timeout = read_timeout
@@ -191,8 +192,8 @@ class RealRepo:
             timeout = self.read_timeout
             extra["GIT_OPTIONAL_LOCKS"] = "0"
         limit = DEFAULT_TIMEOUT if timeout is None else timeout
-        child = real_env.base(extra) if self._ambient is None else {**self._ambient, **extra}
-        exe = _find_git(child) if self._ambient is None else self._git
+        child = {**self._ambient, **extra}
+        exe = self._git
         if exe is None:
             msg = "git not found on PATH"
             raise GitUnavailable(msg, hint="install git")

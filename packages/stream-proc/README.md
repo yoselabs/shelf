@@ -69,7 +69,7 @@ stop_pid(pid, start)   # a recorded holder, a server from an earlier run: stops 
   same wall timeout and tree stop. There is no size cap; all output is held in memory.
 - **`capture_bytes(argv, cwd=, env=, timeout=, input=, stdin=subprocess.DEVNULL, grace=, drain=2.0)`** is
   `capture` for bytes, and `capture` is built on it (it only decodes): `out`/`err` are the exact bytes (no decoding,
-  `\r\n` kept) in a `CapturedBytes` (`exit, out, err, secs, timed_out, survivors`). `stdin` is a `subprocess` value:
+  `\r\n` kept) in a `CapturedBytes` (`exit, out, err, secs, timed_out, survivors, peak_rss`; `peak_rss` is the child's own high-water resident set in bytes, a lower bound for a tree). `stdin` is a `subprocess` value:
   `DEVNULL` (default), `None` (inherit ours), an fd or a file. `input` instead feeds bytes through a pipe while output
   is read, so large in and out never deadlock, and a child that exits without reading it all is no error; `input` with a
   non-default `stdin` raises `ValueError`. `run_inherited(argv, cwd=, env=, timeout=, stdin=, grace=) -> int` is

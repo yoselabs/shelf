@@ -8,18 +8,19 @@ from git_porcelain.real import RealRepo
 from git_porcelain.real_observe import read_config
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
 
-def config_get(repo: Path, key: str, default: str | None = None) -> str | None:
+def config_get(repo: Path, key: str, default: str | None = None, *, ambient: Mapping[str, str]) -> str | None:
     """The last configured value for ``key``, or ``default`` when absent."""
-    out = read_config(RealRepo(repo), "--get", key)
+    out = read_config(RealRepo(repo, ambient=ambient), "--get", key)
     return default if out is None else out.removesuffix("\0")
 
 
-def config_entries(repo: Path, pattern: str) -> list[tuple[str, str]]:
+def config_entries(repo: Path, pattern: str, *, ambient: Mapping[str, str]) -> list[tuple[str, str]]:
     """All matching config entries in git's order, including repeated keys and multiline values."""
-    out = read_config(RealRepo(repo), "--get-regexp", pattern)
+    out = read_config(RealRepo(repo, ambient=ambient), "--get-regexp", pattern)
     if out is None:
         return []
     return [(key, value) for key, _, value in (row.partition("\n") for row in out.split("\0") if row)]

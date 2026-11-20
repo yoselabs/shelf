@@ -8,17 +8,18 @@ from git_porcelain.porcelain import run_git, run_git_result
 from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
     from git_porcelain.api import CommandResult
 
 
-def merge_ff(repo: Path, ref: str) -> None:
+def merge_ff(repo: Path, ref: str, *, ambient: Mapping[str, str]) -> None:
     """Fast-forward to ``ref``; refuse divergence or an overwrite of local changes."""
     validate_revisions(ref)
-    run_git(repo, "merge", "--ff-only", "--", ref, env={"LC_ALL": "C", "LANG": "C"})
+    run_git(repo, "merge", "--ff-only", "--", ref, ambient=ambient, env={"LC_ALL": "C", "LANG": "C"})
 
 
-def pull_rebase(repo: Path, remote: str, branch: str) -> CommandResult:
+def pull_rebase(repo: Path, remote: str, branch: str, *, ambient: Mapping[str, str]) -> CommandResult:
     """Fetch the named remote branch and replay local commits; conflicts remain for resolution."""
-    return run_git_result(repo, "pull", "--rebase", "--", remote, branch)
+    return run_git_result(repo, "pull", "--rebase", "--", remote, branch, ambient=ambient)

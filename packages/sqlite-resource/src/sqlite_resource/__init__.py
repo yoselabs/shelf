@@ -70,7 +70,7 @@ class SqliteResource:
             return self._conn
 
     async def _open(self) -> aiosqlite.Connection:
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(self._db_path.parent.mkdir, parents=True, exist_ok=True)
         conn = await aiosqlite.connect(self._db_path)
         for pragma in self._pragmas:
             await conn.execute(f"PRAGMA {pragma}")

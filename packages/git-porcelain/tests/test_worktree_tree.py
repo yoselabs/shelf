@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -25,7 +26,7 @@ def _committed(root: Path, files: dict[str, bytes]) -> RealRepo:
         (root / rel).write_bytes(data)
     git(root, "add", "-A")
     git(root, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "-m", "root")
-    return RealRepo(root)
+    return RealRepo(root, ambient=dict(os.environ))
 
 
 def test_blob_sha_is_the_id_git_gives_a_file(tmp_path: Path) -> None:

@@ -15,7 +15,7 @@ from git_porcelain.plumbing import Ref, Refs
 from git_porcelain.revision_validation import validate_revisions
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
     from pathlib import Path
 
     from git_porcelain.fake_store import CheckoutState, RepoState
@@ -35,7 +35,7 @@ class FakePlumbing:
             raise NotARepo(msg)
         return found
 
-    def ls_remote(self, repo: Path, remote: str, *patterns: str) -> Refs:
+    def ls_remote(self, repo: Path, remote: str, *patterns: str, ambient: Mapping[str, str]) -> Refs:  # noqa: ARG002 - a fake has no environment
         self._checkout(repo)
         there = self.state.remote_repos.get(remote)
         if there is None:
@@ -51,14 +51,14 @@ class FakePlumbing:
         ]
         return Refs(rows, output="\n".join(f"{row.oid}\t{row.name}" for row in rows))
 
-    def branches(self, repo: Path, remote: str | None = None) -> list[Ref]:
+    def branches(self, repo: Path, remote: str | None = None, *, ambient: Mapping[str, str]) -> list[Ref]:  # noqa: ARG002 - a fake has no environment
         self._checkout(repo)
         prefix = "refs/heads/" if remote is None else f"refs/remotes/{remote}/"
         return [Ref(name[len(prefix) :], oid) for name, oid in sorted(self.state.refs.items()) if name.startswith(prefix)]
 
-    def delete_ref_at(self, repo: Path, ref: str, oid: str) -> None:
+    def delete_ref_at(self, repo: Path, ref: str, oid: str, *, ambient: Mapping[str, str]) -> None:
         wt = self._checkout(repo)
-        target = self.symbolic_ref(repo, ref) or ref
+        target = self.symbolic_ref(repo, ref, ambient=ambient) or ref
         current = self.state.head_sha(wt) if ref == "HEAD" else self.state.refs.get(target)
         # A zero old oid means the ref must be absent, as for update-ref.
         if current != (None if set(oid) == {"0"} else oid):
@@ -69,11 +69,11 @@ class FakePlumbing:
         else:
             self.state.refs.pop(target, None)
 
-    def config_get(self, repo: Path, key: str, default: str | None = None) -> str | None:
+    def config_get(self, repo: Path, key: str, default: str | None = None, *, ambient: Mapping[str, str]) -> str | None:  # noqa: ARG002 - a fake has no environment
         self._checkout(repo)
         return self.state.config.get(key.lower(), default)
 
-    def config_entries(self, repo: Path, pattern: str) -> list[tuple[str, str]]:
+    def config_entries(self, repo: Path, pattern: str, *, ambient: Mapping[str, str]) -> list[tuple[str, str]]:  # noqa: ARG002 - a fake has no environment
         self._checkout(repo)
         try:
             matcher = re.compile(pattern)
@@ -82,7 +82,7 @@ class FakePlumbing:
             raise GitUnavailable(msg) from exc
         return [(key, value) for key, value in self.state.config.items() if matcher.search(key)]
 
-    def symbolic_ref(self, repo: Path, name: str) -> str | None:
+    def symbolic_ref(self, repo: Path, name: str, *, ambient: Mapping[str, str]) -> str | None:  # noqa: ARG002 - a fake has no environment
         wt = self._checkout(repo)
         target = wt.head_ref if name == "HEAD" else self.state.symbolic_refs.get(name)
         seen: set[str] = set()
@@ -94,7 +94,7 @@ class FakePlumbing:
             target = self.state.symbolic_refs[target]
         return target
 
-    def merge_ff(self, repo: Path, ref: str) -> None:
+    def merge_ff(self, repo: Path, ref: str, *, ambient: Mapping[str, str]) -> None:  # noqa: ARG002 - a fake has no environment
         validate_revisions(ref)
         wt = self._checkout(repo)
         target = self.state.commit_named(ref, wt)
@@ -111,7 +111,7 @@ class FakePlumbing:
         switch_tree(self.state, wt, self.state.store.commits[target].files, self.state.head_files(wt))
         self.state.move_head(wt, target)
 
-    def pull_rebase(self, repo: Path, remote: str, branch: str) -> CommandResult:
+    def pull_rebase(self, repo: Path, remote: str, branch: str, *, ambient: Mapping[str, str]) -> CommandResult:
         wt = self._checkout(repo)
         if tracked_dirty(wt, self.state.head_files(wt)):
             msg = "cannot pull with rebase: you have unstaged changes"
@@ -126,7 +126,7 @@ class FakePlumbing:
             raise GitUnavailable(msg)
         head = self.state.head_sha(wt)
         if head is None or head in ancestors(self.state.store, target):
-            self.merge_ff(repo, ref)
+            self.merge_ff(repo, ref, ambient=ambient)
         elif target not in ancestors(self.state.store, head):
             require_index(wt)
             rebased = fake_flow.start_rebase(self.state, wt, head, target)
@@ -134,7 +134,7 @@ class FakePlumbing:
                 raise GitUnavailable(rebased.tail, output=rebased.output)
         return CommandResult(ok=True, output=f"From {remote}\n * branch {branch} -> FETCH_HEAD")
 
-    def check_ignore(self, repo: Path, paths: Sequence[str]) -> set[str]:
+    def check_ignore(self, repo: Path, paths: Sequence[str], *, ambient: Mapping[str, str]) -> set[str]:  # noqa: ARG002 - a fake has no environment
         if not paths:
             return set()
         wt = self._checkout(repo)
@@ -142,7 +142,7 @@ class FakePlumbing:
         prefix = repo.relative_to(wt.path).as_posix()
         return {p for p in paths if ignore.ignores(p if prefix == "." else f"{prefix}/{p}")}
 
-    def ls_files(self, repo: Path, *, scope: str = "tracked") -> list[str]:
+    def ls_files(self, repo: Path, *, ambient: Mapping[str, str], scope: str = "tracked") -> list[str]:  # noqa: ARG002 - a fake has no environment
         wt = self._checkout(repo)
         tracked = set(wt.index)
         others = set(wt.files) - tracked

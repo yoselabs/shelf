@@ -23,7 +23,19 @@ from typing import TYPE_CHECKING, Protocol
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from git_porcelain import Change, CommandResult, GitTimeout, GitUnavailable, Identity, RealRepo, Rebased, Worktree, WorktreeRemoveRefused
+from git_porcelain import (
+    Change,
+    CommandResult,
+    GitTimeout,
+    GitUnavailable,
+    Identity,
+    RealRepo,
+    Rebased,
+    Worktree,
+    WorktreeRemoveRefused,
+    real_env,
+)
+from git_porcelain.real import _find_git
 from git_porcelain.real_done import Done
 from git_porcelain.real_parse import parse_status
 from git_porcelain.testing import QUIET, FakeRemote, FakeRepo, FakeWorktree, apply_hermetic_env
@@ -90,6 +102,7 @@ class RealRig:
         self.identity: Identity | None = None
         self.locks: list[Path] = []
         self.rests: list[float] = []
+        self.repos: list[RealRepo] = []
         self._advances = 0
 
     def sleep(self, seconds: float) -> None:
@@ -99,7 +112,15 @@ class RealRig:
             lock.unlink(missing_ok=True)
 
     def _repo(self, path: Path) -> Worktree:
-        return RealRepo(path, identity=self.identity, sleep=self.sleep).worktree(path)
+        repo = RealRepo(path, identity=self.identity, sleep=self.sleep, ambient=dict(os.environ))
+        self.repos.append(repo)
+        return repo.worktree(path)
+
+    def env_changed(self) -> None:
+        """The test changed the process environment after the repos were made: hand them the new one, as their caller's edge would."""
+        for repo in self.repos:
+            repo._ambient = real_env.base(dict(os.environ))
+            repo._git = _find_git(repo._ambient)
 
     def init(self, name: str) -> Worktree:
         path = self.root / name
@@ -176,6 +197,7 @@ class RealRig:
         # the hermetic env runs with core.hooksPath=/dev/null at command-line scope: hooks only run without it
         config = {k: v for k, v in QUIET.items() if k != "core.hooksPath"}
         apply_hermetic_env(self.monkeypatch, identity=_ME, config=config, home=self.root / "home")
+        self.env_changed()
         script = _hook_script(kind, mode)
         hook = wt.path / ".git" / "hooks" / kind
         hook.parent.mkdir(parents=True, exist_ok=True)
@@ -724,11 +746,15 @@ def _identity(world: World, who: str) -> None:
 @given("the machine has no git identity")
 def _no_identity(world: World, tmp_path: Path) -> None:
     apply_hermetic_env(world.monkeypatch, identity=None, config={**QUIET, "user.useConfigOnly": "true"}, home=tmp_path / "home")
+    if isinstance(world.rig, RealRig):
+        world.rig.env_changed()
 
 
 @when("git is not on the PATH")
 def _no_git(world: World) -> None:
     world.monkeypatch.setenv("PATH", "")
+    if isinstance(world.rig, RealRig):
+        world.rig.env_changed()
 
 
 @given(parsers.parse('a competing fetch holds the lock on "{ref}" until the first retry'))

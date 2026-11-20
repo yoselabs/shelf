@@ -24,7 +24,9 @@ TIMEOUT_EXIT = 124  # the exit code of coreutils ``timeout``
 @dataclass(frozen=True, slots=True)
 class Captured:
     """What :func:`capture` saw: ``exit`` (124 on a timeout, ``-signal`` when a signal ended the child), the decoded
-    ``out`` and ``err`` in full, ``secs`` wall time, ``timed_out``, and ``survivors`` (pids left after the stop)."""
+    ``out`` and ``err`` in full, ``secs`` wall time, ``timed_out``, and ``survivors`` (pids left after the stop) and ``peak_rss``
+    (bytes: the child's own high-water resident set, the largest of it and the descendants it waited for; None when
+    the child was reaped by someone else; a lower bound for a tree, see ``MeasuredPopen``)."""
 
     exit: int
     out: str
@@ -32,6 +34,7 @@ class Captured:
     secs: float
     timed_out: bool
     survivors: tuple[int, ...] = ()
+    peak_rss: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +48,7 @@ class CapturedBytes:
     secs: float
     timed_out: bool
     survivors: tuple[int, ...] = ()
+    peak_rss: int | None = None
 
 
 def _slurp(stream: IO[bytes] | None, sink: list[bytes], quit_: threading.Event) -> None:
@@ -190,7 +194,7 @@ def _run(
         _release(p, threads, quit_)
     code = p.returncode
     exit_ = TIMEOUT_EXIT if timed else (code if code is not None else -1)
-    return CapturedBytes(exit_, b"".join(out), b"".join(err), time.monotonic() - t0, timed, survivors)
+    return CapturedBytes(exit_, b"".join(out), b"".join(err), time.monotonic() - t0, timed, survivors, p.peak_rss)
 
 
 def capture(
@@ -232,5 +236,11 @@ def capture(
         with contextlib.suppress(Exception):
             tick()  # a failing heartbeat never costs the result
     return Captured(
-        res.exit, res.out.decode("utf-8", "replace"), res.err.decode("utf-8", "replace"), res.secs, res.timed_out, res.survivors
+        res.exit,
+        res.out.decode("utf-8", "replace"),
+        res.err.decode("utf-8", "replace"),
+        res.secs,
+        res.timed_out,
+        res.survivors,
+        res.peak_rss,
     )
