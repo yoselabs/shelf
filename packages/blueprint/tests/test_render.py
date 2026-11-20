@@ -51,6 +51,13 @@ def test_two_stacks_render_two_parts_and_the_check_names_both_steps(repo: Repo) 
     assert '"scripts"' in parts[".blueprint/base.just"]
 
 
+def test_every_repo_gets_the_secret_scan_step_and_its_recipes(repo: Repo) -> None:
+    base = render.parts(repo.root)[".blueprint/base.just"]
+    assert '"blueprint" "secrets"' in base
+    assert "\nsecrets:\n    uv run python -m blueprint.secret_scan range" in base
+    assert "\nsecrets-all:\n    uv run python -m blueprint.secret_scan full" in base
+
+
 def test_a_repo_with_no_known_stack_gets_only_the_base(repo: Repo) -> None:
     assert sorted(render.parts(repo.root)) == [".blueprint/base.just"]
 
