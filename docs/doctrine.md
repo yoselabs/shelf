@@ -27,7 +27,7 @@ need exists is not.
 ## The philosophy of use: how every shelf package is shaped
 
 > **⚠️ THIS IS THE SHELF'S FOUNDING PHILOSOPHY. NO MATTER WHAT, FOLLOW IT.**
-> **⚠️ A package that breaks these five points is defective, however well it works.**
+> **⚠️ A package that breaks these six points is defective, however well it works.**
 > **⚠️ Owner's words: "It's like a Bible of how shelf works." (Denis, 2026-11-20)**
 
 Most people use a package through its defaults, and most of them in the same way. So the default must be the best
@@ -49,6 +49,9 @@ thing for that common use, and everything else must stay reachable by calling so
 5. **The default serves the common reader; the value serves every reader.** Today the common reader is an AI
    (tokens are money), so the default view is compact. The stored value stays complete. These two never trade off,
    because they live in different layers: value below, view above.
+
+6. **Breaking is free.** The cost of changing a shape is a loud failure and a fast fix, never a reason to keep a wrong shape.
+   Shelf is never held back by a caller it can break (Article III).
 
 *Worked example:* any-speech stores one `<name>.speech.json` holding words, times, probabilities, speakers and
 provenance. `to_markdown()` and `any-speech text` give the compact, token-cheap turn lines an AI should read.

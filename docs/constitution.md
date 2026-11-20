@@ -33,6 +33,11 @@ Accumulation without consolidation is drift. Hard opinions, a breach is a defect
 - **No backward compatibility in code.** No shims, aliases, deprecated paths or dual code paths (the
   catalog's `deprecated` state, Article VIII, is a lifecycle label, not a code path). A breaking change
   bumps the package tag; consumers move or stay pinned (tags are never deleted).
+- **Breaking is free; only the right shape costs.** Shelf is not afraid of breaking things. A change that makes a
+  caller fail (a new exception to handle, a required argument, a removed name) is fine, because the failure is loud
+  and a caller moves in minutes. Never keep a wrong shape to spare a caller, and never add a flag, alias or silent
+  fallback so that nothing breaks. The only question is what the right shape is. No migration documents: the
+  package CHANGELOG line (one per contract change) is all the upgrader needs, and it reads the new version.
 - **No redundancy.** One implementation of a behaviour per repo. A duplicate is allowed only as a recorded
   task that reconciliation (Article VIII) must resolve, never as the end state.
 Each rule names its check; where the check does not exist yet, adopting the rule includes filing it:
