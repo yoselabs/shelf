@@ -1,16 +1,17 @@
-"""tools/affected.py: a change selects its package, the packages depending on it, and the fitness tests."""
+"""any_gate_python: a change selects its package, the packages depending on it, and the repo's own tests."""
 
 from __future__ import annotations
 
 import os
 import subprocess
-import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
+import any_gate_python as affected
 import pytest
+from any_gate_python import graph
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
-import affected
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _member(repo: Path, directory: str, deps: tuple[str, ...] = (), *, plugin: bool = False) -> None:
@@ -21,8 +22,23 @@ def _member(repo: Path, directory: str, deps: tuple[str, ...] = (), *, plugin: b
     (pkg / "pyproject.toml").write_text(f'[project]\nname = "{directory}"\ndependencies = [{listed}]\n{entry}')
 
 
+RULES = """
+[tool.any-gate.python]
+no-effect = ["tests/", "tools/", "docs/", "AGENTS.md"]
+repo-tests = "tests"
+
+[tool.any-gate.python.gated]
+tests = ["test_onboard_*", "test_bootstrap_target.py"]
+inputs = ["tools/onboard/", "tests/conftest.py", "justfile", "pyproject.toml", "uv.lock"]
+
+[tool.any-gate.python.gated.reads]
+"test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/backlog.py"]
+"""
+
+
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
+    (tmp_path / "pyproject.toml").write_text(RULES)
     _member(tmp_path, "base")
     _member(tmp_path, "middle", ("base",))
     _member(tmp_path, "top", ("Middle",))
@@ -92,7 +108,7 @@ def test_a_change_selects_its_packages_and_their_dependents(repo: Path, changed:
 PINS = {"base": "1", "middle": "1", "top": "1", "leaf": "1", "plug": "1"}
 ROOT_PYPROJECT = (
     '[tool.ruff]\nline-length = 100\n\n[dependency-groups]\ndev = ["pytest"]\n\n'
-    '[tool.pytest.ini_options]\naddopts = "-q"\ntestpaths = ["packages/base/tests"]\n'
+    '[tool.pytest.ini_options]\naddopts = "-q"\ntestpaths = ["packages/base/tests"]\n' + RULES
 )
 
 
@@ -162,7 +178,7 @@ def test_a_root_pyproject_change_no_test_can_see_selects_no_package(committed: P
 def test_a_lock_change_whose_export_cannot_be_read_selects_every_package(committed: Path) -> None:
     def broken(_repo: Path, _packages: list[str]) -> dict[str, str]:
         message = "uv failed"
-        raise affected.ExportError(message)
+        raise graph.ExportError(message)
 
     _write_pins(committed, {**PINS, "leaf": "2"})
     touched = lambda: affected.lock_touched(committed, "HEAD", broken)  # noqa: E731
@@ -181,7 +197,7 @@ def _plan(repo: Path, paths: list[str]) -> dict[str, str]:
 
 def _no_uv(_repo: Path, _packages: list[str]) -> dict[str, str]:
     message = "uv is not available here"
-    raise affected.ExportError(message)
+    raise graph.ExportError(message)
 
 
 def test_the_plan_gives_each_package_suite_a_key_and_the_fitness_tests_none(committed: Path) -> None:

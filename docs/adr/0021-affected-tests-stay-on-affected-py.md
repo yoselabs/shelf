@@ -6,7 +6,7 @@ concerns: [gate, tooling]
 status: accepted
 decided_by: owner
 updated: 2026-11-19
-distilled_into: docs/missions/gate-kit-package; tools/affected.py and the justfile check recipe until that change lands
+distilled_into: docs/missions/gate-kit-package; packages/any-gate, packages/any-gate-python
 ---
 
 # 0021 — The gate core is our own
@@ -16,8 +16,7 @@ distilled_into: docs/missions/gate-kit-package; tools/affected.py and the justfi
 Narrowing the gate to what a change reaches, remembering green results, and guarding the run are done by a shelf-owned,
 language-neutral core (`docs/missions/gate-kit-package`) with one adapter per stack. The Python adapter builds the unit graph from
 `pyproject.toml` and fingerprints each package with `uv export` (measured 2026-11-19: median 1.5 suites per commit instead of 79). The
-`blueprint` CLI is the one entry point and dispatches on the repo's declared stacks. Until that change lands, `tools/affected.py` and the
-justfile's `test-affected` keep running the gate.
+`blueprint` CLI is the one entry point and dispatches on the repo's declared stacks. The shelf's `test-affected` recipe runs the Python adapter (`any-gate-python`).
 
 The owner expects blueprint itself may later be rewritten in Rust. So the core's contracts stay plain: a CLI, declarative config, and
 receipt and render files in a documented text format, never a Python-only object or pickle.
@@ -40,6 +39,6 @@ languages. The first non-Python package (the old trigger) now starts that second
 
 ## History
 
-- 2026-10-11: decided to keep `tools/affected.py` and name moon the migration target for the first non-Python package, after round 3.
+- 2026-10-11: decided to keep the `tools/affected.py` script and name moon the migration target for the first non-Python package, after round 3.
 - 2026-11-05: the Turborepo trial's "drops the container gate" note is moot: the shelf has no container gate (ADR 0027).
 - 2026-11-19: owner chose the own core over moon, after a replay of the last 50 commits showed the lock rule, not the selector, was the cost.

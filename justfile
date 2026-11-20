@@ -234,7 +234,7 @@ test:
     uv run python -m any_lease run --root {{ lease_root }} tests 1 check-all -- uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
 
 # Only the tests a change can reach: the changed packages, every package depending on them, and the fitness tests
-# (tools/affected.py prints the plan, `path<TAB>key` per suite). `any-gate test` skips a suite whose key already passed (the receipts file in the
+# (`any_gate_python` prints the plan, `path<TAB>key` per suite). `any-gate test` skips a suite whose key already passed (the receipts file in the
 # git common dir, shared by every worktree), runs the rest in stages under a lease, and records them when green. No coverage floor: it is
 # measured over the whole repo, so a partial run cannot meet it.
 [group('gate')]
@@ -242,7 +242,7 @@ test-affected:
     #!/usr/bin/env bash
     set -euo pipefail
     receipts="$(git rev-parse --path-format=absolute --git-common-dir)/gate-receipts.json"
-    python3 tools/affected.py --explain --plan | uv run python -m any_gate test --receipts "$receipts" --lease-root {{ lease_root }} -- -p no:cov
+    uv run python -m any_gate_python --explain --plan | uv run python -m any_gate test --receipts "$receipts" --lease-root {{ lease_root }} -- -p no:cov
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. CI runs
