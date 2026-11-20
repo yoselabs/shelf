@@ -38,6 +38,9 @@ Accumulation without consolidation is drift. Hard opinions, a breach is a defect
   and a caller moves in minutes. Never keep a wrong shape to spare a caller, and never add a flag, alias or silent
   fallback so that nothing breaks. The only question is what the right shape is. No migration documents: the
   package CHANGELOG line (one per contract change) is all the upgrader needs, and it reads the new version.
+  This covers stored data too: a cache key, a file format or a hash may change when the right shape needs it, and
+  the cache is rebuilt. Never freeze a wrong algorithm to protect old entries; batch such changes into one release
+  so a store is rebuilt once. We care about consumers by knowing better for them, and by making them evolve fast.
 - **No redundancy.** One implementation of a behaviour per repo. A duplicate is allowed only as a recorded
   task that reconciliation (Article VIII) must resolve, never as the end state.
 Each rule names its check; where the check does not exist yet, adopting the rule includes filing it:
