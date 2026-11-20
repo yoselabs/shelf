@@ -4,18 +4,18 @@ Implements `docs/linting.md`'s own copy list, mechanically:
 
 1. The `[tool.ruff]`, `[tool.ruff.lint]` (+ subtables), `[tool.codespell]`,
    `[tool.coverage.*]` and `[tool.shelf-size]` blocks from shelf's `pyproject.toml`.
-2. The `justfile` recipes (`check gate-start guard preset secrets bootstrap bootstrap-verify tools lint format typecheck spell deps test`),
-   with the attributes and comments that sit directly above each (ADR 0023: the gate runner is just);
-   `check` is the plain gate (the shelf's own also runs the affected-only tests), and `deps` is rewritten
-   for a single-package repo, since the shelf's own loops over `packages/*`. `check` and `test` call
-   the `any-gate` dev dependency (the gate's tree record and pre-push skip), pinned by git tag, added when absent.
+2. The justfile: not copied. `blueprint render` writes the blueprint-owned parts (`.blueprint/base.just` and one per stack) and the
+   repo's `justfile` imports them (ADR 0029), so a consumer holds no copy of the gate's recipe text and `blueprint render --check` is
+   its drift check. Only `bootstrap` and `bootstrap-verify` (this onboarding, which needs a shelf clone) are still copied, and only
+   when the repo has no recipe of its own by that name. The gate's shelf packages (`any-gate`, `any-gate-python`, `blueprint`) are
+   added as dev dependencies when absent.
 3. The `dev` dependency-group.
 4. A `[tool.pyrefly]` and a `[tool.pytest.ini_options]` built for a consumer: the shelf's strict
    preset and error severities (the axis `just preset` compares), its lighter bar for tests, and
    none of the shelf's own include/exclude/search paths or testpaths.
 
 ADR 0004 — "linters are a config-preset, not a CLI" — means this is a
-**one-shot scaffold**, not a syncing tool: copy, then the consumer owns it.
+**one-shot scaffold**, not a syncing tool: copy, then the consumer owns it (the justfile is the exception: it is rendered).
 That is also why the merge granularity is per-table / per-recipe, never
 per-line: **a repo that already has its own `[tool.ruff]` keeps it exactly as
 written** — this operation appends only what is genuinely absent, and never
@@ -35,6 +35,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,6 +45,12 @@ from .hooks import ensure_gate_dependency
 from .operations import Outcome, Result
 
 _SHELF_ROOT = Path(__file__).resolve().parent.parent.parent
+# blueprint is plain stdlib python: onboarding runs from a shelf clone with no install, so it reads the package from there.
+_BLUEPRINT_SRC = str(_SHELF_ROOT / "packages" / "blueprint" / "src")
+if _BLUEPRINT_SRC not in sys.path:
+    sys.path.insert(0, _BLUEPRINT_SRC)
+from blueprint import render  # noqa: E402 -- after the path above
+
 _SHELF_PYPROJECT = _SHELF_ROOT / "pyproject.toml"
 _SHELF_JUSTFILE = _SHELF_ROOT / "justfile"
 _JUSTFILES = ("justfile", "Justfile", ".justfile")
@@ -53,59 +60,10 @@ _DEV_GROUP_TABLE = "dependency-groups"
 # Shelf-specific ruff tables a consumer must not inherit: the banned-api list bans the consumer apps
 # (a2kay, ...), which would ban a consumer from importing itself.
 _SHELF_ONLY_TABLES = ("tool.ruff.lint.flake8-tidy-imports",)
-_RECIPES = (
-    "check",
-    "gate-start",
-    "guard",
-    "preset",
-    "secrets",
-    "secrets-all",
-    "bootstrap",
-    "bootstrap-verify",
-    "tools",
-    "beads-lint",
-    "steps",
-    "lint",
-    "format",
-    "typecheck",
-    "spell",
-    "deps",
-    "test",
-    "cov",
-    "sync",
-    "blueprint",
-)
+_BOOTSTRAP_RECIPES = ("bootstrap", "bootstrap-verify")
 
 _GENERATED_PREFIXES = ("tool.pyrefly", "tool.pytest")
 _SHELF_TESTS_SUBCONFIG = "packages/*/tests/**"
-# A consumer's `test`: plain pytest in one test slot (any-lease, installed with the any-gate dev dependency). The shelf's own `test` also
-# runs with the shelf's xdist variable.
-_CONSUMER_TEST = """[group('gate')]
-test:
-    uv run python -m any_lease run --root "${GATE_LEASE_ROOT:-${XDG_CACHE_HOME:-$HOME/.cache}/gate-leases}" tests 1 check-all -- \\
-        uv run pytest --cov --cov-report=term-missing --cov-fail-under=65
-
-"""
-_CONSUMER_DEPS = """# dependency hygiene: the lockfile matches pyproject, then unused, missing and transitive (deptry).
-[group('gate')]
-deps:
-    uv lock --check
-    uv run deptry .
-
-"""
-# The shelf's `check` runs recipes a consumer is not given (test-affected); a consumer gets the plain gate.
-_CONSUMER_CHECK = """# The gate: every step at once (`steps`), one timing line, a warning for a step over its budget.
-# A green run records the tree it checked (any-gate), so the pre-push hook does not run it again on that tree.
-[group('gate')]
-check: gate-start beads-lint (steps "guard" "preset" "blueprint" "secrets" "lint" "typecheck" "spell" "deps" "test")
-    uv run python -m any_gate passed --gate check
-
-"""
-# A new justfile starts with the shelf's shell setting: plain recipe lines fail fast and on unset pipes.
-_JUSTFILE_HEADER = """# The gate runner is just (ADR 0023), pinned as the `rust-just` dev dependency: `uv run just check`.
-set shell := ["bash", "-euo", "pipefail", "-c"]
-
-"""
 _CONSUMER_PYTEST = """[tool.pytest.ini_options]
 addopts = "-ra --strict-markers"
 
@@ -210,19 +168,12 @@ def _gate_resolves(repo: Path) -> str | None:
 
 
 def _recipes_to_copy(target_text: str) -> list[str]:
-    shelf_recipes = dict(_split_just_recipes(_SHELF_JUSTFILE.read_text()))
     target_names = {name for name, _ in _split_just_recipes(target_text)}
-
-    to_copy = [name for name in _RECIPES if name in shelf_recipes and name not in target_names]
-    # `bootstrap-verify: bootstrap` is meaningless on its own: found against a real consumer
-    # (a2kay) that already owned an unrelated `bootstrap:` target of its own (a very common
-    # name) -- `bootstrap` was correctly skipped as owned, but `bootstrap-verify`
-    # was still copied, silently aliasing to the consumer's OWN unrelated recipe. If `bootstrap`
-    # isn't ours to add (already present under any meaning), its dependent isn't either.
-    if "bootstrap-verify" in to_copy and "bootstrap" in target_names and "bootstrap" not in to_copy:
-        to_copy.remove("bootstrap-verify")
-
-    return to_copy
+    # `bootstrap-verify: bootstrap` is meaningless on its own: a consumer that owns an unrelated `bootstrap:` (a common name) must not get
+    # a `bootstrap-verify` that silently aliases to it.
+    if "bootstrap" in target_names:
+        return [name for name in _BOOTSTRAP_RECIPES if name not in target_names and name != "bootstrap-verify"]
+    return [name for name in _BOOTSTRAP_RECIPES if name not in target_names]
 
 
 @dataclass
@@ -252,17 +203,15 @@ class LinterPresetOperation:
             pyproject.write_text(new_toml)
             applied.append("pyproject.toml tables")
 
+        rendered = render.write(self.repo)
+        if rendered:
+            applied.append(f"justfile parts ({', '.join(rendered)})")
         justfile = next((self.repo / n for n in _JUSTFILES if (self.repo / n).is_file()), self.repo / "justfile")
-        existing = justfile.read_text() if justfile.exists() else ""
+        existing = justfile.read_text()
         to_copy = _recipes_to_copy(existing)
         if to_copy:
             shelf_recipes = dict(_split_just_recipes(_SHELF_JUSTFILE.read_text()))
-            shelf_recipes["check"] = _CONSUMER_CHECK
-            shelf_recipes["test"] = _CONSUMER_TEST
-            if not (self.repo / "packages").is_dir():
-                shelf_recipes["deps"] = _CONSUMER_DEPS
-            head = existing.rstrip("\n") + "\n\n" if existing else _JUSTFILE_HEADER
-            justfile.write_text(head + "".join(shelf_recipes[name] for name in to_copy))
+            justfile.write_text(existing.rstrip("\n") + "\n\n" + "".join(shelf_recipes[name] for name in to_copy))
             applied.append(f"{justfile.name} recipes")
         if ensure_gate_dependency(self.repo):
             applied.append("pyproject.toml any-gate dev dependency")

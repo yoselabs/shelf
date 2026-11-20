@@ -5,7 +5,7 @@ Installed as a dev dependency (`uv run blueprint check --repo .`), or from a she
 
     PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint check --repo .
 
-`blueprint guard` and `blueprint preset` are the gate steps that need no shelf clone.
+`blueprint guard`, `blueprint preset`, `blueprint render` and `blueprint test` are the gate steps that need no shelf clone.
 
 Exit codes: 0 every checkpoint passes or does not apply · 1 something fails or is not set up ·
 2 nothing fails but something could not be checked (never a pass).
@@ -18,7 +18,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from blueprint import adr, checkpoints, guard, preset, report, survey, templates
+from blueprint import adr, checkpoints, gate_test, guard, preset, render, report, survey, templates
 from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
@@ -83,6 +83,14 @@ def _parser() -> argparse.ArgumentParser:
     pre.add_argument("--repo", default=".", type=Path, help="the repository to check (default: cwd)")
     pre.add_argument("--reference", type=Path, help="compare with this snapshot instead of the packaged one")
     pre.add_argument("--refresh", action="store_true", help="in the shelf: rewrite the packaged snapshot from its own files")
+    rnd = sub.add_parser("render", help="write the justfile parts the blueprint owns (.blueprint/*.just), or with --check fail on drift")
+    rnd.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+    rnd.add_argument("--check", action="store_true", help="change nothing; exit 1 when the committed parts differ from what is rendered")
+    tst = sub.add_parser("test", help="run the gate's tests through any-gate with the repo's adapter runner (`just test`)")
+    tst.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+    tst.add_argument("--receipts", type=Path, help="any-gate's receipts file (default: gate-receipts.json in the git directory)")
+    tst.add_argument("--lease-root", type=Path, help="the test-slot lease folder (default: any-gate's)")
+    tst.add_argument("--pytest-args", default=gate_test.DEFAULT_PYTEST_ARGS, help="extra arguments for every pytest stage, as one string")
     return parser
 
 
@@ -90,13 +98,8 @@ def main(argv: list[str] | None = None) -> int:
     """The command line."""
     args = _parser().parse_args(argv)
 
-    if args.command == "guard":
-        return guard.check(committed=args.committed)
-    if args.command == "preset":
-        if args.refresh:
-            sys.stdout.write(f"wrote {preset.refresh(args.repo.resolve())}\n")
-            return 0
-        return preset.check(args.repo.expanduser().resolve(), args.reference)
+    if args.command in _GATE_VERBS:
+        return _GATE_VERBS[args.command](args)
     if args.command == "survey":
         return _survey(args.repo, args.check)
     commands = {
@@ -121,6 +124,34 @@ def main(argv: list[str] | None = None) -> int:
         for path in report.write(result, args.repo.resolve(), date.today(), prune=args.concern is None):  # noqa: DTZ011 -- a report date, the owner's calendar
             sys.stderr.write(f"wrote {path}\n")
     return result.exit_code
+
+
+def _guard(args: argparse.Namespace) -> int:
+    return guard.check(committed=args.committed)
+
+
+def _preset(args: argparse.Namespace) -> int:
+    if args.refresh:
+        sys.stdout.write(f"wrote {preset.refresh(args.repo.resolve())}\n")
+        return 0
+    return preset.check(args.repo.expanduser().resolve(), args.reference)
+
+
+def _render(args: argparse.Namespace) -> int:
+    repo = args.repo.expanduser().resolve()
+    if args.check:
+        return render.check(repo)
+    for changed in render.write(repo):
+        sys.stdout.write(f"wrote {changed}\n")
+    return 0
+
+
+def _test(args: argparse.Namespace) -> int:
+    return gate_test.run(args.repo.expanduser().resolve(), receipts=args.receipts, lease_root=args.lease_root, pytest_args=args.pytest_args)
+
+
+# The verbs that are gate steps: no shelf clone, no checkpoint run.
+_GATE_VERBS = {"guard": _guard, "preset": _preset, "render": _render, "test": _test}
 
 
 def _checkpoints(args: argparse.Namespace) -> int:

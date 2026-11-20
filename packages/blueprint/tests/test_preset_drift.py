@@ -107,33 +107,12 @@ def test_a_pyrefly_kind_set_false_is_a_rejection_not_a_rule(tmp_path: Path, shel
     assert result.returncode == 0, result.stderr
 
 
-def test_a_recipe_difference_is_reported(tmp_path: Path, shelf: Path) -> None:
+def test_the_justfile_is_not_compared_here(tmp_path: Path, shelf: Path) -> None:
+    """Its parts are rendered and `blueprint render --check` is their drift check (ADR 0029); a recipe set is no axis of the preset."""
     consumer = _write(tmp_path / "consumer", _SHELF, justfile=_JUSTFILE + "\narchlint:\n    @true\n")
+    (consumer / "Makefile").write_text("extra:\n\t@true\n")
     result = _run(consumer, shelf)
-    assert result.returncode == 1
-    assert "extra 'archlint'" in result.stderr
-
-
-def test_a_recipe_with_parameters_counts_and_an_assignment_does_not(tmp_path: Path, shelf: Path) -> None:
-    consumer = _write(tmp_path / "consumer", _SHELF, justfile=_JUSTFILE + "\nflag := 'x'\n\nrun *args:\n    @true\n")
-    result = _run(consumer, shelf)
-    assert "extra 'run'" in result.stderr
-    assert "flag" not in result.stderr
-
-
-def test_a_difference_declared_under_the_old_make_targets_key_still_counts(tmp_path: Path, shelf: Path) -> None:
-    pyproject = _SHELF + '\n[tool.shelf-preset]\nmake-targets-extra = ["archlint"]\n'
-    consumer = _write(tmp_path / "consumer", pyproject, justfile=_JUSTFILE + "\narchlint:\n    @true\n")
-    assert _run(consumer, shelf).returncode == 0
-
-
-def test_a_consumer_still_on_a_makefile_is_compared_by_its_targets(tmp_path: Path, shelf: Path) -> None:
-    consumer = _write(tmp_path / "consumer", _SHELF)
-    (consumer / "justfile").unlink()
-    (consumer / "Makefile").write_text("check: lint\n\t@true\nlint:\n\t@true\nextra:\n\t@true\n")
-    result = _run(consumer, shelf)
-    assert result.returncode == 1
-    assert "extra 'extra'" in result.stderr
+    assert result.returncode == 0, result.stderr
 
 
 def test_per_file_ignores_are_not_compared(tmp_path: Path, shelf: Path) -> None:
@@ -184,22 +163,6 @@ def test_a_snapshot_round_trips_through_its_text(shelf: Path) -> None:
     assert tomllib.loads(preset.render(snap)) == snap
 
 
-def test_a_shelf_only_target_missing_from_a_consumer_is_not_drift(tmp_path: Path) -> None:
-    shelf = _write(tmp_path / "shelf", _SHELF, justfile=_JUSTFILE + "\ncatalog:\n    @true\ntest-browser:\n    @true\n")
-    consumer = _write(tmp_path / "consumer", _SHELF)
-    result = _run(consumer, shelf)
-    assert result.returncode == 0, result.stderr
-
-
-def test_a_consumer_that_copies_a_shelf_only_recipe_is_not_drift(tmp_path: Path) -> None:
-    # a2kay (shelf-cld): it copied the shelf's `check: (gate "check-host")` dispatch and was flagged 'extra gate'.
-    dispatch = "\n[private]\ngate target:\n    just {{ target }}\n\ncheck-host:\n    @true\n"
-    shelf = _write(tmp_path / "shelf", _SHELF, justfile=_JUSTFILE + dispatch)
-    consumer = _write(tmp_path / "consumer", _SHELF, justfile=_JUSTFILE + dispatch)
-    result = _run(consumer, shelf)
-    assert result.returncode == 0, result.stderr
-
-
 # ── shelf-bv5: the same config under another ruff is another rule set ─────────
 # a2kay's `uv lock --upgrade` moved ruff 0.15 -> 0.17 under an identical config: 30 new findings.
 
@@ -232,9 +195,3 @@ def test_a_declared_linter_version_difference_passes(tmp_path: Path, shelf: Path
     _lock(shelf, ruff="0.15.20")
     _lock(consumer, ruff="0.17.0")
     assert _run(consumer, shelf).returncode == 0
-
-
-def test_the_stack_conditional_recipes_are_neither_owed_nor_extra(tmp_path: Path) -> None:
-    shelf = _write(tmp_path / "shelf", _SHELF, _JUSTFILE + "images:\n    @true\n\nscripts:\n    @true\n")
-    assert _run(_write(tmp_path / "bare", _SHELF), shelf).returncode == 0
-    assert _run(_write(tmp_path / "with", _SHELF, _JUSTFILE + "scripts:\n    @true\n"), shelf).returncode == 0

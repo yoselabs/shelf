@@ -10,6 +10,8 @@
 # it is abandoned: archived, broken on the current toolchain, or its users have moved to a successor.
 # Ecosystems differ (C# and Java tools release rarely); judge by use and compatibility, not by date.
 stack = "python-uv"
+# language: carries code that grows layers, so it needs a layering tool; artifact: a file format with no layers of code (its architecture row says why).
+family = "language"
 status = "evidenced"  # evidenced: the shelf and a2kay run it | provisional: written, not yet proven
 source = "the shelf's own gate (pyproject.toml, justfile; ADR 0004, 0023)"
 
@@ -77,7 +79,9 @@ role = "tests"
 tool = "pytest, strict markers"
 install = "uv add --dev pytest pytest-xdist"
 config = [{ path = "pyproject.toml", contains = "[tool.pytest.ini_options]" }]
-gate = "pytest"
+# Outcome (shelf-jc7r.3): the gate reaches a test runner, whichever one: pytest itself, or the shared runners that run it.
+outcome = "runs"
+runs = ['\bpytest\b', '\bany_gate[ _]test\b', '\bany_gate_python\b', '\bany-gate(?:-python)?\b']
 
 [[role]]
 role = "coverage"
@@ -92,20 +96,25 @@ config = [{ any = [
     { path = "justfile", contains = "--cov" },
     { path = "Makefile", contains = "--cov" },
 ] }]
-gate = "cov-fail-under"
+# Outcome (shelf-jc7r.3): a floor is enforced, by any tool the gate reaches (closes shelf-2hl). Measuring alone is the failing case.
+outcome = "floor"
 
-# coverage.py's own floor is as good: a repo whose C extensions break under the pytest-cov plugin
-# (a2kay, duckdb) measures with `coverage run` and enforces the floor with `coverage report`.
-[[role.alternative]]
-label = "coverage.py's `coverage report --fail-under=<N>`"
-gate = '\bcoverage report\b[^\n]*--fail-under'
+[[role.floor]]
+label = "a `--cov-fail-under` or `coverage report --fail-under` flag"
+gate = '--cov-fail-under|\bcoverage report\b[^\n]*--fail-under'
 
-# The floor in pyproject only bites when the gate runs `coverage report`; `coverage run` alone never checks it.
-[[role.alternative]]
-label = "`fail_under` in [tool.coverage.report] with a `coverage report` step"
-gate = '\bcoverage report\b'
+# A floor in pyproject only bites when the gate reports (`coverage report`) or measures with pytest-cov, which reads it.
+[[role.floor]]
+label = "`fail_under` in [tool.coverage.report], read by `coverage report` or `pytest --cov`"
+gate = '\bcoverage report\b|--cov\b'
 path = "pyproject.toml"
 contains = "fail_under"
+
+# Tool-agnostic: any script that compares measured coverage to a committed floor file.
+[[role.floor]]
+label = "a script comparing coverage to a committed `coverage-floor.json`"
+gate = 'check_coverage|coverage-floor'
+path = "coverage-floor.json"
 
 [[role]]
 role = "architecture"

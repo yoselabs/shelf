@@ -77,7 +77,7 @@ def test_second_run_is_a_no_op_when_everything_already_copied(repo: Path) -> Non
     assert (repo / "pyproject.toml").read_text() == before
 
 
-def test_copies_missing_justfile_recipes_and_leaves_existing_ones_alone(repo: Path) -> None:
+def test_renders_the_blueprint_parts_and_leaves_the_consumers_own_recipes_alone(repo: Path) -> None:
     (repo / "pyproject.toml").write_text('[project]\nname = "consumer"\nversion = "0.1.0"\n')
     (repo / "justfile").write_text("lint:\n    echo my own lint step, not shelf's\n")
 
@@ -86,10 +86,11 @@ def test_copies_missing_justfile_recipes_and_leaves_existing_ones_alone(repo: Pa
     assert result.outcome == Outcome.APPLIED, result.message
     just_text = (repo / "justfile").read_text()
     assert "echo my own lint step" in just_text, "the consumer's own lint recipe was overwritten"
-    assert "guard:" in just_text
-    assert "typecheck:" in just_text
-    lint_occurrences = just_text.count("\nlint:") + (1 if just_text.startswith("lint:") else 0)
-    assert lint_occurrences == 1, "shelf's lint recipe was appended even though the consumer already had one"
+    assert "import '.blueprint/base.just'" in just_text
+    assert "set allow-duplicate-recipes" in just_text, "the consumer's own lint must replace the rendered one"
+    assert "\nguard:" not in just_text, "no recipe text is copied: it is imported"
+    assert "\nguard:" in (repo / ".blueprint" / "base.just").read_text()
+    assert (repo / ".blueprint" / "python.just").is_file()
 
 
 def test_an_unrelated_owned_bootstrap_target_is_not_aliased_by_bootstrap_verify(repo: Path) -> None:
@@ -107,7 +108,7 @@ def test_an_unrelated_owned_bootstrap_target_is_not_aliased_by_bootstrap_verify(
     just_text = (repo / "justfile").read_text()
     assert "echo set up my own dev env" in just_text, "the consumer's own bootstrap recipe was overwritten"
     assert "bootstrap-verify" not in just_text, "bootstrap-verify would alias to the consumer's unrelated bootstrap recipe"
-    assert "guard:" in just_text, "unrelated recipes must still be copied"
+    assert "import '.blueprint/base.just'" in just_text, "the rendered gate is still imported"
 
 
 def test_creates_a_justfile_from_scratch_when_absent(repo: Path) -> None:
@@ -117,22 +118,18 @@ def test_creates_a_justfile_from_scratch_when_absent(repo: Path) -> None:
 
     assert result.outcome == Outcome.APPLIED, result.message
     just_text = (repo / "justfile").read_text()
-    for target in (
-        "check:",
-        "guard:",
-        "bootstrap:",
-        "bootstrap-verify:",
-        "lint:",
-        "format:",
-        "typecheck:",
-        "spell:",
-        "deps:",
-        "test:",
-        "gate-start:",
-    ):
-        assert target in just_text
-    assert "check: gate-start beads-lint (steps" in just_text
-    assert "any-gate" in (repo / "pyproject.toml").read_text(), "check, test and the pre-push hook call it"
+    base = (repo / ".blueprint" / "base.just").read_text()
+    python = (repo / ".blueprint" / "python.just").read_text()
+    for target in ("check:", "guard:", "gate-start:"):
+        assert target in base
+    for target in ("lint:", "format:", "typecheck:", "spell:", "deps:", "test:"):
+        assert target in python
+    assert "bootstrap:" in just_text
+    assert "bootstrap-verify:" in just_text
+    assert "check: gate-start beads-lint (steps" in base
+    pyproject = (repo / "pyproject.toml").read_text()
+    assert "any-gate" in pyproject, "check and the pre-push hook call it"
+    assert "any-gate-python" in pyproject, "`blueprint test` calls its planner and runner"
 
 
 # ── shelf-4mz: the copied gate must RUN, not merely exist ─────────────────────
@@ -191,8 +188,9 @@ def test_deps_checks_the_consumer_itself_not_the_shelfs_packages(repo: Path) -> 
 
     deps = _dry_run(repo, "deps")
     assert deps.returncode == 0, deps.stderr
-    assert "packages/" not in deps.stderr  # just --dry-run prints the recipe lines to stderr
-    assert "deptry ." in deps.stderr
+    # just --dry-run prints the recipe lines to stderr: the per-package loop sits behind a check that this repo has `packages/`.
+    assert "if [ -d packages ]" in deps.stderr
+    assert "else\n    uv run deptry ." in deps.stderr
 
 
 def test_a_copied_gate_that_names_a_missing_recipe_is_a_failure(repo: Path) -> None:
@@ -203,6 +201,17 @@ def test_a_copied_gate_that_names_a_missing_recipe_is_a_failure(repo: Path) -> N
 
     assert result.outcome == Outcome.FAILED
     assert "not-a-recipe" in result.message
+
+
+def test_a_freshly_onboarded_repo_passes_the_render_drift_check(repo: Path) -> None:
+    _bare(repo)
+
+    LinterPresetOperation(repo).run({})
+
+    drift = subprocess.run(
+        [sys.executable, "-m", "blueprint", "render", "--repo", str(repo), "--check"], capture_output=True, text=True, check=False
+    )
+    assert drift.returncode == 0, drift.stderr
 
 
 def test_a_freshly_onboarded_repo_passes_preset_drift(repo: Path) -> None:
@@ -230,11 +239,11 @@ def test_a_makefile_beside_the_new_justfile_is_named_in_the_result(repo: Path) -
     assert (repo / "Makefile").read_text() == "check:\n\ttrue\n", "the consumer's Makefile is theirs to port and delete"
 
 
-def test_the_recipes_keep_their_group_attribute_and_the_test_recipe_runs_without_the_shelfs_worker_variable(repo: Path) -> None:
+def test_the_rendered_recipes_keep_their_group_attribute_and_the_test_recipe_runs_without_the_shelfs_worker_variable(repo: Path) -> None:
     _bare(repo)
 
     LinterPresetOperation(repo).run({})
 
-    text = (repo / "justfile").read_text()
+    text = (repo / ".blueprint" / "python.just").read_text()
     assert "[group('gate')]\nlint:" in text
     assert "pytest_par" not in text

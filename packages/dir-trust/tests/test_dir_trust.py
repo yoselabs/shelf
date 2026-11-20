@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 import pytest
@@ -163,3 +164,12 @@ def test_an_unwritable_store_raises(tmp_path: Path) -> None:
     store = TrustStore(blocker / "trust.yml")
     with pytest.raises(TrustStoreError):
         store.grant(tmp_path, tmp_path)
+
+
+def test_many_threads_reading_one_store_all_get_the_same_answer(setup: tuple[Path, Path, TrustStore]) -> None:
+    """A scheduler checks trust from executor threads: ruamel's YAML object is not thread-safe, so a shared one corrupts a parse."""
+    key, folder, store = setup
+    store.grant(key, folder, pattern="*.py")
+    with ThreadPoolExecutor(16) as pool:
+        answers = list(pool.map(lambda _: store.is_trusted(key, folder, pattern="*.py"), range(2000)))
+    assert all(answers)
