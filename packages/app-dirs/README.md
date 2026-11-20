@@ -5,25 +5,26 @@ POSIX only; macOS uses the same XDG layout as Linux.
 
 ```python
 from pathlib import Path
-from app_dirs import cache_dir, config_dir, data_dir, plugin_data_dir, state_dir, tool_home
+from app_dirs import cache_dir, config_dir, data_dir, ensure, plugin_data_dir, plugin_dir, state_dir, tool_home
 
 config_dir("task-loop")                    # $XDG_CONFIG_HOME/task-loop, else ~/.config/task-loop
 state_dir("task-loop")                     # $XDG_STATE_HOME/task-loop,  else ~/.local/state/task-loop
-cache_dir("task-loop", create=True)        # $XDG_CACHE_HOME/task-loop,  else ~/.cache/task-loop; mkdir -p
+cache_dir("task-loop")                     # $XDG_CACHE_HOME/task-loop,  else ~/.cache/task-loop
+ensure(cache_dir("task-loop"))             # the same, after mkdir -p
 data_dir("opencode")                     # $XDG_DATA_HOME/opencode,   else ~/.local/share/opencode (a foreign tool's data)
 tool_home("codex", "CODEX_HOME")         # $CODEX_HOME when set and non-empty, else ~/.codex
 tool_home("claude")                      # ~/.claude (no variable)
-config_dir("task-loop", plugin_data=True)  # $CLAUDE_PLUGIN_DATA/config when that is set, else as above
+plugin_dir("config", "task-loop")          # $CLAUDE_PLUGIN_DATA/config when that is set, else as config_dir
 config_dir("x", env={"XDG_CONFIG_HOME": "/cfg"}, home=Path("/h"))  # no os.environ patching in tests
 plugin_data_dir()                          # the CLAUDE_PLUGIN_DATA folder, or None
 ```
 
 - An unset, empty or relative variable is ignored (the XDG spec), for the XDG variables and for
   `CLAUDE_PLUGIN_DATA` alike.
-- `plugin_data=True` is opt-in: that variable names whichever plugin launched the process, so a
-  tool that must not follow it (delegate keeps its own `DELEGATE_CONFIG_DIR`) never reads it.
-  With it, config, state and cache are `config/`, `state/` and `cache/` below that folder.
-- Nothing is created unless `create=True`; the folder's permissions are the caller's to set.
+- `plugin_dir(kind, app)` is the separate plugin resolver: that variable names whichever plugin launched the
+  process, so the XDG functions never read it and a tool that must not follow it (delegate keeps its own
+  `DELEGATE_CONFIG_DIR`) never calls it. `kind` is `config`, `state`, `cache` or `data`: `<variable>/<kind>`.
+- Nothing is created unless `ensure(path)` is called; the folder's permissions are the caller's to set.
 - `app` is one folder name: empty, `.`, `..` or one holding `/` raises `ValueError`.
 
 ## Boundary

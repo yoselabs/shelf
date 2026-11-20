@@ -81,20 +81,6 @@ _ALLOWED: dict[str, str] = {
         "child-env:scrub_current:strip_venv",
     ),
     **_rows(
-        "split: create=True is a lookup plus a mkdir; the lookup stays pure",
-        "app-dirs:data_dir:create",
-        "app-dirs:cache_dir:create",
-        "app-dirs:config_dir:create",
-        "app-dirs:state_dir:create",
-    ),
-    **_rows(
-        "split: plugin_data=True swaps the base-directory policy; it is a second resolver",
-        "app-dirs:data_dir:plugin_data",
-        "app-dirs:cache_dir:plugin_data",
-        "app-dirs:config_dir:plugin_data",
-        "app-dirs:state_dir:plugin_data",
-    ),
-    **_rows(
         "split: check_yield=False means the source size is not comparable to text length; a2kay consumes grade",
         "convert-md:_result:check_yield",
         "convert-md:grade:check_yield",

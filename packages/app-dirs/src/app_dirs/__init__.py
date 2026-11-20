@@ -6,12 +6,12 @@ or ``~/.config/task-loop``; ``state_dir``, ``cache_dir`` and ``data_dir`` are th
 (``$CODEX_HOME`` or ``~/.codex``). POSIX only: macOS uses the same XDG layout as
 Linux, because the tools this serves already keep their files under ``~/.config`` there.
 
-Per the XDG spec, an unset, empty or *relative* variable is ignored. With ``plugin_data=True``
-the folder Claude Code hands a plugin in ``CLAUDE_PLUGIN_DATA`` wins when it is set (and
-absolute): ``<it>/config``, ``<it>/state`` and ``<it>/cache``. That variable names whichever
-plugin launched the process, so it is opt-in, never read by default.
+Per the XDG spec, an unset, empty or *relative* variable is ignored. ``plugin_dir(kind, app)``
+is the separate resolver for a plugin: the folder Claude Code hands it in ``CLAUDE_PLUGIN_DATA`` wins when it
+is set (and absolute): ``<it>/config``, ``<it>/state``, ``<it>/cache`` or ``<it>/data``. That variable names
+whichever plugin launched the process, so the XDG functions never read it.
 
-Nothing is created unless ``create=True``. The environment and home folder can be passed in,
+Nothing is created unless ``ensure(path)`` is called on the result. The environment and home folder can be passed in,
 so a caller or a test never needs to patch ``os.environ``.
 """
 
@@ -19,12 +19,14 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
 PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA"
+
+Kind = Literal["config", "state", "cache", "data"]
 
 #: kind -> (XDG variable, fallback below the home folder)
 _KINDS = {
@@ -35,35 +37,40 @@ _KINDS = {
 }
 
 
-def config_dir(
-    app: str, *, plugin_data: bool = False, create: bool = False, env: Mapping[str, str] | None = None, home: Path | None = None
-) -> Path:
+def config_dir(app: str, *, env: Mapping[str, str] | None = None, home: Path | None = None) -> Path:
     """The folder for ``app``'s settings: ``$XDG_CONFIG_HOME/<app>``, else ``~/.config/<app>``."""
-    return _resolve("config", app, plugin_data=plugin_data, create=create, env=env, home=home)
+    return _xdg("config", app, env=env, home=home)
 
 
-def state_dir(
-    app: str, *, plugin_data: bool = False, create: bool = False, env: Mapping[str, str] | None = None, home: Path | None = None
-) -> Path:
+def state_dir(app: str, *, env: Mapping[str, str] | None = None, home: Path | None = None) -> Path:
     """The folder for ``app``'s state (logs, history, locks): ``$XDG_STATE_HOME/<app>``, else ``~/.local/state/<app>``."""
-    return _resolve("state", app, plugin_data=plugin_data, create=create, env=env, home=home)
+    return _xdg("state", app, env=env, home=home)
 
 
-def cache_dir(
-    app: str, *, plugin_data: bool = False, create: bool = False, env: Mapping[str, str] | None = None, home: Path | None = None
-) -> Path:
+def cache_dir(app: str, *, env: Mapping[str, str] | None = None, home: Path | None = None) -> Path:
     """The folder for ``app``'s disposable cache: ``$XDG_CACHE_HOME/<app>``, else ``~/.cache/<app>``."""
-    return _resolve("cache", app, plugin_data=plugin_data, create=create, env=env, home=home)
+    return _xdg("cache", app, env=env, home=home)
 
 
-def data_dir(
-    app: str, *, plugin_data: bool = False, create: bool = False, env: Mapping[str, str] | None = None, home: Path | None = None
-) -> Path:
+def data_dir(app: str, *, env: Mapping[str, str] | None = None, home: Path | None = None) -> Path:
     """The folder for ``app``'s data (what it keeps, not config): ``$XDG_DATA_HOME/<app>``, else ``~/.local/share/<app>``.
 
     Also how to find a *foreign* tool's data folder (opencode keeps its logs and ``auth.json`` there).
     """
-    return _resolve("data", app, plugin_data=plugin_data, create=create, env=env, home=home)
+    return _xdg("data", app, env=env, home=home)
+
+
+def plugin_dir(kind: Kind, app: str, *, env: Mapping[str, str] | None = None, home: Path | None = None) -> Path:
+    """``$CLAUDE_PLUGIN_DATA/<kind>`` when that is set and absolute, else the XDG folder of ``kind`` for ``app``."""
+    _check_app(app)
+    plugin = plugin_data_dir(env)
+    return plugin / kind if plugin is not None else _xdg(kind, app, env=env, home=home)
+
+
+def ensure(path: Path) -> Path:
+    """Create ``path`` and its parents if missing (``mkdir -p``) and return it; permissions are the caller's to set."""
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def tool_home(tool: str, env_var: str | None = None, *, env: Mapping[str, str] | None = None, home: Path | None = None) -> Path:
@@ -84,19 +91,11 @@ def plugin_data_dir(env: Mapping[str, str] | None = None) -> Path | None:
     return _absolute((os.environ if env is None else env).get(PLUGIN_DATA_ENV))
 
 
-def _resolve(kind: str, app: str, *, plugin_data: bool, create: bool, env: Mapping[str, str] | None, home: Path | None) -> Path:
+def _xdg(kind: Kind, app: str, *, env: Mapping[str, str] | None, home: Path | None) -> Path:
     _check_app(app)
-    values = os.environ if env is None else env
-    plugin = plugin_data_dir(values) if plugin_data else None
-    if plugin is not None:
-        path = plugin / kind
-    else:
-        variable, fallback = _KINDS[kind]
-        base = _absolute(values.get(variable)) or (Path.home() if home is None else home) / fallback
-        path = base / app
-    if create:
-        path.mkdir(parents=True, exist_ok=True)
-    return path
+    variable, fallback = _KINDS[kind]
+    base = _absolute((os.environ if env is None else env).get(variable)) or (Path.home() if home is None else home) / fallback
+    return base / app
 
 
 def _absolute(value: str | None) -> Path | None:
@@ -112,4 +111,15 @@ def _check_app(app: str, what: str = "app") -> None:
         raise ValueError(msg)
 
 
-__all__ = ["PLUGIN_DATA_ENV", "cache_dir", "config_dir", "data_dir", "plugin_data_dir", "state_dir", "tool_home"]
+__all__ = [
+    "PLUGIN_DATA_ENV",
+    "Kind",
+    "cache_dir",
+    "config_dir",
+    "data_dir",
+    "ensure",
+    "plugin_data_dir",
+    "plugin_dir",
+    "state_dir",
+    "tool_home",
+]

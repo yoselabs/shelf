@@ -21,14 +21,6 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `any-browser:_navigate:scroll_to_stable` | A | Two operations: `render` and `render_listing` (scroll to stable), on the Backend protocol; a2web (use-cases/a2web--any-browser) must move. Left: external consumer. |
 | `any-browser:render:scroll_to_stable` | A | Two operations: `render` and `render_listing` (scroll to stable), on the Backend protocol; a2web (use-cases/a2web--any-browser) must move. Left: external consumer. |
 | `anyllm:resolve_provider:fallback` | A | `resolve_first(order, ...)` beside `resolve_provider` (composed with runtime fallback). Left: external consumers. |
-| `app-dirs:cache_dir:create` | A | `config_dir(app)` pure, plus `ensure(path) -> Path` (mkdir -p). In-tree: any-agent, iorlas-task-loop use app-dirs. Left: public API with external consumers. |
-| `app-dirs:cache_dir:plugin_data` | A | `plugin_config_dir(app)` etc. (or one `plugin_dir(kind, app)`) reading CLAUDE_PLUGIN_DATA, beside the XDG functions. Left: public API with external consumers. |
-| `app-dirs:config_dir:create` | A | `config_dir(app)` pure, plus `ensure(path) -> Path` (mkdir -p). In-tree: any-agent, iorlas-task-loop use app-dirs. Left: public API with external consumers. |
-| `app-dirs:config_dir:plugin_data` | A | `plugin_config_dir(app)` etc. (or one `plugin_dir(kind, app)`) reading CLAUDE_PLUGIN_DATA, beside the XDG functions. Left: public API with external consumers. |
-| `app-dirs:data_dir:create` | A | `config_dir(app)` pure, plus `ensure(path) -> Path` (mkdir -p). In-tree: any-agent, iorlas-task-loop use app-dirs. Left: public API with external consumers. |
-| `app-dirs:data_dir:plugin_data` | A | `plugin_config_dir(app)` etc. (or one `plugin_dir(kind, app)`) reading CLAUDE_PLUGIN_DATA, beside the XDG functions. Left: public API with external consumers. |
-| `app-dirs:state_dir:create` | A | `config_dir(app)` pure, plus `ensure(path) -> Path` (mkdir -p). In-tree: any-agent, iorlas-task-loop use app-dirs. Left: public API with external consumers. |
-| `app-dirs:state_dir:plugin_data` | A | `plugin_config_dir(app)` etc. (or one `plugin_dir(kind, app)`) reading CLAUDE_PLUGIN_DATA, beside the XDG functions. Left: public API with external consumers. |
 | `atomic-io:atomic_write_bytes:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
 | `atomic-io:atomic_write_json:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
 | `atomic-io:atomic_write_text:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
@@ -132,6 +124,6 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 ## What the A rows say
 
 - Read-only vs read-write is a type difference in four places (`jsonl-log`, `sqlite-sidecar`, `process-lock`'s reentrancy, `any-browser`'s listing render): split by type, not flag.
-- `app-dirs` `create` and `plugin_data` (8 rows) and `child-env` `strip_venv` (2 rows) are the cheapest public splits: pure lookups plus `ensure`, and an existing `without_venv`.
+- `app-dirs` `create` and `plugin_data` (8 rows) and `child-env` `strip_venv` (2 rows) are the cheapest public splits (app-dirs done in 0.3.0: pure lookups, `plugin_dir`, `ensure`).
 - git-porcelain's 38 rows are mostly git's own flags (`force`, `allow_empty`, `clean -x`): one ADR for the destructive-opt-in class closes the C rows; the A rows (`missing_ok`, `run(check=)`, `literal`, `push`) wait for the next change that opens that package.
 - ADR 0022 as written covers blueprint.toml overrides; the C rows need either an accepted ADR naming this allowlist class or an `expires` date. Not decided here.

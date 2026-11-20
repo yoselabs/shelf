@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-from app_dirs import cache_dir, config_dir, data_dir, state_dir
+from app_dirs import cache_dir, config_dir, data_dir, ensure, plugin_dir, state_dir
 from pytest_bdd import given, parsers, scenarios, then, when
 
 if TYPE_CHECKING:
@@ -43,12 +43,12 @@ def _real_home(world: World, tmp_path: Path) -> None:
 
 @when(parsers.parse('the {kind} folder of "{app}" is asked for with the plugin data folder'))
 def _ask_plugin(world: World, kind: str, app: str) -> None:
-    world.folder = _KINDS[kind](app, env=world.env, home=world.home, plugin_data=True)
+    world.folder = plugin_dir(kind, app, env=world.env, home=world.home)  # type: ignore[arg-type]
 
 
 @when(parsers.parse('the {kind} folder of "{app}" is asked for and created'))
 def _ask_create(world: World, kind: str, app: str) -> None:
-    world.folder = _KINDS[kind](app, env=world.env, home=world.home, create=True)
+    world.folder = ensure(_KINDS[kind](app, env=world.env, home=world.home))
 
 
 @when(parsers.parse('the {kind} folder of "{app}" is asked for'))

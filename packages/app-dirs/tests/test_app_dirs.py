@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from app_dirs import cache_dir, config_dir, data_dir, plugin_data_dir, state_dir, tool_home
+from app_dirs import config_dir, data_dir, ensure, plugin_data_dir, plugin_dir, state_dir, tool_home
 
 _HOME = Path("/home/me")
 
@@ -23,16 +23,29 @@ def test_defaults_read_the_process_environment(monkeypatch: pytest.MonkeyPatch) 
 def test_plugin_data_must_be_set_and_absolute(value: str | None) -> None:
     env = {} if value is None else {"CLAUDE_PLUGIN_DATA": value}
     assert plugin_data_dir(env) is None
-    assert cache_dir("a", env=env, home=_HOME, plugin_data=True) == _HOME / ".cache" / "a"
+    assert plugin_dir("cache", "a", env=env, home=_HOME) == _HOME / ".cache" / "a"
 
 
 def test_plugin_data_splits_by_kind() -> None:
     env = {"CLAUDE_PLUGIN_DATA": "/p"}
-    assert [f("a", env=env, home=_HOME, plugin_data=True) for f in (config_dir, state_dir, cache_dir)] == [
+    assert [plugin_dir(kind, "a", env=env, home=_HOME) for kind in ("config", "state", "cache", "data")] == [
         Path("/p/config"),
         Path("/p/state"),
         Path("/p/cache"),
+        Path("/p/data"),
     ]
+
+
+def test_plugin_dir_refuses_a_bad_app_name_even_when_the_plugin_folder_is_set() -> None:
+    with pytest.raises(ValueError, match="single folder name"):
+        plugin_dir("config", "a/b", env={"CLAUDE_PLUGIN_DATA": "/p"}, home=_HOME)
+
+
+def test_ensure_makes_the_folder_and_returns_it(tmp_path: Path) -> None:
+    target = tmp_path / "a" / "b"
+    assert ensure(target) == target
+    assert target.is_dir()
+    assert ensure(target) == target
 
 
 @pytest.mark.parametrize("app", ["", ".", "..", "a/b", "a\0b"])
