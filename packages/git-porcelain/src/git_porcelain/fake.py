@@ -46,7 +46,6 @@ if TYPE_CHECKING:
     from git_porcelain.api import (
         Diff,
         Dirty,
-        FinishResult,
         Health,
         LogEntry,
         MergeStarted,
@@ -402,12 +401,8 @@ class FakeWorktree:
         *,
         paths: Literal["own", "all", "tracked", "staged"] = "own",
         base: str | None = None,
-        mode: Literal["new", "amend", "squash_to"] = "new",
-        squash_to: Sha | None = None,
     ) -> RecordResult:
-        return write.record(
-            self._repo, self.state(), message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=False, allow_empty=False
-        )
+        return write.record(self._repo, self.state(), message, paths=paths, base=base, hooks=False, allow_empty=False)
 
     def record_with_hooks(
         self,
@@ -415,30 +410,22 @@ class FakeWorktree:
         *,
         paths: Literal["own", "all", "tracked", "staged"] = "own",
         base: str | None = None,
-        mode: Literal["new", "amend", "squash_to"] = "new",
-        squash_to: Sha | None = None,
     ) -> RecordResult:
-        return write.record(
-            self._repo, self.state(), message, paths=paths, base=base, mode=mode, squash_to=squash_to, hooks=True, allow_empty=False
-        )
+        return write.record(self._repo, self.state(), message, paths=paths, base=base, hooks=True, allow_empty=False)
 
     def record_empty(self, message: str) -> RecordResult:
-        return write.record(
-            self._repo, self.state(), message, paths="staged", base=None, mode="new", squash_to=None, hooks=False, allow_empty=True
-        )
+        return write.record(self._repo, self.state(), message, paths="staged", base=None, hooks=False, allow_empty=True)
 
-    def take_branch(
-        self,
-        branch: str,
-        base: str,
-        *,
-        mode: Literal["resume", "fresh", "restart"],
-        keep_aside_as: str | None = None,
-        clean_keep: Sequence[str] | None = None,
+    def amend(self, message: str = "") -> RecordResult:
+        return write.amend(self._repo, self.state(), message)
+
+    def take_branch(self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None) -> TakeResult:
+        return write.take_branch(self._repo, self.state(), branch=branch, base=base, clean_keep=clean_keep)
+
+    def restart_branch(
+        self, branch: str, base: str, *, keep_aside_as: str | None = None, clean_keep: Sequence[str] | None = None
     ) -> TakeResult:
-        return write.take_branch(
-            self._repo, self.state(), branch=branch, base=base, mode=mode, keep_aside_as=keep_aside_as, clean_keep=clean_keep
-        )
+        return write.restart_branch(self._repo, self.state(), branch=branch, base=base, keep_aside_as=keep_aside_as, clean_keep=clean_keep)
 
     def release_branch(self, holder: Path) -> Released | StillHeld:
         return write.release_branch(self._repo, self.state(), holder)
@@ -451,10 +438,9 @@ class FakeWorktree:
         base: str,
         *,
         squash_message: str | None = None,
-        squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
         update_refs: bool | None = None,
     ) -> RebaseResult:
-        return write.rebase_onto(self._repo, self.state(), base, squash_message, squash_failure=squash_failure, update_refs=update_refs)
+        return write.rebase_onto(self._repo, self.state(), base, squash_message, update_refs=update_refs)
 
     def rebase(self, base: str, *, update_refs: bool | None = None) -> CommandResult:
         return fake_commands.rebase(self._repo, self.state(), base, update_refs=update_refs)
@@ -519,9 +505,6 @@ class FakeWorktree:
         if self._repo.hooks.lfs_push_failure is not None:
             return CommandResult(ok=False, output=self._repo.hooks.lfs_push_failure)
         return CommandResult(ok=True, output="")
-
-    def finish_rebase(self, action: Literal["continue", "abort"], *, restore_to: Sha | None = None) -> FinishResult:
-        return write.finish_rebase(self._repo, self.state(), action, restore_to)
 
     def push(self, dst: str, *, remote: str = "origin", hook_env: Mapping[str, str] | None = None, head: Sha | None = None) -> PushResult:
         return flow.push(self._repo, self.state(), dst, remote, hook_env or {}, head=head)

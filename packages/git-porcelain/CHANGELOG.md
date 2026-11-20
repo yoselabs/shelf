@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.28.0
+
+**Breaking**: the `Literal` policy parameters are gone (Article III; ADR 0030). Each mode is its own verb, or deleted where the caller can compose it.
+
+- `Worktree.finish_rebase(action, *, restore_to=None)` deleted, with `FinishResult` and `Aborted`: use `resolve_and_continue()` and `abort_rebase(*, restore_to=None)`, which return `CommandResult`.
+- `Worktree.rebase_onto(..., squash_failure=)` => `rebase_onto(base, *, squash_message=None, update_refs=None)`: a failed squash always restores the original work and raises `GitUnavailable`; `Rebased.squash_failure` and `Conflict.squash_failure` are gone. To go on unsquashed, call `rebase_onto(base)` again.
+- `Worktree.record(..., mode=, squash_to=)` and `record_with_hooks(..., mode=, squash_to=)` => `record(message, *, paths, base)` (new commits only), `record_with_hooks(...)` and new `amend(message="")` (HEAD replaced by the index as it is; no hooks, no staging: stage first). `mode="squash_to"` is `reset(fork, mode="soft")` then `record(message, paths="staged")`.
+- `Worktree.take_branch(branch, base, *, mode=, keep_aside_as=, clean_keep=)` => `take_branch(branch, base, *, clean_keep=None)` (`resume`) and new `restart_branch(branch, base, *, keep_aside_as=None, clean_keep=None)` (`fresh` and `restart`: `keep_aside_as=None` is the old `restart`).
+
 ## 0.27.0
 
 **Breaking** (shelf-tyld.26): tolerance and destructive flags are gone (Article III: tolerance is a handler, not a flag; ADR 0030). Store bytes unchanged.

@@ -22,7 +22,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Final, Literal, Protocol
 
 from git_porcelain.api_results import (
-    Aborted,
     BranchHeld,
     BranchTaken,
     Change,
@@ -31,7 +30,6 @@ from git_porcelain.api_results import (
     Conflicted,
     Diff,
     Dirty,
-    FinishResult,
     Health,
     HookRejected,
     LogEntry,
@@ -84,7 +82,6 @@ DEFAULT_TIMEOUT: Final = 3600.0
 
 __all__ = [
     "DEFAULT_TIMEOUT",
-    "Aborted",
     "BranchHeld",
     "BranchTaken",
     "Change",
@@ -93,7 +90,6 @@ __all__ = [
     "Conflicted",
     "Diff",
     "Dirty",
-    "FinishResult",
     "GitUnavailable",
     "Health",
     "HookRejected",
@@ -417,15 +413,12 @@ class Worktree(Protocol):
         *,
         paths: Literal["own", "all", "tracked", "staged"] = "own",
         base: str | None = None,
-        mode: Literal["new", "amend", "squash_to"] = "new",
-        squash_to: Sha | None = None,
     ) -> RecordResult:
         """Stage and commit. ``own``: tracked changes plus untracked files base's ignore rules do not cover, by
         exact path. ``all``: everything. ``tracked``: index-tracked changes, including staged additions,
         without untracked files. ``staged``: commit the existing index without staging working files.
-        ``amend`` folds into HEAD (empty ``message`` keeps its message), even without staged changes;
-        ``squash_to`` first moves HEAD softly to ``squash_to``. Hooks are skipped (``record_with_hooks`` runs them);
-        an unchanged index gives ``NothingToRecord`` (``record_empty`` commits anyway).
+        Hooks are skipped (``record_with_hooks`` runs them); an unchanged index gives ``NothingToRecord``
+        (``record_empty`` commits anyway). To fold several commits into one, ``reset(fork, mode="soft")`` then ``record``.
         Results retain complete combined command output; infrastructure exceptions carry ``output`` too.
         Marker text is not a precondition: git decides whether the index can commit."""
         ...
@@ -436,8 +429,6 @@ class Worktree(Protocol):
         *,
         paths: Literal["own", "all", "tracked", "staged"] = "own",
         base: str | None = None,
-        mode: Literal["new", "amend", "squash_to"] = "new",
-        squash_to: Sha | None = None,
     ) -> RecordResult:
         """``record`` with the repository's commit hooks run; a hook's refusal returns ``HookRejected``."""
         ...
@@ -446,19 +437,22 @@ class Worktree(Protocol):
         """Commit the index as it is, even when it equals HEAD (``git commit --allow-empty``); hooks are skipped."""
         ...
 
-    def take_branch(
-        self,
-        branch: str,
-        base: str,
-        *,
-        mode: Literal["resume", "fresh", "restart"],
-        keep_aside_as: str | None = None,
-        clean_keep: Sequence[str] | None = None,
+    def amend(self, message: str = "") -> RecordResult:
+        """Fold the index as it is into HEAD, even when unchanged (stage first); an empty ``message`` keeps HEAD's.
+        Hooks are skipped. ``GitUnavailable`` on an unborn branch."""
+        ...
+
+    def take_branch(self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None) -> TakeResult:
+        """Check out ``branch`` as it is (created at ``base`` when absent). ``BranchHeld`` when another worktree holds it.
+        ``clean_keep`` (not None) then deletes untracked files except those patterns."""
+        ...
+
+    def restart_branch(
+        self, branch: str, base: str, *, keep_aside_as: str | None = None, clean_keep: Sequence[str] | None = None
     ) -> TakeResult:
-        """Check out ``branch``. ``resume``: as it is (created at ``base`` when absent). ``fresh``: at ``base``, the
-        old tip with work beyond ``base`` kept as ``keep_aside_as``. ``restart``: at ``base``, the old tip dropped.
-        ``BranchHeld`` when another worktree holds it. ``clean_keep`` (not None) then deletes untracked files
-        except those patterns."""
+        """Check out ``branch`` at ``base``, dropping its old tip; with ``keep_aside_as`` an old tip holding work beyond
+        ``base`` is renamed to that name first (``ValueError`` when it exists). ``BranchHeld`` and ``clean_keep`` as in
+        :meth:`take_branch`."""
         ...
 
     def release_branch(self, holder: Path) -> Released | StillHeld:
@@ -477,11 +471,11 @@ class Worktree(Protocol):
         base: str,
         *,
         squash_message: str | None = None,
-        squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
         update_refs: bool | None = None,
     ) -> RebaseResult:
         """Replay the branch onto ``base``; with ``squash_message``, first squash a branch of more than one commit.
-        A conflict leaves the rebase paused. Raises ``ValueError`` on a tracked-dirty tree or a paused rebase."""
+        A conflict leaves the rebase paused. Raises ``ValueError`` on a tracked-dirty tree or a paused rebase, and
+        ``GitUnavailable`` when the squash commit fails (the original commits are restored)."""
         ...
 
     def rebase(self, base: str, *, update_refs: bool | None = None) -> CommandResult:
@@ -566,11 +560,6 @@ class Worktree(Protocol):
 
     def lfs_push(self, remote: str, refs: Sequence[str], *, timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         """Upload all requested refs in one invocation without installing LFS or hooks."""
-        ...
-
-    def finish_rebase(self, action: Literal["continue", "abort"], *, restore_to: Sha | None = None) -> FinishResult:
-        """``continue``: stage the files that were conflicted; ``Conflict`` while markers remain, else go on.
-        ``abort``: abandon, then ``reset --hard`` to ``restore_to`` when given. A no-op when nothing is paused."""
         ...
 
     def push(self, dst: str, *, remote: str = "origin", hook_env: Mapping[str, str] | None = None, head: Sha | None = None) -> PushResult:

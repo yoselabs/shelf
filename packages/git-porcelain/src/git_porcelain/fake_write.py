@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 from git_porcelain import fake_flow as flow
 from git_porcelain.api import (
-    Aborted,
     BranchHeld,
     BranchTaken,
     HookRejected,
@@ -24,7 +23,6 @@ from git_porcelain.errors import GitUnavailable, IgnoredFilesWouldBeOverwritten,
 from git_porcelain.fake_ops import (
     branch_ref,
     clean,
-    hard_to,
     ignore_of,
     is_clean,
     make_commit,
@@ -43,10 +41,10 @@ if TYPE_CHECKING:
     from pathlib import Path
     from typing import Literal
 
-    from git_porcelain.api import FinishResult, RebaseResult, RecordResult, TakeResult
+    from git_porcelain.api import RebaseResult, RecordResult, TakeResult
     from git_porcelain.fake_store import CheckoutState, RepoState
 
-__all__ = ["finish_rebase", "park", "rebase_onto", "record", "release_branch", "take_branch"]
+__all__ = ["amend", "park", "rebase_onto", "record", "release_branch", "restart_branch", "take_branch"]
 
 
 def _head(repo: RepoState, wt: CheckoutState) -> str:
@@ -64,44 +62,39 @@ def record(
     *,
     paths: Literal["own", "all", "tracked", "staged"],
     base: str | None,
-    mode: Literal["new", "amend", "squash_to"],
-    squash_to: Sha | None,
     hooks: bool,
     allow_empty: bool,
 ) -> RecordResult:
-    validate_revisions(*([base] if base is not None else []), *([str(squash_to)] if squash_to is not None else []))
-    if mode == "squash_to" and squash_to is None:
-        msg = "mode='squash_to' needs squash_to"
-        raise ValueError(msg)
+    validate_revisions(*([base] if base is not None else []))
     old = repo.head_sha(wt)
     require_index(wt)
     record_stage(repo, wt, paths, base)
-    if not record_needed(repo, wt, mode, old, squash_to, allow_empty=allow_empty):
+    if dict(wt.index) == (dict(repo.store.commits[old].files) if old else {}) and not allow_empty:
         return NothingToRecord()
-    if mode == "amend" and old is None:
+    if (rejected := _gate(repo, hooks=hooks)) is not None:
+        return rejected
+    return Recorded(Sha(make_commit(repo, wt, message, (old,) if old else ())), output=repo.hooks.commit_output if hooks else "")
+
+
+def amend(repo: RepoState, wt: CheckoutState, message: str) -> RecordResult:
+    """Fold the index into HEAD, even when it is unchanged; an empty message keeps HEAD's."""
+    old = repo.head_sha(wt)
+    require_index(wt)
+    if old is None:
         msg = "fatal: You have nothing to amend."
         raise GitUnavailable(msg)
+    _gate(repo, hooks=False)
+    previous = repo.store.commits[old]
+    return Recorded(Sha(make_commit(repo, wt, message or previous.message, previous.parents)))
+
+
+def _gate(repo: RepoState, *, hooks: bool) -> HookRejected | None:
     if hooks and repo.hooks.refuse_commit:
         output = repo.hooks.commit_output or "pre-commit hook declined the commit"
         return HookRejected(output, output=output)
     if repo.hooks.commit_failure is not None:
         raise GitUnavailable(repo.hooks.commit_failure)
-    return record_commit(repo, wt, message, mode, old, squash_to=squash_to, hooks=hooks)
-
-
-def record_needed(
-    repo: RepoState,
-    wt: CheckoutState,
-    mode: Literal["new", "amend", "squash_to"],
-    old: str | None,
-    squash_to: Sha | None,
-    *,
-    allow_empty: bool,
-) -> bool:
-    """An amendment still invokes commit when the index has not changed."""
-    target = squash_to if mode == "squash_to" else old
-    changed = dict(wt.index) != (dict(repo.store.commits[target].files) if target else {})
-    return changed or allow_empty or mode == "amend"
+    return None
 
 
 def record_stage(repo: RepoState, wt: CheckoutState, paths: Literal["own", "all", "tracked", "staged"], base: str | None) -> None:
@@ -115,28 +108,6 @@ def record_stage(repo: RepoState, wt: CheckoutState, paths: Literal["own", "all"
         picks = [*state.tracked, *(p for p in state.untracked if p not in state.base_ignored)]
         if picks:
             stage(repo, wt, picks)
-
-
-def record_commit(
-    repo: RepoState,
-    wt: CheckoutState,
-    message: str,
-    mode: Literal["new", "amend", "squash_to"],
-    old: str | None,
-    *,
-    squash_to: Sha | None,
-    hooks: bool,
-) -> Recorded:
-    """Commit the prepared index with the requested parent and message semantics."""
-    if mode == "squash_to":
-        repo.move_head(wt, str(squash_to))
-    if mode == "amend":
-        previous = repo.store.commits[str(old)]
-        sha = make_commit(repo, wt, message or previous.message, previous.parents)
-    else:
-        parent = repo.head_sha(wt)
-        sha = make_commit(repo, wt, message, (parent,) if parent else ())
-    return Recorded(Sha(sha), output=repo.hooks.commit_output if hooks else "")
 
 
 def _land(repo: RepoState, wt: CheckoutState, sha: str, ref: str | None) -> None:
@@ -162,41 +133,47 @@ def _holders(repo: RepoState, wt: CheckoutState, ref: str) -> tuple[WorktreeInfo
     )
 
 
-def take_branch(
-    repo: RepoState,
-    wt: CheckoutState,
-    *,
-    branch: str,
-    base: str,
-    mode: Literal["resume", "fresh", "restart"],
-    keep_aside_as: str | None,
-    clean_keep: Sequence[str] | None,
+def take_branch(repo: RepoState, wt: CheckoutState, *, branch: str, base: str, clean_keep: Sequence[str] | None) -> TakeResult:
+    validate_revisions(branch, base)
+    ref = branch_ref(branch)
+    if held := _holders(repo, wt, ref):
+        return BranchHeld(held)
+    target = resolve_commit(repo, wt, base)
+    require_index(wt)
+    exists = ref in repo.refs
+    if exists:
+        _land(repo, wt, repo.refs[ref], ref)
+    else:
+        _checkout_branch(repo, wt, ref, target)
+    if clean_keep is not None:
+        clean(repo, wt, clean_keep)
+    return BranchTaken(branch, Sha(_head(repo, wt)), created=not exists, kept_aside=None)
+
+
+def restart_branch(
+    repo: RepoState, wt: CheckoutState, *, branch: str, base: str, keep_aside_as: str | None, clean_keep: Sequence[str] | None
 ) -> TakeResult:
     validate_revisions(branch, base)
     ref = branch_ref(branch)
-    held = _holders(repo, wt, ref)
-    if held:
+    if held := _holders(repo, wt, ref):
         return BranchHeld(held)
     target = resolve_commit(repo, wt, base)
     require_index(wt)
     exists = ref in repo.refs
     kept: str | None = None
-    if mode == "resume" and exists:
-        _land(repo, wt, repo.refs[ref], ref)
-    else:
-        if mode == "fresh" and exists and keep_aside_as is not None:
-            ahead = ancestors(repo.store, repo.refs[ref]) - ancestors(repo.store, target)
-            if ahead:
-                aside = branch_ref(keep_aside_as)
-                if aside in repo.refs:
-                    msg = f"keep_aside_as {keep_aside_as!r} already exists"
-                    raise ValueError(msg)
-                repo.refs[aside] = repo.refs.pop(ref)
-                for other in repo.worktrees.values():
-                    if other.head_ref == ref:
-                        other.head_ref = aside
-                kept = keep_aside_as
-        _checkout_branch(repo, wt, ref, target)
+    if exists and keep_aside_as is not None:
+        ahead = ancestors(repo.store, repo.refs[ref]) - ancestors(repo.store, target)
+        if ahead:
+            aside = branch_ref(keep_aside_as)
+            if aside in repo.refs:
+                msg = f"keep_aside_as {keep_aside_as!r} already exists"
+                raise ValueError(msg)
+            repo.refs[aside] = repo.refs.pop(ref)
+            for other in repo.worktrees.values():
+                if other.head_ref == ref:
+                    other.head_ref = aside
+            kept = keep_aside_as
+    _checkout_branch(repo, wt, ref, target)
     if clean_keep is not None:
         clean(repo, wt, clean_keep)
     return BranchTaken(branch, Sha(_head(repo, wt)), created=not exists or kept is not None, kept_aside=kept)
@@ -245,14 +222,11 @@ def rebase_onto(
     base: str,
     squash_message: str | None,
     *,
-    squash_failure: Literal["raise", "continue_unsquashed"] = "raise",
     update_refs: bool | None = None,
 ) -> RebaseResult:
     validate_revisions(base)
-    if squash_failure not in {"raise", "continue_unsquashed"}:
-        raise ValueError(squash_failure)
     if wt.rebase is not None:
-        msg = "a rebase is already paused here: finish_rebase first"
+        msg = "a rebase is already paused here: abort_rebase or resolve_and_continue first"
         raise ValueError(msg)
     if tracked_dirty(wt, repo.head_files(wt)):
         msg = "dirty: the tree has tracked changes"
@@ -262,18 +236,14 @@ def rebase_onto(
     if not ancestors(repo.store, target) - ancestors(repo.store, head):
         return UpToDate()
     squashed = False
-    squash_diagnostic: str | None = None
     if squash_message is not None:
         fork = relate(repo, wt, "HEAD", base).merge_base
         if fork is not None and len(ancestors(repo.store, head) - ancestors(repo.store, fork)) > 1:
             if repo.hooks.squash_failure is not None:
-                if squash_failure == "raise":
-                    raise GitUnavailable(repo.hooks.squash_failure)
-                squash_diagnostic = repo.hooks.squash_failure
-            else:
-                repo.move_head(wt, fork)
-                make_commit(repo, wt, squash_message, (fork,))
-                squashed = True
+                raise GitUnavailable(repo.hooks.squash_failure)
+            repo.move_head(wt, fork)
+            make_commit(repo, wt, squash_message, (fork,))
+            squashed = True
     started = repo.head_sha(wt)
     started = some(started)
     updates = (
@@ -281,21 +251,5 @@ def rebase_onto(
     )
     done = flow.start_rebase(repo, wt, started, target, update_refs=updates)
     if isinstance(done, Rebased):
-        return Rebased(Sha(head), done.new_head, squashed=squashed, squash_failure=squash_diagnostic, output=done.output)
-    return replace(done, old_head=Sha(head), squash_failure=squash_diagnostic)
-
-
-def finish_rebase(repo: RepoState, wt: CheckoutState, action: Literal["continue", "abort"], restore_to: Sha | None) -> FinishResult:
-    restore_to = Sha(resolve_commit(repo, wt, str(restore_to))) if restore_to is not None else None
-    if action == "abort":
-        if wt.rebase is not None:
-            flow.rebase_abort(repo, wt)
-        if restore_to is not None:
-            old = dict(repo.head_files(wt))
-            hard_to(repo, wt, repo.store.commits[restore_to].files, old)
-            repo.move_head(wt, restore_to)
-        return Aborted(Sha(_head(repo, wt)))
-    if wt.rebase is None:
-        head = Sha(_head(repo, wt))
-        return Rebased(head, head, squashed=False)
-    return flow.continue_rebase(repo, wt)
+        return Rebased(Sha(head), done.new_head, squashed=squashed, output=done.output)
+    return replace(done, old_head=Sha(head))
