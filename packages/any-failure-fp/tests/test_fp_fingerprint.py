@@ -95,3 +95,18 @@ def test_tail_is_tunable() -> None:
 
 def test_head_of_a_short_fingerprint_is_itself() -> None:
     assert head("compile error") == "compile error"
+
+
+def test_a_youtube_bot_check_is_one_fingerprint_whatever_the_video() -> None:
+    # yt-dlp prints the 11-character video id (letters, digits, - and _, so not a hex SHA): the host names that shape.
+    video = {"video": re.compile(r"(?<=\[youtube\] )[\w-]{11}(?=:)")}
+    text = (
+        "ERROR: [youtube] {vid}: Sign in to confirm you're not a bot. Use --cookies-from-browser or --cookies for the authentication. "
+        "See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies."
+    )
+    a = fingerprint(text.format(vid="dQw4w9WgXcQ"), ids=video)
+    b = fingerprint(text.format(vid="abcdEFGhijK"), ids=video)
+    assert a == b
+    assert "<video>" in a
+    bare = [fingerprint(text.format(vid=v)) for v in ("dQw4w9WgXcQ", "abcdEFGhijK")]
+    assert bare[0] != bare[1]  # without `ids` the id keeps them apart
