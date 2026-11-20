@@ -73,6 +73,7 @@ def _run(
         )
     except subprocess.TimeoutExpired as exc:
         msg = f"git {args[0] if args else ''} timed out after {timeout}s"
+        # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
         output = ((exc.stdout or b"") + (exc.stderr or b"")).decode("utf-8", "replace").strip()
         raise GitError(msg, retryable=True, output=output) from exc
     except OSError as exc:  # pragma: no cover - exec failure

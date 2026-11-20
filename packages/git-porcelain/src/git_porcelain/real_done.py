@@ -29,6 +29,7 @@ class Done:
 
     @property
     def out(self) -> str:
+        # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
         return self.raw.decode("utf-8", "replace")
 
     @property

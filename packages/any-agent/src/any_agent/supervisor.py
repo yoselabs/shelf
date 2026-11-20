@@ -183,6 +183,7 @@ class LogWatcher:
                 if size > off:
                     with f.open("rb") as fh:
                         fh.seek(off)
+                        # lossy-ok: parse: the log is scanned for rate-limit phrases, never stored
                         new = fh.read(size - off).decode("utf-8", "replace")
                     self.offs[f] = size
                     hit = next((ln for ln in new.splitlines() if self.is_limit(ln) and not self.echoes(ln)), None)
@@ -281,6 +282,7 @@ class Supervisor:
         tick: Callable[[], None],
     ) -> None:
         for raw in iter(stream.readline, b""):
+            # lossy-ok: parse: the log is scanned for rate-limit phrases, never stored
             line = raw.decode("utf-8", "replace")
             sink.append(line)
             with contextlib.suppress(Exception):

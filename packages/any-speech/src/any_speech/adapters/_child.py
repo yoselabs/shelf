@@ -60,6 +60,7 @@ def run_child(args: Sequence[str | Path], *, timeout: float | None, budget_gb: f
             stop_tree(process, grace=_GRACE)
             raise
         err.seek(0)
+        # lossy-ok: display: a child's stderr tail goes into an error message
         tail = err.read()[-_TAIL:].decode("utf-8", "replace")
     return ChildResult(os.waitstatus_to_exitcode(status), time.monotonic() - started, usage.ru_maxrss * unit / _GB, tail)
 

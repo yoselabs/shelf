@@ -202,6 +202,7 @@ async def _launch_diagnostics(executable: str | None) -> str:  # noqa: PLR0911 â
             return f" (probe timed out running {executable} --version)"
     except Exception as exc:  # probing must never mask the real launch failure
         return f" (probe failed: {_summarize_exc(exc)})"
+    # lossy-ok: display: browser stderr goes into an error message
     text = (out or b"").decode("utf-8", "replace").strip()
     if proc.returncode == 0:
         # Binary is fine on its own â€” the failure is in the CDP handshake or the

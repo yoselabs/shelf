@@ -27,6 +27,7 @@ def decode_f32(audio: Path, start: float | None, end: float | None) -> list[floa
         ["ffmpeg", "-v", "error", *span, "-i", str(audio), "-f", "f32le", "-ac", "1", "-ar", str(_RATE), "-"], timeout=_DECODE_TIMEOUT
     )
     if done.exit != 0:
+        # lossy-ok: display: a child's stderr tail goes into an error message
         message = f"ffmpeg failed on {audio} (exit {done.exit}): {done.err.decode('utf-8', 'replace').strip()[-300:]}"
         raise RuntimeError(message)
     samples = array("f")

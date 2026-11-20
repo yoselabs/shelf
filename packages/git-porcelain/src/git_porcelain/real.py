@@ -205,7 +205,9 @@ class RealRepo:
             raise GitUnavailable(msg) from exc
         if done.timed_out:
             msg = f"git {args[0] if args else ''} timed out after {limit}s"
+            # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
             raise GitTimeout(msg, retryable=True, output=(done.out + done.err).decode("utf-8", "replace").strip())
+        # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
         result = Done(done.exit, done.out, done.err.decode("utf-8", "replace"), hooks=hooks, hook_exits=hook_exits)
         if check and result.rc != 0:
             raise unavailable(args, result)

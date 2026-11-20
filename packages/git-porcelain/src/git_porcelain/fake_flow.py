@@ -84,6 +84,7 @@ def continue_rebase(repo: RepoState, wt: CheckoutState) -> Rebased | Conflict:
     state = wt.rebase
     state = some(state)
     require_index(wt)
+    # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
     marked = tuple(sorted(p for p in wt.unmerged if MARKERS.search(wt.files.get(p, b"").decode("utf-8", "replace"))))
     if marked:
         return Conflict(marked, "conflict markers remain", Sha(state.orig_sha))

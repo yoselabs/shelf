@@ -109,4 +109,6 @@ its law.
 - **The pit of success.** The default is safe and correct; misuse fails loud; a missing dependency raises, never
   silently falls back.
 Check: the package's README names its value, its default view and its opt-ins; a review rejects a flag that
-selects an output shape. State: task to be filed as a check beside the table in Article III.
+selects an output shape. State: the flag rule is blocking (`tests/test_arch_output_shape_flags.py`, row "One value, no output-shape
+flags (IX)" in the Article III table). "One value, one file" and the README naming are review-only: two files for one result needs
+meaning a parser cannot see, and no README heading convention exists to check against.
