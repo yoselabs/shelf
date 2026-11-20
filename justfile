@@ -41,7 +41,7 @@ check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint
     uv run python -m any_gate passed --gate check
 
 [group('gate')]
-check-all: beads-lint (scripts "all") (steps "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "arch" "spell" "deps" "test-all")
+check-all: beads-lint (scripts "all") (steps-all "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "arch" "spell" "deps" "test-all")
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
 # blueprint's for this step in every repo (stack/shell).

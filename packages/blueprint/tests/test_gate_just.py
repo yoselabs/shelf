@@ -191,6 +191,7 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
         ("gate.one-command", 1, False),
         ("gate.runner", 1, False),
         ("gate.no-ci", 1, False),
+        ("gate.step-inputs", 1, False),
         ("gate.hooks-recipe", 3, False),
         ("gate.hooks-installed", 2, True),
         ("gate.runs-blueprint", 2, False),
@@ -212,3 +213,33 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
     assert gated.skipped_audit == sum(audit for _, _, audit in expected)
     assert audited.set_hash == gated.set_hash
     assert not run_audit(repo.root, concern="gate_no_ci", env=repo.env).rows
+
+
+_STEPS = 'check: (steps "lint" "test")\nsteps +names:\n    true\nlint:\n    true\ntest:\n    true\n'
+
+
+def test_step_inputs_fails_with_no_declaration_file(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    verdict, evidence = _row(repo, "gate.step-inputs")
+    assert verdict is Verdict.FAILING
+    assert "lint, test" in evidence
+
+
+def test_step_inputs_names_the_step_that_declares_nothing(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write("gate-inputs.toml", 'lint = ["*.py"]\n')
+    verdict, evidence = _row(repo, "gate.step-inputs")
+    assert verdict is Verdict.FAILING
+    assert "test" in evidence
+    assert "lint" not in evidence.split("for")[1]
+
+
+def test_step_inputs_passes_when_every_step_declares(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write("gate-inputs.toml", 'lint = ["*.py"]\ntest = ["*"]\n')
+    assert _row(repo, "gate.step-inputs")[0] is Verdict.PASSING
+
+
+def test_step_inputs_is_not_applicable_when_the_gate_runs_no_steps(repo: Repo) -> None:
+    repo.write("justfile", "check: lint\nlint:\n    true\n")
+    assert _row(repo, "gate.step-inputs")[0] is Verdict.NOT_APPLICABLE

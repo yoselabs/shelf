@@ -50,6 +50,12 @@ Makefile fails `gate.runner`. Three rules keep the file readable by blueprint, w
 - Loops and multi-line shell go in a shebang recipe (`#!/usr/bin/env bash`, then `set -euo pipefail`); just has no loops.
 - A dependency, or a recipe argument that names a recipe (`check: (steps "lint")`), is an edge in the graph.
 
+## Steps declare their inputs
+
+Each step `check` hands to `steps` lists the files it reads in `gate-inputs.toml` (`lint = ["*.py", "*.toml"]`; `["*"]` for the whole
+repo). A step none of whose inputs changed since the upstream merge-base is not started: no process, no file read. `check-all` runs
+every step (`steps-all`). A step with no entry always runs, and `gate.step-inputs` says so (shelf ADR 0031).
+
 ## One box, many gates
 
 Several agents share one machine, and each test run takes every core: on 2026-10-20 four gates at once on a 6-CPU box

@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 _SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__"}
+SKIPPED_PREFIX = "skipped "
 GIT_TIMEOUT = 600.0  # seconds one git call may take
 
 

@@ -48,6 +48,8 @@ class Gate:
     recipes: dict[str, Recipe] = field(default_factory=dict)
     # Why the graph is empty although the file exists: the runner is missing, or it rejected the file.
     unread: str = ""
+    # The names handed to the `steps` recipe by `check`: the gate's steps, the ones any-gate can skip.
+    stepped: tuple[str, ...] = ()
 
     def has_recipe(self, name: str) -> bool:
         return name in self.recipes if self.recipes else bool(re.search(rf"^{re.escape(name)}\s*:(?!=)", self.text, re.MULTILINE))
@@ -123,7 +125,16 @@ def _just(ctx: Context, name: str, text: str) -> Gate:
         names += [arg for dep in recipe["dependencies"] for arg in dep["arguments"] if isinstance(arg, str) and arg in known]
         names += [m for m in _JUST_CALL.findall(body) if m in known]
         recipes[recipe_name] = Recipe(tuple(dict.fromkeys(names)), body)
-    return Gate("just", name, text, recipes)
+    stepped = tuple(
+        dict.fromkeys(
+            arg
+            for dep in dump["recipes"].get("check", {}).get("dependencies", [])
+            if dep["recipe"] == "steps"
+            for arg in dep["arguments"]
+            if isinstance(arg, str)
+        )
+    )
+    return Gate("just", name, text, recipes, stepped=stepped)
 
 
 def _fragment(part: Any, assignments: dict[str, Any], depth: int) -> str:

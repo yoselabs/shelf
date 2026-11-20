@@ -26,6 +26,7 @@ the file holds the reasons, the rejected options and the history.
 - [0023](0023-the-gate-runner-is-just.md) **The gate runner is just**: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`.
 - [0027](0027-no-repository-has-ci.md) **No repository has GitHub Actions CI; the local gate is the gate**: No repository holds GitHub Actions configuration. Done is the local `just check` green on the tree pushed and on a merged tree; blueprint's `gate.no-ci` fails a repo with workflows.
 - [0029](0029-the-justfile-imports-blueprint-rendered-parts.md) **A repo's justfile imports blueprint-rendered parts; `import`, not `mod`**: The gate's common recipes are files `blueprint gate render` writes per stack; the repo's justfile imports them (`import`, not `mod`) and owns the rest; `render --check` is the drift check.
+- [0031](0031-gate-steps-declare-their-inputs.md) **Every gate step declares the files it reads; a step whose inputs did not change is not started**: gate-inputs.toml lists each step's input globs; any-gate does not start a step none of whose inputs changed; blueprint checkpoints stay one step reading the whole repo.
 
 ## knowledge
 
