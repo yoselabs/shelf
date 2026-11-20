@@ -1,0 +1,5 @@
+# One owner per fact, for the shelf's git sources: every shelf entry in a consumer's [tool.uv.sources] is written the same way.
+# A package whose siblings are `workspace = true` resolves them at its parent's own URL and tag, so each (spelling, tag) pair is a
+# different source and `uv lock` fails with conflicting URLs. Plain text on purpose: any reader needs no Python.
+url = "https://github.com/yoselabs/shelf"  # the one spelling: no `.git`, no trailing slash
+tag = "blueprint-v{version}"  # the one snapshot tag: every package at the tag of the blueprint release the repo audits with

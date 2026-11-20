@@ -23,7 +23,7 @@ import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from blueprint import preset, render, templates
+from blueprint import preset, render, shelf_sources, templates
 from blueprint.concerns import tool_pins
 from blueprint.concerns.profile_data import load_profiles, profile_for
 from blueprint.model import Context, Verdict
@@ -186,6 +186,11 @@ def _write_beads(repo: Path, env: Mapping[str, str]) -> list[str]:
     return [".beads/ (bd init --skip-hooks)" if failed is None else f"beads FAILED: {failed}"]
 
 
+def _shelf_sources_drift(repo: Path) -> bool:
+    text = (repo / "pyproject.toml").read_text(encoding="utf-8") if (repo / "pyproject.toml").is_file() else ""
+    return shelf_sources.normalize(text) != text
+
+
 def _plan(repo: Path, stacks: tuple[str, ...], env: Mapping[str, str], *, hooks: bool, beads: bool) -> list[str]:
     profile = detect(repo, load_state(repo))
     steps: list[str] = []
@@ -197,6 +202,8 @@ def _plan(repo: Path, stacks: tuple[str, ...], env: Mapping[str, str], *, hooks:
         steps.append("the justfile parts (.blueprint/*.just)")
     if _PYTHON & set(stacks) and _preset_text(repo)[1]:
         steps.append("the linter preset tables absent from pyproject.toml")
+    if _shelf_sources_drift(repo):
+        steps.append("the shelf git sources at one tag and one spelling (pyproject.toml)")
     if _recipes_missing(repo, _kinds(profile)):
         steps.append("the stack's recipe files (tools/, policy/)")
     if hooks and _hook_config_missing(repo):
@@ -216,6 +223,10 @@ def _apply(repo: Path, stacks: tuple[str, ...], steps: list[str], env: Mapping[s
         written += render.write(repo)
     if any(s.startswith("the linter") for s in steps) and _PYTHON & set(stacks):
         written += _write_preset(repo)
+    if any(s.startswith("the shelf git") for s in steps):
+        pyproject = repo / "pyproject.toml"
+        pyproject.write_text(shelf_sources.normalize(pyproject.read_text(encoding="utf-8")), encoding="utf-8")
+        written.append("pyproject.toml (the shelf git sources)")
     if any(s.startswith("the stack's recipe") for s in steps):
         written += _write_recipes(repo, _kinds(detect(repo, load_state(repo))))
     if hooks and any(s.startswith("the hook") for s in steps):
