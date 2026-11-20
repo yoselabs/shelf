@@ -41,10 +41,10 @@ IDENTITY_KEYS: tuple[str, ...] = ("name", "id", "key")
 
 
 @overload
-def merge_into(existing: object, payload: Mapping[str, Any]) -> Mapping[str, Any]: ...
+def merge_into(existing: object, payload: Mapping[str, Any]) -> Mapping[str, Any]: ...  # Any: parsed YAML, foreign data
 @overload
-def merge_into(existing: object, payload: list[Any]) -> list[Any]: ...
-def merge_into(existing: object, payload: Mapping[str, Any] | list[Any]) -> Mapping[str, Any] | list[Any]:
+def merge_into(existing: object, payload: list[Any]) -> list[Any]: ...  # Any: parsed YAML, foreign data
+def merge_into(existing: object, payload: Mapping[str, Any] | list[Any]) -> Mapping[str, Any] | list[Any]:  # Any: parsed YAML, foreign data
     """``payload``'s values, carried into ``existing``'s document. Never mutates ``payload``.
 
     ``existing`` is whatever was parsed from the file — a ``CommentedMap`` or

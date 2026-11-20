@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from a2effect._lint._core import LintMessage
 
 
-def discover_rules() -> dict[str, Callable[..., Any]]:
+def discover_rules() -> dict[str, Callable[..., Any]]:  # Any: entry-point rules have any signature
     """Load every rule registered under the `a2lint.rules` entry-point group."""
     eps = entry_points(group="a2lint.rules")
     return {ep.name: ep.load() for ep in eps}

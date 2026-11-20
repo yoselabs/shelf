@@ -27,7 +27,7 @@ def _plan_for_hint(format_hint: FormatHint) -> EncodingPlan:
     return EncodingPlan("json")
 
 
-def format_response(raw: Any, *, format_hint: FormatHint = "auto") -> Response:
+def format_response(raw: Any, *, format_hint: FormatHint = "auto") -> Response:  # Any: any value a tool returns is rendered
     """Encode ``raw`` per ``format_hint`` and return a :class:`Response`.
 
     A thin ``format_hint``-shaped adapter over :func:`render` for callers that still

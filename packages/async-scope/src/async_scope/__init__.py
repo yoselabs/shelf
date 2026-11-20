@@ -68,7 +68,7 @@ class ResourceScope:
         self._entered.append(resource)
         return entered  # type: ignore[no-any-return]
 
-    def spawn(self, coro: Coroutine[Any, Any, _T]) -> asyncio.Task[_T]:
+    def spawn(self, coro: Coroutine[Any, Any, _T]) -> asyncio.Task[_T]:  # Any: a coroutine of any yield and send type
         """Run `coro` as a task now; `aclose()` cancels it and waits for it to finish.
 
         It unwinds in its LIFO place among the entered resources, so a task spawned

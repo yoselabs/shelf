@@ -39,7 +39,9 @@ async def raises_as(awaitable: Awaitable[T], mapping: _Mapping) -> T:
 
 
 @asynccontextmanager
-async def translate_to(target: type[AppError], *sources: type[BaseException]) -> Any:
+async def translate_to(
+    target: type[AppError], *sources: type[BaseException]
+) -> Any:  # Any: the async context manager type is awkward to spell
     """Async context manager that re-raises any `sources` exception as `target`.
 
     The original is chained as `__cause__`; exceptions outside `sources` propagate.

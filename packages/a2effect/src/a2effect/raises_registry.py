@@ -72,7 +72,7 @@ def reset_for_testing() -> None:
     _extensions.clear()
 
 
-def read_inline_annotation(fn: Callable[..., Any]) -> frozenset[str]:
+def read_inline_annotation(fn: Callable[..., Any]) -> frozenset[str]:  # Any: any callable is inspected
     """Parse `fn`'s source for inline `# a2effect: may-raise A, B` comment closures."""
     try:
         source = inspect.getsource(fn)

@@ -72,7 +72,7 @@ def _is_tsv_shaped(rows: list[Any]) -> bool:
     return bool(rows) and all(isinstance(row, (BaseModel, dict)) for row in rows)
 
 
-def encode_envelope(value: Any, tsv_fields: tuple[str, ...]) -> str:
+def encode_envelope(value: Any, tsv_fields: tuple[str, ...]) -> str:  # Any: any value a tool returns is rendered
     """Encode a ``BaseModel`` envelope as JSON with embedded TSV strings.
 
     Every field named in ``tsv_fields`` becomes a single TSV string with a
@@ -125,7 +125,7 @@ def encode_envelope(value: Any, tsv_fields: tuple[str, ...]) -> str:
     return _encode_json(envelope)
 
 
-def encode_page_tsv_dict(payload: dict[str, Any]) -> str:
+def encode_page_tsv_dict(payload: dict[str, Any]) -> str:  # Any: any value a tool returns is rendered
     """Page-tsv from an already-plain page dict (``{items, next_cursor, ...}``).
 
     The dict-input counterpart of :func:`page_tsv.page.encode_page_tsv` — used by a
@@ -139,7 +139,7 @@ def encode_page_tsv_dict(payload: dict[str, Any]) -> str:
     return assemble_page_envelope(envelope_no_items, rows, derive_columns(rows))
 
 
-def render_plain(payload: Any, plan: EncodingPlan) -> str:
+def render_plain(payload: Any, plan: EncodingPlan) -> str:  # Any: any value a tool returns is rendered
     """Re-derive the compressed wire string from an already-plain payload.
 
     Follows a static :class:`EncodingPlan` — used by a result middleware that runs
@@ -166,14 +166,16 @@ class Rendered:
 
     __slots__ = ("_structured", "_value", "format", "text")
 
-    def __init__(self, text: str, fmt: FormatName, value: Any, *, structured: Any = _UNSET) -> None:
+    def __init__(
+        self, text: str, fmt: FormatName, value: Any, *, structured: Any = _UNSET
+    ) -> None:  # Any: any value a tool returns is rendered
         self.text = text
         self.format = fmt
         self._value = value
         self._structured: Any = structured
 
     @property
-    def structured(self) -> Any:
+    def structured(self) -> Any:  # Any: any value a tool returns is rendered
         """The JSON-able plain payload (the structured-content channel), computed once."""
         if self._structured is _UNSET:
             self._structured = _to_plain(self._value)
@@ -183,7 +185,7 @@ class Rendered:
         return f"Rendered(format={self.format!r}, text=<{len(self.text)} chars>)"
 
 
-def render(value: Any, consumer: Consumer, *, plan: EncodingPlan | None = None) -> Rendered:
+def render(value: Any, consumer: Consumer, *, plan: EncodingPlan | None = None) -> Rendered:  # Any: any value a tool returns is rendered
     """Render ``value`` for ``consumer`` — the one rendering seam.
 
     The ``llm`` consumer compresses per ``plan`` (an :class:`EncodingPlan`); when
@@ -224,7 +226,7 @@ def _is_flat_record(item: Any) -> bool:
     return all(not isinstance(v, (list, dict)) for v in item.values())
 
 
-def render_execute(value: Any) -> Rendered:
+def render_execute(value: Any) -> Rendered:  # Any: any value a tool returns is rendered
     """Render a dynamically-typed output for the ``llm`` consumer by value inference.
 
     A head-uniform flat list encodes as TSV; anything else (or a TSV failure) falls

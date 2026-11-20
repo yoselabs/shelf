@@ -56,7 +56,7 @@ class CodexCliAdapter:
         temperature: float = 0.0,
         thinking_disabled: bool = True,
         parts: PromptParts | None = None,
-        response_schema: Mapping[str, Any] | None = None,
+        response_schema: Mapping[str, Any] | None = None,  # Any: provider-specific options pass through
         effort: Effort | None = None,
     ) -> Completion:
         """Complete once; max_tokens, temperature and thinking_disabled are not CLI knobs.

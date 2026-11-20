@@ -18,7 +18,7 @@ class Verdict:
     reason: str = ""
 
 
-def judge(rules: Iterable[Rule], tool: str, tool_input: Mapping[str, Any]) -> Verdict:
+def judge(rules: Iterable[Rule], tool: str, tool_input: Mapping[str, Any]) -> Verdict:  # Any: a tool's input is the agent's JSON
     """The first rule that blocks `tool` called with `tool_input`; allowed when none does. Exceptions from a rule propagate."""
     for rule in rules:
         answer = rule(tool, tool_input)

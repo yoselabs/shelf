@@ -25,12 +25,12 @@ class Invocation:
     """A parsed command line: which verb, and the exact arguments to call it with."""
 
     name: str
-    fn: Callable[..., Any]
-    args: tuple[Any, ...]
-    kwargs: dict[str, Any]
-    shared: Any = None
+    fn: Callable[..., Any]  # Any: a verb's parameters and defaults are of any type
+    args: tuple[Any, ...]  # Any: a verb's parameters and defaults are of any type
+    kwargs: dict[str, Any]  # Any: a verb's parameters and defaults are of any type
+    shared: Any = None  # Any: a verb's parameters and defaults are of any type
 
-    def call(self) -> Any:
+    def call(self) -> Any:  # Any: a verb's parameters and defaults are of any type
         """Call the verb. A coroutine function returns its coroutine, for the caller to await."""
         return self.fn(*self.args, **self.kwargs)
 
@@ -43,7 +43,9 @@ def _first_line(text: str | None) -> str | None:
 class VerbCli:
     """One parser from ``{name: fn}``; ``shared`` is folded into every verb."""
 
-    def __init__(self, verbs: Mapping[str, Callable[..., Any]], *, shared: type | None = None) -> None:
+    def __init__(
+        self, verbs: Mapping[str, Callable[..., Any]], *, shared: type | None = None
+    ) -> None:  # Any: a verb's parameters and defaults are of any type
         self.verbs = dict(verbs)
         self.shared = shared
         self._shared_specs = vc.choice_flags_of(shared) if shared is not None else []

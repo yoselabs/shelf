@@ -98,7 +98,7 @@ class MeasuredPopen(subprocess.Popen[bytes]):
         return super()._internal_poll(_deadstate, _waitpid=self._reap)  # type: ignore[call-arg]
 
 
-def popen_held(*args: Any, **kwargs: Any) -> tuple[MeasuredPopen, TermHold]:
+def popen_held(*args: Any, **kwargs: Any) -> tuple[MeasuredPopen, TermHold]:  # Any: passed through to subprocess.Popen unchanged
     """``(MeasuredPopen(*args, **kwargs), hold)``; the caller calls ``hold.replay()`` inside the ``try`` that stops the child."""
     with TermHold() as hold:
         return MeasuredPopen(*args, **kwargs), hold

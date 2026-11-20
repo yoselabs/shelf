@@ -57,7 +57,7 @@ class Bead:
     acceptance_criteria: str = ""
     notes: str = ""
     dependencies: tuple[Dep, ...] = ()
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)  # Any: bd's JSON, foreign data
     lease_expires_at: str = ""
     close_reason: str = ""
     created_at: str = ""
@@ -109,7 +109,7 @@ def _dependencies(d: Mapping[str, object]) -> tuple[Dep, ...]:
     return tuple(dep_of(row) for row in rows)
 
 
-def dep_of(d: dict[str, Any]) -> Dep:
+def dep_of(d: dict[str, Any]) -> Dep:  # Any: bd's JSON, foreign data
     # `list` prints depends_on_id/type, `show` prints id/dependency_type
     return Dep(
         id=_dependency_value(d, ("id", "depends_on_id")),
@@ -120,7 +120,7 @@ def dep_of(d: dict[str, Any]) -> Dep:
     )
 
 
-def bead_of(d: dict[str, Any]) -> Bead:
+def bead_of(d: dict[str, Any]) -> Bead:  # Any: bd's JSON, foreign data
     prio, labels, meta = d.get("priority"), d.get("labels"), d.get("metadata")
     return Bead(
         id=str(d["id"]),

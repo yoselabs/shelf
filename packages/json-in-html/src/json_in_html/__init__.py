@@ -51,7 +51,7 @@ class JsonPayload:
     """
 
     source: JsonSource
-    data: dict[str, Any] | list[Any]
+    data: dict[str, Any] | list[Any]  # Any: extracted JSON, foreign data
     script_id: str | None
     byte_size: int
 
@@ -711,7 +711,7 @@ def is_answer_bearing(payload: JsonPayload) -> bool:
     return False
 
 
-def microdata_to_ld(data: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
+def microdata_to_ld(data: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:  # Any: extracted JSON, foreign data
     """Flatten a ``microdata`` payload into LD-JSON shape.
 
     Microdata comes out of the extractor as
@@ -758,7 +758,7 @@ def microdata_to_ld(data: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
     return out
 
 
-def ld_entries(data: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
+def ld_entries(data: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:  # Any: extracted JSON, foreign data
     """The entity entries in an LD-JSON payload, whatever container it arrived in.
 
     LD-JSON reaches a consumer as one of three things and a walker that handles

@@ -50,7 +50,7 @@ def canonicalize(doc: Document) -> str:
     return _canonical(doc.frontmatter, doc.body)
 
 
-def version_of(frontmatter: Mapping[str, Any], body: str) -> str:
+def version_of(frontmatter: Mapping[str, Any], body: str) -> str:  # Any: parsed YAML, foreign data
     """The version of a frontmatter mapping plus a body, with no file or document needed."""
     return digest_text(_canonical(frontmatter, body), length=64)
 

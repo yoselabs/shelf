@@ -10,7 +10,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict
 
 from child_env import NotFound, find
 
@@ -205,7 +205,24 @@ def merge_in_progress(vault: Path) -> bool:
     return found is not None and (found / "MERGE_HEAD").exists()
 
 
-def sync_status(vault: Path, *, ambient: Mapping[str, str]) -> dict[str, Any]:
+class SyncStatus(TypedDict):
+    branch: str
+    clean: bool
+    changed_files: int
+    ahead: int
+    behind: int
+    conflict_paused: bool
+
+
+class Readiness(TypedDict):
+    is_repo: bool
+    identity: bool
+    remote: bool
+    push_access: bool | None
+    output: str
+
+
+def sync_status(vault: Path, *, ambient: Mapping[str, str]) -> SyncStatus:
     """Branch / clean / changed count / ahead-behind / merge-in-progress (no network)."""
     branch = try_git(vault, "rev-parse", "--abbrev-ref", "HEAD", ambient=ambient).strip() or "HEAD"
     porcelain = try_git(vault, "status", "--porcelain", ambient=ambient).strip()
@@ -225,7 +242,7 @@ def sync_status(vault: Path, *, ambient: Mapping[str, str]) -> dict[str, Any]:
     }
 
 
-def readiness(vault: Path, *, ambient: Mapping[str, str], check_push: bool = True) -> dict[str, Any]:
+def readiness(vault: Path, *, ambient: Mapping[str, str], check_push: bool = True) -> Readiness:
     """Is git usable here? (repo / identity / remote / push access). Never raises.
 
     ``check_push=False`` skips the network ``ls-remote`` probe — used by ``intro``,

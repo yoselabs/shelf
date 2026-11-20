@@ -13,7 +13,7 @@ from typing import Any
 from .playwright import chromium_launch
 
 
-def patchright_launcher() -> Any:
+def patchright_launcher() -> Any:  # Any: a Playwright object, an optional dependency typed only at runtime
     """Yield an async-CM launching headless Chromium via Patchright.
 
     ``ImportError`` (the ``patchright`` engine is not installed) propagates →

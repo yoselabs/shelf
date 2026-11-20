@@ -23,5 +23,5 @@ class ErrorEnvelope(BaseModel):
     message: str
     hint: str | None = None
     retryable: bool
-    details: dict[str, Any] = Field(default_factory=dict)
+    details: dict[str, Any] = Field(default_factory=dict)  # Any: error details are caller-defined JSON
     envelope_version: Literal["2"] = ENVELOPE_VERSION

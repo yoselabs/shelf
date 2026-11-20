@@ -43,7 +43,9 @@ def _item_columns(page: Page[T]) -> list[str]:
     return derive_columns(list(page.items))
 
 
-def assemble_page_envelope(envelope_no_items: dict[str, Any], rows: list[Any], columns: list[str]) -> str:
+def assemble_page_envelope(
+    envelope_no_items: dict[str, Any], rows: list[Any], columns: list[str]
+) -> str:  # Any: any value a tool returns is rendered
     """Serialize a page-shaped dict into the wire JSON string.
 
     Take the envelope (with ``items`` already excluded), the row list, and the

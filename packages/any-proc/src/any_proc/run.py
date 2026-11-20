@@ -62,14 +62,16 @@ class Outcome:
     timeout.
     """
 
-    result: dict[str, Any] | None
+    result: dict[str, Any] | None  # Any: JSON crossing the process boundary
     returncode: int | None
     stderr: str
     duration_ms: int
     timed_out: bool = False
 
 
-def encode_args(args: Mapping[str, Any] | None, *, max_bytes: int = DEFAULT_MAX_ARGS_BYTES) -> str | None:
+def encode_args(
+    args: Mapping[str, Any] | None, *, max_bytes: int = DEFAULT_MAX_ARGS_BYTES
+) -> str | None:  # Any: JSON crossing the process boundary
     """The JSON to pipe to the child, or ``None`` for no arguments.
 
     Raises :class:`ArgsError` for a non-object, an unserializable value, or a payload over
@@ -150,7 +152,7 @@ def _preexec(limits: Limits) -> Callable[[], None]:
 def call(
     argv: Sequence[str],
     *,
-    args: Mapping[str, Any] | None = None,
+    args: Mapping[str, Any] | None = None,  # Any: JSON crossing the process boundary
     env: Mapping[str, str] | None = None,
     cwd: str | os.PathLike[str] | None = None,
     timeout: float | None = None,
@@ -192,7 +194,7 @@ def _ms_since(started: float) -> int:
     return int((time.monotonic() - started) * 1000)
 
 
-def parse_result(stdout: str) -> dict[str, Any] | None:
+def parse_result(stdout: str) -> dict[str, Any] | None:  # Any: JSON crossing the process boundary
     """The JSON object on the last marked line of ``stdout``, or ``None``.
 
     The last marked line wins, so a child that logs a marker-looking line early is still
@@ -208,14 +210,14 @@ def parse_result(stdout: str) -> dict[str, Any] | None:
     return None
 
 
-def emit(payload: Mapping[str, Any], stream: TextIO | None = None) -> None:
+def emit(payload: Mapping[str, Any], stream: TextIO | None = None) -> None:  # Any: JSON crossing the process boundary
     """Child side: write ``payload`` as the marked result line, flushed."""
     out = stream if stream is not None else sys.stdout
     out.write(f"{RESULT_MARKER} {json.dumps(dict(payload))}\n")
     out.flush()
 
 
-def read_args(stream: TextIO | None = None) -> dict[str, Any] | None:
+def read_args(stream: TextIO | None = None) -> dict[str, Any] | None:  # Any: JSON crossing the process boundary
     """Child side: read stdin once and parse it as the arguments.
 
     Empty or unreadable stdin means no arguments (``None``). Anything else that is not a

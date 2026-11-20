@@ -19,6 +19,7 @@ Breaking (shelf-tyld.13, bool modes split into named operations; every old call 
 - `RealRepo.run` / `RealWorktree.run(..., check=True, ...)` ⇒ `run(...)` (raises `GitUnavailable`) and new `try_run(...)` (returns the `Done`; the old `check=False`).
 - Internal: `RealRepo.memo(forever=)` ⇒ `memo` and `memo_until_write`; the fake's `fetch(retry=)` ⇒ `fetch` and `fetch_once`.
 - Stays: `missing_ok` (`abort_rebase`, `continue_rebase`, `delete_remote_at`, `drop_worktree`), `force`/`allow_delete`/`ignored`/`nested`/`allow_empty`/`hooks`/`keep_ignored`: justified exceptions, ADR 0030.
+- `sync_status` returns `SyncStatus` and `readiness` returns `Readiness` (TypedDicts, exported) instead of `dict[str, Any]`; the keys and values are unchanged.
 
 ## 0.25.0
 

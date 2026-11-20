@@ -38,7 +38,7 @@ _DUMP_SCALAR_TYPES: tuple[type, ...] = (
 )
 
 
-def is_basemodel(ann: Any) -> type[BaseModel] | None:
+def is_basemodel(ann: object) -> type[BaseModel] | None:
     """Return the BaseModel subclass if ``ann`` (or its inner Annotated/Optional/Union) is one.
 
     Truthy-friendly: callers that only want a bool can use ``if is_basemodel(x):``.
@@ -107,7 +107,7 @@ def _model_is_scalar_only(cls: type[BaseModel]) -> bool:
     return all(_is_dump_scalar(model_field.annotation) for model_field in cls.model_fields.values())
 
 
-def infer_format_hint(return_type: Any) -> FormatHintInferred:  # noqa: PLR0911
+def infer_format_hint(return_type: object) -> FormatHintInferred:  # noqa: PLR0911
     """Map a resolved return-type annotation to a wire-format hint.
 
     Defaults to ``"json"`` whenever the type is missing, ambiguous, or not
@@ -163,7 +163,7 @@ class EncodingPlan:
     tsv_fields: tuple[str, ...] = field(default=())
 
 
-def build_encoding_plan(return_type: Any) -> EncodingPlan:
+def build_encoding_plan(return_type: object) -> EncodingPlan:
     """Walk ``return_type`` and produce a static :class:`EncodingPlan`.
 
     Composes :func:`infer_format_hint` over the type and (one level down) its
@@ -175,10 +175,9 @@ def build_encoding_plan(return_type: Any) -> EncodingPlan:
     if hint == "page-tsv":
         return EncodingPlan("page-tsv")
     # hint == "json": dig one level for flat-array fields on a BaseModel.
-    if is_basemodel(return_type):
-        tsv_fields = tuple(
-            name for name, model_field in return_type.model_fields.items() if infer_format_hint(model_field.annotation) == "tsv"
-        )
+    model = is_basemodel(return_type)
+    if model:
+        tsv_fields = tuple(name for name, model_field in model.model_fields.items() if infer_format_hint(model_field.annotation) == "tsv")
         if tsv_fields:
             return EncodingPlan("envelope", tsv_fields=tsv_fields)
     return EncodingPlan("json")

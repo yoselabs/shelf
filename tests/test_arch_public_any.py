@@ -42,7 +42,7 @@ def public_any(source: str) -> list[str]:
             if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and _is_public(node.name):
                 a = node.args
                 annotated = [x.annotation for x in (*a.posonlyargs, *a.args, *a.kwonlyargs, a.vararg, a.kwarg) if x is not None]
-                signature = lines[node.lineno - 1 : node.body[0].lineno - 1 or node.lineno]
+                signature = lines[node.lineno - 1 : max(node.body[0].lineno - 1, node.lineno)]
                 if any(_names_any(x) for x in (*annotated, node.returns)) and not any(_REASON in ln for ln in signature):
                     found.append(f"{node.lineno} {node.name}")
             elif isinstance(node, ast.ClassDef) and _is_public(node.name):
@@ -121,5 +121,6 @@ def test_the_rule_lets_through_a_reason_a_private_name_and_a_typed_signature() -
         "    def e(self, x: int) -> str:\n"
         "        def inner(y: Any) -> Any: ...\n"
         "        return ''\n"
+        "def f(x: Any) -> int: ...  # Any: a one-line stub\n"
     )
     assert public_any(source) == []

@@ -71,7 +71,9 @@ def _node(value: object) -> Mapping[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def diff_schema(want: Mapping[str, Any], have: Mapping[str, Any], path: str = "") -> dict[str, tuple[tuple[Any, ...], tuple[Any, ...]]]:
+def diff_schema(
+    want: Mapping[str, Any], have: Mapping[str, Any], path: str = ""
+) -> dict[str, tuple[tuple[Any, ...], tuple[Any, ...]]]:  # Any: JSON schema values, foreign data
     """Every difference between two JSON schemas, keyed ``<path>.fields`` or ``<path>.enum``.
 
     Each value is ``(only in want, only in have)``, sorted. Fields are ``properties`` plus ``required``; the walk goes
@@ -112,7 +114,7 @@ def diff_schema(want: Mapping[str, Any], have: Mapping[str, Any], path: str = ""
 
 
 def undeclared(
-    found: Mapping[str, tuple[tuple[Any, ...], tuple[Any, ...]]],
+    found: Mapping[str, tuple[tuple[Any, ...], tuple[Any, ...]]],  # Any: JSON schema values, foreign data
     known: Mapping[str, tuple[tuple[Any, ...], tuple[Any, ...], str]],
 ) -> tuple[list[str], list[str]]:
     """``(new, resolved)``: differences nobody accepted, and accepted ones that are now gone or changed.

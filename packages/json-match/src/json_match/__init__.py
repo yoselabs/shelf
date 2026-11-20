@@ -33,7 +33,7 @@ OPS: Final = ("does not contain", "is more than", "starts with", "ends with", "c
 _INDEX = re.compile(r"-?\d+")
 
 
-def dig(value: Any, path: str) -> Any:
+def dig(value: Any, path: str) -> Any:  # Any: any JSON value is compared
     """The value at a dotted ``path``: a number indexes a list (``-1`` the last), ``*`` maps over one."""
     if not path or value is MISSING:
         return value
@@ -55,7 +55,7 @@ def _step(value: Any, key: str) -> Any:
     return MISSING
 
 
-def as_text(value: Any) -> str:
+def as_text(value: Any) -> str:  # Any: any JSON value is compared
     """A string as is, a list as its items' text joined by ``", "``, anything else as JSON."""
     if isinstance(value, str):
         return value
@@ -64,7 +64,7 @@ def as_text(value: Any) -> str:
     return json.dumps(value)
 
 
-def compare(actual: Any, op: str, expected: str) -> bool:
+def compare(actual: Any, op: str, expected: str) -> bool:  # Any: any JSON value is compared
     """``actual {op} expected``, for every operator in :data:`OPS`.
 
     ``contains`` on a list means some item contains the text; ``is more than`` compares numbers.
@@ -87,7 +87,7 @@ def compare(actual: Any, op: str, expected: str) -> bool:
     raise ValueError(msg)
 
 
-def matches(expected: Any, actual: Any) -> bool:
+def matches(expected: Any, actual: Any) -> bool:  # Any: any JSON value is compared
     """Subset match: named keys only, objects recursively, a list of objects item by item
     against any actual item, a list of plain values as the same values in any order."""
     if isinstance(expected, dict):
