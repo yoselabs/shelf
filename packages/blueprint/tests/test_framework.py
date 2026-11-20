@@ -150,7 +150,7 @@ def test_a_repo_shaped_like_a2kay_passes_the_configured_roles(repo: Repo) -> Non
     rows = _rows(repo)
     for role in ("framework-version", "project-hygiene", "build", "tests", "surface-integrity"):
         assert rows[f"framework.mcp.{role}"][0] is Verdict.PASSING, role
-    assert "framework.mcp.agent-guidance" not in rows  # cut: agents.culture-files covers it
+    assert "framework.mcp.agent-guidance" not in rows
 
 
 def test_a_server_without_a_tool_list_snapshot_is_not_set_up(repo: Repo) -> None:

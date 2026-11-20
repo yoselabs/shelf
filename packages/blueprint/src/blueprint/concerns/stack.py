@@ -47,7 +47,6 @@ ROLES = (
     "spelling",  # typos in code and docs
     "architecture",  # layer rules enforced by a tool (banned APIs, import rules)
     "hooks",  # what prek runs per commit for this stack (fast: format and lint on staged files)
-    "agent-guidance",  # the stack's conventions file agents read (docs/agents/<stack>.md), linked from AGENTS.md
 )
 # Names are framework-neutral: a role says what is judged, and each profile maps its own tools onto it
 # (godot: scenes and import settings; mcp: the tool list and its schema).
@@ -61,18 +60,12 @@ FRAMEWORK_ROLES = (
     "surface-integrity",  # the surface the framework exposes (scene references, tool list) cannot drift unseen
     "architecture",  # the core stays framework-free; the framework layer is thin
     "hooks",  # what prek adds per commit for the framework
-    "agent-guidance",  # the framework's conventions file agents read (docs/agents/<framework>.md)
 )
-# Cut 2026-11-20 (checkpoint-review.md): `agent-guidance` repeats agents.culture-files and the managed block; a role that is
-# `na` for the stack is not a checkpoint. The profile files keep the data; no row is projected from it.
-_NEVER_ROWS = frozenset({"agent-guidance"})
 _NA_NOT_ROWS = frozenset({"coverage", "embedded-script-lint"})
 
 
 def is_checkpoint(profile: StackProfile, role: str) -> bool:
     """Whether a role of this profile becomes a row: not a cut role, and not a cut role the profile marks `na`."""
-    if role in _NEVER_ROWS:
-        return False
     spec = profile.roles.get(role)
     return not (role in _NA_NOT_ROWS and spec is not None and bool(spec.na or spec.untested))
 

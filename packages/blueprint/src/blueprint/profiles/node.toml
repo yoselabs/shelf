@@ -100,9 +100,3 @@ role = "hooks"
 tool = "prek runs biome and typos on staged files (pre-commit); just check on pre-push"
 install = "add local hooks `biome check --staged` style entry and typos to .pre-commit-config.yaml after bd's; the gate on pre-push"
 config = [{ path = ".pre-commit-config.yaml", contains = "biome" }, { path = ".pre-commit-config.yaml", contains = "typos" }]
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/node.md: commands, layering table, strictness policy, test naming; linked from AGENTS.md"
-install = "create docs/agents/node.md (<= 150 lines) and link it from AGENTS.md"
-config = [{ path = "docs/agents/node.md" }, { path = "AGENTS.md", contains = "docs/agents/node.md" }]

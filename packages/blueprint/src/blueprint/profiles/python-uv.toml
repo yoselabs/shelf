@@ -139,9 +139,3 @@ role = "hooks"
 tool = "prek runs ruff check and ruff format --check on staged Python files"
 install = "add ruff-check and ruff-format local hooks (types: [python]) to .pre-commit-config.yaml after bd's entries"
 config = [{ path = ".pre-commit-config.yaml", contains = "ruff check" }, { path = ".pre-commit-config.yaml", contains = "ruff format" }]
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/python.md: tools per role, placement, naming, comments, traps"
-install = "uv run blueprint init"
-config = [{ path = "docs/agents/python.md" }]

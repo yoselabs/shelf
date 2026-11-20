@@ -67,7 +67,7 @@ clean-clone-seconds = 120 # gate.clean-clone's budget
 id = "gate.hooks-recipe"   # a checkpoint id (`blueprint check --list`)
 reason = "the owner installs hooks by hand on each machine"
 decided_by = "owner"      # owner | agent; missing reads "unknown" in the report
-adr = "0003"              # an accepted ADR in docs/adr/ records the durable decision; no expiry needed
+adr = "0003"              # cites the decision record that makes the exception durable (not read by blueprint); no expiry needed
 # expires = 2027-04-01    # a temporary exception instead of adr
 # code = "not-applicable" # optional, legacy: test-data | remediated | not-applicable | not-supported | not-detected
 
@@ -95,8 +95,7 @@ work for now, each reported (a notice, a conftest warning) with the override to 
 Every report starts, after its header, with the list of all overrides (id, scope, reason, decided by, expiry or ADR).
 
 **Every exception is justified** ([ADR 0022](../../docs/adr/0022-every-exception-is-justified.md)): a non-empty
-`reason`, and either `expires` or `adr`. An `adr` must name an accepted ADR in `docs/adr/`; one that is missing,
-not accepted, or an exception with neither field is a problem the gate reports (exit 1), and it counts for nothing.
+`reason`, and either `expires` or `adr`. An `adr` cites the decision record (blueprint does not read it); an exception with neither field is a problem the gate reports (exit 1), and it counts for nothing.
 
 A written report's header names the shelf commit and package version that produced it, the checkpoint-set hash,
 and the scope: concerns checked, concerns not run, and whether the audit-only checkpoints ran.
@@ -108,8 +107,8 @@ and the scope: concerns checked, concerns not run, and whether the audit-only ch
 | generic | gate | `one-command` · `runner` (a Makefile-only gate fails: the runner is just, ADR 0023; the graph is read from `just --dump --dump-format json`, a Makefile still being judged) · `runs-blueprint` · `no-ci` (no repository has GitHub Actions configuration, ADR 0027) · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` (follows `just check` into pre-commit hooks) · `checkers-wired` · `lfs-binaries` (a repo with LFS patterns: every binary blob is a pointer, read from the blob since `--eol` cannot judge a `-text` file) · `lfs-installed` (audit only: git-lfs and its filter in this clone) · `default-branch` (audit only) · `git-remote` (audit only) · `clean-clone` (audit only) |
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
 | stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional; the toolchain row also checks every dotnet install against global.json); `python-uv.uv-tool` (audit only): an application's installed uv tool matches uv.lock; `tool-pins`: every tool the repo runs (uv, just, prek, bd, git-lfs, godot) is pinned exactly in mise.toml, locked in mise.lock and installed by a `mise install --locked` recipe, with no second pin beside .python-version, global.json or rust-just (ADR 0024); `agent-cli-pins`: mise.toml pins no self-updating agent CLI (codex, claude code, opencode, gemini; the list is `tools.toml`), and a machine-owned tool such as git takes a floor (`>=`) instead of a pin; `tools-installed` (audit only): each pinned tool on PATH is its pinned version |
-| framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, unity, mcp, provisional: framework-version · project-hygiene · binary-assets · build · tests · surface-integrity · architecture · hooks; `embedded-script-lint` and `agent-guidance` project no row); paths may use `{root}` (the project folder) and globs |
-| agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `worktrees` · `culture-files` (placeholders in docs/agents/ and AGENTS.md; a domain.md naming a file the repo lacks) · `managed-block` |
+| framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, unity, mcp, provisional: framework-version · project-hygiene · binary-assets · build · tests · surface-integrity · architecture · hooks; `embedded-script-lint` projects no row); paths may use `{root}` (the project folder) and globs |
+| agent | agents | `instructions` · `bd-metrics-off` · `session-hooks` · `worktrees` |
 
 With `--audit`, a gate row that is failing or not set up (`one-command`, `runner`, `hooks-recipe`, `runs-blueprint`, `clean-clone`) also names any remote-tracking branch (`origin/*`, local refs, no fetch) ahead of the default branch that changes a gate file (justfile, Makefile, hook config), and hands the fix to the owner: merge that branch or remediate on main, not a parallel gate. The branch itself is never checked.
 
@@ -120,12 +119,9 @@ A stack with no profile, or a role its profile leaves untested, is a **blueprint
 every run, never a pass, but left out of the exit code, since the shelf lacks the answer, not the repo.
 A new stack is a new `profiles/<stack>.toml`, not code.
 
-## Culture templates
+## Knowledge and agent docs
 
-`blueprint init` copies the `docs/agents/` files the profile requires (`templates/`)
-and writes the AGENTS.md managed block; it never overwrites a file the repo has. `gate.md` carries the no-CI wording (ADR 0027).
-The decision-record layout of ADR 0017 (`CONTEXT.md`, `docs/adr/`) is the standard the templates assume: a repo
-that keeps its records elsewhere migrates, or records an override backed by an accepted ADR (ADR 0022).
+Blueprint checks and seeds none of it: decision records, the glossary and `docs/agents/` live in `any-knowledge` (`python -m any_knowledge index|check|seed`), which a repo wires into its own `check-extra`. An override may still cite a decision record with `adr = "NNNN"`; blueprint does not read it.
 
 ## Survey
 

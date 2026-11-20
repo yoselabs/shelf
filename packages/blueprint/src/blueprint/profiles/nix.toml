@@ -85,13 +85,3 @@ tool = "prek per commit on staged .nix files: nixfmt --check, statix check, dead
 install = """.pre-commit-config.yaml local hooks (language: system, files: \\.nix$): id nixfmt / entry nixfmt --check; id statix / entry statix check (pass_filenames: false: statix takes a path, not a list); id deadnix / entry deadnix --fail; \
 the pre-push `just check` hook already runs the evaluation"""
 config = [{ path = ".pre-commit-config.yaml", contains = "nixfmt" }, { path = ".pre-commit-config.yaml", contains = "deadnix" }]
-
-[[role]]
-role = "agent-guidance"
-tool = "docs/agents/nix.md (how a host is evaluated, the formatter and lint commands, flake.lock rules, what never to hand-edit), linked from AGENTS.md"
-install = """create docs/agents/nix.md (<= 120 lines): the recipes; never hand-edit flake.lock (use `nix flake update <input>`); a new module is imported from nixosModules/default.nix; \
-evaluate before deploy (`just check-hosts`); secrets are sealed, never in the Nix store. Link from AGENTS.md: `Nix conventions: docs/agents/nix.md`"""
-config = [
-    { path = "docs/agents/nix.md" },
-    { path = "AGENTS.md", contains = "docs/agents/nix.md" },
-]

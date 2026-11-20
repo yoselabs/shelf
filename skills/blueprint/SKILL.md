@@ -28,7 +28,7 @@ holds becomes a `blueprint lacks:` bead (§6), not an exception granted in chat.
 
 | layer | what it judges | concerns in v0.1 |
 |---|---|---|
-| Generic | any repo, any language | `gate` (one command, no CI, hooks, guards, clean clone), `backlog` (beads), `knowledge` (CONTEXT.md, living ADRs, the generated `docs/adr/INDEX.md`), `secrets` (sops files sealed and covered by a rule) |
+| Generic | any repo, any language | `gate` (one command, no CI, hooks, guards, clean clone), `backlog` (beads), `secrets` (sops files sealed and covered by a rule) |
 | Stack-specific | one language's tools, from the shelf's profile for it | `stack/<stack>`: toolchain, formatter, linter, types, dependencies, tests, coverage, spelling, architecture; python-uv also the Python and uv pins (images included), shell also strict mode |
 | Framework-specific | an engine or framework on top of a stack, from its profile | `framework/<name>` (godot, unity, mcp): framework version, project hygiene, build, tests, surface integrity, architecture |
 | Agent harness | what agents run inside | `agents`: AGENTS.md, session env, session hooks |
@@ -51,7 +51,7 @@ Code, `${CLAUDE_SKILL_DIR}/../../…`) and run `PYTHONPATH=<engine> python3 -m b
 the rows it could not set up. `blueprint gate <step>` runs one step of `just check` (the justfile and hooks call them; you rarely type one):
 `guard` (no committed local shelf source), `preset` (linter config against the shelf's snapshot), `render` (`--check` fails when the
 blueprint-owned parts of the justfile differ from what the repo's stacks render), `test` (the repo's tests through any-gate: receipts skip
-what passed, a lease queues runs) and `adr-index`; `check --brief` is the per-commit step. A repo's justfile imports the rendered base; it does not copy recipes.
+what passed, a lease queues runs); `check --brief` is the per-commit step. A repo's justfile imports the rendered base; it does not copy recipes.
 
 ## 2. Audit
 
@@ -127,7 +127,7 @@ gets a short plain-words picture first; much work ahead gets one page outlining 
 ## 6. Start, reabsorb
 
 - **Start:** audit the empty repo, then on the yes: `blueprint init` (the gate as rendered justfile parts with `just blueprint` in it, the preset tables,
-  prek hooks from the recipe unless `--no-hooks`, docs/agents/ and the AGENTS.md block, the stack's recipe files; the runner is `just`, pinned as
+  prek hooks from the recipe unless `--no-hooks`, the stack's recipe files; the runner is `just`, pinned as
   `rust-just`; beads setup is the owner's), then fill every `{{name}}` from the repo → the stack's profile → the
   framework's profile. Never add CI: no repository has GitHub Actions (ADR 0027).
 - **Reabsorb:** a blueprint gap, or anything the run met that no checkpoint covers, becomes one
@@ -174,12 +174,11 @@ file's §10 says. Its ❌ rows become beads like any other finding.
   blocking commits in other managers' hook files.
 - `--audit` adds the audit-only rows: slow ones (a fresh clone running `just check`) and ones
   reading this clone's state (installed hooks, bd's database). The repo's `just blueprint` skips them.
-- Culture files: `template --repo .` copies only what is missing and rewrites only the AGENTS.md
-  block; fill the placeholders, never delete the block's markers.
-- Concerns: `gate`, `backlog`, `knowledge`, `secrets`, `stack`, `framework`, `agents`; profiles python-uv
+- Decision records, the glossary and the agent docs are not blueprint's: `python -m any_knowledge` (`index`, `check`, `seed`) keeps them.
+- Concerns: `gate`, `backlog`, `secrets`, `stack`, `framework`, `agents`; profiles python-uv
   (evidenced); node, go, rust, dotnet, nix, compose, dockerfile, shell, godot, unity and mcp (provisional). A mixed repo gets one table per stack and declares the edges between them. A repo with no code yet
   declares its stack (`[profile] stacks = ["python-uv"]` in docs/blueprint/blueprint.toml). Do not invent rows for what the engine does not check.
 - ADRs are living: one file per decision topic, rewritten when it changes, the dropped decision and
-  why in its `## History`. `adr-index --repo . --write` regenerates the index agents read.
+  why in its `## History`. `python -m any_knowledge index --write` regenerates the index agents read.
 - Two projects of one framework (a game and a prototype spike) each get a table; the owner names
   the real one in `docs/blueprint/blueprint.toml` (`[profile.frameworks] godot = "src/Game.Godot"`).

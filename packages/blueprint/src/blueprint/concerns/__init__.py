@@ -7,7 +7,6 @@ import importlib
 MODULES = (
     "gate",
     "backlog",
-    "knowledge",
     "secrets",
     "hooks",
     "stack",

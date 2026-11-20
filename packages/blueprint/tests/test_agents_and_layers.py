@@ -8,9 +8,8 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 import pytest
-from blueprint import report, templates
+from blueprint import report
 from blueprint.model import Verdict
-from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -37,11 +36,6 @@ def _sound(repo: Repo) -> None:
 
 def test_a_sound_harness_passes_every_agent_checkpoint(repo: Repo) -> None:
     _sound(repo)
-    templates.install(repo.root, detect(repo.root, load_state(repo.root)))
-    for path in (repo.root / "docs/agents").glob("*.md"):
-        path.write_text(templates.PLACEHOLDER.sub("filled", path.read_text()))
-    repo.write("CONTEXT.md", "# Glossary\n")
-    repo.write("docs/adr/INDEX.md", "# Index\n")
     assert set(_verdicts(repo).values()) == {Verdict.PASSING}
 
 
@@ -93,53 +87,6 @@ def test_only_a_claude_md_is_renamed_to_agents_md(repo: Repo) -> None:
     verdict, _, remediation = _evidence(repo, "agents.instructions")
     assert verdict is Verdict.NOT_SET_UP
     assert "git mv CLAUDE.md AGENTS.md" in remediation
-
-
-_BD_TEMPLATE = "# Project\n\n## Build & Test\n\n{build}\n\n## Architecture Overview\n\n{arch}\n\n## Conventions & Patterns\n\n{conv}\n"
-
-
-def _filled_harness(repo: Repo) -> None:
-    _sound(repo)
-    templates.install(repo.root, detect(repo.root, load_state(repo.root)))
-    for path in (repo.root / "docs/agents").glob("*.md"):
-        path.write_text(templates.PLACEHOLDER.sub("filled", path.read_text()))
-    repo.write("CONTEXT.md", "# Glossary\n")  # domain.md names these two
-    repo.write("docs/adr/INDEX.md", "# Index\n")
-
-
-@pytest.mark.parametrize("mark", ["*", "_"])
-def test_bd_template_placeholders_left_in_claude_md_fail_and_pass_once_replaced(repo: Repo, mark: str) -> None:
-    # a2peer: `bd init` wrote these three lines and nobody replaced them, so agents had no build or test command.
-    _filled_harness(repo)
-    repo.write(
-        "CLAUDE.md",
-        _BD_TEMPLATE.format(
-            build=f"{mark}Add your build and test commands here{mark}",
-            arch=f"{mark}Add a brief overview of your project architecture{mark}",
-            conv=f"{mark}Add your project-specific conventions here{mark}",
-        ),
-    )
-    verdict, evidence, _ = _evidence(repo, "agents.culture-files")
-    assert verdict is Verdict.FAILING
-    assert "CLAUDE.md" in evidence
-    assert "3 template placeholder" in evidence
-    repo.write("CLAUDE.md", _BD_TEMPLATE.format(build="`just check`", arch="a package per concern", conv="tests first"))
-    assert _evidence(repo, "agents.culture-files")[0] is Verdict.PASSING
-
-
-def test_a_mustache_placeholder_in_agents_md_fails(repo: Repo) -> None:
-    _filled_harness(repo)
-    repo.write("AGENTS.md", "# {{project_name}}\n")
-    verdict, evidence, _ = _evidence(repo, "agents.culture-files")
-    assert verdict is Verdict.FAILING
-    assert "AGENTS.md" in evidence
-
-
-def test_a_symlinked_claude_md_is_read_once(repo: Repo) -> None:
-    _filled_harness(repo)
-    repo.write("AGENTS.md", "# map\n_Add your build and test commands here_\n")
-    _, evidence, _ = _evidence(repo, "agents.culture-files")
-    assert "1 template placeholder" in evidence
 
 
 def test_worktree_folders_not_ignored_is_not_set_up(repo: Repo) -> None:
@@ -281,9 +228,3 @@ def test_an_unreadable_gitignore_is_reported_not_checked_instead_of_raising(repo
 
 def test_the_pocock_skills_row_is_gone(repo: Repo) -> None:
     assert "agents.pocock-skills" not in _verdicts(repo)
-
-
-def test_the_domain_template_keeps_the_skills_off_blueprints_files() -> None:
-    text = (templates.TEMPLATES / "agents" / "domain.md").read_text()
-    assert "GLOSSARY.md" in text
-    assert "Do not run `setup-matt-pocock-skills`" in text

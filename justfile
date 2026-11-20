@@ -40,8 +40,16 @@ lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACH
 check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "tag-check" "test") check-extra
     uv run python -m any_gate passed --gate check
 
+# The decision records are the shelf's own to keep (any-knowledge); blueprint does not check them. Runs after the steps, before the record.
+[private]
+check-extra: adr-check
+
 [group('gate')]
-check-all: beads-lint (scripts "all") (steps-all "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "arch" "spell" "deps" "test-all")
+adr-check:
+    uv run python -m any_knowledge check
+
+[group('gate')]
+check-all: beads-lint (scripts "all") (steps-all "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "arch" "spell" "deps" "test-all") adr-check
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
 # blueprint's for this step in every repo (stack/shell).

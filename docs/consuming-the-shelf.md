@@ -7,7 +7,7 @@ projects) the linter reference. The full agent behaviour lives in one place —
 exists.
 
 **To onboard a project, run `uv run blueprint init`** in its root (a dev dependency pinned by git tag; no shelf clone). It detects the
-stack, audits, then writes only what is missing: the justfile parts, the linter preset tables, `docs/agents/` and the AGENTS.md block, the
+stack, audits, then writes only what is missing: the justfile parts, the linter preset tables, the
 stack's recipe files, and the hook config with `prek install` (`--no-hooks` skips both). It never overwrites a file you have, and ends with
 the rows it could not set up. It also writes `mise.toml` (the tools the repo runs, at the versions found on PATH) and runs `mise lock`. Beads is opt-in: `init` suggests it, and
 `blueprint init --beads` runs `bd init --skip-hooks` (see `runbooks/adopt-beads.md`). Not done by `init`: the shelf git+tag dependencies of §1 (it points at

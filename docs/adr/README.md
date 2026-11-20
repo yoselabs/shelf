@@ -15,7 +15,7 @@ Thoughts feed tracks; tracks spawn missions; missions close into **ADRs**. An AD
 - **Living, one file per topic.** `docs/adr/NNNN-slug.md`. Numbers and slugs are stable.
 - **Rewritten when the decision changes.** The body states the decision as it stands. The old
   choice, the trigger and why it was dropped go into the file's `## History` as a dated bullet.
-- **Agents read `docs/adr/INDEX.md` only.** It is generated (`blueprint gate adr-index --write`) from
+- **Agents read `docs/adr/INDEX.md` only.** It is generated (`python -m any_knowledge index --write`) from
   the frontmatter: one line per decision in force. Open an ADR file only to challenge or change it.
 - **Short.** Decision on top, rejected options with their reasons, then History.
 
