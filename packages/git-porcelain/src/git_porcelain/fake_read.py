@@ -151,6 +151,7 @@ def dirty(repo: RepoState, wt: CheckoutState, *, base: str | None, ignored_under
 
 def _ignore_files(repo: RepoState, commit: str) -> dict[str, str]:
     files = repo.store.commits[commit].files
+    # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
     return {p: repo.store.blobs[s].decode("utf-8", "replace") for p, s in files.items() if ignore_rules.is_ignore_file(p)}
 
 

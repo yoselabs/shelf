@@ -185,6 +185,7 @@ def call(
             preexec_fn=preexec_fn,  # setrlimit only, async-signal-safe; see _preexec
         )
     except subprocess.TimeoutExpired as exc:
+        # lossy-ok: display: the stderr of a failed child goes into an error message
         stderr = exc.stderr.decode("utf-8", "replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
         return Outcome(result=None, returncode=None, stderr=stderr, duration_ms=_ms_since(started), timed_out=True)
     return Outcome(result=parse_result(proc.stdout), returncode=proc.returncode, stderr=proc.stderr, duration_ms=_ms_since(started))

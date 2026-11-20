@@ -31,6 +31,7 @@ __all__ = [
 
 def ignore_of(repo: RepoState, wt: CheckoutState, extra: Sequence[str] = ()) -> Ignore:
     """The root ``.gitignore`` over ``info/exclude`` over the checkout's own excludes over ``extra`` (each overrides the ones before)."""
+    # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
     return Ignore([*extra, *wt.exclude, *repo.info_exclude, *wt.files.get(".gitignore", b"").decode("utf-8", "replace").splitlines()])
 
 
@@ -144,6 +145,7 @@ def clean(repo: RepoState, wt: CheckoutState, keep: Sequence[str], *, ignored: b
     """Remove untracked files except keep patterns; optionally include ignored files. The model holds no nested
     repositories, so ``nested`` changes nothing here."""
     del nested
+    # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
     lines = [] if ignored else [*wt.exclude, *repo.info_exclude, *wt.files.get(".gitignore", b"").decode("utf-8", "replace").splitlines()]
     ignore = Ignore([*lines, *keep])
     for path in [p for p in wt.files if p not in wt.index and not ignore.ignores(p)]:

@@ -453,6 +453,7 @@ class PlaywrightBackend:
         self._stderr_buf += chunk
         *lines, self._stderr_buf = self._stderr_buf.split(b"\n")
         for raw in lines:
+            # lossy-ok: display: browser stderr goes into an error message
             line = raw.decode("utf-8", "replace").rstrip("\r")
             if line:
                 self._emit_stderr_line(line)
@@ -472,6 +473,7 @@ class PlaywrightBackend:
         if read_fd is None:
             return
         if self._stderr_buf:  # flush a trailing unterminated line
+            # lossy-ok: display: browser stderr goes into an error message
             line = self._stderr_buf.decode("utf-8", "replace").rstrip("\r")
             self._stderr_buf = b""
             if line:

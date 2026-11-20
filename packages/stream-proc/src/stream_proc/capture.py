@@ -235,6 +235,7 @@ def capture(
     if tick is not None:
         with contextlib.suppress(Exception):
             tick()  # a failing heartbeat never costs the result
+    # lossy-ok: input: child output returned as text; callers needing the exact bytes use capture_bytes
     return Captured(
         res.exit,
         res.out.decode("utf-8", "replace"),

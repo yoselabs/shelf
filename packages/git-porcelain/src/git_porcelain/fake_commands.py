@@ -41,6 +41,7 @@ def continue_rebase(repo: RepoState, state: CheckoutState, *, missing_ok: bool) 
 def resolve_and_continue(repo: RepoState, state: CheckoutState) -> CommandResult:
     if state.rebase is None:
         return CommandResult(ok=False, output="fatal: No rebase in progress?")
+    # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
     if any(fake_flow.MARKERS.search(state.files.get(p, b"").decode("utf-8", "replace")) for p in state.unmerged):
         return CommandResult(ok=False, output="conflict markers remain")
     try:

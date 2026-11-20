@@ -118,18 +118,25 @@ def _statement_lines(tree: ast.Module, call: ast.Call, lines: list[str]) -> list
     return lines[max(holder.lineno - 2, 0) : end]
 
 
+def _unmarked_replace(tree: ast.Module, lines: list[str]) -> list[int]:
+    """Line numbers of `errors="replace"` calls, keyword or positional (`.decode("utf-8", "replace")`), without a marker."""
+    calls = [*_errors_calls(tree, "replace"), *_errors_args(tree, "replace")]
+    return sorted({call.lineno for call in calls if not any("# lossy-ok: " in line for line in _statement_lines(tree, call, lines))})
+
+
 def test_errors_replace_carries_a_lossy_ok_marker() -> None:
     unmarked: list[str] = []
     for rel, tree in _sources().items():
-        lines = _lines(rel)
-        # keyword form only: ~27 sites spell it `.decode("utf-8", "replace")` positionally; they are not yet marked
-        unmarked += [
-            f"{rel}:{call.lineno}"
-            for call in _errors_calls(tree, "replace")
-            if not any("# lossy-ok: " in line for line in _statement_lines(tree, call, lines))
-        ]
+        unmarked += [f"{rel}:{n}" for n in _unmarked_replace(tree, _lines(rel))]
     msg = "errors=replace needs `# lossy-ok: <display|parse|detect|measure|input>: <why>`; text for a hash or stored file decodes strictly"
     assert unmarked == [], msg
+
+
+def test_planted_positional_replace_is_caught_and_a_marker_clears_it() -> None:
+    bare: str = 'def f(raw: bytes) -> str:\n    return raw.decode("utf-8", "replace")\n'
+    marked = 'def f(raw: bytes) -> str:\n    # lossy-ok: display: shown to a person\n    return raw.decode("utf-8", "replace")\n'
+    assert _unmarked_replace(ast.parse(bare), list(bare.splitlines())) == [2]
+    assert _unmarked_replace(ast.parse(marked), list(marked.splitlines())) == []
 
 
 def _unsorted_listings(tree: ast.Module) -> set[str]:

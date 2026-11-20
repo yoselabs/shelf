@@ -65,6 +65,7 @@ def merge_text(base: list[str], ours: list[str], theirs: list[str]) -> tuple[lis
 
 
 def _split(data: bytes) -> list[str]:
+    # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
     return data.decode("utf-8", "replace").splitlines()
 
 

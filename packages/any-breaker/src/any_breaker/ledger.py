@@ -58,6 +58,7 @@ class Ledger:
 
 def _facts(chunk: bytes) -> list[Fact]:
     out: list[Fact] = []
+    # lossy-ok: parse: a torn or non-UTF-8 line fails json.loads and is skipped
     for line in chunk.decode("utf-8", "replace").splitlines():
         try:
             out.append(Fact(**json.loads(line)))

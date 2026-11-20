@@ -76,6 +76,7 @@ def _renames(head: Mapping[str, str], index: Mapping[str, str], staged: Mapping[
 
 
 def _text_lines(data: bytes) -> list[str]:
+    # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
     text = data.decode("utf-8", "replace")
     if not text:
         return []
@@ -171,6 +172,7 @@ def grep_files(wt: CheckoutState, term: str) -> list[str]:
     found: list[str] = []
     for path in sorted(wt.index):
         data = wt.files.get(path)
+        # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
         if data is not None and b"\0" not in data and word.search(data.decode("utf-8", "replace")):
             found.append(path)
     return found
