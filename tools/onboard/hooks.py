@@ -108,8 +108,30 @@ def shelf_closure(name: str) -> list[str]:
     return sorted(seen - {name})
 
 
+def _workspace_sources(name: str) -> set[str]:
+    """The packages `name`'s manifest sources as `{ workspace = true }`."""
+    manifest = _SHELF_ROOT / "packages" / name / "pyproject.toml"
+    sources = tomllib.loads(manifest.read_text()).get("tool", {}).get("uv", {}).get("sources", {})
+    return {_norm(k) for k, v in sources.items() if isinstance(v, dict) and v.get("workspace") is True}
+
+
+def _tag_owner(name: str) -> str | None:
+    """The gate package that fixes `name`'s tag, or None.
+
+    A gate package that needs another gate package (`any-gate-python` needs `any-gate`) sources its workspace siblings as
+    `{ workspace = true }`, which uv resolves to the git URL at that package's own tag. A consumer pinning one of them at any other
+    tag fails to lock with conflicting URLs, so those siblings share the owner's tag.
+    """
+    for owner in GATE_PACKAGES:
+        if (GATE_PACKAGES.keys() - {owner}) & set(_shelf_requirements(owner)) and name in _workspace_sources(owner):
+            return owner
+    return None
+
+
 def release_tag(name: str) -> str:
-    """The tag a consumer pins `name` to: the gate packages' own, else the tag of the version the shelf holds now (`<name>-v<version>`)."""
+    """The tag a consumer pins `name` to: its tag owner's, else the gate packages' own, else the tag of the version the shelf holds now."""
+    if (owner := _tag_owner(name)) is not None:
+        return GATE_PACKAGES[owner]
     if name in GATE_PACKAGES:
         return GATE_PACKAGES[name]
     manifest = _SHELF_ROOT / "packages" / name / "pyproject.toml"

@@ -16,7 +16,7 @@ from onboard.hooks import config_text, ensure_gate_dependency
 SOURCE = {
     "git": "https://github.com/yoselabs/shelf",
     "subdirectory": "packages/any-gate",
-    "tag": "any-gate-v0.1.1",
+    "tag": "any-gate-python-v0.1.2",  # any-gate-python owns its workspace siblings' tag
 }
 
 
@@ -93,9 +93,21 @@ def test_the_shelf_packages_the_gate_needs_get_a_tag_source_too(tmp_path: Path) 
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "c"\nversion = "0.1.0"\n')
     ensure_gate_dependency(tmp_path)
     sources = tomllib.loads((tmp_path / "pyproject.toml").read_text())["tool"]["uv"]["sources"]
-    for name in ("any-lease", "process-lock", "atomic-io", "content-digest", "stream-proc"):
+    for name in ("any-lease", "process-lock", "atomic-io", "content-digest"):
         assert sources[name]["subdirectory"] == f"packages/{name}"
         assert sources[name]["tag"].startswith(f"{name}-v")
+
+
+def test_a_gate_package_that_needs_another_owns_the_tag_of_its_workspace_sources(tmp_path: Path) -> None:
+    # any-gate-python declares `any-gate = { workspace = true }`: uv resolves that to the git URL at any-gate-python's own tag,
+    # so a consumer pinning any-gate or stream-proc at another tag fails to lock with "conflicting URLs" (ogy, 2026-11-20).
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "c"\nversion = "0.1.0"\n')
+    ensure_gate_dependency(tmp_path)
+    sources = tomllib.loads((tmp_path / "pyproject.toml").read_text())["tool"]["uv"]["sources"]
+    owner = hooks.GATE_PACKAGES["any-gate-python"]
+    assert sources["any-gate"]["tag"] == owner
+    assert sources["stream-proc"]["tag"] == owner
+    assert sources["any-gate-python"]["tag"] == owner
 
 
 def test_every_tag_a_consumer_is_pinned_to_for_a_dependency_exists() -> None:
