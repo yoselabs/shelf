@@ -2,7 +2,7 @@
 name = "dir-trust"
 kind = "primitive"
 tier = "T0"
-release = "dir-trust-v0.1.0"
+release = "dir-trust-v0.1.1"
 capability = "Stop caring how a folder earns trust on this machine — a SHA-256 over its matching files in name order, a grant store kept outside the folder and written atomically, keys resolved so two spellings share a grant, and any edit, new file or removed file revoking the grant with no one revoking it."
 implementation = "ours"
 status = "candidate"
