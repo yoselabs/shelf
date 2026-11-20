@@ -1,5 +1,7 @@
 # Gate kit: scripts become packages, consumers drop their copies
 
+Status: **closed 2026-11-20** (tasks 1-13 done; task 5's lock-versus-slots is `shelf-3pcn.8`, deferred). The decision is ADR 0021; the code is `packages/any-gate`, `any-gate-python`, `blueprint`.
+
 Owner: shelf gate. Source: `docs/thoughts/2026-11-19-gate-and-blueprint-overhaul-menu.md`. Carries the mechanism of `gate-test-loop` and
 the contracts of `blueprint-multi-stack-contracts`.
 
