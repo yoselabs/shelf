@@ -26,17 +26,12 @@ _CONSTRUCTORS = {
 }
 
 _ALLOWED = {
-    "packages/stream-proc/src/stream_proc/runner.py": (
-        "owner of child supervision: one reader thread per pipe so a full pipe never stalls the child; sync API by design"
+    "packages/stream-proc/src/stream_proc/pump.py": (
+        "owner of child pipes: one reader thread per output pipe and a stdin feeder, released by the owner; sync API by design"
     ),
-    "packages/stream-proc/src/stream_proc/capture.py": (
-        "owner of child supervision: pipe drainers, stdin feeder and the tick heartbeat beside a blocking wait; sync API by design"
-    ),
+    "packages/stream-proc/src/stream_proc/capture.py": "owner of child supervision: the tick heartbeat beside a blocking wait; sync API",
     "packages/any-gate/src/any_gate/steps.py": (
         "fan-out of blocking `just` recipes with pass_fds, one thread per step joined together; run_steps is sync by design"
-    ),
-    "packages/any-agent/src/any_agent/supervisor.py": (
-        "supervisor of an agent child: stdout/stderr pumps and a stdin feeder beside a blocking wait; sync API by design"
     ),
     "packages/any-net/src/any_net/probe.py": (
         "blocking adapter: getaddrinfo ignores socket timeouts, so each probe is a daemon thread joined to one deadline; probe() is sync"

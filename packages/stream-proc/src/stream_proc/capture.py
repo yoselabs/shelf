@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import os
-import select
 import subprocess
 import threading
 import time
@@ -12,10 +10,12 @@ from dataclasses import dataclass
 from typing import IO, TYPE_CHECKING, Any
 
 from stream_proc.hold import popen_held
-from stream_proc.runner import _release, _wait
+from stream_proc.pump import Pump
+from stream_proc.runner import _wait
 from stream_proc.tree import stop_tree
 
 if TYPE_CHECKING:
+    import os
     from collections.abc import Callable, Mapping, Sequence
 
 TIMEOUT_EXIT = 124  # the exit code of coreutils ``timeout``
@@ -49,45 +49,6 @@ class CapturedBytes:
     timed_out: bool
     survivors: tuple[int, ...] = ()
     peak_rss: int | None = None
-
-
-def _slurp(stream: IO[bytes] | None, sink: list[bytes], quit_: threading.Event) -> None:
-    """Read ``stream`` to EOF into ``sink``; polls so ``quit_`` ends it even when a stranger holds the pipe open."""
-    if stream is None:
-        return
-    fd = stream.fileno()
-    while not quit_.is_set():
-        if not select.select([fd], [], [], 0.05)[0]:
-            continue
-        try:
-            chunk = os.read(fd, 65536)
-        except OSError:
-            return
-        if not chunk:
-            return
-        sink.append(chunk)
-
-
-def _feed(stream: IO[bytes] | None, data: bytes, quit_: threading.Event) -> None:
-    """Write ``data`` to ``stream`` as the child takes it, then close; a child that stops reading (or exits) ends it quietly."""
-    if stream is None:
-        return
-    fd = stream.fileno()
-    os.set_blocking(fd, False)
-    view = memoryview(data)
-    try:
-        while view and not quit_.is_set():
-            if not select.select([], [fd], [], 0.05)[1]:
-                continue
-            try:
-                view = view[os.write(fd, view[:65536]) :]
-            except BlockingIOError:
-                continue
-    except OSError:  # BrokenPipeError: the child exited without reading it all
-        pass
-    finally:
-        with contextlib.suppress(OSError):
-            stream.close()
 
 
 def capture_bytes(
@@ -163,35 +124,22 @@ def _run(
     )
     out: list[bytes] = []
     err: list[bytes] = []
-    quit_ = threading.Event()
-    threads: list[threading.Thread] = []  # filled and started together, after the replay: _release joins only started ones
+    pump = Pump(p, on_stdout=out.append, on_stderr=err.append, stdin=input)
     survivors: tuple[int, ...] = ()
     timed = False
     try:
         try:
             hold.replay()
-            threads.extend(
-                (
-                    threading.Thread(target=_slurp, args=(p.stdout, out, quit_), daemon=True),
-                    threading.Thread(target=_slurp, args=(p.stderr, err, quit_), daemon=True),
-                )
-            )
-            if input is not None:
-                threads.append(threading.Thread(target=_feed, args=(p.stdin, input, quit_), daemon=True))
-            for thread in threads:
-                thread.start()
+            pump.start()
             timed = _wait(p, t0=t0, last=[t0], timeout=timeout, idle=None, stop=None) is not None
             if timed:
                 survivors = stop_tree(p, grace=grace)
         except BaseException:
             stop_tree(p, grace=grace)
             raise
-        end = time.monotonic() + drain
-        for thread in threads:
-            if thread.is_alive():
-                thread.join(max(0.0, end - time.monotonic()))
+        pump.drain(drain)
     finally:
-        _release(p, threads, quit_)
+        pump.release()
     code = p.returncode
     exit_ = TIMEOUT_EXIT if timed else (code if code is not None else -1)
     return CapturedBytes(exit_, b"".join(out), b"".join(err), time.monotonic() - t0, timed, survivors, p.peak_rss)

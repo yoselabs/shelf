@@ -4,29 +4,27 @@ from __future__ import annotations
 
 import contextlib
 import errno
-import os
-import select
 import subprocess
-import threading
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from stream_proc import proctable
 from stream_proc.hold import popen_held
+from stream_proc.pump import MAX_LINE, Pump, check_max_line
 from stream_proc.registered import popen_registered
 from stream_proc.tree import stop_tree
 
 if TYPE_CHECKING:
+    import os
+    import threading
     from collections.abc import Callable, Mapping, Sequence
-    from typing import IO
 
     from stream_proc.owned import OwnedProcess
 
 Kind = Literal["wall", "idle", "stopped"]
 _FIRST_NAP_S = 0.001  # the wait for a child starts short and doubles to _NAP_S: a child that ends in a few ms is seen in a few ms
 _NAP_S = 0.02
-MAX_LINE = 1 << 20  # default cap of one emitted piece and of the pending bytes of an unfinished line (1 MiB)
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,56 +62,6 @@ def _emit(cb: Callable[[bytes], None] | None, raw: bytes) -> None:
 def _text(cb: Callable[[str], None] | None) -> Callable[[bytes], None] | None:
     # lossy-ok: input: child output returned as text; callers needing the exact bytes use capture_bytes
     return None if cb is None else lambda raw: cb(raw.decode("utf-8", "replace"))
-
-
-def _pump(
-    stream: IO[bytes] | None,
-    cb: Callable[[bytes], None] | None,
-    touch: Callable[[], None],
-    quit_: threading.Event,
-    *,
-    max_line: int = MAX_LINE,
-    splits: list[int] | None = None,
-) -> None:
-    """Read lines until EOF (a torn last line included) so a full pipe never blocks; a failing callback never stops it.
-
-    A line is held at most ``max_line`` bytes: when more arrives before its newline, the callback gets pieces of
-    exactly ``max_line`` bytes (no newline) and ``splits[0]`` counts them, so a child that never prints a newline
-    cannot grow memory. Polls the descriptor so ``quit_`` ends the reader even when a grandchild keeps the pipe
-    open: the caller can then close the pipe without a reader inside it.
-    """
-    if stream is None:
-        return
-    fd = stream.fileno()
-    buf = b""
-
-    def emit_capped(data: bytes) -> bytes:
-        while len(data) >= max_line:
-            _emit(cb, data[:max_line])
-            data = data[max_line:]
-            if splits is not None:
-                splits[0] += 1
-        return data
-
-    while not quit_.is_set():
-        if not select.select([fd], [], [], 0.05)[0]:
-            continue
-        try:
-            chunk = os.read(fd, min(65536, max_line))
-        except OSError:
-            break
-        if not chunk:
-            break
-        touch()
-        buf += chunk
-        *lines, buf = buf.split(b"\n")
-        for line in lines:
-            rest = emit_capped(line + b"\n")
-            if rest:
-                _emit(cb, rest)
-        buf = emit_capped(buf)
-    if buf:
-        _emit(cb, buf)
 
 
 def _wait(
@@ -169,7 +117,7 @@ def run(
     ``max_line`` (>= 1, default 1 MiB) caps the bytes held for one line: a longer line reaches the callback in
     pieces of ``max_line`` bytes and ``Result.split_lines`` counts the cuts.
     """
-    _check_max_line(max_line)
+    check_max_line(max_line)
     t0 = time.monotonic()
     p, hold = popen_held(
         list(argv),
@@ -181,7 +129,7 @@ def run(
         start_new_session=True,
     )
     limits = _Limits(timeout, idle, stop, grace, prove, drain, max_line)
-    return _supervise(p, ((p.stdout, _text(on_stdout)), (p.stderr, _text(on_stderr))), t0=t0, replay=hold.replay, limits=limits)
+    return _supervise(p, (_text(on_stdout), _text(on_stderr)), t0=t0, replay=hold.replay, limits=limits)
 
 
 def run_registered(
@@ -211,7 +159,7 @@ def run_registered(
     descendant still in the group is left to the caller (``pgid`` names it, :func:`group_alive` observes it).
     ``max_line`` caps a held line as in :func:`run`.
     """
-    _check_max_line(max_line)
+    check_max_line(max_line)
     t0 = time.monotonic()
     committed: list[OwnedProcess] = []
 
@@ -235,7 +183,7 @@ def run_registered(
         who = committed[0]
         return Result(None, None, None, who.pid, who.pgid, who.start, time.monotonic() - t0, exec_errno=error.errno or errno.EIO)
     limits = _Limits(timeout, None, stop, grace, prove, drain, max_line)
-    return _supervise(p, ((p.stdout, on_line),), t0=t0, replay=lambda: None, limits=limits)
+    return _supervise(p, (on_line, None), t0=t0, replay=lambda: None, limits=limits)
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,39 +197,29 @@ class _Limits:
     max_line: int = MAX_LINE
 
 
-def _check_max_line(max_line: int) -> None:
-    if max_line < 1:
-        message = f"max_line must be >= 1, got {max_line}"
-        raise ValueError(message)
-
-
 def _supervise(
     p: subprocess.Popen[bytes],
-    pumps: tuple[tuple[IO[bytes] | None, Callable[[bytes], None] | None], ...],
+    streams: tuple[Callable[[bytes], None] | None, Callable[[bytes], None] | None],
     *,
     t0: float,
     replay: Callable[[], None],
     limits: _Limits,
 ) -> Result:
-    """Pump ``pumps`` until the child ends or a limit stops its tree; on any unwinding the tree is stopped first."""
+    """Pump the child's output until it ends or a limit stops its tree; on any unwinding the tree is stopped first."""
     last = [t0]
-    readers: list[threading.Thread] = []
-    splits: list[list[int]] = []
-    quit_ = threading.Event()
+    pump = Pump(
+        p,
+        on_stdout=streams[0],
+        on_stderr=streams[1],
+        touch=lambda: last.__setitem__(0, time.monotonic()),
+        max_line=limits.max_line,
+    )
     kind: Kind | None = None
     survivors: tuple[int, ...] = ()
     try:
         try:
             replay()
-            for stream, cb in pumps:
-                touch = lambda: last.__setitem__(0, time.monotonic())  # noqa: E731
-                cuts = [0]
-                splits.append(cuts)
-                reader = threading.Thread(
-                    target=_pump, args=(stream, cb, touch, quit_), kwargs={"max_line": limits.max_line, "splits": cuts}, daemon=True
-                )
-                reader.start()
-                readers.append(reader)
+            pump.start()
             start = proctable.proc_start(p.pid)
             kind = _wait(p, t0=t0, last=last, timeout=limits.timeout, idle=limits.idle, stop=limits.stop)
             if kind is not None:
@@ -289,26 +227,9 @@ def _supervise(
         except BaseException:
             stop_tree(p, grace=limits.grace, prove=limits.prove)
             raise
-        end = time.monotonic() + (limits.drain if kind is None else 2.0)
-        for reader in readers:
-            reader.join(max(0.0, end - time.monotonic()))
+        pump.drain(limits.drain if kind is None else 2.0)
     finally:
-        _release(p, readers, quit_)
+        pump.release()
     code = p.returncode
     sig = -code if code is not None and code < 0 else None
-    return Result(
-        None if sig else code, sig, kind, p.pid, p.pid, start, time.monotonic() - t0, survivors, split_lines=sum(c[0] for c in splits)
-    )
-
-
-def _release(p: subprocess.Popen[bytes], readers: list[threading.Thread], quit_: threading.Event) -> None:
-    """End every reader, then close the child's pipes: on every exit path nothing of the child stays open."""
-    quit_.set()
-    for reader in readers:
-        reader.join(2.0)
-    if any(reader.is_alive() for reader in readers):
-        return  # a callback is stuck: closing a pipe under its reader is worse than the warning
-    for stream in (p.stdout, p.stderr, p.stdin):
-        if stream is not None:
-            with contextlib.suppress(OSError):
-                stream.close()
+    return Result(None if sig else code, sig, kind, p.pid, p.pid, start, time.monotonic() - t0, survivors, split_lines=pump.splits)
