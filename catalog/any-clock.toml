@@ -2,7 +2,7 @@
 name = "any-clock"
 kind = "any-lib"
 tier = "T1"
-release = "any-clock-v0.3.0"
+release = "any-clock-v0.4.0"
 capability = "Stop attributing time by hand: a nested phase stopwatch where exactly one phase owns each instant, with per-phase totals, limits and exempt phases."
 implementation = "ours"
 status = "candidate"

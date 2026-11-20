@@ -1,6 +1,6 @@
 [project]
 name = "shelf-vendor"
-version = "0.3.0"
+version = "0.2.0"
 description = "Vendor shelf packages byte-for-byte into a plugin's skill directory from a recorded shelf tag, record each tree hash in a manifest, check for drift, and warn when a newer shelf tag exists. Standard library only. Sunset: remove when plugins can depend on the shelf directly."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

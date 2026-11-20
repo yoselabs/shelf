@@ -48,15 +48,12 @@ class Repo:
         path.write_text(f"#!/bin/sh\ncat <<'EOF'\n{output}\nEOF\n")
         path.chmod(0o755)
 
-    def write(self, rel: str, text: str) -> Path:
+    def write(self, rel: str, text: str, *, executable: bool = False) -> Path:
         path = self.root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
-        return path
-
-    def write_executable(self, rel: str, text: str) -> Path:
-        path = self.write(rel, text)
-        path.chmod(0o755)
+        if executable:
+            path.chmod(0o755)
         return path
 
     def git(self, *args: str) -> str:

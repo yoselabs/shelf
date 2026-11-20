@@ -1,4 +1,5 @@
 """Write a file so a crash never leaves it half-written."""
+
 import os
 import tempfile
 

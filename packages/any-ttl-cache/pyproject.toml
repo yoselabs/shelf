@@ -1,6 +1,6 @@
 [project]
 name = "any-ttl-cache"
-version = "0.2.0"
+version = "0.1.0"
 description = "One owner of the sqlite TTL table: expiry, lazy eviction on read and an injected clock. Callers keep their keying and policy."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

@@ -120,6 +120,11 @@ _ALLOWED: dict[str, str] = {
         "blueprint:run:audit",
     ),
     **_rows(
+        "split: blueprint is being rewritten; its prune and executable flags wait for that rewrite",
+        "blueprint:write:prune",
+        "blueprint:write:executable",
+    ),
+    **_rows(
         "split: capture=False inherits stdio instead of capturing; a second operation",
         "stream-proc:capture_bytes:capture",
     ),
