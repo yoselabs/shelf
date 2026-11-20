@@ -1,0 +1,10 @@
+seq = 181
+date = "2026-11-20"
+event = "verdict"
+software = "beads-client"
+release = "beads-client-v0.2.0"
+actor = "iorlas-task-loop"
+consumer = "iorlas-task-loop"
+verdict = "adopted"
+cost = "iorlas-task-loop/pyproject.toml (beads-client==0.2.0, git source at tag beads-client-v0.2.0)"
+note = "Records the adoption left open by ledger 0177. task-loop pins beads-client==0.2.0 at the tag and uses the new seam: src/taskloop/tracker.py imports ReadyReadClient and TaskReadClient, and tests/cli/test_task_cli.py seeds FakeTaskReadClient. Read from the consumer's files on 2026-11-20; its suite was not run for this entry. The pin has since stayed at 0.2.0 while the shelf is at 0.4.0."
