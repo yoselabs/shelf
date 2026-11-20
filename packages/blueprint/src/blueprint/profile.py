@@ -249,7 +249,9 @@ _SHELL_MIN_LINES = 10
 
 def _shell_scripts(repo: Path, skip: tuple[str, ...]) -> list[str]:
     found = walk(repo, "*.sh", 3, (*skip, ".beads/hooks"))
-    if len(found) == 1 and len(found[0].read_text(errors="replace").splitlines()) < _SHELL_MIN_LINES:
+    if (
+        len(found) == 1 and len(found[0].read_text(encoding="utf-8", errors="replace").splitlines()) < _SHELL_MIN_LINES
+    ):  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
         return []
     return [p.relative_to(repo).as_posix() for p in found]
 
@@ -328,7 +330,7 @@ _NOT_SOURCE = SKIP_DIRS | {"tests", "test"}
 def _runtime_dependencies(pyproject: Path) -> set[str]:
     """Normalized (PEP 503) names in [project] dependencies and optional-dependencies; dev groups are left out."""
     try:
-        project = tomllib.loads(pyproject.read_text()).get("project", {})
+        project = tomllib.loads(pyproject.read_text(encoding="utf-8")).get("project", {})
     except (tomllib.TOMLDecodeError, OSError):
         return set()
     specs = list(project.get("dependencies", []))
@@ -342,7 +344,9 @@ def _source_uses(folder: Path, needles: tuple[str, ...]) -> bool:
     for here, dirs, files in os.walk(folder):
         dirs[:] = [d for d in dirs if d not in _NOT_SOURCE]
         for name in files:
-            if name.endswith(".py") and any(n in (Path(here) / name).read_text(errors="replace") for n in needles):
+            if name.endswith(".py") and any(
+                n in (Path(here) / name).read_text(encoding="utf-8", errors="replace") for n in needles
+            ):  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
                 return True
     return False
 

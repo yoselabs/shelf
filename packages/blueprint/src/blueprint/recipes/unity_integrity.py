@@ -47,7 +47,9 @@ def _meta_problems(root: Path) -> list[str]:
                 continue
             if not path.with_suffix("").exists():
                 problems.append(f"orphan meta (no asset): {rel}")
-            found = _GUID.search(path.read_text(errors="replace"))
+            found = _GUID.search(
+                path.read_text(encoding="utf-8", errors="replace")
+            )  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
             if found is None:
                 problems.append(f"meta without a 32-hex guid: {rel}")
             elif found[1] in guids:
@@ -61,7 +63,9 @@ def _setting_problems(root: Path) -> list[str]:
     problems: list[str] = []
     for file, pattern, want, why in _SETTINGS:
         path = root / "ProjectSettings" / file
-        found = re.search(pattern, path.read_text(errors="replace") if path.is_file() else "", re.MULTILINE)
+        found = re.search(
+            pattern, path.read_text(encoding="utf-8", errors="replace") if path.is_file() else "", re.MULTILINE
+        )  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
         value = found[1].strip() if found else ""
         if value != want:
             problems.append(f"ProjectSettings/{file}: {why} (found {value or 'nothing'!r}, want {want!r})")

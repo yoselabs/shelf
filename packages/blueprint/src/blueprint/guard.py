@@ -37,6 +37,7 @@ import tomllib
 
 SHELF_MARKER = "shelf"
 COULD_NOT_CHECK = 2
+_GIT_TIMEOUT = 60
 
 
 def _say(text: str) -> None:
@@ -44,7 +45,7 @@ def _say(text: str) -> None:
 
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+    return subprocess.run(["git", *args], capture_output=True, text=True, check=False, timeout=_GIT_TIMEOUT)
 
 
 def _staged_pyproject() -> str | None:
@@ -74,6 +75,15 @@ def _is_local_shelf_source(src: object) -> bool:
 
 def check(*, committed: bool) -> int:
     """The exit code of `blueprint guard`: 0 clean, 1 offenders, 2 could not check."""
+    try:
+        return _verdict(committed=committed)
+    except subprocess.TimeoutExpired:
+        _say(f"✖ cannot check for a local shelf source: git did not answer within {_GIT_TIMEOUT}s.")
+        _say("  This is NOT a pass — the guard could not run at all.")
+        return COULD_NOT_CHECK
+
+
+def _verdict(*, committed: bool) -> int:
     if _git("rev-parse", "--git-dir").returncode != 0:
         _say("✖ cannot check for a local shelf source: not a git repository.")
         _say("  This is NOT a pass — the guard could not run at all.")

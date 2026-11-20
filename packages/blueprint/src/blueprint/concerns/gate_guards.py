@@ -88,7 +88,9 @@ def guards_have_red_tests(ctx: Context) -> Finding:
     scripts = _gate_scripts(ctx, gate)
     if not scripts:
         return not_applicable("`just check` runs no repo-local script")
-    tests = [p.read_text(errors="replace") for pattern in _TEST_GLOBS for p in walk(ctx.repo, pattern)]
+    tests = [
+        p.read_text(encoding="utf-8", errors="replace") for pattern in _TEST_GLOBS for p in walk(ctx.repo, pattern)
+    ]  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
     # An unchanged copy of a blueprint recipe is tested where it is written, in the shelf; an edited copy is the repo's own.
     recipes = [s for s in scripts if _is_recipe_copy(ctx, s)]
     untested = [s for s in scripts if s not in recipes and not any(Path(s).stem in t or Path(s).stem.replace("-", "_") in t for t in tests)]

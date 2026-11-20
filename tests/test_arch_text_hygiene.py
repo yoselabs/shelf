@@ -8,9 +8,6 @@
    returns the file system's order, which differs between machines. This is a HEURISTIC: it sees only a listing that
    is not inside a `sorted()` call, not where the result ends up. A hit is fixed when its result feeds a stored file,
    a hash or a printed list, and allowlisted (with the reason it is order-free) when it does not.
-
-Blueprint is another owner's package and tools/gate_state.py is the byte-identical copy of its recipe; both are out of
-scope here until blueprint adds `encoding=` and the markers itself.
 """
 
 from __future__ import annotations
@@ -19,7 +16,6 @@ import ast
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
-_UNOWNED = ("packages/blueprint/", "tools/gate_state.py")
 
 _IGNORE_OK = {
     "packages/anyembed/src/anyembed/llamacpp.py": "drops the half-cut character a token truncation leaves at the end of the bytes",
@@ -52,6 +48,9 @@ _UNSORTED_OK = {
     "packages/any-proc/src/any_proc/run.py::user_task_count": "only counted",
     "packages/git-porcelain/src/git_porcelain/real_cache.py::heads_files": "an in-process stat signature; another order is a recompute",
     "packages/stream-proc/src/stream_proc/procfs.py::table": "a dict by pid: callers look up, none rely on its order",
+    "packages/blueprint/src/blueprint/gate_test.py::is_workspace": "any() over the glob yields a bool: no order reaches output",
+    "packages/blueprint/src/blueprint/model.py::walk": "os.walk runs unwrapped to prune `dirs`; it returns sorted(found)",
+    "packages/blueprint/src/blueprint/profile.py::_source_uses": "returns a bool (any file matches): no order reaches output",
     "tools/blueprint_fitness.py::_whole_suite": "builds a set",
     "tools/blueprint_fitness.py::pytest_sessionfinish": "the observed records feed `judge`, which compares sets, and are not stored",
     "tools/changed.py::everything": "sorted on the line that returns the list",
@@ -63,8 +62,7 @@ def _sources() -> dict[str, ast.Module]:
     paths = [*_ROOT.glob("packages/*/src/**/*.py"), *_ROOT.glob("packages/*/bench/**/*.py"), *_ROOT.glob("tools/**/*.py")]
     for path in sorted(paths):
         rel = path.relative_to(_ROOT).as_posix()
-        if not rel.startswith(_UNOWNED):
-            out[rel] = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
+        out[rel] = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
     return out
 
 

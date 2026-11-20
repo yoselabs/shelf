@@ -133,9 +133,9 @@ def _audit_strict(repo: Path) -> str | None:
     if str(_BLUEPRINT_SRC) not in sys.path:
         sys.path.insert(0, str(_BLUEPRINT_SRC))
     from blueprint.model import Verdict  # noqa: PLC0415 -- resolved from the shelf clone at run time
-    from blueprint.runner import run  # noqa: PLC0415 -- same
+    from blueprint.runner import run_audit  # noqa: PLC0415 -- same
 
-    rows = {r.id: r for r in run(repo, concern="backlog", audit=True).rows}
+    rows = {r.id: r for r in run_audit(repo, concern="backlog").rows}
     row = rows.get("backlog.strict-config")
     if row is None:
         return "backlog.strict-config did not run (no tracker detected)"

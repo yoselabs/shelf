@@ -45,15 +45,18 @@ class Repo:
     def fake_tool(self, path: Path, output: str) -> None:
         """An executable at `path` that prints `output` and exits 0, whatever it is asked."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"#!/bin/sh\ncat <<'EOF'\n{output}\nEOF\n")
+        path.write_text(f"#!/bin/sh\ncat <<'EOF'\n{output}\nEOF\n", encoding="utf-8")
         path.chmod(0o755)
 
-    def write(self, rel: str, text: str, *, executable: bool = False) -> Path:
+    def write(self, rel: str, text: str) -> Path:
         path = self.root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
-        if executable:
-            path.chmod(0o755)
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def write_executable(self, rel: str, text: str) -> Path:
+        path = self.write(rel, text)
+        path.chmod(0o755)
         return path
 
     def git(self, *args: str) -> str:

@@ -13,7 +13,7 @@ def actions_files(ctx: Context) -> list[str]:
     for folder, pick in ((".github/workflows", "*"), (".github/actions", "**/action.*")):
         root = ctx.path(folder)
         if root.is_dir():
-            found += [p.relative_to(ctx.repo).as_posix() for p in root.glob(pick) if p.is_file() and p.suffix in _SUFFIXES]
+            found += [p.relative_to(ctx.repo).as_posix() for p in sorted(root.glob(pick)) if p.is_file() and p.suffix in _SUFFIXES]
     return sorted(found)
 
 

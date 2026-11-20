@@ -202,10 +202,17 @@ def _branch_aware(row: Row, branches: dict[str, list[str]]) -> Row:
     return replace(row, evidence=evidence, remediation=remediation, fixed_by=FixedBy.OWNER)
 
 
-def run(
-    repo: Path, *, concern: str | None = None, audit: bool = False, today: date | None = None, env: dict[str, str] | None = None
-) -> Run:
-    """Run every applicable check on `repo`; the audit-only ones only when `audit`."""
+def run(repo: Path, *, concern: str | None = None, today: date | None = None, env: dict[str, str] | None = None) -> Run:
+    """Run every applicable check on `repo` except the audit-only ones: the per-commit gate."""
+    return _run_checks(repo, concern=concern, audit=False, today=today, env=env)
+
+
+def run_audit(repo: Path, *, concern: str | None = None, today: date | None = None, env: dict[str, str] | None = None) -> Run:
+    """Run every applicable check on `repo`, the slow and machine-state (audit-only) ones too."""
+    return _run_checks(repo, concern=concern, audit=True, today=today, env=env)
+
+
+def _run_checks(repo: Path, *, concern: str | None, audit: bool, today: date | None, env: dict[str, str] | None) -> Run:
     repo = repo.resolve()
     today = today or date.today()  # noqa: DTZ011 -- override expiry is a calendar date in the owner's zone
     state = load_state(repo, today)

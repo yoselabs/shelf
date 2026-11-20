@@ -37,7 +37,7 @@ def test_a_fingerprint_follows_the_verdict_and_not_the_evidence_text() -> None:
 
 
 def _write(repo: Repo, today: date) -> list[Path]:
-    return report.write(run(repo.root, concern="scratch", env=repo.env, today=today), repo.root, today, prune=False)
+    return report.write_concern(run(repo.root, concern="scratch", env=repo.env, today=today), repo.root, today)
 
 
 def test_a_rerun_with_the_same_verdicts_does_not_touch_the_report(repo: Repo, scratch: None) -> None:

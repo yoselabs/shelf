@@ -20,7 +20,7 @@ from pathlib import Path
 
 from blueprint import adr, checkpoints, gate_test, guard, preset, render, report, survey, templates
 from blueprint.profile import detect, load_state
-from blueprint.runner import run
+from blueprint.runner import run, run_audit
 
 RECIPES = Path(__file__).resolve().parent / "recipes"
 RECIPE_FILES = {
@@ -110,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     }
     if args.command in commands:
         return commands[args.command](args)
-    result = run(args.repo, concern=args.concern, audit=args.audit)
+    result = (run_audit if args.audit else run)(args.repo, concern=args.concern)
     if args.json:
         text = report.as_json(result)
     elif args.gate:
@@ -121,7 +121,8 @@ def main(argv: list[str] | None = None) -> int:
         text = report.markdown(result)
     sys.stdout.write(text + "\n")
     if args.write:
-        for path in report.write(result, args.repo.resolve(), date.today(), prune=args.concern is None):  # noqa: DTZ011 -- a report date, the owner's calendar
+        write = report.write_concern if args.concern else report.write
+        for path in write(result, args.repo.resolve(), date.today()):  # noqa: DTZ011 -- a report date, the owner's calendar
             sys.stderr.write(f"wrote {path}\n")
     return result.exit_code
 

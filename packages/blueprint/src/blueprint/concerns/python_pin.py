@@ -108,7 +108,9 @@ def _floor(ctx: Context) -> object:
 
 
 def _uv_images(ctx: Context) -> Finding:
-    copies = [p for p in dockerfiles(ctx.repo, ctx.profile.ignore) if _UV_IMAGE.search(p.read_text(errors="replace"))]
+    copies = [
+        p for p in dockerfiles(ctx.repo, ctx.profile.ignore) if _UV_IMAGE.search(p.read_text(encoding="utf-8", errors="replace"))
+    ]  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
     if not copies:
         return passing("no image copies uv")
     pinned = _uv_pin(ctx)
@@ -119,7 +121,9 @@ def _uv_images(ctx: Context) -> Finding:
     pin, where = pinned
     problems: list[str] = []
     for p in copies:
-        tags = {m.group(1) or "no tag" for m in _UV_IMAGE.finditer(p.read_text(errors="replace"))}
+        tags = {
+            m.group(1) or "no tag" for m in _UV_IMAGE.finditer(p.read_text(encoding="utf-8", errors="replace"))
+        }  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
         problems += [f"{p.relative_to(ctx.repo).as_posix()} copies uv:{tag}, the pin is {pin}" for tag in sorted(tags) if tag != pin]
     if problems:
         return failing("; ".join(problems), f"install uv {pin} ({where}) in every image: `COPY --from=ghcr.io/astral-sh/uv:{pin}`")

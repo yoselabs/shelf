@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 from blueprint.concerns.backlog import STRICT
 from blueprint.model import Verdict
-from blueprint.runner import run
+from blueprint.runner import run, run_audit
 
 if TYPE_CHECKING:
     from blueprint.testing import Repo
@@ -22,7 +22,7 @@ def _beads(repo: Repo, *, config: dict[str, str] | None = None, lint_exit: int =
 
 
 def _verdicts(repo: Repo) -> dict[str, Verdict]:
-    return {r.id: r.verdict for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows}
+    return {r.id: r.verdict for r in run_audit(repo.root, concern="backlog", env=repo.env).rows}
 
 
 def test_a_strict_quiet_beads_repo_passes_every_backlog_checkpoint(repo: Repo) -> None:
@@ -63,7 +63,7 @@ def test_a_value_only_in_bds_database_fails_whatever_order_bd_lists_it_in(repo: 
     _beads(repo)
     pair = [("import.auto", "true", "default"), ("import.auto", "false", "database")]
     _show(repo, *(pair[::-1] if reverse else pair))
-    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.strict-config")
+    row = next(r for r in run_audit(repo.root, concern="backlog", env=repo.env).rows if r.id == "backlog.strict-config")
     assert row.verdict is Verdict.FAILING
     assert "import.auto" in row.evidence
     assert ".beads/config.yaml" in row.evidence
@@ -118,7 +118,7 @@ def test_a_blocked_bead_is_linted_too(repo: Repo) -> None:
             1,
         )
     )
-    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    row = next(r for r in run_audit(repo.root, concern="backlog", env=repo.env).rows if r.id == "backlog.lint")
     assert row.verdict is Verdict.FAILING
     assert "x-9" in row.evidence
 
@@ -142,7 +142,7 @@ def test_lint_evidence_counts_beads_and_missing_sections_and_names_the_first_few
     # empty segments, one bead named, nothing to size the cleanup by.
     repo.write(".beads/config.yaml", "")
     repo.fake_bd(STRICT, lint_exit=1, lint_out=_LINT)
-    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    row = next(r for r in run_audit(repo.root, concern="backlog", env=repo.env).rows if r.id == "backlog.lint")
     assert row.verdict is Verdict.FAILING
     assert row.evidence == (
         "3 beads miss sections: Acceptance Criteria x2, Steps to Reproduce x1, Success Criteria x1; "
@@ -154,7 +154,7 @@ def test_lint_evidence_caps_the_bead_list_at_five_and_keeps_the_total(repo: Repo
     beads = "".join(f"x-{i} [task]: t\n  \u26a0 Missing: ## Acceptance Criteria\n\n" for i in range(8))
     repo.write(".beads/config.yaml", "")
     repo.fake_bd(STRICT, lint_exit=1, lint_out=f"Template warnings (8 issues, 8 warnings):\n\n{beads}")
-    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    row = next(r for r in run_audit(repo.root, concern="backlog", env=repo.env).rows if r.id == "backlog.lint")
     assert row.evidence.startswith("8 beads miss sections: Acceptance Criteria x8; first: x-0, x-1, x-2, x-3, x-4")
     assert "x-5" not in row.evidence
 
@@ -200,7 +200,7 @@ def test_a_clone_whose_bd_database_does_not_answer_fails_lint(repo: Repo) -> Non
             'if [ "$1" = lint ]', 'if [ "$1" = list ]; then echo "Error: no beads database found" >&2; exit 1; fi\nif [ "$1" = lint ]', 1
         )
     )
-    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    row = next(r for r in run_audit(repo.root, concern="backlog", env=repo.env).rows if r.id == "backlog.lint")
     assert row.verdict is Verdict.FAILING
     assert "bd bootstrap" in row.remediation
 
@@ -215,7 +215,7 @@ def test_an_uninitialized_database_gets_the_fix_bootstrap_alone_cannot_make(repo
             1,
         )
     )
-    row = next(r for r in run(repo.root, concern="backlog", audit=True, env=repo.env).rows if r.id == "backlog.lint")
+    row = next(r for r in run_audit(repo.root, concern="backlog", env=repo.env).rows if r.id == "backlog.lint")
     assert "embeddeddolt.broken" in row.remediation
 
 

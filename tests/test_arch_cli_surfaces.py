@@ -19,8 +19,9 @@ _RECIPE = "a standalone script a repo copies alone into its tools/: it cannot im
 _ALLOWED = {
     **{
         f"packages/blueprint/src/blueprint/recipes/{name}.py": _RECIPE
-        for name in ("changed", "check_coverage", "check_dockerfile_pins", "check_godot", "gate_state", "unity_integrity")
+        for name in ("check_coverage", "check_dockerfile_pins", "check_godot", "unity_integrity")
     },
+    "packages/blueprint/src/blueprint/secret_scan.py": "blueprint is stdlib only (bare clone, PYTHONPATH): no verb-cli",
     "packages/stream-proc/src/stream_proc/_exec_gate.py": "a child-side gate script run by path: stdlib only, no shelf import",
     "tools/catalog.py": "a repo tool script, run by `just`: stdlib only, no workspace import",
     "tools/preset_drift.py": "a repo tool script, run by `just`: stdlib only, no workspace import",

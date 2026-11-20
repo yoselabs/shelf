@@ -13,7 +13,8 @@ _PACKAGES = _ROOT / "packages"
 _HASHLIB_IMPORTERS = {
     "any-failure-fp/src/any_failure_fp/fingerprint.py": "legitimate: sha1 suffix of a cut fingerprint is a key; sha256 would change it",
     "anyembed/src/anyembed/testing.py": "legitimate: raw digest bytes seed a fake vector, not an identity",
-    "blueprint/src/blueprint/runner.py": "consumer wave: sha256 of one joined string (digest_text)",
+    "blueprint/src/blueprint/report.py": "legitimate: sha256[:12] fingerprints stored in written reports; stdlib-only engine",
+    "blueprint/src/blueprint/runner.py": "legitimate: sha256[:12] checkpoint-set hash stored in reports; stdlib-only engine",
     "dir-trust/src/dir_trust/__init__.py": "legitimate: incremental hash with NUL framing, kept in trust grants; no content-digest door",
     "git-porcelain/src/git_porcelain/fake_read.py": "legitimate: sha1 of the common dir is a stored local key",
     "git-porcelain/src/git_porcelain/fake_store.py": "legitimate: git's own blob and tree object id is sha1",

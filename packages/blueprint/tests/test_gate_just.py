@@ -8,14 +8,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from blueprint.model import Verdict
-from blueprint.runner import run
+from blueprint.runner import run, run_audit
 
 if TYPE_CHECKING:
     from blueprint.testing import Repo
 
 
 def _row(repo: Repo, check_id: str, *, audit: bool = True) -> tuple[Verdict, str]:
-    rows = {r.id: r for r in run(repo.root, concern="gate", audit=audit, env=repo.env).rows}
+    rows = {r.id: r for r in (run_audit if audit else run)(repo.root, concern="gate", env=repo.env).rows}
     return rows[check_id].verdict, rows[check_id].evidence
 
 
@@ -140,14 +140,14 @@ def test_a_justfile_without_just_installed_is_not_checked_not_failed(repo: Repo)
 
 def test_the_pinned_just_in_the_repos_venv_is_used_when_none_is_on_path(repo: Repo) -> None:
     repo.write("justfile", "check:\n    true\n")
-    repo.write(".venv/bin/just", "#!/bin/sh\nexit 0\n", executable=True)
+    repo.write_executable(".venv/bin/just", "#!/bin/sh\nexit 0\n")
     repo.env["PATH"] = str(repo.bin_dir)
     rows = {r.id: r for r in run(repo.root, concern="gate", env=repo.env).rows}
     assert rows["gate.one-command"].verdict is Verdict.PASSING
 
 
 def _fix(repo: Repo, check_id: str) -> str:
-    return next(r.remediation for r in run(repo.root, concern="gate", audit=False, env=repo.env).rows if r.id == check_id)
+    return next(r.remediation for r in run(repo.root, concern="gate", env=repo.env).rows if r.id == check_id)
 
 
 def test_a_repo_with_no_code_that_declares_python_gets_the_onboarding_fix(repo: Repo) -> None:
@@ -204,11 +204,11 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
         ("gate.git-config-clean", 1, True),
         ("gate.lfs-installed", 1, True),
     )
-    audited = run(repo.root, concern="gate", audit=True, env=repo.env)
+    audited = run_audit(repo.root, concern="gate", env=repo.env)
     gated = run(repo.root, concern="gate", env=repo.env)
     assert [(r.id, r.version) for r in audited.rows] == [(key, version) for key, version, _ in expected]
     assert [(r.id, r.version) for r in gated.rows] == [(key, version) for key, version, audit in expected if not audit]
     assert all(r.concern == "gate" and r.layer == "generic" for r in audited.rows)
     assert gated.skipped_audit == sum(audit for _, _, audit in expected)
     assert audited.set_hash == gated.set_hash
-    assert not run(repo.root, concern="gate_no_ci", audit=True, env=repo.env).rows
+    assert not run_audit(repo.root, concern="gate_no_ci", env=repo.env).rows

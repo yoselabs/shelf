@@ -91,9 +91,9 @@ def test_the_blueprint_backlog_concern_passes_after_the_operation(repo: Path) ->
     assert BeadsOperation(repo).run({}).outcome == Outcome.APPLIED
     sys.path.insert(0, str(_ROOT / "packages" / "blueprint" / "src"))
     from blueprint.model import Verdict  # noqa: PLC0415 -- path-injected above
-    from blueprint.runner import run  # noqa: PLC0415
+    from blueprint.runner import run_audit  # noqa: PLC0415
 
-    rows = {r.id: r for r in run(repo, concern="backlog", audit=True).rows}
+    rows = {r.id: r for r in run_audit(repo, concern="backlog").rows}
     assert rows["backlog.strict-config"].verdict is Verdict.PASSING, rows["backlog.strict-config"].evidence
     config = (repo / ".beads" / "config.yaml").read_text()
     assert "auto: true" not in config
