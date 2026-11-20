@@ -3463,7 +3463,7 @@ dev = [
 
 [[package]]
 name = "llm-wobble"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "packages/llm-wobble" }
 
 [package.dev-dependencies]

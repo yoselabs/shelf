@@ -76,14 +76,6 @@ _ALLOWED: dict[str, str] = {
         "atomic-io:atomic_write_text:keep_mode",
     ),
     **_rows(
-        "split: json_only picks between two strippers; a2kay and a2web consume llm-wobble",
-        "llm-wobble:strip_fenced_blocks:json_only",
-    ),
-    **_rows(
-        "split: strip_fences skips a step the caller can do; a2kay and a2web consume llm-wobble",
-        "llm-wobble:parse_list_with_policy:strip_fences",
-    ),
-    **_rows(
         "split: choices=True is a compatibility switch between two flag shapes; ogy consumes verb-cli",
         "verb-cli:flags_of:choices",
     ),
