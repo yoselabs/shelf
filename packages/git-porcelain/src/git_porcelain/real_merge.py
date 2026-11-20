@@ -23,7 +23,7 @@ __all__ = ["abort_merge", "finish_merge", "merging", "start_merge"]
 
 
 def merging(wt: RealWorktree) -> bool:
-    return wt.run("rev-parse", "-q", "--verify", "MERGE_HEAD", check=False).rc == 0
+    return wt.try_run("rev-parse", "-q", "--verify", "MERGE_HEAD").rc == 0
 
 
 def _paused_rebase(wt: RealWorktree) -> bool:
@@ -40,7 +40,7 @@ def start_merge(wt: RealWorktree, rev: str) -> MergeStarted | UpToDate:
         msg = "dirty: the tree has tracked changes"
         raise ValueError(msg)
     try:
-        done = wt.run("merge", "--no-ff", "--no-commit", "--no-verify", "--no-edit", target, check=False)
+        done = wt.try_run("merge", "--no-ff", "--no-commit", "--no-verify", "--no-edit", target)
         if merging(wt):
             return MergeStarted(Sha(target), unmerged(wt), output=done.output)
         if done.rc == 0:
@@ -59,7 +59,7 @@ def finish_merge(wt: RealWorktree, message: str) -> Sha:
         text = f"the index has unresolved merge entries: {', '.join(paths)}"
         raise UnmergedPaths(text, paths)
     try:
-        done = wt.repo.run(wt.path, *_identity_args(wt.repo), "commit", "-q", "--no-verify", "--allow-empty", "-m", message, check=False)
+        done = wt.repo.try_run(wt.path, *_identity_args(wt.repo), "commit", "-q", "--no-verify", "--allow-empty", "-m", message)
         if done.rc:
             raise unavailable(("commit",), done)
     finally:
@@ -71,7 +71,7 @@ def abort_merge(wt: RealWorktree) -> None:
     if not merging(wt):
         return
     try:
-        done = wt.run("merge", "--abort", check=False)
+        done = wt.try_run("merge", "--abort")
         if done.rc:
             raise unavailable(("merge",), done)
     finally:

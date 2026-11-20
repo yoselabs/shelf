@@ -1,13 +1,13 @@
 [project]
 name = "any-speech"
-version = "0.6.0"
+version = "0.6.1"
 description = "Stop caring which engine turns speech into words, turns and voices — one Transcript (word times, speakers, provenance) from swappable engines behind small ports, with one model per machine (a flock, a draining queue), a failure record that never stalls a batch, a peak-memory guard and a voice embedding for matching a host across files."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
-    "process-lock>=0.2,<1",
+    "process-lock>=0.4,<1",
     "any-lease>=0.1,<1",
     "atomic-io>=0.2,<1",
     "content-digest>=0.2,<1",
@@ -15,7 +15,7 @@ dependencies = [
     "verb-cli>=0.2,<1",
     "any-pipeline>=0.1,<1",
     "any-versioned>=0.1,<1",
-    "stream-proc>=0.10,<1",
+    "stream-proc>=0.11,<1",
     "child-env>=0.2,<1",
     "any-clock>=0.4,<1",
 ]

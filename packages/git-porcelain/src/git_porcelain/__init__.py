@@ -119,6 +119,7 @@ from git_porcelain.porcelain import (
     show_stage,
     status,
     sync_status,
+    try_git,
     unmerged_paths,
 )
 from git_porcelain.real import RealRepo, RealWorktree
@@ -242,6 +243,7 @@ __all__ = [
     "status",
     "symbolic_ref",
     "sync_status",
+    "try_git",
     "unmerged_paths",
     "upstream",
     "worktree_tree",

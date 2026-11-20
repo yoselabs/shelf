@@ -5,12 +5,12 @@ Method: each row read in its code, not from the old reason. Verdicts:
 
 - **A** split: the flag picks between two behaviours of one operation; the proposal names the separate type or function.
 - **B** fact: data about a call, a value or an error, or a third-party library's own option; not a code path.
-- **C** exception: Article IX allows a flag that opts into a cost, and a named safety or durability opt-in is the default-safe pit of success; kept as a justified row, each needing an accepted ADR (0022) to be durable.
+- **C** exception: Article IX allows a flag that opts into a cost, and a named safety or durability opt-in is the default-safe pit of success; kept as a justified row, made durable by ADR 0030.
 - **FIXED**: an A row private to one package with no external consumer, cheap and test-covered; fixed in this change.
 
-Counts: 114 rows. FIXED 4; A (left) 42; B 44; C 24.
+Counts: 114 rows at the start. Now FIXED 41 (4 earlier + 37 split in shelf-tyld.13); A left 1 (blueprint:run:audit, skipped); B 44; C 28 (24 + 4 reclassified from A). Rows added by new split functions: `atomic_replace_*` repeat the `fsync` (C) and `sort_keys` (B) rows, `try_run` repeats `pin` (C).
 
-External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row on a public export or with a `use-cases/` row from one of them is left, with the consumers named. git-porcelain (public `Repo` protocol, consumed by ogy and a2kay) is classified only.
+External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: the splits below break their calls (major/minor bump + CHANGELOG each).
 
 | row | verdict | proposal / reason |
 |---|---|---|
@@ -18,72 +18,72 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `shelf-vendor:_say:err` | FIXED (A) | `_out(text)` and `_err(text)` (shelf-vendor 0.3.0) |
 | `blueprint:write:prune` | FIXED (A) | `report.write` always writes; `report.prune_stale(repo, written)` is called by the CLI after a full run (blueprint 0.2.0) |
 | `blueprint:write:executable` | FIXED (A) | `Repo.write` and `Repo.write_executable` in `blueprint.testing` (blueprint 0.2.0) |
-| `any-browser:_navigate:scroll_to_stable` | A | Two operations: `render` and `render_listing` (scroll to stable), on the Backend protocol; a2web (use-cases/a2web--any-browser) must move. Left: external consumer. |
-| `any-browser:render:scroll_to_stable` | A | Two operations: `render` and `render_listing` (scroll to stable), on the Backend protocol; a2web (use-cases/a2web--any-browser) must move. Left: external consumer. |
-| `anyllm:resolve_provider:fallback` | A | `resolve_first(order, ...)` beside `resolve_provider` (composed with runtime fallback). Left: external consumers. |
-| `app-dirs:cache_dir:create` | A | `config_dir(app)` pure, plus `ensure(path) -> Path` (mkdir -p). In-tree: any-agent, iorlas-task-loop use app-dirs. Left: public API with external consumers. |
-| `app-dirs:cache_dir:plugin_data` | A | `plugin_config_dir(app)` etc. (or one `plugin_dir(kind, app)`) reading CLAUDE_PLUGIN_DATA, beside the XDG functions. Left: public API with external consumers. |
-| `app-dirs:config_dir:create` | A | `config_dir(app)` pure, plus `ensure(path) -> Path` (mkdir -p). In-tree: any-agent, iorlas-task-loop use app-dirs. Left: public API with external consumers. |
-| `app-dirs:config_dir:plugin_data` | A | `plugin_config_dir(app)` etc. (or one `plugin_dir(kind, app)`) reading CLAUDE_PLUGIN_DATA, beside the XDG functions. Left: public API with external consumers. |
-| `app-dirs:data_dir:create` | A | `config_dir(app)` pure, plus `ensure(path) -> Path` (mkdir -p). In-tree: any-agent, iorlas-task-loop use app-dirs. Left: public API with external consumers. |
-| `app-dirs:data_dir:plugin_data` | A | `plugin_config_dir(app)` etc. (or one `plugin_dir(kind, app)`) reading CLAUDE_PLUGIN_DATA, beside the XDG functions. Left: public API with external consumers. |
-| `app-dirs:state_dir:create` | A | `config_dir(app)` pure, plus `ensure(path) -> Path` (mkdir -p). In-tree: any-agent, iorlas-task-loop use app-dirs. Left: public API with external consumers. |
-| `app-dirs:state_dir:plugin_data` | A | `plugin_config_dir(app)` etc. (or one `plugin_dir(kind, app)`) reading CLAUDE_PLUGIN_DATA, beside the XDG functions. Left: public API with external consumers. |
-| `atomic-io:atomic_write_bytes:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
-| `atomic-io:atomic_write_json:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
-| `atomic-io:atomic_write_text:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
-| `blueprint:run:audit` | A | `run_gate(repo)` and `run_audit(repo)` sharing `_judge`; the CLI picks one. Private to the shelf (use-case shelf--blueprint) but touches the CLI, skill docs and ~20 tests. Left: not cheap. |
-| `child-env:scrub:strip_venv` | A | Delete `strip_venv`; callers compose `without_venv(scrub(env))`. Edge: today VIRTUAL_ENV is read before `drop` removes it (test pins that), so the composition needs `without_venv(scrub(..), venv=env.get('VIRTUAL_ENV'))` or a kept-order helper. Public API, major bump. Left: public export. |
-| `child-env:scrub_current:strip_venv` | A | Delete `strip_venv`; callers compose `without_venv(scrub(env))`. Edge: today VIRTUAL_ENV is read before `drop` removes it (test pins that), so the composition needs `without_venv(scrub(..), venv=env.get('VIRTUAL_ENV'))` or a kept-order helper. Public API, major bump. Left: public export. |
-| `convert-md:_result:check_yield` | A | `grade(markdown, source_size: int | None)`; None = not comparable (zip containers, PDFs). Drops the flag from `grade` and `_result`. a2kay (use-cases/a2kay--convert-md) uses `grade`. Left: public export. |
-| `convert-md:grade:check_yield` | A | `grade(markdown, source_size: int | None)`; None = not comparable (zip containers, PDFs). Drops the flag from `grade` and `_result`. a2kay (use-cases/a2kay--convert-md) uses `grade`. Left: public export. |
-| `git-porcelain:abort_rebase:missing_ok` | A | Return a `Missing`/`Gone` outcome value and let the caller decide, instead of `missing_ok`. git-porcelain public Repo protocol (ogy consumes). Not touched. |
-| `git-porcelain:continue_rebase:check_markers` | A | `resolve_and_continue(...)` beside `continue_rebase()`. git-porcelain public Repo protocol (ogy consumes). Not touched. |
-| `git-porcelain:continue_rebase:missing_ok` | A | Return a `Missing`/`Gone` outcome value and let the caller decide, instead of `missing_ok`. git-porcelain public Repo protocol (ogy consumes). Not touched. |
-| `git-porcelain:continue_rebase:stage_conflicts` | A | `resolve_and_continue(...)` beside `continue_rebase()`. git-porcelain public Repo protocol (ogy consumes). Not touched. |
-| `git-porcelain:delete_remote_at:missing_ok` | A | Return a `Missing`/`Gone` outcome value and let the caller decide, instead of `missing_ok`. git-porcelain public Repo protocol (ogy consumes). Not touched. |
-| `git-porcelain:drop_worktree:missing_ok` | A | Return a `Missing`/`Gone` outcome value and let the caller decide, instead of `missing_ok`. git-porcelain public Repo protocol (ogy consumes). Not touched. |
-| `git-porcelain:fetch:retry` | A | `fetch` and `fetch_once` in fake_flow (the real fetch has no such flag). Fake internals. Not touched (git-porcelain). |
-| `git-porcelain:memo:forever` | A | `memo` and `memo_until_write`. RealRepo internals. Not touched (git-porcelain). |
-| `git-porcelain:remote_url:push` | A | `remote_url` and `remote_push_url` (and plural forms). git-porcelain public Repo protocol. Not touched. |
-| `git-porcelain:remote_urls:push` | A | `remote_url` and `remote_push_url` (and plural forms). git-porcelain public Repo protocol. Not touched. |
-| `git-porcelain:run:check` | A | `run` (raises) and `try_run` (returns `Done`). git-porcelain internal runner, 40+ call sites. Not touched (git-porcelain). |
-| `git-porcelain:run_git:check` | A | `run` (raises) and `try_run` (returns `Done`). git-porcelain internal runner, 40+ call sites. Not touched (git-porcelain). |
-| `git-porcelain:stage:literal` | A | `stage(paths)` literal and `stage_pathspec(patterns)`. git-porcelain public Repo protocol. Not touched. |
-| `jsonl-log:__init__:read_only` | A | `JsonlReader(path)` (read, no fd, no rotate) beside `JsonlLog` (append). a2kay (use-cases/a2kay--jsonl-log) must move. Left: external consumer. |
-| `jsonl-log:open:read_only` | A | `JsonlReader(path)` (read, no fd, no rotate) beside `JsonlLog` (append). a2kay (use-cases/a2kay--jsonl-log) must move. Left: external consumer. |
-| `llm-wobble:parse_list_with_policy:strip_fences` | A | Callers that hold fence-free text call a `parse_list_unfenced`; the default funnel always strips. Or the caller strips first with `strip_fences(raw)` and one parse path remains. Left: external consumers. |
-| `llm-wobble:strip_fenced_blocks:json_only` | A | `strip_fenced_json(text)` and `strip_fenced_blocks(text)` (all fences). Left: external consumers. |
-| `process-lock:acquire:reentrant` | A | `acquire` (reentrant) and `acquire_exclusive`; the `_Held.reentrant` field stays as data. a2kay (use-cases/a2kay--process-lock). Left: external consumer. |
-| `sqlite-sidecar:connect:read_only` | A | `connect_read_only(target)` beside `connect(target)`. In-tree: sqlite-store, anyembed, fts-query; external: a2kay. Left: consumers. |
-| `sqlite-sidecar:from_text:aware` | A | `from_text(text) -> datetime` (naive UTC) and `from_text_utc(text)` (aware). a2kay (use-cases/a2kay--sqlite-sidecar). Left: external consumer. |
-| `stream-proc:_hit:group` | A | `_hit_pid` and `_hit` (group, then pid). Private to stream-proc, but it is the signal path that kills process trees; left for an owner-reviewed change, not a drive-by. |
-| `stream-proc:capture_bytes:capture` | A | `run_inherited(argv, timeout=...) -> int` beside `capture_bytes`. In-tree: any-proc, any-speech, delegate; external: a2kay. Left: external consumer. |
-| `verb-cli:flags_of:choices` | A | Make argparse choices the only behaviour (a major bump) or add `choice_flags_of`. ogy (use-cases/ogy--verb-cli). Left: external consumer. |
-| `any-json-doc:__init__:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
-| `atomic-io:atomic_write_bytes:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
-| `atomic-io:atomic_write_json:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
-| `atomic-io:atomic_write_text:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
-| `beads-client:reclaim:any_replica` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `beads-client:unclaim:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:__init__:memoize` | C | Object configuration (injected once), not a per-call branch. Needs an accepted ADR (0022). |
-| `git-porcelain:add_worktree:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:clean:ignored` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:clean:nested` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:drop_worktree:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:park:keep_ignored` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:push_refspecs:allow_delete` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:push_refspecs:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:push_request:allow_delete` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:push_request:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:readiness:check_push` | C | Article IX cost opt-in. Needs an accepted ADR (0022). |
-| `git-porcelain:record:allow_empty` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:record:hooks` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
+| `any-browser:_navigate:scroll_to_stable` | FIXED (A) | split in any-browser 0.3.0: `render` and `render_listing` on the Backend protocol |
+| `any-browser:render:scroll_to_stable` | FIXED (A) | split in any-browser 0.3.0: `render` and `render_listing` on the Backend protocol |
+| `anyllm:resolve_provider:fallback` | FIXED (A) | split in anyllm 0.11.0: `resolve_provider` and `resolve_first` |
+| `app-dirs:cache_dir:create` | FIXED (A) | split in app-dirs 0.3.0: pure `*_dir`, `plugin_dir(kind, app)`, `ensure(path)` |
+| `app-dirs:cache_dir:plugin_data` | FIXED (A) | split in app-dirs 0.3.0: pure `*_dir`, `plugin_dir(kind, app)`, `ensure(path)` |
+| `app-dirs:config_dir:create` | FIXED (A) | split in app-dirs 0.3.0: pure `*_dir`, `plugin_dir(kind, app)`, `ensure(path)` |
+| `app-dirs:config_dir:plugin_data` | FIXED (A) | split in app-dirs 0.3.0: pure `*_dir`, `plugin_dir(kind, app)`, `ensure(path)` |
+| `app-dirs:data_dir:create` | FIXED (A) | split in app-dirs 0.3.0: pure `*_dir`, `plugin_dir(kind, app)`, `ensure(path)` |
+| `app-dirs:data_dir:plugin_data` | FIXED (A) | split in app-dirs 0.3.0: pure `*_dir`, `plugin_dir(kind, app)`, `ensure(path)` |
+| `app-dirs:state_dir:create` | FIXED (A) | split in app-dirs 0.3.0: pure `*_dir`, `plugin_dir(kind, app)`, `ensure(path)` |
+| `app-dirs:state_dir:plugin_data` | FIXED (A) | split in app-dirs 0.3.0: pure `*_dir`, `plugin_dir(kind, app)`, `ensure(path)` |
+| `atomic-io:atomic_write_bytes:keep_mode` | FIXED (A) | split in atomic-io 0.3.0: `atomic_write_*` (0o600) and `atomic_replace_*` (keeps the replaced file's mode) |
+| `atomic-io:atomic_write_json:keep_mode` | FIXED (A) | split in atomic-io 0.3.0: `atomic_write_*` (0o600) and `atomic_replace_*` (keeps the replaced file's mode) |
+| `atomic-io:atomic_write_text:keep_mode` | FIXED (A) | split in atomic-io 0.3.0: `atomic_write_*` (0o600) and `atomic_replace_*` (keeps the replaced file's mode) |
+| `blueprint:run:audit` | A | `run_gate(repo)` and `run_audit(repo)` sharing `_judge`; the CLI picks one. Private to the shelf (use-case shelf--blueprint) but touches the CLI, skill docs and ~20 tests. Skipped by the owner brief (blueprint was handled separately). |
+| `child-env:scrub:strip_venv` | FIXED (A) | split in child-env 0.3.0: `scrub(without_venv(env))` (venv stripped first, same result) |
+| `child-env:scrub_current:strip_venv` | FIXED (A) | split in child-env 0.3.0: `scrub(without_venv(env))` (venv stripped first, same result) |
+| `convert-md:_result:check_yield` | FIXED (A) | split in convert-md 0.12.0: `grade` and `grade_container` (the structure check still reads the size, so `None` was wrong) |
+| `convert-md:grade:check_yield` | FIXED (A) | split in convert-md 0.12.0: `grade` and `grade_container` (the structure check still reads the size, so `None` was wrong) |
+| `git-porcelain:abort_rebase:missing_ok` | C (was A) | Absence tolerance named by the caller, as `Path.unlink(missing_ok=)`; a split needs an outcome value on three result shapes. ADR 0030. |
+| `git-porcelain:continue_rebase:check_markers` | FIXED (A) | split in git-porcelain 0.26.0: `resolve_and_continue()` |
+| `git-porcelain:continue_rebase:missing_ok` | C (was A) | Absence tolerance named by the caller, as `Path.unlink(missing_ok=)`; a split needs an outcome value on three result shapes. ADR 0030. |
+| `git-porcelain:continue_rebase:stage_conflicts` | FIXED (A) | split in git-porcelain 0.26.0: `resolve_and_continue()` |
+| `git-porcelain:delete_remote_at:missing_ok` | C (was A) | Absence tolerance named by the caller, as `Path.unlink(missing_ok=)`; a split needs an outcome value on three result shapes. ADR 0030. |
+| `git-porcelain:drop_worktree:missing_ok` | C (was A) | Absence tolerance named by the caller, as `Path.unlink(missing_ok=)`; a split needs an outcome value on three result shapes. ADR 0030. |
+| `git-porcelain:fetch:retry` | FIXED (A) | split in git-porcelain 0.26.0: `fetch` and `fetch_once` (fake) |
+| `git-porcelain:memo:forever` | FIXED (A) | split in git-porcelain 0.26.0: `memo` and `memo_until_write` |
+| `git-porcelain:remote_url:push` | FIXED (A) | split in git-porcelain 0.26.0: `remote_url` and `remote_push_url` |
+| `git-porcelain:remote_urls:push` | FIXED (A) | split in git-porcelain 0.26.0: `remote_urls` and `remote_push_urls` |
+| `git-porcelain:run:check` | FIXED (A) | split in git-porcelain 0.26.0: `run` and `try_run` |
+| `git-porcelain:run_git:check` | FIXED (A) | split in git-porcelain 0.26.0: `run_git` and `try_git` |
+| `git-porcelain:stage:literal` | FIXED (A) | split in git-porcelain 0.26.0: `stage` and `stage_pathspec` |
+| `jsonl-log:__init__:read_only` | FIXED (A) | split in jsonl-log 0.6.0: `JsonlReader` beside `JsonlLog` |
+| `jsonl-log:open:read_only` | FIXED (A) | split in jsonl-log 0.6.0: `JsonlReader` beside `JsonlLog` |
+| `llm-wobble:parse_list_with_policy:strip_fences` | FIXED (A) | split in llm-wobble 0.6.0 |
+| `llm-wobble:strip_fenced_blocks:json_only` | FIXED (A) | split in llm-wobble 0.6.0 |
+| `process-lock:acquire:reentrant` | FIXED (A) | split in process-lock 0.4.0: `acquire` and `acquire_exclusive` |
+| `sqlite-sidecar:connect:read_only` | FIXED (A) | split in sqlite-sidecar 0.4.0: `connect_read_only`, `from_text_utc` |
+| `sqlite-sidecar:from_text:aware` | FIXED (A) | split in sqlite-sidecar 0.4.0: `connect_read_only`, `from_text_utc` |
+| `stream-proc:_hit:group` | FIXED (A) | split in stream-proc 0.11.0 |
+| `stream-proc:capture_bytes:capture` | FIXED (A) | split in stream-proc 0.11.0 |
+| `verb-cli:flags_of:choices` | FIXED (A) | split in verb-cli 0.3.0: `flags_of` and `choice_flags_of` |
+| `any-json-doc:__init__:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. ADR 0030. |
+| `atomic-io:atomic_write_bytes:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. ADR 0030. |
+| `atomic-io:atomic_write_json:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. ADR 0030. |
+| `atomic-io:atomic_write_text:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. ADR 0030. |
+| `beads-client:reclaim:any_replica` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `beads-client:unclaim:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:__init__:memoize` | C | Object configuration (injected once), not a per-call branch. ADR 0030. |
+| `git-porcelain:add_worktree:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:clean:ignored` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:clean:nested` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:drop_worktree:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:park:keep_ignored` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:push_refspecs:allow_delete` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:push_refspecs:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:push_request:allow_delete` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:push_request:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:readiness:check_push` | C | Article IX cost opt-in. ADR 0030. |
+| `git-porcelain:record:allow_empty` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:record:hooks` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
 | `git-porcelain:run:pin` | C | Internal runner opt-out; folds into the `run`/`try_run` split when git-porcelain is next opened. |
-| `git-porcelain:validate_push:allow_delete` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:validate_push:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:worktree_add:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
-| `git-porcelain:worktrees:with_dirty` | C | Article IX allows a flag that asks for a costly capability. Needs an accepted ADR (0022). |
+| `git-porcelain:validate_push:allow_delete` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:validate_push:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:worktree_add:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. ADR 0030. |
+| `git-porcelain:worktrees:with_dirty` | C | Article IX allows a flag that asks for a costly capability. ADR 0030. |
 | `a2effect:__init__:retryable` | B | Data on the error value. |
 | `a2effect:__init_subclass__:abstract` | B | Test-support opt-ins mirroring pytest's signature (`raising`) or selecting contract checks. |
 | `a2effect:contract_tests:dead_enricher` | B | Test-support opt-ins mirroring pytest's signature (`raising`) or selecting contract checks. |
@@ -129,9 +129,8 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `stream-proc:popen_registered:start_new_session` | B | Passthrough of Popen's parameter. |
 | `stream-proc:report:error` | B | Data on the report value. |
 
-## What the A rows say
+## Outcome
 
-- Read-only vs read-write is a type difference in four places (`jsonl-log`, `sqlite-sidecar`, `process-lock`'s reentrancy, `any-browser`'s listing render): split by type, not flag.
-- `app-dirs` `create` and `plugin_data` (8 rows) and `child-env` `strip_venv` (2 rows) are the cheapest public splits: pure lookups plus `ensure`, and an existing `without_venv`.
-- git-porcelain's 38 rows are mostly git's own flags (`force`, `allow_empty`, `clean -x`): one ADR for the destructive-opt-in class closes the C rows; the A rows (`missing_ok`, `run(check=)`, `literal`, `push`) wait for the next change that opens that package.
-- ADR 0022 as written covers blueprint.toml overrides; the C rows need either an accepted ADR naming this allowlist class or an `expires` date. Not decided here.
+- Every A row except the blueprint one is split, or reclassified (the four git-porcelain `missing_ok` rows: an idempotency tolerance named by the caller, ADR 0030).
+- Two triage proposals were wrong and changed: `convert-md` `grade(source_size=None)` would also have switched off the structure check, so it is `grade` and `grade_container`; `child-env` composes as `scrub(without_venv(env))` (venv first), which needs no `venv=` argument.
+- `git-porcelain` `continue_rebase(stage_conflicts, check_markers)` became `resolve_and_continue()` (both together, the only combination any caller used).

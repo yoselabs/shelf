@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- breaking: `scrub(..., strip_venv=)` and `scrub_current(strip_venv=)` removed; strip the venv with `scrub(without_venv(env), ...)` (same result for every keep/drop). `without_venv` unchanged.
+
 ## 0.2.0
 
 - `find(name, env, extra_dirs=())` returns an `Exe(path, how)` or raises `NotFound(name, searched)`: the one binary

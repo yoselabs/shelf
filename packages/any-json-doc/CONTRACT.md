@@ -13,7 +13,7 @@ Status: **candidate**. Shape: flexible. Protection is not yet earned by a live c
 - `read_rev()` reads bytes once, decodes through the same path as `read`, and returns the state plus
   their SHA-256 hex digest (absent: `''`; unreadable: `Torn` with `''`). Revisions are opaque strings.
 - `update(fn, *, expect=None)` exclusively locks `<path>.lock` with `ProcessLock.acquire`, timeout
-  10 seconds and `reentrant=False`, then re-reads, transforms and atomically writes, returning the record.
+  10 seconds and `acquire_exclusive`, then re-reads, transforms and atomically writes, returning the record.
   Absent passes `None` to `fn`; present passes the record, including false-valued records.
 - Torn/ForeignVersion raise `RefusedError` before revision comparison or transform. Mismatching `expect`
   raises `ConflictError(path, found, expected)` without writing or calling `fn`. Matching revisions proceed.

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 def read_config(repo: RealRepo, *args: str) -> str | None:
     """Read NUL-delimited config, preserving the distinction between absence and failure."""
-    done = repo.run(repo.path, "config", "--null", *args, check=False)
+    done = repo.try_run(repo.path, "config", "--null", *args)
     if done.rc == 1 and not done.out and not done.err:
         return None
     if done.rc:
@@ -28,7 +28,7 @@ def read_config(repo: RealRepo, *args: str) -> str | None:
 
 def _read(repo: RealRepo, *args: str, stdin: str | None = None) -> Done:
     try:
-        done = repo.run(repo.path, *args, check=False, stdin=stdin)
+        done = repo.try_run(repo.path, *args, stdin=stdin)
     except GitUnavailable as exc:
         raise GitReadFailure(str(exc), retryable=exc.retryable) from exc
     return done
@@ -102,13 +102,22 @@ def _get_url(repo: RealRepo, remote: str, *flags: str) -> str:
     return done.out
 
 
-def remote_url(repo: RealRepo, remote: str, *, push: bool = False) -> str:
-    return _get_url(repo, remote, *(["--push"] if push else [])).strip()
+def remote_url(repo: RealRepo, remote: str) -> str:
+    return _get_url(repo, remote).strip()
 
 
-def remote_urls(repo: RealRepo, remote: str, *, push: bool = False) -> tuple[str, ...]:
-    """``remote get-url --all [--push]``: one URL per line, in configuration order."""
-    return tuple(line for line in _get_url(repo, remote, "--all", *(["--push"] if push else [])).splitlines() if line)
+def remote_push_url(repo: RealRepo, remote: str) -> str:
+    return _get_url(repo, remote, "--push").strip()
+
+
+def remote_urls(repo: RealRepo, remote: str) -> tuple[str, ...]:
+    """``remote get-url --all``: one URL per line, in configuration order."""
+    return tuple(line for line in _get_url(repo, remote, "--all").splitlines() if line)
+
+
+def remote_push_urls(repo: RealRepo, remote: str) -> tuple[str, ...]:
+    """``remote get-url --all --push``: one URL per line, in configuration order."""
+    return tuple(line for line in _get_url(repo, remote, "--all", "--push").splitlines() if line)
 
 
 def rebasing(wt: RealWorktree) -> bool:

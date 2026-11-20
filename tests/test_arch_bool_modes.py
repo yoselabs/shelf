@@ -10,7 +10,7 @@ a row whose flag is gone must be deleted. Reason prefixes:
 - `split:` the flag picks between two behaviours of one operation; the reason names the separate type or function
 - `fact:` the flag is data about one call, one value or one error (or a third-party library's own option), not a code path
 - `exception:` a named, justified opt-in (cost, safety, durability) that Article III allows only as a row; each needs an
-  accepted ADR (ADR 0022) to be durable
+  accepted ADR (ADR 0030) to be durable
 """
 
 import ast
@@ -47,137 +47,28 @@ def _rows(reason: str, *keys: str) -> dict[str, str]:
 
 _ALLOWED: dict[str, str] = {
     # --- split: the flag chooses between behaviours; a separate type or function is the fix ---
+    # --- exceptions: a named, justified opt-in (ADR 0030) ---
     **_rows(
-        "split: one render() path that scrolls an infinite listing to the end; a2web consumes the Protocol",
-        "any-browser:render:scroll_to_stable",
-        "any-browser:_navigate:scroll_to_stable",
-    ),
-    **_rows(
-        "split: read-only vs appending is two types; a2kay consumes JsonlLog",
-        "jsonl-log:__init__:read_only",
-        "jsonl-log:open:read_only",
-    ),
-    **_rows(
-        "split: a read-only connection is another function; a2kay, anyembed, sqlite-store, fts-query consume connect()",
-        "sqlite-sidecar:connect:read_only",
-    ),
-    **_rows(
-        "split: naive vs tz-aware result is two return types; a2kay consumes from_text",
-        "sqlite-sidecar:from_text:aware",
-    ),
-    **_rows(
-        "split: reentrant vs exclusive acquire are two lock semantics; a2kay consumes acquire",
-        "process-lock:acquire:reentrant",
-    ),
-    **_rows(
-        "split: keep_mode picks between two permission behaviours; consumers a2kay, any-frontmatter, any-net, dir-trust",
-        "atomic-io:atomic_write_bytes:keep_mode",
-        "atomic-io:atomic_write_json:keep_mode",
-        "atomic-io:atomic_write_text:keep_mode",
-    ),
-    **_rows(
-        "split: the flag duplicates child_env.without_venv(scrub(...)); a second path to one result",
-        "child-env:scrub:strip_venv",
-        "child-env:scrub_current:strip_venv",
-    ),
-    **_rows(
-        "split: create=True is a lookup plus a mkdir; the lookup stays pure",
-        "app-dirs:data_dir:create",
-        "app-dirs:cache_dir:create",
-        "app-dirs:config_dir:create",
-        "app-dirs:state_dir:create",
-    ),
-    **_rows(
-        "split: plugin_data=True swaps the base-directory policy; it is a second resolver",
-        "app-dirs:data_dir:plugin_data",
-        "app-dirs:cache_dir:plugin_data",
-        "app-dirs:config_dir:plugin_data",
-        "app-dirs:state_dir:plugin_data",
-    ),
-    **_rows(
-        "split: check_yield=False means the source size is not comparable to text length; a2kay consumes grade",
-        "convert-md:_result:check_yield",
-        "convert-md:grade:check_yield",
-    ),
-    **_rows(
-        "split: json_only picks between two strippers; a2kay and a2web consume llm-wobble",
-        "llm-wobble:strip_fenced_blocks:json_only",
-    ),
-    **_rows(
-        "split: strip_fences skips a step the caller can do; a2kay and a2web consume llm-wobble",
-        "llm-wobble:parse_list_with_policy:strip_fences",
-    ),
-    **_rows(
-        "split: choices=True is a compatibility switch between two flag shapes; ogy consumes verb-cli",
-        "verb-cli:flags_of:choices",
-    ),
-    **_rows(
-        "split: fallback=False returns the first survivor instead of the composed provider; a2kay and a2web consume resolve_provider",
-        "anyllm:resolve_provider:fallback",
-    ),
-    **_rows(
-        "split: capture=False inherits stdio instead of capturing; a second operation",
-        "stream-proc:capture_bytes:capture",
-    ),
-    **_rows(
-        "split: _hit(group=) sends to the pid only or to its group too; the call site computes the flag",
-        "stream-proc:_hit:group",
-    ),
-    **_rows(
-        "split: the same call, two policies for a missing target; the codebase already returns outcome values (NothingToRecord)",
-        "git-porcelain:abort_rebase:missing_ok",
-        "git-porcelain:continue_rebase:missing_ok",
-        "git-porcelain:delete_remote_at:missing_ok",
-        "git-porcelain:drop_worktree:missing_ok",
-    ),
-    **_rows(
-        "split: raising vs returning the exit code is two functions (run / try_run)",
-        "git-porcelain:run:check",
-        "git-porcelain:run_git:check",
-    ),
-    **_rows(
-        "split: memo(forever=False) is a second cache lifetime (until the next write)",
-        "git-porcelain:memo:forever",
-    ),
-    **_rows(
-        "split: the fake's fetch(retry=False) skips ref races the real fetch always retries; a flag only the fake has",
-        "git-porcelain:fetch:retry",
-    ),
-    **_rows(
-        "split: stage_conflicts and check_markers turn continue_rebase into a resolve-and-continue operation",
-        "git-porcelain:continue_rebase:check_markers",
-        "git-porcelain:continue_rebase:stage_conflicts",
-    ),
-    **_rows(
-        "split: literal=False is pathspec staging, another operation",
-        "git-porcelain:stage:literal",
-    ),
-    **_rows(
-        "split: push=True reads the push URL, git's separate `get-url --push`",
-        "git-porcelain:remote_url:push",
-        "git-porcelain:remote_urls:push",
-    ),
-    # --- exceptions: a named, justified opt-in (needs an accepted ADR, ADR 0022) ---
-    **_rows(
-        "exception: durability tier of one write (fsync or not); the default is the safe one, off is "
-        "for caches and hot state; needs an ADR row (ADR 0022)",
+        "exception: durability tier of one write (fsync or not); the default is the safe one, off is for caches and hot state; ADR 0030",
         "any-json-doc:__init__:fsync",
         "atomic-io:atomic_write_bytes:fsync",
         "atomic-io:atomic_write_json:fsync",
         "atomic-io:atomic_write_text:fsync",
+        "atomic-io:atomic_replace_bytes:fsync",
+        "atomic-io:atomic_replace_json:fsync",
+        "atomic-io:atomic_replace_text:fsync",
     ),
     **_rows(
-        "exception: a cost opt-in: the dirty flag needs one `git status` per worktree (Article IX: cost "
-        "makes it opt-in); needs an ADR row (ADR 0022)",
+        "exception: a cost opt-in: the dirty flag needs one `git status` per worktree (Article IX: cost makes it opt-in); ADR 0030",
         "git-porcelain:worktrees:with_dirty",
     ),
     **_rows(
-        "exception: a cost opt-in: the network ls-remote probe; check_push=False stays local and fast; needs an ADR row (ADR 0022)",
+        "exception: a cost opt-in: the network ls-remote probe; check_push=False stays local and fast; ADR 0030",
         "git-porcelain:readiness:check_push",
     ),
     **_rows(
         "exception: the safe default and a named opt-out that mirrors git's own flag for one "
-        "destructive or history-changing call; needs an ADR row (ADR 0022)",
+        "destructive or history-changing call; ADR 0030",
         "git-porcelain:add_worktree:force",
         "git-porcelain:drop_worktree:force",
         "git-porcelain:worktree_add:force",
@@ -196,13 +87,21 @@ _ALLOWED: dict[str, str] = {
         "beads-client:reclaim:any_replica",
     ),
     **_rows(
-        "exception: whether a repo observation is cached, chosen once at construction, for fresh reads; needs an ADR row (ADR 0022)",
+        "exception: the caller names that a missing target is success (as Path.unlink(missing_ok=)); a split needs an outcome "
+        "value on three result shapes; ADR 0030",
+        "git-porcelain:abort_rebase:missing_ok",
+        "git-porcelain:continue_rebase:missing_ok",
+        "git-porcelain:delete_remote_at:missing_ok",
+        "git-porcelain:drop_worktree:missing_ok",
+    ),
+    **_rows(
+        "exception: whether a repo observation is cached, chosen once at construction, for fresh reads; ADR 0030",
         "git-porcelain:__init__:memoize",
     ),
     **_rows(
-        "exception: pin=False skips the checkout's environment pin for one call (the runner's own "
-        "escape hatch); needs an ADR row (ADR 0022)",
+        "exception: pin=False skips the checkout's environment pin for one call (the runner's own escape hatch); ADR 0030",
         "git-porcelain:run:pin",
+        "git-porcelain:try_run:pin",
     ),
     # --- facts: data about one call, value or error ---
     **_rows(
@@ -233,6 +132,7 @@ _ALLOWED: dict[str, str] = {
     **_rows(
         "fact: json.dumps's own formatting option, passed through (like indent)",
         "atomic-io:atomic_write_json:sort_keys",
+        "atomic-io:atomic_replace_json:sort_keys",
     ),
     **_rows(
         "fact: the connection's thread affinity, passed to sqlite3 as check_same_thread",

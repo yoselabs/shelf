@@ -9,7 +9,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from stream_proc import alive, capture, capture_bytes
+from stream_proc import alive, capture, capture_bytes, run_inherited
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -117,22 +117,18 @@ def test_input_and_stdin_together_are_refused() -> None:
         capture_bytes(py("pass"), input=b"x", stdin=None, timeout=30)
 
 
-def test_capture_false_inherits_stdout_and_returns_empty() -> None:
+def test_run_inherited_writes_to_our_streams_and_returns_the_exit() -> None:
     host = subprocess.run(
         [
             PY,
             "-c",
-            (
-                "from stream_proc import capture_bytes\n"
-                "g = capture_bytes(['sh', '-c', 'echo loud; echo quiet >&2'], capture=False, timeout=30)\n"
-                "print(g.exit, g.out, g.err)"
-            ),
+            ("from stream_proc import run_inherited\nprint(run_inherited(['sh', '-c', 'echo loud; echo quiet >&2; exit 3'], timeout=30))"),
         ],
         capture_output=True,
         check=True,
         timeout=30,
     )
-    assert host.stdout.split(b"\n") == [b"loud", b"0 b'' b''", b""]
+    assert host.stdout.split(b"\n") == [b"loud", b"3", b""]
     assert host.stderr == b"quiet\n"
 
 
@@ -190,3 +186,7 @@ def test_raising_sigterm_handler_during_spawn_propagates_and_child_is_gone(
         run(["sleep", "60"], timeout=30)
     assert len(sigterm_during_spawn) == 1
     assert not alive(sigterm_during_spawn[0])
+
+
+def test_run_inherited_stops_the_tree_on_a_timeout_and_reports_124() -> None:
+    assert run_inherited(py("import time; time.sleep(30)"), timeout=0.3, grace=0.5) == 124

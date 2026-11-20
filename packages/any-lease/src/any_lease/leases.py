@@ -224,9 +224,9 @@ class Leases:
 
     @staticmethod
     def _take_path(path: Path, label: str | None, meta: Mapping[str, object]) -> process_lock.ProcessLock | None:
-        # reentrant=False: process-lock then refuses a second acquire of one path in this process, threads included.
+        # acquire_exclusive: process-lock then refuses a second acquire of one path in this process, threads included.
         try:
-            return process_lock.ProcessLock.acquire(path, timeout=0, label=label, meta=meta, reentrant=False)
+            return process_lock.ProcessLock.acquire_exclusive(path, timeout=0, label=label, meta=meta)
         except process_lock.LockHeldError:
             return None
 

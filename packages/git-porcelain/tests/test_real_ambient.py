@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 def _marker(repo: RealRepo, cwd: Path) -> str:
-    return repo.run(cwd, "config", "--get", "ambient.seen", check=False, pin=False).out.strip()
+    return repo.try_run(cwd, "config", "--get", "ambient.seen", pin=False).out.strip()
 
 
 @pytest.fixture

@@ -99,15 +99,18 @@ def tail_match(name: str, pattern: str) -> bool:
     return any(fnmatch.fnmatchcase(name[start:], pattern) for start in (0, *(i + 1 for i, c in enumerate(name) if c == "/")))
 
 
-def stage(repo: RepoState, wt: CheckoutState, paths: Sequence[str], *, literal: bool) -> None:
+def stage(repo: RepoState, wt: CheckoutState, paths: Sequence[str]) -> None:
     if not paths:
+        return
+    fake_ops.stage(repo, wt, list(paths))
+
+
+def stage_pathspec(repo: RepoState, wt: CheckoutState, patterns: Sequence[str]) -> None:
+    if not patterns:
         return
     picks: list[str] = []
     names = set(wt.files) | set(wt.index)
-    for spec in paths:
-        if literal:
-            picks.append(spec)
-        else:
-            matches = sorted(p for p in names if fnmatch.fnmatchcase(p, spec) or p.startswith(spec.rstrip("/") + "/"))
-            picks.extend(matches or [spec])
+    for spec in patterns:
+        matches = sorted(p for p in names if fnmatch.fnmatchcase(p, spec) or p.startswith(spec.rstrip("/") + "/"))
+        picks.extend(matches or [spec])
     fake_ops.stage(repo, wt, picks)

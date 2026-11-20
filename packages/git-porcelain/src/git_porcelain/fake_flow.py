@@ -158,14 +158,19 @@ def fetch_races(repo: RepoState) -> None:
         raise RefRace(msg)
 
 
-def fetch(repo: RepoState, name: str, *, retry: bool = True) -> SyncResult:
-    """Copy the remote's objects and set ``refs/remotes/<name>/<branch>`` for each of its branches."""
+def fetch(repo: RepoState, name: str) -> SyncResult:
+    """:func:`fetch_once` after the ref races a real fetch retries through (an exhausted budget is ``Offline``)."""
     validate_remote(name)
-    if retry:
-        try:
-            fetch_races(repo)
-        except RefRace as exc:
-            return Offline(exc.tail, output=exc.output)
+    try:
+        fetch_races(repo)
+    except RefRace as exc:
+        return Offline(exc.tail, output=exc.output)
+    return fetch_once(repo, name)
+
+
+def fetch_once(repo: RepoState, name: str) -> SyncResult:
+    """Copy the remote's objects and set ``refs/remotes/<name>/<branch>`` for each of its branches; no ref races."""
+    validate_remote(name)
     there = remote_state(repo, name)
     if isinstance(there, str):
         return Offline(there)

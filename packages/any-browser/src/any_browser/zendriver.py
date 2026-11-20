@@ -30,10 +30,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
 from .base import BackendCookie, RenderedPage, RenderOutcome
-from .playwright import _CHALLENGE_STATUSES, _SCROLL_STABLE_MAX_PASSES, _THIN_FLOOR, _ms, _summarize_exc
+from .playwright import _CHALLENGE_STATUSES, _SCROLL_STABLE_MAX_PASSES, _THIN_FLOOR, _keep, _ms, _summarize_exc
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Awaitable, Callable, Mapping
 
 _SAMESITE = {"strict": "STRICT", "lax": "LAX", "none": "NONE"}
 
@@ -218,16 +218,27 @@ class ZendriverBackend:
         self._env = env  # where the browser location variables are read from; the process environment is never read
         self.page_budget_s = page_budget_s
 
-    async def render(
+    async def render(self, url: str, *, cookies: list[BackendCookie], budget_s: float, js_heavy: bool) -> RenderedPage:
+        """Launch Chromium over CDP, navigate, capture HTML (never raises for a routine failure)."""
+        return await self._render(url, cookies=cookies, budget_s=budget_s, js_heavy=js_heavy, settle=_keep)
+
+    async def render_listing(self, url: str, *, cookies: list[BackendCookie], budget_s: float, js_heavy: bool) -> RenderedPage:
+        """:meth:`render` that scrolls an infinite-scroll listing until the captured HTML stops growing."""
+
+        async def settle(tab: Any, html: str) -> str:
+            return await _scroll_to_stable_cdp(tab, html)
+
+        return await self._render(url, cookies=cookies, budget_s=budget_s, js_heavy=js_heavy, settle=settle)
+
+    async def _render(
         self,
         url: str,
         *,
         cookies: list[BackendCookie],
         budget_s: float,
         js_heavy: bool,
-        scroll_to_stable: bool = False,
+        settle: Callable[[Any, str], Awaitable[str]],
     ) -> RenderedPage:
-        """Launch Chromium over CDP, navigate, capture HTML (never raises for a routine failure)."""
         try:
             import zendriver as zd  # noqa: PLC0415 — lazy: zendriver is the optional [zendriver] extra
         except ImportError as exc:
@@ -280,7 +291,7 @@ class ZendriverBackend:
 
             try:
                 html, final_url = await asyncio.wait_for(
-                    self._navigate(browser, url, js_heavy=js_heavy, scroll_to_stable=scroll_to_stable, blocked=blocked),
+                    self._navigate(browser, url, js_heavy=js_heavy, settle=settle, blocked=blocked),
                     timeout=budget_s,
                 )
             except TimeoutError:
@@ -328,7 +339,7 @@ class ZendriverBackend:
         url: str,
         *,
         js_heavy: bool,
-        scroll_to_stable: bool = False,
+        settle: Callable[[Any, str], Awaitable[str]],
         blocked: list[int] | None = None,
     ) -> tuple[str, str]:
         import zendriver as zd  # noqa: PLC0415 — lazy: zendriver is the optional [zendriver] extra
@@ -354,8 +365,7 @@ class ZendriverBackend:
         html = await tab.get_content()
         if len(html) < _THIN_FLOOR and js_heavy:
             html = await _scroll_and_retry_cdp(tab, html)
-        if scroll_to_stable:
-            html = await _scroll_to_stable_cdp(tab, html)
+        html = await settle(tab, html)
         return html, tab.url or url
 
     async def __aenter__(self) -> Self:

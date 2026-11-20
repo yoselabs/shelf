@@ -64,7 +64,7 @@ def capture(wt: RealWorktree) -> TreeId:
 def commit_tree(repo: RealRepo, tree: str, parents: tuple[str, ...], message: str, *, when: int | None) -> Sha:
     validate_revisions(tree, *parents)
     wt = repo.worktree(repo.path)
-    if wt.run("rev-parse", "--verify", "-q", "--end-of-options", f"{tree}^{{tree}}", check=False).rc != 0:
+    if wt.try_run("rev-parse", "--verify", "-q", "--end-of-options", f"{tree}^{{tree}}").rc != 0:
         msg = f"git: bad tree '{tree}'"
         raise MissingRevision(msg)
     args = ["commit-tree", "--no-gpg-sign"]

@@ -79,7 +79,7 @@ await pacer.apace("proxy-2081", every=1.0)                  # same, sleeping on 
   at once (a record left behind by a released unit never counts). The probe can make a `timeout=0` acquirer miss that
   unit in the same instant; waiters retry on their next poll. Each `Occupant.holder` is the record the holder wrote
   (`None` for a holder that has not written one yet).
-- **Threads.** Units are taken with `process_lock`'s `reentrant=False`, which refuses a second acquire of one
+- **Threads.** Units are taken with `process_lock`'s `acquire_exclusive`, which refuses a second acquire of one
   path inside a process, so threads of one process exclude each other without a mutex of this package's own.
 - **Holder record.** `label` and `meta` land in the unit's lock file (JSON, readable while the unit is held); a
   waiter sees them in `Waiting.occupants` and `LeaseTimeoutError.occupants`. Host-global: any process, any worktree,

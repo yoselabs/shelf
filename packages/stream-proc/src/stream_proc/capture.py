@@ -36,8 +36,8 @@ class Captured:
 
 @dataclass(frozen=True, slots=True)
 class CapturedBytes:
-    """What :func:`capture_bytes` saw: like :class:`Captured`, but ``out`` and ``err`` are the exact bytes (b"" when
-    ``capture=False``). On a timeout they hold what the child wrote before it was stopped."""
+    """What :func:`capture_bytes` saw: like :class:`Captured`, but ``out`` and ``err`` are the exact bytes.
+    On a timeout they hold what the child wrote before it was stopped."""
 
     exit: int
     out: bytes
@@ -94,7 +94,6 @@ def capture_bytes(
     timeout: float,
     input: bytes | None = None,  # noqa: A002 - subprocess.run's name
     stdin: int | IO[Any] | None = subprocess.DEVNULL,
-    capture: bool = True,
     grace: float = 5.0,
     drain: float = 2.0,
 ) -> CapturedBytes:
@@ -103,7 +102,7 @@ def capture_bytes(
     ``stdin`` is a ``subprocess`` value: ``subprocess.DEVNULL`` (default), ``None`` (inherit ours), a descriptor or a
     file. ``input`` feeds bytes instead (a pipe, written while the output is read, so large input and large output never
     deadlock; a child that exits without reading it all is not an error); give ``input`` or ``stdin``, not both
-    (``ValueError``). ``capture=False`` leaves stdout and stderr inherited and returns them empty. The child is always
+    (``ValueError``). The child is always
     a session leader, so even with an inherited stdin it has no controlling terminal (no tty job control, no ``/dev/tty``).
 
     The wait is on the child, not on its pipes: ``timeout`` is the wall limit for the child; hitting it stops the whole
@@ -113,11 +112,42 @@ def capture_bytes(
     its own lifetime; whatever arrived by then is returned. An exception that unwinds the wait (KeyboardInterrupt, a raising
     SIGTERM handler, even one landing during the spawn) stops the tree first and goes on. The output is not capped.
     """
+    return _run(argv, cwd=cwd, env=env, timeout=timeout, input=input, stdin=stdin, grace=grace, drain=drain, pipe=subprocess.PIPE)
+
+
+def run_inherited(
+    argv: Sequence[str],
+    *,
+    cwd: str | os.PathLike[str] | None = None,
+    env: Mapping[str, str] | None = None,
+    timeout: float,
+    stdin: int | IO[Any] | None = subprocess.DEVNULL,
+    grace: float = 5.0,
+) -> int:
+    """:func:`capture_bytes` for a child that writes to OUR stdout and stderr (a build someone watches): returns its exit code.
+
+    The exit is 124 on a timeout (the tree is stopped, as in :func:`capture_bytes`) and ``-signal`` when a signal ended
+    the child. The child shares our descriptors but, as always, is a session leader with no controlling terminal.
+    """
+    return _run(argv, cwd=cwd, env=env, timeout=timeout, input=None, stdin=stdin, grace=grace, drain=0.0, pipe=None).exit
+
+
+def _run(
+    argv: Sequence[str],
+    *,
+    cwd: str | os.PathLike[str] | None,
+    env: Mapping[str, str] | None,
+    timeout: float,
+    input: bytes | None,  # noqa: A002 - subprocess.run's name
+    stdin: int | IO[Any] | None,
+    grace: float,
+    drain: float,
+    pipe: int | None,
+) -> CapturedBytes:
     if input is not None and stdin != subprocess.DEVNULL:
         msg = "give input or stdin, not both"
         raise ValueError(msg)
     t0 = time.monotonic()
-    pipe = subprocess.PIPE if capture else None
     p, hold = popen_held(
         list(argv),
         cwd=cwd,

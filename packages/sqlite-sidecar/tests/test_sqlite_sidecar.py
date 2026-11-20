@@ -57,7 +57,7 @@ def test_a_read_only_open_reads_the_last_commit_and_refuses_a_write(tmp_path: Pa
     writer = sc.connect(path)
     writer.execute("CREATE TABLE t(x)")
     writer.execute("INSERT INTO t VALUES (1)")
-    reader = sc.connect(path, read_only=True)
+    reader = sc.connect_read_only(path)
     try:
         assert reader.execute("SELECT x FROM t").fetchall() == [(1,)]
         with pytest.raises(sqlite3.OperationalError, match="readonly"):
@@ -136,8 +136,8 @@ def test_text_reads_back_naive_or_utc_aware() -> None:
     value = _naive(2026, 7, 1, (12, 30, 15, 250))
     assert sc.from_text(sc.to_text(value)) == value
     aware = datetime(2026, 7, 1, 12, 30, tzinfo=UTC)
-    assert sc.from_text(sc.to_text(aware), aware=True) == aware
-    assert sc.from_text(sc.to_text(aware), aware=True).tzinfo is UTC
+    assert sc.from_text_utc(sc.to_text(aware)) == aware
+    assert sc.from_text_utc(sc.to_text(aware)).tzinfo is UTC
 
 
 def test_text_order_is_time_order() -> None:
@@ -221,10 +221,18 @@ def test_another_process_reads_the_last_commit_while_a_write_is_open(tmp_path: P
     writer.execute("INSERT INTO t VALUES (2)")
     probe = (
         "import sys, sqlite_sidecar as sc\n"
-        "c = sc.connect(sys.argv[1], read_only=True, timeout=0)\n"
+        "c = sc.connect_read_only(sys.argv[1], timeout=0)\n"
         "print(c.execute('SELECT count(*) FROM t').fetchone()[0])\n"
     )
     out = subprocess.run([sys.executable, "-c", probe, str(path)], capture_output=True, text=True, check=True, timeout=30)
     writer.execute("COMMIT")
     writer.close()
     assert out.stdout.strip() == "1"
+
+
+def test_a_read_only_open_creates_nothing_and_sets_no_journal_mode(tmp_path: Path) -> None:
+    missing = tmp_path / "sub" / "x.db"
+    with pytest.raises(sqlite3.OperationalError):
+        sc.connect_read_only(missing)
+    assert not missing.parent.exists()
+    assert sc.connect_read_only(":memory:").execute("PRAGMA journal_mode").fetchone()[0] == "memory"

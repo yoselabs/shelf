@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 def branch(wt: RealWorktree) -> str | None:
     """Read symbolic HEAD, including an unborn branch."""
-    done = wt.run("symbolic-ref", "--short", "-q", "HEAD", check=False)
+    done = wt.try_run("symbolic-ref", "--short", "-q", "HEAD")
     if done.rc == 1 and not done.out and not done.err:
         return None
     if done.rc:
@@ -29,7 +29,7 @@ def branch(wt: RealWorktree) -> str | None:
 def resolve_commit(wt: RealWorktree, ref: str) -> str:
     """Validate a revision without option parsing and return its commit OID."""
     validate_revisions(ref)
-    done = wt.run("rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}", check=False)
+    done = wt.try_run("rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}")
     if done.rc:
         error = unavailable(("rev-parse",), done)
         if "Needed a single revision" in done.err or "expected commit type" in done.err:

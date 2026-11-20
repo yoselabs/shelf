@@ -20,7 +20,7 @@ What is here because it was learned, not read:
 * A derived store is set aside and rebuilt, never repaired: :func:`mark_for_rebuild` while
   serving, :func:`prepare` at the next start, :func:`ensure_schema` to empty a file written
   under another schema version.
-* :func:`to_text` / :func:`from_text`: ``sqlite3``'s default datetime adapter is
+* :func:`to_text` / :func:`from_text` / :func:`from_text_utc`: ``sqlite3``'s default datetime adapter is
   deprecated (3.12) and a value comes back as the text it went in as, so a time column
   is fixed-width ISO text — text order is then time order — coded in one place.
 """
@@ -61,17 +61,18 @@ class ExtensionUnavailableError(RuntimeError):
         self.extension = extension
 
 
+_WRITER_PRAGMAS = ("PRAGMA journal_mode=WAL", "PRAGMA synchronous=NORMAL")
+
+
 def connect(
     target: Path | str,
     *,
     extensions: Mapping[str, Callable[[sqlite3.Connection], object]] | None = None,
-    read_only: bool = False,
     timeout: float = 10.0,
 ) -> sqlite3.Connection:
     """Open a sidecar connection: autocommit, WAL, ``synchronous=NORMAL``, extensions loaded.
 
     A file target gets its parent directory created; ``":memory:"`` touches no path.
-    ``read_only`` opens ``mode=ro``: it reads the last commit and every write fails.
     ``extensions`` maps a name to a loader (``sqlite_vec.load``); a loader that fails
     raises :class:`ExtensionUnavailableError` naming it.
     """
@@ -80,17 +81,37 @@ def connect(
         conn = sqlite3.connect(name, check_same_thread=False, isolation_level=None, timeout=timeout)
     else:
         path = Path(target)
-        if read_only:
-            conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False, isolation_level=None, timeout=timeout)
-        else:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None, timeout=timeout)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None, timeout=timeout)
+    # The first statement that reads the file: one that is not a database fails here.
+    return _prepared(conn, extensions, _WRITER_PRAGMAS)
+
+
+def connect_read_only(
+    target: Path | str,
+    *,
+    extensions: Mapping[str, Callable[[sqlite3.Connection], object]] | None = None,
+    timeout: float = 10.0,
+) -> sqlite3.Connection:
+    """:func:`connect` opened ``mode=ro``: it reads the last commit and every write fails.
+
+    Nothing is created and no journal mode is set (that is a write); ``":memory:"`` is a plain private database.
+    """
+    name = str(target)
+    if name == ":memory:":
+        conn = sqlite3.connect(name, check_same_thread=False, isolation_level=None, timeout=timeout)
+    else:
+        conn = sqlite3.connect(f"file:{Path(target)}?mode=ro", uri=True, check_same_thread=False, isolation_level=None, timeout=timeout)
+    return _prepared(conn, extensions, ())
+
+
+def _prepared(
+    conn: sqlite3.Connection, extensions: Mapping[str, Callable[[sqlite3.Connection], object]] | None, pragmas: tuple[str, ...]
+) -> sqlite3.Connection:
     try:
         _load(conn, extensions or {})
-        if not read_only:
-            # The first statement that reads the file: one that is not a database fails here.
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")
+        for pragma in pragmas:
+            conn.execute(pragma)
     except BaseException:
         conn.close()
         raise
@@ -153,10 +174,14 @@ def to_text(value: datetime) -> str:
     return value.isoformat(sep=" ", timespec="microseconds")
 
 
-def from_text(text: str, *, aware: bool = False) -> datetime:
-    """The datetime :func:`to_text` wrote: naive UTC, or ``tzinfo=UTC`` with ``aware``."""
-    value = datetime.strptime(text, _TEXT_FORMAT)  # noqa: DTZ007 — the text is UTC by contract; aware adds it
-    return value.replace(tzinfo=UTC) if aware else value
+def from_text(text: str) -> datetime:
+    """The datetime :func:`to_text` wrote, as naive UTC."""
+    return datetime.strptime(text, _TEXT_FORMAT)  # noqa: DTZ007 — the text is UTC by contract; from_text_utc adds it
+
+
+def from_text_utc(text: str) -> datetime:
+    """The datetime :func:`to_text` wrote, with ``tzinfo=UTC``."""
+    return from_text(text).replace(tzinfo=UTC)
 
 
 def is_corruption(exc: BaseException) -> bool:
@@ -335,8 +360,10 @@ __all__ = [
     "MARK_SUFFIX",
     "ExtensionUnavailableError",
     "connect",
+    "connect_read_only",
     "ensure_schema",
     "from_text",
+    "from_text_utc",
     "integrity_ok",
     "is_busy",
     "is_corruption",

@@ -20,7 +20,7 @@ from convert_md.engines import (
     PymupdfLlmEngine,
     TrafilaturaEngine,
 )
-from convert_md.fidelity import grade
+from convert_md.fidelity import grade, grade_container
 from convert_md.html import SourceKind, convert_html
 
 __all__ = [
@@ -39,6 +39,7 @@ __all__ = [
     "convert_html",
     "fallback_chain_for",
     "grade",
+    "grade_container",
     "missing_engines",
     "select_engine",
 ]

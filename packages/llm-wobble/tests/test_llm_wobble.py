@@ -26,7 +26,8 @@ from llm_wobble import (
     parse_list_with_policy,
     parse_with_policy,
     recovered_fields,
-    strip_fenced_blocks,
+    strip_all_fenced_blocks,
+    strip_fenced_json,
     unwrap,
 )
 
@@ -184,7 +185,6 @@ def test_bind_forwards_parameters_it_never_names() -> None:
         item=dict,
         boundary="test",
         model="m",
-        strip_fences=False,  # never named by `bind`; must still arrive
     )
     assert unwrap(wobbled) == [{"a": 1}]
 
@@ -324,7 +324,7 @@ def test_injected_logger_receives_events_not_default(caplog: pytest.LogCaptureFi
 
 
 # --------------------------------------------------------------------- #
-# strip_fenced_blocks — the INVERSE of the parse funnel
+# strip_fenced_json — the INVERSE of the parse funnel
 #
 # The funnel keeps the JSON and discards the prose; this keeps the prose and
 # discards the JSON. Both need to know what a fence looks like, so the syntax
@@ -332,56 +332,56 @@ def test_injected_logger_receives_events_not_default(caplog: pytest.LogCaptureFi
 # --------------------------------------------------------------------- #
 
 
-def test_strip_fenced_blocks_removes_a_labelled_json_block() -> None:
+def test_strip_fenced_json_removes_a_labelled_json_block() -> None:
     text = 'The page is a 404.\n\n```next_links\n[{"anchor":"x","url":"https://e.com"}]\n```\n'
-    assert strip_fenced_blocks(text) == "The page is a 404."
+    assert strip_fenced_json(text) == "The page is a 404."
 
 
-def test_strip_fenced_blocks_removes_a_json_labelled_block() -> None:
-    assert strip_fenced_blocks('answer\n\n```json\n{"a": 1}\n```') == "answer"
+def test_strip_fenced_json_removes_a_json_labelled_block() -> None:
+    assert strip_fenced_json('answer\n\n```json\n{"a": 1}\n```') == "answer"
 
 
-def test_strip_fenced_blocks_removes_an_unlabelled_json_block() -> None:
-    assert strip_fenced_blocks("answer\n\n```\n[1, 2, 3]\n```") == "answer"
+def test_strip_fenced_json_removes_an_unlabelled_json_block() -> None:
+    assert strip_fenced_json("answer\n\n```\n[1, 2, 3]\n```") == "answer"
 
 
-def test_strip_fenced_blocks_keeps_real_code_samples() -> None:
-    """`json_only=True` is what makes this safe on answers that quote code."""
+def test_strip_fenced_json_keeps_real_code_samples() -> None:
+    """`strip_fenced_json` is what makes this safe on answers that quote code."""
     text = "Use this:\n\n```python\nprint('hi')\n```\n\nDone."
-    assert strip_fenced_blocks(text) == text.strip()
+    assert strip_fenced_json(text) == text.strip()
 
 
-def test_strip_fenced_blocks_drops_malformed_json_too() -> None:
+def test_strip_fenced_json_drops_malformed_json_too() -> None:
     """Shape check, not a parse — the payload is discarded either way.
 
     Requiring valid JSON would silently KEEP the broken blocks, which are exactly
     as unwelcome in prose as the well-formed ones.
     """
-    assert strip_fenced_blocks('answer\n\n```json\n[{"a": 1,,,\n```') == "answer"
+    assert strip_fenced_json('answer\n\n```json\n[{"a": 1,,,\n```') == "answer"
 
 
-def test_strip_fenced_blocks_json_only_false_drops_everything() -> None:
+def test_strip_all_fenced_blocks_drops_everything() -> None:
     text = "answer\n\n```python\nprint(1)\n```"
-    assert strip_fenced_blocks(text, json_only=False) == "answer"
+    assert strip_all_fenced_blocks(text) == "answer"
 
 
-def test_strip_fenced_blocks_handles_multiple_blocks() -> None:
+def test_strip_fenced_json_handles_multiple_blocks() -> None:
     text = 'a\n\n```json\n{"x":1}\n```\n\nb\n\n```next_links\n[2]\n```\n\nc'
-    assert strip_fenced_blocks(text) == "a\n\n\n\nb\n\n\n\nc"
+    assert strip_fenced_json(text) == "a\n\n\n\nb\n\n\n\nc"
 
 
-def test_strip_fenced_blocks_is_a_noop_without_fences() -> None:
-    assert strip_fenced_blocks("  just prose  ") == "just prose"
+def test_strip_fenced_json_is_a_noop_without_fences() -> None:
+    assert strip_fenced_json("  just prose  ") == "just prose"
 
 
-def test_strip_fenced_blocks_is_the_inverse_of_the_funnel() -> None:
+def test_strip_fenced_json_is_the_inverse_of_the_funnel() -> None:
     """The two halves of the same knowledge, on one payload.
 
-    `parse_with_policy` recovers the JSON; `strip_fenced_blocks` recovers the
+    `parse_with_policy` recovers the JSON; `strip_fenced_json` recovers the
     prose. Neither should ever return the other's half.
     """
     payload = 'The answer is 42.\n\n```json\n{"value": 42}\n```'
-    prose = strip_fenced_blocks(payload)
+    prose = strip_fenced_json(payload)
     parsed = unwrap(
         parse_with_policy(
             payload,

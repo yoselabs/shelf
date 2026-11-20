@@ -40,7 +40,7 @@ pl.holder(path)             # Holder(pid, created, label, meta, start) -- no loc
   and the recorded pid is gone, a forked child kept the descriptor (Python's own descriptors
   are non-inheritable, so only a raw `fork` does); the error reads "held by an inherited
   descriptor; recorded holder pid N is gone" and the caller decides what to do.
-- **Non-reentrant mode.** `reentrant=False`: a second acquire of the path in this process
+- **Non-reentrant acquire.** `ProcessLock.acquire_exclusive(path)`: a second acquire of the path in this process
   waits or raises like any other holder. Re-entry needs both acquirers reentrant.
 - **Released by the kernel.** A `flock` dies with its holder, `kill -9` included: no stale
   lock to clean. The record is a hint for messages.

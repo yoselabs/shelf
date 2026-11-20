@@ -164,7 +164,7 @@ class Doc[T]:
         if key in _UPDATES.paths:
             msg = f"recursive update of {self.path}"
             raise RuntimeError(msg)
-        lock = ProcessLock.acquire(Path(str(self.path) + ".lock"), timeout=10.0, reentrant=False)
+        lock = ProcessLock.acquire_exclusive(Path(str(self.path) + ".lock"), timeout=10.0)
         _UPDATES.paths.add(key)
         try:
             current, revision = self.read_rev()

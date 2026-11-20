@@ -38,25 +38,26 @@ def _rewrite(state: RepoState, url: str, suffix: str) -> str | None:
     return replacement + url[len(prefix) :]
 
 
-def remote_url(state: RepoState, remote: str, *, push: bool = False) -> str:
-    """As ``remote get-url [--push]``: an explicit ``pushurl`` wins (``insteadOf`` applies to it, ``pushInsteadOf``
-    does not), else ``pushInsteadOf`` over the URL, else ``insteadOf``."""
-    return remote_urls(state, remote, push=push)[0]
+def remote_push_urls(state: RepoState, remote: str) -> tuple[str, ...]:
+    """As ``remote get-url --all --push``: every ``pushurl`` (each with ``insteadOf``) when one is set, else every
+    ``url`` (each with ``pushInsteadOf``, else ``insteadOf``)."""
+    urls = _configured_urls(state, remote)
+    key = f"remote.{remote}.pushurl"
+    if key in state.config:
+        return tuple(_rewrite(state, url, "insteadof") or url for url in [state.config[key], *state.more_config.get(key, [])])
+    return tuple(_rewrite(state, url, "pushinsteadof") or _rewrite(state, url, "insteadof") or url for url in urls)
 
 
-def remote_urls(state: RepoState, remote: str, *, push: bool = False) -> tuple[str, ...]:
-    """As ``remote get-url --all [--push]``: every ``pushurl`` (each with ``insteadOf``) when one is set, else every
-    ``url`` (each with ``pushInsteadOf``, else ``insteadOf``, for a push)."""
+def remote_urls(state: RepoState, remote: str) -> tuple[str, ...]:
+    """As ``remote get-url --all``: every ``url``, each with ``insteadOf``."""
+    return tuple(_rewrite(state, url, "insteadof") or url for url in _configured_urls(state, remote))
+
+
+def _configured_urls(state: RepoState, remote: str) -> list[str]:
     if remote not in state.remotes:
         msg = f"error: No such remote '{remote}'"
         raise MissingRemote(msg)
-    key = f"remote.{remote}.pushurl"
-    urls = [state.remotes[remote], *state.more_config.get(f"remote.{remote}.url", [])]
-    explicit = push and key in state.config
-    if explicit:
-        urls = [state.config[key], *state.more_config.get(key, [])]
-    rewritten = [(_rewrite(state, url, "pushinsteadof") if push and not explicit else None) for url in urls]
-    return tuple(pushed or _rewrite(state, url, "insteadof") or url for pushed, url in zip(rewritten, urls, strict=True))
+    return [state.remotes[remote], *state.more_config.get(f"remote.{remote}.url", [])]
 
 
 def fetch(state: RepoState, remote: str, refspecs: Sequence[str]) -> CommandResult:
@@ -65,7 +66,7 @@ def fetch(state: RepoState, remote: str, refspecs: Sequence[str]) -> CommandResu
     name, there = _source(state, remote)
     state.store.absorb(there.store)
     if not refspecs:
-        fake_flow.fetch(state, name, retry=False)
+        fake_flow.fetch_once(state, name)
         tip = there.refs.get(f"refs/heads/{there.default_branch}")
         if tip:
             state.refs["FETCH_HEAD"] = tip

@@ -14,7 +14,7 @@ env["DELEGATE_DEPTH"] = "1"                      # add your own after scrubbing
 subprocess.Popen(argv, env=env)
 ```
 
-- `strip_venv=True` (or `without_venv(env)` alone) also strips an active Python virtualenv, see below.
+- `without_venv(env)` (alone, or first: `scrub(without_venv(env))`) also strips an active Python virtualenv, see below.
 - `keep` / `drop` entries are exact names, or a prefix when they end with `*`.
 - Precedence: `drop` beats everything; `keep` beats the defaults; anything else not matched by a default stays
   (`PATH`, `HOME`, `LANG`, `XDG_*`, `GIT_*`, `TERM`, ...).
@@ -68,10 +68,10 @@ feature flag). Rescue them with `keep`.
 ## Virtualenv strip (opt-in)
 
 A child that inherits our `VIRTUAL_ENV` runs in our venv (the task-loop leak of 2026-10-30). Off by default;
-`scrub(env, strip_venv=True)` or `without_venv(env)` removes `VENV_NAMES` (`VIRTUAL_ENV`, `VIRTUAL_ENV_PROMPT`,
+`without_venv(env)` (or `scrub(without_venv(env))` for both) removes `VENV_NAMES` (`VIRTUAL_ENV`, `VIRTUAL_ENV_PROMPT`,
 `PYTHONHOME`, `__PYVENV_LAUNCHER__`, `PYTHONEXECUTABLE`) and, when `VIRTUAL_ENV` is set, the exact entry
 `$VIRTUAL_ENV/bin` from `PATH` (other entries and their order stay; with no `VIRTUAL_ENV`, `PATH` is untouched).
-`strip_venv` wins over `keep`, and still cleans `PATH` when `drop` removed `VIRTUAL_ENV`. `PYTHONPATH`, `UV_*` and
+Applied first, it wins over `keep`, and still cleans `PATH` when `drop` names `VIRTUAL_ENV`. `PYTHONPATH`, `UV_*` and
 the rest are not touched. There is no allowlist mode.
 
 ## Provenance: two copies, one union

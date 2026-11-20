@@ -158,8 +158,8 @@ def is_double_escaped(text: str) -> bool:
 _FENCED_BLOCK_RE = re.compile(r"```[a-zA-Z0-9_-]*[ \t]*\n(?P<body>.*?)\n[ \t]*```", re.DOTALL)
 
 
-def strip_fenced_blocks(text: str, *, json_only: bool = True) -> str:
-    """Remove fenced blocks from prose, keeping the prose.
+def strip_fenced_json(text: str) -> str:
+    """Remove fenced JSON blocks from prose, keeping the prose.
 
     The INVERSE of what the parse funnel does. `parse_with_policy` keeps the JSON
     and discards the prose around it; this keeps the prose and discards the JSON.
@@ -172,24 +172,27 @@ def strip_fenced_blocks(text: str, *, json_only: bool = True) -> str:
     parse as text inflates tokens, breaks rendering, and puts structured data in a
     channel not reserved for it.
 
-    `json_only=True` (default) drops only blocks whose body opens as JSON
-    (`[` or `{`), so genuine code samples in an answer survive. It is a SHAPE
-    check, not a parse: the payload is being discarded, so whether it is
-    well-formed is irrelevant — a malformed array is exactly as unwelcome in
-    prose as a valid one, and requiring validity would silently keep the broken
-    ones. `json_only=False` drops every fenced block regardless of content.
+    Drops only blocks whose body opens as JSON (`[` or `{`), so genuine code
+    samples in an answer survive. It is a SHAPE check, not a parse: the payload is
+    being discarded, so whether it is well-formed is irrelevant — a malformed
+    array is exactly as unwelcome in prose as a valid one, and requiring validity
+    would silently keep the broken ones. `strip_all_fenced_blocks` drops every
+    fenced block regardless of content.
 
     Returns the text with matched blocks removed and surrounding whitespace
     collapsed at the ends. Text with no fences is returned stripped, unchanged.
     """
 
     def _replace(match: re.Match[str]) -> str:
-        if not json_only:
-            return ""
         body = match.group("body").strip()
         return "" if body[:1] in ("[", "{") else match.group(0)
 
     return _FENCED_BLOCK_RE.sub(_replace, text).strip()
+
+
+def strip_all_fenced_blocks(text: str) -> str:
+    """Remove every fenced block from prose, whatever it holds (code samples too), keeping the prose."""
+    return _FENCED_BLOCK_RE.sub("", text).strip()
 
 
 def _first_json_object(text: str) -> str | None:
@@ -354,10 +357,9 @@ def parse_list_with_policy(
     item: Callable[[dict[str, Any]], T | None],
     boundary: str,
     model: str,
-    strip_fences: bool = True,
     logger: logging.Logger | None = None,
 ) -> Wobbled:
-    """Strip fences (optional) → `json.loads` → expect list → filter via `item(...)`.
+    """Strip fences → `json.loads` → expect list → filter via `item(...)`.
 
     For envelopes where the model returns a JSON array. `item(dict) -> T | None`
     returns None to drop malformed entries; that filtering happens inside the
@@ -366,7 +368,7 @@ def parse_list_with_policy(
     Returns a `Wobbled` wrapping `list[T]`. `recovered_fields` lists the indices
     (as strings) of dropped entries.
     """
-    payload = _strip_fences(raw) if strip_fences else raw.strip()
+    payload = _strip_fences(raw)
     try:
         parsed = json.loads(payload)
     except (ValueError, json.JSONDecodeError) as exc:
@@ -451,6 +453,7 @@ __all__ = (
     "parse_list_with_policy",
     "parse_with_policy",
     "recovered_fields",
-    "strip_fenced_blocks",
+    "strip_all_fenced_blocks",
+    "strip_fenced_json",
     "unwrap",
 )

@@ -29,7 +29,7 @@ def drop_worktree(repo: RealRepo, path: Path, *, force: bool, missing_ok: bool) 
     try:
         if not missing_ok or path.exists():
             args = ("worktree", "remove", *(["--force"] if force else []), str(path))
-            done = repo.run(repo.path, *args, check=False)
+            done = repo.try_run(repo.path, *args)
             if done.rc:
                 error = unavailable(args, done)
                 if type(error) is not GitUnavailable:
@@ -53,7 +53,7 @@ def prune_worktrees(repo: RealRepo) -> None:
 
 def worktree_state(repo: RealRepo, path: Path) -> bytes | None:
     args = ("--no-optional-locks", "status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all")
-    done = repo.run(path, *args, check=False)
+    done = repo.try_run(path, *args)
     if done.rc == 0:
         return done.raw
     error = unavailable(args, done)

@@ -32,18 +32,25 @@ def rebase(repo: RepoState, state: CheckoutState, base: str, *, update_refs: boo
     return CommandResult(ok=not isinstance(done, Conflict), output=done.output)
 
 
-def continue_rebase(
-    repo: RepoState, state: CheckoutState, *, stage_conflicts: bool, check_markers: bool, missing_ok: bool
-) -> CommandResult:
+def continue_rebase(repo: RepoState, state: CheckoutState, *, missing_ok: bool) -> CommandResult:
     if state.rebase is None:
         return CommandResult(ok=missing_ok, output="" if missing_ok else "fatal: No rebase in progress?")
-    if check_markers and any(fake_flow.MARKERS.search(state.files.get(p, b"").decode("utf-8", "replace")) for p in state.unmerged):
+    return _continue(repo, state)
+
+
+def resolve_and_continue(repo: RepoState, state: CheckoutState) -> CommandResult:
+    if state.rebase is None:
+        return CommandResult(ok=False, output="fatal: No rebase in progress?")
+    if any(fake_flow.MARKERS.search(state.files.get(p, b"").decode("utf-8", "replace")) for p in state.unmerged):
         return CommandResult(ok=False, output="conflict markers remain")
-    if stage_conflicts:
-        try:
-            stage(repo, state, sorted(state.unmerged))
-        except GitUnavailable as exc:
-            return CommandResult(ok=False, output=exc.output)
+    try:
+        stage(repo, state, sorted(state.unmerged))
+    except GitUnavailable as exc:
+        return CommandResult(ok=False, output=exc.output)
+    return _continue(repo, state)
+
+
+def _continue(repo: RepoState, state: CheckoutState) -> CommandResult:
     if state.unmerged or any(state.files.get(path) != repo.store.blobs[sha] for path, sha in state.index.items()):
         return CommandResult(ok=False, output="You must edit all merge conflicts and then mark them as resolved using git add")
     try:

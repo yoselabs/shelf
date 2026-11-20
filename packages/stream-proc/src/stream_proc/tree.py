@@ -74,13 +74,20 @@ def own_ids() -> set[int]:
     return ids
 
 
-def _hit(pid: int, sig: int, sent: _Sent, *, group: bool = True) -> None:
-    """Signal ``pid`` and, when ``group``, its own group; never ours, never pid or group 0 or 1."""
+def _hit_pid(pid: int, sig: int, sent: _Sent) -> None:
+    """Signal ``pid`` alone; never ours, never pid 0 or 1."""
+    if pid <= 1 or pid in own_ids():
+        return
+    sent.call(sig, os.kill, pid)
+
+
+def _hit(pid: int, sig: int, sent: _Sent) -> None:
+    """Signal ``pid``'s own group, then ``pid``; never ours, never pid or group 0 or 1."""
     if pid <= 1 or pid in own_ids():
         return
     with contextlib.suppress(OSError):
         pgid = os.getpgid(pid)
-        if group and pgid > 1 and pgid not in own_ids():
+        if pgid > 1 and pgid not in own_ids():
             sent.call(sig, os.killpg, pgid)
     sent.call(sig, os.kill, pid)
 
@@ -138,7 +145,7 @@ def _stop(p: subprocess.Popen[bytes], grace: float, prove: float, sent: _Sent) -
         sent.call(signal.SIGTERM, os.kill, p.pid)  # the leader alone, then everyone: the group walk reaches a member before the leader
         sent.call(signal.SIGTERM, os.killpg, p.pid)
     elif p.returncode is None:
-        _hit(p.pid, signal.SIGTERM, sent, group=False)
+        _hit_pid(p.pid, signal.SIGTERM, sent)
     for pid in noted:
         _hit(pid, signal.SIGTERM, sent)
     end = time.monotonic() + grace
@@ -153,7 +160,10 @@ def _stop(p: subprocess.Popen[bytes], grace: float, prove: float, sent: _Sent) -
             sent.call(signal.SIGKILL, os.killpg, p.pid)  # unreaped: the group id is still ours to name
         left = _survivors(p, led=led, noted=noted)
         for pid in left:
-            _hit(pid, signal.SIGKILL, sent, group=pid != p.pid or led)
+            if pid != p.pid or led:
+                _hit(pid, signal.SIGKILL, sent)
+            else:
+                _hit_pid(pid, signal.SIGKILL, sent)
         p.poll()
         left = _survivors(p, led=led, noted=noted)
         if (not left and p.returncode is not None) or time.monotonic() >= end:

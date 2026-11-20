@@ -1,6 +1,6 @@
 [project]
 name = "any-browser"
-version = "0.2.0"
+version = "0.3.0"
 description = "Stop caring which headless browser renders a JS page — one BrowserBackend seam over Playwright-API and raw-CDP engines."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

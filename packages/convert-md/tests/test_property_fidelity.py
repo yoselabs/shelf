@@ -10,7 +10,7 @@ real-corpus examples can't parametrically sweep.
 
 from __future__ import annotations
 
-from convert_md.fidelity import grade
+from convert_md.fidelity import grade, grade_container
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -40,7 +40,7 @@ def test_property_garbage_density_above_threshold_is_always_partial(garbage_coun
     markdown = ("\x01" * garbage_count) + ("a" * clean_count)
     density = garbage_count / len(markdown)
     if density > 0.02:
-        verdict, lost, _warnings = grade(markdown=markdown, source_size=len(markdown) * 10, check_yield=False)
+        verdict, lost, _warnings = grade_container(markdown=markdown, source_size=len(markdown) * 10)
         assert verdict == "partial"
         assert "encoding" in lost
 
@@ -49,12 +49,19 @@ def test_property_garbage_density_above_threshold_is_always_partial(garbage_coun
 @settings(max_examples=150)
 def test_property_clean_short_text_always_grades_high(text: str) -> None:
     """For any non-empty, garbage-free, cid-free text short enough to stay
-    under the structure-check's large-document threshold, with check_yield
-    disabled (so this isolates the garbage/cid/shatter checks specifically,
+    under the structure-check's large-document threshold, with the yield
+    check skipped (grade_container) (so this isolates the garbage/cid/shatter checks specifically,
     not yield), the grade is always high — generalizing beyond one clean
     example to the whole space of "boring, well-behaved" input.
     """
-    verdict, lost, warnings = grade(markdown=text, source_size=100, check_yield=False)
+    verdict, lost, warnings = grade_container(markdown=text, source_size=100)
     assert verdict == "high"
     assert lost == []
     assert warnings == []
+
+
+def test_grade_container_skips_only_the_yield_check() -> None:
+    markdown = "# Title\n\n" + "word " * 20
+    assert grade(markdown=markdown, source_size=100_000)[1] == ["content"]
+    assert grade_container(markdown=markdown, source_size=100_000) == ("high", [], [])
+    assert grade_container(markdown=" ", source_size=5) == grade(markdown=" ", source_size=5)

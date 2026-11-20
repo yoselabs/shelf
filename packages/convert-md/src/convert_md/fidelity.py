@@ -111,13 +111,21 @@ def _check_structure(markdown: str, source_size: int) -> _Verdict | None:
     return None
 
 
-def grade(*, markdown: str, source_size: int, check_yield: bool = True) -> tuple[Fidelity, list[str], list[str]]:
-    """Return ``(fidelity, lost, warnings)`` for a conversion output.
+def grade(*, markdown: str, source_size: int) -> tuple[Fidelity, list[str], list[str]]:
+    """Return ``(fidelity, lost, warnings)`` for a text-like source (html): the output/input yield ratio is checked."""
+    return _grade(markdown, source_size, _check_yield(markdown, source_size))
 
-    ``check_yield`` should be False for ZIP-container formats (docx/xlsx/pptx)
-    and PDFs, whose on-disk byte size is not comparable to extracted text length
-    — only text-like sources (html) get the output/input ratio check.
+
+def grade_container(*, markdown: str, source_size: int) -> tuple[Fidelity, list[str], list[str]]:
+    """``grade`` for ZIP-container formats (docx/xlsx/pptx) and PDFs.
+
+    Their on-disk byte size is not comparable to extracted text length, so the yield ratio is not checked;
+    every other check is the same.
     """
+    return _grade(markdown, source_size, None)
+
+
+def _grade(markdown: str, source_size: int, low_yield: _Verdict | None) -> tuple[Fidelity, list[str], list[str]]:
     stripped = markdown.strip()
     if not stripped:
         return "failed", ["all"], ["empty_output"]
@@ -127,7 +135,7 @@ def grade(*, markdown: str, source_size: int, check_yield: bool = True) -> tuple
         _check_garbage(markdown)
         or _check_cid_leak(lines)
         or _check_shattered_table(lines)
-        or (_check_yield(markdown, source_size) if check_yield else None)
+        or low_yield
         or _check_structure(markdown, source_size)
     )
     if verdict is not None:
@@ -135,4 +143,4 @@ def grade(*, markdown: str, source_size: int, check_yield: bool = True) -> tuple
     return "high", [], []
 
 
-__all__ = ["grade"]
+__all__ = ["grade", "grade_container"]

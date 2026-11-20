@@ -30,7 +30,7 @@ def squash(repo: RealRepo, onto: str, head: str, message: str) -> SquashResult:
     wt = repo.worktree(repo.path)
     base, tip = resolve_commit(wt, onto), resolve_commit(wt, head)
     args = ("merge-tree", "--write-tree", "-z", "--name-only", "--no-messages", base, tip)
-    merged = repo.run(repo.path, *args, check=False)
+    merged = repo.try_run(repo.path, *args)
     if merged.rc not in (0, 1):
         raise unavailable(args, merged)
     parts = [part for part in merged.out.split("\0") if part]

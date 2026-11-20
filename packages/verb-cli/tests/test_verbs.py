@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 import pytest
 from pydantic import Field
-from verb_cli import POSITIONAL, VerbCli, VerbCliError, flags_of
+from verb_cli import POSITIONAL, VerbCli, VerbCliError, choice_flags_of, flags_of
 from verb_cli.testing import assert_help_tree
 
 
@@ -96,6 +96,6 @@ def test_a_verb_parameter_that_clashes_with_a_shared_one_is_refused() -> None:
         VerbCli({"bad": bad}, shared=Target)
 
 
-def test_choices_are_off_by_default_so_a_literal_stays_one_json_flag() -> None:
+def test_flags_of_keeps_a_literal_one_json_flag_and_choice_flags_of_makes_choices() -> None:
     assert flags_of(show)[2].needs_json is True
-    assert flags_of(show, choices=True)[2].choices == ("short", "full")
+    assert choice_flags_of(show)[2].choices == ("short", "full")

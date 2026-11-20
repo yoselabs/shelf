@@ -18,7 +18,7 @@ from process_lock import Holder, LockHeldError, ProcessLock, Waiting, held, hold
 from pytest_bdd import given, parsers, scenarios, then, when
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from pathlib import Path
 
 scenarios("features")
@@ -66,7 +66,7 @@ def _held_by_thread(world: World, name: str, secs: float) -> None:
     ready = threading.Event()
 
     def run() -> None:
-        lock = ProcessLock.acquire(world.root / name, reentrant=False)
+        lock = ProcessLock.acquire_exclusive(world.root / name)
         ready.set()
         time.sleep(secs)
         lock.release()
@@ -89,7 +89,7 @@ def _hold_labelled(world: World, name: str, label: str, meta: str) -> None:
 
 @given(parsers.parse('I hold "{name}" non-reentrantly'))
 def _hold_non_reentrant(world: World, name: str) -> None:
-    world.locks.append(ProcessLock.acquire(world.root / name, reentrant=False))
+    world.locks.append(ProcessLock.acquire_exclusive(world.root / name))
 
 
 @given(parsers.parse("I release it after {secs:g} seconds"))
@@ -100,21 +100,21 @@ def _release_later(world: World, secs: float) -> None:
     world.threads.append(thread)
 
 
-def _acquire(world: World, name: str, secs: float, *, reentrant: bool = True) -> None:
+def _acquire(world: World, acquire: Callable[..., ProcessLock], name: str, secs: float) -> None:
     try:
-        world.locks.append(ProcessLock.acquire(world.root / name, timeout=secs, on_wait=world.seen.append, reentrant=reentrant))
+        world.locks.append(acquire(world.root / name, timeout=secs, on_wait=world.seen.append))
     except LockHeldError as exc:
         world.refusal = exc
 
 
 @when(parsers.parse('I acquire "{name}" waiting up to {secs:g} seconds'))
 def _acquire_waiting(world: World, name: str, secs: float) -> None:
-    _acquire(world, name, secs)
+    _acquire(world, ProcessLock.acquire, name, secs)
 
 
 @when(parsers.parse('I acquire "{name}" non-reentrantly waiting up to {secs:g} seconds'))
 def _acquire_non_reentrant(world: World, name: str, secs: float) -> None:
-    _acquire(world, name, secs, reentrant=False)
+    _acquire(world, ProcessLock.acquire_exclusive, name, secs)
 
 
 @then(parsers.parse('I hold "{name}"'))

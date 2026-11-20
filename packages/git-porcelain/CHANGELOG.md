@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.26.0
+
+Breaking (shelf-tyld.13, bool modes split into named operations; every old call maps one to one):
+
+- `Worktree.stage(paths, *, literal=True)` ⇒ `stage(paths)` (literal) and new `stage_pathspec(patterns)` (the old `literal=False`).
+- `Repo.remote_url(remote, *, push=False)` / `remote_urls(...)` ⇒ `remote_url(remote)`, `remote_urls(remote)` and new `remote_push_url(remote)`, `remote_push_urls(remote)` (the old `push=True`).
+- `Worktree.continue_rebase(*, stage_conflicts=False, check_markers=False, missing_ok=False)` ⇒ `continue_rebase(*, missing_ok=False)` (existing index) and new `resolve_and_continue()` (the old `stage_conflicts=True, check_markers=True`: refuse on markers, stage every unmerged file, continue). The two flags alone, in other combinations, are gone.
+- `run_git(vault, *args, check=True, ...)` ⇒ `run_git(vault, *args, ...)` (raises) and new `try_git(vault, *args, ...)` (the old `check=False`: stdout whatever the exit code).
+- `RealRepo.run` / `RealWorktree.run(..., check=True, ...)` ⇒ `run(...)` (raises `GitUnavailable`) and new `try_run(...)` (returns the `Done`; the old `check=False`).
+- Internal: `RealRepo.memo(forever=)` ⇒ `memo` and `memo_until_write`; the fake's `fetch(retry=)` ⇒ `fetch` and `fetch_once`.
+- Stays: `missing_ok` (`abort_rebase`, `continue_rebase`, `delete_remote_at`, `drop_worktree`), `force`/`allow_delete`/`ignored`/`nested`/`allow_empty`/`hooks`/`keep_ignored`: justified exceptions, ADR 0030.
+
 ## 0.25.0
 
 Consumer wave (shelf-tyld): git-porcelain now runs on the shelf's owners instead of its own copies. Behaviour change: **every git call is bounded**.

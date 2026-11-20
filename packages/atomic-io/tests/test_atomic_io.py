@@ -5,7 +5,14 @@ import stat
 from pathlib import Path
 
 import pytest
-from atomic_io import atomic_write_bytes, atomic_write_json, atomic_write_text
+from atomic_io import (
+    atomic_replace_bytes,
+    atomic_replace_json,
+    atomic_replace_text,
+    atomic_write_bytes,
+    atomic_write_json,
+    atomic_write_text,
+)
 
 
 def test_writes_full_content(tmp_path: Path) -> None:
@@ -65,10 +72,23 @@ def test_fsync_is_skipped_on_request(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert len(calls) == 1
 
 
-def test_keep_mode_without_a_prior_file_uses_the_umask_default(tmp_path: Path) -> None:
+def test_replace_without_a_prior_file_uses_the_umask_default(tmp_path: Path) -> None:
     old = os.umask(0o022)
     try:
-        atomic_write_bytes(tmp_path / "new", b"1", keep_mode=True)
+        atomic_replace_bytes(tmp_path / "new", b"1")
     finally:
         os.umask(old)
     assert stat.S_IMODE((tmp_path / "new").stat().st_mode) == 0o644
+
+
+def test_replace_text_and_json_keep_the_mode_and_write_the_same_bytes_as_write(tmp_path: Path) -> None:
+    for name, replace, write in (("t", atomic_replace_text, atomic_write_text), ("j", atomic_replace_json, atomic_write_json)):
+        value = "héllo\n" if name == "t" else {"b": 1, "a": "é"}
+        target = tmp_path / name
+        target.write_bytes(b"old")
+        target.chmod(0o640)
+        replace(target, value)  # type: ignore[operator]
+        write(tmp_path / f"{name}.w", value)  # type: ignore[operator]
+        assert target.read_bytes() == (tmp_path / f"{name}.w").read_bytes()
+        assert stat.S_IMODE(target.stat().st_mode) == 0o640
+        assert stat.S_IMODE((tmp_path / f"{name}.w").stat().st_mode) == 0o600

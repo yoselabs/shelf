@@ -9,7 +9,7 @@
   :func:`group_alive` — is any process in a group; :func:`group_rss` — resident bytes of a group.
 - :func:`capture` — :func:`run` to the end, output as text, exit 124 on a timeout, optional heartbeat ``tick``.
 - :func:`capture_bytes` — the same, output as exact bytes, optional ``input`` on stdin, stdin devnull or inherited,
-  or ``capture=False`` to inherit stdout/stderr.
+  and :func:`run_inherited` for a child that writes to our stdout/stderr.
 - :func:`stop_pid`, :class:`PidHandle` — stop a process we did not spawn, only while its start token matches.
 - :class:`TermHold`, :func:`popen_held` — a SIGTERM landing during a spawn still stops the child.
 - :func:`popen_registered` — the command executes only after a callback durably registered its identity;
@@ -18,7 +18,7 @@
 Stdlib only (``ctypes`` on macOS), POSIX.
 """
 
-from stream_proc.capture import Captured, CapturedBytes, capture, capture_bytes
+from stream_proc.capture import Captured, CapturedBytes, capture, capture_bytes, run_inherited
 from stream_proc.hold import TermHold, popen_held
 from stream_proc.owned import IdentityUnavailableError, OwnedProcess, ProcessObservation, inspect_process, observe_owned
 from stream_proc.pid import PidHandle, stop_pid
@@ -53,6 +53,7 @@ __all__ = [
     "popen_registered",
     "proc_start",
     "run",
+    "run_inherited",
     "run_registered",
     "stop_pid",
     "stop_tree",

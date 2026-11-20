@@ -26,7 +26,7 @@ from urllib.parse import urlparse
 from .base import BackendCookie, RenderedPage, RenderOutcome
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Callable, Coroutine
+    from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine
 
 _DEFAULT_LOG = logging.getLogger("any_browser")
 
@@ -150,6 +150,10 @@ async def _scroll_and_retry(page: Any, original_html: str, *, log: logging.Logge
     return larger
 
 
+async def _keep(_page: Any, html: str) -> str:
+    return html
+
+
 async def _scroll_to_stable(page: Any, original_html: str, *, log: logging.Logger, max_passes: int = _SCROLL_STABLE_MAX_PASSES) -> str:
     """Scroll repeatedly until the captured HTML stops growing (infinite-scroll).
 
@@ -266,23 +270,34 @@ class PlaywrightBackend:
         self._stderr_loop: asyncio.AbstractEventLoop | None = None
         self._stderr_tasks: set[asyncio.Task[None]] = set()
 
-    async def render(
+    async def render(self, url: str, *, cookies: list[BackendCookie], budget_s: float, js_heavy: bool) -> RenderedPage:
+        """Launch (lazily), navigate, and capture rendered HTML.
+
+        Never raises for routine failures — returns a :class:`RenderedPage` with
+        the matching outcome.
+        """
+        return await self._render(url, cookies=cookies, budget_s=budget_s, js_heavy=js_heavy, settle=_keep)
+
+    async def render_listing(self, url: str, *, cookies: list[BackendCookie], budget_s: float, js_heavy: bool) -> RenderedPage:
+        """:meth:`render` that drives an infinite-scroll listing to completion after navigation.
+
+        Scrolls until the captured HTML stops growing, instead of the single thin-triggered pass.
+        """
+
+        async def settle(page: Any, html: str) -> str:
+            return await _scroll_to_stable(page, html, log=self._log)
+
+        return await self._render(url, cookies=cookies, budget_s=budget_s, js_heavy=js_heavy, settle=settle)
+
+    async def _render(
         self,
         url: str,
         *,
         cookies: list[BackendCookie],
         budget_s: float,
         js_heavy: bool,
-        scroll_to_stable: bool = False,
+        settle: Callable[[Any, str], Awaitable[str]],
     ) -> RenderedPage:
-        """Launch (lazily), navigate, and capture rendered HTML.
-
-        Never raises for routine failures — returns a :class:`RenderedPage` with
-        the matching outcome.
-        ``scroll_to_stable`` drives an infinite-scroll listing to completion
-        after navigation — scroll until the captured HTML stops growing —
-        instead of the single thin-triggered pass.
-        """
         try:
             await asyncio.wait_for(self._ensure(), timeout=self.launch_budget_s)
         except TimeoutError:
@@ -338,9 +353,7 @@ class PlaywrightBackend:
                 # scroll + 2s networkidle, keep the larger snapshot.
                 if len(html) < _THIN_FLOOR and js_heavy:
                     html = await _scroll_and_retry(page, html, log=self._log)
-                # Explicit listing completion: scroll to stable.
-                if scroll_to_stable:
-                    html = await _scroll_to_stable(page, html, log=self._log)
+                html = await settle(page, html)  # listing completion (render_listing), else unchanged
         except Exception as exc:  # navigation/network/driver errors
             return RenderedPage(
                 outcome=RenderOutcome.error,

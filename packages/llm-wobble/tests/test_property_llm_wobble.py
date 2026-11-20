@@ -5,7 +5,7 @@ over every body a consumer accepts, so the property that matters is the one that
 bounds its false positives: the example tests name a few shapes that must survive,
 and these say *no* multi-line text at all can be caught, whatever is in it.
 
-`strip_fenced_blocks` gets the complementary invariant — it is the inverse of the
+`strip_fenced_json` gets the complementary invariant — it is the inverse of the
 parse funnel, and inverses are where a property suite earns its keep: text with no
 fence in it must come back unchanged apart from the documented outer strip.
 """
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from hypothesis import given
 from hypothesis import strategies as st
-from llm_wobble import is_double_escaped, strip_fenced_blocks
+from llm_wobble import is_double_escaped, strip_fenced_json
 
 # Text likely to trip a naive escape counter: the literal pairs, in quantity. Built by
 # joining tokens rather than by `alphabet=`, which takes single characters only.
@@ -41,4 +41,4 @@ def test_it_never_raises_and_always_answers(text: str) -> None:
 @given(text=st.text(alphabet=st.characters(blacklist_characters="`"), max_size=200))
 def test_text_with_no_fence_survives_stripping(text: str) -> None:
     """The inverse property: with nothing to remove, only the documented strip applies."""
-    assert strip_fenced_blocks(text) == text.strip()
+    assert strip_fenced_json(text) == text.strip()
