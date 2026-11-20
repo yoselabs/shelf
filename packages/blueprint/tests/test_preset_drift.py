@@ -195,3 +195,52 @@ def test_a_declared_linter_version_difference_passes(tmp_path: Path, shelf: Path
     _lock(shelf, ruff="0.15.20")
     _lock(consumer, ruff="0.17.0")
     assert _run(consumer, shelf).returncode == 0
+
+
+# ── the EFFECTIVE ruff config: ruff.toml wins over pyproject, as ruff does (shelf-166r) ──
+# OGY showed 252 errors under the preset while `blueprint preset` passed: a ruff.toml shadowed the preset block in pyproject.toml.
+
+_OLD_RULES = '[lint]\nselect = ["F"]\nignore = []\n'
+
+
+@pytest.mark.parametrize("name", ["ruff.toml", ".ruff.toml"])
+def test_a_ruff_toml_shadowing_the_preset_block_fails_and_is_what_gets_compared(tmp_path: Path, shelf: Path, name: str) -> None:
+    consumer = _write(tmp_path / "consumer", _SHELF)
+    (consumer / name).write_text(_OLD_RULES)
+    result = _run(consumer, shelf)
+    assert result.returncode == 1
+    assert f"{name} shadows" in result.stderr
+    assert "missing 'RUF'" in result.stderr, "the preset must judge the config ruff reads, not the dead block"
+
+
+def test_a_declared_shadow_passes_when_the_effective_config_matches(tmp_path: Path, shelf: Path) -> None:
+    declaration = '\n[tool.shelf-preset]\nruff-config-shadows = ["ruff.toml"]  # one file for the editor too\n'
+    consumer = _write(tmp_path / "consumer", _SHELF + declaration)
+    (consumer / "ruff.toml").write_text('[lint]\nselect = ["F", "E", "RUF"]\nignore = ["ANN401"]\n')
+    result = _run(consumer, shelf)
+    assert result.returncode == 0, result.stderr
+
+
+def test_a_declared_shadow_still_fails_when_the_effective_config_drifts(tmp_path: Path, shelf: Path) -> None:
+    consumer = _write(tmp_path / "consumer", _SHELF + '\n[tool.shelf-preset]\nruff-config-shadows = ["ruff.toml"]\n')
+    (consumer / "ruff.toml").write_text(_OLD_RULES)
+    result = _run(consumer, shelf)
+    assert result.returncode == 1
+    assert "shadows" not in result.stderr
+    assert "missing 'RUF'" in result.stderr
+
+
+def test_a_ruff_toml_with_no_ruff_block_in_pyproject_is_just_the_config(tmp_path: Path, shelf: Path) -> None:
+    consumer = _write(tmp_path / "consumer", '[tool.pyrefly.errors]\ndeprecated = "error"\n')
+    (consumer / "ruff.toml").write_text('[lint]\nselect = ["F", "E", "RUF"]\nignore = ["ANN401"]\n')
+    result = _run(consumer, shelf)
+    assert result.returncode == 0, result.stderr
+
+
+def test_dot_ruff_toml_wins_over_ruff_toml(tmp_path: Path, shelf: Path) -> None:
+    consumer = _write(tmp_path / "consumer", '[tool.pyrefly.errors]\ndeprecated = "error"\n')
+    (consumer / "ruff.toml").write_text('[lint]\nselect = ["F", "E", "RUF"]\nignore = ["ANN401"]\n')
+    (consumer / ".ruff.toml").write_text(_OLD_RULES)
+    result = _run(consumer, shelf)
+    assert result.returncode == 1
+    assert "missing 'RUF'" in result.stderr

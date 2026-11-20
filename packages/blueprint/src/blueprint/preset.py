@@ -19,6 +19,9 @@ An empty list means "identical here". A
 declared entry is a local choice made on purpose, in the consumer's own file, next to a reason. An *undeclared* one is drift, and that is
 the only thing this fails on: it never edits, never proposes a value, and has no opinion about which side is right.
 
+The ruff axes come from the config ruff reads: a `.ruff.toml` or `ruff.toml` beside pyproject.toml wins over its `[tool.ruff]` (the
+file's `[lint]` is compared), and a shadowed block fails unless `ruff-config-shadows = ["ruff.toml"]` declares it.
+
 Deliberately NOT compared: `per-file-ignores` keys and `sub-config` matches. Those are paths, and a consumer's tree is not the shelf's.
 
 The reference is `preset.toml` beside this file: a snapshot of the shelf's own config, so a consumer needs no shelf clone. The shelf
@@ -53,8 +56,20 @@ def _load(path: Path) -> dict[str, Any]:
         return tomllib.load(fh)
 
 
+# Ruff reads the nearest of these in a folder, first one wins; a `[tool.ruff]` table in pyproject.toml comes last.
+_RUFF_FILES = (".ruff.toml", "ruff.toml")
+
+
 def _ruff(config: dict[str, Any], key: str) -> set[str]:
     return set(config.get("tool", {}).get("ruff", {}).get("lint", {}).get(key, []))
+
+
+def _effective_ruff(repo: Path, consumer: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    """The config ruff reads in `repo`, shaped as a pyproject (`tool.ruff`), and the file name when that file is not pyproject.toml."""
+    for name in _RUFF_FILES:
+        if (repo / name).is_file():
+            return {"tool": {"ruff": _load(repo / name)}}, name
+    return consumer, None
 
 
 def _pyrefly_errors(config: dict[str, Any]) -> set[str]:
@@ -142,6 +157,15 @@ def _version_drift(reference: dict[str, str], repo: Path, declared: dict[str, An
     ]
 
 
+def _shadow(consumer: dict[str, Any], ruff_file: str | None, declared: dict[str, Any]) -> list[str]:
+    """A ruff file beside a `[tool.ruff]` block: ruff reads the file, so the block is dead, unless the consumer says so on purpose."""
+    if ruff_file is None or "ruff" not in consumer.get("tool", {}) or ruff_file in declared.get("ruff-config-shadows", []):
+        return []
+    what = f"{ruff_file} shadows [tool.ruff] in pyproject.toml: ruff reads {ruff_file} and ignores the block"
+    how = f'(compared here: {ruff_file}); delete one, or declare ruff-config-shadows = ["{ruff_file}"]'
+    return [f"  {what} {how}"]
+
+
 def check(repo: Path, reference_file: Path | None = None) -> int:
     """Compare `repo` with the preset; the exit code of `blueprint preset`."""
     consumer_toml = repo / "pyproject.toml"
@@ -159,12 +183,18 @@ def check(repo: Path, reference_file: Path | None = None) -> int:
         return 2
 
     declared = consumer.get("tool", {}).get("shelf-preset", {})
+    try:
+        effective, ruff_file = _effective_ruff(repo, consumer)
+    except (tomllib.TOMLDecodeError, OSError) as exc:
+        sys.stderr.write(f"preset-drift: unreadable ruff config ({exc}) -- CANNOT VERIFY, not a pass\n")
+        return 2
     values = {
-        "ruff-select": _ruff(consumer, "select"),
-        "ruff-ignore": _ruff(consumer, "ignore"),
+        "ruff-select": _ruff(effective, "select"),
+        "ruff-ignore": _ruff(effective, "ignore"),
         "pyrefly-errors": _pyrefly_errors(consumer),
     }
-    findings = [line for axis, _ in _AXES for line in _compare(axis, set(reference.get(axis, [])), values[axis], declared)]
+    findings = _shadow(consumer, ruff_file, declared)
+    findings += [line for axis, _ in _AXES for line in _compare(axis, set(reference.get(axis, [])), values[axis], declared)]
     findings += _version_drift(reference.get("linters", {}), repo, declared)
     findings += size_drift({"tool": {"shelf-size": reference.get("shelf-size", {})}}, consumer)
     if not findings:

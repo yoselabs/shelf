@@ -447,7 +447,13 @@ def _gate_with_tests(repo: Repo, recipe: str) -> None:
 
 @pytest.mark.parametrize(
     "recipe",
-    ["uv run pytest", "uv run python -m any_gate test -- uv run python -m any_gate_python run", "uv run python -m any_gate_python run"],
+    [
+        "uv run pytest",
+        "uv run python -m any_gate test -- uv run python -m any_gate_python run",
+        "uv run python -m any_gate_python run",
+        "uv run blueprint test",
+        "uv run python -m blueprint test",
+    ],
 )
 def test_tests_pass_when_the_gate_reaches_any_test_runner(repo: Repo, recipe: str) -> None:
     _gate_with_tests(repo, recipe)

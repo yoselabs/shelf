@@ -247,3 +247,20 @@ def test_the_rendered_recipes_keep_their_group_attribute_and_the_test_recipe_run
     text = (repo / ".blueprint" / "python.just").read_text()
     assert "[group('gate')]\nlint:" in text
     assert "pytest_par" not in text
+
+
+def test_a_stale_shelf_copy_of_bootstrap_is_refreshed_and_the_consumers_own_is_not(repo: Path) -> None:
+    """A `bootstrap` copied from an older shelf (it runs the onboard script) is shelf-owned: the current text replaces it (shelf-mw91)."""
+    _bare(repo)
+    stale = "bootstrap:\n    python3 .agents/skills/onboard-consumer/scripts/onboard.py --repo .\n\nlint:\n    echo mine\n"
+    (repo / "justfile").write_text(stale)
+
+    LinterPresetOperation(repo).run({})
+
+    text = (repo / "justfile").read_text()
+    assert "SHELF_HOME" in text, "the current shelf bootstrap replaced the stale copy"
+    assert text.count("\nbootstrap:") + text.startswith("bootstrap:") == 1
+    assert "echo mine" in text
+    before = text
+    LinterPresetOperation(repo).run({})
+    assert (repo / "justfile").read_text() == before

@@ -103,3 +103,20 @@ def test_every_tag_a_consumer_is_pinned_to_for_a_dependency_exists() -> None:
     needed = {hooks.release_tag(d) for name in hooks.GATE_PACKAGES for d in hooks.shelf_closure(name) if d not in hooks.GATE_PACKAGES}
     have = set(subprocess.run(["git", "tag"], cwd=hooks._SHELF_ROOT, capture_output=True, text=True, check=True).stdout.split())
     assert needed <= have, f"tag the release first: {sorted(needed - have)}"
+
+
+def test_pytest_xdist_joins_the_dev_group_because_the_runner_passes_n(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "c"\nversion = "0.1.0"\n\n[dependency-groups]\ndev = ["ruff"]\n')
+    ensure_gate_dependency(tmp_path)
+    data = tomllib.loads((tmp_path / "pyproject.toml").read_text())
+    assert "pytest-xdist" in data["dependency-groups"]["dev"]
+    assert "pytest-xdist" not in data["tool"]["uv"]["sources"], "a PyPI package: no git source"
+    before = (tmp_path / "pyproject.toml").read_text()
+    assert not ensure_gate_dependency(tmp_path)
+    assert (tmp_path / "pyproject.toml").read_text() == before
+
+
+def test_any_gate_python_declares_the_xdist_its_runner_passes_n_for() -> None:
+    manifest = Path(__file__).resolve().parent.parent / "packages" / "any-gate-python" / "pyproject.toml"
+    extra = tomllib.loads(manifest.read_text())["project"]["optional-dependencies"]["pytest"]
+    assert any(r.startswith("pytest-xdist") for r in extra)

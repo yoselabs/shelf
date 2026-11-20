@@ -12,8 +12,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# The stages load `any_gate_python.lanes_plugin` into the pytest of the project under test.
-pytest = ["pytest>=8"]
+# The stages load `any_gate_python.lanes_plugin` into the pytest of the project under test and pass it `-n` (xdist) for the parallel stage.
+pytest = ["pytest>=8", "pytest-xdist>=3.6,<4"]
 
 [tool.uv.sources]
 any-gate = { workspace = true }
@@ -29,3 +29,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/any_gate_python"]
+
+[tool.deptry.per_rule_ignores]
+# Never imported: the runner passes `-n` to the pytest of the project under test, which needs the plugin installed.
+DEP002 = ["pytest-xdist"]

@@ -22,8 +22,12 @@ import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from .operations import Outcome, Result
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _SHELF_ROOT = Path(__file__).resolve().parent.parent.parent
 _RECIPE = _SHELF_ROOT / "packages" / "blueprint" / "src" / "blueprint" / "recipes" / "pre-commit-config.yaml"
@@ -112,10 +116,12 @@ def release_tag(name: str) -> str:
     return f"{name}-v{tomllib.loads(manifest.read_text())['project']['version']}"
 
 
-def package_spec(name: str) -> str:
-    return f'{{ git = "{_REPO}", subdirectory = "packages/{name}", tag = "{release_tag(name)}" }}'
+def package_spec(name: str, url: str = _REPO) -> str:
+    return f'{{ git = "{url}", subdirectory = "packages/{name}", tag = "{release_tag(name)}" }}'
 
 
+# What the gate's test runner asks of the project under test: `any-gate-python` passes `-n` to pytest (its `pytest` extra says so too).
+GATE_PLUGINS = ("pytest-xdist",)
 GATE_SPEC = package_spec("any-gate")
 _GATE_ENTRY = "uv run python -m any_gate pre-push --gate check -- uv run just check"
 _DEV_GROUP = re.compile(r"^dev\s*=\s*\[", re.MULTILINE)
@@ -131,12 +137,93 @@ def _into_dev_group(text: str, name: str) -> str:
     return text[: opened.end()] + entry + text[opened.end() :]
 
 
-def _ensure_dependency(text: str, name: str) -> str:
-    """`text` with `name` a dev dependency sourced by its git tag; unchanged when it already is."""
+class ShelfSourceConflict(Exception):  # noqa: N818 -- a stop, named for what it says
+    """A shelf source the repo already has cannot lock with the kit: onboarding stops rather than write a pyproject that cannot lock."""
+
+
+def _same_repo(url: str) -> bool:
+    return url.strip().rstrip("/").removesuffix(".git").lower() == _REPO.lower()
+
+
+def _shelf_sources(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """The repo's git sources that point at the shelf (whatever the URL spelling), by package name."""
+    sources = data.get("tool", {}).get("uv", {}).get("sources", {})
+    return {_norm(n): s for n, s in sources.items() if isinstance(s, dict) and isinstance(s.get("git"), str) and _same_repo(s["git"])}
+
+
+def _spelling(data: dict[str, Any]) -> str:
+    """The shelf URL as the repo already spells it: a second spelling is a second source for uv, which needs an override to lock."""
+    return next((s["git"] for s in _shelf_sources(data).values()), _REPO)
+
+
+def _version(tag: str, name: str) -> tuple[int, ...] | None:
+    m = re.fullmatch(rf"{re.escape(name)}-v(\d+(?:\.\d+)*)", tag)
+    return tuple(int(x) for x in m.group(1).split(".")) if m else None
+
+
+_CLAUSE = re.compile(r"(>=|<=|==|>|<)\s*(\d+(?:\.\d+)*)")
+_OPS: dict[str, Callable[[tuple[int, ...], tuple[int, ...]], bool]] = {
+    ">=": lambda a, b: a >= b,
+    "<=": lambda a, b: a <= b,
+    "==": lambda a, b: a == b,
+    ">": lambda a, b: a > b,
+    "<": lambda a, b: a < b,
+}
+
+
+def _satisfies(version: tuple[int, ...], spec: str) -> bool:
+    width = max(len(version), 3)
+
+    def pad(v: tuple[int, ...]) -> tuple[int, ...]:
+        return (*v, *([0] * (width - len(v))))
+
+    return all(_OPS[op](pad(version), pad(tuple(int(x) for x in num.split(".")))) for op, num in _CLAUSE.findall(spec))
+
+
+def _kit_requirements() -> list[tuple[str, str, str]]:
+    """`(kit package, shelf package, specifier)` for every shelf dependency of the gate packages and their closure."""
+    found = []
+    for kit in [*GATE_PACKAGES, *(d for g in GATE_PACKAGES for d in shelf_closure(g))]:
+        manifest = _SHELF_ROOT / "packages" / kit / "pyproject.toml"
+        reqs = tomllib.loads(manifest.read_text()).get("project", {}).get("dependencies", [])
+        matches = (re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(.*)", req) for req in reqs)
+        found.extend((kit, _norm(m.group(1)), m.group(2)) for m in matches if m and _norm(m.group(1)) in _all_shelf())
+    return found
+
+
+def _all_shelf() -> set[str]:
+    return {p.parent.name for p in (_SHELF_ROOT / "packages").glob("*/pyproject.toml")}
+
+
+def check_shelf_sources(text: str) -> None:
+    """Raise `ShelfSourceConflict` when a shelf source `text` already holds does not satisfy what a kit package requires."""
+    existing = _shelf_sources(tomllib.loads(text))
+    clashes = []
+    for kit, dep, spec in _kit_requirements():
+        tag = existing.get(dep, {}).get("tag", "")
+        version = _version(str(tag), dep) if tag else None
+        if version is not None and not _satisfies(version, spec):
+            clashes.append(f"{dep} is pinned to {tag}, but {kit} needs {dep}{spec}")
+    if not clashes:
+        return
+    pins = ", ".join(f"{n} ({s.get('tag', s.get('rev', 'no tag'))})" for n, s in sorted(existing.items()))
+    msg = (
+        "shelf sources that cannot lock with the gate kit: "
+        + "; ".join(sorted(set(clashes)))
+        + f". Shelf sources in this repo: {pins}. They come from one shelf snapshot and must move together: "
+        "upgrade all of them to one current snapshot (a shelf snapshot upgrade, its own change), "
+        "then re-run onboarding. Nothing was written."
+    )
+    raise ShelfSourceConflict(msg)
+
+
+def _ensure_dependency(text: str, name: str, *, tagged: bool = True) -> str:
+    """`text` with `name` a dev dependency (sourced by its git tag unless `tagged` is off); unchanged when it already is."""
     data = tomllib.loads(text)
     group = [d for d in data.get("dependency-groups", {}).get("dev", []) if isinstance(d, str)]
     wired = any(d.split("[")[0].split(">")[0].split("=")[0].strip() == name for d in group)
     sourced = name in data.get("tool", {}).get("uv", {}).get("sources", {})
+    url = _spelling(data)
     if not wired:
         if "dependency-groups" not in data:
             text = text.rstrip("\n") + f'\n\n[dependency-groups]\ndev = ["{name}"]\n'
@@ -144,21 +231,23 @@ def _ensure_dependency(text: str, name: str) -> str:
             text = text.replace("[dependency-groups]\n", f'[dependency-groups]\ndev = ["{name}"]\n', 1)
         else:
             text = _into_dev_group(text, name)
-    if not sourced:
+    if tagged and not sourced:
         if "[tool.uv.sources]" in text:
-            text = text.replace("[tool.uv.sources]\n", f"[tool.uv.sources]\n{name} = {package_spec(name)}\n", 1)
+            text = text.replace("[tool.uv.sources]\n", f"[tool.uv.sources]\n{name} = {package_spec(name, url)}\n", 1)
         else:
-            text = text.rstrip("\n") + f"\n\n[tool.uv.sources]\n{name} = {package_spec(name)}\n"
+            text = text.rstrip("\n") + f"\n\n[tool.uv.sources]\n{name} = {package_spec(name, url)}\n"
     return text
 
 
 def _ensure_source(text: str, name: str) -> str:
     """`text` with a git-tag source for `name` (a transitive shelf dependency); unchanged when the repo already sources it."""
-    if name in tomllib.loads(text).get("tool", {}).get("uv", {}).get("sources", {}):
+    data = tomllib.loads(text)
+    if name in data.get("tool", {}).get("uv", {}).get("sources", {}):
         return text
+    spec = package_spec(name, _spelling(data))
     if "[tool.uv.sources]" in text:
-        return text.replace("[tool.uv.sources]\n", f"[tool.uv.sources]\n{name} = {package_spec(name)}\n", 1)
-    return text.rstrip("\n") + f"\n\n[tool.uv.sources]\n{name} = {package_spec(name)}\n"
+        return text.replace("[tool.uv.sources]\n", f"[tool.uv.sources]\n{name} = {spec}\n", 1)
+    return text.rstrip("\n") + f"\n\n[tool.uv.sources]\n{name} = {spec}\n"
 
 
 def ensure_gate_dependency(repo: Path) -> bool:
@@ -166,17 +255,22 @@ def ensure_gate_dependency(repo: Path) -> bool:
 
     Their own shelf dependencies get a tag source too: uv does not carry a git source to the packages that need it.
 
+    Raises `ShelfSourceConflict` (writing nothing) when a shelf source the repo already has cannot lock with them.
+
     True when pyproject.toml changed. The hook entries and the `check`, `test`, `guard`, `preset` and `blueprint` recipes run them.
     """
     pyproject = repo / "pyproject.toml"
     if not pyproject.is_file():
         return False
     before = pyproject.read_text()
+    check_shelf_sources(before)
     text = before
     for name in GATE_PACKAGES:
         text = _ensure_dependency(text, name)
         for dep in shelf_closure(name):
             text = _ensure_source(text, dep)
+    for plugin in GATE_PLUGINS:
+        text = _ensure_dependency(text, plugin, tagged=False)
     if text == before:
         return False
     tomllib.loads(text)  # never leave a pyproject that does not parse
@@ -244,8 +338,11 @@ class HooksOperation:
         config = self.repo / _CONFIG
         kept = config.exists()
         if not kept:
+            try:
+                ensure_gate_dependency(self.repo)
+            except ShelfSourceConflict as stop:
+                return Result(Outcome.COULD_NOT_APPLY, verified=False, message=str(stop))
             config.write_text(config_text(beads=self.beads, python=(self.repo / "pyproject.toml").exists()))
-            ensure_gate_dependency(self.repo)
         if self.beads and shutil.which("bd"):
             subprocess.run(["bd", "hooks", "uninstall"], cwd=self.repo, capture_output=True, text=True, check=False)
         _git(self.repo, "config", "--local", "--unset", "core.hooksPath")
