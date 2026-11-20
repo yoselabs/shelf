@@ -14,5 +14,6 @@ Beads with acceptance criteria; tests first; Done = `just check` green over the 
 - [x] 8. `tools/preset_drift.py` and `tools/hooks/forbid-local-shelf-source.py` moved into `blueprint` (`preset.py`, `guard.py`); the shelf's `.pre-commit-hooks.yaml` is deleted (onboarding writes the consumer's hooks). No byte-identical copies remain between `tools/` and `recipes/`; what stays in `tools/` is shelf repo content (`size_caps`, `arch_rules`, `catalog`, `blueprint_fitness`, `onboard/`).
 - [ ] 9. Shelf adopts its own packages (workspace edges); `just check` and the pre-push hook call the new verbs; remove `tools/affected.py`, `changed.py`, `gate_state.py`.
 - [ ] 10. Migrate a2kay, then task-loop, then OGY (each its own session and PR in that repo; owner approves each).
-- [ ] 11. Write the second adapter's capability list for .NET against `dotnet.toml` and confirm nothing in the core is Python-shaped.
+- [x] 11. The .NET adapter's capability list is `dotnet-adapter.md`. Finding: the core is neutral except the `test` verb, which carries the pytest runner; its split is task 13.
+- [ ] 13. `any_gate test` takes the runner as a command template per unit; the pytest staging (`run.py`, `lanes_plugin.py`, workers) moves into `any-gate-python`.
 - [ ] 12. `just check` green; `just check-all` once; archive.
