@@ -29,7 +29,7 @@ _FLOOR = re.compile(r">=\s*(\d+(?:\.\d+)*)")
 # A tool's mise key names its source (`github:gastownhall/beads`); these sources ship the tool under another name.
 _ALIASES = {"beads": "bd"}
 # How each tool says its version, for the audit; a tool not listed here is not asked.
-_VERSION_ARGV = {
+VERSION_ARGV = {
     "uv": ("uv", "--version"),
     "just": ("just", "--version"),
     "prek": ("prek", "--version"),
@@ -46,7 +46,7 @@ def _rust_just(ctx: Context) -> bool:
     return any(isinstance(deps, list) and any(str(d).startswith("rust-just") for d in deps) for deps in groups.values())
 
 
-def _needed(ctx: Context) -> dict[str, str]:
+def needed(ctx: Context) -> dict[str, str]:
     """Each tool the repo runs, with what says so."""
     needed: dict[str, str] = {}
     profiles = load_profiles()
@@ -132,18 +132,18 @@ def _installs_locked(ctx: Context) -> bool:
 @check("stack.tool-pins", "every tool the repo runs is pinned exactly in mise.toml and locked in mise.lock", layer="stack")
 def tool_pins(ctx: Context) -> Finding:
     """Read mise.toml and mise.lock against the tools the repo's files say it runs; no network."""
-    needed = _needed(ctx)
-    if not needed:
+    wanted_tools = needed(ctx)
+    if not wanted_tools:
         return not_applicable("the repo runs no tool blueprint pins (uv, just, prek, bd, godot)")
-    wanted = ", ".join(f"{tool} ({why})" for tool, why in needed.items())
+    wanted = ", ".join(f"{tool} ({why})" for tool, why in wanted_tools.items())
     if ctx.read(_MISE) is None:
         return not_set_up(
             f"no mise.toml; the repo runs {wanted}",
-            f"write mise.toml with an exact version per tool ([tools] {_example(needed)}), "
+            f"write mise.toml with an exact version per tool ([tools] {_example(wanted_tools)}), "
             f"run `mise lock`, commit both, and add {_INSTALL} (ADR 0024)",
         )
     pins = _pins(ctx)
-    problems = [f"{tool} is not pinned (the repo runs it: {why})" for tool, why in needed.items() if tool not in pins]
+    problems = [f"{tool} is not pinned (the repo runs it: {why})" for tool, why in wanted_tools.items() if tool not in pins]
     problems += [f"{tool} {version!r} is not an exact version" for tool, (_, version) in pins.items() if not _EXACT.match(version)]
     problems += _cross_file(ctx, pins)
     if "git-lfs" in pins:
@@ -175,13 +175,13 @@ def tool_pins(ctx: Context) -> Finding:
 )
 def tools_installed(ctx: Context) -> Finding:
     """Ask each pinned tool its version through PATH, the way the gate will find it."""
-    pins = {t: v for t, (_, v) in _pins(ctx).items() if t in _VERSION_ARGV}
+    pins = {t: v for t, (_, v) in _pins(ctx).items() if t in VERSION_ARGV}
     if not pins:
         return not_applicable("mise.toml pins no tool blueprint knows how to ask for its version")
     drift: list[str] = []
     untrusted: list[str] = []
     for tool, pinned in sorted(pins.items()):
-        done = ctx.run(*_VERSION_ARGV[tool], timeout=30)
+        done = ctx.run(*VERSION_ARGV[tool], timeout=30)
         if done is None:
             drift.append(f"{tool} is not installed")
             continue

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import tomllib
 from typing import TYPE_CHECKING
 
@@ -144,3 +145,68 @@ def test_it_runs_from_the_installed_package_with_no_shelf_clone(tmp_path: Path) 
     source = inspect.getsource(init)
     assert "tools/onboard" not in source
     assert "SHELF_HOME" not in source
+
+
+def _fake(repo: Repo, name: str, version_out: str, log: bool = True) -> None:
+    calls = repo.bin_dir / f"{name}.calls"
+    body = f'#!/bin/sh\necho "$@" >> "{calls}"\n' if log else "#!/bin/sh\n"
+    (repo.bin_dir / name).write_text(body + f'case "$1" in --version|version) echo "{version_out}";; esac\n')
+    (repo.bin_dir / name).chmod(0o755)
+
+
+def test_beads_is_suggested_not_demanded_and_not_a_left_row(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    _python_repo(repo)
+    _, out = _init(repo, capsys)
+    suggested = out.split("suggested:")[1]
+    assert "blueprint init --beads" in suggested
+    assert "backlog" not in out.split("left:")[1].split("suggested:")[0]
+
+
+def test_the_suggestions_name_the_shelf_catalog(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    _python_repo(repo)
+    _, out = _init(repo, capsys)
+    assert "catalog" in out.split("suggested:")[1]
+
+
+def test_beads_opt_in_runs_bd_init_without_hooks_and_the_suggestion_goes(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    _python_repo(repo)
+    _fake(repo, "bd", "bd version 1.3.1 (abc)")
+    code = init.run(repo.root, hooks=False, beads=True, env=repo.env)
+    out = capsys.readouterr().out
+    assert (repo.bin_dir / "bd.calls").read_text().splitlines()[0] == "init --skip-hooks"
+    assert "blueprint init --beads" not in out
+    assert code in {0, 1}
+
+
+def test_without_the_flag_bd_is_never_run(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    _python_repo(repo)
+    _fake(repo, "bd", "bd version 1.3.1 (abc)")
+    _init(repo, capsys)
+    assert not (repo.bin_dir / "bd.calls").exists()
+
+
+def test_mise_toml_is_written_from_the_versions_of_the_tools_on_path(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    _python_repo(repo)
+    _fake(repo, "uv", "uv 0.13.0 (abc 2026-01-01)")
+    _fake(repo, "mise", "2026.1.1")
+    _init(repo, capsys)
+    data = tomllib.loads((repo.root / "mise.toml").read_text())
+    assert data["tools"]["uv"] == "0.13.0"
+    assert (repo.bin_dir / "mise.calls").read_text().splitlines()[-1] == "lock"
+
+
+def test_an_existing_mise_toml_is_kept(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    _python_repo(repo)
+    repo.write("mise.toml", '[tools]\nuv = "0.9.0"\n')
+    _fake(repo, "uv", "uv 0.13.0 (abc)")
+    _init(repo, capsys)
+    assert (repo.root / "mise.toml").read_text() == '[tools]\nuv = "0.9.0"\n'
+
+
+def test_a_tool_whose_version_cannot_be_read_stays_a_left_row(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    _python_repo(repo)
+    (repo.bin_dir / "git").symlink_to(shutil.which("git") or "git")
+    repo.env["PATH"] = str(repo.bin_dir)
+    _, out = _init(repo, capsys)
+    assert not (repo.root / "mise.toml").exists()
+    assert "stack.tool-pins" in out.split("left:")[1]
