@@ -329,8 +329,6 @@ class ClaudeHarness(Quiet):
             "requests": e.requests or None,
             "usage_incomplete": not e.final,  # no result event: the request in flight when the run ended is not in the usage
             "context_k": e.context_k,
-            "model_resolved": e.model,
-            "harness_version": e.harness_version,
             "started": e.work,
             "partial": e.work,
         }
@@ -349,6 +347,8 @@ class ClaudeHarness(Quiet):
             tail=text,
             data=container(j.get("structured_output")),
             facts={"http_status": j.get("api_error_status")},
+            model_resolved=e.model,
+            harness_version=e.harness_version,
         )
 
     def vendor_error(self, rc: int | None) -> str:

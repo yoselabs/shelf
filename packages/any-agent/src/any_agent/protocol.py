@@ -85,9 +85,7 @@ class Summary:
 
     text: str = ""
     rc: int | None = None
-    res: dict[str, Json] = field(
-        default_factory=dict
-    )  # ref, tokens, turns, context_k, started, partial, acct, model_resolved, harness_version (""=unknown)
+    res: dict[str, Json] = field(default_factory=dict)  # ref, tokens, turns, context_k, started, partial, acct
     vendor: str = ""  # the CLI's own error text (never the model's answer)
     stderr: str = ""  # the stderr the ladder may read
     work: bool = False  # the worker did something before it failed
@@ -98,6 +96,8 @@ class Summary:
     data: Json = None  # the harness's own structured answer (claude --json-schema), else the caller parses `text`
     facts: dict[str, Json] = field(default_factory=dict)  # measured facts for the ladder (http_status)
     cost: float = 0.0
+    model_resolved: str = ""  # the model id that actually answered (resolved, not the requested alias); "" = the harness cannot tell
+    harness_version: str = ""  # the CLI's own version; "" = the harness cannot tell
 
 
 class Quiet:

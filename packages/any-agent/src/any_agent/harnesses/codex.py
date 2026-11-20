@@ -281,8 +281,6 @@ class CodexHarness(Quiet):
         res: dict[str, Json] = {
             "text": text,
             "ref": e.ref,
-            "model_resolved": meta.model,  # the rollout's session meta and turn context; "" when there is no readable rollout
-            "harness_version": meta.cli_version,
             "tokens": e.tokens or (used.tokens() if used and used.requests else None),  # a turn that never ended: the rollout has it
             "turns": e.turns or None,
             "requests": used.requests if used else e.requests or e.turns or None,  # rollout: one record per request
@@ -293,7 +291,16 @@ class CodexHarness(Quiet):
             "cumulative": e.cumulative or (used.tokens() if used and used.requests else None),
         }
         return Summary(
-            text=text, rc=rc, res=res, vendor=self.vendor_error(rc), stderr=err, work=e.work, stands=final and not e.error, tail=err or text
+            text=text,
+            rc=rc,
+            res=res,
+            vendor=self.vendor_error(rc),
+            stderr=err,
+            work=e.work,
+            stands=final and not e.error,
+            tail=err or text,
+            model_resolved=meta.model,
+            harness_version=meta.cli_version,
         )
 
     def vendor_error(self, rc: int | None) -> str:
