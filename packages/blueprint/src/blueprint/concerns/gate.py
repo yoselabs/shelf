@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from blueprint.concerns import gate_clone, gate_command, gate_git, gate_guards, gate_hooks, gate_lfs, gate_no_ci
+from blueprint.concerns import gate_clone, gate_command, gate_git, gate_guards, gate_hooks, gate_inputs, gate_lfs, gate_no_ci
 from blueprint.model import check
 
 check("gate.one-command", "`just check` exists and every recipe it names resolves")(gate_command.one_command)
 check("gate.runner", "the gate runner is just: a justfile holds the gate, not a Makefile")(gate_command.runner)
 check("gate.no-ci", "the repo holds no GitHub Actions configuration (no repository has CI, ADR 0027)")(gate_no_ci.no_ci)
+check("gate.step-inputs", "every step `check` runs declares the files it reads in gate-inputs.toml, so an unaffected commit does no work")(
+    gate_inputs.step_inputs
+)
 check(
     "gate.hooks-recipe",
     "prek owns the git hooks through .pre-commit-config.yaml, bd's hooks run from it, pre-push runs the gate",

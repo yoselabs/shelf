@@ -49,17 +49,30 @@ class Report:
 
 
 def run_steps(
-    names: Sequence[str], *, env: Mapping[str, str], runner: str = "just", cwd: Path | None = None, terminal: int | None = None
+    names: Sequence[str],
+    *,
+    env: Mapping[str, str],
+    runner: str = "just",
+    cwd: Path | None = None,
+    terminal: int | None = None,
+    skip: Mapping[str, str] | None = None,
 ) -> Report:
-    """Run `runner NAME` for every name at once in `env`; `terminal` is the descriptor notices go to (default: a copy of stderr)."""
+    """Run `runner NAME` for every name at once in `env`; `terminal` is the descriptor notices go to (default: a copy of stderr).
+
+    A name in `skip` is never started: its step is a pass whose log is the reason (a `skipped ...` line).
+    """
     own = terminal is None
     tty = os.dup(2) if own else terminal
     child_env = {**env, "GATE_NOTICE_FD": str(tty)}
     results: dict[str, Step] = {}
+    skipped = dict(skip or {})
     began = time.monotonic()
     with tempfile.TemporaryDirectory() as scratch:
 
         def one(name: str) -> None:
+            if name in skipped:
+                results[name] = Step(name, 0, 0, skipped[name] + "\n")
+                return
             log = Path(scratch) / f"{name}.log"
             started = time.monotonic()
             with log.open("wb") as sink:
@@ -111,10 +124,11 @@ def run_and_report(
     gate_budget: float,
     say: Callable[[str], None],
     cwd: Path | None = None,
+    skip: Mapping[str, str] | None = None,
 ) -> int:
     """Run the steps, say what happened through `say`, and return 0 when every step passed, else 1."""
     say(f"gate: {' '.join(names)} (in parallel)")
-    report = run_steps(names, env=env, runner=runner, cwd=cwd)
+    report = run_steps(names, env=env, runner=runner, cwd=cwd, skip=skip)
     for line in render(report, step_budget=step_budget, gate_budget=gate_budget):
         say(line)
     return 1 if report.failed else 0

@@ -12,7 +12,7 @@ check: gate-start beads-lint (steps @STEPS@) check-extra
 
 # The release gate, rare (before a tag): every step over everything (all files, all history, every test, the coverage floor).
 [group('gate')]
-check-all: beads-lint (steps @STEPS_ALL@)
+check-all: beads-lint (steps-all @STEPS_ALL@)
 
 # Extension point: a repo defines `check-extra` in its own justfile to run one more thing in the gate (after the steps, before the record).
 [private]
@@ -46,6 +46,11 @@ beads-lint:
 [private]
 steps +names:
     uv run python -m any_gate steps --runner {{ just_executable() }} {{ names }}
+
+# `steps` for the release gate: every step runs, whatever changed (a step otherwise skips when `gate-inputs.toml` says its inputs did not change).
+[private]
+steps-all +names:
+    uv run python -m any_gate steps --all --runner {{ just_executable() }} {{ names }}
 
 # The blueprint's per-commit checkpoints: one line per one that is not passing.
 [group('gate')]
