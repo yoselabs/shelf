@@ -6,7 +6,7 @@ concerns: [stack, gate]
 status: accepted
 decided_by: owner
 updated: 2026-10-12
-distilled_into: blueprint stack.python-uv.cli-parse and stack.python-uv.cli-help-tested (concerns/cli_parse.py); templates/agents/python.md
+distilled_into: blueprint stack.python-uv.cli-help-tested (concerns/cli_parse.py); templates/agents/python.md
 ---
 
 # 0025 — every command answers --help and refuses what it does not know
@@ -23,7 +23,8 @@ A CLI is how agents use software, so its surface is a contract:
 - The CLI is built on a library that gives this by default (argparse with `parse_args` and `add_help` kept, click,
   Typer). A hand-rolled parser, `parse_known_args`, or `add_help=False` is a bug. The one allowed shape is a two-stage
   pre-parser for global flags whose rest goes to a parser that keeps `--help`, recorded as an override of
-  `stack.python-uv.cli-parse` scoped to its file (ADR 0026).
+  `stack.python-uv.cli-parse` scoped to its file (ADR 0026). That row was cut 2026-11-20 (checkpoint review: its one consumer overrode
+  it twice); the rule stays in the template and in ruff, and `cli-help-tested` stays.
 - A script run directly (`uv run tools/x.py`, a `__main__` block that parses arguments) counts as a command: it
   answers `--help` too, so an agent can read what it does before running it.
 - Every command and subcommand has a description, and every flag and positional has help text. With argparse,

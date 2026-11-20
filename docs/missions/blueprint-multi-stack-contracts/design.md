@@ -90,3 +90,51 @@ comparison in `tools/preset_drift.py`. Whether to use `mod` (namespaced, wrappab
 - Behaviour of a2kay's gate on the expired coverage override was not checked.
 - A rendered justfile is a new generated artefact; the constitution says indexes are derived, never edited, which fits, but the review must confirm
   the repo-owned part stays small.
+
+## Addendum (task 2, 2026-11-20): what blueprint's own core needs from an adapter
+
+Read against `profile.py`, `facts.py`, `runner.py`, `concerns/*.py` and the profiles `python-uv.toml` and `dotnet.toml`. The gate-side
+interface (units, edges, fingerprint, runner) is in `docs/missions/gate-kit-package/dotnet-adapter.md`; D2 above is its summary.
+This addendum is the other half: what the *auditor* needs. Nothing was run or changed.
+
+### The three things the core asks of a stack
+
+| core need | where it is today | what a stack supplies | python-uv | dotnet |
+|---|---|---|---|---|
+| **Profile loading** | `concerns/stack.py` `load_profiles(profiles/*.toml)`; `ROLES` is a fixed 11-tuple | one TOML: per role `tool`, `install`, `config`, `gate`, `na`/`untested`, `alternative`, optional `requires` | `python-uv.toml`, 11 roles | `dotnet.toml`, the same 11 roles (`types`, `coverage` as tools) |
+| **Detection** (which stacks, where) | `profile.py` `_stack_files`: a hard-coded manifest table (`pyproject.toml`+`uv.lock`, `*.sln/*.slnx/*.csproj`, `flake.nix`, `package.json`, `go.mod`, `Cargo.toml`) | a manifest glob and a depth | `pyproject.toml` (+ `uv.lock` gives `python-uv`) | `*.sln`, `*.slnx`, `*.csproj` |
+| **Roles to checkpoints** | `stack.roles` projects `(stack x role)` rows; `runner.py` applies overrides and expiry; `report.py` renders | nothing: it is generic over the profile data | same | same |
+| **Checkpoints specific to one stack** | `python_pin.py`, `cli_parse.py`, `uv_tool.py`, `shell.py` register with `applies=` on the stack | an `applies` predicate and a check | three | none yet (dotnet logic sits inside `stack.py`, see below) |
+
+Proposed adapter record for blueprint (extends D2, nothing for the gate side): `manifests` (glob, depth), `roles` (the profile file),
+`extra_checks` (module registering stack-specific checkpoints), `facts` (how kind, surfaces and traits are read, see below). The first
+two already exist as data or a table; moving the table into each profile file's `[detect]` section is the only structural change.
+
+### Is any Python assumption in the core? Yes, at the edges; the role/profile/override/report path is neutral
+
+Neutral (checked): `runner.py` (rows, overrides, expiry, audit/gate split), `report.py`, `concerns/stack.py` role judging for
+`config` and `gate` (file presence and a regex over `just --dump`), `facts`-independent checks (`gate.*` bar the ones below, `knowledge.*`,
+`secrets.*`, `agents.*`, `backlog.*`). Six profiles, three of them not Python, already run through this path.
+
+Python-shaped (each with the place and what to do):
+
+1. **Kind, surface and trait detection reads only `pyproject.toml`**: `profile.py` `_detect_kind` and `_runtime_dependencies`,
+   `detect_frameworks` (walk for `pyproject.toml`), `facts.py` `cli` and evidence rules. A Node or .NET repo gets no kind and no surfaces,
+   so `framework.mcp.*` and the `kind` field can never fire for it. Fix: facts become adapter-provided (`manifests` + a dependency reader).
+2. **`concerns/tool_pins.py`** keys the pin of `uv` on the stack name `python-uv` and reads `[tool.uv] required-version`. Move the
+   per-stack pin (`uv` for python-uv, SDK for dotnet via `global.json`, already special-cased) into the profile as a `pins` field.
+3. **`concerns/gate_guards.py` `_SCRIPT`** finds guard scripts by `*.py` in `python3` or `uv run python` commands, so
+   `gate.guards-have-red-tests` sees no script in a Node, Go or shell gate: silent pass. Fix: an adapter supplies a script-pattern or the
+   check fails on an unknown command shape instead of passing.
+4. **`concerns/gate_command.py`**: the remediation text branches on `python` and says `uv add --dev rust-just`. Text only; make the fix
+   hint a profile field.
+5. **`concerns/stack.py`** holds .NET SDK logic (`_dotnet_executables`, `_sdk_versions`, `_sdk_ok`, lines 277-350) inside the generic role
+   judge. Not Python, but proof that stack code lives in the core; it belongs behind the `extra_checks` hook.
+6. **Install hints** (`PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint ...`) assume blueprint itself runs in Python. That is
+   the tool, not the audited stack; it stays (a Node repo still runs blueprint from a shelf clone or dev dependency, and
+   `uv` is the shelf's own pin).
+
+Verdict for task 2's acceptance ("no Python assumption sits in the core"): **not yet true**. Items 1 to 3 are real: they make a
+non-Python repo pass or go blank silently, which design D4 forbids. 4 to 6 are cosmetic or placement. The role contract itself
+(D1) needs no Python knowledge, so the interface above is enough for a second adapter; items 1 to 3 are the work that task 4 and task 5
+(profiles for node, go, rust; mixed-stack) must include, each with a failing fixture first.

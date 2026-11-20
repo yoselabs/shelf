@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 from blueprint import concerns
 from blueprint.concerns.framework import FRAMEWORK_DIR
-from blueprint.concerns.stack import FRAMEWORK_ROLES, PROFILE_DIR, ROLES, Role, StackProfile, load_profiles, purpose_fact
+from blueprint.concerns.stack import FRAMEWORK_ROLES, PROFILE_DIR, ROLES, Role, StackProfile, is_checkpoint, load_profiles, purpose_fact
 from blueprint.model import REGISTRY, Check
 
 if TYPE_CHECKING:
@@ -65,6 +65,8 @@ def _profile_rows(kind: str, directory: object, roles: tuple[str, ...]) -> Itera
         fact = f"the {name} {'stack' if kind == 'stack' else 'framework'} is detected"
         yield Listed(f"{kind}.{name}.profile", f"the shelf has a profile for {name}: the tool for every role", fact)
         for role in (*roles, *(r for r in profile.roles if r not in roles)):
+            if not is_checkpoint(profile, role):
+                continue
             statement = f"{name} {role}: the profile's tool is set up and run by `just check`"
             spec = profile.roles.get(role)
             purpose = f"; and {purpose_fact(spec.requires)}" if spec and spec.requires else ""

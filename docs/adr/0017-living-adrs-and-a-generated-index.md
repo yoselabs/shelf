@@ -6,7 +6,7 @@ concerns: [knowledge]
 status: accepted
 decided_by: owner
 updated: 2026-10-12
-distilled_into: blueprint knowledge.glossary, knowledge.adr-format, knowledge.adr-index, agents.pocock-skills; templates/agents/domain.md
+distilled_into: blueprint knowledge.glossary, knowledge.adr-format, knowledge.adr-index; templates/agents/domain.md
 ---
 
 # 0017 — Living ADRs and a generated index
