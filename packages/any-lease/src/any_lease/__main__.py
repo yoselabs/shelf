@@ -10,8 +10,6 @@ import sys
 import time
 from pathlib import Path
 
-from child_env import build_env
-
 from any_lease.leases import Leases, Waiting
 
 _HELD_ENV = "ANY_LEASE_HELD"  # names held by an ancestor wrapper, colon-separated: a nested run of the same name just runs
@@ -75,7 +73,7 @@ def _run(command: list[str], held: list[str]) -> int:
         # exec keeps the signal mask: a wrapper started with SIGINT/SIGTERM blocked would hand its child a command that ignores both.
         child = subprocess.Popen(
             command,
-            env=build_env(os.environ, allow=("*",), extra={_HELD_ENV: ":".join(held)}),  # every name but credentials and agent-session ones
+            env={**os.environ, _HELD_ENV: ":".join(held)},  # a lock is transparent: the command sees all the caller set
             preexec_fn=lambda: signal.pthread_sigmask(signal.SIG_SETMASK, []),  # noqa: PLW1509
         )
         for signum in pending:
