@@ -28,6 +28,8 @@
   "denials": [],
   "final": null,
   "context_k": null,
-  "steps": []
+  "steps": [],
+  "model": "",
+  "harness_version": ""
  }
 }

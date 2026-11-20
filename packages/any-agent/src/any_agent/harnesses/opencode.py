@@ -353,6 +353,8 @@ class OpenCodeHarness(Quiet):
             "requests": e.requests or None,
             "usage_incomplete": bool(timed_out or stop or (rc or 0) < 0),  # stopped: the step in flight is not in the usage
             "context_k": e.context_k,
+            "model_resolved": e.model,  # "": `opencode run --format json` names neither the model nor its own version
+            "harness_version": e.harness_version,
             "started": bool(e.ref),
             "partial": e.work,
             "acct": acct,

@@ -228,6 +228,9 @@ class ClaudeHarness(Quiet):
             return self._user(blocks)
         if kind == "result":
             return self._result(raw)
+        if kind == "system" and raw.get("subtype") == "init":
+            e.model = text(raw.get("model")) or e.model
+            e.harness_version = text(raw.get("claude_code_version")) or e.harness_version
         return [] if kind in ("system", "stream_event", "rate_limit_event") else [ev.Unknown(type=kind[:60])]
 
     def _assistant(self, raw: dict[str, Json], msg: dict[str, Json], blocks: list[dict[str, Json]]) -> list[ev.HarnessEvent]:
@@ -243,6 +246,9 @@ class ClaudeHarness(Quiet):
                 out.append(ev.Think(text=text(b["thinking"])))
             elif kind == "tool_use":
                 out.append(self._tool_call(b, raw.get("cwd")))
+        answered = text(msg.get("model"))
+        if answered and not answered.startswith("<") and not self.evidence.model:
+            self.evidence.model = answered  # no init event: the first real reply names the model ("<synthetic>" is the CLI's own)
         u = msg.get("usage")
         if isinstance(u, dict):  # one model request: its whole input is the context size
             self.evidence.context_k = round(input_of(u) / 1000, 1)
@@ -323,6 +329,8 @@ class ClaudeHarness(Quiet):
             "requests": e.requests or None,
             "usage_incomplete": not e.final,  # no result event: the request in flight when the run ended is not in the usage
             "context_k": e.context_k,
+            "model_resolved": e.model,
+            "harness_version": e.harness_version,
             "started": e.work,
             "partial": e.work,
         }

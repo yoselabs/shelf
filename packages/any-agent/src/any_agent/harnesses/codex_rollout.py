@@ -26,6 +26,37 @@ class RolloutUsage:
         return {"in": self.total["input_tokens"], "cached": self.total["cached_input_tokens"], "out": self.total["output_tokens"]}
 
 
+@dataclass(frozen=True)
+class Meta:
+    """What the rollout says of the run itself: the model that answered (the last `turn_context`) and the CLI's own version
+    (`session_meta.cli_version`); "" for either the file does not say."""
+
+    model: str = ""
+    cli_version: str = ""
+
+
+def meta(sessions: Path, ref: str) -> Meta:
+    path = find(sessions, ref)
+    if path is None:
+        return Meta()
+    model = version = ""
+    try:
+        with path.open(encoding="utf-8", errors="replace") as f:  # lossy-ok: parse: two strings from JSON lines, bad lines skipped
+            for line in f:
+                try:
+                    raw = obj(json.loads(line))
+                except ValueError:
+                    continue
+                payload = obj(raw.get("payload"))
+                if raw.get("type") == "session_meta":
+                    version = str(payload.get("cli_version") or version)
+                elif raw.get("type") == "turn_context":
+                    model = str(payload.get("model") or model)
+    except OSError:
+        return Meta()
+    return Meta(model=model, cli_version=version)
+
+
 def find(sessions: Path, ref: str) -> Path | None:
     if not ref:
         return None

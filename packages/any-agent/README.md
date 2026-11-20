@@ -18,7 +18,7 @@ spec = h.launch_spec(LaunchInputs(exe="claude", cwd=".", model="m", effort="high
                                   session=uuid, system="rules", settings=guard_json, write=False))
 out = run(h, spec, timeout=3600, hooks=RunHooks(ref=save_ref, beat=stamp_lease), policy=secret_path_of, gone=lane_marked_out)
 
-s = out.summary                                   # text, rc, res (ref, tokens, turns, acct...), vendor, stderr, work
+s = out.summary                                   # text, rc, res (ref, tokens, turns, acct, model_resolved, harness_version...), vendor, stderr, work
 why = classify(s.rc, s.vendor, s.stderr, out.timed_out, s.work, {"watchdog": out.watch.why and "hung"})
 ```
 
@@ -100,6 +100,12 @@ validate the returned answer. Keep the raw outcome alongside answer validity:
 valid JSON does not establish execution success, and existing answer-grace/stands
 facts must not be replaced with an rc-only decision. Usage absent from the harness
 remains unknown; Summary.cost's default zero is not measured free cost.
+
+`res["model_resolved"]` is the model id that actually answered (resolved, not the requested
+alias) and `res["harness_version"]` the CLI's own version; both are `str`, `""` when the
+harness cannot tell. Claude reads them from the stream's `system/init` event, codex from
+the thread's rollout file, opencode always reports `""`. Store both per attempt to compare
+workflows.
 
 `any_agent.testing.FakeRun(outcome, refs=())` substitutes for the four-positional-
 argument `run(harness, spec, timeout, hooks)` call. Supply an explicit outcome.worker;

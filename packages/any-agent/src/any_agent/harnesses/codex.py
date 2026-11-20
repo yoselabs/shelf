@@ -277,9 +277,12 @@ class CodexHarness(Quiet):
         final = bool(text) or bool(e.last and (e.turns or stop == "answer"))  # the turn finished: codex writes -o only at its end
         text = text or e.last
         used = rollout.read(self.sessions or self._home(self.env) / "sessions", e.ref or "", self.began) if e.ref else None
+        meta = rollout.meta(self.sessions or self._home(self.env) / "sessions", e.ref or "") if e.ref else rollout.Meta()
         res: dict[str, Json] = {
             "text": text,
             "ref": e.ref,
+            "model_resolved": meta.model,  # the rollout's session meta and turn context; "" when there is no readable rollout
+            "harness_version": meta.cli_version,
             "tokens": e.tokens or (used.tokens() if used and used.requests else None),  # a turn that never ended: the rollout has it
             "turns": e.turns or None,
             "requests": used.requests if used else e.requests or e.turns or None,  # rollout: one record per request

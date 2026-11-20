@@ -72,6 +72,8 @@ class Evidence:
     denials: list[ev.Denied] = field(default_factory=list)  # what the harness or its reviewer refused, in order
     final: dict[str, Json] | None = None  # claude: the first `result` event
     context_k: float | None = None  # the last request's whole input, in thousands of tokens
+    model: str = ""  # the model id that actually answered (resolved, not the requested alias); "" = the stream did not say
+    harness_version: str = ""  # the CLI's own version; "" = the stream did not say
     # raw usage the harness reported per request or step (claude: usage, opencode: {tokens, cost})
     steps: list[dict[str, Json]] = field(default_factory=list)
 
@@ -83,7 +85,9 @@ class Summary:
 
     text: str = ""
     rc: int | None = None
-    res: dict[str, Json] = field(default_factory=dict)  # ref, tokens, turns, context_k, started, partial, acct, ...
+    res: dict[str, Json] = field(
+        default_factory=dict
+    )  # ref, tokens, turns, context_k, started, partial, acct, model_resolved, harness_version (""=unknown)
     vendor: str = ""  # the CLI's own error text (never the model's answer)
     stderr: str = ""  # the stderr the ladder may read
     work: bool = False  # the worker did something before it failed
