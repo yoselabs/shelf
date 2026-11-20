@@ -2,10 +2,14 @@
 
 import json
 from pathlib import Path
+from typing import Any
+from unittest import mock
 
+from any_agent.harnesses import opencode_sandbox as box
 from any_agent.harnesses.claude import ClaudeHarness
 from any_agent.harnesses.codex import CodexHarness
 from any_agent.harnesses.opencode import OpenCodeHarness
+from any_agent.protocol import LaunchInputs
 
 GOLDEN = Path(__file__).parent / "golden"
 REF = "01a1891e-1155-77b1-af0a-f0d2b004bf08"
@@ -77,3 +81,40 @@ def test_opencode_says_empty_because_its_json_stream_names_neither():
     feed(h, "opencode_session.jsonl")
     got = h.summary(0, "", "", None, False)
     assert (got.model_resolved, got.harness_version) == ("", "")
+
+
+def launched(h, **kw):
+    base: dict[str, Any] = {"exe": "/bin/x", "cwd": "/w", "model": "m", "effort": "high", "prompt": "p", "env": {}, "session": "rid"}
+    return h.launch_spec(LaunchInputs(**(base | kw)))
+
+
+def test_each_summary_names_its_harness():
+    assert [h(env={}).summary(0, "", "", None, False).harness for h in (ClaudeHarness, CodexHarness, OpenCodeHarness)] == [
+        "claude",
+        "codex",
+        "opencode",
+    ]
+
+
+def test_claude_effort_is_the_one_the_launch_asked_for_and_empty_when_none():
+    h = ClaudeHarness(env={})
+    assert h.summary(0, "", "", None, False).effort == ""
+    launched(h)
+    assert h.summary(0, "", "", None, False).effort == "high"
+
+
+def test_opencode_effort_is_the_variant_the_launch_asked_for(tmp_path):
+    h = OpenCodeHarness(None, tmp_path, env={})
+    with mock.patch.object(box, "write_shell"):
+        launched(h)
+    assert h.summary(0, "", "", None, False).effort == "high"
+
+
+def test_codex_effort_is_the_rollouts_and_falls_back_to_the_launch_request(tmp_path):
+    h = codex_with_rollout(tmp_path, "rollout_codex_meta.jsonl")  # the rollout says "high"
+    launched(h, effort="low")
+    h.sessions = tmp_path / "sessions"  # a launch points the harness at CODEX_HOME's sessions
+    assert h.summary(0, "", "", None, False).effort == "high"
+    h = codex_with_rollout(tmp_path / "none", None)  # no rollout: what we asked for
+    launched(h, effort="low")
+    assert h.summary(0, "", "", None, False).effort == "low"

@@ -26,6 +26,7 @@
   "context_k": null,
   "steps": [],
   "model": "",
-  "harness_version": ""
+  "harness_version": "",
+  "effort": ""
  }
 }

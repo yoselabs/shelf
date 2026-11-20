@@ -206,6 +206,7 @@ class ClaudeHarness(Quiet):
             self.sealed_dir = SealedDir("claude-sealed-")
             return LaunchSpec(argv=sealed_argv(i), env=launch_env(i.env, i.auth), cwd=str(self.sealed_dir.path), stdin=i.prompt)
         argv = launch_argv(i)
+        self.evidence.effort = i.effort
         self.evidence.ref = i.resume or i.session  # claude takes the session id from us: known before the first event
         return LaunchSpec(argv=argv, env=launch_env(i.env, i.auth), cwd=i.cwd, stdin=i.prompt)
 
@@ -349,6 +350,8 @@ class ClaudeHarness(Quiet):
             facts={"http_status": j.get("api_error_status")},
             model_resolved=e.model,
             harness_version=e.harness_version,
+            harness=self.kind,
+            effort=e.effort,
         )
 
     def vendor_error(self, rc: int | None) -> str:

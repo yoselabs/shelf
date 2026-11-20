@@ -33,13 +33,14 @@ class Meta:
 
     model: str = ""
     cli_version: str = ""
+    effort: str = ""  # the last `turn_context.effort`
 
 
 def meta(sessions: Path, ref: str) -> Meta:
     path = find(sessions, ref)
     if path is None:
         return Meta()
-    model = version = ""
+    model = version = effort = ""
     try:
         with path.open(encoding="utf-8", errors="replace") as f:  # lossy-ok: parse: two strings from JSON lines, bad lines skipped
             for line in f:
@@ -52,9 +53,10 @@ def meta(sessions: Path, ref: str) -> Meta:
                     version = str(payload.get("cli_version") or version)
                 elif raw.get("type") == "turn_context":
                     model = str(payload.get("model") or model)
+                    effort = str(payload.get("effort") or effort)
     except OSError:
         return Meta()
-    return Meta(model=model, cli_version=version)
+    return Meta(model=model, cli_version=version, effort=effort)
 
 
 def find(sessions: Path, ref: str) -> Path | None:

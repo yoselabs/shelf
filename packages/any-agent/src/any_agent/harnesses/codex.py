@@ -118,6 +118,7 @@ class CodexHarness(Quiet):
             argv += ["-m", i.model]
         if i.effort:
             argv += ["-c", "model_reasoning_effort=" + json.dumps(i.effort)]
+        self.evidence.effort = i.effort
         if sandbox:
             argv += ["-c", "sandbox_mode=" + json.dumps(sandbox)] if i.resume is not None else ["-s", sandbox]
         argv += (access.flags() + access.config() if access is not None else []) + i.access + i.isolation + ["--json"]
@@ -139,6 +140,7 @@ class CodexHarness(Quiet):
         argv = [i.exe, "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--ephemeral"]
         argv += ["--model", i.model] if i.model else []
         argv += ["-c", "model_reasoning_effort=" + json.dumps(i.effort)] if i.effort else []
+        self.evidence.effort = i.effort
         argv += ["--output-schema", i.schema] if i.schema else []
         argv += ["--json", "-o", self.out_file, "-"]
         return LaunchSpec(argv=argv, env=i.env, cwd=str(self.sealed_dir.path), stdin=i.prompt)
@@ -301,6 +303,8 @@ class CodexHarness(Quiet):
             tail=err or text,
             model_resolved=meta.model,
             harness_version=meta.cli_version,
+            harness=self.kind,
+            effort=meta.effort or e.effort,  # the rollout says what the turn really ran with
         )
 
     def vendor_error(self, rc: int | None) -> str:

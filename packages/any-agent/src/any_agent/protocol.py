@@ -74,6 +74,7 @@ class Evidence:
     context_k: float | None = None  # the last request's whole input, in thousands of tokens
     model: str = ""  # the model id that actually answered (resolved, not the requested alias); "" = the stream did not say
     harness_version: str = ""  # the CLI's own version; "" = the stream did not say
+    effort: str = ""  # the reasoning effort the launch asked for ("" = none, the CLI's default); a stream that reports its own wins
     # raw usage the harness reported per request or step (claude: usage, opencode: {tokens, cost})
     steps: list[dict[str, Json]] = field(default_factory=list)
 
@@ -98,6 +99,8 @@ class Summary:
     cost: float = 0.0
     model_resolved: str = ""  # the model id that actually answered (resolved, not the requested alias); "" = the harness cannot tell
     harness_version: str = ""  # the CLI's own version; "" = the harness cannot tell
+    harness: str = ""  # the CLI's name (`Harness.kind`: claude, codex, opencode)
+    effort: str = ""  # the reasoning effort the run used: what the CLI reports (codex rollout), else what the launch asked for; "" = none
 
 
 class Quiet:

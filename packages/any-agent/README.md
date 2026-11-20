@@ -104,8 +104,9 @@ remains unknown; Summary.cost's default zero is not measured free cost.
 `Summary.model_resolved` is the model id that actually answered (resolved, not the requested
 alias) and `Summary.harness_version` the CLI's own version; both are typed `str` fields (not `res` keys), `""` when the
 harness cannot tell. Claude reads them from the stream's `system/init` event, codex from
-the thread's rollout file, opencode always reports `""`. Store both per attempt to compare
-workflows.
+the thread's rollout file, opencode always reports `""`. `Summary.harness` names the CLI (`claude`, `codex`, `opencode`) and `Summary.effort` is the
+reasoning effort the run used (codex: the rollout's own value, else what the launch asked for;
+`""` for none). Store them per attempt to compare workflows.
 
 `any_agent.testing.FakeRun(outcome, refs=())` substitutes for the four-positional-
 argument `run(harness, spec, timeout, hooks)` call. Supply an explicit outcome.worker;
