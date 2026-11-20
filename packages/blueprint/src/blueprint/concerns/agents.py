@@ -47,35 +47,29 @@ def _lines(n: int) -> str:
 
 def _no_agents_md(claude_text: str | None) -> Finding:
     if claude_text is not None:
-        return not_set_up(
-            "CLAUDE.md is the only instructions file; other agents read AGENTS.md",
-            "mv CLAUDE.md AGENTS.md, then `ln -s AGENTS.md CLAUDE.md`",
-        )
-    return not_set_up("no AGENTS.md", "write AGENTS.md (the map and the working agreement), then `ln -s AGENTS.md CLAUDE.md`")
+        return not_set_up("CLAUDE.md is the only instructions file; AGENTS.md is the one", "git mv CLAUDE.md AGENTS.md")
+    return not_set_up("no AGENTS.md", "write AGENTS.md (the map and the working agreement)")
 
 
-@check("agents.instructions", "AGENTS.md is the one instructions file; CLAUDE.md points to it", layer="agent", version=2)
+@check("agents.instructions", "AGENTS.md is the only instructions file; there is no CLAUDE.md", layer="agent", version=3)
 def instructions(ctx: Context) -> Finding:
-    """AGENTS.md exists; CLAUDE.md is absent, a symlink to it, or imports it."""
+    """AGENTS.md exists and CLAUDE.md does not (owner, 2026-11-20): a CLAUDE.md in any form, file, copy or symlink, is a second home."""
     agents = ctx.read("AGENTS.md")
     claude_text = ctx.read("CLAUDE.md")
     if agents is None:
         return _no_agents_md(claude_text)
     claude = ctx.path("CLAUDE.md")
-    if claude.is_symlink() and claude.resolve() == ctx.path("AGENTS.md").resolve():
-        return passing("CLAUDE.md is a symlink to AGENTS.md")
-    if not claude.exists():
-        return failing("no CLAUDE.md, so Claude Code does not read AGENTS.md", "ln -s AGENTS.md CLAUDE.md", FixedBy.AUTO)
-    if "@AGENTS.md" in (claude_text or ""):
-        return passing("CLAUDE.md imports @AGENTS.md")
-    # Two files drift: each tool reads one, so the agents on one repo follow different rules.
+    if not claude.exists() and not claude.is_symlink():
+        return passing("AGENTS.md is the only instructions file (no CLAUDE.md)")
+    if claude.is_symlink():
+        return failing("CLAUDE.md is a symlink to AGENTS.md: the repo has one instructions file", "git rm CLAUDE.md", FixedBy.AUTO)
     theirs, ours = _only_in(claude_text or "", agents), _only_in(agents, claude_text or "")
     if not theirs and not ours:
-        return failing("CLAUDE.md is a copy of AGENTS.md: it drifts at the next edit", "ln -sf AGENTS.md CLAUDE.md", FixedBy.AUTO)
+        return failing("CLAUDE.md is a copy of AGENTS.md: it drifts at the next edit", "git rm CLAUDE.md", FixedBy.AUTO)
     return failing(
         f"CLAUDE.md is a second instructions file: {_lines(theirs)} only in CLAUDE.md, {_lines(ours)} only in AGENTS.md, "
         "so agents reading one get different rules than agents reading the other",
-        "move what only CLAUDE.md holds into AGENTS.md (`diff AGENTS.md CLAUDE.md`), then `ln -sf AGENTS.md CLAUDE.md`",
+        "move what only CLAUDE.md holds into AGENTS.md (`diff AGENTS.md CLAUDE.md`), then `git rm CLAUDE.md`",
     )
 
 

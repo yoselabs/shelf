@@ -863,7 +863,6 @@ no-effect = [
     "LICENSE",
     "README.md",
     "AGENTS.md",
-    "CLAUDE.md",
 ]
 repo-tests = "tests"
 

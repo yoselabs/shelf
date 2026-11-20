@@ -31,7 +31,6 @@ def _verdicts(repo: Repo) -> dict[str, Verdict]:
 def _sound(repo: Repo) -> None:
     repo.write(".beads/config.yaml", "")
     repo.write("AGENTS.md", "# map\n")
-    repo.root.joinpath("CLAUDE.md").symlink_to("AGENTS.md")
     repo.write(".claude/settings.json", json.dumps({"env": {"BD_DISABLE_METRICS": "1"}, "hooks": _HOOKS}))
     repo.write(".gitignore", ".claude/worktrees/\n.worktrees/\n")
 
@@ -48,9 +47,18 @@ def test_a_sound_harness_passes_every_agent_checkpoint(repo: Repo) -> None:
 
 def test_a_separate_claude_md_fails(repo: Repo) -> None:
     _sound(repo)
-    repo.root.joinpath("CLAUDE.md").unlink()
     repo.write("CLAUDE.md", "other rules\n")
     assert _verdicts(repo)["agents.instructions"] is Verdict.FAILING
+
+
+def test_no_claude_md_passes_and_a_symlink_to_agents_md_fails(repo: Repo) -> None:
+    _sound(repo)
+    assert _verdicts(repo)["agents.instructions"] is Verdict.PASSING
+    repo.root.joinpath("CLAUDE.md").symlink_to("AGENTS.md")
+    verdict, evidence, remediation = _evidence(repo, "agents.instructions")
+    assert verdict is Verdict.FAILING
+    assert "symlink" in evidence
+    assert remediation == "git rm CLAUDE.md"
 
 
 def _evidence(repo: Repo, check_id: str) -> tuple[Verdict, str, str]:
@@ -61,7 +69,6 @@ def _evidence(repo: Repo, check_id: str) -> tuple[Verdict, str, str]:
 def test_two_diverging_instruction_files_fail_with_what_differs_and_how_to_merge(repo: Repo) -> None:
     # a2peer: AGENTS.md carried a sync section and shell rules CLAUDE.md lacked, so two agents got two rule sets.
     _sound(repo)
-    repo.root.joinpath("CLAUDE.md").unlink()
     repo.write("AGENTS.md", "# map\nsync rules\nshell rules\n")
     repo.write("CLAUDE.md", "# map\nbd template\n")
     verdict, evidence, remediation = _evidence(repo, "agents.instructions")
@@ -69,24 +76,23 @@ def test_two_diverging_instruction_files_fail_with_what_differs_and_how_to_merge
     assert "1 line only in CLAUDE.md" in evidence
     assert "2 lines only in AGENTS.md" in evidence
     assert "diff AGENTS.md CLAUDE.md" in remediation
-    assert "ln -sf AGENTS.md CLAUDE.md" in remediation
+    assert "git rm CLAUDE.md" in remediation
 
 
-def test_an_identical_copy_is_fixed_by_the_link_alone(repo: Repo) -> None:
+def test_an_identical_copy_is_fixed_by_removing_it(repo: Repo) -> None:
     _sound(repo)
-    repo.root.joinpath("CLAUDE.md").unlink()
     repo.write("CLAUDE.md", "# map\n")
     verdict, evidence, remediation = _evidence(repo, "agents.instructions")
     assert verdict is Verdict.FAILING
     assert "copy" in evidence
-    assert remediation == "ln -sf AGENTS.md CLAUDE.md"
+    assert remediation == "git rm CLAUDE.md"
 
 
 def test_only_a_claude_md_is_renamed_to_agents_md(repo: Repo) -> None:
     repo.write("CLAUDE.md", "# map\n")
     verdict, _, remediation = _evidence(repo, "agents.instructions")
     assert verdict is Verdict.NOT_SET_UP
-    assert "mv CLAUDE.md AGENTS.md" in remediation
+    assert "git mv CLAUDE.md AGENTS.md" in remediation
 
 
 _BD_TEMPLATE = "# Project\n\n## Build & Test\n\n{build}\n\n## Architecture Overview\n\n{arch}\n\n## Conventions & Patterns\n\n{conv}\n"
@@ -105,7 +111,6 @@ def _filled_harness(repo: Repo) -> None:
 def test_bd_template_placeholders_left_in_claude_md_fail_and_pass_once_replaced(repo: Repo, mark: str) -> None:
     # a2peer: `bd init` wrote these three lines and nobody replaced them, so agents had no build or test command.
     _filled_harness(repo)
-    repo.root.joinpath("CLAUDE.md").unlink()
     repo.write(
         "CLAUDE.md",
         _BD_TEMPLATE.format(

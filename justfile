@@ -114,7 +114,7 @@ arch:
 # typos in code, docstrings, and docs.
 [group('gate')]
 spell:
-    uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md CLAUDE.md conftest.py
+    uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md conftest.py
 
 # `spell` over the files changed against the base, for `check`. Shelf-only: consumers copy `spell`.
 [group('gate')]
@@ -122,7 +122,7 @@ spell-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    uv run python -m any_gate changed --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md CLAUDE.md conftest.py > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md conftest.py > "$list"
     [ -s "$list" ] || { echo "skipped spell: no file changed"; exit 0; }
     xargs -0 uv run codespell < "$list"
 
