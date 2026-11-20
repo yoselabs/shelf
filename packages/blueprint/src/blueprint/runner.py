@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass, replace
 from datetime import date
 from typing import TYPE_CHECKING
@@ -10,7 +11,7 @@ from typing import TYPE_CHECKING
 from blueprint import concerns
 from blueprint.concerns import gate_git
 from blueprint.model import REGISTRY, Check, Context, Finding, FixedBy, Profile, Sub, Verdict, not_checked
-from blueprint.profile import Override, State, detect, load_state
+from blueprint.profile import DETECTION, Override, State, detect, load_state
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -89,6 +90,36 @@ def expiry_notices(overrides: tuple[Override, ...], today: date, days: int = EXP
         elif (o.expires - today).days <= days:
             out.append(f"override `{o.id}`{scope} expires {o.expires.isoformat()} (within {days} days): renew it or fix the checkpoint")
     return tuple(out)
+
+
+_GLOB = re.compile(r"[*?\[]")
+
+
+def scoped_dead_notices(ctx: Context, row_ids: set[str]) -> tuple[str, ...]:
+    """A scoped override that excused nothing: its check ran and no offender matched it, or its `detection` path is gone."""
+    out = []
+    for o in ctx.overrides:
+        if not o.scope or o.problem(ctx.today or date.today()) is not None:  # noqa: DTZ011 -- a calendar date in the owner's zone
+            continue
+        if o.id == DETECTION:
+            path = o.scope.rsplit(":", 1)[0] if re.search(r":\d+$", o.scope) else o.scope
+            gone = not _GLOB.search(path) and not ctx.path(path.rstrip("/")).exists()
+        else:
+            gone = o.id in row_ids and (o.id, o.scope) not in ctx.used_overrides
+        if gone:
+            out.append(
+                f"override `{o.id}` scope `{o.scope}` excuses nothing: no offender matches it; delete it from docs/blueprint/blueprint.toml"
+            )
+    return tuple(out)
+
+
+def orphan_override_notices(overrides: tuple[Override, ...], row_ids: set[str], skipped_ids: set[str]) -> tuple[str, ...]:
+    """An override whose checkpoint is not among the run's rows: renamed, removed, or a stack the repo no longer has."""
+    return tuple(
+        f"override `{o.id}` names no checkpoint this repo runs: renamed, removed or not applicable; delete it"
+        for o in {o.id: o for o in overrides}.values()
+        if o.id != DETECTION and o.id not in row_ids and o.id not in skipped_ids
+    )
 
 
 ACCEPTED = "docs/blueprint/checkpoints.txt"
@@ -191,6 +222,12 @@ def run(
     if audit and (branches := gate_git.unmerged_gate_branches(ctx)):
         rows = tuple(_branch_aware(r, branches) for r in rows)
     skipped = 0 if audit else sum(c.audit_only for c in checks)
+    # Only a whole run knows which ids exist: a one-concern run would call every other concern's override an orphan.
+    orphans = (
+        orphan_override_notices(state.overrides, {r.id for r in rows}, {c.id for c in checks if c.audit_only and not audit})
+        if concern is None
+        else ()
+    )
     return Run(
         profile=profile,
         set_hash=set_hash(active(profile)),
@@ -198,5 +235,12 @@ def run(
         problems=state.problems,
         skipped_audit=skipped,
         overrides=state.overrides,
-        notices=(*state.notices, *ctx.notices, *expiry_notices(state.overrides, today), *dead),
+        notices=(
+            *state.notices,
+            *ctx.notices,
+            *expiry_notices(state.overrides, today),
+            *dead,
+            *scoped_dead_notices(ctx, {r.id for r in rows}),
+            *orphans,
+        ),
     )
