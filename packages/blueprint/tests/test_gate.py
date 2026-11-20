@@ -76,6 +76,30 @@ def test_no_ci_remediation_deletes_and_never_silently_keeps_a_non_ci_duty(repo: 
     assert row.fixed_by is FixedBy.OWNER
 
 
+def _audited_before_no_ci(repo: Repo) -> None:
+    """A consumer audited when `gate.ci` existed: its record lists the removed checkpoints, not `gate.no-ci`."""
+    repo.write("docs/blueprint/checkpoints.txt", "gate.ci@1\ngate.ci-no-manifest-edit@1\ngate.ci-green@1\n")
+    repo.write("docs/blueprint/blueprint.toml", '[[override]]\nid = "gate.ci"\nreason = "no CI here"\nexpires = 2099-01-01\n')
+
+
+def test_gate_no_ci_warns_new_in_a_consumer_audited_before_it_existed(repo: Repo) -> None:
+    # ADR 0018: a checkpoint newer than the last audit only warns until the next audit takes it in.
+    _audited_before_no_ci(repo)
+    repo.write(".github/workflows/check.yml", "on: [push]\n")
+    result = run(repo.root, concern="gate", env=repo.env)
+    row = {r.id: r for r in result.rows}["gate.no-ci"]
+    assert row.verdict is Verdict.FAILING
+    assert row.new
+    assert "gate.no-ci" in gate_report(result)
+
+
+def test_a_leftover_override_of_a_removed_ci_checkpoint_is_a_notice_not_a_failure(repo: Repo) -> None:
+    _audited_before_no_ci(repo)
+    result = run(repo.root, env=repo.env)
+    assert any("`gate.ci` names no checkpoint" in n for n in result.notices)
+    assert not any("gate.ci" in p for p in result.problems)
+
+
 def _recipe() -> str:
     return (RECIPES / "pre-commit-config.yaml").read_text()
 

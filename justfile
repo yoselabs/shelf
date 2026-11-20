@@ -137,7 +137,7 @@ test-all:
     uv run python -m any_lease run --root {{ lease_root }} tests 1 check-all -- uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
-# Launches each real engine against a local JS page and asserts a render. CI runs
+# Launches each real engine against a local JS page and asserts a render. Run
 # this with SHELF_REQUIRE_BROWSER=1 (after installing Chromium: `patchright
 # install --with-deps chromium`), where a non-launching engine is a hard FAILURE
 # rather than a skip -- the one environment obligated to prove the browser starts.

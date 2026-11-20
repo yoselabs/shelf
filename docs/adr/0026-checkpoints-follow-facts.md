@@ -5,7 +5,7 @@ statement: Checkpoints apply because of facts (technology, surface, trait, what 
 concerns: [stack, gate, workflow]
 status: accepted
 decided_by: owner
-updated: 2026-11-05
+updated: 2026-11-20
 distilled_into: blueprint facts.py (facts, evidence, closed lists, classification), profile.py ([[override]] with scope, [profile] classified/rejected), checkpoints.py (`blueprint checkpoints`), stack.py (requires = shipped-image | deployed), tools/changed.py and the justfile (changed-file linting); bead shelf-6q1
 ---
 
@@ -15,11 +15,9 @@ distilled_into: blueprint facts.py (facts, evidence, closed lists, classificatio
 
 - **Facts turn checkpoints on.** Using a technology turns on all of its checkpoints (a Dockerfile: hadolint, the
   formatter, digest pins, something builds it). What the repo is and what happens to a file add more: a CLI surface
-  adds ADR 0025's `--help` checkpoints; a Dockerfile a `push: true` step builds is a shipped image (a CI smoke test,
-  an updater); a compose file a deploy step applies is a deployed stack (the healthcheck and architecture policy).
+  adds ADR 0025's `--help` checkpoints; a repo classified `ships-image` has a base-image updater; a compose file a deploy step applies is a deployed stack (the healthcheck and architecture policy).
   No checkpoint turns on or off by a count of files, so adding a file never flips a set of rules.
-- **Detection reports facts and evidence; the agent classifies.** A fact means one thing only (`push: true` plus a
-  registry login). Evidence points without proving (an `mcp` dependency: a server, or a client library), with high
+- **Detection reports facts and evidence; the agent classifies.** A fact means one thing only (a `bin` entry in a package.json). Evidence points without proving (an `mcp` dependency: a server, or a client library), with high
   or low confidence. The agent accepts facts and high-confidence evidence, and judges low-confidence evidence itself
   or asks the owner, as it does for what nothing detects (a game, a desktop app, library versus application).
 - **The classification is recorded** in `docs/blueprint/blueprint.toml` `[profile]`: kind, surfaces and traits, each
@@ -64,3 +62,4 @@ five shapes in two days.
   classification in `[profile]`, ship-smoke/ship-updater and deploy-only compose policy, changed-file linting in the
   shelf. Consumers' changed-file recipe is shelf-6q1.9.
 - 2026-11-05: the shelf itself no longer pins hadolint or dockerfmt (its Docker gate is gone, ADR 0027); the Dockerfile checkpoints above stay for consumer repos that have Dockerfiles, via blueprint's dockerfile profile.
+- 2026-11-20: ADR 0027 (no repository has CI): no workflow is read, so `ships-image`, `deployed` and `scheduled-jobs` are classified by the agent, not detected; `ship-smoke` is gone and `ship-updater` applies once `ships-image` is classified; high-confidence `deployed` evidence no longer exists.

@@ -121,8 +121,8 @@ def _where(rel: str, line: int) -> str:
 
 
 def is_deployed(profile: Profile) -> bool:
-    """Whether the repo is deployed: high-confidence deploy evidence, or the classified `deployed` trait (ADR 0026)."""
-    return "deployed" in profile.traits or any(e.claim == "deployed" and e.confidence == "high" for e in profile.evidence)
+    """Whether the repo is deployed: the classified `deployed` trait (ADR 0026; no workflow shows a deploy, ADR 0027)."""
+    return "deployed" in profile.traits
 
 
 def package_json(path: Path) -> dict[str, object]:

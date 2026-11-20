@@ -127,7 +127,7 @@ def _dockerfile_rels(ctx: Context) -> list[str]:
 
 _PURPOSE_FACT = {
     "shipped-image": "the repo ships an image: a classified ships-image trait and a Dockerfile",
-    "deployed": "the repo is deployed: high deploy evidence or a classified deployed trait",
+    "deployed": "the repo is deployed: a classified deployed trait",
 }
 
 
@@ -137,16 +137,13 @@ def purpose_fact(requires: str) -> str:
 
 
 def _purpose(ctx: Context, requires: str) -> tuple[bool, str]:
-    """Whether the fact holds, and what it is about: the shipped files, or the deploy evidence."""
+    """Whether the fact holds, and what it is about: the shipped images, or the classified trait."""
     from blueprint.facts import is_deployed  # noqa: PLC0415 -- facts imports the concerns
 
     if requires == "shipped-image":
         images = _dockerfile_rels(ctx) if "ships-image" in ctx.profile.traits else []
         return bool(images), ", ".join(images)
-    deploy = [e.where for e in ctx.profile.evidence if e.claim == "deployed" and e.confidence == "high"]
-    if "deployed" in ctx.profile.traits:
-        deploy.insert(0, "classified trait")
-    return is_deployed(ctx.profile), ", ".join(deploy)
+    return is_deployed(ctx.profile), "classified trait" if is_deployed(ctx.profile) else ""
 
 
 def _describe(spec: dict[str, Any]) -> str:

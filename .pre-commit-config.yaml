@@ -50,7 +50,7 @@ repos:
     language: system
     always_run: true
     stages: [prepare-commit-msg]
-# The shelf's own fast checks. `just check` stays the gate (CI, Definition of Done); the hook
+# The shelf's own fast checks. `just check` stays the gate (Definition of Done); the hook
 # keeps commits fast: the local-source guard, ruff on staged files, preset drift on pyproject.
 - repo: local
   hooks:
