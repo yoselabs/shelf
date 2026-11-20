@@ -8,7 +8,7 @@ where the two differ, this file wins for this repo and says why.
 
 | # | Article | Why |
 |---|---|---|
-| 1 | **Done = the bead's acceptance scenarios green and `just check` green.** `just check` runs the cross-file checks over the whole repo and narrows tests to what the change reaches (shelf ADR 0021). The full test run is CI, shared-file changes, keystone beads and nightly. No "pre-existing", no "unrelated file". | A full test run per change costs minutes and catches little the narrowed run misses (lifesim, 79: the gate caught 1-3 of 22 reds) |
+| 1 | **Done = the bead's acceptance scenarios green and `just check` green.** `just check` runs the cross-file checks over the whole repo and narrows tests to what the change reaches (shelf ADR 0021). The full test run (`just check-all`) is for a release tag, shared-file changes and keystone beads. No "pre-existing", no "unrelated file". | A full test run per change costs minutes and catches little the narrowed run misses (lifesim, 79: the gate caught 1-3 of 22 reds) |
 | 2 | **Test first, from a scenario.** The planner writes the acceptance as scenario text (Gherkin); the writer implements the steps, then the code. No free-written unit tests. See [testing.md](testing.md). | A test written after the code only confirms what the code does; volume is not purpose |
 | 3 | **Never skip a hook or the gate.** No `--no-verify`, no `SKIP=`, no commenting out a check. A red check is fixed or the rule is changed in a reviewed commit. | A bypassed gate trains everyone to bypass it |
 | 4 | **A guard is seen red before it is trusted.** Plant the violation, watch the gate fail, remove it. | A check that never failed may check nothing |

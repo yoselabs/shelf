@@ -100,7 +100,7 @@ starts per test.
 
 | # | rule | why | check |
 |---|---|---|---|
-| G1 | The local gate is the only gate. CI is a non-blocking backstop after landing. | A blocking remote CI that is red on every OS blocks nothing useful and stalls everything | CI is not a required check |
+| G1 | The local gate is the only gate. No repository has CI (ADR 0027). | A remote CI that is red on every OS blocks nothing useful and stalls everything | No workflow exists; `gate.no-ci` fails one |
 | G2 | One command is the gate; landing holds a lock; the release suite runs on the rebased result before push. | Two loops race to land on one main; the race is tested with real processes (task-loop `test_race`) | the land lock and its test |
 | G4 | Agents run the selecting gate (`just check`) per task, and the full suite (`check-all`) only before a release tag. | Agents re-ran the full suite per task and per PR: minutes each time, re-proving what the selected gate and its receipts already proved. | agents' gate calls in the last 20 task records |
 | G3 | A scanner of all history (secrets across every commit and branch) does not run in the gate. | 34 s per run for the same history every time | gate steps |

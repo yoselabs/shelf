@@ -16,7 +16,7 @@ def _rows(capsys: pytest.CaptureFixture[str], *args: str) -> list[dict[str, str]
 
 def test_lists_registered_and_profile_checkpoints_with_their_turning_on_fact(capsys: pytest.CaptureFixture[str]) -> None:
     rows = {r["id"]: r for r in _rows(capsys)}
-    assert rows["gate.ci-green"]["turned_on_by"].startswith("always")
+    assert rows["gate.no-ci"]["turned_on_by"].startswith("always")
     profile_row = rows["stack.dockerfile.linter"]
     assert "dockerfile stack is detected" in profile_row["turned_on_by"]
     assert profile_row["statement"]

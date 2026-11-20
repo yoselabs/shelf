@@ -23,7 +23,7 @@ Why: one tool per role, strictest preset.
 
 ```bash
 uv sync                  # environment from the lockfile
-just check               # the gate: whole repo, same as CI
+just check               # the gate: whole repo
 uv run pytest path::name # one test while iterating; the gate still decides done
 just test                # the tests the change reaches
 ```
@@ -35,9 +35,8 @@ Always `uv run <tool>`; never a global interpreter or `pip install`. Add a depen
 
 | file | rule |
 |---|---|
-| `.python-version` | one `X.Y` line; every run uses it (dev, CI, agents) |
+| `.python-version` | one `X.Y` line; every run uses it (dev, agents) |
 | `requires-python` | `">=X.Y"` in every pyproject, no upper cap, the pin inside it |
-| CI | a lower bound below the pin runs in CI; Python comes from the pin through uv, never `setup-python` |
 | `[tool.uv] required-version` | uv's floor; a different uv rewrites `uv.lock` |
 
 Why: the shelf's ADR 0016. Change the pin and the floors together, then `uv lock`.

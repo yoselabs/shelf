@@ -28,9 +28,9 @@ holds becomes a `blueprint lacks:` bead (§6), not an exception granted in chat.
 
 | layer | what it judges | concerns in v0.1 |
 |---|---|---|
-| Generic | any repo, any language | `gate` (one command, CI, hooks, guards, clean clone), `backlog` (beads), `knowledge` (CONTEXT.md, living ADRs, the generated `docs/adr/INDEX.md`), `secrets` (sops files sealed and covered by a rule) |
-| Stack-specific | one language's tools, from the shelf's profile for it | `stack/<stack>`: toolchain, formatter, linter, types, dependencies, tests, coverage, spelling, architecture; python-uv also the Python and uv pins (CI and images included), shell also strict mode |
-| Framework-specific | an engine or framework on top of a stack, from its profile | `framework/<name>` (godot, unity, mcp): framework version, project hygiene, build, tests, surface integrity, architecture, CI |
+| Generic | any repo, any language | `gate` (one command, no CI, hooks, guards, clean clone), `backlog` (beads), `knowledge` (CONTEXT.md, living ADRs, the generated `docs/adr/INDEX.md`), `secrets` (sops files sealed and covered by a rule) |
+| Stack-specific | one language's tools, from the shelf's profile for it | `stack/<stack>`: toolchain, formatter, linter, types, dependencies, tests, coverage, spelling, architecture; python-uv also the Python and uv pins (images included), shell also strict mode |
+| Framework-specific | an engine or framework on top of a stack, from its profile | `framework/<name>` (godot, unity, mcp): framework version, project hygiene, build, tests, surface integrity, architecture |
 | Agent harness | what agents run inside | `agents`: AGENTS.md, session env, session hooks |
 
 A stack or framework with no profile, or a role its profile leaves open, is a **blueprint gap**: "no standard
@@ -84,8 +84,8 @@ The owner's one yes covers the `auto` and `agent` rows, never the `owner` rows. 
 - Re-run `check --concern <c> --audit`; a fix never seen ✅ is unverified, and you say so.
 - A row right to leave failing becomes an override in `docs/blueprint/blueprint.toml` only with the
   owner's yes. Every exception is justified: a reason, and either `expires` (temporary) or
-  `adr = "NNNN"` naming the accepted ADR that records the durable decision (no CI, builds on the
-  owner's machines). **Every exception is this one `[[override]]` table**: `id` (a checkpoint id), optional `scope`
+  `adr = "NNNN"` naming the accepted ADR that records the durable decision (the owner installs hooks by hand
+  on each machine). **Every exception is this one `[[override]]` table**: `id` (a checkpoint id), optional `scope`
   (a path glob, `path:line`, or `service:<compose service>`: the check still runs and drops only what the scope
   names), `reason`, `decided_by` (`owner` or `agent`), and `expires` or `adr`. A path detection must skip (a
   throwaway spike) is the same table with `id = "detection"` and `scope` = the path (the old `[[profile.ignore]]`,
@@ -128,7 +128,7 @@ gets a short plain-words picture first; much work ahead gets one page outlining 
   <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo .`: beads strict and quiet, prek
   hooks from the recipe, the gate as a `justfile` with `just blueprint` in it; the runner is `just`, pinned as `rust-just`) → `template --repo .` (docs/agents/
   and the AGENTS.md block; then fill every `{{name}}` from the repo) → the stack's profile → the
-  framework's profile → CI.
+  framework's profile. Never add CI: no repository has GitHub Actions (ADR 0027).
 - **Reabsorb:** a blueprint gap, or anything the run met that no checkpoint covers, becomes one
   bead in the **shelf** titled `blueprint lacks: <what>` (repo, evidence, the checkpoint or profile
   you would add). Never change blueprint from inside the consumer.

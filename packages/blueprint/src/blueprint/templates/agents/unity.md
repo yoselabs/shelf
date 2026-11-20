@@ -51,7 +51,7 @@ one editor cannot be opened by a second.
 |---|---|
 | Engine-free logic | `Assets/Scripts/Core/` (`Game.Core.asmdef`, `noEngineReferences`), linked into `tests/<Name>.Core.Tests` |
 | MonoBehaviours, ScriptableObjects | `Assets/Scripts/Runtime/` (`Game.Runtime.asmdef`, references Core) |
-| Editor tools, CI entry points | `Assets/Editor/` (Editor-only asmdef): `CiValidate`, `CiBuild` |
+| Editor tools, build entry points | `Assets/Editor/` (Editor-only asmdef): `CiValidate`, `CiBuild` |
 | Tests | `Assets/Tests/EditMode`, `Assets/Tests/PlayMode` (own asmdefs, `UNITY_INCLUDE_TESTS`) |
 | Analyzer config | `Assets/Unity.globalconfig`, pointed at by `Assets/Scripts/*/<Asm>.rsp` and `Directory.Build.props` |
 

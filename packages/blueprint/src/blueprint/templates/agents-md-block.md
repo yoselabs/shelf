@@ -8,7 +8,7 @@ Read a file below when its trigger applies, not before.
 |---|---|
 | [docs/agents/constitution.md](docs/agents/constitution.md) | before changing anything: how work is done here |
 | [docs/agents/working-with-agents.md](docs/agents/working-with-agents.md) | at session start and handoff: loop, rules, survey |
-| [docs/agents/gate.md](docs/agents/gate.md) | when a check fails, or you add one or touch hooks or CI |
+| [docs/agents/gate.md](docs/agents/gate.md) | when a check fails, or you add one or touch hooks |
 | [docs/agents/testing.md](docs/agents/testing.md) | before writing or changing any test |
 | [docs/agents/architecture.md](docs/agents/architecture.md) | before adding a module, dependency or layer |
 | [docs/agents/health.md](docs/agents/health.md) | before planning a bead: the trends that say slicing is failing |

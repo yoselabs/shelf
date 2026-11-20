@@ -103,29 +103,17 @@ def test_an_mcp_server_gets_its_conventions_file_and_a_block_row(repo: Repo) -> 
     assert "docs/agents/mcp.md" in (repo.root / "AGENTS.md").read_text()
 
 
-def _no_ci(repo: Repo) -> None:
-    repo.write("docs/blueprint/blueprint.toml", '[profile]\nkind = "application"\nsurfaces = ["cli"]\ntraits = ["no-ci"]\n')
-
-
-def test_the_gate_template_says_ci_runs_it_unless_the_profile_has_no_ci(repo: Repo) -> None:
+def test_the_gate_template_says_no_repository_has_ci(repo: Repo) -> None:
     _install(repo)
     text = (repo.root / "docs/agents/gate.md").read_text()
-    assert "CI runs `just check`" in text
-    assert "no CI" not in text
-
-
-def test_the_no_ci_trait_writes_no_ci_wording_into_the_gate_template(repo: Repo) -> None:
-    _no_ci(repo)
-    _install(repo)
-    text = (repo.root / "docs/agents/gate.md").read_text()
+    assert "## No CI" in text
+    assert "gate.no-ci" in text
     assert "CI runs" not in text
     assert "and CI all call" not in text
-    assert "no CI" in text
     assert "## Hooks" in text
 
 
-def test_the_no_ci_wording_never_overwrites_a_gate_file_the_repo_has(repo: Repo) -> None:
-    _no_ci(repo)
+def test_the_gate_template_never_overwrites_a_gate_file_the_repo_has(repo: Repo) -> None:
     repo.write("docs/agents/gate.md", "ours\n")
     _install(repo)
     assert (repo.root / "docs/agents/gate.md").read_text() == "ours\n"

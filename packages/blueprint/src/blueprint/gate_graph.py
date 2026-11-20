@@ -67,7 +67,7 @@ class Gate:
         """The body text of everything `check` or `check-all` reaches, joined.
 
         `check-all` counts: a repo may narrow `check` to what a change touches and keep the whole
-        run (coverage floor included) in `check-all`, which CI runs.
+        run (coverage floor included) in `check-all`, which is run before a release tag.
         """
         return "\n".join(dict.fromkeys(self.reachable("check") + self.reachable("check-all")))
 

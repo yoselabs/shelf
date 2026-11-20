@@ -3,7 +3,7 @@
 The shelf is consumed by git+tag so a consumer builds anywhere. A local
 ``{ path = ... }`` / ``editable = true`` source is legitimate ONLY as an
 *uncommitted* co-development override; committing it ties the repo to one
-filesystem and breaks CI and every other checkout.
+filesystem and breaks every other checkout.
 
 It flags a ``[tool.uv.sources]`` entry that is local (``path`` or
 ``editable = true``) AND references the shelf (``"shelf"`` in its ``path`` or

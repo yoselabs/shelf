@@ -7,18 +7,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
 from blueprint.model import Verdict
 from blueprint.runner import run
 
 if TYPE_CHECKING:
     from blueprint.testing import Repo
-
-_SHA = "11d5960a326750d5838078e36cf38b85af677262"
-_CI = (
-    "name: check\non: [push]\npermissions:\n  contents: read\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n"
-    f"      - uses: actions/checkout@{_SHA} # v4\n      - run: {{gate}}\n"
-)
 
 
 def _row(repo: Repo, check_id: str, *, audit: bool = True) -> tuple[Verdict, str]:
@@ -73,25 +66,6 @@ def test_a_makefile_only_repo_is_still_judged_by_the_other_rows(repo: Repo) -> N
 
 def test_the_runner_row_does_not_apply_without_any_gate(repo: Repo) -> None:
     assert _row(repo, "gate.runner")[0] is Verdict.NOT_APPLICABLE
-
-
-@pytest.mark.parametrize("gate", ["just check", "just check-all", "uv run just check-all", "uvx rust-just@1.58.0 check"])
-def test_ci_accepts_a_just_gate(repo: Repo, gate: str) -> None:
-    repo.write(".github/workflows/check.yml", _CI.format(gate=gate))
-    assert _row(repo, "gate.ci")[0] is Verdict.PASSING
-
-
-def test_ci_without_the_gate_word_names_the_missing_command(repo: Repo) -> None:
-    repo.write(".github/workflows/check.yml", _CI.format(gate="pytest"))
-    verdict, evidence = _row(repo, "gate.ci")
-    assert verdict is Verdict.FAILING
-    assert "no workflow runs the gate" in evidence
-
-
-def test_a_manifest_rewrite_ahead_of_a_just_gate_fails(repo: Repo) -> None:
-    text = _CI.format(gate="uv run just check").replace("      - run: uv run", "      - run: uv lock\n      - run: uv run")
-    repo.write(".github/workflows/check.yml", text)
-    assert _row(repo, "gate.ci-no-manifest-edit")[0] is Verdict.FAILING
 
 
 _JUSTFILE_BLUEPRINT = """check: (gate "check-host")
@@ -216,8 +190,7 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
     expected = (
         ("gate.one-command", 1, False),
         ("gate.runner", 1, False),
-        ("gate.ci", 1, False),
-        ("gate.ci-no-manifest-edit", 1, False),
+        ("gate.no-ci", 1, False),
         ("gate.hooks-recipe", 3, False),
         ("gate.hooks-installed", 2, True),
         ("gate.runs-blueprint", 2, False),
@@ -227,7 +200,6 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
         ("gate.superseded-scripts", 1, False),
         ("gate.default-branch", 1, True),
         ("gate.git-remote", 1, True),
-        ("gate.ci-green", 1, True),
         ("gate.lfs-binaries", 1, False),
         ("gate.git-config-clean", 1, True),
         ("gate.lfs-installed", 1, True),
@@ -239,4 +211,4 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
     assert all(r.concern == "gate" and r.layer == "generic" for r in audited.rows)
     assert gated.skipped_audit == sum(audit for _, _, audit in expected)
     assert audited.set_hash == gated.set_hash
-    assert not run(repo.root, concern="gate_ci", audit=True, env=repo.env).rows
+    assert not run(repo.root, concern="gate_no_ci", audit=True, env=repo.env).rows
