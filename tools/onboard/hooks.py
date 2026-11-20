@@ -75,9 +75,9 @@ _REPO = "https://github.com/yoselabs/shelf"
 # (the pytest planner and runner `blueprint test` calls) and `blueprint` (the `guard`, `preset`, `render`, `test` and `check` steps).
 # A consumer needs no shelf clone.
 GATE_PACKAGES = {
-    "any-gate": "any-gate-v0.1.0",
-    "any-gate-python": "any-gate-python-v0.1.0",
-    "blueprint": "blueprint-v0.1.0",
+    "any-gate": "any-gate-v0.1.1",
+    "any-gate-python": "any-gate-python-v0.1.1",
+    "blueprint": "blueprint-v0.2.0",
 }
 
 
