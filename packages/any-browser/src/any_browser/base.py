@@ -97,9 +97,19 @@ class BrowserBackend(Protocol):
         cookies: list[BackendCookie],
         budget_s: float,
         js_heavy: bool,
-        scroll_to_stable: bool = False,
     ) -> RenderedPage:
         """Render ``url`` and return a :class:`RenderedPage` (never raise for a routine failure)."""
+        ...
+
+    async def render_listing(
+        self,
+        url: str,
+        *,
+        cookies: list[BackendCookie],
+        budget_s: float,
+        js_heavy: bool,
+    ) -> RenderedPage:
+        """:meth:`render` for an infinite-scroll listing: scroll until the captured HTML stops growing."""
         ...
 
     async def __aenter__(self) -> Self: ...

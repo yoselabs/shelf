@@ -48,11 +48,6 @@ def _rows(reason: str, *keys: str) -> dict[str, str]:
 _ALLOWED: dict[str, str] = {
     # --- split: the flag chooses between behaviours; a separate type or function is the fix ---
     **_rows(
-        "split: one render() path that scrolls an infinite listing to the end; a2web consumes the Protocol",
-        "any-browser:render:scroll_to_stable",
-        "any-browser:_navigate:scroll_to_stable",
-    ),
-    **_rows(
         "split: keep_mode picks between two permission behaviours; consumers a2kay, any-frontmatter, any-net, dir-trust",
         "atomic-io:atomic_write_bytes:keep_mode",
         "atomic-io:atomic_write_json:keep_mode",

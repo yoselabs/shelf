@@ -463,3 +463,25 @@ async def test_render_clean_page_counts_zero_subresources() -> None:
         assert page.subresource_blocks == 0
     finally:
         await backend.close()
+
+
+@pytest.mark.asyncio
+async def test_render_listing_scrolls_to_stable_and_render_does_not(monkeypatch: pytest.MonkeyPatch) -> None:
+    from any_browser import playwright as pw  # noqa: PLC0415
+
+    calls: list[str] = []
+
+    async def fake_scroll(page: Any, html: str, *, log: Any, max_passes: int = 0) -> str:
+        calls.append("scroll")
+        return html + "<!-- more -->"
+
+    monkeypatch.setattr(pw, "_scroll_to_stable", fake_scroll)
+    backend, _, _ = _make_backend()
+    try:
+        plain = await backend.render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
+        assert calls == [] and "<!-- more -->" not in plain.html
+        listing = await backend.render_listing("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
+        assert calls == ["scroll"] and listing.html.endswith("<!-- more -->")
+        assert listing.outcome is RenderOutcome.ok
+    finally:
+        await backend.close()

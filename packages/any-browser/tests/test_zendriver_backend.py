@@ -446,3 +446,21 @@ async def test_launch_failure_distinguishes_healthy_binary(monkeypatch: pytest.M
     page = await ZendriverBackend(env=env).render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
     assert page.outcome is RenderOutcome.unavailable
     assert "CDP handshake" in page.detail
+
+
+@pytest.mark.asyncio
+async def test_render_listing_scrolls_to_stable_and_render_does_not(monkeypatch: pytest.MonkeyPatch) -> None:
+    from any_browser import zendriver as zd_module  # noqa: PLC0415
+
+    calls: list[str] = []
+
+    async def fake_scroll(tab: Any, html: str, *, max_passes: int = 0) -> str:
+        calls.append("scroll")
+        return html + "<!-- more -->"
+
+    monkeypatch.setattr(zd_module, "_scroll_to_stable_cdp", fake_scroll)
+    _install_fake_zendriver(monkeypatch, tab=_FakeTab("<html><body>" + "x" * 5000 + "</body></html>"))
+    plain = await ZendriverBackend(env={}).render("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
+    assert calls == [] and "<!-- more -->" not in plain.html
+    listing = await ZendriverBackend(env={}).render_listing("https://example.com/", cookies=[], budget_s=5.0, js_heavy=False)
+    assert calls == ["scroll"] and listing.html.endswith("<!-- more -->")

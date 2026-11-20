@@ -280,7 +280,7 @@ dev = [
 
 [[package]]
 name = "any-browser"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/any-browser" }
 
 [package.optional-dependencies]

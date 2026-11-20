@@ -17,8 +17,6 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `shelf-vendor:_say:err` | FIXED (A) | `_out(text)` and `_err(text)` (shelf-vendor 0.3.0) |
 | `blueprint:write:prune` | FIXED (A) | `report.write` always writes; `report.prune_stale(repo, written)` is called by the CLI after a full run (blueprint 0.2.0) |
 | `blueprint:write:executable` | FIXED (A) | `Repo.write` and `Repo.write_executable` in `blueprint.testing` (blueprint 0.2.0) |
-| `any-browser:_navigate:scroll_to_stable` | A | Two operations: `render` and `render_listing` (scroll to stable), on the Backend protocol; a2web (use-cases/a2web--any-browser) must move. Left: external consumer. |
-| `any-browser:render:scroll_to_stable` | A | Two operations: `render` and `render_listing` (scroll to stable), on the Backend protocol; a2web (use-cases/a2web--any-browser) must move. Left: external consumer. |
 | `anyllm:resolve_provider:fallback` | A | `resolve_first(order, ...)` beside `resolve_provider` (composed with runtime fallback). Left: external consumers. |
 | `atomic-io:atomic_write_bytes:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
 | `atomic-io:atomic_write_json:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
