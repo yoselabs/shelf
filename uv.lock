@@ -3221,7 +3221,7 @@ dev = [
 
 [[package]]
 name = "jsonl-log"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "packages/jsonl-log" }
 dependencies = [
     { name = "atomic-io" },

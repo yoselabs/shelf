@@ -14,7 +14,6 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 
 | row | verdict | proposal / reason |
 |---|---|---|
-| `jsonl-log:_drop:evict` | FIXED (A) | `_close(key)` and `_evict(key)` on HeldLogs (jsonl-log 0.5.0) |
 | `shelf-vendor:_say:err` | FIXED (A) | `_out(text)` and `_err(text)` (shelf-vendor 0.3.0) |
 | `blueprint:write:prune` | FIXED (A) | `report.write` always writes; `report.prune_stale(repo, written)` is called by the CLI after a full run (blueprint 0.2.0) |
 | `blueprint:write:executable` | FIXED (A) | `Repo.write` and `Repo.write_executable` in `blueprint.testing` (blueprint 0.2.0) |
@@ -38,8 +37,6 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `git-porcelain:run:check` | A | `run` (raises) and `try_run` (returns `Done`). git-porcelain internal runner, 40+ call sites. Not touched (git-porcelain). |
 | `git-porcelain:run_git:check` | A | `run` (raises) and `try_run` (returns `Done`). git-porcelain internal runner, 40+ call sites. Not touched (git-porcelain). |
 | `git-porcelain:stage:literal` | A | `stage(paths)` literal and `stage_pathspec(patterns)`. git-porcelain public Repo protocol. Not touched. |
-| `jsonl-log:__init__:read_only` | A | `JsonlReader(path)` (read, no fd, no rotate) beside `JsonlLog` (append). a2kay (use-cases/a2kay--jsonl-log) must move. Left: external consumer. |
-| `jsonl-log:open:read_only` | A | `JsonlReader(path)` (read, no fd, no rotate) beside `JsonlLog` (append). a2kay (use-cases/a2kay--jsonl-log) must move. Left: external consumer. |
 | `stream-proc:_hit:group` | A | `_hit_pid` and `_hit` (group, then pid). Private to stream-proc, but it is the signal path that kills process trees; left for an owner-reviewed change, not a drive-by. |
 | `stream-proc:capture_bytes:capture` | A | `run_inherited(argv, timeout=...) -> int` beside `capture_bytes`. In-tree: any-proc, any-speech, delegate; external: a2kay. Left: external consumer. |
 | `verb-cli:flags_of:choices` | A | Make argparse choices the only behaviour (a major bump) or add `choice_flags_of`. ogy (use-cases/ogy--verb-cli). Left: external consumer. |

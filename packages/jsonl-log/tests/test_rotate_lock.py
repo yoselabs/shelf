@@ -11,13 +11,13 @@ from pathlib import Path
 
 import jsonl_log
 import pytest
-from jsonl_log import JsonlLog, JsonlLogError, LogClosedError
+from jsonl_log import JsonlLog, JsonlLogError, JsonlReader, LogClosedError
 from process_lock import ProcessLock
 
 _PAD = "x" * 100
 
 
-def _tags(log: JsonlLog) -> list[tuple[str, int]]:
+def _tags(log: JsonlLog | JsonlReader) -> list[tuple[str, int]]:
     return [(r["tag"], r["i"]) for r in log.records(json.loads)]
 
 
@@ -39,9 +39,9 @@ def test_two_process_rotation_race_drops_no_line_and_no_file(tmp_path: Path) -> 
     for p in procs:
         p.join(60)
         assert p.exitcode == 0
-    with JsonlLog.open(path, keep=1000, read_only=True) as log:
-        got = _tags(log)
-        files = [f for f in log.files() if f.exists()]
+    log = JsonlReader(path, keep=1000)
+    got = _tags(log)
+    files = [f for f in log.files() if f.exists()]
     assert len(got) == len(set(got)) == 600  # every line, once
     assert len(files) > 5  # it did rotate, and kept every file (keep is far above)
     suffixes = sorted(int(f.suffix[1:]) for f in files if f != path)
@@ -96,8 +96,6 @@ def test_rewrite_needs_a_lock_and_a_writable_open_log(tmp_path: Path) -> None:
     log.close()
     with pytest.raises(LogClosedError):
         log.rewrite(lambda _l: True)
-    with JsonlLog.open(tmp_path / "m", rotate_lock=True, read_only=True) as ro:
-        assert ro.rewrite(lambda _l: False) == 0
     assert JsonlLog.open(tmp_path / "absent", rotate_lock=True).rewrite(lambda _l: False) == 0
 
 
@@ -305,7 +303,7 @@ def test_an_evicted_log_that_is_appended_to_leaks_no_descriptor(tmp_path: Path) 
     try:
         before = _open_fds()
         for _ in range(5):
-            assert first.append(b"{}")  # reopens the descriptor each time
+            first.append(b"{}")  # reopens the descriptor each time
         assert _open_fds() == before
         assert len((tmp_path / "first.jsonl").read_bytes().splitlines()) == 5
     finally:
@@ -329,4 +327,4 @@ def test_an_append_whose_file_is_replaced_on_every_attempt_raises(tmp_path: Path
             _ = log.append(b"{}")
         assert len(calls) == 4  # the first write and three re-appends, the last one checked too
         monkeypatch.undo()
-        assert log.append(b"{}")  # the log stays usable
+        log.append(b"{}")  # the log stays usable

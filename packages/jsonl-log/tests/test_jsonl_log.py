@@ -10,7 +10,7 @@ from pathlib import Path
 
 import jsonl_log
 import pytest
-from jsonl_log import JsonlLog, LineError, LogClosedError, expire, read, read_lines
+from jsonl_log import JsonlLog, JsonlReader, LineError, LogClosedError, expire, read, read_lines
 
 _LIMIT = 1024
 
@@ -22,8 +22,8 @@ def _row(n: int) -> bytes:
 def test_an_append_writes_one_line_and_flushes(tmp_path: Path) -> None:
     path = tmp_path / "sub" / "log.jsonl"
     with JsonlLog.open(path) as log:
-        assert log.append(_row(1))
-        assert log.append(_row(2) + b"\n")  # a newline already there is not doubled
+        log.append(_row(1))
+        log.append(_row(2) + b"\n")  # a newline already there is not doubled
         assert path.read_bytes() == b'{"n": 1}\n{"n": 2}\n'  # flushed before close
     assert log.closed
 
@@ -115,19 +115,17 @@ def test_a_torn_or_foreign_line_is_skipped(tmp_path: Path) -> None:
 
 
 def test_no_log_yet_reads_empty(tmp_path: Path) -> None:
-    with JsonlLog.open(tmp_path / "log.jsonl", read_only=True) as log:
-        assert list(log.records(json.loads)) == []
+    assert list(JsonlReader(tmp_path / "log.jsonl").records(json.loads)) == []
     assert not (tmp_path / "log.jsonl").exists()
 
 
-def test_a_read_only_log_appends_nothing(tmp_path: Path) -> None:
+def test_a_reader_beside_a_writer_reads_and_has_nothing_to_write_with(tmp_path: Path) -> None:
     path = tmp_path / "log.jsonl"
     with JsonlLog.open(path) as writer:
         writer.append(_row(1))
-        with JsonlLog.open(path, read_only=True) as reader:
-            assert reader.read_only
-            assert reader.append(_row(2)) is False
-            assert [r["n"] for r in reader.records(json.loads)] == [1]
+        reader = JsonlReader(path)
+        assert [r["n"] for r in reader.records(json.loads)] == [1]
+        assert not hasattr(reader, "append")
     assert path.read_bytes().count(b"\n") == 1
 
 
@@ -148,9 +146,9 @@ def test_the_module_only_appends() -> None:
 def test_a_rotation_by_another_process_is_noticed(tmp_path: Path) -> None:
     path = tmp_path / "log.jsonl"
     with JsonlLog.open(path) as mine:
-        assert mine.append(_row(1))
+        mine.append(_row(1))
         path.replace(tmp_path / "log.jsonl.1")  # what another process's rotation does
-        assert mine.append(_row(2))
+        mine.append(_row(2))
     assert [r["n"] for r in read(path, json.loads)] == [2]
 
 

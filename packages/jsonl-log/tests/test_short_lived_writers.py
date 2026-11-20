@@ -7,7 +7,7 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
-from jsonl_log import JsonlLog
+from jsonl_log import JsonlReader
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -31,6 +31,5 @@ def test_processes_that_open_append_and_close_lose_no_line(tmp_path: Path) -> No
     ]
     errors = [p.communicate()[1] for p in procs]
     assert [p.returncode for p in procs] == [0, 0, 0, 0], errors
-    with JsonlLog.open(path, read_only=True) as log:
-        rows = list(log.records(json.loads))
+    rows = list(JsonlReader(path).records(json.loads))
     assert sorted((r["who"], r["n"]) for r in rows) == sorted((w, n) for w in "abcd" for n in range(40))

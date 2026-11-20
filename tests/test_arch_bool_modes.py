@@ -53,11 +53,6 @@ _ALLOWED: dict[str, str] = {
         "any-browser:_navigate:scroll_to_stable",
     ),
     **_rows(
-        "split: read-only vs appending is two types; a2kay consumes JsonlLog",
-        "jsonl-log:__init__:read_only",
-        "jsonl-log:open:read_only",
-    ),
-    **_rows(
         "split: keep_mode picks between two permission behaviours; consumers a2kay, any-frontmatter, any-net, dir-trust",
         "atomic-io:atomic_write_bytes:keep_mode",
         "atomic-io:atomic_write_json:keep_mode",

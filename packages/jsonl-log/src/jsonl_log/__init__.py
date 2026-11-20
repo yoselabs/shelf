@@ -100,6 +100,37 @@ def read(path: Path, decode: Callable[[bytes], _T]) -> Iterator[_T]:
             yield decode(line)
 
 
+def _rotated(path: Path, n: int) -> Path:
+    return path.with_name(f"{path.name}.{n}")
+
+
+class JsonlReader:
+    """The files of one rotated log, read without a writer: no descriptor, no rotation, nothing created.
+
+    The reader beside a :class:`JsonlLog` (another process, or the same one) that writes it.
+    """
+
+    def __init__(self, path: Path | str, *, keep: int = KEEP) -> None:
+        if keep < 1:
+            msg = f"keep must be at least 1, got {keep}"
+            raise ValueError(msg)
+        self._path = Path(path)
+        self._keep = keep
+
+    @property
+    def path(self) -> Path:
+        return self._path
+
+    def files(self) -> list[Path]:
+        """Every file the log may hold, newest first: the log, then ``.1`` … ``.{keep-1}``."""
+        return [self._path, *(_rotated(self._path, n) for n in range(1, self._keep))]
+
+    def records(self, decode: Callable[[bytes], _T]) -> Iterator[_T]:
+        """:func:`read` over every file, newest file first, each file in written order."""
+        for path in self.files():
+            yield from read(path, decode)
+
+
 class JsonlLog:
     """One rotated JSON-lines log. Append-only at the application level.
 
@@ -113,7 +144,6 @@ class JsonlLog:
         *,
         rotate_bytes: int = ROTATE_BYTES,
         keep: int = KEEP,
-        read_only: bool = False,
         max_age: float | None = None,
         rotate_lock: bool | Path | str = False,
     ) -> None:
@@ -124,7 +154,6 @@ class JsonlLog:
         self._path = path
         self._rotate_bytes = rotate_bytes
         self._keep = keep
-        self._read_only = read_only
         self._max_age = max_age
         self._fd: int | None = None
         self._closed = False
@@ -141,27 +170,21 @@ class JsonlLog:
         *,
         rotate_bytes: int = ROTATE_BYTES,
         keep: int = KEEP,
-        read_only: bool = False,
         max_age: float | None = None,
         rotate_lock: bool | Path | str = False,
     ) -> JsonlLog:
-        """The log at ``path``, opened for appending unless ``read_only``.
+        """The log at ``path``, opened for appending (:class:`JsonlReader` reads without writing).
 
         ``max_age`` seconds retains rotated files; ``rotate_lock`` serialises rotation and :meth:`rewrite` across processes.
         """
-        log = cls(Path(path), rotate_bytes=rotate_bytes, keep=keep, read_only=read_only, max_age=max_age, rotate_lock=rotate_lock)
-        if not read_only:
-            _ = log._current_fd()
-            _ = log.prune()
+        log = cls(Path(path), rotate_bytes=rotate_bytes, keep=keep, max_age=max_age, rotate_lock=rotate_lock)
+        _ = log._current_fd()
+        _ = log.prune()
         return log
 
     @property
     def path(self) -> Path:
         return self._path
-
-    @property
-    def read_only(self) -> bool:
-        return self._read_only
 
     @property
     def closed(self) -> bool:
@@ -177,23 +200,21 @@ class JsonlLog:
     def __exit__(self, *exc: object) -> None:
         self.close()
 
-    def append(self, line: bytes) -> bool:
-        """Write one line in a single ``write`` call; ``False`` (nothing written) on a read-only log.
+    def append(self, line: bytes) -> None:
+        """Write one line in a single ``write`` call.
 
         A missing trailing newline is added. Raises :class:`LogClosedError` once closed and
         :class:`LineError` for a newline before the end.
         """
-        return self.append_at(line) is not None
+        _ = self.append_at(line)
 
-    def append_at(self, line: bytes) -> int | None:
-        """:meth:`append`, returning the byte offset of the line in the current file; ``None`` on a read-only log.
+    def append_at(self, line: bytes) -> int:
+        """:meth:`append`, returning the byte offset of the line in the current file.
 
         The offset is what :func:`jsonl_log.cursor.read_from` takes to read from this line on.
         """
         if self._closed:
             raise LogClosedError(self._path)
-        if self._read_only:
-            return None
         data = line if line.endswith(b"\n") else line + b"\n"
         if b"\n" in data[:-1]:
             raise LineError(self._path)
@@ -220,27 +241,23 @@ class JsonlLog:
                 if self._transient:
                     self._close_file()  # evicted from the held cache: never keep a descriptor nobody can release
 
-    def append_json(self, value: object) -> bool:
+    def append_json(self, value: object) -> None:
         """:meth:`append` of ``value`` as compact JSON."""
-        return self.append(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode())
+        self.append(json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode())
 
     def files(self) -> list[Path]:
         """Every file the log may hold, newest first: the log, then ``.1`` … ``.{keep-1}``."""
-        return [self._path, *(self._rotated(n) for n in range(1, self._keep))]
+        return JsonlReader(self._path, keep=self._keep).files()
 
     def records(self, decode: Callable[[bytes], _T]) -> Iterator[_T]:
         """:func:`read` over every file, newest file first, each file in written order."""
-        for path in self.files():
-            yield from read(path, decode)
-
-    def _rotated(self, n: int) -> Path:
-        return self._path.with_name(f"{self._path.name}.{n}")
+        return JsonlReader(self._path, keep=self._keep).records(decode)
 
     def prune(self, *, now: float | None = None) -> list[Path]:
         """Delete the rotated files not written to for ``max_age`` seconds; returns them. Nothing without ``max_age``."""
         if self._max_age is None:
             return []
-        return expire((self._rotated(n) for n in range(1, self._keep)), self._max_age, now=now)
+        return expire((_rotated(self._path, n) for n in range(1, self._keep)), self._max_age, now=now)
 
     def _current_fd(self) -> int:
         """The append descriptor, reopened when another process rotated the file away from under it."""
@@ -282,8 +299,6 @@ class JsonlLog:
             raise JsonlLogError(msg)
         if self._closed:
             raise LogClosedError(self._path)
-        if self._read_only:
-            return 0
         with self._mutex, self.locked():
             return rewrite_file(self._path, keep, then=self._close_file)
 
@@ -315,9 +330,9 @@ class JsonlLog:
         else:
             for n in range(self._keep - 1, 1, -1):
                 with contextlib.suppress(FileNotFoundError):
-                    self._rotated(n - 1).replace(self._rotated(n))
+                    _rotated(self._path, n - 1).replace(_rotated(self._path, n))
             with contextlib.suppress(FileNotFoundError):
-                self._path.replace(self._rotated(1))
+                self._path.replace(_rotated(self._path, 1))
         _ = self.prune()
 
 
@@ -350,6 +365,7 @@ __all__ = [
     "Jsonl",
     "JsonlLog",
     "JsonlLogError",
+    "JsonlReader",
     "LineError",
     "LineLostError",
     "LogClosedError",

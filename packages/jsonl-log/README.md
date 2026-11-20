@@ -15,7 +15,7 @@ with jl.JsonlLog.open(path, rotate_bytes=5 * 1024 * 1024, keep=5) as log:
             ...
     list(log.records(json.loads))             # every file, newest file first
 
-jl.JsonlLog.open(path, read_only=True)        # a reader beside the writer: append writes nothing
+jl.JsonlReader(path, keep=jl.KEEP)            # a reader beside the writer: files() and records(), no descriptor, nothing created
 
 jl.JsonlLog.open(path, max_age=7 * 86400)     # rotated files untouched for 7 days are deleted
 log.append_at(b'{"verb": "read"}')            # like append, returns the line's byte offset
@@ -83,6 +83,6 @@ jl.read_from(path, decode, cursor)            # the same with your own decode(by
 - **Errors.** `append` on a closed log raises `LogClosedError`; a line holding a newline
   before its end raises `LineError`; an append lost to repeated rewrites raises `LineLostError`.
   All are `JsonlLogError`.
-- A `read_only` log never opens the file for writing and its `append` returns `False`.
+- A `JsonlReader` never opens a file for writing, rotates or creates anything; `append` returns `None` (there is no "not written" case).
 
 Codec-agnostic: the caller owns what a line means. Stdlib plus `atomic-io` (rewrite) and `process-lock` (imported only with `rotate_lock`).
