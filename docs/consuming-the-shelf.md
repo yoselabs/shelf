@@ -90,7 +90,7 @@ the "hooks are per-clone and cannot be committed" premise above has that excepti
 **Using the pre-commit framework instead?** the onboarding writes `.pre-commit-config.yaml` for you (prek). The guard entry is `uv run blueprint guard` and the preset
 check is `uv run blueprint preset --repo .`, both from the `blueprint` dev dependency the onboarding adds, pinned by git tag. The shelf ships no hook repository.
 
-## 3. The resolver block, in the project's `AGENTS.md` / `CLAUDE.md`
+## 3. The resolver block, in the project's `AGENTS.md`
 
 This is the only thing duplicated per repo — tiny and stable. It reaches the full loop from the local
 shelf clone (which every contributor has anyway), touching GitHub only on greenfield or a real

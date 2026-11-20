@@ -9,7 +9,7 @@ open backlog, fitness records): those have derived homes, linked below, and are 
 If you catch this file naming a specific package count or roster, that's a bug — delete it.
 
 > This is the canonical agent instructions file (read by Claude Code, opencode, Codex, …).
-> `CLAUDE.md` is a symlink to it — edit only this file.
+> There is no `CLAUDE.md`: AGENTS.md is the only instructions file (owner, 2026-11-20).
 
 ## Read in this order
 
