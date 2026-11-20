@@ -16,7 +16,7 @@ from importlib.metadata import version as _pkg_version
 from typing import TYPE_CHECKING
 
 from convert_md.base import ConversionError, ConversionResult
-from convert_md.fidelity import grade
+from convert_md.fidelity import grade, grade_container
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -30,8 +30,14 @@ def _ver(pkg: str) -> str:
         return "unknown"
 
 
-def _result(markdown: str, engine: str, source_size: int, *, check_yield: bool = True) -> ConversionResult:
-    fidelity, lost, warnings = grade(markdown=markdown, source_size=source_size, check_yield=check_yield)
+def _result(markdown: str, engine: str, source_size: int) -> ConversionResult:
+    fidelity, lost, warnings = grade(markdown=markdown, source_size=source_size)
+    return ConversionResult(body_markdown=markdown, engine=engine, fidelity=fidelity, lost=lost, warnings=warnings)
+
+
+def _result_container(markdown: str, engine: str, source_size: int) -> ConversionResult:
+    """``_result`` for ZIP containers and PDFs, whose byte size says nothing about the text length."""
+    fidelity, lost, warnings = grade_container(markdown=markdown, source_size=source_size)
     return ConversionResult(body_markdown=markdown, engine=engine, fidelity=fidelity, lost=lost, warnings=warnings)
 
 
@@ -66,7 +72,7 @@ class PymupdfLlmEngine:
         if not isinstance(markdown, str):
             msg = "pymupdf4llm returned page chunks instead of Markdown"
             raise ConversionError(msg)
-        return _result(markdown, self.name, path.stat().st_size, check_yield=False)
+        return _result_container(markdown, self.name, path.stat().st_size)
 
 
 class MammothEngine:
@@ -136,7 +142,7 @@ class MarkitdownEngine:
             notes = _pptx_notes(path)
             if notes:
                 markdown = f"{markdown}\n\n## Speaker notes\n\n{notes}"
-        return _result(markdown, self.name, path.stat().st_size, check_yield=False)
+        return _result_container(markdown, self.name, path.stat().st_size)
 
 
 class OpenpyxlEngine:
@@ -164,7 +170,7 @@ class OpenpyxlEngine:
         except Exception as exc:
             msg = f"openpyxl failed on {path.name}: {exc}"
             raise ConversionError(msg) from exc
-        return _result(markdown, self.name, path.stat().st_size, check_yield=False)
+        return _result_container(markdown, self.name, path.stat().st_size)
 
 
 class TrafilaturaEngine:

@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from convert_md.fidelity import grade
+from convert_md.fidelity import grade_container
 
 BENCH_DIR = Path(__file__).parent
 CORPUS_DIR = BENCH_DIR / "corpus"
@@ -26,7 +26,7 @@ for out_path in sorted(OUTPUTS_DIR.glob("*.md")):
         continue
     markdown = out_path.read_text(encoding="utf-8", errors="replace")  # lossy-ok: bench: scores a probe output, not stored
     source_size = pdf_path.stat().st_size
-    fidelity, lost, warnings = grade(markdown=markdown, source_size=source_size, check_yield=False)
+    fidelity, lost, warnings = grade_container(markdown=markdown, source_size=source_size)
     rows.append(
         {
             "engine": engine,

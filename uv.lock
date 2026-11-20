@@ -1775,7 +1775,7 @@ dev = [
 
 [[package]]
 name = "convert-md"
-version = "0.11.0"
+version = "0.12.0"
 source = { editable = "packages/convert-md" }
 dependencies = [
     { name = "child-env" },

@@ -76,11 +76,6 @@ _ALLOWED: dict[str, str] = {
         "atomic-io:atomic_write_text:keep_mode",
     ),
     **_rows(
-        "split: check_yield=False means the source size is not comparable to text length; a2kay consumes grade",
-        "convert-md:_result:check_yield",
-        "convert-md:grade:check_yield",
-    ),
-    **_rows(
         "split: json_only picks between two strippers; a2kay and a2web consume llm-wobble",
         "llm-wobble:strip_fenced_blocks:json_only",
     ),
