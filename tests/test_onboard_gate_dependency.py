@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -9,6 +10,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+from onboard import hooks
 from onboard.hooks import config_text, ensure_gate_dependency
 
 SOURCE = {
@@ -84,3 +86,20 @@ def test_the_pre_push_hook_runs_the_gate_through_any_gate_in_a_python_repo_and_p
     plain = config_text(beads=False, python=False)
     assert entry not in plain
     assert "entry: just check" in plain
+
+
+def test_the_shelf_packages_the_gate_needs_get_a_tag_source_too(tmp_path: Path) -> None:
+    # uv does not carry a git source to the dependencies of a git dependency: any-gate's own shelf packages need one each.
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "c"\nversion = "0.1.0"\n')
+    ensure_gate_dependency(tmp_path)
+    sources = tomllib.loads((tmp_path / "pyproject.toml").read_text())["tool"]["uv"]["sources"]
+    for name in ("any-lease", "process-lock", "atomic-io", "content-digest", "stream-proc"):
+        assert sources[name]["subdirectory"] == f"packages/{name}"
+        assert sources[name]["tag"].startswith(f"{name}-v")
+
+
+def test_every_tag_a_consumer_is_pinned_to_for_a_dependency_exists() -> None:
+    # The gate packages' own tags are made at release; their dependencies were released before and must still be tagged.
+    needed = {hooks.release_tag(d) for name in hooks.GATE_PACKAGES for d in hooks.shelf_closure(name)}
+    have = set(subprocess.run(["git", "tag"], cwd=hooks._SHELF_ROOT, capture_output=True, text=True, check=True).stdout.split())
+    assert needed <= have, f"tag the release first: {sorted(needed - have)}"
