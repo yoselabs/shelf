@@ -13,13 +13,13 @@ Feature: A file is written whole or not at all
     And "state.json" holds the JSON {"n": 1}
     And no temp file is left beside it
 
-  Scenario: keep_mode carries the permissions of the file replaced
+  Scenario: atomic_replace carries the permissions of the file replaced
     Given a file "secret.bin" with permissions 640
     When the bytes "new" are written atomically to "secret.bin" keeping its mode
     Then "secret.bin" has permissions 640
     And "secret.bin" holds the bytes "new"
 
-  Scenario: Without keep_mode the file is private to the owner
+  Scenario: atomic_write leaves the file is private to the owner
     Given a file "secret.bin" with permissions 644
     When the bytes "new" are written atomically to "secret.bin"
     Then "secret.bin" has permissions 600

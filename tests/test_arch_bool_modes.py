@@ -48,12 +48,6 @@ def _rows(reason: str, *keys: str) -> dict[str, str]:
 _ALLOWED: dict[str, str] = {
     # --- split: the flag chooses between behaviours; a separate type or function is the fix ---
     **_rows(
-        "split: keep_mode picks between two permission behaviours; consumers a2kay, any-frontmatter, any-net, dir-trust",
-        "atomic-io:atomic_write_bytes:keep_mode",
-        "atomic-io:atomic_write_json:keep_mode",
-        "atomic-io:atomic_write_text:keep_mode",
-    ),
-    **_rows(
         "split: choices=True is a compatibility switch between two flag shapes; ogy consumes verb-cli",
         "verb-cli:flags_of:choices",
     ),
@@ -107,6 +101,9 @@ _ALLOWED: dict[str, str] = {
         "atomic-io:atomic_write_bytes:fsync",
         "atomic-io:atomic_write_json:fsync",
         "atomic-io:atomic_write_text:fsync",
+        "atomic-io:atomic_replace_bytes:fsync",
+        "atomic-io:atomic_replace_json:fsync",
+        "atomic-io:atomic_replace_text:fsync",
     ),
     **_rows(
         "exception: a cost opt-in: the dirty flag needs one `git status` per worktree (Article IX: cost "
@@ -175,6 +172,7 @@ _ALLOWED: dict[str, str] = {
     **_rows(
         "fact: json.dumps's own formatting option, passed through (like indent)",
         "atomic-io:atomic_write_json:sort_keys",
+        "atomic-io:atomic_replace_json:sort_keys",
     ),
     **_rows(
         "fact: the connection's thread affinity, passed to sqlite3 as check_same_thread",

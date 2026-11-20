@@ -17,9 +17,6 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `shelf-vendor:_say:err` | FIXED (A) | `_out(text)` and `_err(text)` (shelf-vendor 0.3.0) |
 | `blueprint:write:prune` | FIXED (A) | `report.write` always writes; `report.prune_stale(repo, written)` is called by the CLI after a full run (blueprint 0.2.0) |
 | `blueprint:write:executable` | FIXED (A) | `Repo.write` and `Repo.write_executable` in `blueprint.testing` (blueprint 0.2.0) |
-| `atomic-io:atomic_write_bytes:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
-| `atomic-io:atomic_write_json:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
-| `atomic-io:atomic_write_text:keep_mode` | A | Pick ONE behaviour for a replaced file (keep its bits; new file 0o600) and delete the flag, or add `atomic_write_keeping_mode`. Four consumers. Left: touches stored file permissions (needs an owner call). |
 | `blueprint:run:audit` | A | `run_gate(repo)` and `run_audit(repo)` sharing `_judge`; the CLI picks one. Private to the shelf (use-case shelf--blueprint) but touches the CLI, skill docs and ~20 tests. Left: not cheap. |
 | `git-porcelain:abort_rebase:missing_ok` | A | Return a `Missing`/`Gone` outcome value and let the caller decide, instead of `missing_ok`. git-porcelain public Repo protocol (ogy consumes). Not touched. |
 | `git-porcelain:continue_rebase:check_markers` | A | `resolve_and_continue(...)` beside `continue_rebase()`. git-porcelain public Repo protocol (ogy consumes). Not touched. |
@@ -41,6 +38,9 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `atomic-io:atomic_write_bytes:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
 | `atomic-io:atomic_write_json:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
 | `atomic-io:atomic_write_text:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
+| `atomic-io:atomic_replace_bytes:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
+| `atomic-io:atomic_replace_json:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
+| `atomic-io:atomic_replace_text:fsync` | C | Cost opt-in per Article IX: the default is durable, opting out is named. Needs an accepted ADR (0022) to be durable. |
 | `beads-client:reclaim:any_replica` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
 | `beads-client:unclaim:force` | C | Destructive-intent opt-ins mirroring `--force`, `--allow-empty`, `--no-verify`, `clean -x/-ff`, `--any-replica`; the pit of success is the default. One ADR can name the class. Needs an accepted ADR (0022). |
 | `git-porcelain:__init__:memoize` | C | Object configuration (injected once), not a per-call branch. Needs an accepted ADR (0022). |
@@ -77,6 +77,7 @@ External consumers (a2kay, a2web, ogy, iorlas-*) are not in this tree: an A row 
 | `anyllm:delenv:raising` | B | Test-support opt-ins mirroring pytest's signature (`raising`) or selecting contract checks. |
 | `anyllm:setattr:raising` | B | Test-support opt-ins mirroring pytest's signature (`raising`) or selecting contract checks. |
 | `atomic-io:atomic_write_json:sort_keys` | B | Output formatting of the JSON text; same bytes written either way for a given setting. |
+| `atomic-io:atomic_replace_json:sort_keys` | B | Output formatting of the JSON text; same bytes written either way for a given setting. |
 | `beads-client:find:include_closed` | B | Filter, not a behaviour: closed beads are in the result or not. |
 | `blueprint:check:audit_only` | B | Registration metadata; the runner filters on it. The two registrars share one field. |
 | `blueprint:check_each:audit_only` | B | Registration metadata; the runner filters on it. The two registrars share one field. |

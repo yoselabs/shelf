@@ -1,7 +1,7 @@
 [project]
 name = "atomic-io"
-version = "0.2.0"
-description = "Atomic file write (bytes, text, JSON) — tempfile + optional fsync + os.replace, so a crash or a concurrent reader never sees a partial file; keep_mode preserves permissions."
+version = "0.3.0"
+description = "Atomic file write (bytes, text, JSON) — tempfile + optional fsync + os.replace, so a crash or a concurrent reader never sees a partial file; atomic_replace_* preserves permissions."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"

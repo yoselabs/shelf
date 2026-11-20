@@ -6,7 +6,7 @@ import contextlib
 import os
 from typing import TYPE_CHECKING, BinaryIO
 
-from atomic_io import atomic_write_bytes
+from atomic_io import atomic_replace_bytes
 
 from jsonl_log._append import append_line, open_append
 
@@ -77,7 +77,7 @@ def rewrite_file(path: Path, keep: Callable[[bytes], bool], *, then: Callable[[]
         more, tail, torn = puller.pull(keep)  # appended while the filter ran
         dropped += more
         body = kept + tail + (torn + b"\n" if torn.strip() else b"")
-        atomic_write_bytes(path, body, fsync=True, keep_mode=True)
+        atomic_replace_bytes(path, body, fsync=True)
         _sync_dir(path)
         then()
         puller.offset += len(torn)  # the fragment went into the new file whole

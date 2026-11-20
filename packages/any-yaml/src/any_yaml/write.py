@@ -4,7 +4,7 @@ blank lines and key order (yaml-merge). The file writers replace the file atomic
 import io
 from pathlib import Path
 
-from atomic_io import atomic_write_text
+from atomic_io import atomic_replace_text
 from ruamel.yaml import YAML
 from yaml_merge import merge3, merge_into
 
@@ -54,4 +54,4 @@ def write(path: Path, data: object) -> None:
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     text = merge_text(existing, data) if existing.strip() else dump(data)
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_text(path, text, keep_mode=True)
+    atomic_replace_text(path, text)

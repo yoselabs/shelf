@@ -7,7 +7,7 @@ authors = [{ name = "yoselabs" }]
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
-    "atomic-io>=0.2,<1",
+    "atomic-io>=0.3,<1",
     "process-lock>=0.4,<1",
 ]
 

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
-from atomic_io import atomic_write_bytes, atomic_write_json
+from atomic_io import atomic_replace_bytes, atomic_write_bytes, atomic_write_json
 from pytest_bdd import given, parsers, scenarios, then, when
 
 if TYPE_CHECKING:
@@ -55,7 +55,7 @@ def _write_unencodable(world: World, name: str) -> None:
 
 @when(parsers.parse('the bytes "{text}" are written atomically to "{name}" keeping its mode'))
 def _write_keep_mode(world: World, text: str, name: str) -> None:
-    atomic_write_bytes(world.root / name, text.encode(), keep_mode=True)
+    atomic_replace_bytes(world.root / name, text.encode())
 
 
 @when(parsers.parse('the bytes "{text}" are written atomically to "{name}" without fsync'))

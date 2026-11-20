@@ -4,7 +4,7 @@ Git sees one added block and a ledger that must stay append-only can be checked 
 import re
 from pathlib import Path
 
-from atomic_io import atomic_write_text
+from atomic_io import atomic_replace_text
 from ruamel.yaml.error import YAMLError
 
 from any_yaml.read import load
@@ -72,4 +72,4 @@ def append_item_file(path: Path, key: str, item: object, *, initial: str = "") -
     """`append_item` on the file at `path` (atomically); a missing file starts from `initial`, e.g. `format: 1\\n`."""
     text = path.read_text(encoding="utf-8") if path.exists() else initial
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write_text(path, append_item(text, key, item), keep_mode=True)
+    atomic_replace_text(path, append_item(text, key, item))

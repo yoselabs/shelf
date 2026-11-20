@@ -966,7 +966,7 @@ dev = [
 
 [[package]]
 name = "any-yaml"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/any-yaml" }
 dependencies = [
     { name = "atomic-io" },
@@ -1239,7 +1239,7 @@ wheels = [
 
 [[package]]
 name = "atomic-io"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/atomic-io" }
 
 [package.dev-dependencies]
