@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 from dir_trust import TrustStore, TrustStoreError, folder_hash
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def _file(folder: Path, name: str, content: str) -> None:
@@ -166,13 +164,16 @@ def test_an_unwritable_store_raises(tmp_path: Path) -> None:
         store.grant(tmp_path, tmp_path)
 
 
-def test_store_bytes_are_the_yaml_dump_of_the_grants(tmp_path: Path) -> None:
-    store_path = tmp_path / "config" / "trust.yml"
-    key = tmp_path / "vault"
-    folder = key / "jobs"
-    _file(folder, "a.py", "x\n")
-    TrustStore(store_path).grant(key, folder)
-    assert store_path.read_bytes() == f"{{{key.resolve()}: {folder_hash(folder)}}}\n".encode()
+def test_store_bytes_are_the_yaml_dump_of_the_grants() -> None:
+    # A short root: the YAML writer switches a mapping key over 128 characters to its `? ` form, and pytest's tmp_path can be that long.
+    with tempfile.TemporaryDirectory(prefix="dt", dir="/tmp") as root:
+        base = Path(root).resolve()
+        store_path = base / "config" / "trust.yml"
+        key = base / "vault"
+        folder = key / "jobs"
+        _file(folder, "a.py", "x\n")
+        TrustStore(store_path).grant(key, folder)
+        assert store_path.read_bytes() == f"{{{key}: {folder_hash(folder)}}}\n".encode()
 
 
 def test_a_crash_before_the_swap_keeps_the_old_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -71,7 +71,11 @@ def test_claim_takes_only_the_asked_kind(work: Work) -> None:
     with take(work, "channel") as c:
         assert c.key == "c"
         assert work.claim("channel") is None
-    assert [work.claim("video") is not None, work.claim("nothing")] == [True, None]
+    video = work.claim("video")
+    assert video is not None
+    with video:
+        pass
+    assert work.claim("nothing") is None
 
 
 def test_a_key_held_by_another_claim_is_skipped(work: Work) -> None:

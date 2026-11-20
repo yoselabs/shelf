@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+_LOWEST_PRIORITY = 19  # the highest niceness a process can have
+
 
 def _run(root: Path, *paths: str, **kw: object):
     return run_tests(list(paths) or ["."], cwd=root, **{"env": os.environ, **kw})  # type: ignore[arg-type]
@@ -124,6 +126,8 @@ def test_the_repos_own_marker_default_still_holds_in_every_stage(project: Callab
 
 def test_a_niced_run_starts_pytest_at_that_priority(project: Callable[..., Path]) -> None:
     base = os.nice(0)
-    root = project(a=f"import os\n\ndef test_a():\n    assert os.nice(0) == {base + 5}\n")
-    assert _run(root, nice=5).ok
+    if base >= _LOWEST_PRIORITY:
+        pytest.skip("the caller already runs at the lowest priority: a nice increment proves nothing")
+    root = project(a=f"import os\n\ndef test_a():\n    assert os.nice(0) == {base + 1}\n")
+    assert _run(root, nice=1).ok
     assert not _run(root).ok  # without it pytest keeps the caller's priority, so the same assertion fails
