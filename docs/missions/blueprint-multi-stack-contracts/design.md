@@ -138,3 +138,16 @@ Verdict for task 2's acceptance ("no Python assumption sits in the core"): **not
 non-Python repo pass or go blank silently, which design D4 forbids. 4 to 6 are cosmetic or placement. The role contract itself
 (D1) needs no Python knowledge, so the interface above is enough for a second adapter; items 1 to 3 are the work that task 4 and task 5
 (profiles for node, go, rust; mixed-stack) must include, each with a failing fixture first.
+
+### Status of the Python assumptions (shelf-51yk, 2026-11-20)
+
+Items 1 to 4 are fixed, each behind a failing Node fixture first (`packages/blueprint/tests/test_non_python_core.py`):
+1. kind, surface and evidence now also read `package.json` (`bin` is a `cli` fact, runtime dependencies are evidence, a `workspaces` manifest with no `bin`
+   is a library; `facts.py`, `profile._detect_kind`);
+2. the tools a stack runs and the file that says so are the profile's `[pins]` table (`python-uv.toml`: `uv = "uv.lock"`);
+3. `gate.guards-have-red-tests` finds guard scripts run by `node`, `bun`, `tsx`, `ts-node`, `deno run` and counts `*.test.*`, `*.spec.*`, `*_test.go`;
+4. the onboarding command and the way `just` is pinned are the profile's `onboard`, `runner_pin`, `runner_run`.
+
+Not changed: item 5 (.NET SDK logic inside `concerns/stack.py`, it belongs behind an `extra_checks` hook) and item 6 (install hints). The profile data model
+moved to `concerns/profile_data.py` so `stack.py` stays under the size cap. Go and Rust get no framework or dependency evidence yet: only Python and Node
+manifests are read for facts.

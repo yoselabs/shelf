@@ -22,14 +22,22 @@ from blueprint.model import (
 
 if TYPE_CHECKING:
     from blueprint.gate_graph import Gate
-# A script a recipe runs: `python3 x.py`, `uv run python x.py`, or `g=x.py` handed to python later.
-# `python3 -I tools/x.py`: interpreter flags before the script (the recipes are run isolated) still name it.
-_SCRIPT = re.compile(r"(?:python3?(?:\s+-\w+)*\s+|uv run python(?:\s+-\w+)*\s+|\b[A-Za-z_]\w*=)((?:[\w.-]+/)*[\w.-]+\.py)\b")
+# A script a recipe runs: an interpreter and the script (`python3 x.py`, `uv run python x.py`, `node x.js`, `npx tsx x.ts`, `bun x.ts`),
+# or `g=x.py` handed to an interpreter later. Interpreter flags before the script (`python3 -I`, `node --no-warnings`) still name it.
+_EXT = r"(?:py|js|mjs|cjs|ts|mts|cts)"
+_INTERPRETER = r"(?:python3?|uv run python|node|bun(?: run)?|tsx|ts-node|npx tsx|npx ts-node|deno run)"
+_SCRIPT = re.compile(rf"(?:{_INTERPRETER}(?:\s+-[\w-]+(?:=\S+)?)*\s+|\b[A-Za-z_]\w*=)((?:[\w.-]+/)*[\w.-]+\.{_EXT})\b")
+# A test file in any language the repo's stacks use: `test_x.py`, `x.test.ts`, `x.spec.js`, `x_test.go`.
+_TEST_GLOBS = ("test_*.py", "*.test.*", "*.spec.*", "*_test.go")
 
 
 _HOOK_ENTRY = re.compile(r"^\s*(?:-\s*)?entry:\s*(.+?)\s*$", re.MULTILINE)
 # Any `.py` path in a hook's entry (`uv run tools/x.py`, `python x.py`, a bare path); a glob such as `test_*.py` has no match.
-_HOOK_SCRIPT = re.compile(r"(?<![\w./-])((?:[\w.-]+/)*[\w.-]+\.py)\b")
+_HOOK_SCRIPT = re.compile(rf"(?<![\w./-])((?:[\w.-]+/)*[\w.-]+\.{_EXT})\b")
+
+
+def _is_test_name(name: str) -> bool:
+    return name.startswith("test_") or bool(re.search(r"\.(?:test|spec)\.\w+$", name))
 
 
 def _hook_entries(ctx: Context, recipes: str) -> list[str]:
@@ -51,7 +59,7 @@ def _gate_commands(ctx: Context, gate: Gate) -> str:
 def _gate_scripts(ctx: Context, gate: Gate) -> list[str]:
     found = [m for recipe in gate.reachable() for m in _SCRIPT.findall(recipe)]
     for entry in _hook_entries(ctx, gate.gate_recipes()):
-        found += [m for m in _HOOK_SCRIPT.findall(entry) if not Path(m).name.startswith("test_")]
+        found += [m for m in _HOOK_SCRIPT.findall(entry) if not _is_test_name(Path(m).name)]
     return list(dict.fromkeys(m for m in found if ctx.path(m).is_file()))
 
 
@@ -70,7 +78,7 @@ def runs_blueprint(ctx: Context) -> Finding:
 
 
 def guards_have_red_tests(ctx: Context) -> Finding:
-    """Each repo `*.py` that `just check` reaches, in a recipe or through its pre-commit hooks, is named by some test file.
+    """Each repo script (`.py`, `.js`, `.ts` and kin) that `just check` reaches, in a recipe or a pre-commit hook, is named by a test.
 
     A guard never seen red is a hypothesis.
     """
@@ -79,8 +87,8 @@ def guards_have_red_tests(ctx: Context) -> Finding:
         return not_applicable("no justfile, so no guard scripts")
     scripts = _gate_scripts(ctx, gate)
     if not scripts:
-        return not_applicable("`just check` runs no repo-local Python script")
-    tests = [p.read_text(errors="replace") for p in walk(ctx.repo, "test_*.py")]
+        return not_applicable("`just check` runs no repo-local script")
+    tests = [p.read_text(errors="replace") for pattern in _TEST_GLOBS for p in walk(ctx.repo, pattern)]
     # An unchanged copy of a blueprint recipe is tested where it is written, in the shelf; an edited copy is the repo's own.
     recipes = [s for s in scripts if _is_recipe_copy(ctx, s)]
     untested = [s for s in scripts if s not in recipes and not any(Path(s).stem in t or Path(s).stem.replace("-", "_") in t for t in tests)]

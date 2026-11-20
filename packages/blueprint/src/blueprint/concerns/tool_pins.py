@@ -13,6 +13,7 @@ import re
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
+from blueprint.concerns.profile_data import load_profiles
 from blueprint.model import FixedBy, check, failing, not_applicable, not_set_up, passing, toml_table, uses_beads
 
 if TYPE_CHECKING:
@@ -48,8 +49,10 @@ def _rust_just(ctx: Context) -> bool:
 def _needed(ctx: Context) -> dict[str, str]:
     """Each tool the repo runs, with what says so."""
     needed: dict[str, str] = {}
-    if "python-uv" in ctx.profile.stacks:
-        needed["uv"] = "uv.lock"
+    profiles = load_profiles()
+    for stack in ctx.profile.stacks:
+        if profile := profiles.get(stack):
+            needed.update(profile.pins)
     if ctx.read(".pre-commit-config.yaml") is not None:
         needed["prek"] = ".pre-commit-config.yaml"
     if uses_beads(ctx.profile):

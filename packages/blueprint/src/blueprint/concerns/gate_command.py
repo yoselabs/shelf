@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from blueprint import gate_graph
+from blueprint.concerns.profile_data import StackProfile, load_profiles, profile_for
 from blueprint.model import (
     Context,
     Finding,
@@ -14,21 +15,23 @@ from blueprint.model import (
     passing,
 )
 
-_ONBOARD = (
-    "the shelf onboarding writes the gate: `just bootstrap`, or python3 <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo ."
-)
+
+def _stack_profiles(ctx: Context) -> list[StackProfile]:
+    """The profile of each detected stack, in detection order (a stack without one is left out)."""
+    profiles = load_profiles()
+    return [p for s in ctx.profile.stacks if (p := profile_for(s, profiles))]
 
 
 def one_command(ctx: Context) -> Finding:
     """The justfile has a `check` recipe and `just --dry-run check` resolves (a Makefile: `make -n check`)."""
-    python = any(s.startswith("python") for s in ctx.profile.stacks)
+    onboard = next((p.onboard for p in _stack_profiles(ctx) if p.onboard), "")
     generic = "add a justfile whose `check` recipe runs every linter and the tests"
     if not ctx.profile.stacks:
         generic += (
             '; no code yet? declare the stack it will have, `[profile] stacks = ["python-uv"]` in '
             "docs/blueprint/blueprint.toml, for its own fix"
         )
-    fixer = (_ONBOARD, FixedBy.AUTO) if python else (generic, FixedBy.AGENT)
+    fixer = (onboard, FixedBy.AUTO) if onboard else (generic, FixedBy.AGENT)
     gate = gate_graph.load(ctx)
     if gate is None:
         return not_set_up("no justfile", *fixer)
@@ -58,8 +61,9 @@ _PORT = "port each target to a recipe (same names; loops go in shebang recipes; 
 
 def _migration(ctx: Context) -> str:
     """Pin just where the repo already pins things: the pyproject's dev group for Python, mise.toml for every other stack."""
-    if ctx.read("pyproject.toml") is not None:
-        pin, run_it = "`uv add --dev rust-just`", "run it as `uv run just check`"
+    runner = next(((p.runner_pin, p.runner_run) for p in _stack_profiles(ctx) if p.runner_pin), None)
+    if runner:
+        pin, run_it = runner
     else:
         pin, run_it = '`just = "<version>"` under [tools] in mise.toml, then `mise lock` (ADR 0024)', "run it as `just check`"
     return (

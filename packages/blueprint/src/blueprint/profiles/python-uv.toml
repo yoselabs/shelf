@@ -14,6 +14,13 @@ stack = "python-uv"
 family = "language"
 status = "evidenced"  # evidenced: the shelf and a2kay run it | provisional: written, not yet proven
 source = "the shelf's own gate (pyproject.toml, justfile; ADR 0004, 0023)"
+# Stack-wide answers other concerns read (shelf-51yk): the tools to pin, the gate's onboarding command, the runner's pin.
+onboard = "the shelf onboarding writes the gate: `just bootstrap`, or python3 <shelf>/.agents/skills/onboard-consumer/scripts/onboard.py --repo ."
+runner_pin = "`uv add --dev rust-just`"
+runner_run = "run it as `uv run just check`"
+
+[pins]
+uv = "uv.lock"
 
 [[role]]
 role = "toolchain"
