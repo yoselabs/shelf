@@ -1,6 +1,6 @@
 [project]
 name = "sqlite-resource"
-version = "0.1.0"
+version = "0.2.0"
 description = "A lazily-opened aiosqlite connection with a lock, idempotent close, and the async context-manager lifecycle — schema stays caller-side."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

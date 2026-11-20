@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+from pathlib import Path as _Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -95,3 +97,18 @@ async def test_custom_pragmas_applied(tmp_path: Path) -> None:
     assert row is not None
     assert row[0].lower() == "memory"
     await res.close()
+
+
+async def test_the_parent_folder_is_made_off_the_event_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    made_on: list[int] = []
+    real_mkdir = _Path.mkdir
+
+    def spy(self: Path, *args: object, **kwargs: object) -> None:
+        made_on.append(threading.get_ident())
+        real_mkdir(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(_Path, "mkdir", spy)
+    async with SqliteResource(tmp_path / "deep" / "data.sqlite"):
+        pass
+    assert made_on
+    assert threading.get_ident() not in made_on
