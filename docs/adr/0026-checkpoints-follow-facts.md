@@ -6,7 +6,7 @@ concerns: [stack, gate, workflow]
 status: accepted
 decided_by: owner
 updated: 2026-11-20
-distilled_into: blueprint facts.py (facts, evidence, closed lists, classification), profile.py ([[override]] with scope, [profile] classified/rejected), checkpoints.py (`blueprint checkpoints`), stack.py (requires = shipped-image | deployed), tools/changed.py and the justfile (changed-file linting); bead shelf-6q1
+distilled_into: blueprint facts.py (facts, evidence, closed lists, classification), profile.py ([[override]] with scope, [profile] classified/rejected), checkpoints.py (`blueprint check --list`), stack.py (requires = shipped-image | deployed), tools/changed.py and the justfile (changed-file linting); bead shelf-6q1
 ---
 
 # 0026 — checkpoints follow facts about the repo, never its size; one override format
@@ -34,7 +34,7 @@ distilled_into: blueprint facts.py (facts, evidence, closed lists, classificatio
   compose policy reads the same file (`conftest test --combine --policy policy docs/blueprint/blueprint.toml <compose files>`; conftest 0.71.1 loads only `.json`/`.yaml` through `--data`, so the TOML goes in as an input, tried 2026-10-12). A linter's
   own suppression (`# noqa`, hadolint `ignored:`, `# shellcheck disable`) stays where the linter reads it and carries
   a reason. Every report lists every override at the top.
-- **`blueprint checkpoints`** lists each checkpoint, what it checks and the fact that turns it on, so an agent knows
+- **`blueprint check --list`** lists each checkpoint, what it checks and the fact that turns it on, so an agent knows
   what to declare or override.
 - **Per-file linters run on changed files.** A detected technology's per-file linters (hadolint, dockerfmt,
   shellcheck, shfmt, compose config, nix fmt, ruff) run on the files changed against the base branch; checks that
@@ -57,7 +57,7 @@ five shapes in two days.
 - 2026-10-12: grilled with the owner (grill-with-docs) after the size tiers shipped; accepted. Replaces the tiers in
   shell-scripts.toml, dockerfile-lite.toml and compose-lite.toml; amends ADR 0025 (scripts answer `--help`, its
   `# lenient:` waiver becomes an override).
-- 2026-10-12: built (shelf-6q1.1-.8): size tiers deleted, `blueprint checkpoints`, scripts answer `--help`, facts and evidence
+- 2026-10-12: built (shelf-6q1.1-.8): size tiers deleted, `blueprint check --list`, scripts answer `--help`, facts and evidence
   in the report, one scoped `[[override]]` (old markers still honoured, each reported with its replacement), the
   classification in `[profile]`, ship-smoke/ship-updater and deploy-only compose policy, changed-file linting in the
   shelf. Consumers' changed-file recipe is shelf-6q1.9.

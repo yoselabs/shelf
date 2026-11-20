@@ -226,7 +226,7 @@ def _ago(stamp: int) -> str:
     return f"{(time.time() - stamp) / 3600:.0f}h ago"
 
 
-_INSTALL = "PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint template --repo ."
+_INSTALL = "uv run blueprint init"
 
 
 # What `bd init` writes into CLAUDE.md/AGENTS.md for the owner to fill: `_Add your build and test commands here_`

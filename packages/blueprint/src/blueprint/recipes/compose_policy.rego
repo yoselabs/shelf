@@ -1,4 +1,4 @@
-# Compose policy (blueprint recipe `compose-policy`): architecture (five deny rules) and the healthcheck rule tests read. conftest reads the compose YAML directly,
+# Compose policy (a blueprint recipe: `blueprint init` writes it): architecture (five deny rules) and the healthcheck rule tests read. conftest reads the compose YAML directly,
 # no Docker CLI needed:
 #   conftest test --combine --policy policy docs/blueprint/blueprint.toml $(git ls-files 'compose.y*ml')
 # --combine hands the policy every file at once as input[i] = {path, contents}. docs/blueprint/blueprint.toml is one of

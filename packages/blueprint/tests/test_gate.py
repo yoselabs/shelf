@@ -10,8 +10,8 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from blueprint.__main__ import RECIPES
 from blueprint.concerns import gate_clone
+from blueprint.init import RECIPES
 from blueprint.model import FixedBy, Verdict
 from blueprint.report import gate as gate_report
 from blueprint.runner import run
@@ -119,7 +119,7 @@ def test_the_recipe_passes_both_halves_with_beads(repo: Repo) -> None:
 def test_no_hook_config_is_not_set_up_with_the_recipe_as_auto_fix(repo: Repo) -> None:
     row = next(r for r in run(repo.root, concern="gate", audit=True, env=repo.env).rows if r.id == "gate.hooks-recipe")
     assert row.verdict is Verdict.NOT_SET_UP
-    assert "recipe hooks" in row.remediation
+    assert "blueprint init" in row.remediation
     assert row.fixed_by == "auto"
 
 

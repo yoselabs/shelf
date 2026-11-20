@@ -1,4 +1,4 @@
-# A blueprint recipe (`blueprint recipe godot-test`): paste into the repo's justfile and add godot-test to `check`.
+# A blueprint recipe (`blueprint init` writes it to tools/godot-test.just): the repo's justfile imports it and adds godot-test to `check`.
 # Set godot_root to the folder holding project.godot. No backticks: `just --dry-run` evaluates them.
 
 godot := env('GODOT', 'godot')

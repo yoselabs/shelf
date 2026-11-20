@@ -7,7 +7,7 @@ the remediation with who applies it (auto, agent, owner). Stdlib only.
 
 ## Run it
 
-From any repo, with a shelf clone beside it — no install:
+`blueprint init` sets a repo up; `blueprint check` judges it; `blueprint gate <step>` runs one step of `just check` (the justfile and hooks call those). From any repo, with a shelf clone beside it — no install:
 
 ```bash
 PYTHONPATH=../shelf/packages/blueprint/src python3 -m blueprint check --repo .
@@ -15,10 +15,10 @@ PYTHONPATH=../shelf/packages/blueprint/src python3 -m blueprint check --repo .
 
 | flag | effect |
 |---|---|
-| `--summary` | one row per concern, grouped by layer (generic, stack-specific, agent harness); says how many audit-only checkpoints it left out, so pair it with `--audit` to match a README written by `--audit --write` |
-| `--gate` | one line per checkpoint that is not passing; what `just blueprint` prints |
+| `--brief` | one line per checkpoint that is not passing; what `just blueprint` prints |
+| `--list [PREFIX]` | list the checkpoints instead (id, statement, the fact that turns each on), with `--json` as JSON |
 | `--json` | the run as JSON, for agents and evals |
-| `--write` | `docs/blueprint/README.md` (the summary) and `<concern>.md`, one table per concern |
+| `--write` | `docs/blueprint/README.md` (one row per concern, grouped by layer) and `<concern>.md`, one table per concern |
 | `--audit` | also the audit-only checkpoints: slow ones (a fresh clone running `just check`) and ones that read this machine's bd database, which a bare clone does not have |
 | `--concern X` | one concern only |
 
@@ -64,7 +64,7 @@ clean-clone-seconds = 120 # gate.clean-clone's budget
 
 # Every exception to a checkpoint is one [[override]] (ADR 0026); nothing else excuses a row.
 [[override]]              # counts as passing while it is justified
-id = "gate.hooks-recipe"   # a checkpoint id (`blueprint checkpoints`)
+id = "gate.hooks-recipe"   # a checkpoint id (`blueprint check --list`)
 reason = "the owner installs hooks by hand on each machine"
 decided_by = "owner"      # owner | agent; missing reads "unknown" in the report
 adr = "0003"              # an accepted ADR in docs/adr/ records the durable decision; no expiry needed
@@ -114,7 +114,7 @@ and the scope: concerns checked, concerns not run, and whether the audit-only ch
 With `--audit`, a gate row that is failing or not set up (`one-command`, `runner`, `hooks-recipe`, `runs-blueprint`, `clean-clone`) also names any remote-tracking branch (`origin/*`, local refs, no fetch) ahead of the default branch that changes a gate file (justfile, Makefile, hook config), and hands the fix to the owner: merge that branch or remediate on main, not a parallel gate. The branch itself is never checked.
 
 Hooks follow one recipe: prek owns them through `.pre-commit-config.yaml` and bd's five events run
-from it (`blueprint recipe hooks` prints it); bd never installs hooks itself. A framework's or stack's own gate script is a recipe too (`blueprint recipe unity-integrity`, `dockerfile-pins`, `compose-policy`, `changed`): the repo copies it into `tools/` (a rego policy into `policy/`) and owns the copy.
+from it (`blueprint init` writes it, and runs `prek install` unless `--no-hooks`); bd never installs hooks itself. A framework's or stack's own gate script is a recipe too (unity-integrity, dockerfile-pins, compose-policy, godot, dotnet-coverage): `blueprint init` writes it into `tools/` (a rego policy into `policy/`) when the stack is detected, and the repo owns the copy.
 
 A stack with no profile, or a role its profile leaves untested, is a **blueprint gap**: reported
 every run, never a pass, but left out of the exit code, since the shelf lacks the answer, not the repo.
@@ -122,16 +122,15 @@ A new stack is a new `profiles/<stack>.toml`, not code.
 
 ## Culture templates
 
-`blueprint template --repo .` copies the `docs/agents/` files the profile requires (`templates/`)
+`blueprint init` copies the `docs/agents/` files the profile requires (`templates/`)
 and writes the AGENTS.md managed block; it never overwrites a file the repo has. `gate.md` carries the no-CI wording (ADR 0027).
 The decision-record layout of ADR 0017 (`CONTEXT.md`, `docs/adr/`) is the standard the templates assume: a repo
 that keeps its records elsewhere migrates, or records an override backed by an accepted ADR (ADR 0022).
 
 ## Survey
 
-`blueprint survey` prints the run survey (`survey.toml`: experience, completeness, correctness,
-cost; closed answers); the skill fills it into `docs/blueprint/survey.md` after every run, and
-`blueprint survey --check FILE` fails until every question is answered.
+The run survey is data, `survey.toml` (experience, completeness, correctness, cost; closed answers); the skill
+fills it into `docs/blueprint/survey.md` after every run. There is no verb for it.
 
 A new checkpoint is one decorated function in `blueprint/concerns/<concern>.py` returning a
 `Finding`, with a passing test and a planted-violation test (`blueprint.testing.Repo`).

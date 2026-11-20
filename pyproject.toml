@@ -865,22 +865,3 @@ no-effect = [
     "AGENTS.md",
 ]
 repo-tests = "tests"
-
-[tool.any-gate.python.gated]
-tests = ["test_onboard_*", "test_bootstrap_target.py"]
-inputs = [
-    "tools/onboard/",
-    "tools/preset_drift.py",
-    ".agents/skills/onboard-consumer/",
-    "tests/conftest.py",
-    "justfile",
-    "pyproject.toml",
-    "uv.lock",
-    "conftest.py",
-    ".pre-commit-config.yaml",
-    ".beads/config.yaml",
-]
-
-[tool.any-gate.python.gated.reads]
-"test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/backlog.py"]
-"test_onboard_hooks.py" = ["packages/blueprint/src/blueprint/recipes/"]

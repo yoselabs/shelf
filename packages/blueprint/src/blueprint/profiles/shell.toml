@@ -65,5 +65,5 @@ config = [{ path = ".pre-commit-config.yaml", contains = "shellcheck" }]
 [[role]]
 role = "agent-guidance"
 tool = "docs/agents/shell.md (strict-mode header, quoting, the waiver rules, when a script becomes the main language), linked from AGENTS.md"
-install = "`blueprint template --repo .` writes docs/agents/shell.md; link it from AGENTS.md"
+install = "`blueprint init` writes docs/agents/shell.md; link it from AGENTS.md"
 config = [{ path = "docs/agents/shell.md" }, { path = "AGENTS.md", contains = "docs/agents/shell.md" }]

@@ -66,7 +66,7 @@ repos:
   hooks:
   - id: shelf-guard
     name: no local shelf source
-    entry: uv run blueprint guard
+    entry: uv run blueprint gate guard
     language: system
     always_run: true
     pass_filenames: false
@@ -89,7 +89,7 @@ repos:
     stages: [pre-commit]
   - id: preset-drift
     name: preset drift
-    entry: uv run blueprint preset --repo .
+    entry: uv run blueprint gate preset --repo .
     language: system
     files: ^pyproject\.toml$
     pass_filenames: false

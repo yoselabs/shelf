@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unity project hygiene: every asset has a .meta, every .meta an asset, GUIDs unique, Force Text, Visible Meta Files.
 
-A blueprint recipe (`blueprint recipe unity-integrity > tools/unity_integrity.py`): the repo copies it and owns the copy.
+A blueprint recipe (`blueprint init`): the repo copies it and owns the copy.
 Stdlib only, so the gate and a prek hook run it without an environment.
 
 Usage: unity_integrity.py [project_root]; prints one line per finding and exits 1 on any.

@@ -45,16 +45,18 @@ def _is_main_guard(node: ast.stmt) -> bool:
 
 
 def _parses_arguments(tree: ast.Module) -> bool:
-    """An `ArgumentParser(...)` call, a `sys.argv` reference, or a click/typer import, anywhere in the module."""
+    """An `ArgumentParser(...)` call or a click/typer import, anywhere in the module.
+
+    A bare `sys.argv` read is not a command with a usage: it is an internal entry script with a fixed argv (a hook's, a recipe's),
+    and `--help` there is just one more value. The day it grows a parser, it is a command and needs the help test.
+    """
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             f = node.func
             if (isinstance(f, ast.Attribute) and f.attr == "ArgumentParser") or (isinstance(f, ast.Name) and f.id == "ArgumentParser"):
                 return True
-        elif (
-            (isinstance(node, ast.Attribute) and node.attr == "argv" and isinstance(node.value, ast.Name) and node.value.id == "sys")
-            or (isinstance(node, ast.Import) and any(a.name.split(".")[0] in {"click", "typer"} for a in node.names))
-            or (isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] in {"click", "typer"})
+        elif (isinstance(node, ast.Import) and any(a.name.split(".")[0] in {"click", "typer"} for a in node.names)) or (
+            isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] in {"click", "typer"}
         ):
             return True
     return False

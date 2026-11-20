@@ -1,6 +1,6 @@
 """Culture templates: the docs/agents/ files and the AGENTS.md managed block a repo carries.
 
-`blueprint template` copies what is missing and never overwrites a file the repo already has; the
+`blueprint init` copies what is missing and never overwrites a file the repo already has; the
 managed block in AGENTS.md is the one exception, rewritten between its markers on every run.
 """
 

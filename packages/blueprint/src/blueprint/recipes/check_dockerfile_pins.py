@@ -4,7 +4,7 @@
 Why: hadolint's DL3006/DL3007 force a tag, never a digest; a tag moves, a digest is the lockfile (seen 2026-10-11:
 homelab's frigate image and a2kay's three Dockerfiles pull `python:3.12-slim`, `uv:0.13.0` by tag only).
 
-A blueprint recipe (`blueprint recipe dockerfile-pins > tools/check_dockerfile_pins.py`): the repo copies it and owns the copy.
+A blueprint recipe (`blueprint init`): the repo copies it and owns the copy.
 Stdlib only, no network. The digest is fetched elsewhere (`crane digest <image:tag>` or `docker buildx imagetools inspect`)
 and bumped by an updater (Renovate `pinDigests`, or the repo's own report); this script only judges the files.
 

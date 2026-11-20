@@ -1,4 +1,4 @@
-"""`blueprint render`: the justfile parts the blueprint owns, written per detected stack, and the drift check on them.
+"""`blueprint gate render`: the justfile parts the blueprint owns, written per detected stack, and the drift check on them.
 
 The repo's own `justfile` imports `.blueprint/*.just` and fills the named extension points; a recipe it defines itself wins over
 the base one (`set allow-duplicate-recipes`, chosen over `mod` in ADR 0029).
@@ -146,6 +146,16 @@ def test_a_repo_that_never_rendered_fails_the_check_not_passes(repo: Repo) -> No
 
 def test_the_cli_writes_then_checks(repo: Repo, tmp_path: Path) -> None:
     _python(repo)
-    assert main(["render", "--repo", str(repo.root), "--check"]) == 1
-    assert main(["render", "--repo", str(repo.root)]) == 0
-    assert main(["render", "--repo", str(repo.root), "--check"]) == 0
+    assert main(["gate", "render", "--repo", str(repo.root), "--check"]) == 1
+    assert main(["gate", "render", "--repo", str(repo.root)]) == 0
+    assert main(["gate", "render", "--repo", str(repo.root), "--check"]) == 0
+
+
+def test_the_release_gate_runs_the_whole_form_of_each_step_and_a_floor(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    repo.write("uv.lock", "")
+    parts = render.parts(repo.root)
+    assert '"secrets-all"' in parts[".blueprint/base.just"]
+    assert '"test-all"' in parts[".blueprint/base.just"]
+    assert "--cov-fail-under" in parts[".blueprint/python.just"]
+    assert "\ntest-all:" in parts[".blueprint/python.just"]

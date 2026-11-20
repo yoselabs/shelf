@@ -132,7 +132,7 @@ _PURPOSE_FACT = {
 
 
 def purpose_fact(requires: str) -> str:
-    """The fact that turns a purpose row on, for `blueprint checkpoints` and the not-applicable reason."""
+    """The fact that turns a purpose row on, for `blueprint check --list` and the not-applicable reason."""
     return _PURPOSE_FACT[requires]
 
 

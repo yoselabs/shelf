@@ -12,7 +12,7 @@ Stack: python-uv. The gate is `just check`; this file is what to know before wri
 | types | pyrefly, `preset = "strict"` | `just typecheck` |
 | spelling | codespell | `just spell` |
 | dependencies | deptry (unused, missing, transitive) | `just deps` |
-| tests | pytest, strict markers, xdist | `just test` (the tests the change reaches, `blueprint test`; `just test-all` runs every one) |
+| tests | pytest, strict markers, xdist | `just test` (the tests the change reaches, `blueprint gate test`; `just test-all` runs every one) |
 | coverage | pytest-cov with a floor just below current | in `just test` |
 | architecture | import-linter contracts in `[tool.importlinter]`; ruff TID251 banned-api for banned APIs | `just arch` (banned APIs ride `just lint`); see [architecture.md](architecture.md) |
 | hooks | prek: ruff check and ruff format on staged `.py` | [gate.md](gate.md) |

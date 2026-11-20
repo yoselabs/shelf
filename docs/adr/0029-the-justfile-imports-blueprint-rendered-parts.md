@@ -1,30 +1,30 @@
 ---
 id: 0029
 title: A repo's justfile imports blueprint-rendered parts; `import`, not `mod`
-statement: The gate's common recipes are files `blueprint render` writes per stack; the repo's justfile imports them (`import`, not `mod`) and owns the rest; `render --check` is the drift check.
+statement: The gate's common recipes are files `blueprint gate render` writes per stack; the repo's justfile imports them (`import`, not `mod`) and owns the rest; `render --check` is the drift check.
 concerns: [gate, stack]
 status: accepted
 decided_by: owner
 updated: 2026-11-20
-distilled_into: blueprint render.py and just/*.just (the parts), `blueprint render` and `blueprint render --check`, the `render` gate recipe; mission blueprint-multi-stack-contracts task 8
+distilled_into: blueprint gate render.py and just/*.just (the parts), `blueprint gate render` and `blueprint gate render --check`, the `render` gate recipe; mission blueprint-multi-stack-contracts task 8
 ---
 
 # 0029 — the justfile imports blueprint-rendered parts
 
 ## Decision
 
-- `blueprint render` writes `.blueprint/base.just` (the gate: `check`, `guard`, `preset`, `render`, `blueprint`, `steps`, `tools`, ...) and one
+- `blueprint gate render` writes `.blueprint/base.just` (the gate: `check`, `guard`, `preset`, `render`, `blueprint`, `steps`, `tools`, ...) and one
   `.blueprint/<stack>.just` per detected stack that has a part (python, shell). Plain text, deterministic: the same repo gives the same bytes,
   so a Rust blueprint can render the same files.
 - The repo's `justfile` keeps `set allow-duplicate-recipes` and one `import '.blueprint/<part>.just'` per part, and owns everything else.
-  `blueprint render` adds missing imports and never rewrites the rest.
+  `blueprint gate render` adds missing imports and never rewrites the rest.
 - Extension points: a recipe defined in the repo's justfile replaces the base or stack recipe of the same name; `check-extra` (private,
   empty in the base) runs one more thing in the gate.
-- `blueprint render --check` (the `render` recipe, a step of `check`) fails when a part differs from what would be rendered, is missing,
-  belongs to a stack the repo no longer has, or is not imported. The recipe-set axis of `blueprint preset` is retired: it compared recipe
+- `blueprint gate render --check` (the `render` recipe, a step of `check`) fails when a part differs from what would be rendered, is missing,
+  belongs to a stack the repo no longer has, or is not imported. The recipe-set axis of `blueprint gate preset` is retired: it compared recipe
   names, which the rendered parts now fix.
-- `blueprint test` is the one entry for the stack's tests: the adapter plans, `any-gate test` skips what passed and queues for the slot, the
-  adapter's runner runs the rest. The python part's `test` recipe is `uv run blueprint test`.
+- `blueprint gate test` is the one entry for the stack's tests: the adapter plans, `any-gate test` skips what passed and queues for the slot, the
+  adapter's runner runs the rest. The python part's `test` recipe is `uv run blueprint gate test`.
 
 ## Why `import`, not `mod` (spike on just 1.58, 2026-11-20, two stacks)
 

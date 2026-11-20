@@ -1,13 +1,13 @@
 """Guard: a consumer's linter config matches the shelf's, or says why not.
 
 The shelf's `pyproject.toml` IS the linter preset (ADR 0004) and a consumer inherits it by **copying**: "inherit the judgment, own the
-result". That resolution also says drift is acceptable *and visible*. `tools/onboard/linter_preset.py` is append-only by design, so it
+result". That resolution also says drift is acceptable *and visible*. `blueprint init` is append-only by design, so it
 reports "already current" for a repo missing two whole rule families, which is how ten repos here reached ten different rule sets with no
 one deciding to.
 
 This closes that loop without taking the ownership away. It compares two axes (`[tool.ruff.lint] select`/`ignore`,
 and `[tool.pyrefly.errors]`) plus the ruff and pyrefly versions both `uv.lock` files hold and the shared `[tool.shelf-size]` caps. The
-justfile is not compared here: its parts are rendered, and `blueprint render --check` is the drift check on them (ADR 0029). Size
+justfile is not compared here: its parts are rendered, and `blueprint gate render --check` is the drift check on them (ADR 0029). Size
 differences always fail; other differences fail unless the consumer declares them in its own::
 
     [tool.shelf-preset]
@@ -25,7 +25,7 @@ file's `[lint]` is compared), and a shadowed block fails unless `ruff-config-sha
 Deliberately NOT compared: `per-file-ignores` keys and `sub-config` matches. Those are paths, and a consumer's tree is not the shelf's.
 
 The reference is `preset.toml` beside this file: a snapshot of the shelf's own config, so a consumer needs no shelf clone. The shelf
-regenerates it with `blueprint preset --refresh` and a test fails when it is stale.
+regenerates it with `tools/preset_refresh.py` (not shipped) and a test fails when it is stale.
 
 Exit codes: 0 no undeclared drift · 1 drift · 2 could not check (unreadable reference or config). A check that cannot run is never a pass.
 """
@@ -99,35 +99,29 @@ def snapshot(shelf: Path) -> dict[str, Any]:
     }
 
 
-def _value(value: Any) -> str:
-    if isinstance(value, list):
-        return "[" + ", ".join(_value(v) for v in value) + "]"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, int):
-        return str(value)
-    return '"' + str(value).replace("\\", "\\\\").replace('"', '\\"') + '"'
+def toml_value(item: Any) -> str:
+    if isinstance(item, list):
+        return "[" + ", ".join(toml_value(v) for v in item) + "]"
+    if isinstance(item, bool):
+        return "true" if item else "false"
+    if isinstance(item, int):
+        return str(item)
+    return '"' + str(item).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def render(snap: dict[str, Any]) -> str:
     """The snapshot as TOML text: plain, so any reader of it (a Rust blueprint included) needs no Python."""
-    lines = ["# The shelf's linter preset, derived from its own files by `blueprint preset --refresh`. Never hand-edit.", ""]
-    lines += [f"{key} = {_value(val)}" for key, val in snap.items() if not isinstance(val, dict)]
+    lines = ["# The shelf's linter preset, derived from its own files. Never hand-edit.", ""]
+    lines += [f"{key} = {toml_value(val)}" for key, val in snap.items() if not isinstance(val, dict)]
     for key, val in snap.items():
         if isinstance(val, dict):
-            lines += ["", f"[{key}]", *(f"{name} = {_value(item)}" for name, item in sorted(val.items()))]
+            lines += ["", f"[{key}]", *(f"{name} = {toml_value(item)}" for name, item in sorted(val.items()))]
     return "\n".join(lines) + "\n"
 
 
 def is_shelf(repo: Path) -> bool:
     """The repo that owns the snapshot (it holds `preset.toml` in its blueprint package): it IS the preset, so it compares to nothing."""
     return (repo / "packages" / "blueprint" / "src" / "blueprint" / REFERENCE.name).is_file()
-
-
-def refresh(shelf: Path) -> Path:
-    path = shelf / "packages" / "blueprint" / "src" / "blueprint" / REFERENCE.name
-    path.write_text(render(snapshot(shelf)))
-    return path
 
 
 def _compare(axis: str, shelf: set[str], consumer: set[str], declared: dict[str, Any]) -> list[str]:
@@ -167,7 +161,7 @@ def _shadow(consumer: dict[str, Any], ruff_file: str | None, declared: dict[str,
 
 
 def check(repo: Path, reference_file: Path | None = None) -> int:
-    """Compare `repo` with the preset; the exit code of `blueprint preset`."""
+    """Compare `repo` with the preset; the exit code of `blueprint gate preset`."""
     consumer_toml = repo / "pyproject.toml"
     if not consumer_toml.is_file():
         sys.stderr.write(f"preset-drift: no pyproject.toml at {repo} -- CANNOT VERIFY, not a pass\n")

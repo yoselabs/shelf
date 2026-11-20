@@ -112,7 +112,7 @@ def test_a_hook_resolved_through_a_shelf_clone_fails(repo: Repo, path: str) -> N
 
 
 def test_a_hook_through_a_pinned_dependency_passes_the_clone_check(repo: Repo) -> None:
-    assert _rows(repo, _GOOD + _hook("guard", "uv run blueprint guard"))["hooks.no-clone-path"][0] is Verdict.PASSING
+    assert _rows(repo, _GOOD + _hook("guard", "uv run blueprint gate guard"))["hooks.no-clone-path"][0] is Verdict.PASSING
 
 
 def test_a_gate_hook_that_can_be_skipped_fails(repo: Repo) -> None:

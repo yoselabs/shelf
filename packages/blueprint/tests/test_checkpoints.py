@@ -1,4 +1,4 @@
-"""`blueprint checkpoints`: every checkpoint, what it checks, and the fact that turns it on."""
+"""`blueprint check --list`: every checkpoint, what it checks, and the fact that turns it on."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from blueprint.__main__ import main
 
 
 def _rows(capsys: pytest.CaptureFixture[str], *args: str) -> list[dict[str, str]]:
-    assert main(["checkpoints", "--json", *args]) == 0
+    assert main(["check", "--list", *args[:1], "--json"] if args else ["check", "--list", "--json"]) == 0
     rows: list[dict[str, str]] = json.loads(capsys.readouterr().out)
     return rows
 
@@ -23,7 +23,7 @@ def test_lists_registered_and_profile_checkpoints_with_their_turning_on_fact(cap
 
 
 def test_the_plain_table_names_the_columns(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["checkpoints", "stack.dockerfile"]) == 0
+    assert main(["check", "--list", "stack.dockerfile"]) == 0
     out = capsys.readouterr().out
     assert out.splitlines()[0].split() == ["ID", "STATEMENT", "TURNED", "ON", "BY"]
     assert "stack.dockerfile.linter" in out
@@ -35,14 +35,14 @@ def test_a_prefix_filters_by_id(capsys: pytest.CaptureFixture[str]) -> None:
     assert all(i.startswith("stack.dockerfile") for i in ids)
 
 
-def test_help_exits_zero_with_a_description(capsys: pytest.CaptureFixture[str]) -> None:
+def test_help_exits_zero_and_names_the_list_flag(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as stop:
-        main(["checkpoints", "--help"])
+        main(["check", "--help"])
     assert stop.value.code == 0
-    assert "checkpoint" in capsys.readouterr().out
+    assert "--list" in capsys.readouterr().out
 
 
 def test_an_unknown_flag_exits_two() -> None:
     with pytest.raises(SystemExit) as stop:
-        main(["checkpoints", "--nope"])
+        main(["check", "--nope"])
     assert stop.value.code == 2

@@ -1,4 +1,4 @@
-"""`blueprint checkpoints`: every checkpoint blueprint can report, with the fact that turns it on.
+"""`blueprint check --list`: every checkpoint blueprint can report, with the fact that turns it on.
 
 Two sources: the registered checks (`model.REGISTRY`) and the rows the stack and framework profiles
 produce at run time (`stack.<stack>.<role>`, `framework.<name>.<role>`). Nothing is judged here and no

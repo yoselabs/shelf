@@ -189,8 +189,8 @@ def test_red_rows_from_a_provisional_profile_reach_the_reports_as_owner_rows(rep
     assert line.rstrip().endswith("| owner |")
 
 
-def test_the_gate_form_lists_only_what_is_not_passing(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
-    main(["check", "--repo", str(repo.root), "--gate"])
+def test_the_brief_form_lists_only_what_is_not_passing(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    main(["check", "--repo", str(repo.root), "--brief"])
     out = capsys.readouterr().out
     assert "gate.one-command -- not set up" in out
     assert out.strip().splitlines()[-1].startswith("blueprint: ")
@@ -208,13 +208,11 @@ def test_the_summary_without_audit_says_it_omits_audit_rows_and_matches_the_read
     capsys.readouterr()
     readme = (repo.root / "docs/blueprint/README.md").read_text()
 
-    main(["check", "--repo", root, "--concern", "scratch", "--audit", "--summary"])
-    audited = capsys.readouterr().out
+    audited = report.summary(run(repo.root, concern="scratch", audit=True, env=repo.env))
     assert audited.strip() in readme
     assert "| scratch | 0 | 1 |" in audited
 
-    main(["check", "--repo", root, "--concern", "scratch", "--summary"])
-    bare = capsys.readouterr().out
+    bare = report.summary(run(repo.root, concern="scratch", env=repo.env))
     assert "| scratch |" not in bare
     assert "audit-only checkpoints not run: 1" in bare
     assert "--audit" in bare
