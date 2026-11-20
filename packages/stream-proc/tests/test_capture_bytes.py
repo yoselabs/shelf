@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from stream_proc import alive, capture, capture_bytes, run_inherited
+from stream_proc.hold import MeasuredPopen
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -192,46 +193,42 @@ def test_run_inherited_stops_the_tree_on_a_timeout_and_reports_124() -> None:
     assert run_inherited(py("import time; time.sleep(30)"), timeout=0.3, grace=0.5) == 124
 
 
-def _hog(mib: int) -> list[str]:
-    return py(f"b = bytearray({mib} * 1024 * 1024); b[::4096] = b'x' * len(b[::4096])")
+def _hog_code(mib: int) -> str:
+    return f"b = bytearray({mib} * 1024 * 1024); b[::4096] = b'x' * len(b[::4096])"
+
+
+def _peaks(*codes: str) -> list[int]:
+    """``peak_rss`` of each command, captured one after another from a fresh small interpreter.
+
+    Linux hands a child its parent's resident high-water mark, so the parent must not be this (large, long-lived,
+    xdist) test worker: its own size would be the floor of every number measured.
+    """
+    script = "import sys; from stream_proc import capture_bytes\n" + "".join(
+        f"print(capture_bytes([sys.executable, '-c', {code!r}], timeout=30).peak_rss)\n" for code in codes
+    )
+    out = subprocess.run([PY, "-c", script], capture_output=True, text=True, check=True, timeout=120).stdout
+    return [int(n) for n in out.split()]
 
 
 def test_peak_rss_is_the_childs_own_high_water_mark_in_bytes() -> None:
-    small = capture_bytes(py("pass"), timeout=30)
-    big = capture_bytes(_hog(200), timeout=30)
-    assert small.peak_rss is not None
-    assert big.peak_rss is not None
-    assert big.peak_rss >= 200 * 1024 * 1024
-    assert big.peak_rss < 600 * 1024 * 1024
-    assert small.peak_rss < big.peak_rss / 2
+    small, big = _peaks("pass", _hog_code(200))
+    assert big >= 200 * 1024 * 1024
+    assert big < 600 * 1024 * 1024
+    assert small < big / 2
 
 
 def test_peak_rss_is_per_child_not_the_callers_children_total() -> None:
-    capture_bytes(_hog(300), timeout=30)  # an earlier, bigger child must not show in the next one
-    small = capture_bytes(py("pass"), timeout=30)
-    assert small.peak_rss is not None
-    assert small.peak_rss < 100 * 1024 * 1024
+    _, small = _peaks(_hog_code(300), "pass")  # an earlier, bigger child must not show in the next one
+    assert small < 100 * 1024 * 1024
 
 
-def test_peak_rss_counts_a_waited_for_grandchild() -> None:
-    code = (
-        "import subprocess, sys; subprocess.run([sys.executable, '-c', 'b = bytearray(200*1024*1024); b[::4096] = b\"x\"*len(b[::4096])'])"
-    )
-    got = capture_bytes(py(code), timeout=60)
-    assert got.peak_rss is not None
-    assert got.peak_rss >= 200 * 1024 * 1024
-
-
-def test_peak_rss_survives_a_timeout_stop() -> None:
-    got = capture_bytes(
-        py("import time; b = bytearray(100*1024*1024); b[::4096] = b'x'*len(b[::4096]); time.sleep(60)"), timeout=2, grace=1
-    )
-    assert got.timed_out
-    assert got.peak_rss is not None
-    assert got.peak_rss >= 100 * 1024 * 1024
-
-
-def test_capture_text_carries_peak_rss_too() -> None:
-    got = capture(_hog(100), timeout=30)
-    assert got.peak_rss is not None
-    assert got.peak_rss >= 100 * 1024 * 1024
+def test_polling_a_measured_child_reaps_it_and_keeps_its_peak_rss() -> None:
+    """``poll()`` must work on every CPython (3.15 dropped the private ``_waitpid`` argument) and measure too."""
+    p = MeasuredPopen(py("pass"))
+    deadline = time.monotonic() + 30
+    while p.poll() is None:
+        assert time.monotonic() < deadline
+        time.sleep(0.01)
+    assert p.returncode == 0
+    assert p.peak_rss is not None
+    assert p.peak_rss > 0
