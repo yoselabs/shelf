@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint import report
-from blueprint.model import REGISTRY, Finding, FixedBy, Verdict, check, failing, passing
+from blueprint.model import REGISTRY, Context, Finding, FixedBy, Verdict, check, failing, passing
 from blueprint.runner import EXPIRY_NOTICE_DAYS, Row, run
 
 if TYPE_CHECKING:
@@ -159,3 +159,75 @@ def test_an_override_for_a_checkpoint_that_did_not_run_is_not_judged(repo: Repo,
     _override(repo, "scratch.slow")
     result = run(repo.root, concern="scratch", env=repo.env, today=date(2026, 11, 20))
     assert not any("passes without it" in n for n in result.notices)
+
+
+def _scoped(repo: Repo, check_id: str, scope: str) -> None:
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        f'[[override]]\nid = "{check_id}"\nscope = "{scope}"\nreason = "x"\nexpires = 2027-06-01\n',
+    )
+
+
+def _dead_notices(repo: Repo) -> list[str]:
+    result = run(repo.root, concern="scratch", env=repo.env, today=date(2026, 11, 20))
+    return [n for n in result.notices if "excuses nothing" in n]
+
+
+def test_a_scoped_override_that_excuses_an_offender_is_not_dead(repo: Repo, scratch: None) -> None:
+    @check("scratch.files", "files")
+    def _files(ctx: Context) -> Finding:
+        bad = [p for p in ("a.txt", "b.txt") if ctx.excused("scratch.files", p) is None]
+        return failing(", ".join(bad), "fix") if bad else passing("all excused")
+
+    _scoped(repo, "scratch.files", "a.txt")
+    assert _dead_notices(repo) == []
+
+
+def test_a_scoped_override_no_offender_matches_is_named(repo: Repo, scratch: None) -> None:
+    @check("scratch.files", "files")
+    def _files(ctx: Context) -> Finding:
+        return passing("nothing") if ctx.excused("scratch.files", "a.txt") is None else passing("excused")
+
+    _scoped(repo, "scratch.files", "gone/*.txt")
+    assert any("scratch.files" in n and "gone/*.txt" in n for n in _dead_notices(repo))
+
+
+def test_a_scoped_override_on_a_check_that_never_asks_is_named(repo: Repo, scratch: None) -> None:
+    @check("scratch.deaf", "never consults overrides")
+    def _deaf(_ctx: object) -> Finding:
+        return failing("red", "fix")
+
+    _scoped(repo, "scratch.deaf", "x.py")
+    assert any("scratch.deaf" in n for n in _dead_notices(repo))
+
+
+def test_a_detection_override_for_a_path_that_is_gone_is_named(repo: Repo) -> None:
+    repo.write("scripts/here.sh", "#!/bin/sh\n")
+    _scoped(repo, "detection", "scripts/gone.sh")
+    assert any("scripts/gone.sh" in n for n in _dead_notices_all(repo))
+    _scoped(repo, "detection", "scripts/here.sh")
+    assert _dead_notices_all(repo) == []
+
+
+def _dead_notices_all(repo: Repo) -> list[str]:
+    return [n for n in run(repo.root, env=repo.env, today=date(2026, 11, 20)).notices if "excuses nothing" in n]
+
+
+def test_an_override_naming_no_checkpoint_the_run_judged_is_named(repo: Repo, scratch: None) -> None:
+    @check("scratch.real", "real")
+    def _real(_ctx: object) -> Finding:
+        return failing("red", "fix")
+
+    _override(repo, "scratch.renamed-away")
+    result = run(repo.root, env=repo.env, today=date(2026, 11, 20))
+    assert any("scratch.renamed-away" in n and "names no checkpoint" in n for n in result.notices)
+
+
+def test_an_override_for_a_checkpoint_skipped_without_audit_is_not_an_orphan(repo: Repo, scratch: None) -> None:
+    @check("scratch.slow", "audit only", audit_only=True)
+    def _slow(_ctx: object) -> Finding:
+        return failing("red", "fix")
+
+    _override(repo, "scratch.slow")
+    assert not any("names no checkpoint" in n for n in run(repo.root, env=repo.env, today=date(2026, 11, 20)).notices)
+    assert not any("names no checkpoint" in n for n in run(repo.root, concern="scratch", env=repo.env, today=date(2026, 11, 20)).notices)
