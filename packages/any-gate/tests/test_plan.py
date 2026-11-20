@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+
 import pytest
-from any_gate import Resources, too_wide, workers
+from any_gate import Resources, detect, too_wide, workers
 
 
 @pytest.mark.parametrize(
@@ -34,3 +37,12 @@ def test_the_cap_and_the_size_of_a_worker_are_the_callers_to_change() -> None:
 )
 def test_a_selection_over_half_of_everything_is_too_wide(selected: int, total: int, wide: bool) -> None:
     assert too_wide(selected, total) is wide
+
+
+def test_a_box_without_available_pages_reports_the_memory_vm_stat_calls_free(monkeypatch: pytest.MonkeyPatch) -> None:
+    # macOS has no SC_AVPHYS_PAGES; every gate run there died in detect() before this.
+    vm_stat = "Pages free: 100.\nPages inactive: 50.\nPages speculative: 10.\nPages active: 999999.\n"
+    monkeypatch.setattr(os, "sysconf_names", {"SC_PAGE_SIZE": 0})
+    monkeypatch.setattr(os, "sysconf", lambda name: 16384)
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout=vm_stat))
+    assert detect().ram_gb == pytest.approx(160 * 16384 / 1024**3)

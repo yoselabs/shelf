@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 import os
+import re
+import subprocess
 from dataclasses import dataclass
 
 __all__ = ["Resources", "detect", "too_wide", "workers"]
@@ -25,8 +27,16 @@ class Resources:
 def detect() -> Resources:
     """The cores this process may use and the memory the box has free to give."""
     cpus = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
-    pages, size = os.sysconf("SC_AVPHYS_PAGES"), os.sysconf("SC_PAGE_SIZE")
-    return Resources(cpus=cpus, ram_gb=pages * size / 1024**3)
+    return Resources(cpus=cpus, ram_gb=_free_gb())
+
+
+def _free_gb() -> float:
+    size = os.sysconf("SC_PAGE_SIZE")
+    if "SC_AVPHYS_PAGES" in os.sysconf_names:
+        return os.sysconf("SC_AVPHYS_PAGES") * size / 1024**3
+    out = subprocess.run(["vm_stat"], capture_output=True, text=True, check=False).stdout  # macOS has no SC_AVPHYS_PAGES
+    pages = sum(int(m[1]) for m in re.finditer(r"Pages (?:free|inactive|speculative):\s+(\d+)", out))
+    return pages * size / 1024**3
 
 
 def workers(
