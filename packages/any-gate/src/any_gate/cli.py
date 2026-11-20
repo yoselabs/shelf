@@ -12,14 +12,15 @@ push does not run the gate again on the exact content that just passed it. `pre-
 is pushed (`PRE_COMMIT_TO_REF`, when the hook runner gives it) and its key is recorded; anything else runs CMD in place of this process.
 Outside a git repo `start` and `passed` do nothing and `pre-push` runs CMD.
 
-`python -m any_gate test`: run the suites a plan lists that have not already passed, one box slot at a time.
+`python -m any_gate test [OPTIONS] -- RUNNER...`: run the units a plan lists that have not already passed, one box slot at a time.
 
-The plan arrives on stdin, one suite per line: `path<TAB>key`. The path is what pytest is given; the key says what the suite's result
-depends on (empty: never skip it). A suite whose key is in the receipts file already passed on exactly that input and is skipped. The rest
-run in one `run_tests` under a lease, so gates started at once queue instead of thrashing the box; when they pass, each is recorded. Exit
-0: green or nothing to run; 1: a test failed or a run was stopped; 2: usage. Notices go to the descriptor in `$GATE_NOTICE_FD` when open
-(the gate's parallel runner points it at its terminal), else to stderr. The suite and its tests run through the language-neutral plan
-and receipts formats; only the pytest stages are Python's.
+The plan arrives on stdin, one unit per line: `unit<TAB>key`. The unit is what the runner is given; the key says what its result
+depends on (empty: never skip it). A unit whose key is in the receipts file already passed on exactly that input and is skipped. The rest
+are passed to `RUNNER` (any command taking the units as its last arguments and exiting 0 when they are green) under a lease, so gates
+started at once queue instead of thrashing the box; when it exits 0, each is recorded. Exit 0: green or nothing to run; 1: the runner
+failed or was stopped by the wall or idle limit; 2: usage. Notices go to the descriptor in `$GATE_NOTICE_FD` when open (the gate's
+parallel runner points it at its terminal), else to stderr. The core knows no language: the plan, the receipts and the runner contract
+are all it uses.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ from any_lease import Leases
 
 from any_gate import changed as changed_files
 from any_gate.receipts import Receipts
-from any_gate.run import Outcome, run_tests
+from any_gate.runner import RunResult, run_runner
 from any_gate.state import GateState, common_dir
 from any_gate.steps import GATE_BUDGET, STEP_BUDGET, run_and_report
 
@@ -99,8 +100,8 @@ def _lease_root(given: str | None) -> Path:
     return Path(os.environ.get("GATE_LEASE_ROOT") or Path(cache) / "gate-leases")
 
 
-def _run_under_lease(args: argparse.Namespace, paths: list[str]) -> Outcome:
-    """Queue for a test slot, saying who holds it, then run `paths` in stages while holding it."""
+def _run_under_lease(args: argparse.Namespace, units: list[str]) -> RunResult:
+    """Queue for a test slot, saying who holds it, then run `units` through the runner while holding it."""
     cwd = Path(args.cwd).resolve()
     said = False
 
@@ -114,11 +115,13 @@ def _run_under_lease(args: argparse.Namespace, paths: list[str]) -> Outcome:
     with Leases(_lease_root(args.lease_root)).acquire(LEASE_NAME, args.slots, label=f"gate in {cwd}", on_wait=waiting) as held:
         if held.waited >= 1:
             notice(f"got a test slot after {held.waited:.0f}s")
-        workers = None if args.workers == "auto" else int(args.workers)
-        return run_tests(paths, cwd=cwd, workers=workers, wall=args.wall, idle=args.idle, on_output=_show, extra=args.pytest_args)
+        return run_runner(args.runner, units, cwd=cwd, wall=args.wall, idle=args.idle, on_output=_show)
 
 
 def _test(args: argparse.Namespace, stdin: TextIO) -> int:
+    if not args.runner:
+        notice("test: give the runner command after --")
+        return 2
     try:
         plan = parse_plan(stdin.read())
     except PlanError as err:
@@ -135,11 +138,8 @@ def _test(args: argparse.Namespace, stdin: TextIO) -> int:
         notice("nothing to run")
         return 0
     outcome = _run_under_lease(args, [path for path, _ in todo])
-    stopped = [f"{stage.name} stopped by the {stage.stopped} limit" for stage in outcome.stages if stage.stopped]
-    for line in stopped:
-        notice(line)
-    if outcome.quarantined_failed:
-        notice("a quarantined test failed: reported, not blocking")
+    if outcome.stopped:
+        notice(f"the runner was stopped by the {outcome.stopped} limit")
     if not outcome.ok:
         return 1
     for path, key in todo:
@@ -204,11 +204,10 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
     )
     test.add_argument("--lease-root", help="the lease folder (default $GATE_LEASE_ROOT, else ~/.cache/gate-leases)")
     test.add_argument("--slots", type=int, default=1, help="runs allowed at once on this box (default 1)")
-    test.add_argument("--workers", default="auto", help="pytest workers: a number, or auto (sized to the tests and the box)")
-    test.add_argument("--wall", type=float, default=3600.0, help="seconds a stage may take before its tree is stopped")
-    test.add_argument("--idle", type=float, default=600.0, help="seconds a stage may stay silent before its tree is stopped")
-    test.add_argument("--cwd", default=".", help="where pytest runs (default: here)")
-    test.add_argument("pytest_args", nargs=argparse.REMAINDER, metavar="-- PYTEST_ARGS", help="passed to every pytest stage")
+    test.add_argument("--wall", type=float, default=3600.0, help="seconds the runner may take before its tree is stopped")
+    test.add_argument("--idle", type=float, default=600.0, help="seconds the runner may stay silent before its tree is stopped")
+    test.add_argument("--cwd", default=".", help="where the runner runs (default: here)")
+    test.add_argument("runner", nargs=argparse.REMAINDER, metavar="-- RUNNER", help="the command; the units are appended to it")
     for verb, help_text in (
         ("start", "note the working tree as a gate begins"),
         ("passed", "record the noted tree as green for a gate, if it is unchanged"),
@@ -243,5 +242,5 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
         return _changed(args)
     if args.command != "test":
         return _state(args)
-    args.pytest_args = args.pytest_args[1:] if args.pytest_args[:1] == ["--"] else args.pytest_args
+    args.runner = args.runner[1:] if args.runner[:1] == ["--"] else args.runner
     return _test(args, stdin if stdin is not None else sys.stdin)

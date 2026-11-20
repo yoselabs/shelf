@@ -220,7 +220,7 @@ test-affected:
     #!/usr/bin/env bash
     set -euo pipefail
     receipts="$(git rev-parse --path-format=absolute --git-common-dir)/gate-receipts.json"
-    uv run python -m any_gate_python --explain --plan | uv run python -m any_gate test --receipts "$receipts" --lease-root {{ lease_root }} -- -p no:cov
+    uv run python -m any_gate_python plan --explain --plan | uv run python -m any_gate test --receipts "$receipts" --lease-root {{ lease_root }} -- uv run python -m any_gate_python run --pytest-args="-p no:cov"
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. CI runs

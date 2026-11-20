@@ -5,6 +5,7 @@ findings; cross-package body duplication blocks too (Article III, no redundancy)
 private-name collisions are not checked: the same name over different bodies is not redundancy.
 """
 
+import functools
 import re
 import sys
 import tomllib
@@ -19,6 +20,12 @@ sys.path.insert(0, str(_ROOT / "tools"))
 import arch_rules  # noqa: E402  -- path-injected tool module, imported after sys.path setup
 
 _PACKAGES = _ROOT / "packages"
+
+
+@functools.cache
+def _live_facts() -> list[arch_rules.FunctionFact]:
+    """The shelf's own functions, parsed once per process: three tests read them (the patched-path fixtures parse their own)."""
+    return arch_rules.function_facts()
 
 
 def _normalize(name: str) -> str:
@@ -95,7 +102,7 @@ def test_no_runtime_dep_without_upper_bound() -> None:
 
 def test_no_intra_package_body_duplication() -> None:
     # RG001 — copy-pasted / renamed-but-identical bodies WITHIN one package should be one function.
-    facts = arch_rules.function_facts()
+    facts = _live_facts()
     allowed = _body_dup_pairs()
     dups = [
         (a.file, a.name, b.file, b.name)
@@ -108,7 +115,7 @@ def test_no_intra_package_body_duplication() -> None:
 def test_no_cross_package_body_duplication() -> None:
     # Article III — one implementation of a behaviour per repo. No allowlist: the only exits are
     # lifting the shared body to one package or fixing the check.
-    dups = [(a.file, a.name, b.file, b.name) for a, b in arch_rules.body_dups(arch_rules.function_facts(), cross_package=True)]
+    dups = [(a.file, a.name, b.file, b.name) for a, b in arch_rules.body_dups(_live_facts(), cross_package=True)]
     assert not dups, (
         f"function bodies duplicated across packages (lift the shared body to one package; filing a task does not pass the gate): {dups}"
     )
@@ -152,7 +159,7 @@ def test_cross_package_check_passes_bodies_of_a_different_shape(tmp_path: Path, 
 
 def test_no_intra_package_private_name_collision() -> None:
     # RG002 — the same private helper name in two files usually means a re-implementation.
-    facts = arch_rules.function_facts()
+    facts = _live_facts()
     allow = _allowlist("name_collision")
     collisions = [(a.file, b.file, a.name) for a, b in arch_rules.name_collisions(facts, cross_package=False) if a.name not in allow]
     assert not collisions, f"private helper names reused across files (lift to a shared module): {collisions}"

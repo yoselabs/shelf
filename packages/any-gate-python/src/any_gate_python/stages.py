@@ -11,11 +11,11 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
-from stream_proc import run as run_process
-
-from any_gate.lanes_plugin import PREFIX
 from any_gate.plan import detect
 from any_gate.plan import workers as plan_workers
+from stream_proc import run as run_process
+
+from any_gate_python.lanes_plugin import PREFIX
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -70,7 +70,7 @@ def _collect(
         "--collect-only",
         "-q",
         "-p",
-        "any_gate.lanes_plugin",
+        "any_gate_python.lanes_plugin",
         "--any-gate-report",
         "-p",
         "no:cacheprovider",
@@ -109,7 +109,18 @@ def run_tests(
     for name, alone in _STAGES:
         if name != "parallel" and name not in lanes:
             continue
-        cmd = [python, "-m", "pytest", "-p", "no:cacheprovider", "-q", "-p", "any_gate.lanes_plugin", f"--any-gate-lane={name}", *extra]
+        cmd = [
+            python,
+            "-m",
+            "pytest",
+            "-p",
+            "no:cacheprovider",
+            "-q",
+            "-p",
+            "any_gate_python.lanes_plugin",
+            f"--any-gate-lane={name}",
+            *extra,
+        ]
         if pool > 1 and not alone:
             cmd += ["-n", str(pool)]
         result = run_process([*cmd, *paths], cwd=cwd, env=env, on_stdout=on_output, on_stderr=on_output, timeout=wall, idle=idle)

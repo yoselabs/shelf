@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from any_gate import run as run_module
-from any_gate import run_tests
+from any_gate_python import stages as run_module
+from any_gate_python.stages import run_tests
 
 if TYPE_CHECKING:
     from collections.abc import Callable
