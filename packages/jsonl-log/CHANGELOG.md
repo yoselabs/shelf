@@ -7,3 +7,4 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 - 0.4.0: `append`/`append_at` on a file replaced under all 4 attempts: silent success ⇒ raises new `LineLostError(JsonlLogError)`
 - 0.4.0: `JsonlLog(path: str, rotate_lock=True)` AttributeError ⇒ accepted, `True` = `<path>.lock` for `Path` and `str`
 - 0.4.0: evicted held log: reopened descriptor kept (leaked) ⇒ closed after each append
+- 0.5.0: internal only, no contract change  ⇒  `HeldLogs._drop(key, evict=)` split into `_close(key)` and `_evict(key)` (no bool mode, Article III)

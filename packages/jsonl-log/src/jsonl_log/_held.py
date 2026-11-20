@@ -43,9 +43,9 @@ class HeldLogs:
                 raise ValueError(msg)
             if entry is None:
                 for k in [k for k, v in self._logs.items() if v[0] != pid]:
-                    self._drop(k)
+                    self._close(k)
                 while len(self._logs) >= MAX_OPEN:
-                    self._drop(next(iter(self._logs)), evict=True)
+                    self._evict(next(iter(self._logs)))
                 entry = (pid, JsonlLog.open(key, **cast("dict[str, Any]", options)), dict(options))
             self._logs[key] = entry
             return entry[1]
@@ -53,17 +53,22 @@ class HeldLogs:
     def close(self, path: Path | str | None) -> None:
         with self._lock:
             for key in list(self._logs) if path is None else [_key(path)]:
-                self._drop(key)
+                self._close(key)
 
     def count(self, path: Path | str | None) -> int:
         with self._lock:
             pid = os.getpid()
             return sum(1 for k, v in self._logs.items() if v[0] == pid and (path is None or k == _key(path)))
 
-    def _drop(self, key: str, *, evict: bool = False) -> None:
+    def _close(self, key: str) -> None:
         entry = self._logs.pop(key, None)
         if entry is not None:
-            entry[1].release_fd() if evict else entry[1].close()
+            entry[1].close()
+
+    def _evict(self, key: str) -> None:
+        entry = self._logs.pop(key, None)
+        if entry is not None:
+            entry[1].release_fd()
 
 
 HELD = HeldLogs()

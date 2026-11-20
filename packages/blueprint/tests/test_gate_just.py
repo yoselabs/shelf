@@ -166,7 +166,7 @@ def test_a_justfile_without_just_installed_is_not_checked_not_failed(repo: Repo)
 
 def test_the_pinned_just_in_the_repos_venv_is_used_when_none_is_on_path(repo: Repo) -> None:
     repo.write("justfile", "check:\n    true\n")
-    repo.write(".venv/bin/just", "#!/bin/sh\nexit 0\n", executable=True)
+    repo.write_executable(".venv/bin/just", "#!/bin/sh\nexit 0\n")
     repo.env["PATH"] = str(repo.bin_dir)
     rows = {r.id: r for r in run(repo.root, concern="gate", env=repo.env).rows}
     assert rows["gate.one-command"].verdict is Verdict.PASSING

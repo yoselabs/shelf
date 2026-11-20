@@ -3,11 +3,14 @@
 ruff FBT covers positional bools only. This check covers every function and method in `packages/*/src`
 that takes a parameter annotated `bool`, `bool | None` or `Optional[bool]` WITH a default, keyword-only
 included, private helpers included. A hit is keyed `package:function:parameter`, so one flag repeated on
-a Protocol, its real and fake implementations is one row. The rows below are the CURRENT hits; a new bool
-mode fails the gate, a row whose flag is gone must be deleted. Reason prefixes:
+a Protocol, its real and fake implementations is one row. The rows below are the CURRENT hits, triaged in docs/bool-modes-triage.md;
+a new bool mode fails the gate,
+a row whose flag is gone must be deleted. Reason prefixes:
 
-- `mode:` the flag picks between behaviours (a real optionality violation for the consumer waves to split)
-- `fact:` the flag carries a fact or states a safety opt-out about one call, not a second behaviour path
+- `split:` the flag picks between two behaviours of one operation; the reason names the separate type or function
+- `fact:` the flag is data about one call, one value or one error (or a third-party library's own option), not a code path
+- `exception:` a named, justified opt-in (cost, safety, durability) that Article III allows only as a row; each needs an
+  accepted ADR (ADR 0022) to be durable
 """
 
 import ast
@@ -43,9 +46,172 @@ def _rows(reason: str, *keys: str) -> dict[str, str]:
 
 
 _ALLOWED: dict[str, str] = {
-    # --- real modes: the flag chooses between behaviours ---
+    # --- split: the flag chooses between behaviours; a separate type or function is the fix ---
     **_rows(
-        "mode: an include/skip toggle that changes what the one operation gathers or waits for",
+        "split: one render() path that scrolls an infinite listing to the end; a2web consumes the Protocol",
+        "any-browser:render:scroll_to_stable",
+        "any-browser:_navigate:scroll_to_stable",
+    ),
+    **_rows(
+        "split: read-only vs appending is two types; a2kay consumes JsonlLog",
+        "jsonl-log:__init__:read_only",
+        "jsonl-log:open:read_only",
+    ),
+    **_rows(
+        "split: a read-only connection is another function; a2kay, anyembed, sqlite-store, fts-query consume connect()",
+        "sqlite-sidecar:connect:read_only",
+    ),
+    **_rows(
+        "split: naive vs tz-aware result is two return types; a2kay consumes from_text",
+        "sqlite-sidecar:from_text:aware",
+    ),
+    **_rows(
+        "split: reentrant vs exclusive acquire are two lock semantics; a2kay consumes acquire",
+        "process-lock:acquire:reentrant",
+    ),
+    **_rows(
+        "split: keep_mode picks between two permission behaviours; consumers a2kay, any-frontmatter, any-net, dir-trust",
+        "atomic-io:atomic_write_bytes:keep_mode",
+        "atomic-io:atomic_write_json:keep_mode",
+        "atomic-io:atomic_write_text:keep_mode",
+    ),
+    **_rows(
+        "split: the flag duplicates child_env.without_venv(scrub(...)); a second path to one result",
+        "child-env:scrub:strip_venv",
+        "child-env:scrub_current:strip_venv",
+    ),
+    **_rows(
+        "split: create=True is a lookup plus a mkdir; the lookup stays pure",
+        "app-dirs:data_dir:create",
+        "app-dirs:cache_dir:create",
+        "app-dirs:config_dir:create",
+        "app-dirs:state_dir:create",
+    ),
+    **_rows(
+        "split: plugin_data=True swaps the base-directory policy; it is a second resolver",
+        "app-dirs:data_dir:plugin_data",
+        "app-dirs:cache_dir:plugin_data",
+        "app-dirs:config_dir:plugin_data",
+        "app-dirs:state_dir:plugin_data",
+    ),
+    **_rows(
+        "split: check_yield=False means the source size is not comparable to text length; a2kay consumes grade",
+        "convert-md:_result:check_yield",
+        "convert-md:grade:check_yield",
+    ),
+    **_rows(
+        "split: json_only picks between two strippers; a2kay and a2web consume llm-wobble",
+        "llm-wobble:strip_fenced_blocks:json_only",
+    ),
+    **_rows(
+        "split: strip_fences skips a step the caller can do; a2kay and a2web consume llm-wobble",
+        "llm-wobble:parse_list_with_policy:strip_fences",
+    ),
+    **_rows(
+        "split: choices=True is a compatibility switch between two flag shapes; ogy consumes verb-cli",
+        "verb-cli:flags_of:choices",
+    ),
+    **_rows(
+        "split: fallback=False returns the first survivor instead of the composed provider; a2kay and a2web consume resolve_provider",
+        "anyllm:resolve_provider:fallback",
+    ),
+    **_rows(
+        "split: audit vs gate is two entry points over one check list",
+        "blueprint:run:audit",
+    ),
+    **_rows(
+        "split: capture=False inherits stdio instead of capturing; a second operation",
+        "stream-proc:capture_bytes:capture",
+    ),
+    **_rows(
+        "split: _hit(group=) sends to the pid only or to its group too; the call site computes the flag",
+        "stream-proc:_hit:group",
+    ),
+    **_rows(
+        "split: the same call, two policies for a missing target; the codebase already returns outcome values (NothingToRecord)",
+        "git-porcelain:abort_rebase:missing_ok",
+        "git-porcelain:continue_rebase:missing_ok",
+        "git-porcelain:delete_remote_at:missing_ok",
+        "git-porcelain:drop_worktree:missing_ok",
+    ),
+    **_rows(
+        "split: raising vs returning the exit code is two functions (run / try_run)",
+        "git-porcelain:run:check",
+        "git-porcelain:run_git:check",
+    ),
+    **_rows(
+        "split: memo(forever=False) is a second cache lifetime (until the next write)",
+        "git-porcelain:memo:forever",
+    ),
+    **_rows(
+        "split: the fake's fetch(retry=False) skips ref races the real fetch always retries; a flag only the fake has",
+        "git-porcelain:fetch:retry",
+    ),
+    **_rows(
+        "split: stage_conflicts and check_markers turn continue_rebase into a resolve-and-continue operation",
+        "git-porcelain:continue_rebase:check_markers",
+        "git-porcelain:continue_rebase:stage_conflicts",
+    ),
+    **_rows(
+        "split: literal=False is pathspec staging, another operation",
+        "git-porcelain:stage:literal",
+    ),
+    **_rows(
+        "split: push=True reads the push URL, git's separate `get-url --push`",
+        "git-porcelain:remote_url:push",
+        "git-porcelain:remote_urls:push",
+    ),
+    # --- exceptions: a named, justified opt-in (needs an accepted ADR, ADR 0022) ---
+    **_rows(
+        "exception: durability tier of one write (fsync or not); the default is the safe one, off is "
+        "for caches and hot state; needs an ADR row (ADR 0022)",
+        "any-json-doc:__init__:fsync",
+        "atomic-io:atomic_write_bytes:fsync",
+        "atomic-io:atomic_write_json:fsync",
+        "atomic-io:atomic_write_text:fsync",
+    ),
+    **_rows(
+        "exception: a cost opt-in: the dirty flag needs one `git status` per worktree (Article IX: cost "
+        "makes it opt-in); needs an ADR row (ADR 0022)",
+        "git-porcelain:worktrees:with_dirty",
+    ),
+    **_rows(
+        "exception: a cost opt-in: the network ls-remote probe; check_push=False stays local and fast; needs an ADR row (ADR 0022)",
+        "git-porcelain:readiness:check_push",
+    ),
+    **_rows(
+        "exception: the safe default and a named opt-out that mirrors git's own flag for one "
+        "destructive or history-changing call; needs an ADR row (ADR 0022)",
+        "git-porcelain:add_worktree:force",
+        "git-porcelain:drop_worktree:force",
+        "git-porcelain:worktree_add:force",
+        "git-porcelain:push_refspecs:force",
+        "git-porcelain:push_request:force",
+        "git-porcelain:validate_push:force",
+        "git-porcelain:push_refspecs:allow_delete",
+        "git-porcelain:push_request:allow_delete",
+        "git-porcelain:validate_push:allow_delete",
+        "git-porcelain:clean:ignored",
+        "git-porcelain:clean:nested",
+        "git-porcelain:record:allow_empty",
+        "git-porcelain:record:hooks",
+        "git-porcelain:park:keep_ignored",
+        "beads-client:unclaim:force",
+        "beads-client:reclaim:any_replica",
+    ),
+    **_rows(
+        "exception: whether a repo observation is cached, chosen once at construction, for fresh reads; needs an ADR row (ADR 0022)",
+        "git-porcelain:__init__:memoize",
+    ),
+    **_rows(
+        "exception: pin=False skips the checkout's environment pin for one call (the runner's own "
+        "escape hatch); needs an ADR row (ADR 0022)",
+        "git-porcelain:run:pin",
+    ),
+    # --- facts: data about one call, value or error ---
+    **_rows(
+        "fact: the include/skip choice is trafilatura's own extraction option, passed through; the page "
+        "decides which regions are boilerplate",
         "content-extract:_extract_sync:include_comments",
         "content-extract:_extract_sync:include_links",
         "content-extract:_extract_sync:include_tables",
@@ -58,107 +224,61 @@ _ALLOWED: dict[str, str] = {
         "convert-md:convert_html:include_comments",
         "convert-md:convert_html:include_links",
         "convert-md:convert_html:include_tables",
-        "any-browser:_navigate:scroll_to_stable",
-        "any-browser:render:scroll_to_stable",
-        "git-porcelain:worktrees:with_dirty",
+    ),
+    **_rows(
+        "fact: a plist value written verbatim (RunAtLoad, KeepAlive); the function renders data, it does not branch on it",
+        "launchd-agent:render_plist:keep_alive",
+        "launchd-agent:render_plist:run_at_load",
+    ),
+    **_rows(
+        "fact: a query predicate on one `bd list` call (mirrors bd's own --all)",
         "beads-client:find:include_closed",
     ),
     **_rows(
-        "mode: the flag switches an I/O strategy (durability, read-only, sort) on the same operation",
-        "any-json-doc:__init__:fsync",
-        "atomic-io:atomic_write_bytes:fsync",
-        "atomic-io:atomic_write_json:fsync",
-        "atomic-io:atomic_write_text:fsync",
-        "atomic-io:atomic_write_bytes:keep_mode",
-        "atomic-io:atomic_write_json:keep_mode",
-        "atomic-io:atomic_write_text:keep_mode",
+        "fact: json.dumps's own formatting option, passed through (like indent)",
         "atomic-io:atomic_write_json:sort_keys",
-        "jsonl-log:__init__:read_only",
-        "jsonl-log:open:read_only",
-        "jsonl-log:_drop:evict",
-        "sqlite-sidecar:connect:read_only",
+    ),
+    **_rows(
+        "fact: the connection's thread affinity, passed to sqlite3 as check_same_thread",
         "sqlite-store:_open:shared",
-        "process-lock:acquire:reentrant",
-        "git-porcelain:__init__:memoize",
-        "git-porcelain:memo:forever",
-        "git-porcelain:run:check",
-        "git-porcelain:run:pin",
-        "git-porcelain:run_git:check",
     ),
     **_rows(
-        "mode: a destructive-operation or error-handling opt-out; a second path through the same call",
-        "git-porcelain:abort_rebase:missing_ok",
-        "git-porcelain:continue_rebase:missing_ok",
-        "git-porcelain:delete_remote_at:missing_ok",
-        "git-porcelain:drop_worktree:missing_ok",
-        "git-porcelain:add_worktree:force",
-        "git-porcelain:drop_worktree:force",
-        "git-porcelain:worktree_add:force",
-        "git-porcelain:push_refspecs:force",
-        "git-porcelain:push_request:force",
-        "git-porcelain:validate_push:force",
-        "git-porcelain:push_refspecs:allow_delete",
-        "git-porcelain:push_request:allow_delete",
-        "git-porcelain:validate_push:allow_delete",
-        "git-porcelain:clean:ignored",
-        "git-porcelain:clean:nested",
-        "git-porcelain:fetch:retry",
-        "beads-client:unclaim:force",
-        "beads-client:reclaim:any_replica",
+        "fact: a field of the StopReport being built (the observation failed), not a code path",
+        "stream-proc:report:error",
     ),
     **_rows(
-        "mode: stage/hook/rebase behaviour toggled by the flag (update_refs is a tri-state: None defers to git config)",
-        "git-porcelain:record:allow_empty",
-        "git-porcelain:record:hooks",
-        "git-porcelain:continue_rebase:check_markers",
-        "git-porcelain:continue_rebase:stage_conflicts",
-        "git-porcelain:park:keep_ignored",
+        "fact: subprocess's own start_new_session, passed to Popen; no caller varies it",
+        "stream-proc:popen_registered:start_new_session",
+    ),
+    **_rows(
+        "fact: a property of the checkpoint (slow, or reads outside the repo), stored on Check, not a branch in the function",
+        "blueprint:check:audit_only",
+        "blueprint:check_each:audit_only",
+    ),
+    **_rows(
+        "fact: a Finding field: the blueprint itself cannot judge the row yet",
+        "blueprint:not_checked:blueprint_gap",
+    ),
+    **_rows(
+        "fact: the model's load-time hardware and network placement, passed to llama.cpp (n_gpu_layers) "
+        "and transformers (local_files_only)",
+        "anyembed:__init__:gpu",
+        "anyembed:__init__:offline",
+    ),
+    **_rows(
+        "fact: a request parameter of the completion call, like temperature, forwarded to the backend",
+        "anyllm:complete:thinking_disabled",
+    ),
+    **_rows(
+        "fact: git's own tri-state option (None defers to git config), passed through",
         "git-porcelain:rebase:update_refs",
         "git-porcelain:rebase_onto:update_refs",
         "git-porcelain:start_rebase:update_refs",
-        "git-porcelain:stage:literal",
-        "git-porcelain:readiness:check_push",
-        "git-porcelain:remote_url:push",
-        "git-porcelain:remote_urls:push",
     ),
     **_rows(
-        "mode: a feature toggle on one operation (render, include, strip, create, offline); consumer wave splits or defaults it",
+        "fact: how much of the child's output the message quotes (the tail or all of it); the failure is the same",
         "git-porcelain:unavailable:full_output",
-        "launchd-agent:render_plist:keep_alive",
-        "launchd-agent:render_plist:run_at_load",
-        "llm-wobble:parse_list_with_policy:strip_fences",
-        "llm-wobble:strip_fenced_blocks:json_only",
-        "verb-cli:flags_of:choices",
-        "sqlite-sidecar:from_text:aware",
-        "shelf-vendor:_say:err",
-        "stream-proc:_hit:group",
-        "stream-proc:report:error",
-        "blueprint:write:prune",
-        "blueprint:write:executable",
-        "blueprint:check:audit_only",
-        "blueprint:check_each:audit_only",
-        "blueprint:run:audit",
-        "blueprint:not_checked:blueprint_gap",
-        "app-dirs:data_dir:create",
-        "app-dirs:data_dir:plugin_data",
-        "app-dirs:cache_dir:create",
-        "app-dirs:config_dir:create",
-        "app-dirs:state_dir:create",
-        "app-dirs:cache_dir:plugin_data",
-        "app-dirs:config_dir:plugin_data",
-        "app-dirs:state_dir:plugin_data",
-        "child-env:scrub:strip_venv",
-        "child-env:scrub_current:strip_venv",
-        "anyembed:__init__:gpu",
-        "anyembed:__init__:offline",
-        "convert-md:_result:check_yield",
-        "convert-md:grade:check_yield",
-        "stream-proc:capture_bytes:capture",
-        "stream-proc:popen_registered:start_new_session",
-        "anyllm:complete:thinking_disabled",
-        "anyllm:resolve_provider:fallback",
     ),
-    # --- facts: the flag records something about one call or one error ---
     **_rows(
         "fact: whether the failure may be retried is data on the error, not a behaviour switch",
         "a2effect:__init__:retryable",
