@@ -10,12 +10,13 @@ can already stop the child.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import signal
 import subprocess
 import sys
 import threading
-from typing import TYPE_CHECKING, Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self, override
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -77,7 +78,9 @@ class MeasuredPopen(subprocess.Popen[bytes]):
     waited for itself; None until the child is reaped here. It is per child (``RUSAGE_CHILDREN`` would be the largest
     of every child this process ever waited for). A descendant that was never waited for by its parent
     (killed with the tree, or orphaned to init) is not in it, so for a tree it is a lower bound. Overrides
-    ``Popen._try_wait`` and ``_internal_poll``, the two places CPython reaps on POSIX.
+    ``Popen._try_wait`` (its signature is the same on CPython 3.12 to 3.15) and routes the public ``poll`` through
+    ``wait``. ``Popen._internal_poll`` is not overridden: its private ``_waitpid`` argument is gone in 3.15, and only
+    ``__del__`` still reaps through it (an unwaited child, which nobody measures).
     """
 
     peak_rss: int | None = None
@@ -94,8 +97,13 @@ class MeasuredPopen(subprocess.Popen[bytes]):
         except ChildProcessError:
             return self.pid, 0  # CPython's own answer when something else reaped it: dead, no status
 
-    def _internal_poll(self, _deadstate: int | None = None, **_: Any) -> int | None:
-        return super()._internal_poll(_deadstate, _waitpid=self._reap)  # type: ignore[call-arg]
+    @override
+    def poll(self) -> int | None:
+        """Public ``poll`` as a zero-timeout ``wait``, so it reaps through ``_try_wait`` and keeps the measurement."""
+        if self.returncode is None:
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                self.wait(timeout=0)
+        return self.returncode
 
 
 def popen_held(*args: Any, **kwargs: Any) -> tuple[MeasuredPopen, TermHold]:  # Any: passed through to subprocess.Popen unchanged

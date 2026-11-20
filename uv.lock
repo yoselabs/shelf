@@ -1367,7 +1367,7 @@ wheels = [
 
 [[package]]
 name = "blueprint"
-version = "0.9.0"
+version = "0.9.1"
 source = { editable = "packages/blueprint" }
 
 [package.dev-dependencies]
@@ -6352,7 +6352,7 @@ dev = [
 
 [[package]]
 name = "stream-proc"
-version = "0.12.0"
+version = "0.12.1"
 source = { editable = "packages/stream-proc" }
 
 [package.dev-dependencies]
