@@ -1,0 +1,97 @@
+# Stack profile (see python-uv.toml for the format). Go 1.2x with golangci-lint v2, late 2026.
+# Research: docs/research/blueprint-skill/research/node-go-rust-layering.md (architecture: tool, evidence URL, date, verdict).
+# The other roles are the current defaults, documented but never run here: provisional until a consumer runs the set red and green.
+stack = "go"
+status = "provisional"
+source = "node-go-rust-layering.md (2026-11-20, web research only, nothing run); no consumer yet"
+
+[[role]]
+role = "toolchain"
+tool = "go.mod with `go` and `toolchain` directives, go.sum committed, `go mod verify` in the gate"
+install = "go mod init; go mod tidy; set `go 1.x.y` and `toolchain go1.x.y` in go.mod; commit go.sum; the gate runs `go mod verify`"
+config = [{ path = "{root}/go.mod", contains = "toolchain" }, { path = "{root}/go.sum" }]
+gate = "go mod verify"
+
+[[role]]
+role = "formatter"
+tool = "gofumpt through golangci-lint v2 `formatters`"
+install = "golangci.yml (or .golangci.yml): `formatters: enable: [gofumpt]`; the gate runs `golangci-lint fmt --diff`"
+config = [{ any = [{ path = "{root}/.golangci.yml", contains = "gofumpt" }, { path = "{root}/.golangci.yaml", contains = "gofumpt" }, { path = "{root}/golangci.yml", contains = "gofumpt" }] }]
+gate = "golangci-lint fmt"
+
+[[role]]
+role = "linter"
+tool = "golangci-lint v2 with an explicit enable list (errcheck, govet, staticcheck, gosec, revive, depguard for third-party bans)"
+install = ".golangci.yml `version: \"2\"`, `linters: default: none` then enable the list; the gate runs `golangci-lint run`"
+config = [{ any = [{ path = "{root}/.golangci.yml", contains = "linters" }, { path = "{root}/.golangci.yaml", contains = "linters" }, { path = "{root}/golangci.yml", contains = "linters" }] }]
+gate = "golangci-lint run"
+
+[[role]]
+role = "types"
+tool = "the Go compiler plus `go vet` (typed analysis); no looser mode exists"
+install = "the gate runs `go vet ./...` (golangci-lint's govet counts when it is enabled and the gate runs it)"
+config = []
+gate = "go vet"
+
+[[role.alternative]]
+label = "golangci-lint's govet"
+gate = "golangci-lint run"
+
+[[role]]
+role = "dependencies"
+tool = "`go mod tidy -diff` (no drift, no unused module) and govulncheck (known vulnerabilities reached by the code)"
+install = "the gate runs `go mod tidy -diff` and `govulncheck ./...`"
+config = [{ path = "{root}/go.mod" }]
+gate = "go mod tidy"
+
+[[role]]
+role = "tests"
+tool = "`go test` with the race detector, headless, every package"
+install = "the gate runs `go test -race ./...`"
+config = []
+outcome = "runs"
+runs = ['\bgo test\b', '\bgotestsum\b']
+
+[[role]]
+role = "coverage"
+tool = "go-test-coverage (vladopajic) thresholds in .testcoverage.yml; any step that fails the run under a floor counts"
+install = "go test -coverprofile=cover.out ./...; .testcoverage.yml `threshold: total: <floor>`; the gate runs `go-test-coverage --config=.testcoverage.yml` (a floor only rises)"
+config = [{ any = [{ path = "{root}/.testcoverage.yml" }, { path = "{root}/.testcoverage.yaml" }, { path = "{root}/go.mod" }] }]
+outcome = "floor"
+
+[[role.floor]]
+label = "go-test-coverage with a committed .testcoverage.yml"
+gate = 'go-test-coverage'
+path = "{root}/.testcoverage.yml"
+
+[[role.floor]]
+label = "a script comparing coverage to a committed coverage-floor file"
+gate = 'check_coverage|coverage-floor'
+path = "coverage-floor.json"
+
+[[role]]
+role = "spelling"
+tool = "typos (crate-ci) with a committed config"
+install = "typos.toml with [default.extend-words] for domain terms; the gate runs `typos`"
+config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
+gate = "typos"
+
+[[role]]
+role = "architecture"
+tool = "go-arch-lint: layers as components in .go-arch-lint.yml, each with the components and vendors it may use; depguard (via golangci-lint) bans named third-party imports"
+install = """.go-arch-lint.yml: `version: 3`, `components:` one per layer with `in:` package globs, `deps:` one entry per component listing `mayDependOn`, `commonComponents`/`commonVendors` for shared code; \
+the gate runs `go-arch-lint check`; plant a forbidden import and see it fail. The `internal/` rule alone is not layering: it guards module boundaries only"""
+config = [{ path = "{root}/.go-arch-lint.yml" }]
+gate = "go-arch-lint check"
+
+[[role]]
+role = "hooks"
+tool = "prek runs golangci-lint fmt and typos on staged files (pre-commit); just check on pre-push"
+install = "add local hooks (types: [go]) to .pre-commit-config.yaml after bd's; the gate on pre-push"
+config = [{ path = ".pre-commit-config.yaml", contains = "golangci-lint" }, { path = ".pre-commit-config.yaml", contains = "typos" }]
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/go.md: commands, layering table, lint policy, test naming; linked from AGENTS.md"
+install = "create docs/agents/go.md (<= 150 lines) and link it from AGENTS.md"
+config = [{ path = "docs/agents/go.md" }, { path = "AGENTS.md", contains = "docs/agents/go.md" }]

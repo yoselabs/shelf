@@ -1,0 +1,106 @@
+# Stack profile (see python-uv.toml for the format). Node with TypeScript, late 2026.
+# Research: docs/research/blueprint-skill/research/node-go-rust-layering.md (architecture: tool, evidence URL, date, verdict).
+# The other roles are the current defaults, documented but never run here: provisional until a consumer runs the set red and green.
+stack = "node"
+status = "provisional"
+source = "node-go-rust-layering.md (2026-11-20, web research only, nothing run); no consumer yet"
+
+[[role]]
+role = "toolchain"
+tool = "a declared Node range (`engines.node`) and package manager (`packageManager`), one lockfile committed, installed with the lockfile frozen"
+install = "set \"engines\": {\"node\": \">=<x>\"} and \"packageManager\": \"pnpm@<x.y.z>\" in package.json; commit the lockfile; the gate installs with `pnpm install --frozen-lockfile` (npm: `npm ci`)"
+config = [
+    { path = "{root}/package.json", contains = '"engines"' },
+    { path = "{root}/package.json", contains = '"packageManager"' },
+    { any = [{ path = "{root}/pnpm-lock.yaml" }, { path = "{root}/package-lock.json" }, { path = "{root}/yarn.lock" }] },
+]
+gate = "--frozen-lockfile"
+
+[[role.alternative]]
+label = "`npm ci`"
+gate = '\bnpm ci\b'
+
+[[role.alternative]]
+label = "yarn `--immutable`"
+gate = "--immutable"
+
+[[role]]
+role = "formatter"
+tool = "Biome (format and lint in one binary, one config)"
+install = "pnpm add -D -E @biomejs/biome; biome.json (or biome.jsonc); the gate runs `biome ci .`"
+config = [{ any = [{ path = "{root}/biome.json" }, { path = "{root}/biome.jsonc" }] }]
+gate = "biome ci"
+
+[[role]]
+role = "linter"
+tool = "Biome recommended rules raised to errors; type-aware rules through tsc, not a second linter"
+install = "biome.json: linter.enabled, rules.recommended true, and the rule groups you want as \"error\"; `biome ci .` runs format check and lint"
+config = [{ any = [{ path = "{root}/biome.json", contains = "linter" }, { path = "{root}/biome.jsonc", contains = "linter" }] }]
+gate = "biome ci"
+
+[[role]]
+role = "types"
+tool = "TypeScript `strict` with noUncheckedIndexedAccess, `tsc --noEmit` in the gate"
+install = "tsconfig.json compilerOptions: strict true, noUncheckedIndexedAccess true, noEmit true; the gate runs `tsc --noEmit` (or `tsc -b` for project references)"
+config = [{ path = "{root}/tsconfig.json", contains = '"strict"' }]
+gate = "tsc"
+
+[[role]]
+role = "dependencies"
+tool = "knip (unused and missing dependencies, unused exports); versions pinned by the lockfile"
+install = "pnpm add -D knip; knip.json; the gate runs `knip`"
+config = [{ any = [{ path = "{root}/knip.json" }, { path = "{root}/knip.jsonc" }, { path = "{root}/package.json", contains = '"knip"' }] }]
+gate = "knip"
+
+[[role]]
+role = "tests"
+tool = "vitest, headless, run once (not in watch mode)"
+install = "pnpm add -D vitest; package.json script `test`: `vitest run`; the gate runs it"
+config = [{ path = "{root}/package.json", contains = "vitest" }]
+outcome = "runs"
+runs = ['\bvitest\b', '\bjest\b', '\bnode --test\b', '\b(?:pnpm|npm|yarn)(?: run)? test\b']
+
+[[role]]
+role = "coverage"
+tool = "vitest coverage with thresholds that fail the run (any runner whose gate enforces a floor)"
+install = "pnpm add -D @vitest/coverage-v8; vitest.config.ts test.coverage.thresholds {lines, branches}; the gate runs `vitest run --coverage` (a floor only rises)"
+config = [{ any = [{ path = "{root}/package.json", contains = "coverage" }, { path = "{root}/vitest.config.ts", contains = "coverage" }, { path = "{root}/vitest.config.mts", contains = "coverage" }] }]
+outcome = "floor"
+
+[[role.floor]]
+label = "coverage thresholds in the vitest config, enforced by `vitest run --coverage`"
+gate = 'vitest[^\n]*--coverage'
+path = "{root}/vitest.config.*"
+contains = "thresholds"
+
+[[role.floor]]
+label = "c8 or nyc `--check-coverage` with a threshold"
+gate = '(?:c8|nyc)[^\n]*--check-coverage'
+
+[[role]]
+role = "spelling"
+tool = "typos (crate-ci) with a committed config; splits identifiers"
+install = "typos.toml with [default.extend-words] for domain terms; the gate runs `typos`"
+config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
+gate = "typos"
+
+[[role]]
+role = "architecture"
+tool = "dependency-cruiser: forbidden-edge rules between folders and workspace packages, no circular dependencies, one .dependency-cruiser.cjs"
+install = """pnpm add -D dependency-cruiser; `npx depcruise --init`; in .dependency-cruiser.cjs keep `no-circular` and `no-orphans` at error severity and add one `forbidden` rule per layer edge \
+(from { path: \"^src/domain\" } to { path: \"^src/(infra|ui)\" }); the gate runs `depcruise src --config .dependency-cruiser.cjs`; \
+plant a forbidden import and see it fail. eslint-plugin-boundaries is an editor-feedback extra, not the gate"""
+config = [{ any = [{ path = "{root}/.dependency-cruiser.cjs" }, { path = "{root}/.dependency-cruiser.js" }, { path = "{root}/.dependency-cruiser.mjs" }] }]
+gate = "depcruise"
+
+[[role]]
+role = "hooks"
+tool = "prek runs biome and typos on staged files (pre-commit); just check on pre-push"
+install = "add local hooks `biome check --staged` style entry and typos to .pre-commit-config.yaml after bd's; the gate on pre-push"
+config = [{ path = ".pre-commit-config.yaml", contains = "biome" }, { path = ".pre-commit-config.yaml", contains = "typos" }]
+
+[[role]]
+role = "agent-guidance"
+tool = "docs/agents/node.md: commands, layering table, strictness policy, test naming; linked from AGENTS.md"
+install = "create docs/agents/node.md (<= 150 lines) and link it from AGENTS.md"
+config = [{ path = "docs/agents/node.md" }, { path = "AGENTS.md", contains = "docs/agents/node.md" }]

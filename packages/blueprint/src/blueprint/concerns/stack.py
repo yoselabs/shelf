@@ -85,6 +85,12 @@ class Role:
     alternatives: tuple[dict[str, Any], ...] = ()
     untested: str = ""
     na: str = ""
+    # An outcome contract (instead of `gate`): the role is judged by what the gate does, whatever tool does it.
+    # `runs`: some step the gate reaches runs a test runner (any regex matches). `floor`: some step enforces a floor,
+    # where each `floors` entry is a `label`, a `gate` regex over the gate text and optionally a `path`/`contains` the repo must hold.
+    outcome: str = ""
+    runs: tuple[str, ...] = ()
+    floors: tuple[dict[str, Any], ...] = ()
     # Where the role's executable may live, besides PATH: `$PATH`, `$DOTNET_ROOT` or an absolute folder. A
     # toolchain role names them when a second install can be the one a tool resolves (Godot's dotnet).
     installs: tuple[str, ...] = ()
@@ -117,6 +123,9 @@ def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
                 alternatives=tuple(r.get("alternative", ())),
                 untested=r.get("untested", ""),
                 na=r.get("na", ""),
+                outcome=r.get("outcome", ""),
+                runs=tuple(r.get("runs", ())),
+                floors=tuple(r.get("floor", ())),
                 installs=tuple(r.get("installs", ())),
                 requires=r.get("requires", ""),
             )
@@ -351,6 +360,8 @@ def _sdk_installs(ctx: Context, stack: str, spec: Role, judged: _Judged) -> _Jud
 
 def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judged:
     """Pass when the gate runs the role's command, or one of its alternatives; else failing."""
+    if spec.outcome:
+        return _outcome_verdict(ctx, stack, spec, gate_text)
     if not spec.gate or re.search(re.escape(spec.gate), gate_text):
         return _Judged(stack, "pass", spec.tool + (f", run by the gate (`{spec.gate}`)" if spec.gate else ""))
     via = next((a for a in spec.alternatives if _alternative_runs(ctx, a, gate_text)), None)
@@ -371,6 +382,28 @@ def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judg
         f"{spec.tool} set up, but the gate never runs `{spec.gate}`{others}",
         f"run `{spec.gate}` from `just check`{others}",
     )
+
+
+OUTCOMES = ("runs", "floor")
+
+
+def _floor_holds(ctx: Context, floor: dict[str, Any], gate_text: str) -> bool:
+    return bool(re.search(floor["gate"], gate_text)) and ("path" not in floor or _config_holds(ctx, floor))
+
+
+def _outcome_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judged:
+    """Judge a role by its outcome: a test runner is reached, or a floor is enforced, by any tool the profile accepts."""
+    if spec.outcome == "runs":
+        if any(re.search(pattern, gate_text) for pattern in spec.runs):
+            return _Judged(stack, "pass", f"{spec.tool}; the gate reaches a test runner")
+        problem, fix = f"the gate reaches no test runner (accepted: {', '.join(spec.runs)})", "run the tests from `just check`"
+    else:
+        if via := next((f for f in spec.floors if _floor_holds(ctx, f, gate_text)), None):
+            return _Judged(stack, "pass", f"{via['label']}, run by the gate")
+        accepted = " or ".join(f["label"] for f in spec.floors)
+        problem, fix = f"the gate enforces no floor (accepted: {accepted})", f"enforce a floor from `just check`: {accepted}"
+    verdict = "failing" if spec.config else "not-set-up"
+    return _Judged(stack, verdict, f"{spec.tool}: {problem}", spec.install or fix if verdict == "not-set-up" else fix)
 
 
 def finding_for(judged: _Judged) -> Finding:
@@ -410,10 +443,11 @@ def provisional_finding(status: str, finding: Finding) -> Finding:
 def _profile_row(stack: str, prof: StackProfile | None, origin: str = "") -> Sub:
     statement = f"the shelf has a profile for {stack}: the tool for every role"
     if prof is None:
-        finding = not_checked(
-            f"no standard for {stack} yet: blueprint has no profile, so no tool per role can be judged",
-            _RESEARCH.format(roles=", ".join(ROLES), stack=stack),
-            blueprint_gap=True,
+        # An error, never silence and never a pass (owner, 2026-11-19); a justified override is the only way past.
+        finding = failing(
+            f"stack {stack} found, no profile: blueprint has no tool per role for it, so the repo's {stack} code is unjudged",
+            _RESEARCH.format(roles=", ".join(ROLES), stack=stack)
+            + "; or record a justified `not-supported` override with an expiry or an accepted ADR",
         )
         return Sub(f"stack/{stack}", f"stack.{stack}.profile", statement, finding)
     tools = " · ".join(f"{r.role}: {r.tool or '(untested)'}" for r in prof.roles.values() if not r.na)
@@ -435,6 +469,7 @@ def roles(ctx: Context) -> list[Sub]:
     profiles = load_profiles()
     reached = gate_text(ctx)
     origins = dict(ctx.profile.stack_files)
+    roots = dict(ctx.profile.stack_roots)
     subs: list[Sub] = []
     for stack in ctx.profile.stacks:
         prof = profiles.get(stack)
@@ -443,7 +478,36 @@ def roles(ctx: Context) -> list[Sub]:
         if prof is None:
             continue
         for role in (*ROLES, *(r for r in prof.roles if r not in ROLES)):
-            judged = judge_role(ctx, stack, prof, role, reached)
+            judged = judge_role(ctx, stack, prof, role, reached, root=roots.get(stack, "."))
             statement = f"{stack} {role}: the profile's tool is set up and run by `just check`"
             subs.append(Sub(f"stack/{stack}", f"stack.{stack}.{role}", statement, provisional_finding(prof.status, finding_for(judged))))
+    if edges := _edges_row(ctx):
+        subs.append(edges)
     return subs
+
+
+# Stacks that hold code which can call across a language boundary; a compose file or a Dockerfile is not one.
+CODE_STACKS = frozenset({"python-uv", "python", "dotnet", "node", "go", "rust"})
+
+
+def _edges_row(ctx: Context) -> Sub | None:
+    """Two code stacks in one repo touch only through a declared `[[edge]]` (from, to, via a contract file that exists)."""
+    present = [s for s in ctx.profile.stacks if s in CODE_STACKS]
+    if len(present) < 2:
+        return None
+    statement = "stacks sharing the repo touch only through a declared [[edge]] with a contract file"
+    edges = ctx.profile.edges
+    if not edges:
+        finding = not_set_up(
+            f"{' and '.join(present)} share the repo and no [[edge]] says how they touch",
+            "declare each contact in docs/blueprint/blueprint.toml: [[edge]] from = <stack>, to = <stack>, via = <contract file>, "
+            "reason = <why>; an undeclared cross-stack path selects every test",
+        )
+        return Sub("stack", "stack.edges", statement, finding)
+    problems = [f"edge {f} -> {t} names {s}, not a stack of this repo" for f, t, _ in edges for s in (f, t) if s not in present]
+    problems += [f"edge {f} -> {t}: contract file {via} is missing" for f, t, via in edges if not ctx.path(via).exists()]
+    if problems:
+        return Sub(
+            "stack", "stack.edges", statement, failing("; ".join(problems), "fix or delete the [[edge]] in docs/blueprint/blueprint.toml")
+        )
+    return Sub("stack", "stack.edges", statement, passing("; ".join(f"{f} -> {t} via {via}" for f, t, via in edges)))
