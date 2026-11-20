@@ -49,4 +49,5 @@ Waiting on a person or access: `--status blocked` plus a comment. Do not collaps
 
 - Every bead still to be started (open or blocked) needs acceptance criteria; `just beads-lint` in the gate enforces it. An idea without criteria yet is deferred (`bd defer`), not open; claimed work is past that gate.
 - `bd config set` edits the tracked `.beads/config.yaml`; a `git checkout` silently reverts it. Read back with `bd config get <key>`.
+- In a git worktree, `bd` resolves the main checkout's `.beads`, not the worktree's, unless `BEADS_DIR` is set (`BEADS_DIR=<worktree>/.beads bd ...`); check with `bd where` before the first write, or a bead lands in the wrong database.
 - Hooks are prek's, not bd's ([gate.md](gate.md)).

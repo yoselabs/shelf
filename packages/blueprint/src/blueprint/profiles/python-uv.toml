@@ -88,7 +88,7 @@ install = "uv add --dev pytest pytest-xdist"
 config = [{ path = "pyproject.toml", contains = "[tool.pytest.ini_options]" }]
 # Outcome (shelf-jc7r.3): the gate reaches a test runner, whichever one: pytest itself, or the shared runners that run it.
 outcome = "runs"
-runs = ['\bpytest\b', '\bany_gate[ _]test\b', '\bany_gate_python\b', '\bany-gate(?:-python)?\b']
+runs = ['\bpytest\b', '\bany_gate[ _]test\b', '\bany_gate_python\b', '\bany-gate(?:-python)?\b', '\bblueprint[ _]test\b']
 
 [[role]]
 role = "coverage"

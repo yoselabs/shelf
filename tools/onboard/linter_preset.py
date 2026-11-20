@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .hooks import ensure_gate_dependency
+from .hooks import ShelfSourceConflict, check_shelf_sources, ensure_gate_dependency
 from .operations import Outcome, Result
 
 _SHELF_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -61,6 +61,7 @@ _DEV_GROUP_TABLE = "dependency-groups"
 # (a2kay, ...), which would ban a consumer from importing itself.
 _SHELF_ONLY_TABLES = ("tool.ruff.lint.flake8-tidy-imports",)
 _BOOTSTRAP_RECIPES = ("bootstrap", "bootstrap-verify")
+_ONBOARD_SCRIPT = "onboard-consumer/scripts/onboard.py"
 
 _GENERATED_PREFIXES = ("tool.pyrefly", "tool.pytest")
 _SHELF_TESTS_SUBCONFIG = "packages/*/tests/**"
@@ -176,6 +177,19 @@ def _recipes_to_copy(target_text: str) -> list[str]:
     return [name for name in _BOOTSTRAP_RECIPES if name not in target_names]
 
 
+def _refresh_stale_bootstrap(text: str) -> str:
+    """`text` with each shelf-copied `bootstrap` recipe (one that runs the onboard script) at the shelf's current text.
+
+    A recipe of the repo's own under the same name does not run the onboard script and is never touched.
+    """
+    shelf = dict(_split_just_recipes(_SHELF_JUSTFILE.read_text()))
+    for name, block in _split_just_recipes(text):
+        if name in _BOOTSTRAP_RECIPES and _ONBOARD_SCRIPT in block and block.strip() != shelf[name].strip():
+            tail = "\n" if block.endswith("\n") else ""
+            text = text.replace(block, shelf[name].rstrip("\n") + tail, 1)
+    return text
+
+
 @dataclass
 class LinterPresetOperation:
     """Copies missing `pyproject.toml` tables and `justfile` recipes from shelf into `repo` (python+uv only)."""
@@ -190,6 +204,10 @@ class LinterPresetOperation:
         if not pyproject.exists():
             return Result(Outcome.COULD_NOT_APPLY, verified=False, message=f"{pyproject} does not exist — not a python+uv target")
 
+        try:
+            check_shelf_sources(pyproject.read_text())
+        except ShelfSourceConflict as stop:
+            return Result(Outcome.COULD_NOT_APPLY, verified=False, message=str(stop))
         applied: list[str] = []
 
         toml_text = pyproject.read_text()
@@ -208,6 +226,10 @@ class LinterPresetOperation:
             applied.append(f"justfile parts ({', '.join(rendered)})")
         justfile = next((self.repo / n for n in _JUSTFILES if (self.repo / n).is_file()), self.repo / "justfile")
         existing = justfile.read_text()
+        if (refreshed := _refresh_stale_bootstrap(existing)) != existing:
+            justfile.write_text(refreshed)
+            existing = refreshed
+            applied.append(f"{justfile.name} stale bootstrap recipes refreshed")
         to_copy = _recipes_to_copy(existing)
         if to_copy:
             shelf_recipes = dict(_split_just_recipes(_SHELF_JUSTFILE.read_text()))
