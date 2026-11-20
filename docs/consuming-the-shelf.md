@@ -87,18 +87,8 @@ silently dead, and nothing in your repo will tell you; only re-running checks.
 `.beads/hooks`, which `bd init` commits), the hooks are **tracked files that travel with a clone** —
 the "hooks are per-clone and cannot be committed" premise above has that exception.
 
-**Using the pre-commit framework instead?** add to `.pre-commit-config.yaml` (skips the installer):
-
-```yaml
-- repo: https://github.com/yoselabs/shelf
-  rev: <a shelf commit or tag>
-  hooks:
-    - id: no-local-shelf-source
-    - id: shelf-preset-drift
-```
-
-Ruff is not shipped here — use `astral-sh/ruff-pre-commit` for that. What the shelf adds is the
-preset check: whether your ruff and pyrefly config still match this repo's, or declare why not.
+**Using the pre-commit framework instead?** the onboarding writes `.pre-commit-config.yaml` for you (prek). The guard entry is `uv run blueprint guard` and the preset
+check is `uv run blueprint preset --repo .`, both from the `blueprint` dev dependency the onboarding adds, pinned by git tag. The shelf ships no hook repository.
 
 ## 3. The resolver block, in the project's `AGENTS.md` / `CLAUDE.md`
 

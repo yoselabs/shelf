@@ -24,8 +24,6 @@ _SCRIPTS = [
     "packages/convert-md/bench/engines/run_unstructured.py",
     "packages/convert-md/bench/run_bench.py",
     "tools/catalog.py",
-    "tools/hooks/forbid-local-shelf-source.py",
-    "tools/preset_drift.py",
 ]
 
 

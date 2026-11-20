@@ -211,7 +211,7 @@ def test_a_freshly_onboarded_repo_passes_preset_drift(repo: Path) -> None:
     LinterPresetOperation(repo).run({})
 
     drift = subprocess.run(
-        [sys.executable, str(_ROOT / "tools" / "preset_drift.py"), "--repo", str(repo), "--shelf-home", str(_ROOT)],
+        [sys.executable, "-m", "blueprint", "preset", "--repo", str(repo)],
         capture_output=True,
         text=True,
         check=False,

@@ -1,6 +1,6 @@
 """The commit guard, tested — it had no automated coverage until now.
 
-`forbid-local-shelf-source.py` is the one thing standing between a co-development
+`blueprint guard` is the one thing standing between a co-development
 override and a poisoned consumer checkout, and it was verified exactly once, by
 hand, against scratch repos that were deleted afterwards (ledger 0038). This
 suite is that verification made repeatable.
@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
-GUARD = Path(__file__).resolve().parents[1] / "tools" / "hooks" / "forbid-local-shelf-source.py"
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _LOCAL_SOURCE = """\
 [project]
@@ -69,7 +70,7 @@ def repo(tmp_path: Path) -> Path:
 
 def _run(repo: Path, *flags: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(GUARD), *flags],
+        [sys.executable, "-m", "blueprint", "guard", *flags],
         cwd=repo,
         capture_output=True,
         text=True,

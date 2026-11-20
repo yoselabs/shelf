@@ -1,9 +1,11 @@
 """`blueprint check`: judge a repository against the blueprint, in one process.
 `blueprint survey`: write the run survey template, or check a filled one.
 
-Runs as bare `python3` from a shelf clone, no install:
+Installed as a dev dependency (`uv run blueprint check --repo .`), or from a shelf clone with no install:
 
     PYTHONPATH=<shelf>/packages/blueprint/src python3 -m blueprint check --repo .
+
+`blueprint guard` and `blueprint preset` are the gate steps that need no shelf clone.
 
 Exit codes: 0 every checkpoint passes or does not apply · 1 something fails or is not set up ·
 2 nothing fails but something could not be checked (never a pass).
@@ -16,7 +18,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from blueprint import adr, checkpoints, report, survey, templates
+from blueprint import adr, checkpoints, guard, preset, report, survey, templates
 from blueprint.profile import detect, load_state
 from blueprint.runner import run
 
@@ -32,8 +34,7 @@ RECIPE_FILES = {
 }
 
 
-def main(argv: list[str] | None = None) -> int:
-    """The command line."""
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="blueprint", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     chk = sub.add_parser("check", help="run every checkpoint that applies to the repo")
@@ -76,8 +77,26 @@ def main(argv: list[str] | None = None) -> int:
     )
     cps.add_argument("prefix", nargs="?", default="", help="only checkpoints whose id starts with this (e.g. stack.dockerfile)")
     cps.add_argument("--json", action="store_true", help="print JSON")
-    args = parser.parse_args(argv)
+    grd = sub.add_parser("guard", help="refuse a local shelf source in [tool.uv.sources] (the commit hook and `just guard`)")
+    grd.add_argument("--committed", action="store_true", help="check HEAD (the gate's question); the default checks the index (the hook's)")
+    pre = sub.add_parser("preset", help="compare the repo's linter config with the shelf's preset (`just preset`)")
+    pre.add_argument("--repo", default=".", type=Path, help="the repository to check (default: cwd)")
+    pre.add_argument("--reference", type=Path, help="compare with this snapshot instead of the packaged one")
+    pre.add_argument("--refresh", action="store_true", help="in the shelf: rewrite the packaged snapshot from its own files")
+    return parser
 
+
+def main(argv: list[str] | None = None) -> int:
+    """The command line."""
+    args = _parser().parse_args(argv)
+
+    if args.command == "guard":
+        return guard.check(committed=args.committed)
+    if args.command == "preset":
+        if args.refresh:
+            sys.stdout.write(f"wrote {preset.refresh(args.repo.resolve())}\n")
+            return 0
+        return preset.check(args.repo.expanduser().resolve(), args.reference)
     if args.command == "survey":
         return _survey(args.repo, args.check)
     commands = {

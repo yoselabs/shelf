@@ -115,9 +115,9 @@ When onboarding a project (`consuming-the-shelf.md`), copy from this repo:
 2. The `justfile` recipes (`check guard preset blueprint bootstrap bootstrap-verify tools lint format typecheck
    spell deps test cov sync`); `deps` becomes a single-package `uv run deptry .`. The shelf-only
    recipes (`catalog test-browser`) are not copied and are not drift. Pin the runner with
-   `uv add --dev rust-just` and run it as `uv run just check` (the `dev` group below carries it). Copy `guard` and `bootstrap`/`bootstrap-verify` **verbatim** — each resolves the
-   shelf clone itself (`$SHELF_HOME` → `../shelf` → `~/Workspaces/shelf`), so they work unchanged
-   in your repo. `guard` is what actually enforces the no-committed-local-shelf-source rule; the
+   `uv add --dev rust-just` and run it as `uv run just check` (the `dev` group below carries it). Copy `guard` and `bootstrap`/`bootstrap-verify` **verbatim**. `guard`, `preset` and `blueprint` call the `blueprint` dev
+   dependency (pinned by git tag), so they need no shelf clone; `bootstrap` resolves the clone itself
+   (`$SHELF_HOME` → `../shelf` → `~/Workspaces/shelf`). `guard` is what actually enforces the no-committed-local-shelf-source rule; the
    pre-commit hook is fast feedback, not enforcement (a hook is per-clone and any tool claiming
    `core.hooksPath` can disable it silently). `bootstrap` re-runs the onboarding operations
    (`tools/onboard/`) any time — idempotent, safe to re-run to check or repair your repo's state;
@@ -139,10 +139,10 @@ choice, visible in your own `pyproject`. The shelf is the baseline you converge 
 owns, so it reports *"already current"* for a repo missing two whole rule families. Ten repos here
 reached ten rule sets without anyone deciding to.
 
-`tools/preset_drift.py`, wired as `just preset` and copied verbatim like `guard`, compares three axes
+`blueprint preset`, wired as `just preset` and copied verbatim like `guard`, compares three axes
 — `[tool.ruff.lint] select`/`ignore`, `[tool.pyrefly.errors]`, and the `justfile` recipe set — plus the ruff and
 pyrefly versions both `uv.lock` files hold and the shared size-cap table (one config under another ruff is another rule set: a2kay's ruff 0.17 raised
-30 findings the shelf's 0.15 does not), and fails on any difference the consumer has not declared in its own:
+30 findings the shelf's 0.15 does not), against the snapshot of the shelf's own config packaged in `blueprint` (`preset.toml`, regenerated with `blueprint preset --refresh`, a test fails when stale), and fails on any difference the consumer has not declared in its own:
 
 ```toml
 [tool.shelf-preset]
