@@ -21,7 +21,7 @@ lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACH
 # touches (`test-affected`); `check-all` runs every test with the coverage floor.
 #
 # The per-file linters (scripts, lint-changed, spell-changed) check only the files changed against the base
-# in `check` (tools/changed.py; a changed config file, or no base, selects everything). `check-all` runs them on every
+# in `check` (`any-gate changed`; a changed config file, or no base, selects everything). `check-all` runs them on every
 # file (`scripts "all"`, `lint`, `spell`). The cross-file checks (typecheck, arch, deps, blueprint)
 # always cover the whole repo. A linter with nothing changed prints "skipped <linter>: ..." and the gate
 # repeats that line.
@@ -67,40 +67,17 @@ scripts scope="changed":
     set -euo pipefail
     command -v shellcheck >/dev/null || { echo "scripts: shellcheck is not installed -- run just tools" >&2; exit 2; }
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
+    uv run python -m any_gate changed --scope {{ scope }} --config .shellcheckrc '*.sh' > "$list"
     [ -s "$list" ] || { echo "skipped scripts: no shell script changed"; exit 0; }
     xargs -0 shellcheck < "$list"
 
-# Runs the gate's steps at once, each into its own log, then prints one timing line (a step over its budget is
+# Runs the gate's steps at once (`any-gate steps`): each into its own log, then one timing line (a step over its budget is
 # marked) and the log of every step that failed. Each name is a recipe, so the gate graph still reads the edges.
 # Budgets, in seconds: GATE_STEP_BUDGET (default 60) per step, GATE_BUDGET (default 180) for the whole gate. The
 # gate runs several times within one feature, so a slow step is a cost to see and fix, not to wait out.
 [private]
 steps +names:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    step_budget=${GATE_STEP_BUDGET:-60}; gate_budget=${GATE_BUDGET:-180}
-    dir=$(mktemp -d); trap 'rm -rf "$dir"' EXIT
-    # A step's output goes to its log; a notice it must show now (the test lock's "waiting") goes to fd 3, this terminal.
-    exec 3>&2; export GATE_NOTICE_FD=3
-    SECONDS=0
-    echo "gate: {{ names }} (in parallel)" >&2
-    for n in {{ names }}; do
-        ( SECONDS=0; {{ just_executable() }} "$n" > "$dir/$n.log" 2>&1; echo "$? $SECONDS" > "$dir/$n.rc" ) &
-    done
-    wait
-    total=$SECONDS; failed=(); line=()
-    for n in {{ names }}; do
-        read -r rc took < "$dir/$n.rc"
-        mark=""; [ "$took" -gt $step_budget ] && mark=" ⚠ over ${step_budget}s"
-        [ "$rc" -eq 0 ] || { failed+=("$n"); mark="$mark ✗"; }
-        line+=("$n ${took}s$mark")
-    done
-    grep -h '^skipped ' "$dir"/*.log >&2 || true
-    for n in "${failed[@]}"; do echo "--- $n" >&2; cat "$dir/$n.log" >&2; done
-    summary=$(printf '%s · ' "${line[@]}"); echo "gate: ${summary% · } -- total ${total}s" >&2
-    [ "$total" -gt $gate_budget ] && echo "gate: ⚠ ${total}s is over the ${gate_budget}s gate budget: find the slow step above" >&2
-    [ "${#failed[@]}" -eq 0 ] || { echo "gate: failed: ${failed[*]}" >&2; exit 1; }
+    uv run python -m any_gate steps --runner {{ just_executable() }} {{ names }}
 
 # The blueprint's per-commit checkpoints (packages/blueprint): one line per one that is not
 # passing. The audit-only ones (slow, or reading this clone's bd database) run in the
@@ -191,13 +168,13 @@ lint:
     uv run ruff check packages tests tools conftest.py
     uv run ruff format --check packages tests tools conftest.py
 
-# `lint` over the files changed against the base (tools/changed.py), for `check`. Shelf-only: consumers copy `lint`.
+# `lint` over the files changed against the base (`any-gate changed`), for `check`. Shelf-only: consumers copy `lint`.
 [group('gate')]
 lint-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' 'tools/*.py' conftest.py > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' 'tools/*.py' conftest.py > "$list"
     [ -s "$list" ] || { echo "skipped lint: no Python file changed"; exit 0; }
     xargs -0 uv run ruff check --force-exclude < "$list"
     xargs -0 uv run ruff format --check --force-exclude < "$list"
@@ -228,7 +205,7 @@ spell-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md CLAUDE.md conftest.py > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md CLAUDE.md conftest.py > "$list"
     [ -s "$list" ] || { echo "skipped spell: no file changed"; exit 0; }
     xargs -0 uv run codespell < "$list"
 

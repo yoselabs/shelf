@@ -16,7 +16,7 @@ deleted one. A linter with nothing to look at is skipped and says so in one line
 config runs it over everything. A check that reads across files (types, architecture, dependencies) always
 covers the whole repo, and so does the gate in CI (`just check-all`). No base found means everything runs.
 
-`blueprint recipe changed > tools/changed.py` copies the selector (stdlib only; `--help` documents it). It prints the
+`python -m any_gate changed` is the selector (`any-gate`, a dev dependency pinned by git tag; `--help` documents it). It prints the
 changed files matching its globs, NUL-separated, or everything on `--scope all`, when a `--config` file changed, or with
 no base. A repo adds a `-changed` twin of each per-file recipe and `check` calls the twins:
 
@@ -25,7 +25,7 @@ lint-changed:
     #!/usr/bin/env bash
     set -euo pipefail
     list=$(mktemp); trap 'rm -f "$list"' EXIT
-    python3 -I tools/changed.py --config pyproject.toml --config ruff.toml 'src/*.py' 'tests/*.py' > "$list"
+    uv run python -m any_gate changed --config pyproject.toml --config ruff.toml 'src/*.py' 'tests/*.py' > "$list"
     [ -s "$list" ] || { echo "skipped lint: no Python file changed"; exit 0; }
     xargs -0 uv run ruff check --force-exclude < "$list"
     xargs -0 uv run ruff format --check --force-exclude < "$list"
@@ -57,9 +57,10 @@ tag; `python -m any_gate --help` documents it) prevents both halves of that:
 | the green record | `check` takes a first dependency running `python -m any_gate start`, and its body runs `python -m any_gate passed --gate check` | records the tree a green `check` saw, if no file changed during the run |
 | the pre-push skip | the hook's entry is `uv run python -m any_gate pre-push --gate check -- uv run just check` | no second run when the working tree is clean and HEAD's tree is recorded; any doubt runs it |
 
-Only the expensive step takes the slot, so the gate's parallel steps never wait on one another. `steps` points
-`GATE_NOTICE_FD` at its terminal (`exec 3>&2; export GATE_NOTICE_FD=3`), so the "waiting" line shows while the step's
-own output goes to its log. The record keys on the tree and the upstream merge-base, and lives in the git directory every
+Only the expensive step takes the slot, so the gate's parallel steps never wait on one another. `any-gate steps` (the `steps` recipe
+runs it: `python -m any_gate steps --runner <just> <step>...`) points `GATE_NOTICE_FD` at its terminal, so the "waiting" line shows while the
+step's own output goes to its log; it prints one timing line, marks a step over `GATE_STEP_BUDGET` (default 60 s) and the gate over
+`GATE_BUDGET` (default 180 s), and prints the log of each failed step. The record keys on the tree and the upstream merge-base, and lives in the git directory every
 worktree of the checkout shares: a rebase changes the key, and the gate runs again. A repo with no python runs `just check`
 from the hook directly, with no skip.
 

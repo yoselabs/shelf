@@ -32,6 +32,28 @@ Exit 0: green or nothing to run; 1: a test failed or a stage hit a limit; 2: usa
 selects its lane through a pytest plugin (`any_gate.lanes_plugin`), not `-m`, so the repo's own `-m` default stays in force; the plugin
 needs `any-gate[pytest]` in the environment of the tests.
 
+### The gate's steps at once
+
+```bash
+python -m any_gate steps --runner just guard lint typecheck test      # each name is a recipe the runner is asked to run
+```
+
+Runs every step at once, each into its own log, then prints the `skipped ...` lines the steps printed, the log of each failed step, one
+timing line (`gate: guard 0s · lint 2s ⚠ over 1s · test 9s ✗ -- total 9s`), a warning when the whole gate went over its budget, and the names
+that failed (exit 1). `GATE_STEP_BUDGET` (default 60) and `GATE_BUDGET` (default 180) are seconds. A step reaches the terminal while its output
+goes to its log through the descriptor in `GATE_NOTICE_FD` (a test slot's "waiting" line uses it). Because each name stays a recipe in the
+justfile, the gate graph still reads its edges.
+
+### Changed files for per-file linters
+
+```bash
+python -m any_gate changed --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' | xargs -0 ruff check
+```
+
+Prints, NUL-separated, the files that differ from the upstream merge-base (committed, staged, unstaged, untracked and not ignored; a deleted
+file never counts) and match a glob. Everything matching is printed instead on `--scope all`, when a `--config` file changed, or with no base
+(not a repo, no upstream): run too much rather than too little. `--not GLOB` drops a match. `any_gate.changed.select(...)` is the same in Python.
+
 ### The gate's tree record
 
 ```bash
