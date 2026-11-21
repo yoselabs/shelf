@@ -1,5 +1,5 @@
-"""`Worktree.clean_ignored(keep=[...])` and `clean_nested` against real git: the reset-path guarantee a caller relies on to keep a folder (a `.venv`)
-while everything else untracked or ignored goes."""
+"""`Worktree.clean_ignored(keep=[...])` and `clean_nested` against real git: the reset-path guarantee a caller relies on to
+keep a folder (a `.venv`) while everything else untracked or ignored goes."""
 
 from __future__ import annotations
 
