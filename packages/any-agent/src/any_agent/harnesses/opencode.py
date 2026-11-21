@@ -200,9 +200,9 @@ class OpenCodeHarness(Quiet):
         try:
             x = stream_proc.capture([self.exe, "models", "opencode", "--verbose"], env=env, timeout=30)
             marker = model + "\n"
-            if x.exit or marker not in x.out:
+            if x.exit or marker not in x.text:
                 return False
-            entry: dict[str, Json] = json.JSONDecoder().raw_decode(x.out.split(marker, 1)[1].lstrip())[0]
+            entry: dict[str, Json] = json.JSONDecoder().raw_decode(x.text.split(marker, 1)[1].lstrip())[0]
             cost = obj(entry.get("cost"))
             cache = obj(cost.get("cache"))
             return (
@@ -398,7 +398,7 @@ class OpenCodeHarness(Quiet):
             if x.exit == 0 and x.out.strip():
                 f = self.root / "opencode-sessions" / f"{ref}.json"
                 f.parent.mkdir(parents=True, exist_ok=True)
-                f.write_text(x.out, encoding="utf-8")
+                f.write_bytes(x.out)
                 f.chmod(0o600)
         except OSError:
             pass

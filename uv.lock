@@ -229,7 +229,7 @@ wheels = [
 
 [[package]]
 name = "any-agent"
-version = "0.19.0"
+version = "0.20.0"
 source = { editable = "packages/any-agent" }
 dependencies = [
     { name = "app-dirs" },
@@ -426,7 +426,7 @@ dev = [
 
 [[package]]
 name = "any-frontmatter"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/any-frontmatter" }
 dependencies = [
     { name = "atomic-io" },
@@ -466,7 +466,7 @@ dev = [
 
 [[package]]
 name = "any-gate"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/any-gate" }
 dependencies = [
     { name = "any-lease" },
@@ -499,7 +499,7 @@ dev = [
 
 [[package]]
 name = "any-gate-python"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/any-gate-python" }
 dependencies = [
     { name = "any-gate" },
@@ -849,10 +849,11 @@ dev = [
 
 [[package]]
 name = "any-speech"
-version = "0.6.1"
+version = "0.7.0"
 source = { editable = "packages/any-speech" }
 dependencies = [
     { name = "any-clock" },
+    { name = "any-frontmatter" },
     { name = "any-lease" },
     { name = "any-pipeline" },
     { name = "any-versioned" },
@@ -884,6 +885,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "any-clock", editable = "packages/any-clock" },
+    { name = "any-frontmatter", editable = "packages/any-frontmatter" },
     { name = "any-lease", editable = "packages/any-lease" },
     { name = "any-pipeline", editable = "packages/any-pipeline" },
     { name = "any-versioned", editable = "packages/any-versioned" },
@@ -2552,7 +2554,7 @@ wheels = [
 
 [[package]]
 name = "git-porcelain"
-version = "0.29.0"
+version = "0.30.0"
 source = { editable = "packages/git-porcelain" }
 dependencies = [
     { name = "child-env" },
@@ -6374,7 +6376,7 @@ dev = [
 
 [[package]]
 name = "stream-proc"
-version = "0.12.1"
+version = "0.13.0"
 source = { editable = "packages/stream-proc" }
 
 [package.dev-dependencies]

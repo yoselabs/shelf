@@ -5,15 +5,15 @@ from any_speech import transcribe, transcribe_with_speakers
 
 transcript = await transcribe(Path("talk.m4a"))        # words with times; stored in talk.speech.json; returned too
 transcript = await transcribe_with_speakers(Path("talk.m4a"))  # the same, each word labelled S1, S2, ... by voice
-print(transcript.to_markdown())                        # header + [00:00] S1: ну да ...   (the default view of the same data)
+doc = transcript.to_markdown()                         # an any-frontmatter Document: header mapping + [00:00] S1: ну да ...
+doc.frontmatter["recording_id"] = "rec-7"              # add your own header keys, then write(path, doc) or str(doc)
 print(transcript.to_text())                            # just the turn lines
 ```
 
 **The value** is one complete `Transcript`: words with times, segments, speakers and provenance, stored as one compact JSON file. **The default view**
-is `to_markdown()` (also `any-speech text talk.speech.json`, no flags): a YAML header in Reco's transcript v3 field names (`transcript_version`, `kind`,
-`status`, `audio.duration_sec`, `speakers`, `diarizer`, `transcribed_at`, `transcriber`, `transcriber_runtime`), then one `[MM:SS] S1: text` turn per paragraph.
+is `to_markdown()` (also `any-speech text talk.speech.json`, no flags): a Markdown document (`any_frontmatter.Document`; `str(doc)` is the file text) whose front matter is `audio_seconds`, `speakers`, `diarizer`, `transcribed_at`, `transcriber`, `transcriber_runtime`, and whose body is one `[MM:SS] S1: text` turn per paragraph.
 It is a pure function of the stored value, never a different stored shape. Words-only transcripts say `diarizer: not_run` and `speakers: {}`, and their turn
-lines carry no label; a failed diarizer says `diarizer: failed` (`status` stays `ok`: the words are fine). **Opt-ins**: `--diarize` / `transcribe_with_speakers` for
+lines carry no label; a failed diarizer says `diarizer: failed`. **Opt-ins**: `--diarize` / `transcribe_with_speakers` for
 speakers, `--engine` to name another engine, `out` to move the file.
 
 That is the whole simple path: one file stored beside the audio, the same data returned as a `Transcript` (words, segments, provenance) for code
@@ -79,4 +79,4 @@ The binary is found, in order, from `ANY_SPEECH_FLUIDAUDIO_BIN`, the folder `any
 
 ## Refused or untested
 
-mlx-whisper (over the memory budget at 57 min), sherpa-onnx ASR and diarisation, and pyannote are not built. No streaming; no speaker names; no Reco markdown reader.
+mlx-whisper (over the memory budget at 57 min), sherpa-onnx ASR and diarisation, and pyannote are not built. No streaming; no speaker names.

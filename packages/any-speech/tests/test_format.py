@@ -5,6 +5,7 @@ from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
+from any_frontmatter import parse, read, write
 from any_speech import (
     Pipeline,
     Provenance,
@@ -198,12 +199,8 @@ def test_segments_stay_in_the_file_because_they_are_not_always_what_the_words_cu
     assert Transcript.from_json(odd.to_json()).segments == odd.segments
 
 
-_HEADER = """---
-transcript_version: 3
-kind: speech
-status: ok
-audio:
-  duration_sec: 12.5
+_GOLDEN = """---
+audio_seconds: 12.5
 speakers:
   S1: voice 1
 diarizer: not_run
@@ -211,35 +208,42 @@ transcribed_at: '2026-11-19T10:00:00Z'
 transcriber: m1
 transcriber_runtime: r1
 ---
+[00:00] S1: ну да
 """
 
 
-def test_markdown_is_a_reco_header_then_the_turn_lines() -> None:
-    assert _transcript().to_markdown() == _HEADER + "\n[00:00] S1: ну да\n"
+def test_markdown_golden_the_default_compact_view() -> None:
+    assert str(_transcript().to_markdown()) == _GOLDEN
+
+
+def test_markdown_is_a_document_a_consumer_can_add_a_header_to_and_save(tmp_path: Path) -> None:
+    doc = _transcript().to_markdown()
+    doc.frontmatter["recording_id"] = "rec-7"
+    saved = tmp_path / "anywhere" / "talk.md"
+    write(saved, doc)
+    again = read(saved)
+    assert (again.frontmatter["recording_id"], again.frontmatter["transcriber"], again.body) == ("rec-7", "m1", "[00:00] S1: ну да\n")
 
 
 def test_markdown_header_carries_each_voice_the_model_and_quotes_what_yaml_would_misread() -> None:
-    head = _engine_like().to_markdown().split("---\n")[1]
-    assert head == _HEADER.split("---\n")[1].replace("  S1: voice 1\n", "  S1: voice 1\n  S2: voice 2\n").replace(
-        "diarizer: not_run", "diarizer: d1"
-    )
+    fm = _engine_like().to_markdown().frontmatter
+    assert (fm["speakers"], fm["diarizer"]) == ({"S1": "voice 1", "S2": "voice 2"}, "d1")
     odd = replace(_transcript(), provenance=_provenance(model="v3", runtime="1.5", diarizer={"model": "a: b", "status": "ok"}))
-    assert "transcriber: v3\n" in odd.to_markdown()
-    assert "transcriber_runtime: '1.5'\n" in odd.to_markdown()
-    assert "diarizer: 'a: b'\n" in odd.to_markdown()
+    back = parse(str(odd.to_markdown())).frontmatter
+    assert (back["transcriber"], back["transcriber_runtime"], back["diarizer"]) == ("v3", "1.5", "a: b")
 
 
 def test_markdown_separates_turns_with_a_blank_line() -> None:
-    body = _engine_like().to_markdown().split("---\n", 2)[2]
-    assert body == "\n[00:00] S1: ну да\n\n[01:01:40] S2: hello\n"
+    assert _engine_like().to_markdown().body == "[00:00] S1: ну да\n\n[01:01:40] S2: hello\n"
 
 
 def test_markdown_says_what_the_diarizer_did_when_words_have_no_speakers() -> None:
     words_only = Transcript(words=(Word("да", 0.0, 0.5),), segments=(Segment(0.0, 0.5, "да", None),), speakers={}, provenance=_provenance())
-    md = words_only.to_markdown()
-    assert "speakers: {}\n" in md
-    assert "diarizer: not_run\n" in md
-    assert md.endswith("\n[00:00] да\n")
+    doc = words_only.to_markdown()
+    assert (doc.frontmatter["speakers"], doc.frontmatter["diarizer"], doc.body) == ({}, "not_run", "[00:00] да\n")
     failed = replace(words_only, provenance=_provenance(diarizer={"model": "d1", "status": "failed", "detail": "boom"}))
-    assert "diarizer: failed\n" in failed.to_markdown()
-    assert "status: ok\n" in failed.to_markdown()  # the words are fine; only the voices are missing
+    assert failed.to_markdown().frontmatter["diarizer"] == "failed"
+
+
+def test_no_consumer_specific_field_names_are_in_the_header() -> None:
+    assert not {"transcript_version", "kind", "status"} & set(_engine_like().to_markdown().frontmatter)

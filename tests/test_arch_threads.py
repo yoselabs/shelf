@@ -29,7 +29,6 @@ _ALLOWED = {
     "packages/stream-proc/src/stream_proc/pump.py": (
         "owner of child pipes: one reader thread per output pipe and a stdin feeder, released by the owner; sync API by design"
     ),
-    "packages/stream-proc/src/stream_proc/capture.py": "owner of child supervision: the tick heartbeat beside a blocking wait; sync API",
     "packages/any-gate/src/any_gate/steps.py": (
         "fan-out of blocking `just` recipes with pass_fds, one thread per step joined together; run_steps is sync by design"
     ),

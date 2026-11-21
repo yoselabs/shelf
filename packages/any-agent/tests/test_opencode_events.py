@@ -217,7 +217,7 @@ class TestWorld:
     def free(self, out, model="opencode/deepseek-v4.1-flash-free"):
         h = OpenCodeHarness(env={})
         h.exe = "opencode"
-        with mock.patch.object(stream_proc, "capture", return_value=Captured(0, out, "", 0.1, False)):
+        with mock.patch.object(stream_proc, "capture", return_value=Captured(0, out.encode(), b"", 0.1, False)):
             return h.free_model_ok(model, {})
 
     def test_the_free_model_is_accepted_only_exact_and_zero_priced(self):
@@ -246,7 +246,7 @@ class TestWorld:
         ):
             assert not self.free(out), out
         h = OpenCodeHarness(env={})
-        with mock.patch.object(stream_proc, "capture", return_value=Captured(124, "", "", 30.0, True)):
+        with mock.patch.object(stream_proc, "capture", return_value=Captured(124, b"", b"", 30.0, True)):
             assert not h.free_model_ok("opencode/deepseek-v4.1-flash-free", {})
 
     def test_the_login_probe_reads_the_auth_file(self):

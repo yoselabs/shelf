@@ -82,4 +82,4 @@ def test_text_prints_the_markdown_view_of_a_stored_transcript(tmp_path: Path, ca
     main(["transcribe", str(audio)], build=_build, leases_root=_lock(tmp_path))
     capsys.readouterr()
     assert main(["text", str(tmp_path / "a.speech.json")], build=_build, leases_root=_lock(tmp_path)) == 0
-    assert capsys.readouterr().out == Transcript.load(tmp_path / "a.speech.json").to_markdown()
+    assert capsys.readouterr().out == str(Transcript.load(tmp_path / "a.speech.json").to_markdown())

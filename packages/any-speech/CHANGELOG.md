@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- **Breaking: `Transcript.to_markdown()` returns an `any_frontmatter.Document`** (front-matter mapping plus body; `str(doc)` is the file text) instead of a `str`; `any-speech text` prints `str(doc)`. The header drops the Reco field names (`transcript_version`, `kind`, `status`, `audio.duration_sec`) and is `audio_seconds`, `speakers`, `diarizer`, `transcribed_at`, `transcriber`, `transcriber_runtime`; the body has no leading blank line. Requires `any-frontmatter>=0.3,<1`. The stored `.speech.json` is unchanged.
+- Runs children through stream-proc 0.13.0's one `capture` (`Captured`: bytes, `.text` view); requires `stream-proc>=0.13.0,<1`. Contract unchanged.
+
 ## 0.6.1
 
 - Claim locks use `ProcessLock.acquire_exclusive` (process-lock 0.4.0); requires `process-lock>=0.4,<1`; the setup build step runs `stream_proc.run_inherited` (requires `stream-proc>=0.11,<1`); no behaviour change.

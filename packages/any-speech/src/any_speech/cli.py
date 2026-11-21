@@ -135,8 +135,8 @@ def _verbs(
         return 0
 
     def text(file: Annotated[Path, POSITIONAL]) -> int:
-        """Print a stored transcript as markdown: a header, then one `[MM:SS] S1: text` turn per paragraph."""
-        sys.stdout.write(Transcript.load(file).to_markdown())
+        """Print a stored transcript as markdown: a front-matter header, then one `[MM:SS] S1: text` turn per paragraph."""
+        sys.stdout.write(str(Transcript.load(file).to_markdown()))
         return 0
 
     def setup(what: Annotated[Literal["fluidaudio"], POSITIONAL]) -> int:

@@ -6,7 +6,7 @@ import math
 from array import array
 from typing import TYPE_CHECKING, Any
 
-from stream_proc import capture_bytes
+from stream_proc import capture
 
 from any_speech.ports import Identity, Voice
 
@@ -23,12 +23,11 @@ def decode_f32(audio: Path, start: float | None, end: float | None) -> list[floa
     span = [] if start is None else ["-ss", str(start)]
     if end is not None:
         span += ["-t", str(end - (start or 0.0))]
-    done = capture_bytes(
+    done = capture(
         ["ffmpeg", "-v", "error", *span, "-i", str(audio), "-f", "f32le", "-ac", "1", "-ar", str(_RATE), "-"], timeout=_DECODE_TIMEOUT
     )
     if done.exit != 0:
-        # lossy-ok: display: a child's stderr tail goes into an error message
-        message = f"ffmpeg failed on {audio} (exit {done.exit}): {done.err.decode('utf-8', 'replace').strip()[-300:]}"
+        message = f"ffmpeg failed on {audio} (exit {done.exit}): {done.err_text.strip()[-300:]}"
         raise RuntimeError(message)
     samples = array("f")
     samples.frombytes(done.out)

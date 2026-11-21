@@ -83,6 +83,10 @@ class Document:
     frontmatter: dict[str, Any]  # Any: parsed YAML, foreign data
     body: str
 
+    def __str__(self) -> str:
+        """The file text: :func:`dump` of this document."""
+        return dump(self)
+
     def with_frontmatter(self, frontmatter: Mapping[str, Any], *, body: str | None = None) -> Document:  # Any: parsed YAML, foreign data
         """This document with its frontmatter replaced, keeping its comments.
 

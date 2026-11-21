@@ -1,10 +1,8 @@
-"""Run a child to its end and hand back its whole output: as text (:func:`capture`) or as exact bytes (:func:`capture_bytes`)."""
+"""Run a child to its end and hand back its whole output as one :class:`Captured`: exact bytes, with text as a view."""
 
 from __future__ import annotations
 
-import contextlib
 import subprocess
-import threading
 import time
 from dataclasses import dataclass
 from typing import IO, TYPE_CHECKING, Any
@@ -16,31 +14,21 @@ from stream_proc.tree import stop_tree
 
 if TYPE_CHECKING:
     import os
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Mapping, Sequence
 
 TIMEOUT_EXIT = 124  # the exit code of coreutils ``timeout``
 
 
 @dataclass(frozen=True, slots=True)
 class Captured:
-    """What :func:`capture` saw: ``exit`` (124 on a timeout, ``-signal`` when a signal ended the child), the decoded
-    ``out`` and ``err`` in full, ``secs`` wall time, ``timed_out``, and ``survivors`` (pids left after the stop) and ``peak_rss``
-    (bytes: the child's own high-water resident set, the largest of it and the descendants it waited for; None when
-    the child was reaped by someone else; a lower bound for a tree, see ``MeasuredPopen``)."""
+    """What :func:`capture` saw: ``exit`` (124 on a timeout, ``-signal`` when a signal ended the child), ``out`` and
+    ``err`` as the exact bytes in full (on a timeout, what the child wrote before it was stopped), ``secs`` wall time,
+    ``timed_out``, and ``survivors`` (pids left after the stop) and ``peak_rss`` (bytes: the child's own high-water
+    resident set, the largest of it and the descendants it waited for; None when the child was reaped by someone else;
+    a lower bound for a tree, see ``MeasuredPopen``).
 
-    exit: int
-    out: str
-    err: str
-    secs: float
-    timed_out: bool
-    survivors: tuple[int, ...] = ()
-    peak_rss: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class CapturedBytes:
-    """What :func:`capture_bytes` saw: like :class:`Captured`, but ``out`` and ``err`` are the exact bytes.
-    On a timeout they hold what the child wrote before it was stopped."""
+    Store or forward ``out``/``err``; show ``text``/``err_text``, the same bytes as UTF-8 with undecodable bytes replaced
+    by U+FFFD and newlines kept as written."""
 
     exit: int
     out: bytes
@@ -50,8 +38,20 @@ class CapturedBytes:
     survivors: tuple[int, ...] = ()
     peak_rss: int | None = None
 
+    @property
+    def text(self) -> str:
+        """``out`` for a person to read: UTF-8, bad bytes replaced."""
+        # lossy-ok: display: the one decode of child output; callers that store or forward it use the bytes
+        return self.out.decode("utf-8", "replace")
 
-def capture_bytes(
+    @property
+    def err_text(self) -> str:
+        """``err`` for a person to read: UTF-8, bad bytes replaced."""
+        # lossy-ok: display: the one decode of child output; callers that store or forward it use the bytes
+        return self.err.decode("utf-8", "replace")
+
+
+def capture(
     argv: Sequence[str],
     *,
     cwd: str | os.PathLike[str] | None = None,
@@ -61,7 +61,7 @@ def capture_bytes(
     stdin: int | IO[Any] | None = subprocess.DEVNULL,  # Any: passed through to subprocess unchanged
     grace: float = 5.0,
     drain: float = 2.0,
-) -> CapturedBytes:
+) -> Captured:
     """Run ``argv`` in a session of its own to its end; stdout and stderr come back as exact bytes (no decoding, no newline conversion).
 
     ``stdin`` is a ``subprocess`` value: ``subprocess.DEVNULL`` (default), ``None`` (inherit ours), a descriptor or a
@@ -71,7 +71,7 @@ def capture_bytes(
     a session leader, so even with an inherited stdin it has no controlling terminal (no tty job control, no ``/dev/tty``).
 
     The wait is on the child, not on its pipes: ``timeout`` is the wall limit for the child; hitting it stops the whole
-    tree (``grace``) and returns exit 124 with ``timed_out`` set, not an exception, like :func:`capture`, with the partial
+    tree (``grace``) and returns exit 124 with ``timed_out`` set, not an exception, with the partial
     output in ``out``/``err``. After the child ended (or was stopped) the pipes are read for at most ``drain`` more seconds,
     so a process that outlived the child and still holds a pipe (``sleep 30 &``) delays the result by ``drain``, never by
     its own lifetime; whatever arrived by then is returned. An exception that unwinds the wait (KeyboardInterrupt, a raising
@@ -89,9 +89,9 @@ def run_inherited(
     stdin: int | IO[Any] | None = subprocess.DEVNULL,  # Any: passed through to subprocess unchanged
     grace: float = 5.0,
 ) -> int:
-    """:func:`capture_bytes` for a child that writes to OUR stdout and stderr (a build someone watches): returns its exit code.
+    """:func:`capture` for a child that writes to OUR stdout and stderr (a build someone watches): returns its exit code.
 
-    The exit is 124 on a timeout (the tree is stopped, as in :func:`capture_bytes`) and ``-signal`` when a signal ended
+    The exit is 124 on a timeout (the tree is stopped, as in :func:`capture`) and ``-signal`` when a signal ended
     the child. The child shares our descriptors but, as always, is a session leader with no controlling terminal.
     """
     return _run(argv, cwd=cwd, env=env, timeout=timeout, input=None, stdin=stdin, grace=grace, drain=0.0, pipe=None).exit
@@ -108,7 +108,7 @@ def _run(
     grace: float,
     drain: float,
     pipe: int | None,
-) -> CapturedBytes:
+) -> Captured:
     if input is not None and stdin != subprocess.DEVNULL:
         msg = "give input or stdin, not both"
         raise ValueError(msg)
@@ -142,54 +142,4 @@ def _run(
         pump.release()
     code = p.returncode
     exit_ = TIMEOUT_EXIT if timed else (code if code is not None else -1)
-    return CapturedBytes(exit_, b"".join(out), b"".join(err), time.monotonic() - t0, timed, survivors, p.peak_rss)
-
-
-def capture(
-    argv: Sequence[str],
-    *,
-    cwd: str | os.PathLike[str] | None = None,
-    env: Mapping[str, str] | None = None,
-    timeout: float,
-    tick: Callable[[], None] | None = None,
-    poll_s: float = 0.2,
-    grace: float = 5.0,
-) -> Captured:
-    """:func:`capture_bytes` with stdin /dev/null, stdout and stderr decoded as text (UTF-8, bad bytes replaced, newlines kept as written).
-
-    ``timeout`` is the wall limit; hitting it stops the whole tree and reports exit 124. ``tick`` runs every ``poll_s``
-    seconds on a helper thread while the child lives, and once more after it ends (a heartbeat;
-    an exception from it is ignored). An exception that
-    unwinds the wait stops the tree first. The output is not capped: it all sits in memory.
-    """
-    done = threading.Event()
-    helper = None
-    if tick is not None:
-        beat = tick
-
-        def ticker() -> None:
-            while not done.wait(poll_s):
-                with contextlib.suppress(Exception):
-                    beat()
-
-        helper = threading.Thread(target=ticker, daemon=True)
-        helper.start()
-    try:
-        res = capture_bytes(argv, cwd=cwd, env=env, timeout=timeout, grace=grace, drain=5.0)
-    finally:
-        done.set()
-        if helper is not None:
-            helper.join(2)
-    if tick is not None:
-        with contextlib.suppress(Exception):
-            tick()  # a failing heartbeat never costs the result
-    # lossy-ok: input: child output returned as text; callers needing the exact bytes use capture_bytes
-    return Captured(
-        res.exit,
-        res.out.decode("utf-8", "replace"),
-        res.err.decode("utf-8", "replace"),
-        res.secs,
-        res.timed_out,
-        res.survivors,
-        res.peak_rss,
-    )
+    return Captured(exit_, b"".join(out), b"".join(err), time.monotonic() - t0, timed, survivors, p.peak_rss)

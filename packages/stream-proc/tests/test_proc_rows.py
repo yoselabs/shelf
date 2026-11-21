@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 
-from stream_proc import capture, capture_bytes, group_rss, table
+from stream_proc import capture, group_rss, table
 
 PY = sys.executable
 _MB = 1024 * 1024
@@ -45,7 +45,6 @@ def test_group_rss_of_an_empty_group_is_zero() -> None:
 
 
 def test_the_bounded_runs_refuse_to_run_without_a_timeout() -> None:
-    for fn in (capture, capture_bytes):
-        timeout = inspect.signature(fn).parameters["timeout"]
-        assert timeout.kind is inspect.Parameter.KEYWORD_ONLY
-        assert timeout.default is inspect.Parameter.empty, fn.__name__
+    timeout = inspect.signature(capture).parameters["timeout"]
+    assert timeout.kind is inspect.Parameter.KEYWORD_ONLY
+    assert timeout.default is inspect.Parameter.empty

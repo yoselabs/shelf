@@ -1,8 +1,12 @@
 # Changelog
 
-## 0.29.0
+## 0.30.0
 
 - New `Worktree.clean_nested(keep=())` (`git clean -ffdx`): `clean_ignored` that also deletes nested repositories, the mode `clean(nested=True)` had before 0.27. Destructive: a nested repository goes with its history and uncommitted work. `FakeRepo` holds no nested repositories, so there it equals `clean_ignored`.
+
+## 0.29.0
+
+- The real runner uses stream-proc 0.13.0's one `capture` (`Captured`; `err_text` for the display copy); requires `stream-proc>=0.13.0,<1`. Contract unchanged.
 
 ## 0.28.0
 

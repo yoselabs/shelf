@@ -44,5 +44,5 @@ def test_a_box_without_available_pages_reports_the_memory_vm_stat_calls_free(mon
     vm_stat = "Pages free: 100.\nPages inactive: 50.\nPages speculative: 10.\nPages active: 999999.\n"
     monkeypatch.setattr(os, "sysconf_names", {"SC_PAGE_SIZE": 0})
     monkeypatch.setattr(os, "sysconf", lambda name: 16384)
-    monkeypatch.setattr(plan, "capture", lambda *a, **k: Captured(0, vm_stat, "", 0.0, False))
+    monkeypatch.setattr(plan, "capture", lambda *a, **k: Captured(0, vm_stat.encode(), b"", 0.0, False))
     assert detect().ram_gb == pytest.approx(160 * 16384 / 1024**3)

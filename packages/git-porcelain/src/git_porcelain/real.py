@@ -180,7 +180,7 @@ class RealRepo:
                     # event proves an executable hook actually ran, even when that hook printed nothing.
                     child["GIT_TRACE2_EVENT"] = str(trace)
                 argv = [*real_env.argv_prefix(cwd, pin_env), *args]
-                done = stream_proc.capture_bytes(
+                done = stream_proc.capture(
                     [str(exe), *argv[1:]],
                     env=child,
                     timeout=limit,
@@ -194,8 +194,7 @@ class RealRepo:
             msg = f"git {args[0] if args else ''} timed out after {limit}s"
             # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
             raise GitTimeout(msg, retryable=True, output=(done.out + done.err).decode("utf-8", "replace").strip())
-        # lossy-ok: input: git or repo bytes read as text; a non-UTF-8 file or message becomes U+FFFD, matching git's own lossy display
-        return Done(done.exit, done.out, done.err.decode("utf-8", "replace"), hooks=hooks, hook_exits=hook_exits)
+        return Done(done.exit, done.out, done.err_text, hooks=hooks, hook_exits=hook_exits)
 
     def git_dir(self, checkout: Path) -> Path | None:
         """The git directory of ``checkout``: its pin when this repo has ``pins`` (None when it has none), else what its

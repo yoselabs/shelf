@@ -178,7 +178,7 @@ def wide_alarm(repo: Path, paths: list[str]) -> str | None:
 
 
 def _git(repo: Path, *args: str) -> str:
-    return capture(["git", *args], cwd=repo, timeout=GIT_TIMEOUT).out
+    return capture(["git", *args], cwd=repo, timeout=GIT_TIMEOUT).text
 
 
 def merge_base(repo: Path) -> str:
