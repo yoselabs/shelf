@@ -47,6 +47,22 @@ Rules:
 - Debt report: `uv run python -m any_arch tests/test_arch_*.py` lists every `debt:` row, grouped by rule (`debt_text(*rules)` as text, `debt(*rules)` as a dict).
 - Not a fit: a rule that needs the whole repo at once (a name shared across packages), or reads `pyproject.toml`. Keep those as plain tests.
 
+## README convention
+
+Article IX asks every package README to name its value, its default view and its opt-ins.
+`tests/test_arch_readme_names_its_value.py` checks it on `packages/<name>/README.md`:
+
+- **Value:** the first paragraph under the `# title` is a sentence of prose (not a code block, table, list or heading).
+- **Default view:** a line that starts with `Default view:` (bold and a list marker allowed): what the most common reader gets.
+- **Opt-ins:** a line that starts with `Opt-ins:` (same forms): what the caller asks for, or `none`.
+
+The value half already held when the rule was written; the two labels are new, so every README has a `debt:` row until it gains them.
+
+Two rules read more than one file per hit and so use the one-file-per-package trick: `readme_names_its_value` runs on each package's
+first `src/*/__init__.py` and reads the README beside it; `dead_public_api` runs on each `__init__.py` and reads a whole-repo word
+index built once per run. Both take the repo root through a factory (`_readme_rule(root)`, `_unused(root)`) so a planted test can
+point them at a scratch tree.
+
 ## Which of the other 16 arch tests fit
 
 Read for this list: `output_shape_flags`, `environment`, `atomic_writes`, `hashing`, `sqlite_access`, `ttl_cache`, `cli_surfaces` in full;
