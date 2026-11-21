@@ -194,17 +194,25 @@ def _hog_code(mib: int) -> str:
     return f"b = bytearray({mib} * 1024 * 1024); b[::4096] = b'x' * len(b[::4096])"
 
 
-def _peaks(*codes: str) -> list[int]:
-    """``peak_rss`` of each command, captured one after another from a fresh small interpreter.
+def _runs(*codes: str, timeout: float = 30, grace: float = 5.0) -> list[tuple[int, bool]]:
+    """``(peak_rss, timed_out)`` of each command, captured one after another from a fresh small interpreter.
 
     Linux hands a child its parent's resident high-water mark, so the parent must not be this (large, long-lived,
     xdist) test worker: its own size would be the floor of every number measured.
     """
     script = "import sys; from stream_proc import capture\n" + "".join(
-        f"print(capture([sys.executable, '-c', {code!r}], timeout=30).peak_rss)\n" for code in codes
+        f"r = capture([sys.executable, '-c', {code!r}], timeout={timeout!r}, grace={grace!r}); print(r.peak_rss, r.timed_out)\n"
+        for code in codes
     )
-    out = subprocess.run([PY, "-c", script], capture_output=True, text=True, check=True, timeout=120).stdout
-    return [int(n) for n in out.split()]
+    got = subprocess.run([PY, "-c", script], capture_output=True, text=True, check=False, timeout=180)
+    if got.returncode != 0:
+        pytest.fail(f"measuring interpreter exited {got.returncode}\nstderr:\n{got.stderr}\nstdout:\n{got.stdout}")
+    rows = [line.split() for line in got.stdout.splitlines()]
+    return [(int(peak), timed_out == "True") for peak, timed_out in rows]
+
+
+def _peaks(*codes: str) -> list[int]:
+    return [peak for peak, _ in _runs(*codes)]
 
 
 def test_peak_rss_is_the_childs_own_high_water_mark_in_bytes() -> None:
@@ -219,16 +227,32 @@ def test_peak_rss_is_per_child_not_the_callers_children_total() -> None:
     assert small < 100 * 1024 * 1024
 
 
+def test_peak_rss_counts_a_waited_for_grandchild() -> None:
+    [peak] = _peaks(f"import subprocess, sys; subprocess.run([sys.executable, '-c', {_hog_code(200)!r}], check=True)")
+    assert peak >= 200 * 1024 * 1024
+
+
+def test_peak_rss_survives_a_timeout_stop() -> None:
+    [(peak, timed_out)] = _runs(_hog_code(100) + "; import time; time.sleep(60)", timeout=2, grace=1)
+    assert timed_out
+    assert peak >= 100 * 1024 * 1024
+
+
 def test_polling_a_measured_child_reaps_it_and_keeps_its_peak_rss() -> None:
     """``poll()`` must work on every CPython (3.15 dropped the private ``_waitpid`` argument) and measure too."""
     p = MeasuredPopen(py("pass"))
-    deadline = time.monotonic() + 30
-    while p.poll() is None:
-        assert time.monotonic() < deadline
-        time.sleep(0.01)
-    assert p.returncode == 0
-    assert p.peak_rss is not None
-    assert p.peak_rss > 0
+    try:
+        deadline = time.monotonic() + 30
+        while p.poll() is None:
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+        assert p.returncode == 0
+        assert p.peak_rss is not None
+        assert p.peak_rss > 0
+    finally:
+        if p.poll() is None:
+            p.kill()
+            p.wait()
 
 
 def test_text_is_a_utf8_view_of_the_bytes_and_replaces_bad_ones() -> None:
