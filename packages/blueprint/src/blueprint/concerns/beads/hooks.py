@@ -8,8 +8,8 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-from blueprint.concerns.gate_hooks import HOOK_CONFIG
-from blueprint.concerns.hooks import hooks_in
+from blueprint.concerns.git_hooks.gate_hooks import HOOK_CONFIG
+from blueprint.concerns.git_hooks.hooks import hooks_in
 from blueprint.model import check, failing, not_applicable, passing, uses_beads
 
 if TYPE_CHECKING:

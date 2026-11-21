@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
-from blueprint.concerns.gate_lfs import LFS_PACKAGE, uses_lfs
+from blueprint.concerns.gate.gate_lfs import LFS_PACKAGE, uses_lfs
 from blueprint.model import (
     Context,
     Finding,

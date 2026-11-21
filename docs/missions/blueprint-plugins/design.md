@@ -89,17 +89,16 @@ assigning every row:
   keeps the sops rows. The row id is unchanged, so overrides and audit records still match.
 - `gate.git-remote` stays with gate: an origin is needed for any push, and bd now takes its remote from origin. No beads knowledge in it.
 
-## Step 5 as built: beads moved first
+## Step 5 as built: every plugin has its folder
 
-`concerns/beads/` holds the beads plugin's code: `backlog.py` (moved), `hooks.py` (`hooks.beads-sync`, out of `hooks.py`), `agents.py`
-(`agents.bd-metrics-off` and `agents.session-hooks`, out of `agents.py`). `hooks.py` now exports `hooks_in` for the beads module to read
-the hook config; neither `hooks.py` nor `agents.py` mentions bd any more. The manifest names modules by dotted path
-(`beads.backlog`) and the architecture test reads `concerns/**`. Row ids did not change, so overrides and audit records still match.
-The other plugins keep their flat modules: moving each is its own change, nothing else depends on the folder layout.
+`concerns/<plugin>/` holds each plugin's code: `beads/` (backlog, hooks, agents), `git_hooks/`, `gate/` (8 modules), `agents/`, `mise/`,
+`secrets/`, `secret_scan/`, `stacks/` (stack, profile_data, owners, shelf_sources, cli_parse), `python/`, `uv/`, `shell/`, `frameworks/`.
+The beads rows that lived in `hooks.py` and `agents.py` are now `beads/hooks.py` and `beads/agents.py`; neither the hooks nor the
+agents plugin mentions bd. Manifests list modules by dotted path (`git_hooks.hooks`), the architecture test reads `concerns/**`, and
+`concerns/__init__.py` imports them in the old registry order. Row ids did not change, so overrides and audit records still match.
+Stack-only plugins (node, go, rust, dotnet, nix, compose, dockerfile) have no folder: they are data, `profiles/*.toml`.
 
-## Step 6 deferred, with the reason
+## Step 6 dropped
 
-A third-party plugin is a manifest plus Python rows. Loading Python from a repo's own tree or from a path in `blueprint.toml` runs code
-the audit did not vet, so how a plugin is trusted (an installed package with an entry point, pinned in mise.toml, against a path in the
-repo) is a security decision for the owner, and the manifest format is not yet exercised by a second author. Until then a repo chooses
-among blueprint's own plugins through `[plugins]`, and a variant ships as a pull request that adds a manifest.
+No third-party plugins: every plugin lives in the shelf and is controlled by the owner (decision 2026-11-21), so there is no loading
+path and no trust model to build. A repo chooses among blueprint's own plugins through `[plugins]`; a variant is a change in the shelf.

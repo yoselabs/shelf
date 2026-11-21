@@ -13,9 +13,9 @@ from dataclasses import asdict, dataclass, replace
 from typing import TYPE_CHECKING
 
 from blueprint import concerns
-from blueprint.concerns.framework import FRAMEWORK_DIR
-from blueprint.concerns.profile_data import PROFILE_DIR, Role, StackProfile, load_profiles
-from blueprint.concerns.stack import FRAMEWORK_ROLES, ROLES, is_checkpoint, purpose_fact
+from blueprint.concerns.frameworks.framework import FRAMEWORK_DIR
+from blueprint.concerns.stacks.profile_data import PROFILE_DIR, Role, StackProfile, load_profiles
+from blueprint.concerns.stacks.stack import FRAMEWORK_ROLES, ROLES, is_checkpoint, purpose_fact
 from blueprint.model import REGISTRY, Check
 from blueprint.plugins import load_plugins, plugin_of
 

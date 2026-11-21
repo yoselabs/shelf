@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from blueprint.concerns.stack import ROLES
+from blueprint.concerns.stacks.stack import ROLES
 from blueprint.model import Verdict
 from blueprint.profile import detect_stacks
 from blueprint.runner import run

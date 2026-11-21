@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from blueprint.concerns.profile_data import PROFILE_DIR, load_profiles
-from blueprint.concerns.stack import (
+from blueprint.concerns.stacks.profile_data import PROFILE_DIR, load_profiles
+from blueprint.concerns.stacks.stack import (
     FRAMEWORK_ROLES,
     finding_for,
     gate_text,
@@ -20,7 +20,7 @@ from blueprint.concerns.stack import (
 from blueprint.model import Finding, Sub, check_each, is_skipped, not_checked, not_set_up, passing
 
 if TYPE_CHECKING:
-    from blueprint.concerns.stack import _Judged
+    from blueprint.concerns.stacks.stack import _Judged
     from blueprint.model import Context
 
 FRAMEWORK_DIR = PROFILE_DIR / "frameworks"

@@ -3,4 +3,4 @@ title = "The one-command gate (just, any-gate)"
 default = "on"
 requires = ["git-hooks", "stacks"]
 rows = ["gate.checkers-wired", "gate.clean-clone", "gate.default-branch", "gate.git-config-clean", "gate.git-remote", "gate.guards-have-red-tests", "gate.lfs-binaries", "gate.lfs-installed", "gate.no-ci", "gate.one-command", "gate.runner", "gate.runs-blueprint", "gate.step-inputs", "gate.superseded-scripts"]
-modules = ["gate", "gate_clone", "gate_command", "gate_git", "gate_guards", "gate_inputs", "gate_lfs", "gate_no_ci"]
+modules = ["gate.gate", "gate.gate_clone", "gate.gate_command", "gate.gate_git", "gate.gate_guards", "gate.gate_inputs", "gate.gate_lfs", "gate.gate_no_ci"]

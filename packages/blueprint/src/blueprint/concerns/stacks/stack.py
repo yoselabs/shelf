@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from blueprint import gate_graph
-from blueprint.concerns.profile_data import Role, StackProfile, load_profiles
+from blueprint.concerns.stacks.profile_data import Role, StackProfile, load_profiles
 from blueprint.model import (
     Finding,
     FixedBy,

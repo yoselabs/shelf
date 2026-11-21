@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
-from blueprint.concerns.profile_data import load_profiles
+from blueprint.concerns.stacks.profile_data import load_profiles
 from blueprint.model import FixedBy, check, failing, not_applicable, not_set_up, passing, toml_table, uses_beads
 
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ VERSION_ARGV = {
     "godot": ("godot", "--version"),
     "git": ("git", "--version"),
 }
-_TOOLS = Path(__file__).resolve().parent.parent / "tools.toml"
+_TOOLS = Path(__file__).resolve().parent.parent.parent / "tools.toml"
 _INSTALL = 'a recipe (`just tools`) that runs `MISE_IGNORED_CONFIG_PATHS="$HOME/.config/mise" mise install --locked`'
 
 

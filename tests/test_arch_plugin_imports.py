@@ -43,7 +43,7 @@ def _imported_modules(node: ast.AST) -> Iterator[str]:
 
 
 def _module_of(rel: str) -> str:
-    """`beads.backlog` for packages/blueprint/src/blueprint/concerns/beads/backlog.py; `hooks` for concerns/hooks.py."""
+    """`beads.backlog` for packages/blueprint/src/blueprint/concerns/beads/backlog.py; `hooks` for concerns/git_hooks/hooks.py."""
     return ".".join(Path(rel).relative_to(_CONCERNS_DIR).with_suffix("").parts)
 
 
@@ -85,6 +85,6 @@ def test_every_concern_module_has_exactly_one_home_plugin() -> None:
 
 def test_the_rule_sees_a_planted_undeclared_import(tmp_path: Path) -> None:
     found = plant(
-        _RULE, tmp_path, "from blueprint.concerns.beads import backlog\n", path="packages/blueprint/src/blueprint/concerns/agents.py"
+        _RULE, tmp_path, "from blueprint.concerns.beads import backlog\n", path="packages/blueprint/src/blueprint/concerns/agents/agents.py"
     )
-    assert list(found) == ["agents->beads.backlog"]
+    assert list(found) == ["agents.agents->beads.backlog"]

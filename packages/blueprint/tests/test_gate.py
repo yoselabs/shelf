@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from blueprint.concerns import gate_clone
+from blueprint.concerns.gate import gate_clone
 from blueprint.init import RECIPES
 from blueprint.model import FixedBy, Verdict
 from blueprint.report import gate as gate_report

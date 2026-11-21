@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from blueprint import gate_graph
-from blueprint.concerns.profile_data import StackProfile, load_profiles, profile_for
+from blueprint.concerns.stacks.profile_data import StackProfile, load_profiles, profile_for
 from blueprint.model import (
     Context,
     Finding,

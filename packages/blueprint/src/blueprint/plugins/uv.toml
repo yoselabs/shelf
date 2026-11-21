@@ -3,4 +3,4 @@ title = "uv as an installed tool"
 default = "detected"
 requires = ["python"]
 rows = ["stack.python-uv.uv-tool"]
-modules = ["uv_tool"]
+modules = ["uv.uv_tool"]

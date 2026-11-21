@@ -7,7 +7,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from blueprint.concerns.gate_hooks import HOOK_CONFIG
+from blueprint.concerns.git_hooks.gate_hooks import HOOK_CONFIG
 from blueprint.model import Context, Finding, FixedBy, Profile, check, failing, not_checked, not_set_up, passing, uses_beads
 
 # Effective values bd must report (`bd config show --json`), owner rounds 5-8.

@@ -3,4 +3,4 @@ title = "Frameworks (godot, mcp, unity)"
 default = "detected"
 requires = ["stacks"]
 rows = ["framework.godot.*", "framework.mcp.*", "framework.unity.*"]
-modules = ["framework"]
+modules = ["frameworks.framework"]

@@ -128,5 +128,6 @@ Blueprint checks and seeds none of it: decision records, the glossary and `docs/
 The run survey is data, `survey.toml` (experience, completeness, correctness, cost; closed answers); the skill
 fills it into `docs/blueprint/survey.md` after every run. There is no verb for it.
 
-A new checkpoint is one decorated function in `blueprint/concerns/<concern>.py` returning a
-`Finding`, with a passing test and a planted-violation test (`blueprint.testing.Repo`).
+A new checkpoint is one decorated function in the module of the plugin that owns it, `blueprint/concerns/<plugin>/<module>.py`
+(each plugin is a manifest, `blueprint/plugins/<id>.toml`, listing its rows and modules; a repo switches one off in
+`[plugins]` of `docs/blueprint/blueprint.toml`), returning a `Finding`, with a passing test and a planted-violation test (`blueprint.testing.Repo`).

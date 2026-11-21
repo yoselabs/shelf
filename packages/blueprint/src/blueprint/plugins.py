@@ -24,7 +24,7 @@ class Plugin:
     default: str
     requires: tuple[str, ...]
     rows: tuple[str, ...]
-    # The `concerns/*.py` modules this plugin owns until its code moves into a folder of its own (mission step 5).
+    # The `concerns/<plugin>/*.py` modules this plugin owns, as dotted paths below `blueprint.concerns` (`git_hooks.hooks`).
     modules: tuple[str, ...] = ()
 
     def owns(self, row_id: str) -> bool:

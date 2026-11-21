@@ -33,7 +33,7 @@ _OWNER = "packages/child-env/src/child_env/exe.py"
 
 _WHICH_DEBT = "debt: a current caller of shutil.which; the consumer wave moves it onto child_env.find"
 _WHICH_ALLOWED = {
-    **rows(_WHICH_DEBT, "packages/blueprint/src/blueprint/concerns/stack.py", "packages/blueprint/src/blueprint/model.py"),
+    **rows(_WHICH_DEBT, "packages/blueprint/src/blueprint/concerns/stacks/stack.py", "packages/blueprint/src/blueprint/model.py"),
     **rows("debt: stdlib-only engine: looks on the injected env's PATH", "packages/blueprint/src/blueprint/init.py"),
 }
 

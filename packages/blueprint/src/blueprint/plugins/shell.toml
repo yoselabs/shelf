@@ -3,4 +3,4 @@ title = "Shell"
 default = "detected"
 requires = ["stacks"]
 rows = ["stack.shell-strict", "stack.shell.*"]
-modules = ["shell"]
+modules = ["shell.shell"]

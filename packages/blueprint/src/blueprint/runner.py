@@ -9,7 +9,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from blueprint import concerns
-from blueprint.concerns import gate_git
+from blueprint.concerns.gate import gate_git
 from blueprint.model import REGISTRY, Check, Context, Finding, FixedBy, Profile, Sub, Verdict, not_checked
 from blueprint.plugins import load_plugins, notices_for, plugin_of, resolve
 from blueprint.profile import DETECTION, Override, State, detect, load_state

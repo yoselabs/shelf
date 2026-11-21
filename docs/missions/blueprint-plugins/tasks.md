@@ -5,4 +5,6 @@
 3. Architecture test: a plugin imports another only through `requires` (`just arch`).
 4. Split the straddling rows (`gate.git-remote`, `secrets.scanner`, `gate.hooks-recipe`).
 5. Move code, one plugin per change: beads first (most of the rows, the owner's trigger), then mise, then the rest.
-6. Third-party plugin load path, once the open questions are answered by a real second plugin author.
+6. Dropped: no third-party plugins (owner, 2026-11-21).
+
+Done: 1 to 5, 2026-11-21.

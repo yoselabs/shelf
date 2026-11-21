@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from blueprint.concerns import gate_clone, gate_command, gate_git, gate_guards, gate_hooks, gate_inputs, gate_lfs, gate_no_ci
+from blueprint.concerns.gate import gate_clone, gate_command, gate_git, gate_guards, gate_inputs, gate_lfs, gate_no_ci
+from blueprint.concerns.git_hooks import gate_hooks
 from blueprint.model import check
 
 check("gate.one-command", "`just check` exists and every recipe it names resolves")(gate_command.one_command)

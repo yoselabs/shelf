@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
-from blueprint.concerns.gate_hooks import HOOK_CONFIG
+from blueprint.concerns.git_hooks.gate_hooks import HOOK_CONFIG
 from blueprint.model import (
     Context,
     Finding,
@@ -105,7 +105,7 @@ def guards_have_red_tests(ctx: Context) -> Finding:
     return passing(f"{len(scripts)} script(s) ({', '.join(scripts)}), each named by a test{copied}")
 
 
-_RECIPES = Path(__file__).resolve().parent.parent / "recipes"
+_RECIPES = Path(__file__).resolve().parent.parent.parent / "recipes"
 
 
 def _is_recipe_copy(ctx: Context, script: str) -> bool:
