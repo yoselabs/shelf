@@ -4,6 +4,10 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see the ledger for why). Read this before source/README when reconciling a pin
 (agent-loop.md WORKFLOW: RECEIVE).
 
+- 0.4.0: new `Pacer.penalize(key, seconds, *, reason="") -> float`: shared `blocked_until = max(existing, now + seconds)`, returns it; state `<root>/<slug>-<hash>.block`, written under the `.pace` flock; `seconds < 0` ⇒ ValueError
+- 0.4.0: new `Pacer.blocked_until(key) -> float | None` (None when not blocked or passed), `Pacer.clear(key)`
+- 0.4.0: new `Pacer.status(key) -> PaceStatus(next_slot, blocked_until, reason)` (frozen, exported); reads under a shared lock, books no slot, creates no file
+- 0.4.0: `wait`/`apace`/`reserve` slot is `max(now, next, blocked_until)`: callers sleep through a block; unchanged when nothing was penalized
 - 0.3.2: `python -m any_lease run` hands its command `{**os.environ, ANY_LEASE_HELD}` again (reverses the 0.3.0 child-env note): credentials and agent-session variables (`*TOKEN*`, `*SECRET*`, `AWS_*`, `GH_*`, `CLAUDE_*`, `ANTHROPIC_*`, `MCP_*`) reach the command; a lock around a command must not change it; compatible with 0.3.0 callers; drops dependency `child-env`
 - 0.3.0: `python -m any_lease run` handed its command `{**os.environ, ANY_LEASE_HELD}`  ⇒  `child_env.build_env(os.environ, allow=("*",), extra={ANY_LEASE_HELD})`: every variable except credentials (`*TOKEN*`, `*SECRET*`, `AWS_*`, `GH_*`, ...) and agent-session ones (`CLAUDE_*`, `ANTHROPIC_*`, `MCP_*`, ...), which the command no longer inherits
 - 0.3.0: the poll between flock attempts waits on a `threading.Event` (the caller's `cancel`, or a private one) instead of `time.sleep`; same wake-up on cancel, no behaviour change
