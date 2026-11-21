@@ -39,6 +39,7 @@ _ALLOWED = {
             "tools/api_surface.py": "a repo tool script, run by `uv run python`: stdlib only, no workspace import",
             "tools/catalog.py": "a repo tool script, run by `just`: stdlib only, no workspace import",
             "tools/preset_refresh.py": "a repo tool script, run by `just`: takes no arguments, argparse only serves --help",
+            "tools/stdlib_shadow.py": "a repo tool script, run by `just` as bare `python3 -I`: stdlib only, no workspace import",
             "tools/tag_check.py": "a repo tool script, run by the pre-push hook as bare `python3 -I`: stdlib only, no workspace import",
             "packages/any-gate/src/any_gate/cli.py": (
                 "needs argparse.REMAINDER (`-- RUNNER`, `-- CMD`) and repeatable flags; verb-cli has neither"

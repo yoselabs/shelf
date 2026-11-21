@@ -24,6 +24,7 @@ _SCRIPTS = [
     "packages/convert-md/bench/run_bench.py",
     "tools/api_surface.py",
     "tools/catalog.py",
+    "tools/stdlib_shadow.py",
     "tools/tag_check.py",
 ]
 

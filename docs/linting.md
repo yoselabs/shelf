@@ -154,6 +154,17 @@ let one happen by accident.
 Not compared: `per-file-ignores` keys and `sub-config` matches. Those are paths, and a consumer's tree
 is not this one's. A check that fails on every consumer forever teaches everyone to ignore it.
 
+## Stdlib shadowing (`just stdlib-shadow`, in `check` and `check-all`)
+
+Python puts the running script's folder ahead of the standard library on `sys.path`, so a tracked `queue.py` in `scripts/` replaces
+`queue` for every script run from there (a consumer repo: 729 jobs failed with `module 'queue' has no attribute 'SimpleQueue'`; a
+`profile.py` shadows what `cProfile` imports). `tools/stdlib_shadow.py` fails on any `*.py` file or package folder whose name is in
+`sys.stdlib_module_names`, in a folder that can be first on the path: the repo root, `scripts/`, `tools/`, `bin/`, `src/`, `tests/`, `test/`,
+or any folder holding a script (a `__main__` guard or a PEP 723 `# /// script` header). Inside a package (the folder or one above it has
+`__init__.py`, e.g. `src/<pkg>/queue.py`) a name is imported through its package and is not checked. Exceptions go in
+`tools/stdlib_shadow_allow.toml`, one reason per path; an entry without a reason, or for a path that no longer shadows, fails. Declared
+inputs in `gate-inputs.toml` ([ADR 0031](adr/0031-gate-steps-declare-their-inputs.md)): `*.py` and the allowlist.
+
 ## Architectural fitness rules (native, not OPA — ADR 0005)
 
 Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest, reimplementing a2kit's Rego policies without dragging OPA in:

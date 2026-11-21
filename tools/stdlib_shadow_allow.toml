@@ -1,0 +1,3 @@
+# Paths allowed to share a name with a standard library module (tools/stdlib_shadow.py). Every entry needs its one-line reason, keyed by the
+# repo-relative path of the file or package folder; an entry that no longer shadows anything fails the check until it is deleted.
+[allow]
