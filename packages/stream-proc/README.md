@@ -118,3 +118,16 @@ failure after registration (ENOENT, EACCES) is a `Result` with `exec_errno` set 
 registered identity never ran the command. A failure before the callback returned propagates (nothing ran);
 `RegisteredStartUncertainError` propagates as from `popen_registered`. After a normal exit a descendant still in
 the group is not stopped: `Result.pgid` names the group for the caller's `group_alive` proof.
+
+## Detached start
+
+```python
+from stream_proc import spawn_detached
+
+d = spawn_detached(["uv", "run", "worker.py"], cwd=repo, env=env, log=Path("logs/worker.log"))
+d.pid, d.start      # store both; stop_pid(d.pid, d.start) later
+```
+
+A child in a session of its own, stdin `/dev/null`, stdout and stderr appended to `log`, all other descriptors closed: the
+call returns at once and a caller reading our pipes sees EOF when we exit, not when the child does. If the start identity
+cannot be read the child is stopped and `IdentityUnavailableError` raised.

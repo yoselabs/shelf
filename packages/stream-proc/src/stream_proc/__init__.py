@@ -9,6 +9,8 @@
   :func:`group_alive` — is any process in a group; :func:`group_rss` — resident bytes of a group.
 - :func:`capture` — a child to its end, one :class:`Captured`: output as exact bytes with a ``.text`` view, exit 124 on a
   timeout, optional ``input`` on stdin, stdin devnull or inherited; :func:`run_inherited` for a child that writes to our stdout/stderr.
+- :func:`spawn_detached` — a child in its own session with stdin /dev/null and output appended to a log file, returned at once as
+  :class:`Detached` ``(pid, start)``: it outlives the caller and never holds the caller's pipes.
 - :func:`stop_pid`, :class:`PidHandle` — stop a process we did not spawn, only while its start token matches.
 - :class:`TermHold`, :func:`popen_held` — a SIGTERM landing during a spawn still stops the child.
 - :func:`peak_bytes` — a `wait4` rusage's peak resident set in bytes (the OS's `ru_maxrss` unit lives here).
@@ -20,6 +22,7 @@ Stdlib only (``ctypes`` on macOS), POSIX.
 """
 
 from stream_proc.capture import Captured, capture, run_inherited
+from stream_proc.detach import Detached, spawn_detached
 from stream_proc.hold import TermHold, peak_bytes, popen_held
 from stream_proc.owned import IdentityUnavailableError, OwnedProcess, ProcessObservation, inspect_process, observe_owned
 from stream_proc.pid import PidHandle, stop_pid
@@ -32,6 +35,7 @@ from stream_proc.tree import StopReport, stop_tree, stop_tree_report
 
 __all__ = [
     "Captured",
+    "Detached",
     "IdentityUnavailableError",
     "Kind",
     "OwnedProcess",
@@ -58,6 +62,7 @@ __all__ = [
     "run",
     "run_inherited",
     "run_registered",
+    "spawn_detached",
     "stop_pid",
     "stop_tree",
     "stop_tree_report",

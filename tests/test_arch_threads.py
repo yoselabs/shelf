@@ -37,6 +37,9 @@ _ALLOWED = {
         "packages/any-gate/src/any_gate/steps.py": (
             "fan-out of blocking `just` recipes with pass_fds, one thread per step joined together; run_steps is sync by design"
         ),
+        "packages/any-supervise/src/any_supervise/fleet.py": (
+            "roll fans a blocking stop-start-settle over replicas, at most `parallel` at once, one pool joined; sync by design"
+        ),
         "packages/any-net/src/any_net/probe.py": (
             "blocking adapter: getaddrinfo ignores socket timeouts, so each probe is a daemon thread joined to one deadline; "
             "probe() is sync"

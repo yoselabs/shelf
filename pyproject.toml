@@ -45,6 +45,8 @@ any-arch = { workspace = true }
 any-lease = { workspace = true }
 # any-work composes any-lease, any-failure-fp and sqlite-store.
 any-work = { workspace = true }
+# any-supervise composes atomic-io, child-env, process-lock and stream-proc.
+any-supervise = { workspace = true }
 any-failure-fp = { workspace = true }
 sqlite-store = { workspace = true }
 content-digest = { workspace = true }
@@ -326,6 +328,7 @@ testpaths = [
     "packages/any-path-glob/tests",
     "packages/any-failure-fp/tests",
     "packages/any-work/tests",
+    "packages/any-supervise/tests",
     "packages/any-shell-policy/tests",
     "packages/any-net/tests",
     "packages/any-clock/tests",
@@ -440,6 +443,7 @@ root_packages = [
     "any_path_glob",
     "any_failure_fp",
     "any_work",
+    "any_supervise",
     "any_shell_policy",
     "any_net",
     "any_clock",
@@ -539,6 +543,7 @@ source_modules = [
     "any_path_glob",
     "any_failure_fp",
     "any_work",
+    "any_supervise",
     "any_shell_policy",
     "any_net",
     "any_clock",
@@ -640,6 +645,7 @@ modules = [
     "any_path_glob",
     "any_failure_fp",
     "any_work",
+    "any_supervise",
     "any_shell_policy",
     "any_net",
     "any_clock",
@@ -715,6 +721,11 @@ ignore_imports = [
     "any_work.work -> any_failure_fp.backoff",
     "any_work.work -> any_lease",
     "any_work.work -> sqlite_store",
+    "any_supervise.fleet -> child_env",
+    "any_supervise.fleet -> process_lock",
+    "any_supervise.fleet -> stream_proc",
+    "any_supervise.fleet -> stream_proc.capture",
+    "any_supervise.store -> atomic_io",
     "any_yaml -> yaml_merge",
     "any_yaml.write -> yaml_merge",
     "any_yaml.write -> atomic_io",
