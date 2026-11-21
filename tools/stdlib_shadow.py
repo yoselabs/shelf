@@ -8,10 +8,13 @@ and every package directory (one holding `__init__.py`) whose name is a standard
 
 A name is checked in a folder that can be the first on `sys.path`: the repo root, a folder named `scripts`, `tools`, `bin`, `src`,
 `tests` or `test`, or any folder with a `*.py` that has a `__main__` guard or a PEP 723 `# /// script` header (a script a person
-runs). A folder inside a package (it, or a folder above it below the repo root, has `__init__.py`) is not checked: its modules are
-imported by their package name and relative imports apply, so `src/<pkg>/queue.py` is safe. `src/` itself is checked, being on the
-path of an editable install. `__main__.py` is never a shadow. A namespace folder (no `__init__.py`) loses to the standard library,
-so it is not one.
+runs). A folder inside a package (it, or a folder above it below the repo root, has `__init__.py`) is checked only when it holds a
+directly runnable script: a `*.py` other than `__main__.py` with a `__main__` guard or a PEP 723 header. Imported by its package
+name, `src/<pkg>/queue.py` is safe; run `python src/<pkg>/cli.py` and the folder leads `sys.path`, so `queue.py` beside it shadows the
+standard library. A stdlib-named file that is itself that script counts (it leads `sys.path` for what it imports). `__main__.py` is
+run as `python -m <pkg>`, which leads with the working directory, so it never makes its folder a script folder. `src/` itself is
+checked, being on the path of an editable install. `__main__.py` is never a shadow. A namespace folder (no `__init__.py`) loses to the
+standard library, so it is not one.
 
 `tools/stdlib_shadow_allow.toml` lists the paths allowed to stay, each with its one-line reason. An entry with no reason, or for a path
 that no longer shadows, fails too, so the list never outlives the need. Stdlib only, so it runs as bare `python3 -I`.
@@ -64,12 +67,15 @@ def shadows(repo: Path, paths: Sequence[str]) -> dict[str, str]:
         return SCRIPT_MARK.search(text) is not None
 
     scripty = {p.parent for p in files if marked(p)}
+    run_in_package = {p.parent for p in files if p.name != "__main__.py" and marked(p)}  # `python -m pkg` leads with cwd, not the folder
 
     def inside_package(folder: PurePosixPath) -> bool:
         return any(up in packages for up in (folder, *folder.parents) if up != ROOT)
 
     def on_path(folder: PurePosixPath) -> bool:
-        return not inside_package(folder) and (folder == ROOT or folder.name in SCRIPT_DIRS or folder in scripty)
+        if inside_package(folder):
+            return folder in run_in_package
+        return folder == ROOT or folder.name in SCRIPT_DIRS or folder in scripty
 
     out: dict[str, str] = {}
     for p in sorted(files):
