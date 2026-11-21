@@ -287,11 +287,11 @@ def test_the_old_command_line_still_reads_a_top_level_exempt_block(repo: Repo) -
     assert "compose.privileged" in out.stdout
 
 
-# a2kay's owner, 2026-10-12: a hook that cannot fail tells nothing. `bd dolt push` failed over HTTPS on an SSH-only box and
+# a2kay's owner, 2026-10-12: a hook that cannot fail tells nothing. `bd dolt push` (now `bd sync`) failed over HTTPS on an SSH-only box and
 # the pre-push hook still printed Passed.
 def _dolt_push_entry() -> str:
     text = (RECIPES / RECIPE_FILES["hooks"]).read_text()
-    block = text[text.index("id: bd-dolt-push") :]
+    block = text[text.index("id: bd-sync-push") :]
     line = next(ln for ln in block.splitlines() if ln.strip().startswith("entry:"))
     return line.split("entry:", 1)[1].strip()
 

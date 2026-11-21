@@ -18,6 +18,7 @@ STRICT = {
     "export.auto": "false",
     "export.git-add": "false",
     "import.auto": "false",
+    "dolt.auto-push": "true",
 }
 _METRICS_ENV = "BD_DISABLE_METRICS"
 # `bd lint` prints a bead line (`<id> [<type>]: <title>`), then one `Missing: ## <section>` line per gap.

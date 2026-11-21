@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from blueprint.model import check, failing, not_applicable, passing
+from blueprint.model import check, failing, not_applicable, passing, uses_beads
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
@@ -31,7 +31,7 @@ _TESTS = re.compile(
     r"|\byarn\s+test\b|\bpnpm\s+(?:run\s+)?test\b"
 )
 _GATE = re.compile(r"\b(?:just|make)\s+check\b")
-_BD = re.compile(r"\bbd\s+(?:hooks\s+run|dolt\s+push)\b")
+_BD = re.compile(r"\bbd\s+(?:hooks\s+run|dolt\s+push|sync)\b")
 _ALWAYS_OK = re.compile(r"\|\|\s*(?:true|exit\s+0|:)(?!\w)|;\s*exit\s+0\s*['\"]?\s*$")
 _CLONE = re.compile(r"\bSHELF_HOME\b|\.\./shelf\b|~/Workspaces/shelf|\$HOME/Workspaces/shelf|\$\{HOME\}/Workspaces/shelf")
 
@@ -157,3 +157,27 @@ def gate_always_runs(ctx: Context) -> Finding:
             "give it `always_run: true` and `pass_filenames: false`, and remove its `files`, `exclude` and `types` keys",
         )
     return passing("the gate hook always runs")
+
+
+_SYNC = re.compile(r"\bbd\s+sync\b")
+_SYNC_FIX = (
+    "add the recipe's `bd-sync-push` (pre-push) and `bd-sync-pull` (post-merge, post-checkout) hooks: `bd sync` pulls, checks conflicts, "
+    "pushes with retry and exits 2 (conflict), 3 (race), 4 (stuck); bare `bd dolt push` is a fallback, not the routine step"
+)
+
+
+@check(
+    "hooks.beads-sync",
+    "a beads repo syncs through `bd sync`: at pre-push (fatal) and on post-merge and post-checkout (pull)",
+    applies=uses_beads,
+)
+def beads_sync(ctx: Context) -> Finding:
+    """Bead data travels on refs/dolt/data, which git never moves; without these hooks a clone drifts and a push can race silently."""
+    config = ctx.read(_CONFIG)
+    if config is None:
+        return not_applicable(_NONE)
+    synced = {stage for h in _hooks(config) if _SYNC.search(h.entry) for stage in h.stages}
+    missing = [stage for stage in ("pre-push", "post-merge", "post-checkout") if stage not in synced]
+    if missing:
+        return failing(f"no `bd sync` hook at: {', '.join(missing)}", _SYNC_FIX)
+    return passing("`bd sync` runs at pre-push, post-merge and post-checkout")
