@@ -45,7 +45,27 @@ Rules:
   `cost:` and `construction:` are the kinds the existing rules use. A `debt:` row shows up in the debt report.
 - Never change `source.tree`: it is shared by every rule in the run.
 - Debt report: `uv run python -m any_arch tests/test_arch_*.py` lists every `debt:` row, grouped by rule (`debt_text(*rules)` as text, `debt(*rules)` as a dict).
-- Not a fit: a rule that needs the whole repo at once (a name shared across packages), or reads `pyproject.toml`. Keep those as plain tests.
+- Not a fit: a rule that needs the whole repo at once (a name shared across packages) as a verdict on one file, or reads `pyproject.toml`. Keep those as plain tests; a rule that needs repo-wide facts only to judge one file at a time builds them in a factory (below).
+
+## README convention
+
+Article IX asks every package README to name its value, its default view and its opt-ins.
+`tests/test_arch_readme_names_its_value.py` checks it on `packages/<name>/README.md`:
+
+- **Value:** the first paragraph under the `# title` is a sentence of prose (not a code block, table, list or heading).
+- **Default view:** a line that starts with `Default view:` (bold and a list marker allowed): what the most common reader gets.
+- **Opt-ins:** a line that starts with `Opt-ins:` (same forms): what the caller asks for, or `none`.
+
+The value half already held when the rule was written; the two labels are new, so every README has a `debt:` row until it gains them.
+
+Two rules read more than one file per hit and so use the one-file-per-package trick: `readme_names_its_value` runs on each package's
+first `src/*/__init__.py` and reads the README beside it; `dead_public_api` runs on each `__init__.py` and reads a whole-repo word
+index built once per run. Both take the repo root through a factory (`_readme_rule(root)`, `_unused(root)`) so a planted test can
+point them at a scratch tree.
+
+`dead_public_api` is report-only, not a gate: it sees only this repo, and the consumers that matter (a2kay, a2web, task-loop, ogy) live
+outside it, so most hits are false and a gate would train people to add rows blindly. It has no rows and fails nothing; its planted
+tests guard the detection. Print the hits with `uv run python tests/test_arch_dead_public_api.py` (`any_arch` reports only `debt:` rows).
 
 ## Which of the other 16 arch tests fit
 
@@ -53,8 +73,22 @@ Read for this list: `output_shape_flags`, `environment`, `atomic_writes`, `hashi
 `exe_env`, `process_spawn`, `time_json`, `text_hygiene`, `http_clients`, `threads`, `duplicate_names`, `public_any` by their scan and allowlist code.
 A waiver by an inline comment (`# lossy-ok:`, `# Any:`) is the finder's own logic over `source.text`; it fits.
 
-| fits as is | `cli_surfaces`, `threads`, `sqlite_access` (scope `packages`, `tools`, `skills` globs; the owners and `tests` are skipped in the finder), `atomic_writes` (the owner set skipped by `source.package`), `hashing` (two rules; its bare-set rows gain reasons), `exe_env`, `process_spawn`, `time_json`, `text_hygiene` (two to four rules each; bare-set rows gain reasons) |
+| migrated (shelf-tyld.33) | `cli_surfaces`, `threads`, `sqlite_access` (scope `packages`, `tools`, `skills` globs; the owners and `tests` are skipped in the finder), `atomic_writes` (the owner set skipped by `source.package`), `hashing` (two rules; its bare-set rows gained reasons), `exe_env`, `process_spawn`, `time_json`, `text_hygiene` (two to four rules each; bare-set rows gained reasons). None needed a `Hit` detail: a failure shows key and lines |
 |---|---|
-| fits, and wants one more field | a hit's detail text: `environment` (`os.environ`, `Path.home`), `output_shape_flags` (why the flag is an output shape), `ttl_cache` (the SQL string), `atomic_writes`, `process_spawn` print what was found today; a `Hit` is `(key, line)` only. Add the field when the first of them migrates |
-| fits, with a local test beside it | checks that something still exists or the scan is not vacuous: `http_clients` (the two owners still build a client), `ttl_cache` (sources found), `public_any` (its opt-in list is read from `pyproject.toml`; the rule itself has no rows), `hashing` (one list contains the other) |
+| fits, and wants one more field | a hit's detail text: `environment` (`os.environ`, `Path.home`), `output_shape_flags` (why the flag is an output shape), `ttl_cache` (the SQL string) print what was found today; a `Hit` is `(key, line)` only. Add the field when the first of them migrates |
+| fits, with a local test beside it | checks that something still exists or the scan is not vacuous: `http_clients` (the two owners still build a client), `ttl_cache` (sources found), `public_any` (its opt-in list is read from `pyproject.toml`; the rule itself has no rows) |
 | does not fit | `duplicate_names` (a name shared across packages: the finder sees one file, so it needs the whole repo at once), `rules` (pyproject and import-linter TOML, body duplication across packages) |
+
+## Rules that need more than the finder's one file
+
+A rule can build its whole-repo facts once from `any_arch.source.sources(root, scope)` inside a factory `_rule(root, rows)`, lazily on
+the first file the finder sees, so a planted file under `tmp_path` is part of the facts: `tests/test_arch_outcome_unions_consumed.py`
+(outcome types and callee resolution) and `tests/test_arch_package_exception_base.py` (the exception hierarchy of a package) do.
+`tests/arch_keys.py` gives a key finer than a file, `path:Class.function`, for rules whose files hold both an `outcome:` and a `debt:`.
+
+## Package exception base
+
+Every exception class a package defines derives, directly or through another of its own, from one class of that package, so a caller
+writes one `except GitError`. Name it `<Package>Error` (`AnyFileError`, `JsonlLogError`, `McpCallError`); the test enforces the
+single root, not the name. A control-flow signal that must not be caught by `except PackageError` (a `SystemExit` subclass) is the
+one reason to keep a second root: record it as an `outcome:` row.

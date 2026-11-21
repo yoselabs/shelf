@@ -22,6 +22,7 @@ _SCRIPTS = [
     "packages/convert-md/bench/engines/run_pymupdf4llm.py",
     "packages/convert-md/bench/engines/run_unstructured.py",
     "packages/convert-md/bench/run_bench.py",
+    "tools/api_surface.py",
     "tools/catalog.py",
     "tools/tag_check.py",
 ]

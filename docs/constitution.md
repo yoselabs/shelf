@@ -49,22 +49,39 @@ Accumulation without consolidation is drift. Hard opinions, a breach is a defect
   A failed cleanup or shutdown is reported, and the stop it belonged to still happens: a failure to record never
   leaves a worker running.
 - **Tolerance is a handler, not a flag.** `missing_ok=`, `ignore_errors=`, `force=`, `overwrite=` and kin do not
-  exist. The call raises a typed exception, and the caller that tolerates it catches that exception. Two actions
-  that differ in kind (create versus replace) are two verbs. A `Literal` or enum parameter is the same flag in a
-  different coat. ADR 0030 records the 28 old exceptions as debt to convert, not as precedent.
+  exist. A required thing that is absent raises a typed exception, and the caller that tolerates it catches that
+  exception. Lookup of an optional thing is a value in the return type (below), not an exception. Convergence ("make it
+  exist", "make it gone") is one idempotent verb (`ensure`). Two actions that differ in kind (create versus replace)
+  are two verbs. A `Literal` or enum parameter is the same flag in a different coat. ADR 0030 records the 28 old
+  exceptions as debt to convert, not as precedent.
 - **Two kinds of failure** (Go's returned `error` versus `panic`). An *expected outcome* is a normal result the
-  caller must branch on (a merge conflict, not found, a refused push): a value in the return type, a union such as
-  `Rebased | Conflict` that pyrefly checks exhaustively; never an exception, never a bool flag. A failure the
-  function *cannot continue from* (broken invariant, environment gone, caller misuse) is an exception, never
-  swallowed (no `except X: pass`, no `contextlib.suppress` of a typed failure), handled only where something useful
-  can be done, normally the edge. No Result type on every function: only where the outcome is expected.
+  caller must branch on (a merge conflict, an absent optional thing, a refused push): a value in the return type
+  (`X | None`, or a union such as `Rebased | Conflict`); never an exception, never a bool flag. The union is the
+  channel only: pyrefly lets a caller narrow it but does not force a look (a discarded value is legal), so consuming it
+  is a planned check: a discarded or non-exhaustively handled outcome union is a violation; consume with `match` plus
+  `assert_never`. A failure the function *cannot continue from* (broken invariant, environment gone, required thing
+  absent, caller misuse) is an exception, never swallowed (no `except X: pass`, no `contextlib.suppress` of a typed
+  failure), handled only where something useful can be done, normally the edge. No Result type on every function:
+  only where the outcome is expected.
+- **Failure plumbing.**
+  - *Owned thread* (a pump): a callback that raises stores the FIRST error under synchronization, is no longer
+    invoked, while draining continues so the child never blocks; the owner re-raises it at shutdown, after join.
+  - *Cleanup*: attempt every cleanup independently. One failure propagates unchanged; two or more raise an
+    `ExceptionGroup` (`BaseExceptionGroup` when cancellation or `KeyboardInterrupt` is among them; cancellation is
+    preserved, never swallowed). Async cleanup is bounded and shielded. Callers of such code use `except*`.
+  - *Exceptions of a package* share ONE base class: "recognized failures of this package", not everything it can
+    raise. A raw `OSError` may cross when its standard meaning stays useful. Wrap only to add domain meaning, always
+    `raise X(...) from exc`, never for catch convenience.
+  - *Log once, at the edge*: a library neither logs-and-swallows nor logs-and-reraises.
 - **No redundancy.** One implementation of a behaviour per repo. A duplicate is allowed only as a recorded
   task that reconciliation (Article VIII) must resolve, never as the end state.
 Each rule names its check; where the check does not exist yet, adopting the rule includes filing it:
 
 | Rule | Check | State |
 |---|---|---|
-| Injection (II) | module-level I/O and global-state fitness test | task shelf-ufmg |
+| Injection (II) | `tests/test_arch_module_level_state.py` import-time I/O, `global` statements and function-mutated module containers in `packages/*/src`, one exact-count reasoned row per file; the 11 `debt:` file rows (14 hits) are conversions still owed, 4 `outcome:` rows (6 hits) are documented registries; module-level instances of stateful classes are hit, a collaborator constructed inside its user is not checked to an injected collaborator | blocking |
+| Decay (VIII) | `tests/test_arch_dead_public_api.py` a name in a package's `__all__` that no other package, test, use-case, config or script mentions beside the package; a hit is a deletion candidate | report only (consumers outside this repo are invisible to it) |
+| README names its value, default view, opt-ins (IX) | `tests/test_arch_readme_names_its_value.py` first paragraph is prose, plus a `Default view:` and an `Opt-ins:` line ([convention](arch-rules.md#readme-convention)); every package has a `debt:` row until its README gains the lines | blocking |
 | No optionality | `tests/test_arch_bool_modes.py` bool-with-default parameters, keyword-only included, one reasoned allowlist row per current hit | blocking; extends task shelf-cypc |
 | One dispatch on the OS (III) | `tests/test_arch_platform_sites.py` platform reads only in allowlisted modules | blocking |
 | One value, no output-shape flags (IX) | `tests/test_arch_output_shape_flags.py` flag parameters that select the return shape | blocking |
@@ -73,7 +90,13 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 | No backward compatibility | shim / legacy / compat ban | task shelf-au97 |
 | No silent failures | planted-violation test for a swallowed exception (effects research, task shelf-tyld.22) | task |
 | Tolerance is a handler | `tests/test_arch_bool_modes.py` public parameters named force/overwrite/missing_ok/exist_ok/ignore_errors/check, or annotated Literal/Enum (aliases included); `debt:` rows are conversions still owed | blocking |
-| Two kinds of failure (III) | swallowed handlers: `tests/test_arch_swallowed_exceptions.py` silent `except` handlers and `contextlib.suppress`, one exact-count reasoned row per file; a handler that returns a typed value is not flagged; the 38 `debt:` hits are conversions still owed | blocking |
+| Two kinds of failure (III) | swallowed handlers: `tests/test_arch_swallowed_exceptions.py` silent `except` handlers and `contextlib.suppress`, one exact-count reasoned row per file; a handler that returns a typed value is not flagged; no `debt:` hits remain: every handler is an `outcome:` row | blocking |
+| Outcome unions are consumed (III) | `tests/test_arch_outcome_unions_consumed.py` a call to a function whose return is a union of shelf outcome types (frozen dataclasses), used as a statement, never narrowed, or matched non-exhaustively; callees resolved by name and import map, methods only when every `def` of the name is an outcome union; the 2 `debt:` hits are fakes that drop `Offline` | blocking |
+| Cancellation is not lost (III) | `tests/test_arch_cancellation_not_lost.py` `except BaseException` / `CancelledError` / `KeyboardInterrupt` / `SystemExit` / bare `except:` that does not raise on every path, one reasoned row per file | blocking |
+| No error erasure (III) | `tests/test_arch_error_erasure.py` an `except` that returns `None` / `False` / `0` / `''` / an empty container and does not raise, unless it catches only absence types; `return` inside `finally`; disjoint from the swallowed-exceptions test; `debt:` rows are conversions still owed | blocking |
+| No check-then-act (III) | `tests/test_arch_check_then_act.py` `exists` / `is_file` / `is_dir` / `os.access` whose answer guards a mutation of the same path expression in the same function; `outcome:` rows are lock-protected or single-owner cases | blocking |
+| Bounded retry (III) | `tests/test_arch_bounded_retry.py` `while True` / `while <flag>` loop with a handler that continues and a sleep, but no attempt counter, deadline or clock read | blocking |
+| Package exception base (III) | `tests/test_arch_package_exception_base.py` every exception a package defines derives from one root class of that package (convention: `<Package>Error`); one `debt:` row per package with several roots | blocking |
 | Exception handled by the caller (III) | static call-graph check | refused for now: with types (pyrefly `--report-pysa`) 96.7% of calls resolve, but the shelf's 9 cross-package hits were all deliberate pass-through (docstring paperwork, 0 bugs), the check costs 114 s, and Result-everywhere contradicts ADR 0030; reopen if hits pass about 50 or another codebase shows real bugs; [research](research/checked-exceptions.md), [typed calls](research/typed-call-resolution.md) |
 | No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
 | Size limit (IV) | `tests/test_size_caps.py` file and function SLOC caps | blocking on changed files |
@@ -139,5 +162,5 @@ its law.
   silently falls back.
 Check: the package's README names its value, its default view and its opt-ins; a review rejects a flag that
 selects an output shape. State: the flag rule is blocking (`tests/test_arch_output_shape_flags.py`, row "One value, no output-shape
-flags (IX)" in the Article III table). "One value, one file" and the README naming are review-only: two files for one result needs
-meaning a parser cannot see, and no README heading convention exists to check against.
+flags (IX)" in the Article III table). The README naming is blocking too (`tests/test_arch_readme_names_its_value.py`, convention in
+[arch-rules](arch-rules.md#readme-convention)). "One value, one file" is review-only: two files for one result needs meaning a parser cannot see.

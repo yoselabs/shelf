@@ -7,8 +7,8 @@ those):
 - a ``subprocess`` run or spawn (``run``, ``Popen``, ``call``, ``check_call``, ``check_output``) carries a ``timeout=``,
   except in stream-proc, any-proc and git-porcelain.
 
-Each allowlist below is the set of files that break the rule TODAY. A file leaves it when the consumer wave moves it onto
-stream-proc; a new file can never join it, and a listed file that no longer breaks the rule fails the test (shrink the list).
+Each rule's rows are the files that break it TODAY. A file leaves them when the consumer wave moves it onto
+stream-proc; a new file can never join, and a listed file that no longer breaks the rule fails the test (shrink the list).
 """
 
 from __future__ import annotations
@@ -18,35 +18,40 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from any_arch import Rule, check, plant, rows
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Iterator
+
+    from any_arch import Hit, Source
 
 _ROOT = Path(__file__).resolve().parent.parent
 _OWNER = "packages/stream-proc/"
 _SPAWNERS = ("packages/stream-proc/", "packages/any-proc/", "packages/git-porcelain/")
 _SPAWN_CALLS = {"run", "Popen", "call", "check_call", "check_output"}
+_SCOPE = ("packages/*/src/**/*.py", "tools/**/*.py")
 
 # to be emptied by the consumer wave: files that kill, signal-0 probe or session-spawn themselves today
-_KILL_ALLOWLIST = {
-    "packages/any-speech/src/any_speech/adapters/_child.py",  # session spawn only: wait4 alone gives ru_maxrss
-    "packages/anyllm/src/anyllm/providers/_agent.py",  # SIGKILL of a worker group by pgid, no Popen in hand (stop_tree needs one)
+_KILL_ALLOWED = {
+    **rows("debt: session spawn only: wait4 alone gives ru_maxrss", "packages/any-speech/src/any_speech/adapters/_child.py"),
+    **rows(
+        "debt: SIGKILL of a worker group by pgid, no Popen in hand (stop_tree needs one)",
+        "packages/anyllm/src/anyllm/providers/_agent.py",
+    ),
 }
 
 # to be emptied by the consumer wave: files outside the spawners that run a subprocess with no timeout=
-_UNBOUNDED_ALLOWLIST = {
-    "packages/any-lease/src/any_lease/__main__.py",  # kept: the run wrapper waits on an arbitrary user command, a deadline would kill it
-    "packages/blueprint/src/blueprint/gate_test.py",  # kept: runs the repo's whole test suite, which has no fixed duration
-    "packages/any-gate/src/any_gate/steps.py",  # kept: recipes may run long (budgets only warn), get pass_fds; stream-proc.run lacks both
+_UNBOUNDED_ALLOWED = {
+    **rows(
+        "kept: the run wrapper waits on an arbitrary user command, a deadline would kill it",
+        "packages/any-lease/src/any_lease/__main__.py",
+    ),
+    **rows("kept: runs the repo's whole test suite, which has no fixed duration", "packages/blueprint/src/blueprint/gate_test.py"),
+    **rows(
+        "kept: recipes may run long (budgets only warn), get pass_fds; stream-proc.run lacks both",
+        "packages/any-gate/src/any_gate/steps.py",
+    ),
 }
-
-
-def _sources() -> list[Path]:
-    return sorted([*_ROOT.glob("packages/*/src/**/*.py"), *_ROOT.glob("tools/**/*.py")])
-
-
-def _rel(path: Path) -> str:
-    return path.relative_to(_ROOT).as_posix()
 
 
 def _is(node: ast.expr, module: str, names: set[str]) -> bool:
@@ -58,72 +63,58 @@ def _from_imports(tree: ast.AST, module: str) -> set[str]:
     return {a.asname or a.name for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module == module for a in n.names}
 
 
-def _kill_findings(tree: ast.AST) -> list[str]:
-    bare_killpg = _from_imports(tree, "os") & {"killpg"}
-    found: list[str] = []
-    for node in ast.walk(tree):
+def _kills(source: Source) -> Iterator[Hit]:
+    if source.rel.startswith(_OWNER):
+        return
+    bare_killpg = _from_imports(source.tree, "os") & {"killpg"}
+    for node in ast.walk(source.tree):
         if not isinstance(node, ast.Call):
             continue
         fn = node.func
         if _is(fn, "os", {"killpg"}) or (isinstance(fn, ast.Name) and fn.id in bare_killpg):
-            found.append(f"line {node.lineno}: os.killpg")
+            yield source.rel, node.lineno
         if _is(fn, "os", {"kill"}) and len(node.args) >= 2 and isinstance(node.args[1], ast.Constant) and node.args[1].value == 0:
-            found.append(f"line {node.lineno}: os.kill(x, 0)")
-        found += [
-            f"line {node.lineno}: start_new_session=True"
-            for kw in node.keywords
-            if kw.arg == "start_new_session" and isinstance(kw.value, ast.Constant) and kw.value.value is True
-        ]
-    return found
+            yield source.rel, node.lineno
+        for kw in node.keywords:
+            if kw.arg == "start_new_session" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                yield source.rel, node.lineno
 
 
-def _unbounded_findings(tree: ast.AST) -> list[str]:
-    bare = _from_imports(tree, "subprocess") & _SPAWN_CALLS
-    found: list[str] = []
-    for node in ast.walk(tree):
+def _unbounded(source: Source) -> Iterator[Hit]:
+    if source.rel.startswith(_SPAWNERS):
+        return
+    bare = _from_imports(source.tree, "subprocess") & _SPAWN_CALLS
+    for node in ast.walk(source.tree):
         if not isinstance(node, ast.Call):
             continue
         fn = node.func
         spawns = _is(fn, "subprocess", _SPAWN_CALLS) or (isinstance(fn, ast.Name) and fn.id in bare)
         if spawns and not any(kw.arg == "timeout" for kw in node.keywords):
-            found.append(f"line {node.lineno}: subprocess call without timeout=")
-    return found
+            yield source.rel, node.lineno
 
 
-def _scan(check: Callable[[ast.AST], list[str]], owners: tuple[str, ...]) -> dict[str, list[str]]:
-    results: dict[str, list[str]] = {}
-    for path in _sources():
-        rel = _rel(path)
-        if rel.startswith(owners):
-            continue
-        findings = check(ast.parse(path.read_text(encoding="utf-8")))
-        if findings:
-            results[rel] = findings
-    return results
+KILLS = Rule(
+    "kill-and-session",
+    "signal and session spawn belong to stream-proc (stop_tree, run, alive); a moved file: delete its row",
+    _kills,
+    _KILL_ALLOWED,
+    scope=_SCOPE,
+)
+UNBOUNDED = Rule(
+    "unbounded-subprocess",
+    "give it timeout= or run it through stream_proc.capture/any_proc.call; a bounded file: delete its row",
+    _unbounded,
+    _UNBOUNDED_ALLOWED,
+    scope=_SCOPE,
+)
 
 
 def test_kill_and_session_and_liveness_probe_live_only_in_stream_proc() -> None:
-    found = _scan(_kill_findings, (_OWNER,))
-    new = {f: v for f, v in found.items() if f not in _KILL_ALLOWLIST}
-    assert not new, f"signal and session spawn belong to stream-proc (stop_tree, run, alive): {new}"
-
-
-def test_the_kill_allowlist_lists_only_files_that_still_break_the_rule() -> None:
-    found = _scan(_kill_findings, (_OWNER,))
-    stale = sorted(_KILL_ALLOWLIST - found.keys())
-    assert not stale, f"these files moved onto stream-proc: delete them from _KILL_ALLOWLIST: {stale}"
+    check(KILLS, _ROOT)
 
 
 def test_a_subprocess_outside_the_spawners_has_a_timeout() -> None:
-    found = _scan(_unbounded_findings, _SPAWNERS)
-    new = {f: v for f, v in found.items() if f not in _UNBOUNDED_ALLOWLIST}
-    assert not new, f"give it timeout= or run it through stream_proc.capture/any_proc.call: {new}"
-
-
-def test_the_unbounded_allowlist_lists_only_files_that_still_break_the_rule() -> None:
-    found = _scan(_unbounded_findings, _SPAWNERS)
-    stale = sorted(_UNBOUNDED_ALLOWLIST - found.keys())
-    assert not stale, f"these files are bounded now: delete them from _UNBOUNDED_ALLOWLIST: {stale}"
+    check(UNBOUNDED, _ROOT)
 
 
 @pytest.mark.parametrize(
@@ -140,6 +131,14 @@ def test_the_unbounded_allowlist_lists_only_files_that_still_break_the_rule() ->
         ("from subprocess import run\nrun(['x'])", 0, 1),
     ],
 )
-def test_the_scanner_sees_what_it_claims_to(source: str, kill: int, unbounded: int) -> None:
-    tree = ast.parse(source)
-    assert (len(_kill_findings(tree)), len(_unbounded_findings(tree))) == (kill, unbounded)
+def test_the_scanner_sees_what_it_claims_to(tmp_path: Path, source: str, kill: int, unbounded: int) -> None:
+    def count(rule: Rule, name: str) -> int:
+        return sum(len(lines) for lines in plant(rule, tmp_path / name, source).values())
+
+    assert (count(KILLS, "kill"), count(UNBOUNDED, "unbounded")) == (kill, unbounded)
+
+
+def test_the_owners_are_not_scanned(tmp_path: Path) -> None:
+    source = "import os, subprocess\nos.killpg(1, 9)\nsubprocess.run(['x'])\n"
+    assert plant(KILLS, tmp_path / "a", source, "packages/stream-proc/src/stream_proc/mod.py") == {}
+    assert plant(UNBOUNDED, tmp_path / "b", source, "packages/any-proc/src/any_proc/mod.py") == {}

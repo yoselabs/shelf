@@ -221,6 +221,14 @@ def _is_flat_record(item: Any) -> bool:
     return all(not isinstance(v, (list, dict)) for v in item.values())
 
 
+def _tsv_or_none(rows: list[Any]) -> str | None:
+    """The TSV of ``rows``, or None when a row past the head is neither a model nor a dict (the caller falls back to JSON)."""
+    try:
+        return encode_tsv(rows)
+    except TypeError:
+        return None
+
+
 def render_execute(value: Any) -> Rendered:  # Any: any value a tool returns is rendered
     """Render a dynamically-typed output for the ``llm`` consumer by value inference.
 
@@ -230,12 +238,9 @@ def render_execute(value: Any) -> Rendered:  # Any: any value a tool returns is 
     structured = _to_plain(value)
 
     if isinstance(structured, (list, tuple)) and structured and _is_flat_record(structured[0]):
-        try:
-            rows = list(structured)
-            text = encode_tsv(rows)
+        text = _tsv_or_none(list(structured))
+        if text is not None:
             return Rendered(text, "tsv", value, structured=structured)
-        except Exception:  # noqa: BLE001, S110 -- non-uniform past the head → JSON fallback
-            pass
 
     return Rendered(_encode_json(structured), "json", value, structured=structured)
 

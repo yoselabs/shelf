@@ -19,9 +19,11 @@ import os
 import sys
 import time
 from collections import OrderedDict
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import urlparse
+
+from async_scope import cleanup, cleanup_sync
 
 from .base import BackendCookie, RenderedPage, RenderOutcome
 from .scroll import scroll_and_retry
@@ -33,6 +35,7 @@ _DEFAULT_LOG = logging.getLogger("any_browser")
 
 # First-snapshot length below which a JS-heavy host triggers scroll-on-thin.
 _THIN_FLOOR = 4_096
+_CLOSE_S = 10.0  # the bound of one close step (a page, a context, the browser): past it the step is cancelled and reported
 
 # Safety bound on the scroll-to-stable loop — the number of scroll passes before
 # giving up on an ever-growing (or non-terminating) infinite-scroll page.
@@ -72,8 +75,7 @@ async def chromium_launch(
         try:
             yield browser
         finally:
-            with suppress(Exception):
-                await browser.close()
+            await cleanup(browser.close, within=_CLOSE_S)
 
 
 def _cookie_to_playwright(cookie: BackendCookie) -> dict[str, Any]:
@@ -296,8 +298,7 @@ class PlaywrightBackend:
 
         try:
             async with self.acquire(url) as page:
-                with suppress(Exception):
-                    page.on("response", _on_response)
+                page.on("response", _on_response)
                 if cookies:
                     # Seed cookies on the BrowserContext BEFORE navigation so
                     # the request goes out logged-in. add_cookies upserts by
@@ -394,8 +395,7 @@ class PlaywrightBackend:
         if self._stderr_sink is None or self._stderr_read_fd is None:
             return
         sys.stderr = saved
-        with suppress(OSError):
-            os.close(self._stderr_write_fd)
+        os.close(self._stderr_write_fd)
 
     def _begin_stderr_drain(self) -> None:
         """Register an on-loop reader that forwards driver stderr lines."""
@@ -447,12 +447,12 @@ class PlaywrightBackend:
             self._stderr_buf = b""
             if line:
                 self._emit_stderr_line(line)
-        if self._stderr_loop is not None:
-            with suppress(Exception):
-                self._stderr_loop.remove_reader(read_fd)
-        with suppress(OSError):
-            os.close(read_fd)
         self._stderr_read_fd = None
+        loop = self._stderr_loop
+        steps: list[Callable[[], object]] = [lambda: os.close(read_fd)]
+        if loop is not None:
+            steps.insert(0, lambda: loop.remove_reader(read_fd))
+        cleanup_sync(*steps)
 
     async def start(self) -> None:
         """Alias for `_ensure()` — kept for the resource-pattern tests."""
@@ -475,15 +475,15 @@ class PlaywrightBackend:
         reaper, which sleeps the engine so the next render re-launches. Caller
         holds `self._lock`.
         """
-        for host_ctx in list(self._contexts.values()):
-            with suppress(Exception):
-                await host_ctx.context.close()
+        contexts = [host_ctx.context.close for host_ctx in self._contexts.values()]
+        launch_cm, evictions = self._launch_cm, list(self._eviction_tasks)
         self._contexts.clear()
-        if self._launch_cm is not None:
-            with suppress(Exception):
-                await self._launch_cm.__aexit__(None, None, None)
         self._launch_cm = None
         self._browser = None
+        steps: list[Callable[[], Any]] = [*contexts, lambda: asyncio.gather(*evictions)]
+        if launch_cm is not None:
+            steps.append(lambda: launch_cm.__aexit__(None, None, None))
+        await cleanup(*steps, within=_CLOSE_S)
 
     async def _abort_launch(self) -> None:
         """Tear down a half-open launch after a launch-budget timeout.
@@ -509,8 +509,9 @@ class PlaywrightBackend:
         self._reaper_task = None
         if task is not None and not task.done():
             task.cancel()
-            with suppress(asyncio.CancelledError, Exception):
-                await task
+            await asyncio.wait([task])  # the task's own cancel is the expected end; a failure of its own is raised
+            if not task.cancelled() and (failure := task.exception()) is not None:
+                raise failure
 
     async def _reap_idle_loop(self) -> None:
         """Close the launched browser once it has been idle past `idle_timeout_s`.
@@ -557,8 +558,7 @@ class PlaywrightBackend:
         finally:
             self._active_pages -= 1
             self._last_activity = time.monotonic()
-            with suppress(Exception):
-                await page.close()
+            await cleanup(page.close, within=_CLOSE_S)
 
     async def _open_page(self, host: str) -> Any:
         async with self._lock:
@@ -578,8 +578,7 @@ class PlaywrightBackend:
         # LRU evict if at cap.
         while len(self._contexts) >= self.max_pool:
             evicted_host, evicted = self._contexts.popitem(last=False)
-            with suppress(Exception):
-                await evicted.context.close()
+            await cleanup(evicted.context.close, within=_CLOSE_S)
             del evicted_host
         context = await self._browser.new_context()
         host_ctx = _HostContext(context=context, last_used=time.monotonic())
@@ -593,11 +592,7 @@ class PlaywrightBackend:
             ctx = self._contexts.pop(host)
             # Close-fire-and-forget; we're under the lock so can't await.
             # Keep a reference so the task is not garbage-collected mid-close.
-            try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                continue
-            task = loop.create_task(_safe_close(ctx.context))
+            task = asyncio.get_running_loop().create_task(cleanup(ctx.context.close, within=_CLOSE_S))
             self._eviction_tasks.add(task)
             task.add_done_callback(self._eviction_tasks.discard)
 
@@ -612,8 +607,3 @@ class _HostContext:
     def __init__(self, *, context: Any, last_used: float) -> None:
         self.context = context
         self.last_used = last_used
-
-
-async def _safe_close(context: Any) -> None:
-    with suppress(Exception):
-        await context.close()
