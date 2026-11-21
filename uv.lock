@@ -2554,7 +2554,7 @@ wheels = [
 
 [[package]]
 name = "git-porcelain"
-version = "0.29.0"
+version = "0.30.0"
 source = { editable = "packages/git-porcelain" }
 dependencies = [
     { name = "child-env" },
