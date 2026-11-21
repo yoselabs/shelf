@@ -166,7 +166,7 @@ class TestWorld:
                     model="m",
                     effort="high",
                     prompt="rules\n\nbrief",
-                    env={"A": "1", "OPENCODE_AUTH_JSON": "x"},
+                    env={"A": "1", "OPENCODE_AUTH_JSON": "x", "HOME": "/h"},
                     session="rid12345",
                     **kw,
                 )
@@ -272,14 +272,32 @@ class TestWorld:
     def test_the_sandbox_shell_is_offline_and_a_refused_network_is_not_a_denial(self):
         assert box.network_refusal("error: tcp connect error\n  Operation not permitted (os error 1)")
         assert not box.network_refusal("cat: /Users/x/.ssh/id_rsa: Operation not permitted")
-        assert box.permissions(box.Sandbox(), True)["external_directory"] == "deny"
-        assert obj(box.permissions(box.Sandbox(), False)["read"])[str(Path.home() / ".ssh")] == "deny"
+        assert box.permissions(box.Sandbox(), True, home=Path("/h"))["external_directory"] == "deny"
+        assert obj(box.permissions(box.Sandbox(), False, home=Path("/h"))["read"])["/h/.ssh"] == "deny"
+
+
+class TestTheShellReadsTheInjectedEnv:
+    def test_the_shell_hands_back_the_callers_config_root_and_denies_the_callers_home(self, tmp_path):
+        shell = tmp_path / "sh"
+        box.write_shell(box.Sandbox(), "/w", True, shell, env={"HOME": "/h", "XDG_CONFIG_HOME": "/h/cfg"})
+        text = shell.read_text()
+        assert "export XDG_CONFIG_HOME=/h/cfg\n" in text
+        assert "/h/.ssh" in text
+
+    def test_a_caller_without_a_config_root_gets_it_unset(self, tmp_path):
+        shell = tmp_path / "sh"
+        box.write_shell(box.Sandbox(), "/w", True, shell, env={"HOME": "/h"})
+        assert "unset XDG_CONFIG_HOME\n" in shell.read_text()
+
+    def test_no_home_in_the_env_is_refused_not_guessed(self, tmp_path):
+        with pytest.raises(ValueError, match="HOME"):
+            box.write_shell(box.Sandbox(), "/w", True, tmp_path / "sh", env={})
 
 
 class TestReadRoots:
     @staticmethod
     def outside(write: bool, roots: tuple[str, ...] = ()):
-        return box.permissions(box.Sandbox(), write, (), roots)["external_directory"]
+        return box.permissions(box.Sandbox(), write, (), roots, home=Path("/h"))["external_directory"]
 
     def test_a_write_step_reads_nothing_outside_its_cwd_without_a_root(self):
         assert self.outside(True) == "deny"

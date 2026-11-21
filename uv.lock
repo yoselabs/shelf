@@ -229,7 +229,7 @@ wheels = [
 
 [[package]]
 name = "any-agent"
-version = "0.21.0"
+version = "0.22.0"
 source = { editable = "packages/any-agent" }
 dependencies = [
     { name = "app-dirs" },
@@ -1391,7 +1391,7 @@ wheels = [
 
 [[package]]
 name = "blueprint"
-version = "0.10.1"
+version = "0.11.0"
 source = { editable = "packages/blueprint" }
 
 [package.dev-dependencies]
@@ -1644,7 +1644,7 @@ wheels = [
 
 [[package]]
 name = "child-env"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/child-env" }
 
 [package.dev-dependencies]
@@ -6376,7 +6376,7 @@ dev = [
 
 [[package]]
 name = "stream-proc"
-version = "0.14.0"
+version = "0.15.0"
 source = { editable = "packages/stream-proc" }
 
 [package.dev-dependencies]

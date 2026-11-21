@@ -49,8 +49,8 @@ class StopReport:
 
 def spawn(
     argv: list[str],
-    cwd: str | None = None,
-    env: Mapping[str, str] | None = None,
+    cwd: str | None,
+    env: Mapping[str, str],
     *,
     stderr: int = subprocess.PIPE,
     registered: Callable[[Worker], None] | None = None,

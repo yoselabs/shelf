@@ -13,7 +13,7 @@ interpreter variables it sets, and its ``bin`` folder in ``PATH``. Nothing else 
 never do unless named exactly. ``find(name, env, extra_dirs)`` finds the program the child runs (see ``exe``): its
 PATH is the injected ``env``'s, and a miss raises ``NotFound`` instead of returning the bare name.
 
-Pure: the input mapping is never mutated and ``os.environ`` is read only by ``scrub_current``.
+Pure: the input mapping is never mutated and ``os.environ`` is never read; the edge passes it in.
 
 An entry in ``keep`` / ``drop`` is an exact variable name, or a prefix when it ends with ``*``
 (``"MCP_*"``). Precedence: ``drop`` beats everything; ``keep`` beats the defaults.
@@ -134,11 +134,6 @@ def build_env(
     return {**out, **(extra or {})}
 
 
-def scrub_current(*, keep: Iterable[str] = (), drop: Iterable[str] = ()) -> dict[str, str]:
-    """``scrub(os.environ, ...)``: the only place this package reads the process environment."""
-    return scrub(os.environ, keep=keep, drop=drop)
-
-
 __all__ = [
     "APP_NAMES",
     "APP_PREFIXES",
@@ -152,6 +147,5 @@ __all__ = [
     "build_env",
     "find",
     "scrub",
-    "scrub_current",
     "without_venv",
 ]

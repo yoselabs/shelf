@@ -90,7 +90,7 @@ _OTHER_TRANSPORT = tuple(
 
 def _fresh_clone_steps(ctx: Context, clone: Path) -> Finding | None:
     """Run each step the clone's files call for; the first that fails is the finding."""
-    env = {**ctx.env, "MISE_IGNORED_CONFIG_PATHS": str(Path.home() / ".config" / "mise"), "BD_DISABLE_METRICS": "1"}
+    env = {**ctx.env, "MISE_IGNORED_CONFIG_PATHS": str(Path(ctx.env["HOME"]) / ".config" / "mise"), "BD_DISABLE_METRICS": "1"}
     for marker, argv in _FRESH_CLONE_STEPS:
         if not (clone / marker).is_file():
             continue

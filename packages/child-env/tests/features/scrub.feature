@@ -112,9 +112,3 @@ Feature: A child agent gets a scrubbed environment
     When the environment is scrubbed
     Then the input still has CLAUDECODE and PATH
     And the result is a different dict
-
-  Scenario: The current process environment is scrubbed on request
-    Given the process environment has CLAUDECODE set to "1" and CHILD_ENV_MARK set to "m"
-    When the current environment is scrubbed
-    Then CLAUDECODE is gone
-    And CHILD_ENV_MARK stays

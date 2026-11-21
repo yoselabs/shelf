@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0
+
+- `gate.clean-clone` points mise at the injected env's `HOME` (`$HOME/.config/mise`), not the process home.
+
 ## 0.10.0
 
 - **Breaking: `secret_scan.scan(repo, mode)` and `Mode` are gone.** `scan_staged(repo)`, `scan_range(repo)` and `scan_full(repo)` are the three scans; `python -m blueprint.secret_scan staged|range|full` is unchanged.

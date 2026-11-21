@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- breaking: `scrub_current` removed; the edge passes `os.environ` to `scrub`. The package never reads the process environment.
+
 ## 0.3.0
 
 - breaking: `scrub(..., strip_venv=)` and `scrub_current(strip_venv=)` removed; strip the venv with `scrub(without_venv(env), ...)` (same result for every keep/drop). `without_venv` unchanged.

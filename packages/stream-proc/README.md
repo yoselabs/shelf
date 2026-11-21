@@ -90,7 +90,7 @@ stop_pid(pid, start)   # a recorded holder, a server from an earlier run: stops 
 - **Limits**: the token check and the signal are two steps, so a pid reused in that gap can still be hit. With
   no `start` token (`None` or empty and the pid already gone) there is no reuse protection: always store `proc_start`.
 
-`popen_registered(argv, registered=..., cwd=..., env=...)` starts a child behind an
+`popen_registered(argv, registered=..., env=..., cwd=...)` starts (`env` is required: the child gets exactly that mapping, the process's own is never read) a child behind an
 isolated installed Python exec gate. The callback receives `OwnedProcess(pid, pgid,
 start, boot)` and must durably register it before returning. EOF, invalid permission,
 callback failure and held signal replay cannot execute the target. Prompt stdin and

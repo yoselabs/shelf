@@ -102,7 +102,9 @@ def test_macos_native_errno_preserves_unknown(monkeypatch: pytest.MonkeyPatch, e
 def test_process_group_change_preserves_the_registered_process() -> None:
     identities: list[OwnedProcess] = []
     code = "import os,sys\nsys.stdin.readline()\nos.setsid()\nprint('group changed',flush=True)\nsys.stdin.readline()\n"
-    child, original = popen_registered([sys.executable, "-I", "-S", "-c", code], registered=identities.append, start_new_session=False)
+    child, original = popen_registered(
+        [sys.executable, "-I", "-S", "-c", code], env=os.environ, registered=identities.append, start_new_session=False
+    )
     try:
         assert child.stdin is not None and child.stdout is not None
         assert original.pgid == os.getpgrp() and original.pgid != child.pid

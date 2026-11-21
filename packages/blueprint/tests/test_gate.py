@@ -496,6 +496,19 @@ def test_clean_clone_runs_the_fresh_clone_steps_before_the_gate(repo: Repo) -> N
     assert calls[:3] == ["mise trust --yes .", "mise install --locked", "bd bootstrap --yes"]
 
 
+def test_clean_clone_ignores_the_injected_homes_mise_config(repo: Repo) -> None:
+    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("mise.toml", '[tools]\nprek = "0.5.5"\n')
+    repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
+    repo.commit()
+    seen = repo.bin_dir / "seen.log"
+    (repo.bin_dir / "mise").write_text(f'#!/bin/sh\necho "$MISE_IGNORED_CONFIG_PATHS" >> "{seen}"\nexit 0\n')
+    (repo.bin_dir / "mise").chmod(0o755)
+    repo.env["HOME"] = "/injected/home"
+    assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.PASSING
+    assert set(seen.read_text().split()) == {"/injected/home/.config/mise"}
+
+
 def test_clean_clone_names_a_fresh_clone_step_that_failed(repo: Repo) -> None:
     repo.write("Makefile", "check:\n\ttrue\n")
     repo.write(".beads/config.yaml", "")

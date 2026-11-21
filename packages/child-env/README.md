@@ -4,12 +4,11 @@
 agent session exports and minus credential-looking variables. POSIX only, stdlib only.
 
 ```python
-from child_env import scrub, scrub_current
+from child_env import scrub
 
 env = scrub(os.environ)                          # new dict; the input is never touched
 env = scrub(env, keep=["CLAUDE_CONFIG_DIR"])     # rescue a name from the defaults
 env = scrub(env, drop=["TASK_LOOP_*", "GIT_DIR"])  # remove the caller's own names
-env = scrub_current(keep=["MCP_*"])              # the one helper that reads os.environ
 env["DELEGATE_DEPTH"] = "1"                      # add your own after scrubbing
 subprocess.Popen(argv, env=env)
 ```
@@ -18,7 +17,7 @@ subprocess.Popen(argv, env=env)
 - `keep` / `drop` entries are exact names, or a prefix when they end with `*`.
 - Precedence: `drop` beats everything; `keep` beats the defaults; anything else not matched by a default stays
   (`PATH`, `HOME`, `LANG`, `XDG_*`, `GIT_*`, `TERM`, ...).
-- Pure: `scrub` reads no global state; only `scrub_current` reads `os.environ`.
+- Pure: `scrub` reads no global state; the edge passes `os.environ` in.
 - The defaults are exported as tuples: `APP_PREFIXES`, `APP_NAMES`, `CREDENTIAL_PREFIXES`, `CREDENTIAL_NAMES`,
   `CREDENTIAL_MARKERS`.
 

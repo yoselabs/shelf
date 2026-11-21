@@ -106,7 +106,7 @@ def test_claude_effort_is_the_one_the_launch_asked_for_and_empty_when_none():
 def test_opencode_effort_is_the_variant_the_launch_asked_for(tmp_path):
     h = OpenCodeHarness(None, tmp_path, env={})
     with mock.patch.object(box, "write_shell"):
-        launched(h)
+        launched(h, env={"HOME": "/h"})
     assert h.summary(0, "", "", None, False).effort == "high"
 
 

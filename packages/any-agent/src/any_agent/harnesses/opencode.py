@@ -152,8 +152,10 @@ class OpenCodeHarness(Quiet):
         caches = [Path(env[k]) for k in box.cache_env(cache)]
         for r in (*roots, *caches):  # created here, before any sandboxed command: a command cannot create them
             r.mkdir(parents=True, exist_ok=True)
-        box.write_shell(self.sandbox, i.cwd, i.write, self.shell, roots, caches)
-        config: dict[str, Json] = {"permission": box.permissions(self.sandbox, i.write, i.engine_only, i.read_roots)}
+        box.write_shell(self.sandbox, i.cwd, i.write, self.shell, roots, caches, env=i.env)
+        config: dict[str, Json] = {
+            "permission": box.permissions(self.sandbox, i.write, i.engine_only, i.read_roots, home=box.home_of(i.env))
+        }
         if self.profile.providers:
             for key in SESSION_VARS:
                 env.pop(key, None)

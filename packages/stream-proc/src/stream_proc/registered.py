@@ -139,7 +139,7 @@ def popen_registered(
     *,
     registered: Callable[[OwnedProcess], None],
     cwd: str | os.PathLike[str] | None = None,
-    env: Mapping[str, str] | None = None,
+    env: Mapping[str, str],
     stdin: int = subprocess.PIPE,
     stderr: int = subprocess.PIPE,
     start_new_session: bool = True,
@@ -157,7 +157,7 @@ def popen_registered(
     if not argv or registration_timeout <= 0 or not math.isfinite(registration_timeout):
         msg = "Nonempty argv and a finite positive registration timeout are required"
         raise ValueError(msg)
-    target_env = dict(os.environ if env is None else env)
+    target_env = dict(env)
     raw = json.dumps({"permit": "exec", "argv": list(argv), "env": target_env}).encode("utf-8")
     if len(raw) > MAX_FRAME:
         msg = "Registered invocation exceeds the private frame limit"

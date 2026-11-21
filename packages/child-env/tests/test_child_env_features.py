@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import pytest
-from child_env import scrub, scrub_current
+from child_env import scrub
 from pytest_bdd import given, parsers, scenarios, then, when
 
 scenarios("features")
@@ -32,12 +32,6 @@ def _set(world: World, name: str, value: str) -> None:
     world.env[name] = value
 
 
-@given(parsers.parse('the process environment has {name} set to "{value}" and {name2} set to "{value2}"'))
-def _process(monkeypatch: pytest.MonkeyPatch, name: str, value: str, name2: str, value2: str) -> None:
-    monkeypatch.setenv(name, value)
-    monkeypatch.setenv(name2, value2)
-
-
 @when("the environment is scrubbed")
 def _scrub(world: World) -> None:
     world.snapshot = dict(world.env)
@@ -57,11 +51,6 @@ def _scrub_drop(world: World, drop: str) -> None:
 @when(parsers.parse('the environment is scrubbed keeping "{keep}" and dropping "{drop}"'))
 def _scrub_both(world: World, keep: str, drop: str) -> None:
     world.out = scrub(world.env, keep=_names(keep), drop=_names(drop))
-
-
-@when("the current environment is scrubbed")
-def _scrub_current(world: World) -> None:
-    world.out = scrub_current()
 
 
 @then(parsers.parse("{name} is gone"))

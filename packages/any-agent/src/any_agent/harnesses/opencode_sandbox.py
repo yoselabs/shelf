@@ -6,7 +6,7 @@ import json
 import os
 import shlex
 import subprocess
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from any_agent._json import Json, record
@@ -68,7 +68,18 @@ def engine_only_rules(sandbox: Sandbox, engine_only: Sequence[str]) -> dict[str,
     }
 
 
-def permissions(sandbox: Sandbox, write: bool, engine_only: Sequence[str] = (), read_roots: Sequence[str] = ()) -> dict[str, Json]:
+def home_of(env: Mapping[str, str]) -> Path:
+    """The caller's home folder, as the injected `env` names it; a launch without one is refused, not guessed from the process."""
+    home = env.get("HOME")
+    if not home:
+        msg = "the sandbox needs HOME in the launch env to name the secrets it denies"
+        raise ValueError(msg)
+    return Path(home)
+
+
+def permissions(
+    sandbox: Sandbox, write: bool, engine_only: Sequence[str] = (), read_roots: Sequence[str] = (), *, home: Path
+) -> dict[str, Json]:
     reads: dict[str, Json] = {
         "*": "allow",
         ".env": "deny",
@@ -79,7 +90,7 @@ def permissions(sandbox: Sandbox, write: bool, engine_only: Sequence[str] = (), 
         "*.env.template": "allow",
     }
     for x in SECRETS:
-        reads[str(Path.home() / x)] = reads[str(Path.home() / x) + "/*"] = "deny"
+        reads[str(home / x)] = reads[str(home / x) + "/*"] = "deny"
     # a write step reads outside its cwd only in the caller's listed roots; a read-only step ignores the list
     outside: Json = (
         ({"*": "deny", **{x.rstrip("/") + "/**": "allow" for x in read_roots}} if read_roots else "deny")
@@ -120,11 +131,14 @@ def _quote(x: object) -> str:
     return json.dumps(os.path.realpath(str(x)))
 
 
-def write_shell(sandbox: Sandbox, cwd: str, write: bool, path: Path, roots: Sequence[Path] = (), caches: Sequence[Path] = ()) -> None:
+def write_shell(
+    sandbox: Sandbox, cwd: str, write: bool, path: Path, roots: Sequence[Path] = (), caches: Sequence[Path] = (), *, env: Mapping[str, str]
+) -> None:
     """The $SHELL OpenCode runs commands with: each one under sandbox-exec. `roots` are the XDG dirs the launcher points commands at
     (their tools cache and keep state there), writable like temp. `caches` are the tool cache dirs (they may sit under a SECRETS folder
-    such as ~/.claude/plugins/data): read and write is allowed there after the secrets rule, and nowhere wider."""
-    home = Path.home()
+    such as ~/.claude/plugins/data): read and write is allowed there after the secrets rule, and nowhere wider. `env` is the caller's own
+    (its HOME is the folder guarded, its XDG_CONFIG_HOME is handed back to commands)."""
+    home = home_of(env)
     secrets = " ".join(f"(subpath {_quote(home / x)})" for x in SECRETS)
     scratch = Path(cwd) / sandbox.scratch
     writable: list[str | Path] = [
@@ -145,7 +159,7 @@ def write_shell(sandbox: Sandbox, cwd: str, write: bool, path: Path, roots: Sequ
         f'(deny file-write* (require-all {keep} (require-not (regex #"^/dev/"))))'
         + ("" if write else f"(deny file-write* (require-all (subpath {_quote(cwd)}) (require-not (subpath {_quote(scratch)}))))")
     )
-    xdg = os.environ.get("XDG_CONFIG_HOME")
+    xdg = env.get("XDG_CONFIG_HOME")
     head = f"export XDG_CONFIG_HOME={shlex.quote(xdg)}" if xdg else "unset XDG_CONFIG_HOME"  # commands get the user's config root back
     path.write_text(
         f"#!/bin/sh\n{head}\nexport SHELL=/bin/zsh\nexport UV_OFFLINE=1\n"

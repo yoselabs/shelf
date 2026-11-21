@@ -45,7 +45,10 @@ def test_identity_and_stdio_survive_exec(tmp_path: Path) -> None:
         "print(json.dumps(fds))"
     )
     p, identity = popen_registered(
-        [sys.executable, "-I", "-S", "-c", code, "a b", "λ", "$(touch forbidden);*"], cwd=tmp_path, registered=identities.append
+        [sys.executable, "-I", "-S", "-c", code, "a b", "λ", "$(touch forbidden);*"],
+        cwd=tmp_path,
+        env=os.environ,
+        registered=identities.append,
     )
     out, err = p.communicate(b"prompt\n", timeout=5)
     values, fds = out.splitlines()
@@ -84,7 +87,7 @@ def test_registration_failure_never_runs_target(tmp_path: Path, failure: type[Ba
         raise failure
 
     with pytest.raises(failure):
-        popen_registered([sys.executable, "-c", f"open({str(marker)!r},'w').write('bad')"], registered=reject)
+        popen_registered([sys.executable, "-c", f"open({str(marker)!r},'w').write('bad')"], env=os.environ, registered=reject)
     assert not marker.exists()
     assert observe_owned(identities[0]).kind == "gone"
 
@@ -94,14 +97,14 @@ def test_unknown_identity_refuses_registration_and_exec(tmp_path: Path, monkeypa
     calls: list[OwnedProcess] = []
     monkeypatch.setattr(registered, "inspect_process", lambda _pid: ProcessObservation("unknown"))
     with pytest.raises(IdentityUnavailableError):
-        popen_registered([sys.executable, "-c", f"open({str(marker)!r},'w').write('bad')"], registered=calls.append)
+        popen_registered([sys.executable, "-c", f"open({str(marker)!r},'w').write('bad')"], env=os.environ, registered=calls.append)
     assert calls == [] and not marker.exists()
 
 
 def test_missing_target_is_an_explicit_startup_error() -> None:
     identities: list[OwnedProcess] = []
     with pytest.raises(FileNotFoundError) as failure:
-        popen_registered(["/not/a/program"], registered=identities.append)
+        popen_registered(["/not/a/program"], env=os.environ, registered=identities.append)
     assert failure.value.filename == "/not/a/program"
     assert len(identities) == 1
     assert observe_owned(identities[0]).kind == "gone"
@@ -152,11 +155,11 @@ def test_controller_death_before_permission_never_executes(tmp_path: Path) -> No
     marker = tmp_path / "target"
     target = f"open({str(marker)!r}, 'w').write('bad')"
     code = (
-        "import json,sys; from stream_proc import popen_registered\n"
+        "import json,os,sys; from stream_proc import popen_registered\n"
         "def register(identity):\n"
         " print(identity.pid,flush=True)\n"
         " sys.stdin.buffer.read(1)\n"
-        f"popen_registered([sys.executable,'-c',{target!r}], registered=register)\n"
+        f"popen_registered([sys.executable,'-c',{target!r}], env=os.environ, registered=register)\n"
     )
     controller = subprocess.Popen([sys.executable, "-c", code], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
@@ -177,7 +180,7 @@ def test_held_signal_replay_aborts_gated_child(tmp_path: Path, signum: int) -> N
     marker = tmp_path / "target"
     target = f"open({str(marker)!r},'w').write('bad')"
     code = (
-        "import signal,sys; from stream_proc import TermHold,popen_registered\n"
+        "import os,signal,sys; from stream_proc import TermHold,popen_registered\n"
         "original=TermHold.__enter__\n"
         "def enter(self):\n"
         " result=original(self)\n"
@@ -187,7 +190,7 @@ def test_held_signal_replay_aborts_gated_child(tmp_path: Path, signum: int) -> N
         f"signal.signal({signum},stop)\n"
         "TermHold.__enter__=enter\n"
         "try:\n"
-        f" popen_registered([sys.executable,'-c',{target!r}],registered=lambda identity: None)\n"
+        f" popen_registered([sys.executable,'-c',{target!r}],env=os.environ, registered=lambda identity: None)\n"
         "except KeyboardInterrupt: print('interrupted')\n"
     )
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, timeout=5, check=False)
@@ -210,7 +213,7 @@ def test_failure_after_permission_retains_identity_and_reports_uncertainty(tmp_p
     monkeypatch.setattr(registered, "_exec_status", lost_status)
     try:
         with pytest.raises(RegisteredStartUncertainError) as failure:
-            popen_registered([sys.executable, "-c", target], registered=identities.append)
+            popen_registered([sys.executable, "-c", target], env=os.environ, registered=identities.append)
         assert marker.read_text() == "executed"
         assert failure.value.identity == identities[0]
         assert failure.value.leader_reaped
@@ -223,9 +226,9 @@ def test_controller_death_after_permission_keeps_prior_registration(tmp_path: Pa
     marker = tmp_path / "executed"
     target = f"open({str(marker)!r},'w').write('executed'); print('executed',flush=True); input()"
     code = (
-        "import sys; from stream_proc import popen_registered\n"
+        "import os,sys; from stream_proc import popen_registered\n"
         "def register(identity): print('registered',identity.pid,identity.boot,flush=True)\n"
-        f"p,identity=popen_registered([sys.executable,'-c',{target!r}],registered=register)\n"
+        f"p,identity=popen_registered([sys.executable,'-c',{target!r}],env=os.environ, registered=register)\n"
         "print(p.stdout.readline().decode().strip(),flush=True)\n"
         "sys.stdin.buffer.read(1)\n"
     )
@@ -294,7 +297,7 @@ def test_run_registered_registers_before_the_command_and_logs_one_merged_stream(
         events.append(identity)
 
     script = f"touch {marker}; echo out; echo err >&2; cat; echo after"
-    result = run_registered(["/bin/sh", "-c", script], registered=register, cwd=tmp_path, timeout=5, on_line=events.append)
+    result = run_registered(["/bin/sh", "-c", script], env=os.environ, registered=register, cwd=tmp_path, timeout=5, on_line=events.append)
     identity = events[0]
     assert isinstance(identity, OwnedProcess)
     assert events[1:] == [b"out\n", b"err\n", b"after\n"]
@@ -305,7 +308,9 @@ def test_run_registered_registers_before_the_command_and_logs_one_merged_stream(
 
 def test_run_registered_reports_a_nonzero_exit_with_its_partial_log() -> None:
     lines: list[bytes] = []
-    result = run_registered(["/bin/sh", "-c", "echo partial; printf torn; exit 3"], registered=lambda _: None, on_line=lines.append)
+    result = run_registered(
+        ["/bin/sh", "-c", "echo partial; printf torn; exit 3"], env=os.environ, registered=lambda _: None, on_line=lines.append
+    )
     assert (result.returncode, result.timed_out, result.exec_errno) == (3, None, None)
     assert lines == [b"partial\n", b"torn"]
 
@@ -322,6 +327,7 @@ def test_run_registered_stops_and_proves_the_whole_tree_on_deadline_or_stop(endi
 
     result = run_registered(
         ["/bin/sh", "-c", "sleep 30 & echo started; wait"],
+        env=os.environ,
         registered=lambda _: None,
         on_line=line,
         timeout=0.5 if ending == "wall" else 30,
@@ -341,7 +347,7 @@ def test_run_registered_exec_failure_after_registration_is_a_result(tmp_path: Pa
         program.chmod(0o600)
     identities: list[OwnedProcess] = []
     lines: list[bytes] = []
-    result = run_registered([str(program)], registered=identities.append, on_line=lines.append)
+    result = run_registered([str(program)], env=os.environ, registered=identities.append, on_line=lines.append)
     assert result.exec_errno == number and result.returncode is None and result.timed_out is None
     assert [result.pid, result.pgid] == [identities[0].pid, identities[0].pgid] and lines == []
     assert observe_owned(identities[0]).kind == "gone"
@@ -349,7 +355,9 @@ def test_run_registered_exec_failure_after_registration_is_a_result(tmp_path: Pa
 
 def test_run_registered_leaves_a_descendant_in_the_group_to_the_caller() -> None:
     lines: list[bytes] = []
-    result = run_registered(["/bin/sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $!"], registered=lambda _: None, on_line=lines.append)
+    result = run_registered(
+        ["/bin/sh", "-c", "sleep 30 >/dev/null 2>&1 & echo $!"], env=os.environ, registered=lambda _: None, on_line=lines.append
+    )
     sleeper = int(lines[0])
     try:
         assert result.returncode == 0 and result.timed_out is None
@@ -366,7 +374,7 @@ def test_run_registered_never_runs_the_command_when_registration_fails(tmp_path:
         raise OSError(errno.EIO, "store unavailable")
 
     with pytest.raises(OSError, match="store unavailable"):
-        run_registered(["/bin/sh", "-c", f"touch {marker}"], registered=reject)
+        run_registered(["/bin/sh", "-c", f"touch {marker}"], env=os.environ, registered=reject)
     assert not marker.exists()
 
 
@@ -378,7 +386,7 @@ def test_run_registered_propagates_an_uncertain_start_with_the_identity(monkeypa
 
     monkeypatch.setattr(registered, "_exec_status", lost_status)
     with pytest.raises(RegisteredStartUncertainError) as failure:
-        run_registered(["/bin/true"], registered=identities.append)
+        run_registered(["/bin/true"], env=os.environ, registered=identities.append)
     assert failure.value.identity == identities[0]
 
 
@@ -386,6 +394,7 @@ def test_run_registered_caps_a_newline_less_line() -> None:
     got: list[bytes] = []
     res = run_registered(
         [sys.executable, "-c", "import sys; sys.stdout.write('q' * 5000)"],
+        env=os.environ,
         registered=lambda _identity: None,
         on_line=got.append,
         max_line=2048,
