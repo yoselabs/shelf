@@ -48,6 +48,8 @@ sqlite-store = { workspace = true }
 content-digest = { workspace = true }
 app-dirs = { workspace = true }
 verb-cli = { workspace = true }
+# dir-trust, jsonl-log and any-speech compose any-file.
+any-file = { workspace = true }
 atomic-io = { workspace = true }
 # sqlite-store composes sqlite-sidecar.
 sqlite-sidecar = { workspace = true }
@@ -674,6 +676,9 @@ ignore_imports = [
     "py_symbols -> content_digest",
     "static_page_check -> content_digest",
     "dir_trust -> atomic_io",
+    "dir_trust -> any_file",
+    "jsonl_log._held -> any_file",
+    "any_speech.pipeline -> any_file",
     "any_net.probe -> atomic_io",
     "any_net.probe -> any_versioned",
     "any_json_doc -> atomic_io",

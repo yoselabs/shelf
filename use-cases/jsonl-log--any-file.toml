@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "jsonl-log"
+software = "any-file"
+why = "jsonl-log spelled a path key as str(path.resolve()) on its own; four sites, one rule, so one owner."
+needs = "path_key: a path as one absolute, symlink-resolved text key."
+sponsor = "yoselabs"
+requester = "jsonl-log"
+status = "active" # active | retired

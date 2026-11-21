@@ -2,7 +2,7 @@
 name = "any-file"
 kind = "primitive"
 tier = "T0"
-release = "any-file-v0.2.0"
+release = "any-file-v0.3.0"
 capability = "Stop caring what a file's name and bytes say — a safe bare basename in NFC, a reference held inside its root, a NUL-byte binary sniff, case and normalization twins, and a media type from a table this package owns, so .xlsx and .docx resolve the same on a laptop and in a slim container with no /etc/mime.types; a transliterated slug for a name a program mints; and the conventional secret-file name patterns."
 implementation = "hybrid-adapter"
 status = "candidate"

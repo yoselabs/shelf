@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.0
+
+- The audio-hash memo key comes from `any_file.path_key` (same text); requires `any-file>=0.3,<1`
+
 ## 0.8.0
 
 - The child runner reads the peak memory unit from stream-proc `peak_bytes` (was its own `os.uname()` read); requires `stream-proc>=0.14.0`; stored numbers unchanged

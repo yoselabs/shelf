@@ -154,3 +154,10 @@ def test_media_type_does_not_read_the_hosts_table(monkeypatch: pytest.MonkeyPatc
 )
 def test_is_text_media(media: str | None, text: bool) -> None:
     assert is_text_media(media) is text
+
+
+def test_path_key_is_the_resolved_absolute_path_as_text(tmp_path: Path) -> None:
+    (tmp_path / "real").mkdir()
+    (tmp_path / "link").symlink_to(tmp_path / "real")
+    assert any_file.path_key(tmp_path / "link" / ".." / "real") == str((tmp_path / "real").resolve())
+    assert any_file.path_key(str(tmp_path / "link")) == any_file.path_key(tmp_path / "real")

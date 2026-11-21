@@ -16,6 +16,7 @@ import hashlib
 import io
 from typing import TYPE_CHECKING
 
+from any_file import path_key
 from atomic_io import atomic_write_text
 from ruamel.yaml import YAML
 from ruamel.yaml.error import YAMLError
@@ -77,19 +78,19 @@ class TrustStore:
     def grant(self, key: Path, folder: Path, *, pattern: str = "*") -> None:
         """Trust ``folder`` as it is now, under ``key``. A later edit revokes it."""
         data = self._load()
-        data[str(key.resolve())] = folder_hash(folder, pattern)
+        data[path_key(key)] = folder_hash(folder, pattern)
         self._save(data)
 
     def revoke(self, key: Path) -> bool:
         """Forget ``key``'s grant; ``True`` when there was one."""
         data = self._load()
-        removed = data.pop(str(key.resolve()), None)
+        removed = data.pop(path_key(key), None)
         self._save(data)
         return removed is not None
 
     def is_trusted(self, key: Path, folder: Path, *, pattern: str = "*") -> bool:
         """``True`` only when ``key`` has a grant and ``folder`` still hashes to it."""
-        recorded = self._load().get(str(key.resolve()))
+        recorded = self._load().get(path_key(key))
         return recorded is not None and recorded == folder_hash(folder, pattern)
 
     def _load(self) -> dict[str, str]:

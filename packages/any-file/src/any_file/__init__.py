@@ -2,6 +2,7 @@
 
 - :func:`safe_name` — a bare basename, NFC, or :class:`UnsafeNameError`.
 - :func:`resolve_within` — a reference resolved under a root, or :class:`PathEscapeError`.
+- :func:`path_key` — a path as the text key a map or store holds it under: absolute, symlinks resolved.
 - :func:`looks_binary` — a NUL byte in the first 8 KiB.
 - :func:`name_collision` — the existing name equal only after case folding and NFC.
 - :func:`media_type` — the caller's media type, else one read off the name from a table
@@ -113,6 +114,11 @@ def resolve_within(root: Path, ref: str | Path) -> Path:
     return resolved
 
 
+def path_key(path: str | Path) -> str:
+    """``path`` as one text key: absolute, symlinks and ``..`` resolved, so every spelling of a file is one key."""
+    return str(Path(path).resolve())
+
+
 def looks_binary(data: bytes) -> bool:
     """True when the first 8 KiB hold a NUL byte, the mark of a binary file."""
     return b"\x00" in data[:_SNIFF_BYTES]
@@ -172,6 +178,7 @@ __all__ = [
     "looks_binary",
     "media_type",
     "name_collision",
+    "path_key",
     "resolve_within",
     "safe_name",
     "secret_pattern",
