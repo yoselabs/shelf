@@ -68,3 +68,14 @@ assigning every row:
 - Hand-written rows are listed by id, never by glob, so a new row with no owner fails `test_plugins.py`; generated stack and
   framework rows use `stack.<name>.*`.
 - `blueprint check --list` shows the plugin of each row. Nothing else reads the manifests yet.
+
+## Steps 2 and 3 as built
+
+- `[plugins]` in `docs/blueprint/blueprint.toml`: `beads = false`. Only booleans; an unknown plugin or a non-boolean is a problem the run reports.
+- `plugins.resolve` gives the plugins NOT asked, each with why: switched off, off by default and not switched on, or `requires X` where X is
+  not asked. The runner drops those plugins' checks and the rows of theirs that another check reports (`stack.roles` reports
+  `stack.<name>.<role>`), and prints one notice per plugin not asked. `set_hash` counts only the asked checks.
+- The requires graph after assigning real imports: beads and gate require git-hooks; gate and mise require stacks; every stack, python's uv and
+  frameworks require stacks (python also for uv). mise is NOT required by the stacks: a repo that pins no tools still wants its stack rows.
+- Each manifest lists its `modules` (the `concerns/*.py` files it owns until step 5). `tests/test_arch_plugin_imports.py` (any-arch Rule, no
+  rows) fails a concern module importing another plugin's module without a `requires`, and a module no plugin owns.

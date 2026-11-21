@@ -1,5 +1,6 @@
 id = "dotnet"
 title = ".NET"
 default = "detected"
-requires = ["mise", "stacks"]
+requires = ["stacks"]
 rows = ["stack.dotnet.*"]
+modules = []

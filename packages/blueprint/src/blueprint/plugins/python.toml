@@ -1,5 +1,6 @@
 id = "python"
 title = "Python with uv (the python-uv profile)"
 default = "detected"
-requires = ["mise", "stacks"]
+requires = ["stacks"]
 rows = ["stack.python-pin", "stack.python-installed", "stack.python-uv.architecture", "stack.python-uv.cli-help-tested", "stack.python-uv.coverage", "stack.python-uv.dependencies", "stack.python-uv.formatter", "stack.python-uv.hooks", "stack.python-uv.linter", "stack.python-uv.profile", "stack.python-uv.spelling", "stack.python-uv.tests", "stack.python-uv.toolchain", "stack.python-uv.types"]
+modules = ["python_pin"]

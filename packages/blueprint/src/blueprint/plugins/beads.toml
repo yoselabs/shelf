@@ -3,3 +3,4 @@ title = "Beads backlog (bd): config, hooks, sync"
 default = "on"
 requires = ["git-hooks"]
 rows = ["backlog.*", "hooks.beads-sync", "agents.bd-metrics-off", "agents.session-hooks"]
+modules = ["backlog"]

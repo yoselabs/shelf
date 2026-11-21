@@ -1,5 +1,6 @@
 id = "rust"
 title = "Rust"
 default = "detected"
-requires = ["mise", "stacks"]
+requires = ["stacks"]
 rows = ["stack.rust.*"]
+modules = []

@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from blueprint import concerns
 from blueprint.concerns import gate_git
 from blueprint.model import REGISTRY, Check, Context, Finding, FixedBy, Profile, Sub, Verdict, not_checked
+from blueprint.plugins import load_plugins, notices_for, plugin_of, resolve
 from blueprint.profile import DETECTION, Override, State, detect, load_state
 
 if TYPE_CHECKING:
@@ -137,9 +138,11 @@ def _accepted(repo: Path) -> set[str] | None:
     return set() if (repo / ACCEPTED).with_name("README.md").is_file() else None
 
 
-def active(profile: Profile, concern: str | None = None) -> list[Check]:
-    """The registered checks that apply to `profile`, in registry order."""
-    return [c for c in REGISTRY if c.applies(profile) and (concern is None or c.concern == concern)]
+def active(profile: Profile, concern: str | None = None, not_asked: dict[str, str] | None = None) -> list[Check]:
+    """The registered checks that apply to `profile`, in registry order, minus those of a plugin the repo does not ask."""
+    return [
+        c for c in REGISTRY if c.applies(profile) and (concern is None or c.concern == concern) and plugin_of(c.id) not in (not_asked or {})
+    ]
 
 
 def set_hash(checks: list[Check]) -> str:
@@ -220,9 +223,17 @@ def _run_checks(repo: Path, *, concern: str | None, audit: bool, today: date | N
     ctx = Context(repo=repo, profile=profile, settings=state.settings, overrides=state.overrides, today=today)
     if env is not None:
         ctx.env = env
-    checks = active(profile, concern)
+    not_asked = resolve(state.plugins)
+    checks = active(profile, concern, not_asked)
     dead: list[str] = []
-    rows = tuple(_row(c, sub, state, today, dead) for c in checks if audit or not c.audit_only for sub in _judge(c, ctx))
+    # A check such as stack.roles reports rows of other plugins (stack.<name>.<role>): drop the ones of a plugin not asked.
+    rows = tuple(
+        _row(c, sub, state, today, dead)
+        for c in checks
+        if audit or not c.audit_only
+        for sub in _judge(c, ctx)
+        if plugin_of(sub.id) not in not_asked
+    )
     accepted = _accepted(repo)
     if accepted is not None:
         rows = tuple(replace(r, new=True) if r.key not in accepted and r.verdict is not Verdict.PASSING else r for r in rows)
@@ -237,13 +248,14 @@ def _run_checks(repo: Path, *, concern: str | None, audit: bool, today: date | N
     )
     return Run(
         profile=profile,
-        set_hash=set_hash(active(profile)),
+        set_hash=set_hash(active(profile, None, not_asked)),
         rows=rows,
         problems=state.problems,
         skipped_audit=skipped,
         overrides=state.overrides,
         notices=(
             *state.notices,
+            *notices_for(not_asked, load_plugins()),
             *ctx.notices,
             *expiry_notices(state.overrides, today),
             *dead,

@@ -1,5 +1,6 @@
 id = "compose"
 title = "Docker Compose"
 default = "detected"
-requires = ["mise", "stacks"]
+requires = ["stacks"]
 rows = ["stack.compose.*"]
+modules = []

@@ -1,5 +1,6 @@
 id = "node"
 title = "Node"
 default = "detected"
-requires = ["mise", "stacks"]
+requires = ["stacks"]
 rows = ["stack.node.*"]
+modules = []

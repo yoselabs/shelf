@@ -1,5 +1,6 @@
 id = "go"
 title = "Go"
 default = "detected"
-requires = ["mise", "stacks"]
+requires = ["stacks"]
 rows = ["stack.go.*"]
+modules = []
