@@ -264,3 +264,33 @@ def test_a_top_level_exclude_of_beads_covers_every_hook(repo: Repo) -> None:
     _beads(repo)
     repo.write(".pre-commit-config.yaml", "exclude: ^(\\.beads/|vendor/)\n" + _FIXER.format(extra=""))
     assert _verdicts(repo)["backlog.hooks-spare-beads"] is Verdict.PASSING
+
+
+def _remote(repo: Repo, remote: str | None, origin: str | None) -> Verdict:
+    _beads(repo)
+    if remote:
+        repo.write(".beads/config.yaml", f'no-git-ops: true\nsync:\n    remote: "{remote}"\n')
+    if origin:
+        repo.git("remote", "add", "origin", origin)
+    repo.commit()
+    return _verdicts(repo)["backlog.no-duplicate-remote"]
+
+
+@pytest.mark.parametrize(
+    "remote",
+    [
+        "git+https://github.com/o/r.git",
+        "git+ssh://git@github.com/o/r.git",
+        "git@github.com:o/r.git",
+    ],
+)
+def test_a_sync_remote_that_repeats_origin_in_any_transport_fails(repo: Repo, remote: str) -> None:
+    assert _remote(repo, remote, "https://github.com/o/r.git") is Verdict.FAILING
+
+
+def test_a_sync_remote_naming_another_repository_passes(repo: Repo) -> None:
+    assert _remote(repo, "git+https://github.com/o/other.git", "https://github.com/o/r.git") is Verdict.PASSING
+
+
+def test_no_sync_remote_passes(repo: Repo) -> None:
+    assert _remote(repo, None, "https://github.com/o/r.git") is Verdict.PASSING

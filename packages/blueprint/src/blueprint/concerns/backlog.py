@@ -154,6 +154,43 @@ def no_export_file(ctx: Context) -> Finding:
     )
 
 
+_SYNC_REMOTE = re.compile(r"^sync:\s*\n\s+remote:\s*['\"]?([^'\"\s]+)", re.MULTILINE)
+
+
+def _same_place(url: str) -> str:
+    """host/path of a git URL, transport, user and `.git` dropped: the https, ssh and scp forms of one repository agree."""
+    plain = url.removeprefix("git+")
+    found = re.match(r"^[\w.-]+@([\w.-]+):(.+)$", plain) or re.match(r"^[a-z+]+://(?:[^@/]+@)?([^/:]+)(?::\d+)?/(.+)$", plain)
+    if found is None:
+        return plain
+    return f"{found.group(1)}/{found.group(2)}".removesuffix(".git").strip("/").lower()
+
+
+@check(
+    "backlog.no-duplicate-remote",
+    "`sync.remote` does not repeat git origin (bd derives the Dolt remote from origin; a copy drifts, e.g. ssh against https)",
+    applies=uses_beads,
+)
+def no_duplicate_remote(ctx: Context) -> Finding:
+    """A `sync.remote` naming the same repository as origin, in the same or another transport, is a second source of truth."""
+    config = ctx.read(".beads/config.yaml")
+    found = _SYNC_REMOTE.search(config or "")
+    if found is None:
+        return passing("no sync.remote: bd uses git origin")
+    origin = ctx.git("remote", "get-url", "origin")
+    if origin is None or not origin.strip():
+        return passing("sync.remote is set and the repo has no git origin to repeat")
+    remote = found.group(1)
+    if _same_place(remote) != _same_place(origin.strip()):
+        return passing("sync.remote names a different repository than origin")
+    return failing(
+        f"sync.remote {remote} repeats git origin {origin.strip()}"
+        + ("" if remote.removeprefix("git+") == origin.strip() else " (only the transport differs)"),
+        "delete the `sync:` block from .beads/config.yaml: bd takes the Dolt remote from git origin, so the clone's own transport "
+        "always works; a copy goes wrong the day one machine uses ssh and another https",
+    )
+
+
 @check(
     "backlog.no-local-override",
     "nothing outside .beads/config.yaml weakens bd: no config.local.yaml, no BD_* in the session env",
