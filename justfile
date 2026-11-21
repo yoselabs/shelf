@@ -37,7 +37,7 @@ lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACH
 # working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
 # pre-push hook then skips the gate for that exact tree.
 [group('gate')]
-check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "tag-check" "test") check-extra
+check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "stdlib-shadow" "tag-check" "test") check-extra
     uv run python -m any_gate passed --gate check
 
 # The decision records are the shelf's own to keep (any-knowledge); blueprint does not check them. Runs after the steps, before the record.
@@ -49,7 +49,7 @@ adr-check:
     uv run python -m any_knowledge check
 
 [group('gate')]
-check-all: beads-lint (scripts "all") (steps-all "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "arch" "spell" "deps" "test-all") adr-check
+check-all: beads-lint (scripts "all") (steps-all "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "arch" "spell" "deps" "stdlib-shadow" "test-all") adr-check
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
 # blueprint's for this step in every repo (stack/shell).
@@ -68,6 +68,12 @@ scripts scope="changed":
 [group('gate')]
 tag-check:
     python3 -I tools/tag_check.py
+
+# No tracked `*.py` file or package folder is named like a standard library module where a script run puts it first on sys.path (a consumer's
+# `queue.py` in scripts/ broke 729 jobs, 2026-11: `module 'queue' has no attribute 'SimpleQueue'`). Reasoned exceptions: tools/stdlib_shadow_allow.toml.
+[group('gate')]
+stdlib-shadow:
+    python3 -I tools/stdlib_shadow.py
 
 [group('gate')]
 lint:
