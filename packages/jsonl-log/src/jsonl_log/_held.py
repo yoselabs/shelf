@@ -13,16 +13,16 @@ from __future__ import annotations
 
 import os
 import threading
-from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+from any_file import path_key
 
 from jsonl_log import JsonlLog
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 MAX_OPEN = 16
-
-
-def _key(path: Path | str) -> str:
-    return str(Path(path).resolve())
 
 
 class HeldLogs:
@@ -31,7 +31,7 @@ class HeldLogs:
         self._logs: dict[str, tuple[int, JsonlLog, dict[str, object]]] = {}  # least recently used first
 
     def get(self, path: Path | str, options: dict[str, object]) -> JsonlLog:
-        key, pid = _key(path), os.getpid()
+        key, pid = path_key(path), os.getpid()
         with self._lock:
             entry = self._logs.pop(key, None)
             if entry is not None and (entry[0] != pid or entry[1].closed):
@@ -52,13 +52,13 @@ class HeldLogs:
 
     def close(self, path: Path | str | None) -> None:
         with self._lock:
-            for key in list(self._logs) if path is None else [_key(path)]:
+            for key in list(self._logs) if path is None else [path_key(path)]:
                 self._close(key)
 
     def count(self, path: Path | str | None) -> int:
         with self._lock:
             pid = os.getpid()
-            return sum(1 for k, v in self._logs.items() if v[0] == pid and (path is None or k == _key(path)))
+            return sum(1 for k, v in self._logs.items() if v[0] == pid and (path is None or k == path_key(path)))
 
     def _close(self, key: str) -> None:
         entry = self._logs.pop(key, None)

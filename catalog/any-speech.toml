@@ -2,7 +2,7 @@
 name = "any-speech"
 kind = "composite"
 tier = "T2"
-release = "any-speech-v0.8.0"
+release = "any-speech-v0.9.0"
 capability = "Stop caring which engine turns speech into words, turns and voices — one versioned Transcript (word times, probabilities, speakers, provenance with the audio hash, settings, duration and peak memory) from engines behind Transcriber, Diarizer and Embedder ports; FluidAudio's CLI (Parakeet v3 or Ultra, Nemotron 3 diarisation) and parakeet-mlx as adapters; parallel by slots (an any-lease pool of N transcriptions and M diarisations machine-wide; Speech.transcribe(path) waits for a unit; a Drain runs a folder with N workers that claim one file each); a failure record keyed to the file that never stalls a batch; a peak-memory guard (4 GB default); a sherpa-onnx voice embedding to match a host across files; an any-speech CLI."
 implementation = "ours"
 status = "candidate"

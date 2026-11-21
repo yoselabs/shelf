@@ -1,6 +1,6 @@
 [project]
 name = "any-file"
-version = "0.2.0"
+version = "0.3.0"
 description = "Stop caring what a file name or its bytes say: a safe bare basename, a path held inside its root, a binary sniff, case and normalization twins, and a media type from a table that does not depend on the host's mime.types; a transliterated slug; secret-file name patterns."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

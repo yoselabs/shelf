@@ -401,7 +401,7 @@ dev = [
 
 [[package]]
 name = "any-file"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/any-file" }
 dependencies = [
     { name = "anyascii" },
@@ -849,10 +849,11 @@ dev = [
 
 [[package]]
 name = "any-speech"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/any-speech" }
 dependencies = [
     { name = "any-clock" },
+    { name = "any-file" },
     { name = "any-frontmatter" },
     { name = "any-lease" },
     { name = "any-pipeline" },
@@ -885,6 +886,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "any-clock", editable = "packages/any-clock" },
+    { name = "any-file", editable = "packages/any-file" },
     { name = "any-frontmatter", editable = "packages/any-frontmatter" },
     { name = "any-lease", editable = "packages/any-lease" },
     { name = "any-pipeline", editable = "packages/any-pipeline" },
@@ -2189,9 +2191,10 @@ wheels = [
 
 [[package]]
 name = "dir-trust"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/dir-trust" }
 dependencies = [
+    { name = "any-file" },
     { name = "atomic-io" },
     { name = "ruamel-yaml" },
 ]
@@ -2205,6 +2208,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "any-file", editable = "packages/any-file" },
     { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "ruamel-yaml", specifier = ">=0.18,<1" },
 ]
@@ -3243,9 +3247,10 @@ dev = [
 
 [[package]]
 name = "jsonl-log"
-version = "0.6.0"
+version = "0.7.0"
 source = { editable = "packages/jsonl-log" }
 dependencies = [
+    { name = "any-file" },
     { name = "atomic-io" },
     { name = "process-lock" },
 ]
@@ -3260,6 +3265,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "any-file", editable = "packages/any-file" },
     { name = "atomic-io", editable = "packages/atomic-io" },
     { name = "process-lock", editable = "packages/process-lock" },
 ]

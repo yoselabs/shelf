@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from any_clock import utc_stamp
+from any_file import path_key
 from any_pipeline import Limit, Stage, blocking, gather, run_one
 from content_digest import digest_file
 from stream_proc import capture
@@ -77,7 +78,7 @@ class AudioHasher:
 
     def __call__(self, audio: Path) -> str:
         stat = audio.stat()
-        key = (str(audio.resolve()), stat.st_size, stat.st_mtime_ns)
+        key = (path_key(audio), stat.st_size, stat.st_mtime_ns)
         if key not in self._seen:
             self._seen[key] = self._hash_file(audio)
         return self._seen[key]

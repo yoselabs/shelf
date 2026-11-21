@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-speech"
+software = "any-file"
+why = "any-speech spelled a path key as str(path.resolve()) on its own; four sites, one rule, so one owner."
+needs = "path_key: a path as one absolute, symlink-resolved text key."
+sponsor = "yoselabs"
+requester = "any-speech"
+status = "active" # active | retired
