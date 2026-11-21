@@ -1,6 +1,6 @@
 [project]
 name = "any-work"
-version = "0.1.0"
+version = "0.2.0"
 description = "A work table for a long job over many keys: add idempotently, claim the next due key under a per-key flock, finish ok or with a classified failure (retry with backoff, permanent, quarantine), count progress, drain until idle. SQLite, single host, many processes."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

@@ -10,3 +10,6 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 - 0.1.0: `async drain(work, handler, *, concurrency=1, idle_exit_s=30, poll_s=1, kind=None, sleep=asyncio.sleep, clock=time.monotonic)`; handler returns = ok, raises `ClassifiedError(Failure)` = that failure, any other exception = `Failure(UNKNOWN)`
 - 0.1.0: table `work(key PK, kind, status, attempts, last_error, fp, next_try_at, priority, payload JSON)`, sqlite-store schema `any-work` v1
 - 0.1.0: new `any_work.testing.ManualClock(now=1000.0)`: callable clock, `async sleep(s)` advances it
+- 0.2.0: new `.enqueue(items: Iterable[Item], *, bump: bool = False) -> Enqueued` (one transaction; existing keys untouched, with bump an existing pending row moves to a more urgent item priority); `.add(items) -> int` unchanged, now `enqueue(items).new`
+- 0.2.0: new `Enqueued(new: int, existing: int, bumped: int, states: dict[str, int])` frozen dataclass, exported; `states` = given keys by final status
+- 0.2.0: new `.bump(keys: Iterable[str], priority: int = 0) -> int` (pending rows with priority > `priority` only; returns count moved)

@@ -54,6 +54,20 @@ class Item:
 
 
 @dataclass(frozen=True)
+class Enqueued:
+    """What one ``enqueue`` did, read back inside its transaction: the evidence a feeder prints.
+
+    ``new`` rows were inserted, ``existing`` keys were already there (``new + existing`` is the distinct keys given), ``bumped`` of
+    those moved to a more urgent priority. ``states`` counts the given keys by their final status, so "already done" is visible.
+    """
+
+    new: int
+    existing: int
+    bumped: int
+    states: dict[str, int] = field(default_factory=dict[str, int])
+
+
+@dataclass(frozen=True)
 class Progress:
     """Row counts. ``done`` is a count of rows, never a process exit or a marker file."""
 

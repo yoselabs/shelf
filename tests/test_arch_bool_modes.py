@@ -72,6 +72,12 @@ _ALLOWED = {
         "git-porcelain:run:pin",
         "git-porcelain:try_run:pin",
     ),
+    # --- splits: the flag adds a second operation, which also exists on its own ---
+    **rows(
+        "split: bump=True is enqueue plus the separate Work.bump(keys) on the keys that already existed; a feeder gets one call "
+        "and one Enqueued as evidence, any other caller uses bump() alone",
+        "any-work:enqueue:bump",
+    ),
     # --- facts: data about one call, value or error ---
     **rows(
         "fact: the include/skip choice is trafilatura's own extraction option, passed through; the page "
