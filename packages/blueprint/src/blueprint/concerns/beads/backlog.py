@@ -254,6 +254,26 @@ def hooks_installed(ctx: Context) -> Finding:
 
 
 @check(
+    "backlog.worktree-database",
+    "a linked git worktree holds no bd database of its own: every worktree shares the main checkout's",
+    applies=uses_beads,
+)
+def worktree_database(ctx: Context) -> Finding:
+    """`.git` is a file in a linked worktree; an `.beads/embeddeddolt` there is a private, empty copy that loses what is written to it."""
+    if not ctx.path(".git").is_file():
+        return passing("not a linked worktree")
+    if not ctx.path(".beads/embeddeddolt").exists():
+        return passing("this worktree uses the main checkout's bd database")
+    return failing(
+        ".beads/embeddeddolt exists in this worktree: bd has a private database here (BEADS_DIR set to this worktree, or bd init or "
+        "bootstrap run here); beads written to it are lost with the worktree and auto-push warns `remote 'origin' not found`",
+        "check it holds nothing you need (`BEADS_DIR=$PWD/.beads bd stats`), then "
+        "`rm -rf .beads/embeddeddolt .beads/backup .beads/push-state.json`; unset BEADS_DIR; "
+        "`bd where` must then name the main checkout's .beads/embeddeddolt",
+    )
+
+
+@check(
     "backlog.no-local-override",
     "nothing outside .beads/config.yaml weakens bd: no config.local.yaml, no BD_* in the session env",
     applies=uses_beads,

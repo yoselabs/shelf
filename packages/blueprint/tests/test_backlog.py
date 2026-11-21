@@ -12,6 +12,8 @@ from blueprint.model import Verdict
 from blueprint.runner import run, run_audit
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from blueprint.testing import Repo
 
 
@@ -308,3 +310,31 @@ def test_a_beads_repo_without_a_hook_config_is_not_set_up(repo: Repo) -> None:
     _beads(repo)
     (repo.root / ".pre-commit-config.yaml").unlink()
     assert _verdicts(repo)["backlog.hooks-recipe"] is Verdict.NOT_SET_UP
+
+
+def _worktree(repo: Repo) -> Path:
+    _beads(repo)
+    repo.commit()
+    folder = repo.root.parent / f"{repo.root.name}-wt"
+    repo.git("worktree", "add", str(folder), "-b", "wt")
+    return folder
+
+
+def test_a_worktree_with_its_own_bd_database_fails(repo: Repo) -> None:
+    folder = _worktree(repo)
+    (folder / ".beads" / "embeddeddolt").mkdir(parents=True)
+    row = {r.id: r for r in run(folder, concern="backlog", env=repo.env).rows}["backlog.worktree-database"]
+    assert row.verdict is Verdict.FAILING
+    assert "BEADS_DIR" in row.evidence
+
+
+def test_a_worktree_without_its_own_database_passes(repo: Repo) -> None:
+    folder = _worktree(repo)
+    row = {r.id: r for r in run(folder, concern="backlog", env=repo.env).rows}["backlog.worktree-database"]
+    assert row.verdict is Verdict.PASSING
+
+
+def test_the_main_checkout_may_hold_the_database(repo: Repo) -> None:
+    _beads(repo)
+    (repo.root / ".beads" / "embeddeddolt").mkdir(parents=True)
+    assert _verdicts(repo)["backlog.worktree-database"] is Verdict.PASSING
