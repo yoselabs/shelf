@@ -118,9 +118,9 @@ _ALLOWED: dict[str, Row] = {
         ("packages/llm-wobble", 2),
     ),
     **rows(
-        "debt: `IdentityUnavailableError` and `RegisteredStartUncertainError` each derive from RuntimeError; add "
+        "debt: `IdentityUnavailableError`, `RegisteredStartUncertainError` and `PumpStuckError` each derive from RuntimeError; add "
         "`StreamProcError(RuntimeError)` as their base",
-        ("packages/stream-proc", 2),
+        ("packages/stream-proc", 3),
     ),
 }
 

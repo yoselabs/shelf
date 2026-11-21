@@ -179,7 +179,7 @@ _ALLOWED = {
         ("packages/blueprint/src/blueprint/model.py:Context.run", 1),
         ("packages/git-porcelain/src/git_porcelain/history.py:show_at", 1),
     ),
-    # --- outcome-probe: 12 rows, 12 hits ---
+    # --- outcome-probe: 13 rows, 13 hits ---
     **rows(
         _OUTCOME_PROBE,
         ("packages/any-lease/src/any_lease/leases.py:_is_held", 1),
@@ -210,6 +210,7 @@ _ALLOWED = {
         ("packages/git-porcelain/src/git_porcelain/real_cache.py:rev_files", 1),
         ("packages/git-porcelain/src/git_porcelain/real_cache.py:sig", 1),
         ("packages/git-porcelain/src/git_porcelain/real_env.py:git_dir", 1),
+        ("packages/page-tsv/src/page_tsv/render.py:_tsv_or_none", 1),
         ("packages/process-lock/src/process_lock/__init__.py:holder", 1),
         ("packages/stream-proc/src/stream_proc/procfs.py:boot_id", 1),
     ),

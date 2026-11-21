@@ -67,6 +67,15 @@ _ALLOWED = {
         ("packages/any-agent/src/any_agent/supervisor.py", 1),
     ),
     **rows(
+        "outcome: every failure and cancel is collected and re-raised together by `raise_failures`, so the cancel is not lost",
+        ("packages/async-scope/src/async_scope/__init__.py", 2),
+        ("packages/async-scope/src/async_scope/cleanup.py", 2),
+    ),
+    **rows(
+        "outcome: the failure is stored and raised on the owner by release; the pipes must keep draining meanwhile",
+        ("packages/stream-proc/src/stream_proc/pump.py", 2),
+    ),
+    **rows(
         "outcome: `SystemExit` here is argparse rejecting its own input inside the call; the usage message is the answer",
         ("packages/argparse-mcp/src/argparse_mcp/tools.py", 1),
         ("packages/verb-cli/src/verb_cli/testing.py", 1),

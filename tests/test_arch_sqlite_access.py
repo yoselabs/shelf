@@ -49,7 +49,7 @@ SQLITE_CONNECT = Rule(
     "open through sqlite-sidecar `connect` or sqlite-store, not sqlite3.connect",
     _connect_calls,
     {},
-    scope=("packages/*/src/**/*.py", "packages/*/bench/**/*.py", "tools/**/*.py", "skills/**/*.py"),
+    scope=("packages/**/*.py", "tools/**/*.py", "skills/**/*.py"),
 )
 
 
