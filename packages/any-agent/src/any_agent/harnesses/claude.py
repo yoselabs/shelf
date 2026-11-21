@@ -381,4 +381,4 @@ class ClaudeHarness(Quiet):
             logged_in = json.loads(r.out).get("loggedIn")
         except (ValueError, AttributeError):
             logged_in = None
-        return (logged_in if isinstance(logged_in, bool) else None), (r.out + r.err).strip()[:120]
+        return (logged_in if isinstance(logged_in, bool) else None), (r.text + r.err_text).strip()[:120]

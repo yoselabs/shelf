@@ -59,9 +59,9 @@ def audio_sha256(audio: Path) -> str:
 def probe_seconds(audio: Path) -> float:
     out = capture(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(audio)], timeout=_PROBE_TIMEOUT)
     if out.exit != 0:
-        message = f"ffprobe failed on {audio} (exit {out.exit}): {out.err.strip()[-300:]}"
+        message = f"ffprobe failed on {audio} (exit {out.exit}): {out.err_text.strip()[-300:]}"
         raise RuntimeError(message)
-    return float(out.out.strip())
+    return float(out.text.strip())
 
 
 def _utc_now() -> str:

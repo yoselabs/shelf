@@ -32,7 +32,7 @@ def _git(repo: Path, env: Mapping[str, str], *args: str) -> str | None:
         done = capture(["git", *args], cwd=repo, env=env, timeout=GIT_TIMEOUT)
     except OSError:
         return None
-    return done.out.strip() if done.exit == 0 else None
+    return done.text.strip() if done.exit == 0 else None
 
 
 def common_dir(repo: Path, env: Mapping[str, str]) -> Path | None:

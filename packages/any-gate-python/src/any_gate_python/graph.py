@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from content_digest import digest_text
-from stream_proc import capture, capture_bytes
+from stream_proc import capture
 
 _REQ_NAME = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 
@@ -84,9 +84,9 @@ def package_exports(repo: Path, packages: list[str]) -> dict[str, str]:
         cmd += ["--no-emit-workspace", "--no-hashes", "--no-header", "--no-annotate", "-q"]
         done = capture(cmd, cwd=repo, timeout=TOOL_TIMEOUT)
         if done.exit:
-            message = f"uv export --package {names[directory]} failed: {done.err.strip()[:200]}"
+            message = f"uv export --package {names[directory]} failed: {done.err_text.strip()[:200]}"
             raise ExportError(message)
-        hashes[directory] = digest_text(done.out, length=64)
+        hashes[directory] = digest_text(done.text, length=64)
     return hashes
 
 
@@ -104,11 +104,11 @@ def root_config(manifest: Path) -> str:
 
 def extract_base(repo: Path, base: str, dest: Path) -> None:
     listed = capture(["git", "ls-tree", "-r", "--name-only", base], cwd=repo, timeout=TOOL_TIMEOUT)
-    names = [n for n in listed.out.splitlines() if n in LOCK_FILES or re.fullmatch(r"packages/[^/]+/pyproject\.toml", n)]
+    names = [n for n in listed.text.splitlines() if n in LOCK_FILES or re.fullmatch(r"packages/[^/]+/pyproject\.toml", n)]
     if listed.exit or not names:
         message = f"the base tree {base!r} cannot be read"
         raise ExportError(message)
-    archive = capture_bytes(["git", "archive", base, "--", *names], cwd=repo, timeout=TOOL_TIMEOUT)
+    archive = capture(["git", "archive", base, "--", *names], cwd=repo, timeout=TOOL_TIMEOUT)
     if archive.exit:
         message = f"git archive {base!r} failed"
         raise ExportError(message)

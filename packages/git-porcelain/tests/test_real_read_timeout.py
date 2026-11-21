@@ -45,11 +45,11 @@ def test_every_call_is_bounded_and_a_read_takes_no_optional_lock(tmp_path: Path,
     repo = RealRepo(tmp_path, read_timeout=5, ambient=dict(os.environ))
     seen: list[tuple[float, str | None]] = []
 
-    def fake_capture(argv: list[str], *, env: dict[str, str], timeout: float, **_: object) -> stream_proc.CapturedBytes:
+    def fake_capture(argv: list[str], *, env: dict[str, str], timeout: float, **_: object) -> stream_proc.Captured:
         seen.append((timeout, env.get("GIT_OPTIONAL_LOCKS")))
-        return stream_proc.CapturedBytes(0, b"", b"", 0.0, False)
+        return stream_proc.Captured(0, b"", b"", 0.0, False)
 
-    monkeypatch.setattr(stream_proc, "capture_bytes", fake_capture)
+    monkeypatch.setattr(stream_proc, "capture", fake_capture)
     repo.run(tmp_path, "status", pin=False)
     repo.run(tmp_path, "commit", "-q", pin=False)
     repo.run(tmp_path, "commit", "-q", pin=False, timeout=7)

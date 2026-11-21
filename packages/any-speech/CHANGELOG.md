@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0
+
+- Runs children through stream-proc 0.13.0's one `capture` (`Captured`: bytes, `.text` view); requires `stream-proc>=0.13.0,<1`. Contract unchanged.
+
 ## 0.6.1
 
 - Claim locks use `ProcessLock.acquire_exclusive` (process-lock 0.4.0); requires `process-lock>=0.4,<1`; the setup build step runs `stream_proc.run_inherited` (requires `stream-proc>=0.11,<1`); no behaviour change.
