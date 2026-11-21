@@ -40,6 +40,8 @@ any-speech = { workspace = true }
 any-clock = { workspace = true }
 any-pipeline = { workspace = true }
 any-versioned = { workspace = true }
+# the shelf's own arch tests (tests/test_arch_*.py) compose any-arch.
+any-arch = { workspace = true }
 any-lease = { workspace = true }
 # any-work composes any-lease, any-failure-fp and sqlite-store.
 any-work = { workspace = true }
@@ -336,6 +338,7 @@ testpaths = [
     "packages/any-speech/tests",
     "packages/any-pipeline/tests",
     "packages/any-versioned/tests",
+    "packages/any-arch/tests",
     "packages/any-ttl-cache/tests",
     "packages/py-symbols/tests",
     "packages/test-reach/tests",
@@ -452,6 +455,7 @@ root_packages = [
     "any_speech",
     "any_pipeline",
     "any_versioned",
+    "any_arch",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -550,6 +554,7 @@ source_modules = [
     "any_speech",
     "any_pipeline",
     "any_versioned",
+    "any_arch",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -650,6 +655,7 @@ modules = [
     "any_speech",
     "any_pipeline",
     "any_versioned",
+    "any_arch",
     "any_mailbox",
     "any_recorded_fixture",
     "task_spec",
@@ -984,6 +990,7 @@ packages = [
     "any-speech",
     "any-ttl-cache",
     "any-versioned",
+    "any-arch",
     "any-work",
     "any-yaml",
     "anyembed",

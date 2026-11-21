@@ -18,7 +18,10 @@ force, overwrite, missing_ok, exist_ok, ignore_errors or check, and public param
 """
 
 import ast
+from collections.abc import Iterator
 from pathlib import Path
+
+from any_arch import Hit, Rule, Source, check, plant, rows
 
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -27,31 +30,22 @@ def _is_bool(annotation: ast.expr | None) -> bool:
     return annotation is not None and ast.unparse(annotation) in {"bool", "bool | None", "None | bool", "Optional[bool]"}
 
 
-def bool_modes(root: Path) -> dict[str, int]:
-    """`package:function:parameter` -> number of definitions carrying it, for `root/packages/*/src`."""
-    hits: dict[str, int] = {}
-    for path in sorted((root / "packages").glob("*/src/**/*.py")):
-        package = path.relative_to(root / "packages").parts[0]
-        for node in ast.walk(ast.parse(path.read_text())):
-            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-                continue
-            args = node.args
-            positional = [*args.posonlyargs, *args.args]
-            defaults = [None] * (len(positional) - len(args.defaults)) + list(args.defaults)
-            for arg, default in [*zip(positional, defaults, strict=True), *zip(args.kwonlyargs, args.kw_defaults, strict=True)]:
-                if default is not None and _is_bool(arg.annotation):
-                    key = f"{package}:{node.name}:{arg.arg}"
-                    hits[key] = hits.get(key, 0) + 1
-    return hits
+def _bool_modes(source: Source) -> Iterator[Hit]:
+    """`package:function:parameter` for every parameter annotated bool with a default."""
+    for node in ast.walk(source.tree):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        args = node.args
+        positional = [*args.posonlyargs, *args.args]
+        defaults = [None] * (len(positional) - len(args.defaults)) + list(args.defaults)
+        for arg, default in [*zip(positional, defaults, strict=True), *zip(args.kwonlyargs, args.kw_defaults, strict=True)]:
+            if default is not None and _is_bool(arg.annotation):
+                yield f"{source.package}:{node.name}:{arg.arg}", node.lineno
 
 
-def _rows(reason: str, *keys: str) -> dict[str, str]:
-    return dict.fromkeys(keys, reason)
-
-
-_ALLOWED: dict[str, str] = {
+_ALLOWED = {
     # --- cost opt-ins and construction config (ADR 0030) ---
-    **_rows(
+    **rows(
         "cost: durability tier of one write (fsync or not); the default is the safe one, off is for caches and hot state; ADR 0030",
         "any-json-doc:__init__:fsync",
         "atomic-io:atomic_write_bytes:fsync",
@@ -61,25 +55,25 @@ _ALLOWED: dict[str, str] = {
         "atomic-io:atomic_replace_json:fsync",
         "atomic-io:atomic_replace_text:fsync",
     ),
-    **_rows(
+    **rows(
         "cost: the dirty flag needs one `git status` per worktree (Article IX: cost makes it opt-in); ADR 0030",
         "git-porcelain:worktrees:with_dirty",
     ),
-    **_rows(
+    **rows(
         "cost: the network ls-remote probe; check_push=False stays local and fast; ADR 0030",
         "git-porcelain:readiness:check_push",
     ),
-    **_rows(
+    **rows(
         "construction: whether a repo observation is cached, chosen once at construction, for fresh reads; ADR 0030",
         "git-porcelain:__init__:memoize",
     ),
-    **_rows(
+    **rows(
         "cost: pin=False skips the checkout's environment pin for one call (the runner's own escape hatch); ADR 0030",
         "git-porcelain:run:pin",
         "git-porcelain:try_run:pin",
     ),
     # --- facts: data about one call, value or error ---
-    **_rows(
+    **rows(
         "fact: the include/skip choice is trafilatura's own extraction option, passed through; the page "
         "decides which regions are boilerplate",
         "content-extract:_extract_sync:include_comments",
@@ -95,62 +89,62 @@ _ALLOWED: dict[str, str] = {
         "convert-md:convert_html:include_links",
         "convert-md:convert_html:include_tables",
     ),
-    **_rows(
+    **rows(
         "fact: a plist value written verbatim (RunAtLoad, KeepAlive); the function renders data, it does not branch on it",
         "launchd-agent:render_plist:keep_alive",
         "launchd-agent:render_plist:run_at_load",
     ),
-    **_rows(
+    **rows(
         "fact: a query predicate on one `bd list` call (mirrors bd's own --all)",
         "beads-client:find:include_closed",
     ),
-    **_rows(
+    **rows(
         "fact: json.dumps's own formatting option, passed through (like indent)",
         "atomic-io:atomic_write_json:sort_keys",
         "atomic-io:atomic_replace_json:sort_keys",
     ),
-    **_rows(
+    **rows(
         "fact: the connection's thread affinity, passed to sqlite3 as check_same_thread",
         "sqlite-store:_open:shared",
     ),
-    **_rows(
+    **rows(
         "fact: a field of the StopReport being built (the observation failed), not a code path",
         "stream-proc:report:error",
     ),
-    **_rows(
+    **rows(
         "fact: subprocess's own start_new_session, passed to Popen; no caller varies it",
         "stream-proc:popen_registered:start_new_session",
     ),
-    **_rows(
+    **rows(
         "fact: a property of the checkpoint (slow, or reads outside the repo), stored on Check, not a branch in the function",
         "blueprint:check:audit_only",
         "blueprint:check_each:audit_only",
     ),
-    **_rows(
+    **rows(
         "fact: a Finding field: the blueprint itself cannot judge the row yet",
         "blueprint:not_checked:blueprint_gap",
     ),
-    **_rows(
+    **rows(
         "fact: the model's load-time hardware and network placement, passed to llama.cpp (n_gpu_layers) "
         "and transformers (local_files_only)",
         "anyembed:__init__:gpu",
         "anyembed:__init__:offline",
     ),
-    **_rows(
+    **rows(
         "fact: a request parameter of the completion call, like temperature, forwarded to the backend",
         "anyllm:complete:thinking_disabled",
     ),
-    **_rows(
+    **rows(
         "fact: git's own tri-state option (None defers to git config), passed through",
         "git-porcelain:rebase:update_refs",
         "git-porcelain:rebase_onto:update_refs",
         "git-porcelain:start_rebase:update_refs",
     ),
-    **_rows(
+    **rows(
         "fact: how much of the child's output the message quotes (the tail or all of it); the failure is the same",
         "git-porcelain:unavailable:full_output",
     ),
-    **_rows(
+    **rows(
         "fact: whether the failure may be retried is data on the error, not a behaviour switch",
         "a2effect:__init__:retryable",
         "a2effect:register_error_kind:retryable",
@@ -158,13 +152,13 @@ _ALLOWED: dict[str, str] = {
         "git-porcelain:__init__:retryable",
         "git-porcelain:failure:retryable",
     ),
-    **_rows(
+    **rows(
         "fact: an observed outcome passed into a pure classifier",
         "any-agent:classify:timed_out",
         "any-agent:classify:work_seen",
         "any-agent:finish:killed",
     ),
-    **_rows(
+    **rows(
         "fact: a test-support opt-in; contract_tests and the pytest-shaped monkeypatch wrappers mirror pytest's own signature",
         "a2effect:__init_subclass__:abstract",
         "a2effect:contract_tests:dead_enricher",
@@ -195,41 +189,35 @@ def _enums_and_aliases(tree: ast.Module) -> set[str]:
     return names
 
 
-def policy_params(root: Path) -> dict[str, int]:
+def _policy_params(source: Source) -> Iterator[Hit]:
     """`package:function:parameter` for each public function parameter that is a tolerance or policy switch."""
-    hits: dict[str, int] = {}
-    for path in sorted((root / "packages").glob("*/src/**/*.py")):
-        package = path.relative_to(root / "packages").parts[0]
-        tree = ast.parse(path.read_text())
-        coats = _enums_and_aliases(tree)
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) or (node.name.startswith("_") and node.name != "__init__"):
-                continue
-            for arg in [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]:
-                note = ast.unparse(arg.annotation) if arg.annotation is not None else ""
-                names = {n.id for n in ast.walk(arg.annotation) if isinstance(n, ast.Name)} if arg.annotation is not None else set()
-                if arg.arg in _NAMED or "Literal[" in note or names & coats:
-                    key = f"{package}:{node.name}:{arg.arg}"
-                    hits[key] = hits.get(key, 0) + 1
-    return hits
+    coats = _enums_and_aliases(source.tree)
+    for node in ast.walk(source.tree):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) or (node.name.startswith("_") and node.name != "__init__"):
+            continue
+        for arg in [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]:
+            note = ast.unparse(arg.annotation) if arg.annotation is not None else ""
+            names = {n.id for n in ast.walk(arg.annotation) if isinstance(n, ast.Name)} if arg.annotation is not None else set()
+            if arg.arg in _NAMED or "Literal[" in note or names & coats:
+                yield f"{source.package}:{node.name}:{arg.arg}", node.lineno
 
 
-_POLICY_ALLOWED: dict[str, str] = {
-    **_rows(
+_POLICY_ALLOWED = {
+    **rows(
         "fact: which part of the checkout one `record` stages is a selection of data, not a second behaviour",
         "git-porcelain:record:paths",
         "git-porcelain:record_with_hooks:paths",
         "git-porcelain:record_stage:paths",
     ),
-    **_rows(
+    **rows(
         "fact: git reset's own --soft/--mixed/--hard, passed through; it names git's three reset depths",
         "git-porcelain:reset:mode",
     ),
-    **_rows(
+    **rows(
         "fact: a one-member Literal naming the single setup target, a CLI positional, not a switch",
         "any-speech:setup:what",
     ),
-    **_rows(
+    **rows(
         "fact: a tag naming the kind or outcome of one value or error; no code path branches on a caller's choice",
         "a2effect:register_error_kind:base",
         "any-agent:end:status",
@@ -241,7 +229,7 @@ _POLICY_ALLOWED: dict[str, str] = {
         "llm-wobble:emit_wobble:tolerance",
         "task-spec:resolve:kind",
     ),
-    **_rows(
+    **rows(
         "fact: a lookup key or backend setting forwarded as data (which model, store, directory kind or request level)",
         "any-speech:__init__:model_version",
         "any-speech:default_card:role",
@@ -255,55 +243,59 @@ _POLICY_ALLOWED: dict[str, str] = {
 }
 
 
-def _plant(tmp_path: Path, source: str) -> dict[str, int]:
-    module = tmp_path / "packages" / "pkg" / "src" / "pkg" / "mod.py"
-    module.parent.mkdir(parents=True)
-    module.write_text(source)
-    return bool_modes(tmp_path)
+_KINDS = ("split", "fact", "cost", "construction")
+
+BOOL_MODES = Rule(
+    "bool-modes",
+    "a bool parameter with a default is a mode (Article III: no optionality; split the behaviour or list it with a reason)",
+    _bool_modes,
+    _ALLOWED,
+    _KINDS,
+)
+POLICY_PARAMS = Rule(
+    "policy-params",
+    "public parameter named force/overwrite/missing_ok/exist_ok/ignore_errors/check, or a Literal/Enum policy switch: "
+    "raise a typed exception the caller catches, or make two verbs (Article III, ADR 0030)",
+    _policy_params,
+    _POLICY_ALLOWED,
+    _KINDS,
+)
 
 
-def test_repo_has_no_unlisted_bool_mode() -> None:
-    new = sorted(set(bool_modes(_ROOT)) - set(_ALLOWED))
-    assert not new, (
-        f"bool parameter with a default is a mode (Article III: no optionality; split the behaviour or list it with a reason): {new}"
-    )
+def _count(tmp_path: Path, rule: Rule, source: str) -> dict[str, int]:
+    return {key: len(lines) for key, lines in plant(rule, tmp_path, source).items()}
 
 
-def test_listed_bool_modes_still_exist_and_carry_a_reason() -> None:
-    assert not sorted(set(_ALLOWED) - set(bool_modes(_ROOT))), "a listed bool mode no longer exists: delete its row"
-    assert all(reason.strip() for reason in _ALLOWED.values())
+def test_repo_has_no_unlisted_bool_mode_and_every_row_is_live_and_reasoned() -> None:
+    check(BOOL_MODES, _ROOT)
 
 
 def test_planted_keyword_only_bool_is_found(tmp_path: Path) -> None:
-    assert _plant(tmp_path, "def run(cmd, *, fast: bool = False): ...\n") == {"pkg:run:fast": 1}
+    assert _count(tmp_path, BOOL_MODES, "def run(cmd, *, fast: bool = False): ...\n") == {"pkg:run:fast": 1}
 
 
 def test_planted_positional_bool_with_default_and_tri_state_are_found(tmp_path: Path) -> None:
     source = "class C:\n    def go(self, a: int, flag: bool = True, maybe: bool | None = None): ...\n"
-    assert _plant(tmp_path, source) == {"pkg:go:flag": 1, "pkg:go:maybe": 1}
+    assert _count(tmp_path, BOOL_MODES, source) == {"pkg:go:flag": 1, "pkg:go:maybe": 1}
 
 
 def test_required_bool_and_non_bool_defaults_pass(tmp_path: Path) -> None:
     source = "def a(*, flag: bool): ...\ndef b(n: int = 0, s: str = 'x', f=False): ...\n"
-    assert _plant(tmp_path, source) == {}
+    assert _count(tmp_path, BOOL_MODES, source) == {}
 
 
-def test_repo_has_no_unlisted_policy_parameter() -> None:
-    new = sorted(set(policy_params(_ROOT)) - set(_POLICY_ALLOWED))
-    assert not new, (
-        "public parameter named force/overwrite/missing_ok/exist_ok/ignore_errors/check, or a Literal/Enum policy switch: "
-        f"raise a typed exception the caller catches, or make two verbs (Article III, ADR 0030): {new}"
-    )
-
-
-def test_listed_policy_parameters_still_exist() -> None:
-    assert not sorted(set(_POLICY_ALLOWED) - set(policy_params(_ROOT))), "a listed policy parameter no longer exists: delete its row"
-    assert all(reason.strip() for reason in _POLICY_ALLOWED.values())
+def test_repo_has_no_unlisted_policy_parameter_and_every_row_is_live_and_reasoned() -> None:
+    check(POLICY_PARAMS, _ROOT)
 
 
 def test_planted_tolerance_names_are_found_with_any_annotation(tmp_path: Path) -> None:
     source = "def drop(path, *, missing_ok): ...\ndef put(path, overwrite=False, force: bool = True, check=None): ...\n"
-    assert _plant_policy(tmp_path, source) == {"pkg:drop:missing_ok": 1, "pkg:put:overwrite": 1, "pkg:put:force": 1, "pkg:put:check": 1}
+    assert _count(tmp_path, POLICY_PARAMS, source) == {
+        "pkg:drop:missing_ok": 1,
+        "pkg:put:overwrite": 1,
+        "pkg:put:force": 1,
+        "pkg:put:check": 1,
+    }
 
 
 def test_planted_literal_enum_and_alias_policy_are_found(tmp_path: Path) -> None:
@@ -316,16 +308,9 @@ def test_planted_literal_enum_and_alias_policy_are_found(tmp_path: Path) -> None
         "def c(x: Policy): ...\n"
         "def d(x: Annotated[Literal['p'], 1]): ...\n"
     )
-    assert _plant_policy(tmp_path, source) == {"pkg:a:x": 1, "pkg:b:x": 1, "pkg:c:x": 1, "pkg:d:x": 1}
+    assert _count(tmp_path, POLICY_PARAMS, source) == {"pkg:a:x": 1, "pkg:b:x": 1, "pkg:c:x": 1, "pkg:d:x": 1}
 
 
 def test_private_functions_and_plain_parameters_pass(tmp_path: Path) -> None:
     source = "def _hidden(force: bool): ...\ndef shown(path: str, limit: int = 3, mode_name: str = 'x'): ...\n"
-    assert _plant_policy(tmp_path, source) == {}
-
-
-def _plant_policy(tmp_path: Path, source: str) -> dict[str, int]:
-    module = tmp_path / "packages" / "pkg" / "src" / "pkg" / "mod.py"
-    module.parent.mkdir(parents=True)
-    module.write_text(source)
-    return policy_params(tmp_path)
+    assert _count(tmp_path, POLICY_PARAMS, source) == {}

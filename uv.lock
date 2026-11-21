@@ -14,6 +14,7 @@ resolution-markers = [
 members = [
     "a2effect",
     "any-agent",
+    "any-arch",
     "any-breaker",
     "any-browser",
     "any-clock",
@@ -250,6 +251,27 @@ requires-dist = [
     { name = "child-env", editable = "packages/child-env" },
     { name = "stream-proc", editable = "packages/stream-proc" },
 ]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
+[[package]]
+name = "any-arch"
+version = "0.1.0"
+source = { editable = "packages/any-arch" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
 
 [package.metadata.requires-dev]
 dev = [

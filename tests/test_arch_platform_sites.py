@@ -10,7 +10,10 @@ list a new fact with its owner and the reason it cannot be a capability.
 """
 
 import ast
+from collections.abc import Iterator
 from pathlib import Path
+
+from any_arch import Hit, Row, Rule, Source, check, plant
 
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -72,22 +75,22 @@ def _reads(tree: ast.AST) -> list[int]:
     return sorted(set(lines))
 
 
-def platform_sites(root: Path) -> dict[str, list[int]]:
-    """Repo-relative module path -> lines that read the platform, for `root/packages/*/src`."""
-    sites: dict[str, list[int]] = {}
-    for path in sorted((root / "packages").glob("*/src/**/*.py")):
-        if lines := _reads(ast.parse(path.read_text())):
-            sites[path.relative_to(root).as_posix()] = lines
-    return sites
+def _platform_sites(source: Source) -> Iterator[Hit]:
+    """Repo-relative module path and the line of each platform read in it."""
+    for line in _reads(source.tree):
+        yield source.rel, line
 
 
-def test_platform_reads_stay_in_the_allowlisted_modules() -> None:
-    stray = {module: lines for module, lines in platform_sites(_ROOT).items() if module not in _ALLOWED}
-    assert not stray, f"platform branch outside the allowlist (one dispatch: use an owner, or list the module with a reason): {stray}"
+PLATFORM_SITES = Rule(
+    "platform-sites",
+    "platform branch outside the allowlist (one dispatch: use an owner, or list the module with a reason)",
+    _platform_sites,
+    {module: Row(row["why"]) for module, row in _ALLOWED.items()},
+)
 
 
-def test_every_allowlisted_module_still_reads_the_platform() -> None:
-    assert not sorted(set(_ALLOWED) - set(platform_sites(_ROOT))), "an allowlisted module no longer reads the platform: delete its row"
+def test_platform_reads_stay_in_the_allowlisted_modules_and_every_row_still_reads() -> None:
+    check(PLATFORM_SITES, _ROOT)
 
 
 def test_every_row_names_its_fact_owner_and_reason_and_a_fact_has_one_owner() -> None:
@@ -101,10 +104,7 @@ def test_every_row_names_its_fact_owner_and_reason_and_a_fact_has_one_owner() ->
 
 
 def _plant(tmp_path: Path, source: str) -> dict[str, list[int]]:
-    module = tmp_path / "packages" / "pkg" / "src" / "pkg" / "mod.py"
-    module.parent.mkdir(parents=True)
-    module.write_text(source)
-    return platform_sites(tmp_path)
+    return plant(PLATFORM_SITES, tmp_path, source)
 
 
 def test_planted_sys_platform_read_is_found(tmp_path: Path) -> None:

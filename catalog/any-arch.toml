@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-arch"
+kind = "any-lib"
+tier = "T1"
+release = "any-arch-v0.1.0"
+capability = "Stop re-writing the scaffold of an architecture test: write the finder and the reasoned allowlist rows, and get one shared parse of the repo, exact-count rows, the stale-row check, the planted-violation harness, one failure message with the fix text, and a debt report."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Extracted from the shelf's tests/test_arch_*.py (bead shelf-tyld.30); bool_modes, platform_sites and swallowed_exceptions are migrated first, the rest follow. Not here: the file-hash cache and the raise-set rule (later), cross-file rules, TOML-only checks. Born candidate; the shelf's own arch tests are its first consumer."

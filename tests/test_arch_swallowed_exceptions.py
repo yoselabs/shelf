@@ -21,8 +21,15 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+from any_arch import Row, Rule, check, plant, rows
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from any_arch import Hit, Source
 
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -45,32 +52,20 @@ def _suppresses(item: ast.withitem) -> bool:
     )
 
 
-def swallowed(source: str) -> list[int]:
-    """The line of each silent `except` handler and each `suppress(...)` in `source`."""
-    lines: list[int] = []
-    for node in ast.walk(ast.parse(source)):
+def _swallowed(source: Source) -> Iterator[Hit]:
+    """The file and line of each silent `except` handler and each `suppress(...)` in it."""
+    for node in ast.walk(source.tree):
         if isinstance(node, ast.ExceptHandler) and all(_silent(statement) for statement in node.body):
-            lines.append(node.lineno)
+            yield source.rel, node.lineno
         elif isinstance(node, ast.With | ast.AsyncWith):
-            lines.extend(node.lineno for item in node.items if _suppresses(item))
-    return sorted(lines)
+            yield from ((source.rel, node.lineno) for item in node.items if _suppresses(item))
 
 
-def counts(root: Path) -> dict[str, int]:
-    """`packages/<pkg>/src/...py` -> number of swallowed handlers, for the files that have any."""
-    found: dict[str, int] = {}
-    for path in sorted((root / "packages").glob("*/src/**/*.py")):
-        hits = swallowed(path.read_text())
-        if hits:
-            found[path.relative_to(root).as_posix()] = len(hits)
-    return found
+def _rows(reason: str, *paths: tuple[str, int]) -> dict[str, Row]:
+    return rows(reason, *((f"packages/{path}", count) for path, count in paths))
 
 
-def _rows(reason: str, *rows: tuple[str, int]) -> dict[str, tuple[int, str]]:
-    return {f"packages/{path}": (count, reason) for path, count in rows}
-
-
-_ALLOWED: dict[str, tuple[int, str]] = {
+_ALLOWED = {
     # --- debt: real swallows, each with the fix ---
     **_rows(
         "debt: best-effort cleanup (context, page, browser, loop reader, fd) hides a failed close; report it through the "
@@ -162,18 +157,17 @@ _ALLOWED: dict[str, tuple[int, str]] = {
 }
 
 
-def test_repo_has_no_unlisted_swallowed_exception() -> None:
-    found = counts(_ROOT)
-    over = {path: n for path, n in found.items() if n > _ALLOWED.get(path, (0, ""))[0]}
-    assert not over, f"swallowed exceptions beyond their rows (let it raise, or return a typed outcome, or add a reasoned row): {over}"
+SWALLOWED = Rule(
+    "swallowed-exceptions",
+    "swallowed exceptions beyond their rows (let it raise, or return a typed outcome, or add a reasoned row)",
+    _swallowed,
+    _ALLOWED,
+    ("outcome", "debt"),
+)
 
 
-def test_listed_files_still_swallow_exactly_that_many_and_carry_a_reason() -> None:
-    found = counts(_ROOT)
-    stale = {path: (count, found.get(path, 0)) for path, (count, _) in _ALLOWED.items() if found.get(path, 0) != count}
-    assert not stale, f"rows out of date, (listed, found): {stale}"
-    unreasoned = [path for path, (_, reason) in _ALLOWED.items() if not reason.startswith(("outcome: ", "debt: "))]
-    assert not unreasoned, f"a row needs an `outcome:` or `debt:` reason: {unreasoned}"
+def test_repo_swallows_exactly_what_its_rows_list_and_every_row_has_a_reason() -> None:
+    check(SWALLOWED, _ROOT)
 
 
 @pytest.mark.parametrize(
@@ -194,12 +188,10 @@ def test_listed_files_still_swallow_exactly_that_many_and_carry_a_reason() -> No
         ("with open('x') as fh:\n    f(fh)\n", 0),
     ],
 )
-def test_the_scanner_sees_what_it_claims_to(source: str, count: int) -> None:
-    assert len(swallowed(source)) == count
+def test_the_scanner_sees_what_it_claims_to(tmp_path: Path, source: str, count: int) -> None:
+    assert sum(len(lines) for lines in plant(SWALLOWED, tmp_path, source).values()) == count
 
 
 def test_a_planted_swallow_in_a_scratch_package_is_counted(tmp_path: Path) -> None:
-    module = tmp_path / "packages" / "p" / "src" / "p" / "m.py"
-    module.parent.mkdir(parents=True)
-    module.write_text("try:\n    f()\nexcept OSError:\n    pass\n")
-    assert counts(tmp_path) == {"packages/p/src/p/m.py": 1}
+    found = plant(SWALLOWED, tmp_path, "try:\n    f()\nexcept OSError:\n    pass\n", path="packages/p/src/p/m.py")
+    assert {path: len(lines) for path, lines in found.items()} == {"packages/p/src/p/m.py": 1}
