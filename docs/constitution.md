@@ -65,7 +65,7 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 | Async hygiene (III) | ruff `ASYNC` repo-wide (blocking calls inside `async def`) and `tests/test_arch_threads.py` hand-made threads only in reasoned files | blocking |
 | One CLI home (III) | `tests/test_arch_cli_surfaces.py` `import argparse` only in verb-cli, argparse-mcp, `__main__` modules and reasoned files | blocking |
 | No backward compatibility | shim / legacy / compat ban | task shelf-au97 |
-| No silent failures | planted-violation test for a swallowed exception (effects research, task shelf-tyld.22) | task |
+| No silent failures | `tests/test_arch_swallowed_exceptions.py` silent `except` handlers and `contextlib.suppress` in `packages/*/src`, one exact-count reasoned row per file; `debt:` rows are conversions still owed | blocking |
 | Tolerance is a handler | `tests/test_arch_bool_modes.py` public parameters named force/overwrite/missing_ok/exist_ok/ignore_errors/check, or annotated Literal/Enum (aliases included); `debt:` rows are conversions still owed | blocking |
 | No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
 | Size limit (IV) | `tests/test_size_caps.py` file and function SLOC caps | blocking on changed files |
