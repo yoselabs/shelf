@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0
+
+- `blueprint` opts in to the public-`Any` rule: each remaining `Any` in a public signature is parsed TOML and says so. `check_dockerfile_pins` and `testing` bound their git calls with `timeout=` (a git timeout in the recipe falls back to the file walk).
+
 ## 0.11.0
 
 - `gate.clean-clone` points mise at the injected env's `HOME` (`$HOME/.config/mise`), not the process home.

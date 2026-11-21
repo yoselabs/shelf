@@ -38,9 +38,6 @@ _UNBOUNDED_ALLOWLIST = {
     "packages/any-lease/src/any_lease/__main__.py",  # kept: the run wrapper waits on an arbitrary user command, a deadline would kill it
     "packages/blueprint/src/blueprint/gate_test.py",  # kept: runs the repo's whole test suite, which has no fixed duration
     "packages/any-gate/src/any_gate/steps.py",  # kept: recipes may run long (budgets only warn), get pass_fds; stream-proc.run lacks both
-    "packages/blueprint/src/blueprint/recipes/check_dockerfile_pins.py",
-    "packages/blueprint/src/blueprint/testing.py",
-    "packages/shelf-vendor/src/shelf_vendor/__init__.py",
 }
 
 

@@ -990,6 +990,7 @@ packages = [
     "atomic-io",
     "bdd-tags",
     "beads-client",
+    "blueprint",
     "browser-cookies",
     "child-env",
     "content-digest",

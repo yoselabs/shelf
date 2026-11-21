@@ -30,6 +30,7 @@ from pathlib import Path
 
 __all__ = ["Vendor", "dir_files", "newer_tags", "tag_files", "tree_hash"]
 
+_GIT_TIMEOUT_S = 120  # standard library only, so no stream-proc: a git archive or ancestry check never takes this long
 _VERSION = re.compile(r"-v(\d+(?:\.\d+)*)$")
 
 
@@ -52,7 +53,7 @@ def dir_files(path: Path) -> dict[str, bytes]:
 
 
 def _git(shelf: Path, *args: str) -> bytes:
-    return subprocess.run(["git", "-C", str(shelf), *args], check=True, capture_output=True).stdout
+    return subprocess.run(["git", "-C", str(shelf), *args], check=True, capture_output=True, timeout=_GIT_TIMEOUT_S).stdout
 
 
 def tag_files(shelf: Path, name: str, tag: str) -> dict[str, bytes]:
@@ -92,7 +93,9 @@ def newer_tags(shelf: Path, name: str, tag: str) -> list[str]:
         if have is not None:
             if key > have:
                 out.append(t)
-        elif subprocess.run(["git", "-C", str(shelf), "merge-base", "--is-ancestor", t, tag], check=False).returncode:
+        elif subprocess.run(
+            ["git", "-C", str(shelf), "merge-base", "--is-ancestor", t, tag], check=False, timeout=_GIT_TIMEOUT_S
+        ).returncode:
             out.append(t)
     return out
 

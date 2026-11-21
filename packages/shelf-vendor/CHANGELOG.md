@@ -8,3 +8,4 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 - 0.1.0: new `python -m shelf_vendor --vendor-dir D --manifest M [--shelf S] sync NAME [--tag T] | check`; manifest `[{name, shelf_tag, shelf_commit, tree_hash}]`
 - 0.2.0: `Vendor.sync` installs atomically ⇒ new tree built in a sibling `.<name>.new-*` directory, then renamed over the old; manifest written via a sibling temp file + rename; a failure mid-install leaves the old tree and manifest; still standard library only (by design, no atomic-io)
 - 0.3.0: internal only, no contract change  ⇒  `_say(text, err=)` split into `_out(text)` and `_err(text)`; CLI streams unchanged
+- 0.3.0: every `git` call carries `timeout=120` ⇒ a hung git raises `subprocess.TimeoutExpired`, no longer blocks forever

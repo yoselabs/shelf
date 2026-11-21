@@ -105,9 +105,9 @@ class Override:
 class State:
     """What `blueprint.toml` holds: the profile as declared, overrides, settings per check."""
 
-    declared: dict[str, Any]
+    declared: dict[str, Any]  # Any: parsed TOML, read key by key
     overrides: tuple[Override, ...]
-    settings: dict[str, Any]
+    settings: dict[str, Any]  # Any: parsed TOML, per-check shapes differ
     problems: tuple[str, ...]
     # Paths detection and role globs skip: the justified `detection` overrides and the old `[[profile.ignore]]` entries.
     skip: tuple[str, ...] = ()

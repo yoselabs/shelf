@@ -17,11 +17,11 @@ class Role:
     role: str
     tool: str = ""
     install: str = ""
-    config: tuple[dict[str, Any], ...] = ()
+    config: tuple[dict[str, Any], ...] = ()  # Any: parsed TOML rows, keys read by the checks
     gate: str = ""
     # Other ways to prove the role runs: each is a `label`, a `gate` regex over the gate text, and
     # optionally a `path`/`contains` the repo's config must also hold.
-    alternatives: tuple[dict[str, Any], ...] = ()
+    alternatives: tuple[dict[str, Any], ...] = ()  # Any: parsed TOML rows
     untested: str = ""
     na: str = ""
     # An outcome contract (instead of `gate`): the role is judged by what the gate does, whatever tool does it.
@@ -29,7 +29,7 @@ class Role:
     # where each `floors` entry is a `label`, a `gate` regex over the gate text and optionally a `path`/`contains` the repo must hold.
     outcome: str = ""
     runs: tuple[str, ...] = ()
-    floors: tuple[dict[str, Any], ...] = ()
+    floors: tuple[dict[str, Any], ...] = ()  # Any: parsed TOML rows
     # Where the role's executable may live, besides PATH: `$PATH`, `$DOTNET_ROOT` or an absolute folder. A
     # toolchain role names them when a second install can be the one a tool resolves (Godot's dotnet).
     installs: tuple[str, ...] = ()

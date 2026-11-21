@@ -115,8 +115,8 @@ def check_file(path: Path, rel: str, contexts: set[str]) -> list[str]:
 def tracked() -> list[Path]:
     """Tracked Dockerfiles (git ls-files), else every one under the current folder."""
     try:
-        files = subprocess.run(["git", "ls-files"], capture_output=True, text=True, check=True).stdout.splitlines()
-    except (OSError, subprocess.CalledProcessError):
+        files = subprocess.run(["git", "ls-files"], capture_output=True, text=True, check=True, timeout=30).stdout.splitlines()
+    except (OSError, subprocess.SubprocessError):
         files = [p.as_posix() for p in sorted(Path().rglob("*")) if p.is_file() and ".git" not in p.parts]
     return [Path(f) for f in files if NAME.search(f) and not f.endswith(".dockerignore")]
 

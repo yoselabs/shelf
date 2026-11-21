@@ -87,7 +87,7 @@ def _locked_linters(repo: Path) -> dict[str, str]:
     return {str(p["name"]): str(p.get("version", "")) for p in packages if p.get("name") in _LINTERS}
 
 
-def snapshot(shelf: Path) -> dict[str, Any]:
+def snapshot(shelf: Path) -> dict[str, Any]:  # Any: TOML-bound, lists and one table
     """What a consumer is compared against, read from the shelf's own files."""
     config = _load(shelf / "pyproject.toml")
     return {
@@ -99,7 +99,7 @@ def snapshot(shelf: Path) -> dict[str, Any]:
     }
 
 
-def toml_value(item: Any) -> str:
+def toml_value(item: Any) -> str:  # Any: a TOML value of any kind
     if isinstance(item, list):
         return "[" + ", ".join(toml_value(v) for v in item) + "]"
     if isinstance(item, bool):
@@ -109,7 +109,7 @@ def toml_value(item: Any) -> str:
     return '"' + str(item).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def render(snap: dict[str, Any]) -> str:
+def render(snap: dict[str, Any]) -> str:  # Any: TOML-bound snapshot
     """The snapshot as TOML text: plain, so any reader of it (a Rust blueprint included) needs no Python."""
     lines = ["# The shelf's linter preset, derived from its own files. Never hand-edit.", ""]
     lines += [f"{key} = {toml_value(val)}" for key, val in snap.items() if not isinstance(val, dict)]
@@ -133,7 +133,7 @@ def _compare(axis: str, shelf: set[str], consumer: set[str], declared: dict[str,
     ]
 
 
-def size_drift(reference: dict[str, Any], consumer: dict[str, Any]) -> list[str]:
+def size_drift(reference: dict[str, Any], consumer: dict[str, Any]) -> list[str]:  # Any: two parsed pyproject files
     """Size caps are a shared contract, with no exception declarations."""
     expected = reference.get("tool", {}).get("shelf-size", {})
     actual = consumer.get("tool", {}).get("shelf-size", {})
