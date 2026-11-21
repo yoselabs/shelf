@@ -64,7 +64,9 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 
 | Rule | Check | State |
 |---|---|---|
-| Injection (II) | module-level I/O and global-state fitness test | task shelf-ufmg |
+| Injection (II) | `tests/test_arch_module_level_state.py` import-time I/O, `global` statements and function-mutated module containers in `packages/*/src`, one exact-count reasoned row per file; the 11 `debt:` file rows (14 hits) are conversions still owed, 4 `outcome:` rows (6 hits) are documented registries; module-level instances of stateful classes are hit, a collaborator constructed inside its user is not checked to an injected collaborator | blocking |
+| Decay (VIII) | `tests/test_arch_dead_public_api.py` a name in a package's `__all__` that no other package, test, use-case, config or script mentions beside the package; one row per package, 65 `debt:` rows (469 of 890 public names) are names to drop from `__all__` at reconciliation (external consumers are invisible to it: check a2kay, a2web, task-loop before deleting) | blocking |
+| README names its value, default view, opt-ins (IX) | `tests/test_arch_readme_names_its_value.py` first paragraph is prose, plus a `Default view:` and an `Opt-ins:` line ([convention](arch-rules.md#readme-convention)); every package has a `debt:` row until its README gains the lines | blocking |
 | No optionality | `tests/test_arch_bool_modes.py` bool-with-default parameters, keyword-only included, one reasoned allowlist row per current hit | blocking; extends task shelf-cypc |
 | One dispatch on the OS (III) | `tests/test_arch_platform_sites.py` platform reads only in allowlisted modules | blocking |
 | One value, no output-shape flags (IX) | `tests/test_arch_output_shape_flags.py` flag parameters that select the return shape | blocking |
@@ -139,5 +141,5 @@ its law.
   silently falls back.
 Check: the package's README names its value, its default view and its opt-ins; a review rejects a flag that
 selects an output shape. State: the flag rule is blocking (`tests/test_arch_output_shape_flags.py`, row "One value, no output-shape
-flags (IX)" in the Article III table). "One value, one file" and the README naming are review-only: two files for one result needs
-meaning a parser cannot see, and no README heading convention exists to check against.
+flags (IX)" in the Article III table). The README naming is blocking too (`tests/test_arch_readme_names_its_value.py`, convention in
+[arch-rules](arch-rules.md#readme-convention)). "One value, one file" is review-only: two files for one result needs meaning a parser cannot see.
