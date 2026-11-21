@@ -132,7 +132,8 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   except gitignore-style `keep` patterns, without moving HEAD or changing tracked files.
   `clean_ignored(keep=())` also removes ignored files (`git clean -fdx`); a nested repository (a directory
   holding its own `.git`) is left in place, as git leaves it. `clean_nested(keep=())` is `clean_ignored` that also deletes nested
-  repositories (`git clean -ffdx`): destructive, those are other repositories' work.
+  repositories (`git clean -ffdx`): destructive: those are other repositories' work, or a linked worktree of this one under an ignored path
+  (then `prune_worktrees()`).
   `dirty(ignored_under=["."])` lists what is still ignored in the whole checkout. `reset(rev, mode="mixed")` moves HEAD; `soft`
   preserves the index and working files, `mixed` resets the index, and `hard` also resets tracked
   files, discarding edits. Unrelated untracked files survive a hard reset or forced checkout;

@@ -1,4 +1,4 @@
-"""`Worktree.clean_ignored(keep=[...])` against real git: the reset-path guarantee a caller relies on to keep a folder (a `.venv`)
+"""`Worktree.clean_ignored(keep=[...])` and `clean_nested` against real git: the reset-path guarantee a caller relies on to keep a folder (a `.venv`)
 while everything else untracked or ignored goes."""
 
 from __future__ import annotations
@@ -73,6 +73,7 @@ def test_clean_nested_deletes_a_nested_repository_that_clean_ignored_leaves(work
     wt = RealRepo(root, ambient=dict(os.environ)).worktree(root)
     wt.clean_ignored(["/.venv"])
     assert (root / "sub" / ".venv" / "one" / ".git").is_dir()  # the ignored clean leaves a nested repository
+    (root / "untracked.txt").write_text("u\n")
     wt.clean_nested(["/.venv"])
     assert not (root / "sub" / ".venv").exists() and not (root / "untracked.txt").exists()
     assert (root / ".venv" / "lib" / "x").is_file() and (root / ".venv" / "nested" / ".git").is_dir()  # kept whole
