@@ -66,6 +66,11 @@ def clean_ignored(wt: RealWorktree, keep: Sequence[str]) -> None:
     _git_clean(wt, keep, "-fdxq")
 
 
+def clean_nested(wt: RealWorktree, keep: Sequence[str]) -> None:
+    """``clean_ignored`` that also deletes nested repositories (``-ff``): other repositories' work, gone."""
+    _git_clean(wt, keep, "-ffdxq")
+
+
 def _git_clean(wt: RealWorktree, keep: Sequence[str], flags: str) -> None:
     try:
         wt.run("clean", flags, *(arg for pattern in keep for arg in ("-e", pattern)))

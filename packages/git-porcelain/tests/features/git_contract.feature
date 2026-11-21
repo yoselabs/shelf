@@ -1030,6 +1030,16 @@ Feature: One Repo and Worktree, real or fake
     And the file "stray" of "r" is absent
     And the file "tracked" of "r" holds "one"
 
+  Scenario: The nested clean takes ignored files like the ignored clean and still honours an anchored keep
+    Given a repository "r"
+    And "r" commits "root" with .gitignore=".venv/\n" tracked="one"
+    And "r" writes .venv/lib="env", sub/.venv/lib="nested", stray="stray"
+    When "r" calls clean_nested(["/.venv"])
+    Then the file ".venv/lib" of "r" holds "env"
+    And the file "sub/.venv/lib" of "r" is absent
+    And the file "stray" of "r" is absent
+    And the file "tracked" of "r" holds "one"
+
   Scenario: Clean respects keep patterns and optionally removes ignored files without moving HEAD
     Given a repository "r"
     And "r" commits "root" with .gitignore="*.cache\n" tracked="one"

@@ -33,7 +33,7 @@ from git_porcelain.api import DEFAULT_TIMEOUT, CommandResult, Sha
 from git_porcelain.errors import GitReadFailure, GitUnavailable, MissingRevision, NotARepo
 from git_porcelain.fake_bare import FakeRemote
 from git_porcelain.fake_diff import grep_files
-from git_porcelain.fake_ops import branch_ref, clean, clean_ignored, hard_to
+from git_porcelain.fake_ops import branch_ref, clean, clean_ignored, clean_nested, hard_to
 from git_porcelain.fake_plumbing import FakePlumbing
 from git_porcelain.fake_store import CheckoutState, Hooks, RepoState
 from git_porcelain.fake_worktrees import worktree_state
@@ -360,6 +360,9 @@ class FakeWorktree:
 
     def clean_ignored(self, keep: Sequence[str] = ()) -> None:
         clean_ignored(self.state(), keep)
+
+    def clean_nested(self, keep: Sequence[str] = ()) -> None:
+        clean_nested(self.state(), keep)
 
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
         checkout_ops.reset(self._repo, self.state(), rev, mode=mode)
