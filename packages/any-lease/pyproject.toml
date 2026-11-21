@@ -1,6 +1,6 @@
 [project]
 name = "any-lease"
-version = "0.3.2"
+version = "0.4.0"
 description = "A counting lease across processes: up to N holders of a named resource, each a process-lock flock the kernel drops when its holder dies; queue with timeout and cancel, ordered multi-acquire, holders readable without taking a lock."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
