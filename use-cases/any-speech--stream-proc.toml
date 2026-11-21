@@ -2,7 +2,7 @@
 consumer = "any-speech"
 software = "stream-proc"
 why = "any-speech's child runner hand-wrote a `ps -A -o pgid=,rss=` parse, os.killpg and a session spawn, and ffprobe, ffmpeg and the FluidAudio build ran with no timeout (constitution Article III, one implementation per behaviour; shelf-tyld.1)."
-needs = "popen_held, stop_tree and group_rss for the memory-watched child; capture, capture_bytes and run_inherited with a required timeout for ffprobe, ffmpeg and the setup build steps."
+needs = "popen_held, stop_tree and group_rss for the memory-watched child; capture and run_inherited with a required timeout for ffprobe, ffmpeg and the setup build steps."
 sponsor = "yoselabs"
 requester = "any-speech"
 status = "active" # active | retired

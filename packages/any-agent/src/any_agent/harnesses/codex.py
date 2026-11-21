@@ -333,7 +333,7 @@ class CodexHarness(Quiet):
             return None, f"{self.EXE} login check failed: {type(e).__name__}"
         if r.timed_out:
             return None, f"{self.EXE} login check failed: timeout"
-        text = r.out + r.err
+        text = r.text + r.err_text
         return r.exit == 0 and "not logged" not in text.lower(), text.strip()[:120]
 
     @staticmethod

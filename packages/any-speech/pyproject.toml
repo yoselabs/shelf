@@ -16,7 +16,7 @@ dependencies = [
     "any-pipeline>=0.1,<1",
     "any-versioned>=0.1,<1",
     "any-frontmatter>=0.3,<1",
-    "stream-proc>=0.11,<1",
+    "stream-proc>=0.13.0,<1",
     "child-env>=0.2,<1",
     "any-clock>=0.4,<1",
 ]

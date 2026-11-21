@@ -32,7 +32,7 @@ GIT_TIMEOUT = 600.0  # seconds one git call may take
 def _git(repo: Path, *args: str) -> list[str] | None:
     """Lines git prints, or None when git fails (not a repo, no upstream, ...)."""
     done = capture(["git", *args], cwd=repo, timeout=GIT_TIMEOUT)
-    return done.out.split("\0") if done.exit == 0 else None
+    return done.text.split("\0") if done.exit == 0 else None
 
 
 def base(repo: Path) -> str | None:

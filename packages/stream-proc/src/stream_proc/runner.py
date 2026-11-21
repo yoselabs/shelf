@@ -60,7 +60,7 @@ def _emit(cb: Callable[[bytes], None] | None, raw: bytes) -> None:
 
 
 def _text(cb: Callable[[str], None] | None) -> Callable[[bytes], None] | None:
-    # lossy-ok: input: child output returned as text; callers needing the exact bytes use capture_bytes
+    # lossy-ok: input: child output returned as text; a line callback wants text; the exact bytes are `capture`
     return None if cb is None else lambda raw: cb(raw.decode("utf-8", "replace"))
 
 

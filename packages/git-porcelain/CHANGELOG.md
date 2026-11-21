@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.29.0
+
+- The real runner uses stream-proc 0.13.0's one `capture` (`Captured`; `err_text` for the display copy); requires `stream-proc>=0.13.0,<1`. Contract unchanged.
+
 ## 0.28.0
 
 **Breaking**: the `Literal` policy parameters are gone (Article III; ADR 0030). Each mode is its own verb, or deleted where the caller can compose it.

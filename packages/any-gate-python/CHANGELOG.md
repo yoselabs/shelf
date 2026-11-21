@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Reads child output through `Captured` (stream-proc 0.13.0): git and uv text via `.text`, the `git archive` tarball as bytes; requires `stream-proc>=0.13.0,<1`. Contract unchanged.
+
 ## 0.2.0
 
 - Breaking: `run_tests(..., env=)` is required (the environment the pytest processes get and `nice` is found on); the CLI passes `os.environ`. `nice` is found with `child_env.find`. Git and `uv export` run through `stream_proc.capture` with a timeout; the per-package export hash is `content_digest.digest_text(length=64)`, the same bytes. Depends on `child-env`, `content-digest`, `stream-proc>=0.10`. No suite key changes.

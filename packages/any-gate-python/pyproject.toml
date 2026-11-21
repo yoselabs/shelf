@@ -1,6 +1,6 @@
 [project]
 name = "any-gate-python"
-version = "0.2.0"
+version = "0.3.0"
 description = "Which package suites a change reaches in a uv workspace, the key each passed under, and the pytest runner (parallel, serial and quarantine lanes) that any-gate runs them with: the Python adapter of any-gate."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
@@ -10,7 +10,7 @@ dependencies = [
     "any-gate>=0.1,<1",
     "child-env>=0.2,<1",
     "content-digest>=0.2,<1",
-    "stream-proc>=0.10,<1",
+    "stream-proc>=0.13.0,<1",
 ]
 
 [project.optional-dependencies]
