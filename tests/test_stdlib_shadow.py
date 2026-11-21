@@ -38,6 +38,44 @@ def test_the_same_name_inside_an_installed_package_passes(repo):
     put(repo, "src/mypkg/__init__.py")
     put(repo, "src/mypkg/queue.py")
     put(repo, "src/mypkg/profile/__init__.py")
+    put(repo, "src/mypkg/tool.py", "def run():\n    pass\n")  # an ordinary module, never run directly
+    assert check(repo) == 0
+
+
+def test_a_package_folder_with_a_directly_run_script_fails(repo, capsys):
+    put(repo, "src/mypkg/__init__.py")
+    put(repo, "src/mypkg/queue.py")
+    put(repo, "src/mypkg/cli.py", 'if __name__ == "__main__":\n    pass\n')
+    assert check(repo) == 1
+    assert "src/mypkg/queue.py" in capsys.readouterr().err
+
+
+def test_a_package_folder_with_a_pep723_script_fails(repo):
+    put(repo, "src/mypkg/__init__.py")
+    put(repo, "src/mypkg/profile/__init__.py")
+    put(repo, "src/mypkg/job.py", "# /// script\n# dependencies = []\n# ///\n")
+    assert check(repo) == 1
+
+
+def test_a_package_folder_with_only_a_dunder_main_passes(repo):
+    put(repo, "src/mypkg/__init__.py")
+    put(repo, "src/mypkg/queue.py")
+    put(repo, "src/mypkg/__main__.py", 'if __name__ == "__main__":\n    pass\n')  # run as `python -m mypkg`, cwd leads sys.path
+    assert check(repo) == 0
+
+
+def test_the_runnable_script_in_a_package_folder_may_itself_be_stdlib_named(repo, capsys):
+    put(repo, "src/mypkg/__init__.py")
+    put(repo, "src/mypkg/queue.py", 'if __name__ == "__main__":\n    pass\n')
+    assert check(repo) == 1  # run directly it leads sys.path and shadows for what it imports
+    assert "src/mypkg/queue.py" in capsys.readouterr().err
+
+
+def test_a_script_in_another_package_folder_does_not_count(repo):
+    put(repo, "src/mypkg/__init__.py")
+    put(repo, "src/mypkg/queue.py")
+    put(repo, "src/mypkg/sub/__init__.py")
+    put(repo, "src/mypkg/sub/cli.py", 'if __name__ == "__main__":\n    pass\n')  # its folder is first on sys.path, not mypkg/
     assert check(repo) == 0
 
 

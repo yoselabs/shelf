@@ -161,7 +161,11 @@ Python puts the running script's folder ahead of the standard library on `sys.pa
 `profile.py` shadows what `cProfile` imports). `tools/stdlib_shadow.py` fails on any `*.py` file or package folder whose name is in
 `sys.stdlib_module_names`, in a folder that can be first on the path: the repo root, `scripts/`, `tools/`, `bin/`, `src/`, `tests/`, `test/`,
 or any folder holding a script (a `__main__` guard or a PEP 723 `# /// script` header). Inside a package (the folder or one above it has
-`__init__.py`, e.g. `src/<pkg>/queue.py`) a name is imported through its package and is not checked. Exceptions go in
+`__init__.py`, e.g. `src/<pkg>/queue.py`) a name is imported through its package, so it is checked only when its own folder also holds a
+directly runnable script: a `*.py` other than `__main__.py` with a `__main__` guard or a PEP 723 header (`python src/<pkg>/cli.py` puts
+`src/<pkg>/` first on the path, so `queue.py` beside it shadows the standard library). A stdlib-named file that is itself that script
+counts. `__main__.py` does not: `python -m <pkg>` leads with the working directory. A script in a sub-package does not count for its parent
+folder. Exceptions go in
 `tools/stdlib_shadow_allow.toml`, one reason per path; an entry without a reason, or for a path that no longer shadows, fails. Declared
 inputs in `gate-inputs.toml` ([ADR 0031](adr/0031-gate-steps-declare-their-inputs.md)): `*.py` and the allowlist.
 
