@@ -153,6 +153,11 @@ def clean_ignored(wt: CheckoutState, keep: Sequence[str]) -> None:
     _remove_untracked(wt, Ignore(list(keep)))
 
 
+def clean_nested(wt: CheckoutState, keep: Sequence[str]) -> None:
+    """``clean_ignored`` that also deletes nested repositories: the model holds none, so it is the same removal."""
+    _remove_untracked(wt, Ignore(list(keep)))
+
+
 def _remove_untracked(wt: CheckoutState, ignore: Ignore) -> None:
     for path in [p for p in wt.files if p not in wt.index and not ignore.ignores(p)]:
         del wt.files[path]

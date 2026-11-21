@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.29.0
+
+- New `Worktree.clean_nested(keep=())` (`git clean -ffdx`): `clean_ignored` that also deletes nested repositories, the mode `clean(nested=True)` had before 0.27. Destructive: a nested repository goes with its history and uncommitted work. `FakeRepo` holds no nested repositories, so there it equals `clean_ignored`.
+
 ## 0.28.0
 
 **Breaking**: the `Literal` policy parameters are gone (Article III; ADR 0030). Each mode is its own verb, or deleted where the caller can compose it.

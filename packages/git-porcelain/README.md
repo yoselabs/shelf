@@ -111,7 +111,7 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
 
 - **`Repo`**: `identity sync fetch remote_url remote_push_url remote_urls remote_push_urls ls_remote delete_remote_at is_ancestor merge_base cherry relate history count refs tag branches rename_branch delete_branch commit tree squash commit_tree update_ref worktrees add_worktree drop_worktree discard_worktree
   prune_worktrees worktree_state exclude_locally worktree`.
-- **`Worktree`**: `health branch checkout checkout_new clean clean_ignored reset checkout_force snapshot diff dirty stage stage_tracked record record_with_hooks record_empty amend merge_ff take_branch restart_branch release_branch park exclude capture start_merge merging finish_merge abort_merge rebase_onto
+- **`Worktree`**: `health branch checkout checkout_new clean clean_ignored clean_nested reset checkout_force snapshot diff dirty stage stage_tracked record record_with_hooks record_empty amend merge_ff take_branch restart_branch release_branch park exclude capture start_merge merging finish_merge abort_merge rebase_onto
   rebase continue_rebase abort_rebase rebasing unmerged push push_refspecs push_request push_lease lfs_push landed grep_tracked`.
 - **Reading files, commit or disk** (0.24): `Repo.commit(rev)` is the commit id (`MissingRevision` if none); `Repo.tree("rev:folder")` and `worktree_tree(root, folder)` both give a `Tree` (`files` path to `(mode, blob sha)`, `read`, `read_many`, `sha`), so a commit's folder and the same folder on disk compare entry by entry; `blob_sha(data)` is Git's id for bytes.
 - **Results are frozen unions** (`Recorded | NothingToRecord | HookRejected`, `BranchTaken |
@@ -131,7 +131,8 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
 - **Cleanup and reset**: `clean(keep=())` removes untracked files and directories
   except gitignore-style `keep` patterns, without moving HEAD or changing tracked files.
   `clean_ignored(keep=())` also removes ignored files (`git clean -fdx`); a nested repository (a directory
-  holding its own `.git`) is left in place, as git leaves it.
+  holding its own `.git`) is left in place, as git leaves it. `clean_nested(keep=())` is `clean_ignored` that also deletes nested
+  repositories (`git clean -ffdx`): destructive, those are other repositories' work.
   `dirty(ignored_under=["."])` lists what is still ignored in the whole checkout. `reset(rev, mode="mixed")` moves HEAD; `soft`
   preserves the index and working files, `mixed` resets the index, and `hard` also resets tracked
   files, discarding edits. Unrelated untracked files survive a hard reset or forced checkout;

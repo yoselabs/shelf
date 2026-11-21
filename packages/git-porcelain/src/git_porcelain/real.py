@@ -385,6 +385,9 @@ class RealWorktree:
     def clean_ignored(self, keep: Sequence[str] = ()) -> None:
         real_checkout.clean_ignored(self, keep)
 
+    def clean_nested(self, keep: Sequence[str] = ()) -> None:
+        real_checkout.clean_nested(self, keep)
+
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
         real_checkout.reset(self, rev, mode=mode)
 

@@ -355,6 +355,12 @@ class Worktree(Protocol):
         repository (a directory holding its own ``.git``) is left in place, as ``git clean -fdx`` leaves it."""
         ...
 
+    def clean_nested(self, keep: Sequence[str] = ()) -> None:
+        """``clean_ignored`` that also deletes nested repositories (``git clean -ffdx``). DESTRUCTIVE: a directory holding its
+        own ``.git`` goes with its history, branches and uncommitted work, which is some other repository's, not this
+        checkout's. Use it only where every such directory is disposable. Same ``keep`` and symlink rules as ``clean``."""
+        ...
+
     def reset(self, rev: str, *, mode: Literal["soft", "mixed", "hard"] = "mixed") -> None:
         """Move HEAD; mixed also resets the index, hard also discards tracked file edits."""
         ...
