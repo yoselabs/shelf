@@ -6,7 +6,9 @@ import importlib
 
 MODULES = (
     "gate",
-    "backlog",
+    "beads.backlog",
+    "beads.hooks",
+    "beads.agents",
     "secrets",
     "secrets_scanner",
     "hooks",

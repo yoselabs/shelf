@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from blueprint.model import check, failing, not_applicable, passing, uses_beads
+from blueprint.model import check, failing, not_applicable, passing
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Finding
@@ -49,7 +49,7 @@ class Hook:
         return bool(self.stages & _AT_COMMIT)
 
 
-def _hooks(config: str) -> list[Hook]:
+def hooks_in(config: str) -> list[Hook]:
     found = list(_ID.finditer(config))
     ends = [m.start() for m in found[1:]] + [len(config)]
     hooks: list[Hook] = []
@@ -76,7 +76,7 @@ def no_tests_at_commit(ctx: Context) -> Finding:
     config = ctx.read(_CONFIG)
     if config is None:
         return not_applicable(_NONE)
-    slow = [h for h in _hooks(config) if h.at_commit and _TESTS.search(h.entry)]
+    slow = [h for h in hooks_in(config) if h.at_commit and _TESTS.search(h.entry)]
     if slow:
         return failing(
             f"a commit-time hook runs tests: {_named(slow)}",
@@ -91,7 +91,7 @@ def pre_push_is_the_gate(ctx: Context) -> Finding:
     config = ctx.read(_CONFIG)
     if config is None:
         return not_applicable(_NONE)
-    extra = [h for h in _hooks(config) if "pre-push" in h.stages and not _is_gate(h) and not _BD.search(h.entry)]
+    extra = [h for h in hooks_in(config) if "pre-push" in h.stages and not _is_gate(h) and not _BD.search(h.entry)]
     if extra:
         return failing(
             f"pre-push runs something other than the gate: {_named(extra)}",
@@ -106,7 +106,7 @@ def fail_closed(ctx: Context) -> Finding:
     config = ctx.read(_CONFIG)
     if config is None:
         return not_applicable(_NONE)
-    soft = [h for h in _hooks(config) if _ALWAYS_OK.search(h.entry)]
+    soft = [h for h in hooks_in(config) if _ALWAYS_OK.search(h.entry)]
     if soft:
         return failing(
             f"a hook exits 0 whatever happens: {_named(soft)}",
@@ -124,7 +124,7 @@ def no_clone_path(ctx: Context) -> Finding:
     config = ctx.read(_CONFIG)
     if config is None:
         return not_applicable(_NONE)
-    bad = [h for h in _hooks(config) if any(_CLONE.search(ln) for ln in h.text.splitlines() if not ln.lstrip().startswith("#"))]
+    bad = [h for h in hooks_in(config) if any(_CLONE.search(ln) for ln in h.text.splitlines() if not ln.lstrip().startswith("#"))]
     if bad:
         return failing(
             f"a hook reaches into a shelf clone: {_named(bad)}",
@@ -142,7 +142,7 @@ def gate_always_runs(ctx: Context) -> Finding:
     config = ctx.read(_CONFIG)
     if config is None:
         return not_applicable(_NONE)
-    gates = [h for h in _hooks(config) if _is_gate(h)]
+    gates = [h for h in hooks_in(config) if _is_gate(h)]
     if not gates:
         return not_applicable("no pre-push gate hook (gate.hooks-recipe asks for one)")
     leaky = [
@@ -157,30 +157,6 @@ def gate_always_runs(ctx: Context) -> Finding:
             "give it `always_run: true` and `pass_filenames: false`, and remove its `files`, `exclude` and `types` keys",
         )
     return passing("the gate hook always runs")
-
-
-_SYNC = re.compile(r"\bbd\s+sync\b")
-_SYNC_FIX = (
-    "add the recipe's `bd-sync-push` (pre-push) and `bd-sync-pull` (post-merge, post-checkout) hooks: `bd sync` pulls, checks conflicts, "
-    "pushes with retry and exits 2 (conflict), 3 (race), 4 (stuck); bare `bd dolt push` is a fallback, not the routine step"
-)
-
-
-@check(
-    "hooks.beads-sync",
-    "a beads repo syncs through `bd sync`: at pre-push (fatal) and on post-merge and post-checkout (pull)",
-    applies=uses_beads,
-)
-def beads_sync(ctx: Context) -> Finding:
-    """Bead data travels on refs/dolt/data, which git never moves; without these hooks a clone drifts and a push can race silently."""
-    config = ctx.read(_CONFIG)
-    if config is None:
-        return not_applicable(_NONE)
-    synced = {stage for h in _hooks(config) if _SYNC.search(h.entry) for stage in h.stages}
-    missing = [stage for stage in ("pre-push", "post-merge", "post-checkout") if stage not in synced]
-    if missing:
-        return failing(f"no `bd sync` hook at: {', '.join(missing)}", _SYNC_FIX)
-    return passing("`bd sync` runs at pre-push, post-merge and post-checkout")
 
 
 # A plain (unquoted) YAML scalar cannot hold `: ` or ` #`; prek then fails to parse the whole file and no hook runs.

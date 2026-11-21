@@ -6,7 +6,7 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
-from blueprint.concerns.backlog import STRICT
+from blueprint.concerns.beads.backlog import STRICT
 from blueprint.init import RECIPES
 from blueprint.model import Verdict
 from blueprint.runner import run, run_audit

@@ -88,3 +88,18 @@ assigning every row:
 - `secrets.scanner` moved to its own plugin `secret-scan` (default on), module `secrets_scanner.py`, requires mise and git-hooks. `secrets`
   keeps the sops rows. The row id is unchanged, so overrides and audit records still match.
 - `gate.git-remote` stays with gate: an origin is needed for any push, and bd now takes its remote from origin. No beads knowledge in it.
+
+## Step 5 as built: beads moved first
+
+`concerns/beads/` holds the beads plugin's code: `backlog.py` (moved), `hooks.py` (`hooks.beads-sync`, out of `hooks.py`), `agents.py`
+(`agents.bd-metrics-off` and `agents.session-hooks`, out of `agents.py`). `hooks.py` now exports `hooks_in` for the beads module to read
+the hook config; neither `hooks.py` nor `agents.py` mentions bd any more. The manifest names modules by dotted path
+(`beads.backlog`) and the architecture test reads `concerns/**`. Row ids did not change, so overrides and audit records still match.
+The other plugins keep their flat modules: moving each is its own change, nothing else depends on the folder layout.
+
+## Step 6 deferred, with the reason
+
+A third-party plugin is a manifest plus Python rows. Loading Python from a repo's own tree or from a path in `blueprint.toml` runs code
+the audit did not vet, so how a plugin is trusted (an installed package with an entry point, pinned in mise.toml, against a path in the
+repo) is a security decision for the owner, and the manifest format is not yet exercised by a second author. Until then a repo chooses
+among blueprint's own plugins through `[plugins]`, and a variant ships as a pull request that adds a manifest.
