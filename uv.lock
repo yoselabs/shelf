@@ -229,7 +229,7 @@ wheels = [
 
 [[package]]
 name = "any-agent"
-version = "0.20.0"
+version = "0.21.0"
 source = { editable = "packages/any-agent" }
 dependencies = [
     { name = "app-dirs" },
@@ -849,7 +849,7 @@ dev = [
 
 [[package]]
 name = "any-speech"
-version = "0.7.0"
+version = "0.8.0"
 source = { editable = "packages/any-speech" }
 dependencies = [
     { name = "any-clock" },
@@ -1091,7 +1091,7 @@ wheels = [
 
 [[package]]
 name = "anyllm"
-version = "0.11.0"
+version = "0.12.0"
 source = { editable = "packages/anyllm" }
 dependencies = [
     { name = "child-env" },
@@ -6376,7 +6376,7 @@ dev = [
 
 [[package]]
 name = "stream-proc"
-version = "0.13.0"
+version = "0.14.0"
 source = { editable = "packages/stream-proc" }
 
 [package.dev-dependencies]

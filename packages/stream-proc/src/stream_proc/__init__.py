@@ -11,6 +11,7 @@
   timeout, optional ``input`` on stdin, stdin devnull or inherited; :func:`run_inherited` for a child that writes to our stdout/stderr.
 - :func:`stop_pid`, :class:`PidHandle` — stop a process we did not spawn, only while its start token matches.
 - :class:`TermHold`, :func:`popen_held` — a SIGTERM landing during a spawn still stops the child.
+- :func:`peak_bytes` — a `wait4` rusage's peak resident set in bytes (the OS's `ru_maxrss` unit lives here).
 - :class:`Pump` — the readers, stdin feeder and pipe lifetime of a held ``Popen`` (what :func:`run` and :func:`capture` use).
 - :func:`popen_registered` — the command executes only after a callback durably registered its identity;
   :func:`run_registered` — that gate plus :func:`run`'s supervision, stdin /dev/null, stderr merged into one log.
@@ -19,7 +20,7 @@ Stdlib only (``ctypes`` on macOS), POSIX.
 """
 
 from stream_proc.capture import Captured, capture, run_inherited
-from stream_proc.hold import TermHold, popen_held
+from stream_proc.hold import TermHold, peak_bytes, popen_held
 from stream_proc.owned import IdentityUnavailableError, OwnedProcess, ProcessObservation, inspect_process, observe_owned
 from stream_proc.pid import PidHandle, stop_pid
 from stream_proc.procfs import Proc
@@ -49,6 +50,7 @@ __all__ = [
     "group_rss",
     "inspect_process",
     "observe_owned",
+    "peak_bytes",
     "popen_held",
     "popen_registered",
     "proc_start",

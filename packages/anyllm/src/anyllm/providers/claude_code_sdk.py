@@ -48,12 +48,8 @@ _CLI_FALLBACK_DIRS = (
 
 
 def _system() -> str:
-    """The operating system's name: the one place this module reads the platform (the Windows binary name, the macOS Keychain probe)."""
+    """The operating system's name: the one place this module reads the platform (the macOS Keychain probe)."""
     return platform.system()
-
-
-def _cli_name() -> str:
-    return "claude.exe" if _system() == "Windows" else "claude"
 
 
 def _home_dirs(env: Mapping[str, str]) -> tuple[Path, ...]:
@@ -77,7 +73,7 @@ def _find_cli(env: Mapping[str, str]) -> str | None:
     ``complete()`` goes on to do. The ``PATH`` is ``env``'s, never the process's.
     Filesystem-only: no SDK import, no process spawn, no network.
     """
-    name = _cli_name()
+    name = "claude"
 
     # 1. Bundled CLI, shipped inside the SDK package itself. Located via the
     #    module spec rather than an import so the ~210MB package stays unloaded.

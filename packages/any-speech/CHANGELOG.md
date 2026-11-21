@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0
+
+- The child runner reads the peak memory unit from stream-proc `peak_bytes` (was its own `os.uname()` read); requires `stream-proc>=0.14.0`; stored numbers unchanged
+
 ## 0.7.0
 
 - **Breaking: `Transcript.to_markdown()` returns an `any_frontmatter.Document`** (front-matter mapping plus body; `str(doc)` is the file text) instead of a `str`; `any-speech text` prints `str(doc)`. The header drops the Reco field names (`transcript_version`, `kind`, `status`, `audio.duration_sec`) and is `audio_seconds`, `speakers`, `diarizer`, `transcribed_at`, `transcriber`, `transcriber_runtime`; the body has no leading blank line. Requires `any-frontmatter>=0.3,<1`. The stored `.speech.json` is unchanged.

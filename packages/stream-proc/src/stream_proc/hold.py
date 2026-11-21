@@ -19,6 +19,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Literal, Self, override
 
 if TYPE_CHECKING:
+    import resource
     from types import FrameType, TracebackType
 
 HELD = (signal.SIGTERM, signal.SIGINT)
@@ -71,6 +72,11 @@ class TermHold:
 _RSS_UNIT = 1 if sys.platform == "darwin" else 1024  # ru_maxrss is bytes on macOS, kilobytes on Linux
 
 
+def peak_bytes(usage: resource.struct_rusage) -> int:
+    """The high-water resident set in a ``wait4`` rusage, in bytes: the one place the OS's ``ru_maxrss`` unit is known."""
+    return usage.ru_maxrss * _RSS_UNIT
+
+
 class MeasuredPopen(subprocess.Popen[bytes]):
     """A ``Popen`` whose reaping is ``os.wait4``, so the kernel's resource usage of exactly this child is kept.
 
@@ -88,7 +94,7 @@ class MeasuredPopen(subprocess.Popen[bytes]):
     def _reap(self, pid: int, flags: int) -> tuple[int, int]:
         pid, status, usage = os.wait4(pid, flags)
         if pid == self.pid:
-            self.peak_rss = usage.ru_maxrss * _RSS_UNIT
+            self.peak_rss = peak_bytes(usage)
         return pid, status
 
     def _try_wait(self, wait_flags: int) -> tuple[int, int]:

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
-import platform
 import types
 from typing import Any
 
@@ -317,13 +316,6 @@ def test_session_credentials_absent_on_linux_container(monkeypatch: pytest.Monke
     monkeypatch.setattr(_cc, "_system", lambda: "Linux")
     assert _cc._session_credentials_present({"HOME": str(tmp_path)}) is False
     assert _cc._session_credentials_present({}) is False
-
-
-def test_the_platform_is_read_in_one_place(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(platform, "system", lambda: "Windows")
-    assert _cc._cli_name() == "claude.exe"
-    monkeypatch.setattr(platform, "system", lambda: "Linux")
-    assert _cc._cli_name() == "claude"
 
 
 def test_find_cli_returns_none_when_sdk_absent(monkeypatch: pytest.MonkeyPatch) -> None:

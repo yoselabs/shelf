@@ -1,37 +1,41 @@
-# Platform branches: where they live, and why there is no `any-platform`
+# Platform branches: ask for the capability, not the OS
 
-Verdict for bead shelf-q6m0 (OS-switch audit), written from the allowlist in
-[tests/test_arch_platform_sites.py](../tests/test_arch_platform_sites.py), which fails the gate on any
-platform read outside it (bead shelf-tyld.14). The allowlist is the table: this page does not copy it, it
-judges it.
+Owner decision for bead shelf-tyld.24 (earlier audit: shelf-q6m0). The rule is enforced by
+[tests/test_arch_platform_sites.py](../tests/test_arch_platform_sites.py); its table is the roster of owners, this page does not copy it.
 
-## Verdict per site
+## The pattern
 
-| Module | What it switches | Verdict |
-|---|---|---|
-| stream-proc `procmac`, `proctable` | libproc (macOS) vs `/proc` (Linux) process table | Legitimate. One adapter: `proctable` is the selector, the two natives sit behind it. Owner: stream-proc |
-| stream-proc `owned` | `boot_id` per OS; `inspect_process` picks `procmac` or `procfs` | Move behind the selector. It repeats `proctable`'s choice twice; `proctable` should expose `boot_id` and `inspect`, and the row leaves the allowlist. Not done here: `tests/test_owned.py` fakes the OS by patching `owned.sys.platform` for both natives on one machine, so the move rewrites that seam. Owner: stream-proc |
-| sqlite-store `filesystem` | `/proc/mounts` fs-type probe, Linux only, else `unknown` | Legitimate and local. A degraded answer, not two implementations |
-| anyllm `claude_code_sdk` | `claude.exe` on Windows; macOS Keychain probe | Keychain: legitimate, it is knowledge of one CLI's credential store. The Windows name: suspect, the shelf runs on macOS and Linux (no Windows path is tested); delete it unless a consumer runs on Windows. Owner: anyllm |
-| any-agent `harnesses/opencode` | `supported()` is `sys.platform == "darwin"` because the sandbox is `sandbox-exec` | Wrong question. The fact is "is `sandbox-exec` present", not the OS; ask `child-env.find("sandbox-exec", ...)` and drop the OS read. Owner: any-agent |
-| any-speech `adapters/_child` | `ru_maxrss` is bytes on macOS, kilobytes on Linux | Legitimate and local: one unit constant beside the one `wait4` call that returns it |
+1. **A platform fact has one named owner.** The owner is named for the fact, not the OS: process table, mount list,
+   credential store, rusage unit. It is one module in one package; the OS is read only inside it, and it answers the
+   fact in the app's terms (`proctable.boot_id()`, `peak_bytes(usage)`), never "which OS".
+2. **Everywhere else asks for the capability.** Is `sandbox-exec` on the PATH (`child_env.find`), does `/proc/mounts`
+   exist, does the Keychain tool answer. A capability probe works on a fake PATH in a test and survives a new OS; an
+   OS name does neither. If the question is "is this macOS", the question is wrong.
+3. **An app edge passes a fact in only where the fact must vary per app.** Example: the injected `env` (PATH, HOME)
+   decides where a tool is looked for. A fact that does not vary per app (the rusage unit) is never a parameter.
+4. **The test enforces it.** In `packages/*/src`, any OS read (`sys.platform`, `os.name`, `os.uname()`,
+   `sysconfig.get_platform()`, `platform.system()` and kin, or an OS-name literal: `darwin`, `linux`, `win32`,
+   `Windows`, `nt`, `Darwin`, `Linux`) outside a listed module fails. Each row carries `fact`, `owner`, `why`; every
+   row of a fact names the same owner; a row whose module stops reading the OS must leave.
 
-## Is a shared dispatch package worth it? No.
+To add a fact: write the owner, list it with the reason it cannot be a capability. Tests fake the owner
+(`monkeypatch` `proctable.boot_id`), never the OS name.
 
-Constitution VI and VII promote a shape only when it repeats. The five packages read the platform for five
-different facts: a process table, a mount list, a credential store, a sandbox tool, an rusage unit.
-Only stream-proc has the shape "one interface, one implementation per OS, chosen at the edge", and it
-already holds it inside its own owner. A package named `any-platform` would own no fact; every caller
-would still need its own table of per-OS answers. Recorded refusal.
+## Recorded refusals
 
-## What would change this
+- **No `any-platform` package.** The facts differ (a process table, a mount list, a credential store, a unit); it would own
+  none of them and every caller would still keep its own per-OS table. A fact that two packages need gets an owner named
+  for the fact (`any-sandbox`), not for the OS.
+- **No injected `Host` value** (a `Host("darwin")` passed down). Every API would gain a parameter, every caller would
+  thread it, and the branch would still sit at the far end. The capability question needs no parameter.
+- **No Windows.** The shelf runs on macOS and Linux; no Windows path exists or is tested. A consumer that must run on
+  Windows redoes this verdict.
 
-- A third package needs the same fact as another (for example two packages both ask "is this macOS").
-  Then the fact gets an owner named for the fact (`any-sandbox`, not `any-platform`).
-- A consumer must run on Windows. Then the OS-name reads become a real dispatch and this verdict is redone.
+## Follow-ups from the audit (all done in this change)
 
-## Follow-ups (small, each local to one package, none started)
-
-1. stream-proc: `proctable` exposes `boot_id` and `inspect`; `owned` stops reading the platform; its row leaves the allowlist.
-2. any-agent: `supported()` asks for `sandbox-exec` on the PATH instead of the OS.
-3. anyllm: delete the Windows binary name if nothing uses it.
+| Follow-up | Result |
+|---|---|
+| stream-proc `owned` read the OS twice | `proctable` exposes `boot_id` and `inspect`; `owned` reads no OS; its row left the table |
+| any-agent opencode `supported()` read the OS | asks `find("sandbox-exec", env, ["/usr/bin"])`; now an instance method (needs `env`) |
+| anyllm `claude.exe` Windows name | deleted: no consumer, no Windows path |
+| any-speech `_child` duplicated the rusage unit | stream-proc `peak_bytes(usage)` is the one owner; the row left the table |

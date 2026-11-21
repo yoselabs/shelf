@@ -17,6 +17,7 @@ import errno
 import functools
 import sys
 from typing import Literal
+from uuid import UUID
 
 from stream_proc.procfs import Proc, signal0
 
@@ -171,6 +172,23 @@ def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
     cmd = (info.pbi_comm or info.pbi_name).decode("utf-8", errors="replace")  # lossy-ok: display: a process name for a row
     cpu_s, rss = _task(pid)
     return Proc(pid, info.pbi_ppid, info.pbi_pgid, 0, _token(info), state, cpu_s, cmd, info.pbi_uid, rss)
+
+
+def boot_id() -> str | None:
+    """The boot session UUID (``kern.bootsessionuuid``), or None off macOS or when the sysctl fails."""
+    if _lib() is None:
+        return None
+    try:
+        query = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True).sysctlbyname
+        query.argtypes = (ctypes.c_char_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t), ctypes.c_void_p, ctypes.c_size_t)
+        query.restype = ctypes.c_int
+        buf = ctypes.create_string_buffer(37)
+        size = ctypes.c_size_t(len(buf))
+        if query(b"kern.bootsessionuuid", buf, ctypes.byref(size), None, 0) != 0 or size.value != len(buf):
+            return None
+        return str(UUID(buf.value.decode("ascii")))
+    except (OSError, ValueError, UnicodeError, AttributeError):
+        return None
 
 
 def read(pid: int) -> Proc | None:

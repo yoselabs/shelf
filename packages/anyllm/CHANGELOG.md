@@ -4,6 +4,10 @@ AI-facing only: one line per contract-shape change, arrow notation. No prose, no
 (see `ledger/0032-anyllm-v2-delivered.toml` for why). Read this before source/README when
 reconciling a pin (agent-loop.md WORKFLOW: RECEIVE).
 
+## 0.12.0
+
+- Claude Code SDK CLI is found as `claude` only; the Windows name `claude.exe` is gone (the shelf is macOS and Linux)
+
 ## 0.11.0
 
 - BREAKING: `resolve_provider(..., fallback=True)` loses `fallback`; new `resolve_first(order, config, *, env, wrap)` (the old `fallback=False`: the first usable provider, later candidates are not built or wrapped); `resolve_provider` always composes runtime fallback over two or more survivors.

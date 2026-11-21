@@ -11,9 +11,10 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import pytest
-from stream_proc import OwnedProcess, inspect_process, observe_owned, owned, popen_registered, procfs, procmac
+from stream_proc import OwnedProcess, inspect_process, observe_owned, popen_registered, procfs, procmac, proctable
 
 if TYPE_CHECKING:
     from stream_proc.procfs import Proc
@@ -29,14 +30,14 @@ def test_current_process_and_wrong_retained_identity() -> None:
 
 
 def test_unknown_boot_never_becomes_gone(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(owned, "boot_id", lambda: None)
+    monkeypatch.setattr(proctable, "boot_id", lambda: None)
     assert inspect_process(os.getpid()).kind == "unknown"
     assert observe_owned(OwnedProcess(os.getpid(), os.getpgrp(), "1", "boot")).kind == "unknown"
 
 
 def test_boot_change_during_observation_is_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
     boots = iter(["before", "after"])
-    monkeypatch.setattr(owned, "boot_id", lambda: next(boots))
+    monkeypatch.setattr(proctable, "boot_id", lambda: next(boots))
     assert inspect_process(os.getpid()).kind == "unknown"
 
 
@@ -63,22 +64,28 @@ def test_malformed_native_record_is_unknown(tmp_path: Path, monkeypatch: pytest.
     assert procfs.inspect(13) == "gone"
 
 
-@pytest.mark.parametrize("native", [procfs, procmac])
-def test_zombie_is_known_gone(monkeypatch: pytest.MonkeyPatch, native: object) -> None:
+def test_zombie_is_known_gone(monkeypatch: pytest.MonkeyPatch) -> None:
     row = procfs.Proc(12, 1, 12, 12, "100", "Z")
 
     def inspect(_pid: int) -> Proc:
         return row
 
-    monkeypatch.setattr(native, "inspect", inspect)
-    monkeypatch.setattr(owned.sys, "platform", "darwin" if native is procmac else "linux")
-    monkeypatch.setattr(owned, "boot_id", lambda: "boot")
+    monkeypatch.setattr(proctable, "inspect", inspect)
+    monkeypatch.setattr(proctable, "boot_id", lambda: "boot")
     assert inspect_process(12).kind == "gone"
+
+
+def test_the_process_table_owns_the_boot_id_and_the_row() -> None:
+    boot = proctable.boot_id()
+    assert boot is None or str(UUID(boot)) == boot
+    row = proctable.inspect(os.getpid())
+    assert isinstance(row, procfs.Proc) and row.pid == os.getpid()
+    assert proctable.inspect(2**22 + 12345) == "gone"
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="Requires actual macOS native APIs")
 def test_native_macos_boot_uuid_and_identity() -> None:
-    assert owned.boot_id() is not None
+    assert proctable.boot_id() is not None
     assert inspect_process(os.getpid()).kind == "matching"
 
 

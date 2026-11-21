@@ -1,10 +1,12 @@
-"""Platform branches live in a short allowlist of modules, each with a reason (Article III, one dispatch).
+"""A platform fact has one named owner; everywhere else asks for the capability (docs/platform-branches.md).
 
-Reads of `sys.platform`, `os.name`, `os.uname()`, `sysconfig.get_platform()` and the `platform` module's
-system/machine/uname family in `packages/*/src` are allowed only in the modules listed below. A new
-branch on the operating system fails the gate: route it through one of the listed owners, or add the
-module here with the reason it must decide for itself. A listed module that stops reading the platform
-must leave the list.
+A module under `packages/*/src` may read the operating system only if it is a row below. A read is `sys.platform`,
+`os.name`, `os.uname()`, `sysconfig.get_platform()`, the `platform` module's system/machine family, or an
+OS-name string literal (`"darwin"`, `"linux"`, `"win32"`, `"Windows"`, `"nt"`, `"Darwin"`, `"Linux"`). Each row says
+which `fact` the module decides, which module `owner` is that fact's one owner, and why. One fact, one owner: every
+row of a fact names the same owner, and the owner is itself a row. A row whose module stops reading the OS leaves.
+A new branch on the OS fails the gate: ask the owner, or ask for the capability (is the tool on PATH), or
+list a new fact with its owner and the reason it cannot be a capability.
 """
 
 import ast
@@ -13,16 +15,35 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 
 _PLATFORM_CALLS = {"system", "machine", "uname", "platform", "mac_ver", "processor", "release", "version", "architecture"}
+_OS_NAMES = {"darwin", "linux", "win32", "Windows", "nt", "Darwin", "Linux"}
 
-_ALLOWED: dict[str, str] = {
-    "packages/stream-proc/src/stream_proc/owned.py": "boot_id per OS (sysctl darwin, /proc linux); inspect_process picks procmac or procfs",
-    "packages/stream-proc/src/stream_proc/proctable.py": "chooses the darwin libproc binding or the portable table once at import",
-    "packages/stream-proc/src/stream_proc/procmac.py": "guards the libproc dylib: refuses to load anywhere but darwin",
-    "packages/sqlite-store/src/sqlite_store/filesystem.py": "fs-type probe reads /proc/mounts on linux only; others report unknown",
-    "packages/anyllm/src/anyllm/providers/claude_code_sdk.py": "claude.exe name on Windows; darwin-only keychain credential probe",
-    "packages/any-agent/src/any_agent/harnesses/opencode.py": "reports whether the command sandbox exists: sandbox-exec is darwin only",
-    "packages/stream-proc/src/stream_proc/hold.py": "ru_maxrss unit differs: bytes on darwin, kilobytes on linux",
-    "packages/any-speech/src/any_speech/adapters/_child.py": "ru_maxrss unit differs: bytes on darwin, kilobytes on linux",
+_TABLE = "packages/stream-proc/src/stream_proc/proctable.py"
+_ALLOWED: dict[str, dict[str, str]] = {
+    _TABLE: {
+        "fact": "process table",
+        "owner": _TABLE,
+        "why": "chooses the macOS libproc binding or the /proc table once at import; boot_id and inspect come from the same choice",
+    },
+    "packages/stream-proc/src/stream_proc/procmac.py": {
+        "fact": "process table",
+        "owner": _TABLE,
+        "why": "the macOS native behind proctable: refuses to load the libproc dylib anywhere but darwin",
+    },
+    "packages/sqlite-store/src/sqlite_store/filesystem.py": {
+        "fact": "mount list",
+        "owner": "packages/sqlite-store/src/sqlite_store/filesystem.py",
+        "why": "the fs-type probe reads /proc/mounts on linux only; elsewhere the answer is 'unknown'",
+    },
+    "packages/anyllm/src/anyllm/providers/claude_code_sdk.py": {
+        "fact": "credential store",
+        "owner": "packages/anyllm/src/anyllm/providers/claude_code_sdk.py",
+        "why": "the Claude CLI keeps its OAuth session in the macOS Keychain, in a file elsewhere",
+    },
+    "packages/stream-proc/src/stream_proc/hold.py": {
+        "fact": "rusage unit",
+        "owner": "packages/stream-proc/src/stream_proc/hold.py",
+        "why": "ru_maxrss is bytes on macOS, kilobytes on Linux; peak_bytes is the one conversion",
+    },
 }
 
 
@@ -30,7 +51,10 @@ def _reads(tree: ast.AST) -> list[int]:
     """Line numbers of every platform read in a parsed module."""
     lines: list[int] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+        if isinstance(node, ast.Constant):
+            if isinstance(node.value, str) and node.value in _OS_NAMES:
+                lines.append(node.lineno)
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
             owner, attr = node.value.id, node.attr
             if (
                 (owner == "sys" and attr == "platform")
@@ -45,7 +69,7 @@ def _reads(tree: ast.AST) -> list[int]:
                 for alias in node.names
                 if alias.name in _PLATFORM_CALLS | {"get_platform"} or (node.module == "sys" and alias.name == "platform")
             ]
-    return sorted(lines)
+    return sorted(set(lines))
 
 
 def platform_sites(root: Path) -> dict[str, list[int]]:
@@ -62,10 +86,18 @@ def test_platform_reads_stay_in_the_allowlisted_modules() -> None:
     assert not stray, f"platform branch outside the allowlist (one dispatch: use an owner, or list the module with a reason): {stray}"
 
 
-def test_every_allowlisted_module_still_reads_the_platform_and_says_why() -> None:
-    sites = platform_sites(_ROOT)
-    assert not sorted(set(_ALLOWED) - set(sites)), "an allowlisted module no longer reads the platform: delete its row"
-    assert all(reason.strip() for reason in _ALLOWED.values())
+def test_every_allowlisted_module_still_reads_the_platform() -> None:
+    assert not sorted(set(_ALLOWED) - set(platform_sites(_ROOT))), "an allowlisted module no longer reads the platform: delete its row"
+
+
+def test_every_row_names_its_fact_owner_and_reason_and_a_fact_has_one_owner() -> None:
+    for module, row in _ALLOWED.items():
+        assert set(row) == {"fact", "owner", "why"}, module
+        assert all(text.strip() for text in row.values()), f"{module}: fact, owner and why must say something"
+        owner = _ALLOWED.get(row["owner"])
+        assert owner is not None, f"{module}: the owner {row['owner']} is not itself a row"
+        assert owner["fact"] == row["fact"] and owner["owner"] == row["owner"], f"{module}: one fact, one owner ({row['fact']})"
+        assert module.split("/src/")[0] == row["owner"].split("/src/")[0], f"{module}: the owner lives in the same package"
 
 
 def _plant(tmp_path: Path, source: str) -> dict[str, list[int]]:
@@ -90,3 +122,12 @@ def test_planted_from_import_is_found(tmp_path: Path) -> None:
 
 def test_unrelated_names_pass(tmp_path: Path) -> None:
     assert _plant(tmp_path, "import sys\nplatform = 'x'\nprint(sys.argv, platform.upper())\n") == {}
+
+
+def test_planted_os_name_literals_are_found(tmp_path: Path) -> None:
+    source = "a = 'darwin'\nb = 'linux'\nc = 'win32'\nd = 'Windows'\ne = 'nt'\nf = 'Darwin'\ng = 'Linux'\n"
+    assert _plant(tmp_path, source) == {"packages/pkg/src/pkg/mod.py": [1, 2, 3, 4, 5, 6, 7]}
+
+
+def test_a_word_that_merely_contains_an_os_name_passes(tmp_path: Path) -> None:
+    assert _plant(tmp_path, "a = 'linux-only'\nb = 'Is darwin here'\n") == {}

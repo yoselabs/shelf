@@ -2,6 +2,7 @@
 
 Linux reads ``/proc`` (``stream_proc.procfs``); macOS calls ``libproc`` through ``ctypes``
 (``stream_proc.procmac``). The choice is made once, by ``sys.platform``; the dylib is only touched on first use.
+``boot_id`` (the boot UUID, or None) and ``inspect`` (one process, or ``"gone"``/``"unknown"``) are part of it.
 Same names, same rows (:class:`~stream_proc.procfs.Proc`), same start-token contract on both.
 """
 
@@ -9,7 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from stream_proc import procfs
 
@@ -21,6 +22,12 @@ if sys.platform == "darwin":
 
     def has_table() -> bool:
         return procmac.has_table()
+
+    def boot_id() -> str | None:
+        return procmac.boot_id()
+
+    def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
+        return procmac.inspect(pid)
 
     def table() -> dict[int, Proc]:
         return procmac.table()
@@ -38,6 +45,12 @@ else:
 
     def has_table() -> bool:
         return procfs.has_proc()
+
+    def boot_id() -> str | None:
+        return procfs.boot_id()
+
+    def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
+        return procfs.inspect(pid)
 
     def table() -> dict[int, Proc]:
         return procfs.table()

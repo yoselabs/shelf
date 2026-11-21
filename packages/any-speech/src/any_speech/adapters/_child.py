@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from stream_proc import group_rss, popen_held, stop_tree
+from stream_proc import group_rss, peak_bytes, popen_held, stop_tree
 
 from any_speech.guard import MemoryBudgetError
 
@@ -48,8 +48,6 @@ def run_child(args: Sequence[str | Path], *, timeout: float | None, budget_gb: f
     files), the wait4 loop and the mid-run budget check live here; the stop is stream-proc's `stop_tree`.
     Runs on a worker thread (`any_pipeline.blocking`), so its short `time.sleep` poll never blocks an event loop.
     """
-    # ru_maxrss is bytes on macOS, kilobytes elsewhere: the one platform read the peak figure needs
-    unit = 1.0 if os.uname().sysname == "Darwin" else 1024.0
     started = time.monotonic()
     with tempfile.TemporaryFile() as err, tempfile.TemporaryFile() as out:
         process, hold = popen_held([str(a) for a in args], stdout=out, stderr=err, start_new_session=True)
@@ -62,7 +60,7 @@ def run_child(args: Sequence[str | Path], *, timeout: float | None, budget_gb: f
         err.seek(0)
         # lossy-ok: display: a child's stderr tail goes into an error message
         tail = err.read()[-_TAIL:].decode("utf-8", "replace")
-    return ChildResult(os.waitstatus_to_exitcode(status), time.monotonic() - started, usage.ru_maxrss * unit / _GB, tail)
+    return ChildResult(os.waitstatus_to_exitcode(status), time.monotonic() - started, peak_bytes(usage) / _GB, tail)
 
 
 def _wait4(process: subprocess.Popen[bytes], timeout: float | None, budget_gb: float | None) -> tuple[int, int, resource.struct_rusage]:

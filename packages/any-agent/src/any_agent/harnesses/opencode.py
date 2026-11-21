@@ -4,7 +4,6 @@ transcript and its login status."""
 
 import json
 import re
-import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import override
@@ -120,9 +119,13 @@ class OpenCodeHarness(Quiet):
         """The `opencode` program: on the injected PATH, else in its own installer's folder (~/.opencode/bin). NotFound on a miss."""
         return str(find("opencode", self.env, [tool_home("opencode", env=self.env) / "bin"]).path)
 
-    @staticmethod
-    def supported() -> bool:
-        return sys.platform == "darwin"  # the command sandbox is sandbox-exec
+    def supported(self) -> bool:
+        """Whether the command sandbox exists: `sandbox-exec` on the injected PATH or in /usr/bin. Asks for the tool, not the OS."""
+        try:
+            find("sandbox-exec", self.env, ["/usr/bin"])
+        except NotFound:
+            return False
+        return True
 
     def launch_spec(self, i: LaunchInputs) -> LaunchSpec:
         """Writes the sandboxed shell this run's commands use (`cleanup` removes it). The env is `i.env` plus OpenCode's isolation."""

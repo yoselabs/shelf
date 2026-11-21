@@ -15,6 +15,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+from uuid import UUID
 
 PROC = Path("/proc")
 PAGE = os.sysconf("SC_PAGE_SIZE") if hasattr(os, "sysconf") and "SC_PAGE_SIZE" in os.sysconf_names else 4096
@@ -67,6 +68,14 @@ def inspect(pid: int) -> Proc | Literal["gone", "unknown"]:
         return "gone"
     except (OSError, ValueError, IndexError, UnicodeError):
         return "unknown"
+
+
+def boot_id() -> str | None:
+    """The kernel's boot UUID, or None when ``/proc`` has none. Never substitute wall time or PID."""
+    try:
+        return str(UUID((PROC / "sys" / "kernel" / "random" / "boot_id").read_text(encoding="ascii").strip()))
+    except (OSError, ValueError, UnicodeError):
+        return None
 
 
 def read(pid: int) -> Proc | None:
