@@ -29,3 +29,5 @@ output that was wrong — nothing that was correct before is dropped.
 - `encode_envelope(value, tsv_fields)` — a field arriving as an already-encoded TSV `str`: `"\n"` (content discarded) ⇒ the string, unchanged, plus its `_x_format` discriminator.
 - `encode_envelope(value, tsv_fields)` — a field whose rows are neither `BaseModel` nor `dict`: `raise TypeError` (aborting the WHOLE envelope's encode) ⇒ that field stays JSON with no `_x_format`, every other field encodes normally.
 - `_derive_columns` / `page._item_columns` fallback — TSV header columns: `rows[0]`'s keys ⇒ the UNION of every row's keys, first-seen order. Migration: a table over heterogeneous rows gains the columns the first row lacked; sparse rows fill with an empty cell. No column is ever removed, so a reader keyed by column NAME is unaffected; a reader keyed by column INDEX must move to names.
+
+- 0.5.0: `render_dynamic` falls back to JSON only on a TypeError from `encode_tsv` (a row neither model nor dict); any other encode failure propagates  ⇐  v0.4.0 swallowed every `Exception`

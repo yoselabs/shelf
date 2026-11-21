@@ -74,15 +74,16 @@ async def test_the_failure_is_still_raised() -> None:
         await scope.aclose()
 
 
-async def test_the_first_failure_is_the_one_raised() -> None:
+async def test_two_failures_are_raised_together_in_close_order() -> None:
     log: list[str] = []
     scope = ResourceScope()
     await scope.enter(_Res(log, "closed-last", fail_exit=True))
     await scope.enter(_Res(log, "closed-first", fail_exit=True))
 
-    # LIFO, so `closed-first` exits first and its failure is the one surfaced.
-    with pytest.raises(RuntimeError, match="closed-first refused to close"):
+    with pytest.raises(ExceptionGroup) as caught:
         await scope.aclose()
+    # LIFO, so `closed-first` exits first.
+    assert [str(e) for e in caught.value.exceptions] == ["closed-first refused to close", "closed-last refused to close"]
 
 
 async def test_a_resource_that_failed_to_open_is_not_torn_down() -> None:

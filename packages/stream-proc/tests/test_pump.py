@@ -8,7 +8,7 @@ import threading
 import time
 
 import pytest
-from stream_proc import Pump
+from stream_proc import Pump, PumpStuckError
 
 PY = sys.executable
 
@@ -144,19 +144,106 @@ def test_a_line_exactly_under_the_cap_is_whole() -> None:
     assert pump.splits == 0
 
 
-def test_a_failing_callback_does_not_stop_the_reading() -> None:
+def test_a_failing_callback_is_called_once_and_its_error_is_raised_by_release_after_full_teardown() -> None:
     p = spawn("print('1')\nprint('2')")
     seen: list[bytes] = []
+    failure = RuntimeError("first")
 
     def boom(raw: bytes) -> None:
         seen.append(raw)
-        raise RuntimeError
+        raise failure
 
     pump = Pump(p, on_stdout=boom)
     pump.start()
+    assert pump.drain(10)  # the reading went on to EOF
+    with pytest.raises(RuntimeError) as caught:
+        pump.release()
+    assert caught.value is failure
+    assert seen == [b"1\n"]  # a callback that raised is not invoked again
+    assert closed(p)  # the teardown finished before the raise
+    pump.release()  # the error is raised once
+    p.wait()
+
+
+def test_the_first_error_of_the_pump_is_the_one_kept() -> None:
+    p = spawn("import sys, time\nprint('o', flush=True)\ntime.sleep(0.4)\nprint('e', file=sys.stderr, flush=True)")
+    first, second = RuntimeError("stdout"), ValueError("stderr")
+
+    def fail_out(_raw: bytes) -> None:
+        raise first
+
+    def fail_err(_raw: bytes) -> None:
+        raise second
+
+    pump = Pump(p, on_stdout=fail_out, on_stderr=fail_err)
+    pump.start()
     assert pump.drain(10)
-    pump.release()
-    assert seen == [b"1\n", b"2\n"]
+    with pytest.raises(RuntimeError) as caught:
+        pump.release()
+    assert caught.value is first
+    p.wait()
+
+
+def test_a_child_writing_a_lot_after_the_callback_failed_is_still_drained() -> None:
+    code = "import sys\nfor _ in range(200):\n    sys.stdout.write('x' * 50000 + '\\n')\n    sys.stderr.write('y' * 50000 + '\\n')\n"
+    p = spawn(code)
+    calls: list[int] = []
+
+    def boom(_raw: bytes) -> None:
+        calls.append(1)
+        raise RuntimeError
+
+    pump = Pump(p, on_stdout=boom, on_stderr=boom)
+    pump.start()
+    assert pump.drain(30)  # 20 MB past two failed callbacks: a full pipe would block the child for good
+    with pytest.raises(RuntimeError):
+        pump.release()
+    assert p.wait(10) == 0
+    assert len(calls) <= 2
+
+
+def test_a_failing_touch_is_not_called_again_and_its_error_is_raised() -> None:
+    p = spawn("print('1')\nprint('2')")
+    touched: list[int] = []
+    out: list[bytes] = []
+
+    def touch() -> None:
+        touched.append(1)
+        msg = "touch"
+        raise OSError(msg)
+
+    pump = Pump(p, on_stdout=out.append, touch=touch)
+    pump.start()
+    assert pump.drain(10)
+    with pytest.raises(OSError, match="touch"):
+        pump.release()
+    assert out == [b"1\n", b"2\n"]
+    assert touched == [1]
+    p.wait()
+
+
+def test_a_callback_that_never_returns_makes_release_raise_pump_stuck_and_leaves_the_pipes_open() -> None:
+    p = spawn("print('x', flush=True)\nimport time; time.sleep(30)")
+    entered, gate = threading.Event(), threading.Event()
+
+    def block(_raw: bytes) -> None:
+        entered.set()
+        gate.wait(10)
+
+    pump = Pump(p, on_stdout=block, stuck_after=0.3)
+    pump.start()
+    assert entered.wait(5)
+    t0 = time.monotonic()
+    with pytest.raises(PumpStuckError) as caught:
+        pump.release()
+    assert time.monotonic() - t0 < 3.0
+    assert caught.value.running == ("on_stdout",)
+    assert not p.stdout.closed  # type: ignore[union-attr]  # a close under the reader is the race: nothing was closed
+    gate.set()
+    pump.release()  # the callback returned: the teardown completes
+    assert closed(p)
+    p.kill()
+    p.wait()
 
 
 def test_touch_runs_when_bytes_arrive() -> None:

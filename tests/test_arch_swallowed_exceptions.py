@@ -66,43 +66,6 @@ def _rows(reason: str, *paths: tuple[str, int]) -> dict[str, Row]:
 
 
 _ALLOWED = {
-    # --- debt: real swallows, each with the fix ---
-    **_rows(
-        "debt: best-effort cleanup (context, page, browser, loop reader, fd) hides a failed close; report it through the "
-        "engine's close result or let it raise after the engine is down",
-        ("any-browser/src/any_browser/playwright.py", 14),
-        ("any-browser/src/any_browser/zendriver.py", 4),
-    ),
-    **_rows(
-        "debt: a failed best-effort write of the opencode session file is dropped; raise a typed error the caller can report",
-        ("any-agent/src/any_agent/harnesses/opencode.py", 1),
-    ),
-    **_rows(
-        "debt: a failed session DELETE on close is dropped; report it after the client closes",
-        ("mcp-call/src/mcp_call/__init__.py", 1),
-    ),
-    **_rows(
-        "debt: `except Exception: pass` (noqa BLE001) around a whole parse or encode; narrow to the parser's own error "
-        "and fall back with a typed outcome",
-        ("page-tsv/src/page_tsv/render.py", 1),
-        ("content-extract/src/content_extract/__init__.py", 2),
-    ),
-    **_rows(
-        "debt: a user callback (`cb`, `touch`) that raises is dropped so the pipe pump survives; report it as a typed "
-        "callback failure on the run result",
-        ("stream-proc/src/stream_proc/runner.py", 2),  # the second is a poll-slice timeout: an outcome
-        ("stream-proc/src/stream_proc/pump.py", 7),
-    ),
-    **_rows(
-        "debt: closing the sockets and the server's shutdown flag swallow `Exception`; narrow to OSError, let the rest raise",
-        ("async-scope/src/async_scope/asgi.py", 3),
-        ("async-scope/src/async_scope/__init__.py", 1),
-    ),
-    **_rows(
-        "debt: a failed write of the probe cache row is dropped; the probe returns the answer, so the failure belongs in "
-        "a logged warning or a typed outcome",
-        ("any-net/src/any_net/probe.py", 1),
-    ),
     # --- outcome: the failure is the expected answer ---
     **_rows(
         "outcome: a torn, foreign or undecodable line or item is skipped; the rest of the input is the answer",
@@ -114,6 +77,7 @@ _ALLOWED = {
         ("jsonl-log/src/jsonl_log/__init__.py", 5),
         ("jsonl-log/src/jsonl_log/cursor.py", 1),
         ("record-mine/src/record_mine/detector.py", 1),
+        ("content-extract/src/content_extract/__init__.py", 1),
     ),
     **_rows(
         "outcome: an absent, unreadable or vanished file or process is the normal answer of a probe, a scan or a race "
@@ -129,6 +93,22 @@ _ALLOWED = {
         ("stream-proc/src/stream_proc/procfs.py", 1),
         ("stream-proc/src/stream_proc/procmac.py", 1),
         ("stream-proc/src/stream_proc/tree.py", 3),
+    ),
+    **_rows(
+        "outcome: an optional by-product of a finished operation is absent when it cannot be made; the operation's own "
+        "answer is unchanged and the reader of the by-product already gets None for it (an exported transcript file, "
+        "a derived probe-cache row that the next call re-probes for, a second scroll snapshot beside the first paint)",
+        ("any-agent/src/any_agent/harnesses/opencode.py", 1),
+        ("any-net/src/any_net/probe.py", 1),
+    ),
+    **_rows(
+        "outcome: nothing to do right now: the fd has no bytes yet (BlockingIOError), no event loop is running to start the "
+        "idle reaper on, the child already exited and the stdin pipe is broken, a non-blocking write would block, the "
+        "process to kill is already gone, or an optional second snapshot of a page fails and the first paint stands",
+        ("any-browser/src/any_browser/playwright.py", 2),
+        # the process already gone; the scroll-and-retry second snapshot (the first paint is the answer)
+        ("any-browser/src/any_browser/zendriver.py", 2),
+        ("stream-proc/src/stream_proc/pump.py", 2),
     ),
     **_rows(
         "outcome: an optional lookup finds nothing, or a candidate fails to build, and the loop moves to the next one",
@@ -151,6 +131,7 @@ _ALLOWED = {
         ("sqlite-store/src/sqlite_store/connections.py", 1),
         ("sqlite-store/src/sqlite_store/store.py", 1),
         ("stream-proc/src/stream_proc/_exec_gate.py", 1),
+        ("stream-proc/src/stream_proc/runner.py", 1),
         ("stream-proc/src/stream_proc/hold.py", 1),
         ("stream-proc/src/stream_proc/registered.py", 1),
     ),

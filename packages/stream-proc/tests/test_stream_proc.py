@@ -52,16 +52,18 @@ def test_result_names_the_child_for_good() -> None:
         assert res.start
 
 
-def test_a_failing_callback_does_not_stop_the_reading() -> None:
+def test_a_failing_callback_is_not_called_again_and_run_raises_its_error_after_the_child_ended() -> None:
     seen: list[str] = []
+    failure = RuntimeError("bad line")
 
     def bad(line: str) -> None:
         seen.append(line)
-        raise RuntimeError
+        raise failure
 
-    res = run(py("print(1); print(2)"), on_stdout=bad)
-    assert seen == ["1\n", "2\n"]
-    assert res.returncode == 0
+    with pytest.raises(RuntimeError) as caught:
+        run(py("print(1); print(2)"), on_stdout=bad)
+    assert caught.value is failure
+    assert seen == ["1\n"]
 
 
 def test_wall_timeout_stops_the_child() -> None:

@@ -190,31 +190,28 @@ def _extract_sync(
 
     headings: list[ExtractedHeading] = []
     links: list[ExtractedLink] = []
-    try:
-        tree = HTMLParser(html)
-        for node in tree.css("h1, h2, h3, h4, h5, h6"):
-            level = int(node.tag[1])
-            text = (node.text() or "").strip()
-            if text:
-                headings.append(ExtractedHeading(level=level, text=text))
-        for a in tree.css("a[href]"):
-            href = a.attributes.get("href") or ""
-            anchor = (a.text() or "").strip()
-            if not href:
+    tree = HTMLParser(html)
+    for node in tree.css("h1, h2, h3, h4, h5, h6"):
+        level = int(node.tag[1])
+        text = (node.text() or "").strip()
+        if text:
+            headings.append(ExtractedHeading(level=level, text=text))
+    for a in tree.css("a[href]"):
+        href = a.attributes.get("href") or ""
+        anchor = (a.text() or "").strip()
+        if not href:
+            continue
+        if not anchor:
+            # A label-less anchor is normally chrome (an icon link) and is
+            # dropped. The exception is a contact link (``mailto:`` /
+            # ``tel:``) whose href IS the datum the caller wants — keep it,
+            # deriving a label from the scheme's value so it is not empty.
+            derived = _contact_label(href)
+            if derived is None:
                 continue
-            if not anchor:
-                # A label-less anchor is normally chrome (an icon link) and is
-                # dropped. The exception is a contact link (``mailto:`` /
-                # ``tel:``) whose href IS the datum the caller wants — keep it,
-                # deriving a label from the scheme's value so it is not empty.
-                derived = _contact_label(href)
-                if derived is None:
-                    continue
-                anchor = derived
-            role = _classify_link_role(a)
-            links.append(ExtractedLink(anchor=anchor, href=href, role=role))
-    except Exception:  # noqa: BLE001, S110 — selectolax parse errors are non-fatal; content_md is the primary output
-        pass
+            anchor = derived
+        role = _classify_link_role(a)
+        links.append(ExtractedLink(anchor=anchor, href=href, role=role))
 
     return ExtractedContent(
         content_md=content_md,
