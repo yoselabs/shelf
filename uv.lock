@@ -38,6 +38,7 @@ members = [
     "any-recorded-fixture",
     "any-shell-policy",
     "any-speech",
+    "any-supervise",
     "any-ttl-cache",
     "any-versioned",
     "any-work",
@@ -929,6 +930,39 @@ requires-dist = [
     { name = "verb-cli", editable = "packages/verb-cli" },
 ]
 provides-extras = ["parakeet", "embed"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
+[[package]]
+name = "any-supervise"
+version = "0.1.0"
+source = { editable = "packages/any-supervise" }
+dependencies = [
+    { name = "atomic-io" },
+    { name = "child-env" },
+    { name = "process-lock" },
+    { name = "stream-proc" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "child-env", editable = "packages/child-env" },
+    { name = "process-lock", editable = "packages/process-lock" },
+    { name = "stream-proc", editable = "packages/stream-proc" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -6408,7 +6442,7 @@ dev = [
 
 [[package]]
 name = "stream-proc"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "packages/stream-proc" }
 dependencies = [
     { name = "async-scope" },

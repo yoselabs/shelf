@@ -1,0 +1,10 @@
+seq = 184
+date = "2026-11-22"
+event = "delivery"
+software = "any-supervise"
+release = "any-supervise-v0.1.0"
+actor = "channel-research"
+consumer = "channel-research"
+verdict = ""
+cost = ""
+note = "New package from channel-research's nine hand-started worker loops: spec-driven detached start, state file per replica with pid and process start time, STALE status from a version command, rolling restart that keeps a lane alive, graceful down. Needed stream-proc 0.17.0 spawn_detached (session spawn belongs only to stream-proc). Candidate; the consumer has not adopted it yet, so no adoption verdict."
