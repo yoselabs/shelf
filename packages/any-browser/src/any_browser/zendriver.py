@@ -29,8 +29,10 @@ from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
+from async_scope import cleanup
+
 from .base import BackendCookie, RenderedPage, RenderOutcome
-from .playwright import _CHALLENGE_STATUSES, _SCROLL_STABLE_MAX_PASSES, _THIN_FLOOR, _keep, _ms, _summarize_exc
+from .playwright import _CHALLENGE_STATUSES, _CLOSE_S, _SCROLL_STABLE_MAX_PASSES, _THIN_FLOOR, _keep, _ms, _summarize_exc
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping
@@ -314,8 +316,7 @@ class ZendriverBackend:
             )
         finally:
             if browser is not None:
-                with suppress(Exception):
-                    await browser.stop()
+                await cleanup(browser.stop, within=_CLOSE_S)
 
         return RenderedPage(
             outcome=RenderOutcome.ok,
@@ -349,18 +350,17 @@ class ZendriverBackend:
         # — the same ordering the Playwright path uses (`page.on("response")`
         # before `page.goto`). Registering after navigation would miss the very
         # XHR/fetch this exists to catch: an SPA shell that 200s while its data
-        # API is 403'd fires that request during load. Best-effort — a driver
-        # missing the CDP surface degrades to a 0 count, never a failed render.
+        # API is 403'd fires that request during load. A driver missing the CDP
+        # surface counts 0 (checked, not caught).
         tab = await browser.get("about:blank")
-        if blocked is not None:
+        if blocked is not None and hasattr(zd.cdp.network, "ResponseReceived"):  # an older driver without the CDP surface counts 0
 
             def _on_cdp_response(event: Any) -> None:
                 if _is_challenged_cdp_response(event):
                     blocked.append(1)
 
-            with suppress(Exception):
-                await tab.send(zd.cdp.network.enable())
-                tab.add_handler(zd.cdp.network.ResponseReceived, _on_cdp_response)
+            await tab.send(zd.cdp.network.enable())
+            tab.add_handler(zd.cdp.network.ResponseReceived, _on_cdp_response)
         await tab.get(url)
         await tab.wait_for_ready_state("complete", timeout=self.page_budget_s)
         html = await tab.get_content()

@@ -25,7 +25,7 @@ from stream_proc.owned import IdentityUnavailableError, OwnedProcess, ProcessObs
 from stream_proc.pid import PidHandle, stop_pid
 from stream_proc.procfs import Proc
 from stream_proc.proctable import alive, descendants, group_alive, group_rss, proc_start, table
-from stream_proc.pump import Pump
+from stream_proc.pump import Pump, PumpStuckError
 from stream_proc.registered import RegisteredStartUncertainError, popen_registered
 from stream_proc.runner import Kind, Result, run, run_registered
 from stream_proc.tree import StopReport, stop_tree, stop_tree_report
@@ -39,6 +39,7 @@ __all__ = [
     "Proc",
     "ProcessObservation",
     "Pump",
+    "PumpStuckError",
     "RegisteredStartUncertainError",
     "Result",
     "StopReport",

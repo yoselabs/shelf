@@ -1,6 +1,6 @@
 [project]
 name = "any-browser"
-version = "0.3.0"
+version = "0.4.0"
 description = "Stop caring which headless browser renders a JS page — one BrowserBackend seam over Playwright-API and raw-CDP engines."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]
@@ -8,7 +8,7 @@ requires-python = ">=3.12"
 license = "Apache-2.0"
 # The seam itself is stdlib-only. The rendering engines are optional: a consumer
 # installs whichever it wants and a missing one degrades to RenderOutcome.unavailable.
-dependencies = []
+dependencies = ["async-scope>=0.4.0,<1"]
 
 [project.optional-dependencies]
 # The fast Playwright-API Chromium rung (undetected Playwright fork, vendors its
@@ -20,6 +20,9 @@ zendriver = ["zendriver>=0.15,<1"]
 [dependency-groups]
 # The test libraries this package's suite imports, plus what the root conftest and pytest settings load (tests/test_package_tests_declare_their_dependencies.py).
 dev = ["pytest>=8,<9", "pytest-asyncio>=0.24,<1", "hypothesis>=6.100,<7", "zendriver>=0.15,<1"]
+
+[tool.uv.sources]
+async-scope = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

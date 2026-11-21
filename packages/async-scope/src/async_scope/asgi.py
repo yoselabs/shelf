@@ -26,6 +26,8 @@ import socket
 import sys
 from typing import TYPE_CHECKING, Any, cast
 
+from async_scope.cleanup import cleanup
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
@@ -94,9 +96,7 @@ async def serve_asgi(
         await _await_started(server, task, within=startup_timeout)
         yield f"http://{host}:{bound_port}"
     finally:
-        await _stop(server, task, grace=shutdown_grace)
-        with contextlib.suppress(Exception):
-            sock.close()
+        await cleanup(lambda: _stop(server, task, grace=shutdown_grace), sock.close, within=shutdown_grace + 10.0)
 
 
 async def _serve_without_exiting(server: Any, sock: socket.socket) -> None:
@@ -136,14 +136,13 @@ def _reset_sse_starlette_shutdown_flag() -> None:
     poison and nothing to do — importing it here to reset a flag nobody set would
     be work, and a dependency, in exchange for nothing.
 
-    Suppressed wholesale beyond that: this is a workaround for somebody else's bug,
-    and a serve must not fail because that library moved its internals.
+    A library version without ``AppStatus`` has no flag to reset: that absence is the
+    answer, not an error.
     """
     module = sys.modules.get("sse_starlette.sse")
-    if module is None:
-        return
-    with contextlib.suppress(Exception):
-        module.AppStatus.should_exit = False
+    status = getattr(module, "AppStatus", None)
+    if status is not None:
+        status.should_exit = False
 
 
 async def _await_started(server: Any, task: asyncio.Task[Any], *, within: float) -> None:
@@ -188,10 +187,11 @@ async def _stop(server: Any, task: asyncio.Task[Any], *, grace: float) -> None:
     server.force_exit = True
     try:
         await asyncio.wait_for(asyncio.shield(task), timeout=grace)
-    except Exception:  # noqa: BLE001 — TimeoutError is the expected one; anything else still has to reach the cancel
+    except TimeoutError:
         task.cancel()
-        with contextlib.suppress(BaseException):
-            await task
+        await asyncio.wait([task])
+        if not task.cancelled() and (failure := task.exception()) is not None:
+            raise failure from None
 
 
 __all__ = ["LOOPBACK", "ServeError", "bind_loopback", "serve_asgi"]

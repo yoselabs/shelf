@@ -11,7 +11,7 @@ answer when either of these matters:
 - **A failing close must not strand the resources beneath it.** `AsyncExitStack`
   unwinds through the exception, which is correct for its contract but means one
   resource refusing to close can leave the rest of the stack open. Here every
-  entered resource is exited, and the first exception is re-raised afterwards.
+  entered resource is exited, and the failures are raised afterwards (one unchanged, several as a group).
 - **`aclose()` must be idempotent.** A lifespan exit and an explicit teardown
   path can both fire; the second must be a no-op, not a double-`__aexit__`.
 
@@ -25,9 +25,10 @@ thing that crashes.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import TYPE_CHECKING, Any, Self, TypeAlias, TypeVar
+
+from async_scope.cleanup import cleanup, cleanup_sync, raise_failures
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -42,7 +43,7 @@ _T = TypeVar("_T")
 #: for a pre-built value, `memoized(factory)` for a resource built at most once.
 Lazy: TypeAlias = Callable[[], Awaitable[_T]]
 
-__all__ = ["Lazy", "ResourceScope", "lazy", "memoized", "to_thread_joined"]
+__all__ = ["Lazy", "ResourceScope", "cleanup", "cleanup_sync", "lazy", "memoized", "to_thread_joined"]
 
 
 class ResourceScope:
@@ -90,21 +91,20 @@ class ResourceScope:
         """Unwind LIFO. Idempotent, and does not stop at the first failure.
 
         Every entered resource is exited even if an earlier one raises; the
-        first exception is re-raised once the unwind is complete, so a failure
+        failures are raised once the unwind is complete (one unchanged, several as an ExceptionGroup), so a failure
         is still loud but never costs the resources beneath it.
         """
         if self._closed:
             return
         self._closed = True
-        first: BaseException | None = None
+        errors: list[BaseException] = []
         while self._entered:
             resource = self._entered.pop()
             try:
                 await resource.__aexit__(None, None, None)
-            except Exception as exc:  # noqa: BLE001 — keep unwinding; re-raised below
-                first = first or exc
-        if first is not None:
-            raise first
+            except BaseException as exc:  # noqa: BLE001 — keep unwinding; raise_failures re-raises every one
+                errors.append(exc)
+        raise_failures(errors)
 
     async def __aenter__(self) -> Self:
         return self
@@ -185,7 +185,9 @@ async def to_thread_joined(fn: Callable[[], _T]) -> _T:
     work = asyncio.ensure_future(asyncio.to_thread(fn))
     try:
         return await asyncio.shield(work)
-    except asyncio.CancelledError:
-        with contextlib.suppress(BaseException):
+    except asyncio.CancelledError as cancel:
+        try:
             await work
+        except BaseException as failure:  # noqa: BLE001 — the thread's own failure rides with the cancel, never lost
+            raise_failures([cancel, failure])
         raise

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import contextlib
 import os
 import select
 import threading
 import time
 from typing import IO, TYPE_CHECKING
+
+from async_scope import cleanup_sync
 
 if TYPE_CHECKING:
     import subprocess
@@ -24,14 +25,48 @@ def check_max_line(max_line: int) -> None:
         raise ValueError(message)
 
 
+class PumpStuckError(RuntimeError):
+    """``release`` waited ``stuck_after`` seconds and a reader was still inside a callback; nothing was closed.
+
+    ``running`` names the callbacks (``on_stdout``, ``on_stderr``, ``touch``) that had not returned. The pipes stay
+    open, because a close under a reader is the race this pump exists to prevent; call ``release`` again once the
+    callback returns.
+    """
+
+    def __init__(self, running: tuple[str, ...], waited: float) -> None:
+        super().__init__(f"a pump callback did not return within {waited}s: {', '.join(running) or 'a reader'}")
+        self.running = running
+
+
+class _Guard:
+    """One user callback: after it raises once it is never called again, and the pump keeps that first error."""
+
+    def __init__(self, name: str, fn: Callable[[bytes], None], fail: Callable[[BaseException], None]) -> None:
+        self.name, self.fn, self.fail = name, fn, fail
+        self.dead = False
+        self.inside = False
+
+    def __call__(self, raw: bytes) -> None:
+        if self.dead:
+            return
+        self.inside = True
+        try:
+            self.fn(raw)
+        except BaseException as exc:  # noqa: BLE001 — stored, and raised on the owner by release; the pipes must keep draining
+            self.dead = True
+            self.fail(exc)
+        finally:
+            self.inside = False
+
+
 class _Lines:
     """One reader: the lines (capped pieces) of one pipe to one callback, until EOF or the quit flag."""
 
     def __init__(
         self,
         stream: IO[bytes],
-        cb: Callable[[bytes], None] | None,
-        touch: Callable[[], None] | None,
+        cb: _Guard | None,
+        touch: _Guard | None,
         *,
         max_line: int,
         quit_: threading.Event,
@@ -41,8 +76,7 @@ class _Lines:
 
     def emit(self, raw: bytes) -> None:
         if self.cb is not None:
-            with contextlib.suppress(Exception):
-                self.cb(raw)
+            self.cb(raw)
 
     def cut(self, data: bytes) -> bytes:
         while len(data) >= self.max_line:
@@ -56,15 +90,11 @@ class _Lines:
         while not self.quit.is_set():
             if not select.select([fd], [], [], _POLL_S)[0]:
                 continue
-            try:
-                chunk = os.read(fd, min(_CHUNK, self.max_line))
-            except OSError:
-                return
+            chunk = os.read(fd, min(_CHUNK, self.max_line))
             if not chunk:
                 return
             if self.touch is not None:
-                with contextlib.suppress(Exception):
-                    self.touch()
+                self.touch(chunk)
             yield chunk
 
     def run(self) -> None:
@@ -83,7 +113,9 @@ class Pump:
     """Reads a child's stdout and stderr as lines, feeds its stdin, and owns the pipes until :meth:`release`.
 
     ``p`` is a ``Popen`` whose pipes this pump now owns: nothing else reads, writes or closes them. Callbacks get
-    ``bytes`` (newline kept, the torn last line too) and never stop the reading when they raise. A line is held at
+    ``bytes`` (newline kept, the torn last line too). A callback that raises is not called again and the reading
+    goes on to EOF, so the child never blocks on a full pipe; the first error of the pump (any callback, a reader or
+    the feeder) is raised by :meth:`release` after the teardown. A line is held at
     most ``max_line`` bytes: a longer one reaches the callback in pieces of exactly ``max_line`` bytes without a
     newline, ``splits`` counts the cuts, so a child that never prints a newline cannot grow memory. ``touch`` runs
     when bytes arrive. ``stdin`` is written as the child takes it and then closed (the end of input); a child that
@@ -92,8 +124,9 @@ class Pump:
     Lifetime, in order: :meth:`start` (once, after any replay), :meth:`drain` (wait for the end of the output),
     :meth:`release` (always, from the owner). Every reader polls its descriptor, so a grandchild that keeps a
     pipe open cannot pin one. Release asks them to quit, waits for every reader and the feeder to be out, and only
-    then closes the pipes: no pipe is closed under a thread using it. A callback that never returns therefore
-    holds release, by design: closing under it would be the race.
+    then closes the pipes: no pipe is closed under a thread using it. A callback that has not returned after
+    ``stuck_after`` seconds makes release raise :class:`PumpStuckError` with the pipes still open (closing under it
+    would be the race); a later release finishes the teardown.
     """
 
     def __init__(
@@ -105,19 +138,25 @@ class Pump:
         stdin: bytes | None = None,
         touch: Callable[[], None] | None = None,
         max_line: int = MAX_LINE,
+        stuck_after: float = 30.0,
     ) -> None:
         check_max_line(max_line)
         self._p = p
+        self._stuck_after = stuck_after
+        self._error: BaseException | None = None
+        self._guards: list[_Guard] = []
         self._quit = threading.Event()
         self._lock = threading.Lock()
         self._splits = 0
         self._threads: list[threading.Thread] = []
         self._plan: list[Callable[[], None]] = []
-        for stream, cb in ((p.stdout, on_stdout), (p.stderr, on_stderr)):
+        touch_guard = None if touch is None else self._guard("touch", lambda _chunk, fn=touch: fn())
+        for stream, name, cb in ((p.stdout, "on_stdout", on_stdout), (p.stderr, "on_stderr", on_stderr)):
             if stream is not None:
-                self._plan.append(_Lines(stream, cb, touch, max_line=max_line, quit_=self._quit, count_cut=self._count_cut).run)
+                reader = _Lines(stream, self._guard(name, cb), touch_guard, max_line=max_line, quit_=self._quit, count_cut=self._count_cut)
+                self._plan.append(self._kept(reader.run))
         if stdin is not None and p.stdin is not None:
-            self._plan.append(self._feeder(p.stdin, stdin))
+            self._plan.append(self._kept(self._feeder(p.stdin, stdin)))
 
     @property
     def splits(self) -> int:
@@ -139,14 +178,48 @@ class Pump:
         return not any(thread.is_alive() for thread in self._threads)
 
     def release(self) -> None:
-        """Tell every reader and the feeder to quit, wait until none is inside, then close the child's pipes. Idempotent."""
+        """Quit every reader and the feeder, wait until none is inside, close the child's pipes, then raise the first error kept.
+
+        Idempotent. The kept error (a callback, a reader or the feeder failed) is raised once, after the teardown;
+        :class:`PumpStuckError` is raised, nothing closed, when a callback has not returned after ``stuck_after`` seconds.
+        """
         self._quit.set()
+        end = time.monotonic() + self._stuck_after
         for thread in self._threads:
-            thread.join()
-        for stream in (self._p.stdin, self._p.stdout, self._p.stderr):
-            if stream is not None:
-                with contextlib.suppress(OSError):
-                    stream.close()
+            thread.join(max(0.0, end - time.monotonic()))
+        if any(thread.is_alive() for thread in self._threads):
+            raise PumpStuckError(tuple(g.name for g in self._guards if g.inside), self._stuck_after) from self._error
+        streams = (self._p.stdin, self._p.stdout, self._p.stderr)
+        cleanup_sync(*[stream.close for stream in streams if stream is not None], self._raise_kept)
+
+    def _raise_kept(self) -> None:
+        with self._lock:
+            error, self._error = self._error, None
+        if error is not None:
+            raise error
+
+    def _guard(self, name: str, fn: Callable[[bytes], None] | None) -> _Guard | None:
+        if fn is None:
+            return None
+        guard = _Guard(name, fn, self._fail)
+        self._guards.append(guard)
+        return guard
+
+    def _fail(self, exc: BaseException) -> None:
+        with self._lock:
+            if self._error is None:
+                self._error = exc
+
+    def _kept(self, work: Callable[[], None]) -> Callable[[], None]:
+        """A thread body whose own failure (not a callback's) is kept for release instead of dying in the thread."""
+
+        def run() -> None:
+            try:
+                work()
+            except BaseException as exc:  # noqa: BLE001 — kept, raised by release
+                self._fail(exc)
+
+        return run
 
     def _count_cut(self) -> None:
         with self._lock:
@@ -165,10 +238,9 @@ class Pump:
                         view = view[os.write(fd, view[:_CHUNK]) :]
                     except BlockingIOError:
                         continue
-            except OSError:  # BrokenPipeError: the child exited without reading it all
+            except BrokenPipeError:  # the child exited without reading it all
                 pass
             finally:
-                with contextlib.suppress(OSError):
-                    stream.close()  # the end of input; this thread is the only user of the stdin pipe
+                stream.close()  # the end of input; this thread is the only user of the stdin pipe
 
         return feed

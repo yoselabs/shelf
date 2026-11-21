@@ -2,7 +2,7 @@
 name = "async-scope"
 kind = "primitive"
 tier = "T1"
-release = "async-scope-v0.3.0"
+release = "async-scope-v0.4.0"
 capability = "Stop hand-rolling async resource teardown — LIFO unwind that never strands what it holds, background tasks stopped and waited for in their place, lazy thunks that build at most once under concurrency, a thread whose cancel waits for it to finish, and (extra `asgi`) an ASGI app served on a loopback port past the three uvicorn traps that only show up on the way out."
 implementation = "ours"          # stdlib AsyncExitStack is the alternative and is wrong for two named reasons
 status = "candidate"
