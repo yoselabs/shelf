@@ -36,6 +36,7 @@ _ALLOWED = {
         for key, reason in {
             "packages/blueprint/src/blueprint/secret_scan.py": "blueprint is stdlib only (bare clone, PYTHONPATH): no verb-cli",
             "packages/stream-proc/src/stream_proc/_exec_gate.py": "a child-side gate script run by path: stdlib only, no shelf import",
+            "tools/api_surface.py": "a repo tool script, run by `uv run python`: stdlib only, no workspace import",
             "tools/catalog.py": "a repo tool script, run by `just`: stdlib only, no workspace import",
             "tools/preset_refresh.py": "a repo tool script, run by `just`: takes no arguments, argparse only serves --help",
             "tools/tag_check.py": "a repo tool script, run by the pre-push hook as bare `python3 -I`: stdlib only, no workspace import",
