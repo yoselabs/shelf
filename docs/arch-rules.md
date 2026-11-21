@@ -63,6 +63,10 @@ first `src/*/__init__.py` and reads the README beside it; `dead_public_api` runs
 index built once per run. Both take the repo root through a factory (`_readme_rule(root)`, `_unused(root)`) so a planted test can
 point them at a scratch tree.
 
+`dead_public_api` is report-only, not a gate: it sees only this repo, and the consumers that matter (a2kay, a2web, task-loop, ogy) live
+outside it, so most hits are false and a gate would train people to add rows blindly. It has no rows and fails nothing; its planted
+tests guard the detection. Print the hits with `uv run python tests/test_arch_dead_public_api.py` (`any_arch` reports only `debt:` rows).
+
 ## Which of the other 16 arch tests fit
 
 Read for this list: `output_shape_flags`, `environment`, `atomic_writes`, `hashing`, `sqlite_access`, `ttl_cache`, `cli_surfaces` in full;
