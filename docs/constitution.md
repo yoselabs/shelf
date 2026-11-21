@@ -52,6 +52,12 @@ Accumulation without consolidation is drift. Hard opinions, a breach is a defect
   exist. The call raises a typed exception, and the caller that tolerates it catches that exception. Two actions
   that differ in kind (create versus replace) are two verbs. A `Literal` or enum parameter is the same flag in a
   different coat. ADR 0030 records the 28 old exceptions as debt to convert, not as precedent.
+- **Two kinds of failure** (Go's returned `error` versus `panic`). An *expected outcome* is a normal result the
+  caller must branch on (a merge conflict, not found, a refused push): a value in the return type, a union such as
+  `Rebased | Conflict` that pyrefly checks exhaustively; never an exception, never a bool flag. A failure the
+  function *cannot continue from* (broken invariant, environment gone, caller misuse) is an exception, never
+  swallowed (no `except X: pass`, no `contextlib.suppress` of a typed failure), handled only where something useful
+  can be done, normally the edge. No Result type on every function: only where the outcome is expected.
 - **No redundancy.** One implementation of a behaviour per repo. A duplicate is allowed only as a recorded
   task that reconciliation (Article VIII) must resolve, never as the end state.
 Each rule names its check; where the check does not exist yet, adopting the rule includes filing it:
@@ -67,6 +73,8 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 | No backward compatibility | shim / legacy / compat ban | task shelf-au97 |
 | No silent failures | planted-violation test for a swallowed exception (effects research, task shelf-tyld.22) | task |
 | Tolerance is a handler | `tests/test_arch_bool_modes.py` public parameters named force/overwrite/missing_ok/exist_ok/ignore_errors/check, or annotated Literal/Enum (aliases included); `debt:` rows are conversions still owed | blocking |
+| Two kinds of failure (III) | swallowed handlers: `tests/test_arch_swallowed_exceptions.py` | task shelf-tyld.28 |
+| Exception handled by the caller (III) | static call-graph check | refused for now: resolves 22% of calls, 67% false positives on a 3-hit sample, and Result-everywhere contradicts ADR 0030; [research](research/checked-exceptions.md) |
 | No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
 | Size limit (IV) | `tests/test_size_caps.py` file and function SLOC caps | blocking on changed files |
 
