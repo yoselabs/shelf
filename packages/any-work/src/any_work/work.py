@@ -13,11 +13,11 @@ from any_failure_fp import backoff
 from any_lease import Held, Leases
 from sqlite_store import Schema, Store
 
-from any_work.model import Failure, Item, Kind, Progress, RetryRow, Status
+from any_work.model import Enqueued, Failure, Item, Kind, Progress, RetryRow, Status
 
 if TYPE_CHECKING:
     import sqlite3
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Iterator
 
 # Short transactions only: nothing here calls out while a write lock is held. DDL has no ';' inside a statement (sqlite-store splits on it).
 _SCHEMA = Schema(
@@ -39,8 +39,18 @@ _SCHEMA = Schema(
     """,
     steps={},
 )
+_CHUNK = 500  # keys per IN (...) list: far below SQLite's bound-variable limit
 _PAGE = 64  # candidates read per scan; a held key is skipped, so a page may be all held
 _LOCK_LABEL = "any-work"
+
+
+def _chunks(keys: list[str]) -> Iterator[list[str]]:
+    for start in range(0, len(keys), _CHUNK):
+        yield keys[start : start + _CHUNK]
+
+
+def _marks(keys: list[str]) -> str:
+    return ",".join("?" * len(keys))
 
 
 @dataclass
@@ -114,16 +124,59 @@ class Work:
         self._con.close()
 
     def add(self, items: Iterable[Item]) -> int:
-        """Insert items that are not there yet and return how many were new. An existing key is left exactly as it is."""
+        """Insert items that are not there yet and return how many were new. An existing key is left exactly as it is.
+
+        A feeder should call :meth:`enqueue`, whose return value says what happened to each key.
+        """
+        return self.enqueue(items).new
+
+    def enqueue(self, items: Iterable[Item], *, bump: bool = False) -> Enqueued:
+        """Insert items that are not there yet, in one transaction, and say what happened.
+
+        An existing key keeps its payload, kind and status. With ``bump`` an existing pending row moves to the item's priority when
+        that is more urgent (see :meth:`bump`). The result counts new, existing and bumped keys and the final status of every given key.
+        """
         now = self.clock()
-        rows = [(i.key, i.kind, now, i.priority, json.dumps(i.payload)) for i in items]
+        given = list(items)
+        keys = list(dict.fromkeys(i.key for i in given))
+        rows = [(i.key, i.kind, now, i.priority, json.dumps(i.payload)) for i in given]
         with self._store.begin_immediate(self._con):
+            existing: set[str] = set()
+            for chunk in _chunks(keys):
+                found = self._con.execute(f"SELECT key FROM work WHERE key IN ({_marks(chunk)})", chunk)  # noqa: S608 - only '?' marks
+                existing.update(k for (k,) in found)
             before = self._con.total_changes
             self._con.executemany(
                 "INSERT OR IGNORE INTO work (key, kind, status, next_try_at, priority, payload) VALUES (?, ?, 'pending', ?, ?, ?)",
                 rows,
             )
-            return self._con.total_changes - before
+            new = self._con.total_changes - before
+            bumped = 0
+            if bump:
+                for item in given:
+                    if item.key in existing:
+                        bumped += self._bump(item.key, item.priority)
+            states: dict[str, int] = {}
+            for chunk in _chunks(keys):
+                for status, n in self._con.execute(
+                    f"SELECT status, COUNT(*) FROM work WHERE key IN ({_marks(chunk)}) GROUP BY status",  # noqa: S608 - only '?' marks
+                    chunk,
+                ):
+                    states[status] = states.get(status, 0) + n
+            return Enqueued(new=new, existing=len(keys) - new, bumped=bumped, states=states)
+
+    def bump(self, keys: Iterable[str], priority: int = 0) -> int:
+        """Move pending rows to ``priority`` when it is more urgent than theirs; return how many moved.
+
+        A done, permanent or quarantined row, a row already at or more urgent than ``priority`` (lower is more urgent) and an unknown key
+        are untouched.
+        """
+        with self._store.begin_immediate(self._con):
+            return sum(self._bump(k, priority) for k in dict.fromkeys(keys))
+
+    def _bump(self, key: str, priority: int) -> int:
+        sql = "UPDATE work SET priority = ? WHERE key = ? AND status = 'pending' AND priority > ?"
+        return self._con.execute(sql, (priority, key, priority)).rowcount
 
     def claim(self, kind: str | None = None) -> Claimed | None:
         """The next due pending item (priority, then due time, then insertion) whose key no other process holds, or None."""

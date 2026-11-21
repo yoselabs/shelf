@@ -38,7 +38,9 @@ Without `drain`: `c = work.claim(kind=None)` returns a `Claimed` (`key`, `kind`,
 
 | rule | behaviour |
 |---|---|
-| `add(items)` | Idempotent: an existing key is untouched (payload, kind, status, priority); returns the count added. |
+| `add(items)` | Idempotent: an existing key is untouched (payload, kind, status, priority); returns the count added. A feeder calls `enqueue`, not `add`. |
+| `enqueue(items, *, bump=False)` | One transaction: inserts new keys, leaves existing ones as they are (with `bump=True`, an existing `pending` row moves to the item's priority when that is more urgent). Returns `Enqueued(new, existing, bumped, states)`, `states` = the given keys counted by final status, read in the same transaction. |
+| `bump(keys, priority=0)` | Sets `priority` on `pending` rows whose priority is numerically greater; never touches `done`, `permanent`, `quarantined` or a more urgent row. Returns the count moved. |
 | `claim(kind=None)` | The next row with `status = pending` and `next_try_at <= now`, ordered `priority, next_try_at, rowid`, whose `try_claim` succeeds; the row is re-read under the flock, so one finished a moment ago is never handed out. |
 | `finish(ok)` | `done`. |
 | `finish(Failure(TRANSIENT))` | `attempts + 1`, `pending`, `next_try_at = now + backoff(base, cap, attempts_before, rand)`; the `max_attempts`-th failure makes it `quarantined`. |
@@ -50,7 +52,10 @@ Without `drain`: `c = work.claim(kind=None)` returns a `Claimed` (`key`, `kind`,
 | `progress()` / `retry_view()` | Queries over the table; velocity, ETA and dry-run are queries to write on it, not features here. |
 
 Deliberately absent: priorities beyond one column, dependencies between items, cron, watchers, sources, dashboards, a broker.
-A source (what yields keys) is a consumer callable that feeds `add`. The cap is `add`, `claim`, `finish`, `progress`, `drain`.
+A source (what yields keys) is a consumer callable that feeds `enqueue`. The cap is `add`, `enqueue`, `bump`, `claim`, `finish`, `progress`, `drain`.
+
+A feeder returns `Enqueued` and prints it; never report an enqueue from a file or from intent. Work fed while a worker is busy
+(rows due, a claim held) is claimable by the next `claim` once it is `pending` and, with `bump=True`, at the item's priority: the table need not run dry first.
 
 ## Two truths: the table and the result store
 
