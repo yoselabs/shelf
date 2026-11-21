@@ -74,7 +74,7 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 | No silent failures | planted-violation test for a swallowed exception (effects research, task shelf-tyld.22) | task |
 | Tolerance is a handler | `tests/test_arch_bool_modes.py` public parameters named force/overwrite/missing_ok/exist_ok/ignore_errors/check, or annotated Literal/Enum (aliases included); `debt:` rows are conversions still owed | blocking |
 | Two kinds of failure (III) | swallowed handlers: `tests/test_arch_swallowed_exceptions.py` | task shelf-tyld.28 |
-| Exception handled by the caller (III) | static call-graph check | refused for now: resolves 22% of calls, 67% false positives on a 3-hit sample, and Result-everywhere contradicts ADR 0030; [research](research/checked-exceptions.md) |
+| Exception handled by the caller (III) | static call-graph check | refused for now: with types (pyrefly `--report-pysa`) 96.7% of calls resolve, but the shelf's 9 cross-package hits were all deliberate pass-through (docstring paperwork, 0 bugs), the check costs 114 s, and Result-everywhere contradicts ADR 0030; reopen if hits pass about 50 or another codebase shows real bugs; [research](research/checked-exceptions.md), [typed calls](research/typed-call-resolution.md) |
 | No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
 | Size limit (IV) | `tests/test_size_caps.py` file and function SLOC caps | blocking on changed files |
 
