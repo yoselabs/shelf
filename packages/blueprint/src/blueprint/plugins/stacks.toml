@@ -1,0 +1,5 @@
+id = "stacks"
+title = "The stack machinery shared by every language"
+default = "on"
+requires = []
+rows = ["stack.roles", "stack.one-owner", "stack.shelf-sources", "framework.roles"]

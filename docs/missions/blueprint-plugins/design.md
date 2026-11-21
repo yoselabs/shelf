@@ -54,3 +54,17 @@ rows [row ids], recipes [files init writes], settings keys
 - Does an `off` plugin's recipes still get written by `blueprint init`? Proposed: no.
 - Are the framework profiles plugins or settings of their stack? Proposed: settings of their stack, shown as sub-rows.
 - Where do third-party plugins load from (a path in `blueprint.toml`, or an installed package entry point)? Proposed: a path first.
+
+## Step 1 as built
+
+`packages/blueprint/src/blueprint/plugins/*.toml` (18 manifests) and `plugins.py`. Differences from the table above, found while
+assigning every row:
+
+- A `stacks` plugin (default on) owns the rows shared by every language: `stack.roles`, `stack.one-owner`, `stack.shelf-sources`,
+  `framework.roles`. Every stack requires it.
+- `python` owns the python-uv profile rows and the python pin rows; `uv` owns only `stack.python-uv.uv-tool` today, because the profile
+  is one stack named python-uv. Splitting uv further waits for a profile split.
+- `frameworks` is one plugin for godot, mcp and unity, not three; it requires `stacks`.
+- Hand-written rows are listed by id, never by glob, so a new row with no owner fails `test_plugins.py`; generated stack and
+  framework rows use `stack.<name>.*`.
+- `blueprint check --list` shows the plugin of each row. Nothing else reads the manifests yet.

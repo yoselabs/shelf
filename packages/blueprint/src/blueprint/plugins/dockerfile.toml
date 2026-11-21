@@ -1,0 +1,5 @@
+id = "dockerfile"
+title = "Dockerfile"
+default = "detected"
+requires = ["mise", "stacks"]
+rows = ["stack.dockerfile.*"]

@@ -1,0 +1,5 @@
+id = "nix"
+title = "Nix"
+default = "detected"
+requires = ["mise", "stacks"]
+rows = ["stack.nix.*"]

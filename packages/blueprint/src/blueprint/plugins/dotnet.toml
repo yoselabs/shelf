@@ -1,0 +1,5 @@
+id = "dotnet"
+title = ".NET"
+default = "detected"
+requires = ["mise", "stacks"]
+rows = ["stack.dotnet.*"]

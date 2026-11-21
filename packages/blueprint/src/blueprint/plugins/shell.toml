@@ -1,0 +1,5 @@
+id = "shell"
+title = "Shell"
+default = "detected"
+requires = ["mise", "stacks"]
+rows = ["stack.shell-strict", "stack.shell.*"]

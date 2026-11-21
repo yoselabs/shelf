@@ -1,0 +1,5 @@
+id = "gate"
+title = "The one-command gate (just, any-gate)"
+default = "on"
+requires = ["git-hooks"]
+rows = ["gate.checkers-wired", "gate.clean-clone", "gate.default-branch", "gate.git-config-clean", "gate.git-remote", "gate.guards-have-red-tests", "gate.lfs-binaries", "gate.lfs-installed", "gate.no-ci", "gate.one-command", "gate.runner", "gate.runs-blueprint", "gate.step-inputs", "gate.superseded-scripts"]

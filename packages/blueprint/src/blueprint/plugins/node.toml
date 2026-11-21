@@ -1,0 +1,5 @@
+id = "node"
+title = "Node"
+default = "detected"
+requires = ["mise", "stacks"]
+rows = ["stack.node.*"]

@@ -25,7 +25,7 @@ def test_lists_registered_and_profile_checkpoints_with_their_turning_on_fact(cap
 def test_the_plain_table_names_the_columns(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["check", "--list", "stack.dockerfile"]) == 0
     out = capsys.readouterr().out
-    assert out.splitlines()[0].split() == ["ID", "STATEMENT", "TURNED", "ON", "BY"]
+    assert out.splitlines()[0].split() == ["ID", "PLUGIN", "STATEMENT", "TURNED", "ON", "BY"]
     assert "stack.dockerfile.linter" in out
 
 

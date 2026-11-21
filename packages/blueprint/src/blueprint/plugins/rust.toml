@@ -1,0 +1,5 @@
+id = "rust"
+title = "Rust"
+default = "detected"
+requires = ["mise", "stacks"]
+rows = ["stack.rust.*"]
