@@ -92,6 +92,21 @@ def test_a_tracked_jsonl_export_fails(repo: Repo) -> None:
     assert _verdicts(repo)["backlog.no-tracked-export"] is Verdict.FAILING
 
 
+def test_an_ignored_issues_jsonl_still_fails_and_says_to_delete_it(repo: Repo) -> None:
+    _beads(repo)
+    repo.write(".beads/.gitignore", "*.jsonl\n")
+    repo.write(".beads/issues.jsonl", "{}\n")
+    repo.commit()
+    verdicts = _verdicts(repo)
+    assert verdicts["backlog.no-tracked-export"] is Verdict.PASSING
+    assert verdicts["backlog.no-export-file"] is Verdict.FAILING
+
+
+def test_no_issues_jsonl_passes(repo: Repo) -> None:
+    _beads(repo)
+    assert _verdicts(repo)["backlog.no-export-file"] is Verdict.PASSING
+
+
 @pytest.mark.parametrize("plant", ["local-file", "session-env"])
 def test_a_local_override_fails(repo: Repo, plant: str) -> None:
     _beads(repo)

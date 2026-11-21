@@ -88,6 +88,19 @@ _OTHER_TRANSPORT = tuple(
 )
 
 
+def _step_fix(argv: tuple[str, ...]) -> str:
+    """What to do for the step that failed: the after-clone steps run in order, and each needs the one before it."""
+    if argv[0] == "mise":
+        return "run `mise trust --yes && mise install --locked` in the clone: until the config is trusted every mise shim (uv, bd) refuses"
+    if argv[0] == "bd":
+        return (
+            "run `bd bootstrap --yes` in the clone (after `mise trust --yes`, or the bd shim says `config not trusted`); if it fails "
+            "on the "
+            "transport, `sync.remote` in .beads/config.yaml may name ssh on an https-only machine or the reverse"
+        )
+    return "make the documented after-clone steps work on a new clone"
+
+
 def _fresh_clone_steps(ctx: Context, clone: Path) -> Finding | None:
     """Run each step the clone's files call for; the first that fails is the finding."""
     env = {**ctx.env, "MISE_IGNORED_CONFIG_PATHS": str(Path(ctx.env["HOME"]) / ".config" / "mise"), "BD_DISABLE_METRICS": "1"}
@@ -103,9 +116,7 @@ def _fresh_clone_steps(ctx: Context, clone: Path) -> Finding | None:
                     break
         if done is None or done.returncode != 0:
             why = "not installed or timed out" if done is None else _cause(done)
-            return failing(
-                f"fresh-clone step `{' '.join(argv)}` failed: {why}", "make the documented after-clone steps work on a new clone"
-            )
+            return failing(f"fresh-clone step `{' '.join(argv)}` failed: {why}", _step_fix(argv))
     return None
 
 

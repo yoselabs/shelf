@@ -142,6 +142,18 @@ def no_tracked_export(ctx: Context) -> Finding:
     return passing("no JSONL under .beads is tracked")
 
 
+@check("backlog.no-export-file", "no .beads/issues.jsonl on disk: it is a passive export, not a sync path", applies=uses_beads)
+def no_export_file(ctx: Context) -> Finding:
+    """The file may be gitignored and stale; beads sync is Dolt data at refs/dolt/data (`bd sync`), so nothing reads it."""
+    if not ctx.path(".beads/issues.jsonl").exists():
+        return passing("no .beads/issues.jsonl")
+    return failing(
+        ".beads/issues.jsonl exists: a passive export that nothing syncs from, so it only goes stale and misleads",
+        "delete it (rm .beads/issues.jsonl); keep export.auto and export.git-add false (backlog.strict-config). Recovery is the Dolt "
+        "remote (refs/dolt/data), pulled with `bd sync`, not this file",
+    )
+
+
 @check(
     "backlog.no-local-override",
     "nothing outside .beads/config.yaml weakens bd: no config.local.yaml, no BD_* in the session env",
@@ -182,7 +194,10 @@ def lint(ctx: Context) -> Finding:
     if probe.returncode != 0:
         # On a database that is missing or uninitialized `bd lint` checks 0 issues and exits 0 (a2kay, shelf-9g7).
         cause = next((ln.strip() for ln in (probe.stderr + probe.stdout).splitlines() if ln.strip().startswith("Error")), "bd list failed")
-        fix = "bd bootstrap (pulls it from refs/dolt/data); then re-run"
+        fix = (
+            "in a fresh clone, in order: `mise trust --yes && mise install --locked` (until trusted every mise shim refuses, bd "
+            "included), then `bd bootstrap` (pulls the database from refs/dolt/data); then re-run"
+        )
         if "not initialized" in cause:
             # bd bootstrap calls an existing but uninitialized database "nothing to do" (a2kay, shelf-9g7).
             fix = "the local database exists but is broken: mv .beads/embeddeddolt .beads/embeddeddolt.broken, then bd bootstrap"

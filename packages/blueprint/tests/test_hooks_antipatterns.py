@@ -46,7 +46,7 @@ def _rows(repo: Repo, config: str | None) -> dict[str, tuple[Verdict, str]]:
 def test_a_lean_config_passes_every_hook_checkpoint(repo: Repo) -> None:
     rows = _rows(repo, _GOOD)
     assert {v for v, _ in rows.values()} == {Verdict.PASSING}
-    assert len(rows) == 5
+    assert len(rows) == 6
 
 
 def test_a_repo_without_a_hook_config_has_nothing_to_judge(repo: Repo) -> None:
@@ -152,3 +152,15 @@ def test_a_beads_repo_pushing_with_bare_dolt_push_and_never_pulling_fails(repo: 
 
 def test_a_repo_without_beads_is_not_asked_for_bd_sync(repo: Repo) -> None:
     assert "hooks.beads-sync" not in _rows(repo, _GOOD)
+
+
+def test_an_unquoted_colon_space_in_an_entry_fails_and_names_the_line(repo: Repo) -> None:
+    config = _GOOD + _hook("bad", "sh -c 'echo FAILED: now'")
+    verdict, evidence = _rows(repo, config)["hooks.parses"]
+    assert verdict is Verdict.FAILING
+    assert "line 18" in evidence
+
+
+def test_a_quoted_entry_with_a_colon_is_readable(repo: Repo) -> None:
+    config = _GOOD + _hook("ok", "\"sh -c 'echo FAILED: now'\"")
+    assert _rows(repo, config)["hooks.parses"][0] is Verdict.PASSING

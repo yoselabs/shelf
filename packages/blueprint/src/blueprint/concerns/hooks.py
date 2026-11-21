@@ -181,3 +181,27 @@ def beads_sync(ctx: Context) -> Finding:
     if missing:
         return failing(f"no `bd sync` hook at: {', '.join(missing)}", _SYNC_FIX)
     return passing("`bd sync` runs at pre-push, post-merge and post-checkout")
+
+
+# A plain (unquoted) YAML scalar cannot hold `: ` or ` #`; prek then fails to parse the whole file and no hook runs.
+_PLAIN_BAD = re.compile(r": |\s#")
+
+
+@check("hooks.parses", "no hook `entry:` is an unquoted YAML value that YAML cannot read (a `: ` or ` #` inside it)")
+def parses(ctx: Context) -> Finding:
+    """prek refuses a file with such a line, and then no hook runs at all; the gate had passed it (2026-11-21)."""
+    config = ctx.read(_CONFIG)
+    if config is None:
+        return not_applicable(_NONE)
+    bad = []
+    for number, line in enumerate(config.splitlines(), 1):
+        m = re.match(r"^\s*(?:-\s+)?(entry|name|args):\s*(\S.*)$", line)
+        if m and m.group(2)[0] not in "'\"|>[{&*!" and _PLAIN_BAD.search(m.group(2)):
+            bad.append(f"line {number} ({m.group(1)})")
+    if bad:
+        return failing(
+            f"an unquoted value YAML cannot read: {', '.join(bad)}",
+            "quote the value (single quotes, doubling any inner ones) or drop the `: ` / ` #` from the text; "
+            "prek parses the whole file or runs nothing",
+        )
+    return passing("every entry, name and args value is readable YAML")
