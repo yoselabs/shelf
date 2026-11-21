@@ -69,14 +69,14 @@ def git_config_clean(ctx: Context) -> Finding:
 
 # The files that make a gate. A remote branch holding one of them may already carry the gate main lacks.
 _GATE_FILES = ("justfile", "Makefile", ".pre-commit-config.yaml", "lefthook.yml", "lefthook.yaml")
-# The rows that tell an agent to build or repair a gate: where an unmerged branch holding one changes who decides.
+# The rows that tell an agent to build or repair a gate: where an unmerged branch holding one changes who decides. Not
+# `gate.clean-clone`: that row says a step of the gate main already has fails in a fresh clone, a different question.
 BRANCH_AWARE = frozenset(
     {
         "gate.one-command",
         "gate.runner",
         "gate.hooks-recipe",
         "gate.runs-blueprint",
-        "gate.clean-clone",
     }
 )
 

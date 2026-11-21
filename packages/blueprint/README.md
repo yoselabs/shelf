@@ -33,6 +33,41 @@ Processes default to a 120-second timeout. Set `BLUEPRINT_TIMEOUT` to a number o
 checkpoint: *set up?* and *working?* A check that crashes, or passes with no evidence, is
 `not checked`.
 
+## Test units: a repo that is not a uv workspace (`pyproject.toml`)
+
+A workspace is planned per `packages/*`. Any other repo declares units, so `just test` reruns only what a change reaches:
+
+```toml
+[tool.blueprint.test]
+coverage = "coverage"      # or "pytest-cov"; absent: no coverage, no floor
+floor = 90                 # whole-repo percent, over every unit's data (cached ones too)
+pytest-args = ["-n", "auto", "--dist", "loadgroup", "-q"]
+marks = "not slow"         # pytest's -m expression
+env = { COVERAGE_CORE = "sysmon" }
+
+[tool.blueprint.test.units.ui]
+paths = ["tests/ui"]
+reads = ["src/app/ui/*.js"]   # files tests read that no import names (JS run under node, fixtures)
+```
+
+`pytest-args` and `marks` apply to every pytest run, before the CLI's `--pytest-args`.
+`env` adds string values to the test processes' inherited environment; the coverage runner's
+`COVERAGE_FILE` takes precedence. Invalid types for these keys are ignored. Changing any of
+the three settings changes every unit's key. `gate test-all` honors them too, keeping its
+default `-n auto` unless `pytest-args` contains `-n`.
+
+The key of a unit hashes its files, every first-party module they import (found by reading the imports), the `conftest.py` above them, the `reads` files,
+`uv.lock` and the dependency and pytest/coverage parts of `pyproject.toml`. An import it cannot see (`importlib` with a computed name) goes in `reads`.
+Do not define your own `test` recipe: `gate.recipe-shadowing` fails it unless an `[[override]]` says why (ADR 0032).
+
+`blueprint gate test-all` runs every test with a coverage floor: `[tool.blueprint.test] floor` takes precedence over
+`[tool.coverage.report] fail_under`, with 65 as the fallback. The resolved floor is passed explicitly to pytest-cov.
+
+## Run the pinned engine
+
+A recipe calls `uv run blueprint ...` (blueprint is a dev dependency, pinned by the lock), never `PYTHONPATH=<shelf clone>` or `--reference <shelf file>`: a clone
+moves with whatever any session has checked out there. `gate.recipe-calls` fails a recipe that does, and one that passes a flag blueprint does not have.
+
 ## State: `docs/blueprint/blueprint.toml`
 
 ```toml

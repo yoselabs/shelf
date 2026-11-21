@@ -38,23 +38,39 @@ gate = "uv lock --check"
 role = "formatter"
 tool = "ruff format"
 install = "uv add --dev ruff; copy [tool.ruff] from the shelf (`blueprint init` writes it)"
-config = [{ path = "pyproject.toml", contains = "[tool.ruff" }]
+config = [{ any = [
+    { path = "pyproject.toml", contains = "[tool.ruff" },
+    { path = "ruff.toml" },
+    { path = ".ruff.toml" },
+] }]
 gate = "ruff format --check"
 
 [[role.alternative]]
 label = "ruff-pre-commit's `ruff-format` hook, run by the gate's `pre-commit run`"
 gate = '(?m)id:\s*ruff-format\b'
 
+[[role.alternative]]
+label = "blueprint's own `gate lint`, which runs `ruff format --check` over the repo's [tool.blueprint.gate] paths"
+gate = 'blueprint gate lint'
+
 [[role]]
 role = "linter"
 tool = "ruff check, the shelf's rule set"
 install = "copy [tool.ruff.lint] from the shelf (`blueprint init` writes it)"
-config = [{ path = "pyproject.toml", contains = "[tool.ruff.lint]" }]
+config = [{ any = [
+    { path = "pyproject.toml", contains = "[tool.ruff.lint]" },
+    { path = "ruff.toml", contains = "[lint]" },
+    { path = ".ruff.toml", contains = "[lint]" },
+] }]
 gate = "ruff check"
 
 [[role.alternative]]
 label = "ruff-pre-commit's `ruff` hook, run by the gate's `pre-commit run`"
 gate = '(?m)id:\s*ruff\s*$'
+
+[[role.alternative]]
+label = "blueprint's own `gate lint`, which runs `ruff check` over the repo's [tool.blueprint.gate] paths"
+gate = 'blueprint gate lint'
 
 [[role]]
 role = "types"
@@ -62,9 +78,15 @@ tool = "pyrefly, strict preset"
 install = "uv add --dev pyrefly; copy [tool.pyrefly] from the shelf (`blueprint init` writes it)"
 # use-ignore-files = false: with ignore files on, a worktree under an ignored path (.claude/worktrees/) checks no file and passes.
 config = [
-    { path = "pyproject.toml", contains = "[tool.pyrefly]" },
-    { path = "pyproject.toml", contains = 'preset = "strict"' },
-    { path = "pyproject.toml", contains = "use-ignore-files = false" },
+    { any = [{ path = "pyproject.toml", contains = "[tool.pyrefly]" }, { path = "pyrefly.toml" }] },
+    { any = [
+        { path = "pyproject.toml", contains = 'preset = "strict"' },
+        { path = "pyrefly.toml", contains = 'preset = "strict"' },
+    ] },
+    { any = [
+        { path = "pyproject.toml", contains = "use-ignore-files = false" },
+        { path = "pyrefly.toml", contains = "use-ignore-files = false" },
+    ] },
 ]
 gate = "pyrefly check"
 
@@ -74,6 +96,10 @@ tool = "codespell"
 install = "uv add --dev codespell; copy [tool.codespell] from the shelf"
 config = [{ path = "pyproject.toml", contains = "[tool.codespell]" }]
 gate = "codespell"
+
+[[role.alternative]]
+label = "blueprint's own `gate spell`, which runs codespell over the repo's [tool.blueprint.gate] paths"
+gate = 'blueprint gate spell'
 
 [[role]]
 role = "dependencies"
@@ -109,6 +135,11 @@ outcome = "floor"
 [[role.floor]]
 label = "a `--cov-fail-under` or `coverage report --fail-under` flag"
 gate = '--cov-fail-under|\bcoverage report\b[^\n]*--fail-under'
+
+# `blueprint gate test-all` passes `[tool.blueprint.test] floor`, then `[tool.coverage.report] fail_under`, then 65.
+[[role.floor]]
+label = "blueprint's own `gate test-all`: `[tool.blueprint.test] floor`, then `[tool.coverage.report] fail_under`, then 65"
+gate = 'blueprint gate test-all'
 
 # A floor in pyproject only bites when the gate reports (`coverage report`) or measures with pytest-cov, which reads it.
 [[role.floor]]

@@ -741,3 +741,36 @@ def test_a_retired_script_kept_on_purpose_is_excused_by_a_scoped_override(repo: 
         '[[override]]\nid = "gate.superseded-scripts"\nscope = "tools/gate_state.py"\nreason = "x"\nexpires = 2099-01-01\n',
     )
     assert _verdict(repo, "gate.superseded-scripts")[0] is Verdict.PASSING
+
+
+def test_clean_clone_names_the_failing_step_and_shows_its_log(repo: Repo) -> None:
+    repo.write(
+        "justfile",
+        "check:\n"
+        "    @echo '--- lint'\n"
+        + "".join(f"    @echo 'line {n}'\n" for n in range(1, 31))
+        + "    @echo 'gate: lint 1s ✗ -- total 1s'\n    @echo 'gate: failed: lint'\n    @exit 1\n",
+    )
+    repo.commit()
+    verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
+    assert verdict is Verdict.FAILING
+    assert "step lint" in evidence
+    assert "--- lint" in evidence
+    assert "line 1\n" in evidence
+    assert "line 20" in evidence
+    assert "line 21" not in evidence
+
+
+def test_a_failing_clean_clone_is_not_mixed_with_unmerged_branches(repo: Repo) -> None:
+    repo.write("justfile", "check:\n    @exit 1\n")
+    repo.commit()
+    repo.git("update-ref", "refs/remotes/origin/main", "HEAD")
+    repo.git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    repo.git("checkout", "-q", "-b", "feature")
+    repo.write("justfile", "check:\n    @true\n")
+    repo.commit()
+    repo.git("update-ref", "refs/remotes/origin/feature", "HEAD")
+    repo.git("checkout", "-q", "main")
+    verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
+    assert verdict is Verdict.FAILING
+    assert "unmerged remote branch" not in evidence

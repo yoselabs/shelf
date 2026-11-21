@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import tomllib
@@ -236,6 +237,27 @@ def _shell_scripts(repo: Path, skip: tuple[str, ...]) -> list[str]:
     return [p.relative_to(repo).as_posix() for p in found]
 
 
+_NODE_CODE_TOOLS = frozenset({"typescript", "vitest", "jest", "mocha", "ava", "tap", "@playwright/test"})
+_NODE_TEST_SCRIPT = re.compile(r"\b(?:test|vitest|jest|mocha|tsc)\b")
+
+
+def _builds_tooling_only(manifest: Path) -> bool:
+    """A package.json that only runs build tools: it has scripts, none tests or type-checks, no TypeScript or test runner is a dependency,
+    and no tsconfig.json sits beside it. The code it serves is plain JS, tested by another stack's runner; the `node` profile (TypeScript,
+    vitest) does not fit it. A manifest with no scripts is read as `node`, as before."""
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(data, dict) or (manifest.parent / "tsconfig.json").is_file():
+        return False
+    scripts = data.get("scripts")
+    if not isinstance(scripts, dict) or not scripts:
+        return False
+    deps = {k for table in ("dependencies", "devDependencies") if isinstance(data.get(table), dict) for k in data[table]}
+    return not _NODE_CODE_TOOLS & deps and not any(_NODE_TEST_SCRIPT.search(f"{k} {v}") for k, v in scripts.items())
+
+
 def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
     """Each stack present with the files that set it, from their manifests."""
     found: dict[str, list[str]] = {}
@@ -254,7 +276,8 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
     for stack, manifest in (("node", "package.json"), ("go", "go.mod"), ("rust", "Cargo.toml")):
         # One folder per unit: a manifest at the root, else the ones one level down (web/package.json); never inside a dependency folder.
         if manifests := walk(repo, manifest, 2, skip):
-            found[stack] = sorted((p.relative_to(repo).as_posix() for p in manifests), key=lambda rel: (rel.count("/"), rel))
+            files = sorted((p.relative_to(repo).as_posix() for p in manifests), key=lambda rel: (rel.count("/"), rel))
+            found["node-tooling" if stack == "node" and _builds_tooling_only(repo / files[0]) else stack] = files
     if scripts := _shell_scripts(repo, skip):
         found["shell"] = scripts
     return found
@@ -262,7 +285,7 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
 
 def _stack_roots(found: dict[str, list[str]]) -> tuple[tuple[str, str], ...]:
     """The folder each stack's first manifest sits in; a stack that is not a single manifest (dotnet, nix, ...) is rooted at the repo."""
-    return tuple((s, str(Path(files[0]).parent)) for s, files in found.items() if s in {"node", "go", "rust"})
+    return tuple((s, str(Path(files[0]).parent)) for s, files in found.items() if s in {"node", "node-tooling", "go", "rust"})
 
 
 def detect_stacks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[str, ...]:

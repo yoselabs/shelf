@@ -39,11 +39,34 @@ def _cause(done: subprocess.CompletedProcess[str]) -> str:
     return "no output"
 
 
+_FAILED_STEPS = re.compile(r"^gate: failed: (.+)$", re.MULTILINE)
+LOG_LINES = 20  # lines of a failing step's log the row shows
+
+
+def failed_steps(done: subprocess.CompletedProcess[str]) -> tuple[list[str], str]:
+    """The steps the gate said failed (`gate: failed: lint test`) and the first lines of each one's log (`--- lint` blocks), as text."""
+    text = f"{done.stdout}\n{done.stderr}"
+    named = _FAILED_STEPS.findall(text)
+    names = named[-1].split() if named else []
+    logs = []
+    for name in names:
+        block = re.search(rf"^--- {re.escape(name)}\n(.*?)(?=^--- |^gate: |\Z)", text, re.MULTILINE | re.DOTALL)
+        lines = [line for line in (block.group(1) if block else "").splitlines() if line.strip()]
+        logs.append(f"--- {name}\n" + "\n".join(lines[:LOG_LINES]) if lines else f"--- {name}\n(no log)")
+    return names, "\n".join(logs)
+
+
 def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budget: object, ctx: Context, word: str = "just") -> Finding:
     if done is None:
         return failing(f"`{word} check` in a fresh clone did not finish within an hour", "find the step that hangs")
     if done.returncode != 0:
-        return failing(f"`{word} check` fails in a fresh clone ({took}s): {_cause(done)}", "make the gate pass from a clean checkout")
+        names, logs = failed_steps(done)
+        step = f"step {', '.join(names)} " if names else ""
+        shown = f"\n{logs}" if logs else ""
+        return failing(
+            f"`{word} check` {step}fails in a fresh clone ({took}s): {_cause(done)}{shown}",
+            "make the gate pass from a clean checkout (a clone of a worktree also needs MISE_TRUSTED_CONFIG_PATHS set for bd's mise shim)",
+        )
     if not isinstance(budget, int):
         return not_set_up(
             f"fresh-clone gate passed in {took}s; no budget recorded",

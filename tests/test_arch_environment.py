@@ -23,6 +23,7 @@ _OS_NAMES = frozenset({"environ", "getenv", "putenv", "unsetenv"})
 _ALLOWLIST = {
     "blueprint/src/blueprint/model.py": "Context.env defaults to dict(os.environ): the stdlib-only engine's one entry default",
     "blueprint/src/blueprint/report.py": "engine() probes the shelf checkout blueprint itself runs from (cached, no caller env exists)",
+    "blueprint/src/blueprint/unit_runner.py": "the process any-gate spawns: passes its environment on, plus COVERAGE_FILE",
     "blueprint/src/blueprint/testing.py": "test double builds its PATH from os.environ",
 }
 

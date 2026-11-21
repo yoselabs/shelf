@@ -184,21 +184,18 @@ def _oldest(ctx: Context, span: str) -> int | None:
     return min(stamps) if stamps else None
 
 
-@check(
-    "agents.worktrees-in-sync",
-    "every agent worktree merges into main and takes main's changes within a day",
-    audit_only=True,
-    layer="agent",
-)
-def worktrees_in_sync(ctx: Context) -> Finding:
-    """Audit-only: reads this clone's worktrees. Fails on unmerged work, or missing main commits, older than a day.
+def _current_branch(ctx: Context) -> str | None:
+    """The branch of the worktree this run is in, when it is a linked worktree (not the main checkout); None otherwise."""
+    git_dir = (ctx.git("rev-parse", "--path-format=absolute", "--git-dir") or "").strip()
+    common = (ctx.git("rev-parse", "--path-format=absolute", "--git-common-dir") or "").strip()
+    if not git_dir or git_dir == common:
+        return None
+    branch = (ctx.git("rev-parse", "--abbrev-ref", "HEAD") or "").strip()
+    return branch if branch and branch != "HEAD" else None
 
-    Why: worktrees that drift for days turn every merge into conflict resolution and let agents build
-    on a main that no longer exists (owner, 2026-10-11).
-    """
-    branches = _branches(ctx)
-    if not branches:
-        return not_applicable("no linked worktrees")
+
+def _stale(ctx: Context, branches: list[str]) -> list[str]:
+    """Each branch with work unmerged, or main commits missing, past the limit, as a line saying how long."""
     limit = time.time() - float(str(ctx.settings.get("worktree-sync-hours", _SYNC_HOURS))) * 3600
     stale: list[str] = []
     for branch in branches:
@@ -208,7 +205,49 @@ def worktrees_in_sync(ctx: Context) -> Finding:
             stale.append(f"{branch}: work unmerged since {_ago(unmerged)}")
         if missing is not None and missing < limit:
             stale.append(f"{branch}: behind main since {_ago(missing)}")
-    if stale:
+    return stale
+
+
+@check(
+    "agents.worktrees-in-sync",
+    "the worktree this agent works in merges into main and takes main's changes within a day",
+    version=2,
+    layer="agent",
+)
+def worktrees_in_sync(ctx: Context) -> Finding:
+    """The run is inside a linked worktree: its own branch is within a day of main, both ways.
+
+    Why: a worktree that drifts for days turns its merge into conflict resolution and lets the agent build on a main that no
+    longer exists (owner, 2026-10-11). Only this worktree: the agent cannot act on another session's (a2kay, 2026-11-21).
+    """
+    branch = _current_branch(ctx)
+    if branch is None:
+        return not_applicable("this is not a linked worktree (other sessions' worktrees: agents.other-worktrees, in the audit)")
+    if stale := _stale(ctx, [branch]):
+        return failing(
+            "; ".join(stale),
+            "land this worktree's work into main, or take main's changes into it (merge main), in this session",
+            FixedBy.AGENT,
+        )
+    return passing(f"{branch} is within {_SYNC_HOURS}h of main both ways")
+
+
+@check(
+    "agents.other-worktrees",
+    "every other session's worktree merges into main and takes main's changes within a day",
+    audit_only=True,
+    layer="agent",
+)
+def other_worktrees(ctx: Context) -> Finding:
+    """Audit-only: this clone's linked worktrees but this run's own. Fails on unmerged work or missing main commits older than a day.
+
+    The list is the owner's to act on: an agent cannot, and must not reach into a session that is not its own.
+    """
+    own = _current_branch(ctx)
+    branches = [b for b in _branches(ctx) if b != own]
+    if not branches:
+        return not_applicable("no other linked worktrees")
+    if stale := _stale(ctx, branches):
         # Another session works in each of these worktrees: whoever audits must not reach into them
         # (live run #7: the audit told an agent to rebase another session's worktree).
         return failing(
@@ -217,7 +256,7 @@ def worktrees_in_sync(ctx: Context) -> Finding:
             "main's changes, and remove worktrees whose work is done",
             FixedBy.OWNER,
         )
-    return passing(f"{len(branches)} worktrees, each within {_SYNC_HOURS}h of main both ways")
+    return passing(f"{len(branches)} other worktrees, each within {_SYNC_HOURS}h of main both ways")
 
 
 def _ago(stamp: int) -> str:

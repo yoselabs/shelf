@@ -5,8 +5,9 @@ not `mod`). The parts are plain text, rendered from the files under `just/` and 
 `blueprint gate render --check` fails on any difference between what is committed and what the blueprint would write now. A consumer stops
 copying recipe text: it re-renders, and the repo's own `justfile` keeps only what is its own.
 
-Extension points, all in the repo's own justfile: a recipe defined there replaces the base or stack recipe of the same name
-(`set allow-duplicate-recipes`), and `check-extra` runs one more thing in the gate.
+Extension points: `check-extra` in the repo's justfile runs one more thing in the gate; `[tool.blueprint.gate]` in pyproject.toml holds
+the repo's paths and extra steps (`gate_py`). A recipe defined there with a rendered name replaces it (`set allow-duplicate-recipes`),
+but `gate.recipe-shadowing` fails that unless an `[[override]]` says why (ADR 0032).
 
 Exit codes of the check: 0 current · 1 drift (a part differs, is missing, is stale, or the justfile does not import it).
 """
@@ -16,6 +17,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from blueprint import gate_py
 from blueprint.profile import detect_stacks
 
 FOLDER = ".blueprint"
@@ -29,12 +31,16 @@ _HEADER = (
 
 # stack -> (part name, the gate steps it adds to `check`, in order). A stack with no row has no recipes to render.
 _STACKS = {
-    "python-uv": ("python", ("lint", "typecheck", "spell", "deps", "test")),
-    "python": ("python", ("lint", "typecheck", "spell", "deps", "test")),
+    "python-uv": ("python", ("lint-changed", "typecheck", "spell-changed", "deps", "test")),
+    "python": ("python", ("lint-changed", "typecheck", "spell-changed", "deps", "test")),
     "shell": ("shell", ("scripts",)),
 }
+_STACK_INSTALLS = {
+    "node": ("npm ci --no-audit --no-fund",),
+    "node-tooling": ("npm ci --no-audit --no-fund",),
+}
 # What the release gate runs instead of a step: the whole-history and whole-suite form.
-_WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all"}
+_WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all", "lint-changed": "lint", "spell-changed": "spell"}
 _COMMON_STEPS = ("guard", "preset", "render", "blueprint", "secrets")
 
 
@@ -50,10 +56,12 @@ def _stack_parts(repo: Path) -> list[tuple[str, tuple[str, ...]]]:
 def parts(repo: Path) -> dict[str, str]:
     """`{path relative to the repo: text}` of every part this repo's stacks call for."""
     stack_parts = _stack_parts(repo)
-    steps = [*_COMMON_STEPS, *(step for _, group in stack_parts for step in group)]
+    steps = [*_COMMON_STEPS, *(step for _, group in stack_parts for step in group), *gate_py.extra_steps(repo)]
     whole = [_WHOLE.get(s, s) for s in steps]
     base = (_TEMPLATES / "base.just").read_text()
     base = base.replace("@STEPS@", " ".join(f'"{s}"' for s in steps)).replace("@STEPS_ALL@", " ".join(f'"{s}"' for s in whole))
+    installs = dict.fromkeys(line for stack in sorted(detect_stacks(repo)) for line in _STACK_INSTALLS.get(stack, ()))
+    base = base.replace("@TOOLS@\n", "".join(f"    {line}\n" for line in installs))
     rendered = {f"{FOLDER}/base.just": base}
     for name, _ in stack_parts:
         rendered[f"{FOLDER}/{name}.just"] = (_TEMPLATES / f"{name}.just").read_text()

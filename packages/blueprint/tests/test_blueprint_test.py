@@ -39,18 +39,18 @@ def test_run_pipes_the_plan_into_the_test_command_and_returns_its_exit_code(repo
     repo.write("packages/a/pyproject.toml", '[project]\nname = "a"\n')
     seen: list[tuple[list[str], str | None]] = []
 
-    def fake(cmd: list[str], *, cwd: Path, stdin: str | None) -> tuple[int, str]:
+    def fake(cmd: list[str], *, cwd: Path, stdin: str | None, env: dict[str, str]) -> tuple[int, str]:
         seen.append((cmd, stdin))
         return 0, "packages/a/tests\tk1\n" if stdin is None else ""
 
-    assert gate_test.run(repo.root, receipts=None, lease_root=None, pytest_args="", execute=fake) == 0
+    assert gate_test.run(repo.root, receipts=None, lease_root=None, pytest_args="", execute=fake, env=repo.env) == 0
     assert [stdin for _, stdin in seen] == [None, "packages/a/tests\tk1\n"]
 
 
 def test_a_failing_plan_is_not_a_pass(repo: Repo) -> None:
     repo.write("packages/a/pyproject.toml", '[project]\nname = "a"\n')
 
-    def fake(cmd: list[str], *, cwd: Path, stdin: str | None) -> tuple[int, str]:
+    def fake(cmd: list[str], *, cwd: Path, stdin: str | None, env: dict[str, str]) -> tuple[int, str]:
         return 3, ""
 
-    assert gate_test.run(repo.root, receipts=None, lease_root=None, pytest_args="", execute=fake) == 3
+    assert gate_test.run(repo.root, receipts=None, lease_root=None, pytest_args="", execute=fake, env=repo.env) == 3

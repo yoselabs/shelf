@@ -308,3 +308,24 @@ def test_a_classified_deployed_claim_makes_the_compose_policy_needed(repo: Repo)
     rows = _rows(repo)
     for row in _COMPOSE_ROWS:
         assert rows[row][0] is Verdict.NOT_SET_UP
+
+
+def test_a_path_in_an_echo_or_a_comment_is_not_a_build(repo: Repo) -> None:
+    repo.write("images/worker/Dockerfile", "FROM python:3.12-slim\n")
+    repo.write("justfile", "check: img\nimg:\n    # images/worker/Dockerfile\n    echo images/worker/Dockerfile\n")
+    verdict, evidence = _rows(repo)["stack.dockerfile.tests"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "nothing builds images/worker/Dockerfile" in evidence
+
+
+def test_docker_build_check_counts_as_building_and_the_row_says_so(repo: Repo) -> None:
+    repo.write("images/worker/Dockerfile", "FROM python:3.12-slim\n")
+    repo.write("justfile", "check: img\nimg:\n    docker build --check -f images/worker/Dockerfile images/worker\n")
+    assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING
+
+
+def test_a_build_continued_over_lines_and_a_buildx_build_count(repo: Repo) -> None:
+    repo.write("a/Dockerfile", "FROM python:3.12-slim\n")
+    repo.write("b/Dockerfile", "FROM python:3.12-slim\n")
+    repo.write("justfile", "check: img\nimg:\n    docker build -q \\\n      -f a/Dockerfile .\n    docker buildx build -f b/Dockerfile b\n")
+    assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING

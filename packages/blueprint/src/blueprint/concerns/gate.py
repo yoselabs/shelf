@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from blueprint.concerns import gate_clone, gate_command, gate_git, gate_guards, gate_hooks, gate_inputs, gate_lfs, gate_no_ci
+from blueprint.concerns import gate_clone, gate_command, gate_git, gate_guards, gate_hooks, gate_inputs, gate_lfs, gate_no_ci, gate_recipes
 from blueprint.model import check
 
 check("gate.one-command", "`just check` exists and every recipe it names resolves")(gate_command.one_command)
@@ -43,3 +43,11 @@ check("gate.git-config-clean", "this clone's own git config sets neither core.wo
 check("gate.lfs-installed", "in a repo that uses LFS, this clone has git-lfs and its filter installed", audit_only=True)(
     gate_lfs.lfs_installed
 )
+check(
+    "gate.recipe-calls",
+    "every recipe's call of blueprint uses flags that exist and runs the pinned engine, never a shelf clone",
+)(gate_recipes.calls)
+check(
+    "gate.recipe-shadowing",
+    "the justfile redefines no recipe blueprint renders unless an [[override]] declares why (a shadowed step is unchecked)",
+)(gate_recipes.shadowing)

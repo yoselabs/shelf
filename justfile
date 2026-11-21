@@ -5,8 +5,8 @@
 # just (ADR 0023): pinned per repo as the `rust-just` dev dependency, run as `uv run just <recipe>`.
 #
 # The gate's common recipes are the blueprint's, rendered into .blueprint/ (ADR 0029): `uv run blueprint gate render` rewrites them and
-# `just render` fails on any difference. This file keeps only what is the shelf's own: a recipe defined here replaces the rendered one
-# of the same name (`set allow-duplicate-recipes`). Consumers keep the same shape and own even less.
+# `just render` fails on any difference. This file keeps only what is the shelf's own, and redefines none of the rendered recipes
+# (gate.recipe-shadowing): paths and extra steps are data in pyproject.toml `[tool.blueprint.gate]`. Consumers keep the same shape.
 #
 # No backticks anywhere in this file: `just --dry-run` evaluates them, and blueprint's
 # gate.one-command dry-runs `check` and reads this graph from `just --dump --dump-format json`.
@@ -18,28 +18,6 @@ set allow-duplicate-recipes
 import '.blueprint/base.just'
 import '.blueprint/python.just'
 
-# pytest runs one worker per core (pytest-xdist).
-pytest_par := "-n auto"
-
-# Where whole test runs queue (check-all's pytest below; `blueprint gate test` queues in the same folder): one slot, so gates started at once wait instead of thrashing.
-lease_root := env_var_or_default("GATE_LEASE_ROOT", env_var_or_default("XDG_CACHE_HOME", env_var("HOME") + "/.cache") + "/gate-leases")
-
-# The gate. Fast, deterministic tools first; tests last. Tests cover only what the change
-# touches (`test`, the rendered `blueprint gate test`); `check-all` runs every test with the coverage floor: rare, before a release tag, never per task.
-#
-# The per-file linters (scripts, lint-changed, spell-changed) check only the files changed against the base
-# in `check` (`any-gate changed`; a changed config file, or no base, selects everything). `check-all` runs them on every
-# file (`scripts "all"`, `lint`, `spell`). The cross-file checks (typecheck, arch, deps, blueprint)
-# always cover the whole repo. A linter with nothing changed prints "skipped <linter>: ..." and the gate
-# repeats that line.
-#
-# A green `check` records the tree it checked (`any-gate`, `python -m any_gate start|passed|pre-push`): `gate-start` notes the
-# working tree first, the body records it once every step passed and only if nothing changed meanwhile, and the
-# pre-push hook then skips the gate for that exact tree.
-[group('gate')]
-check: gate-start beads-lint scripts (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "arch" "spell-changed" "deps" "tag-check" "test") check-extra
-    uv run python -m any_gate passed --gate check
-
 # The decision records are the shelf's own to keep (any-knowledge); blueprint does not check them. Runs after the steps, before the record.
 [private]
 check-extra: adr-check
@@ -47,9 +25,6 @@ check-extra: adr-check
 [group('gate')]
 adr-check:
     uv run python -m any_knowledge check
-
-[group('gate')]
-check-all: beads-lint (scripts "all") (steps-all "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "arch" "spell" "deps" "test-all") adr-check
 
 # Every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity. The name is the
 # blueprint's for this step in every repo (stack/shell).
@@ -65,28 +40,13 @@ scripts scope="changed":
 
 # Every package version on origin/main has its `<name>-v<version>` tag (2026-11-09: anyllm 0.8.0 was merged and never tagged, so a consumer
 # could not pin it). A release is bump, merge, tag, so the next gate after an untagged merge is the one that stops. Offline it reads local tags.
+# The release gate's form of `scripts`: every tracked shell script, not only the changed ones.
+[group('gate')]
+scripts-all: (scripts "all")
+
 [group('gate')]
 tag-check:
     python3 -I tools/tag_check.py
-
-[group('gate')]
-lint:
-    uv run ruff check packages tests tools conftest.py
-    uv run ruff format --check packages tests tools conftest.py
-
-# `lint` over the files changed against the base (`any-gate changed`), for `check`. Shelf-only: consumers copy `lint`.
-[group('gate')]
-lint-changed:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    list=$(mktemp); trap 'rm -f "$list"' EXIT
-    uv run python -m any_gate changed --config pyproject.toml --config ruff.toml 'packages/*.py' 'tests/*.py' 'tools/*.py' conftest.py > "$list"
-    [ -s "$list" ] || { echo "skipped lint: no Python file changed"; exit 0; }
-    xargs -0 uv run ruff check --force-exclude < "$list"
-    xargs -0 uv run ruff format --check --force-exclude < "$list"
-
-format:
-    uv run ruff format packages tests tools conftest.py
 
 # the import graph against the contracts in [tool.importlinter] (pyproject.toml): no package
 # imports a consumer app, packages stay independent except their declared workspace edges.
@@ -94,31 +54,6 @@ format:
 [group('gate')]
 arch:
     uv run lint-imports
-
-# typos in code, docstrings, and docs.
-[group('gate')]
-spell:
-    uv run codespell packages tests tools docs catalog use-cases ledger README.md AGENTS.md conftest.py
-
-# `spell` over the files changed against the base, for `check`. Shelf-only: consumers copy `spell`.
-[group('gate')]
-spell-changed:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    list=$(mktemp); trap 'rm -f "$list"' EXIT
-    uv run python -m any_gate changed --config pyproject.toml --config .codespellrc 'packages/*' 'tests/*' 'tools/*' 'docs/*' 'catalog/*' 'use-cases/*' 'ledger/*' README.md AGENTS.md conftest.py > "$list"
-    [ -s "$list" ] || { echo "skipped spell: no file changed"; exit 0; }
-    xargs -0 uv run codespell < "$list"
-
-# The test runs queue for one slot (`any-lease`, `lease_root` above): each takes every core, so gates started at once
-# on one box wait instead of thrashing (2026-10-20: four at once took 11-14 min each).
-#
-# tests with coverage; the floor guards against REGRESSION (set just below current).
-# Substrate adapters (docling/torch/subprocess) are legitimately hard to unit-test,
-# so the floor is a rot-guard, not a vanity number. Raise it as coverage climbs.
-[group('gate')]
-test-all:
-    uv run python -m any_lease run --root {{ lease_root }} tests 1 check-all -- uv run pytest {{ pytest_par }} --cov --cov-report=term-missing --cov-fail-under=65
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. Run

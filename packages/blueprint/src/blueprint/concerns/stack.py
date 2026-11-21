@@ -108,10 +108,23 @@ def _offenders(ctx: Context, spec: dict[str, Any], root: str = ".") -> list[str]
     return [r for r in rels if not is_skipped(r, ctx.profile.ignore) and spec["lacks"] in (ctx.read(r) or "")]
 
 
+_DOCKER_BUILD = re.compile(r"\bdocker(?:\s+buildx)?\s+build\b")
+
+
+def builds(gate: str, rel: str) -> bool:
+    """Whether some command in `gate` is a `docker build` (or `docker buildx build`) that names the Dockerfile `rel`.
+
+    `docker build --check` counts: BuildKit parses and lints the file (a syntax or rule error fails), though it runs no layer, so a
+    failing `RUN` is found only by a full build. A path in a comment, an `echo` or another command counts for nothing.
+    """
+    logical = gate.replace("\\\n", " ")
+    return any(_DOCKER_BUILD.search(line) and re.search(rf"(?<![\w./-]){re.escape(rel)}(?![\w./-])", line) for line in logical.splitlines())
+
+
 def _unbuilt(ctx: Context) -> list[str]:
-    """The Dockerfiles the gate does not name."""
+    """The Dockerfiles no `docker build` in the gate names."""
     gate = gate_text(ctx)
-    return [r for r in _dockerfile_rels(ctx) if r not in gate]
+    return [r for r in _dockerfile_rels(ctx) if not builds(gate, r)]
 
 
 def _dockerfile_rels(ctx: Context) -> list[str]:
@@ -363,7 +376,7 @@ def _profile_row(stack: str, prof: StackProfile | None, origin: str = "") -> Sub
     return Sub(f"stack/{stack}", f"stack.{stack}.profile", statement, passing(f"{prof.status} profile: {tools}{note}{seen}"))
 
 
-@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `just check`", layer="stack", version=3)
+@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `just check`", layer="stack", version=4)
 def roles(ctx: Context) -> list[Sub]:
     """Per detected stack: one profile row, then one row per role."""
     if not ctx.profile.stacks:

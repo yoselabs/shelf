@@ -192,11 +192,6 @@ direction = "passing"
 bead = "shelf-fkx.11"
 
 [[gap]]
-id = "stack.python-uv.types"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
 id = "stack.shell-strict"
 direction = "passing"
 bead = "shelf-fkx.11"

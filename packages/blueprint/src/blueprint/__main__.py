@@ -21,7 +21,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from blueprint import checkpoints, gate_test, guard, init, preset, render, report
+from blueprint import checkpoints, gate_py, gate_test, guard, init, preset, render, report
 from blueprint.runner import run, run_audit
 
 _GATE_HELP = """\
@@ -31,6 +31,7 @@ The steps of `just check`. The justfile and the git hooks run them; each one is 
   preset     compare the repo's ruff and pyrefly config with the shelf's preset, or with the differences it declares (`just preset`)
   render     write the justfile parts blueprint owns (.blueprint/*.just); with --check, fail on any difference (`just render`)
   test       run the tests the change reaches, through any-gate (`just test`)
+  lint, format, spell, test-all   the python stack's steps; a repo's paths and extra steps are data in `[tool.blueprint.gate]`
 """
 
 
@@ -79,8 +80,33 @@ def _parser() -> argparse.ArgumentParser:
     tst.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     tst.add_argument("--receipts", type=Path, help="any-gate's receipts file (default: gate-receipts.json in the git directory)")
     tst.add_argument("--lease-root", type=Path, help="the test-slot lease folder (default: any-gate's)")
-    tst.add_argument("--pytest-args", default=gate_test.DEFAULT_PYTEST_ARGS, help="extra arguments for every pytest stage, as one string")
+    tst.add_argument(
+        "--pytest-args",
+        default=None,
+        help=f"extra arguments for every pytest stage, as one string (default `{gate_test.DEFAULT_PYTEST_ARGS}`; none with coverage)",
+    )
+    for name, text in (("lint", "ruff check and format --check"), ("spell", "codespell")):
+        sp = steps.add_parser(name, help=f"{text} over `[tool.blueprint.gate]` paths (`just {name}`)")
+        sp.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+        sp.add_argument("--changed", action="store_true", help="only the files changed against the base (the per-commit gate)")
+    fmt = steps.add_parser("format", help="ruff format over `[tool.blueprint.gate]` lint-paths (`just format`)")
+    fmt.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+    ta = steps.add_parser("test-all", help="every test with the coverage floor, queued behind any-lease (`just test-all`)")
+    ta.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     return parser
+
+
+def known_flags(argv: list[str]) -> tuple[str, set[str]]:
+    """`(command path, flags that command accepts)` for the words of a `blueprint` call (`check --brief`, `gate test --repo .`)."""
+    parser = _parser()
+    path: list[str] = []
+    for word in argv:
+        subs = [a for a in parser._actions if isinstance(a, argparse._SubParsersAction)]  # noqa: SLF001 -- argparse lists no public subparsers
+        if word.startswith("-") or not subs or word not in subs[0].choices:
+            break
+        parser = subs[0].choices[word]
+        path.append(word)
+    return " ".join(path), {flag for action in parser._actions for flag in action.option_strings}  # noqa: SLF001
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -126,10 +152,43 @@ def _render(args: argparse.Namespace) -> int:
 
 
 def _test(args: argparse.Namespace) -> int:
-    return gate_test.run(args.repo.expanduser().resolve(), receipts=args.receipts, lease_root=args.lease_root, pytest_args=args.pytest_args)
+    return gate_test.run(
+        args.repo.expanduser().resolve(),
+        receipts=args.receipts,
+        lease_root=args.lease_root,
+        pytest_args=args.pytest_args,
+        env=dict(os.environ),
+    )
 
 
-_GATE_STEPS = {"guard": _guard, "preset": _preset, "render": _render, "test": _test}
+def _lint(args: argparse.Namespace) -> int:
+    repo = args.repo.expanduser().resolve()
+    return gate_py.lint_changed(repo) if args.changed else gate_py.lint(repo)
+
+
+def _spell(args: argparse.Namespace) -> int:
+    repo = args.repo.expanduser().resolve()
+    return gate_py.spell_changed(repo) if args.changed else gate_py.spell(repo)
+
+
+def _format(args: argparse.Namespace) -> int:
+    return gate_py.format_(args.repo.expanduser().resolve())
+
+
+def _test_all(args: argparse.Namespace) -> int:
+    return gate_py.test_all(args.repo.expanduser().resolve(), dict(os.environ))
+
+
+_GATE_STEPS = {
+    "guard": _guard,
+    "preset": _preset,
+    "render": _render,
+    "test": _test,
+    "lint": _lint,
+    "spell": _spell,
+    "format": _format,
+    "test-all": _test_all,
+}
 
 
 if __name__ == "__main__":

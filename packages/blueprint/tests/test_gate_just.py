@@ -204,6 +204,8 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
         ("gate.lfs-binaries", 1, False),
         ("gate.git-config-clean", 1, True),
         ("gate.lfs-installed", 1, True),
+        ("gate.recipe-calls", 1, False),
+        ("gate.recipe-shadowing", 1, False),
     )
     audited = run_audit(repo.root, concern="gate", env=repo.env)
     gated = run(repo.root, concern="gate", env=repo.env)

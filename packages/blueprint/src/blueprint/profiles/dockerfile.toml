@@ -51,8 +51,8 @@ gate = "check_dockerfile_pins"
 role = "tests"
 tool = """every image is built by the gate (a Dockerfile nothing builds is untested, and a build that breaks is found at the deploy). \
 A test image the gate builds (a2kay's scripts/prune/test.Dockerfile, the shelf's tools/gate/gate.Dockerfile) is exercised by that gate: a recipe `just check` reaches names its path (`docker build -f <path>`). \
-Each Dockerfile is judged on its own: the gate names its path (`docker build -f <path>`)."""
-install = """an image nothing builds is first a question: if nothing deploys it, delete it. Otherwise a recipe `just check` reaches builds it with `docker build -f <path>`."""
+Each Dockerfile is judged on its own: a `docker build` line in the gate names its path (`docker build -f <path>`). `docker build --check -f <path>` counts: BuildKit parses and lints the file in about a second and runs no layer, so a failing `RUN` is found only by a full build; a path in a comment or an `echo` counts for nothing."""
+install = """an image nothing builds is first a question: if nothing deploys it, delete it. Otherwise a recipe `just check` reaches builds it with `docker build -f <path>`, or the cheap proof `docker build --check -f <path> <context>` (syntax and lint, no layers)."""
 config = [{ built = "dockerfiles" }]
 
 [[role]]

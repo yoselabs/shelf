@@ -1,13 +1,18 @@
-# Rendered by `blueprint gate render` -- never edit; a recipe of the same name in the repo's justfile replaces it.
+# Rendered by `blueprint gate render` -- never edit; a recipe of the same name in the repo's justfile replaces it only through a declared override (gate.recipe-shadowing).
 # The python+uv stack: its linter, type, spelling, dependency and test steps.
 
+# Paths and extra steps are data in pyproject.toml `[tool.blueprint.gate]` (blueprint gate --help): a repo defines no recipe of its own.
 [group('gate')]
 lint:
-    uv run ruff check .
-    uv run ruff format --check .
+    uv run blueprint gate lint
+
+# `lint` over the files changed against the base (any-gate changed), for `check`; check-all runs `lint` over everything.
+[group('gate')]
+lint-changed:
+    uv run blueprint gate lint --changed
 
 format:
-    uv run ruff format .
+    uv run blueprint gate format
 
 # A type warning fails the build (pyrefly's config). No slow rot.
 [group('gate')]
@@ -17,7 +22,12 @@ typecheck:
 # Typos in code, docstrings and docs.
 [group('gate')]
 spell:
-    uv run codespell
+    uv run blueprint gate spell
+
+# `spell` over the files changed against the base, for `check`.
+[group('gate')]
+spell-changed:
+    uv run blueprint gate spell --changed
 
 # Dependency hygiene: the lockfile matches pyproject, then unused, missing and transitive (deptry), once per package in a workspace.
 [group('gate')]
@@ -39,10 +49,10 @@ test:
     uv run blueprint gate test
 
 # Every test, with the coverage floor (the release gate's test step). Coverage is a whole-repo measure, so a floor cannot ride
-# on `test`, which runs only what the change reaches. The floor is low on purpose, a rot-guard; raise it as coverage climbs.
+# on `test`, which runs only what the change reaches. The floor is `[tool.blueprint.test] floor` (default 65, low on purpose: a rot-guard; raise it as coverage climbs). Queues behind any-lease when installed.
 [group('gate')]
 test-all:
-    uv run pytest -n auto --cov --cov-report=term-missing --cov-fail-under=65
+    uv run blueprint gate test-all
 
 # Coverage report only (human view).
 cov:
