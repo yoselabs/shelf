@@ -45,7 +45,7 @@ Rules:
   `cost:` and `construction:` are the kinds the existing rules use. A `debt:` row shows up in the debt report.
 - Never change `source.tree`: it is shared by every rule in the run.
 - Debt report: `uv run python -m any_arch tests/test_arch_*.py` lists every `debt:` row, grouped by rule (`debt_text(*rules)` as text, `debt(*rules)` as a dict).
-- Not a fit: a rule that needs the whole repo at once (a name shared across packages), or reads `pyproject.toml`. Keep those as plain tests.
+- Not a fit: a rule that needs the whole repo at once (a name shared across packages) as a verdict on one file, or reads `pyproject.toml`. Keep those as plain tests; a rule that needs repo-wide facts only to judge one file at a time builds them in a factory (below).
 
 ## README convention
 
@@ -74,3 +74,17 @@ A waiver by an inline comment (`# lossy-ok:`, `# Any:`) is the finder's own logi
 | fits, and wants one more field | a hit's detail text: `environment` (`os.environ`, `Path.home`), `output_shape_flags` (why the flag is an output shape), `ttl_cache` (the SQL string) print what was found today; a `Hit` is `(key, line)` only. Add the field when the first of them migrates |
 | fits, with a local test beside it | checks that something still exists or the scan is not vacuous: `http_clients` (the two owners still build a client), `ttl_cache` (sources found), `public_any` (its opt-in list is read from `pyproject.toml`; the rule itself has no rows) |
 | does not fit | `duplicate_names` (a name shared across packages: the finder sees one file, so it needs the whole repo at once), `rules` (pyproject and import-linter TOML, body duplication across packages) |
+
+## Rules that need more than the finder's one file
+
+A rule can build its whole-repo facts once from `any_arch.source.sources(root, scope)` inside a factory `_rule(root, rows)`, lazily on
+the first file the finder sees, so a planted file under `tmp_path` is part of the facts: `tests/test_arch_outcome_unions_consumed.py`
+(outcome types and callee resolution) and `tests/test_arch_package_exception_base.py` (the exception hierarchy of a package) do.
+`tests/arch_keys.py` gives a key finer than a file, `path:Class.function`, for rules whose files hold both an `outcome:` and a `debt:`.
+
+## Package exception base
+
+Every exception class a package defines derives, directly or through another of its own, from one class of that package, so a caller
+writes one `except GitError`. Name it `<Package>Error` (`AnyFileError`, `JsonlLogError`, `McpCallError`); the test enforces the
+single root, not the name. A control-flow signal that must not be caught by `except PackageError` (a `SystemExit` subclass) is the
+one reason to keep a second root: record it as an `outcome:` row.
