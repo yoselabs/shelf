@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-speech"
+software = "any-frontmatter"
+why = "Transcript.to_markdown() is a readable view that callers extend (their own header keys) and save where they choose; a bare string forced them to re-parse it, and a hand-written YAML header repeated what any-frontmatter already dumps correctly."
+needs = "Document(frontmatter, body): str(doc) is the file text, doc.frontmatter takes more keys, write(path, doc) saves it."
+sponsor = "yoselabs"
+requester = "any-speech"
+status = "active" # active | retired

@@ -707,6 +707,7 @@ ignore_imports = [
     "any_speech.format -> content_digest",
     "any_speech.format -> atomic_io",
     "any_speech.format -> any_versioned",
+    "any_speech.format -> any_frontmatter",
     "any_speech.failures -> atomic_io",
     "any_speech.failures -> any_clock",
     "any_speech.pipeline -> any_clock",

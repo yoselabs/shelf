@@ -204,3 +204,8 @@ def test_a_crash_before_the_swap_keeps_the_old_bytes(tmp_path: Path, monkeypatch
     monkeypatch.undo()
     assert target.read_bytes() == before
     assert [p.name for p in tmp_path.iterdir()] == ["e.md"]
+
+
+def test_str_of_a_document_is_the_file_text() -> None:
+    doc = Document(frontmatter={"a": 1}, body="hi\n")
+    assert str(doc) == dump(doc) == "---\na: 1\n---\nhi\n"
