@@ -1,24 +1,33 @@
 """Text hygiene: lossy decoding is marked, and a directory listing feeding output is sorted (bead shelf-tyld.12).
 
-1. `errors="ignore"` silently deletes data. It is banned except the entries in `_IGNORE_OK`, each with its reason.
+1. `errors="ignore"` silently deletes data. It is banned except the rows in `_IGNORE_OK`, each with its reason.
 2. `errors="replace"` writes U+FFFD in place of bad bytes. Fine for text that is only shown, parsed for a yes/no or
    measured; wrong for text that feeds a hash or a stored file. The call carries `# lossy-ok: <class>: <why>`
    (on one of its lines or the line above) and the class says which kind it is: display, parse, detect, measure, input.
 3. A listing call (`glob`, `rglob`, `iterdir`, `os.walk`, `os.listdir`, `os.scandir`) not wrapped in `sorted(...)`
    returns the file system's order, which differs between machines. This is a HEURISTIC: it sees only a listing that
    is not inside a `sorted()` call, not where the result ends up. A hit is fixed when its result feeds a stored file,
-   a hash or a printed list, and allowlisted (with the reason it is order-free) when it does not.
+   a hash or a printed list, and given a row (with the reason it is order-free) when it does not.
 """
 
 from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+from any_arch import Row, Rule, check, plant
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from any_arch import Hit, Source
 
 _ROOT = Path(__file__).resolve().parent.parent
+_SCOPE = ("packages/*/src/**/*.py", "packages/*/bench/**/*.py", "tools/**/*.py")
 
 _IGNORE_OK = {
-    "packages/anyembed/src/anyembed/llamacpp.py": "drops the half-cut character a token truncation leaves at the end of the bytes",
+    "packages/anyembed/src/anyembed/llamacpp.py": Row("drops the half-cut character a token truncation leaves at the end of the bytes"),
 }
 
 _LISTING_ATTRS = {"glob", "rglob", "iterdir"}
@@ -43,31 +52,21 @@ _WRAPPERS = (
 
 # "path::function" -> why the unsorted order cannot reach a stored file, a hash or a printed list.
 _UNSORTED_OK = {
-    "packages/any-agent/src/any_agent/supervisor.py::__init__": "a dict of log offsets: looked up by path, never iterated for output",
-    "packages/any-json-doc/src/any_json_doc/__init__.py::keys": "the names are sorted on the line that returns them",
-    "packages/any-proc/src/any_proc/run.py::user_task_count": "only counted",
-    "packages/git-porcelain/src/git_porcelain/real_cache.py::heads_files": "an in-process stat signature; another order is a recompute",
-    "packages/stream-proc/src/stream_proc/procfs.py::table": "a dict by pid: callers look up, none rely on its order",
-    "packages/blueprint/src/blueprint/gate_test.py::is_workspace": "any() over the glob yields a bool: no order reaches output",
-    "packages/blueprint/src/blueprint/model.py::walk": "os.walk runs unwrapped to prune `dirs`; it returns sorted(found)",
-    "packages/blueprint/src/blueprint/profile.py::_source_uses": "returns a bool (any file matches): no order reaches output",
-    "tools/blueprint_fitness.py::_whole_suite": "builds a set",
-    "tools/blueprint_fitness.py::pytest_sessionfinish": "the observed records feed `judge`, which compares sets, and are not stored",
-    "packages/any-gate/src/any_gate/changed.py::everything": "sorted on the line that returns the list",
+    key: Row(reason)
+    for key, reason in {
+        "packages/any-agent/src/any_agent/supervisor.py::__init__": "a dict of log offsets: looked up by path, never iterated for output",
+        "packages/any-json-doc/src/any_json_doc/__init__.py::keys": "the names are sorted on the line that returns them",
+        "packages/any-proc/src/any_proc/run.py::user_task_count": "only counted",
+        "packages/git-porcelain/src/git_porcelain/real_cache.py::heads_files": "an in-process stat signature; another order is a recompute",
+        "packages/stream-proc/src/stream_proc/procfs.py::table": "a dict by pid: callers look up, none rely on its order",
+        "packages/blueprint/src/blueprint/gate_test.py::is_workspace": "any() over the glob yields a bool: no order reaches output",
+        "packages/blueprint/src/blueprint/model.py::walk": "os.walk runs unwrapped to prune `dirs`; it returns sorted(found)",
+        "packages/blueprint/src/blueprint/profile.py::_source_uses": "returns a bool (any file matches): no order reaches output",
+        "tools/blueprint_fitness.py::_whole_suite": "builds a set",
+        "tools/blueprint_fitness.py::pytest_sessionfinish": "the observed records feed `judge`, which compares sets, and are not stored",
+        "packages/any-gate/src/any_gate/changed.py::everything": "sorted on the line that returns the list",
+    }.items()
 }
-
-
-def _sources() -> dict[str, ast.Module]:
-    out: dict[str, ast.Module] = {}
-    paths = [*_ROOT.glob("packages/*/src/**/*.py"), *_ROOT.glob("packages/*/bench/**/*.py"), *_ROOT.glob("tools/**/*.py")]
-    for path in sorted(paths):
-        rel = path.relative_to(_ROOT).as_posix()
-        out[rel] = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
-    return out
-
-
-def _lines(rel: str) -> list[str]:
-    return (_ROOT / rel).read_text(encoding="utf-8").splitlines()
 
 
 def _errors_calls(tree: ast.Module, mode: str) -> list[ast.Call]:
@@ -93,13 +92,9 @@ def _errors_args(tree: ast.Module, mode: str) -> list[ast.Call]:
     ]
 
 
-def test_errors_ignore_is_banned_outside_the_allowlist() -> None:
-    hits = {rel for rel, tree in _sources().items() if _errors_calls(tree, "ignore") or _errors_args(tree, "ignore")}
-    assert hits - _IGNORE_OK.keys() == set(), (
-        'errors="ignore" deletes data without a trace: decode strictly or use "replace" with a lossy-ok marker'
-    )
-    assert _IGNORE_OK.keys() - hits == set(), "no longer uses errors=ignore: delete its allowlist entry"
-    assert all(_IGNORE_OK.values())
+def _errors_ignore(source: Source) -> Iterator[Hit]:
+    for call in [*_errors_calls(source.tree, "ignore"), *_errors_args(source.tree, "ignore")]:
+        yield source.rel, call.lineno
 
 
 def _statement_lines(tree: ast.Module, call: ast.Call, lines: list[str]) -> list[str]:
@@ -118,30 +113,19 @@ def _statement_lines(tree: ast.Module, call: ast.Call, lines: list[str]) -> list
     return lines[max(holder.lineno - 2, 0) : end]
 
 
-def _unmarked_replace(tree: ast.Module, lines: list[str]) -> list[int]:
-    """Line numbers of `errors="replace"` calls, keyword or positional (`.decode("utf-8", "replace")`), without a marker."""
-    calls = [*_errors_calls(tree, "replace"), *_errors_args(tree, "replace")]
-    return sorted({call.lineno for call in calls if not any("# lossy-ok: " in line for line in _statement_lines(tree, call, lines))})
+def _unmarked_replace(source: Source) -> Iterator[Hit]:
+    """`errors="replace"` calls, keyword or positional (`.decode("utf-8", "replace")`), without a `# lossy-ok: ` marker."""
+    lines = source.text.splitlines()
+    calls = [*_errors_calls(source.tree, "replace"), *_errors_args(source.tree, "replace")]
+    for line in sorted(
+        {call.lineno for call in calls if not any("# lossy-ok: " in text for text in _statement_lines(source.tree, call, lines))}
+    ):
+        yield source.rel, line
 
 
-def test_errors_replace_carries_a_lossy_ok_marker() -> None:
-    unmarked: list[str] = []
-    for rel, tree in _sources().items():
-        unmarked += [f"{rel}:{n}" for n in _unmarked_replace(tree, _lines(rel))]
-    msg = "errors=replace needs `# lossy-ok: <display|parse|detect|measure|input>: <why>`; text for a hash or stored file decodes strictly"
-    assert unmarked == [], msg
-
-
-def test_planted_positional_replace_is_caught_and_a_marker_clears_it() -> None:
-    bare: str = 'def f(raw: bytes) -> str:\n    return raw.decode("utf-8", "replace")\n'
-    marked = 'def f(raw: bytes) -> str:\n    # lossy-ok: display: shown to a person\n    return raw.decode("utf-8", "replace")\n'
-    assert _unmarked_replace(ast.parse(bare), list(bare.splitlines())) == [2]
-    assert _unmarked_replace(ast.parse(marked), list(marked.splitlines())) == []
-
-
-def _unsorted_listings(tree: ast.Module) -> set[str]:
+def _unsorted_listings(source: Source) -> Iterator[Hit]:
+    tree = source.tree
     parent = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
-    found: set[str] = set()
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
             continue
@@ -163,14 +147,59 @@ def _unsorted_listings(tree: ast.Module) -> set[str]:
             scope = node
             while scope in parent and not isinstance(scope, ast.FunctionDef | ast.AsyncFunctionDef):
                 scope = parent[scope]
-            found.add(scope.name if isinstance(scope, ast.FunctionDef | ast.AsyncFunctionDef) else "<module>")
-    return found
+            name = scope.name if isinstance(scope, ast.FunctionDef | ast.AsyncFunctionDef) else "<module>"
+            yield f"{source.rel}::{name}", node.lineno
 
 
-def test_unsorted_listings_are_fixed_or_allowlisted() -> None:
-    hits = {f"{rel}::{name}" for rel, tree in _sources().items() for name in _unsorted_listings(tree)}
-    assert hits - _UNSORTED_OK.keys() == set(), (
-        "wrap the listing in sorted(...), or allowlist it with the reason its order cannot reach output"
-    )
-    assert _UNSORTED_OK.keys() - hits == set(), "sorted now, or gone: delete its allowlist entry"
-    assert all(_UNSORTED_OK.values())
+ERRORS_IGNORE = Rule(
+    "errors-ignore",
+    'errors="ignore" deletes data without a trace: decode strictly or use "replace" with a lossy-ok marker; or add a reasoned row',
+    _errors_ignore,
+    _IGNORE_OK,
+    scope=_SCOPE,
+)
+ERRORS_REPLACE = Rule(
+    "errors-replace",
+    "errors=replace needs `# lossy-ok: <display|parse|detect|measure|input>: <why>`; text for a hash or stored file decodes strictly",
+    _unmarked_replace,
+    {},
+    scope=_SCOPE,
+)
+UNSORTED_LISTING = Rule(
+    "unsorted-listing",
+    "wrap the listing in sorted(...), or add a row with the reason its order cannot reach output",
+    _unsorted_listings,
+    _UNSORTED_OK,
+    scope=_SCOPE,
+)
+
+
+def test_errors_ignore_is_banned_outside_the_rows() -> None:
+    check(ERRORS_IGNORE, _ROOT)
+
+
+def test_errors_replace_carries_a_lossy_ok_marker() -> None:
+    check(ERRORS_REPLACE, _ROOT)
+
+
+def test_unsorted_listings_are_fixed_or_given_a_row() -> None:
+    check(UNSORTED_LISTING, _ROOT)
+
+
+def test_planted_positional_replace_is_caught_and_a_marker_clears_it(tmp_path: Path) -> None:
+    bare = 'def f(raw: bytes) -> str:\n    return raw.decode("utf-8", "replace")\n'
+    marked = 'def f(raw: bytes) -> str:\n    # lossy-ok: display: shown to a person\n    return raw.decode("utf-8", "replace")\n'
+    assert plant(ERRORS_REPLACE, tmp_path / "a", bare) == {"packages/pkg/src/pkg/mod.py": [2]}
+    assert plant(ERRORS_REPLACE, tmp_path / "b", marked) == {}
+
+
+def test_planted_errors_ignore_is_caught_keyword_and_positional(tmp_path: Path) -> None:
+    where = "packages/pkg/src/pkg/mod.py"
+    assert plant(ERRORS_IGNORE, tmp_path / "a", 'raw.decode("utf-8", errors="ignore")\n', where) == {where: [1]}
+    assert plant(ERRORS_IGNORE, tmp_path / "b", 'raw.decode("utf-8", "ignore")\n', where) == {where: [1]}
+
+
+def test_planted_unsorted_listing_is_caught_by_function_and_sorted_clears_it(tmp_path: Path) -> None:
+    where = "packages/pkg/src/pkg/mod.py"
+    assert plant(UNSORTED_LISTING, tmp_path / "a", "def f(p):\n    return list(p.glob('*'))\n", where) == {f"{where}::f": [2]}
+    assert plant(UNSORTED_LISTING, tmp_path / "b", "def f(p):\n    return sorted(p.glob('*'))\n", where) == {}
