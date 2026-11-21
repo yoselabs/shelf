@@ -49,15 +49,30 @@ Accumulation without consolidation is drift. Hard opinions, a breach is a defect
   A failed cleanup or shutdown is reported, and the stop it belonged to still happens: a failure to record never
   leaves a worker running.
 - **Tolerance is a handler, not a flag.** `missing_ok=`, `ignore_errors=`, `force=`, `overwrite=` and kin do not
-  exist. The call raises a typed exception, and the caller that tolerates it catches that exception. Two actions
-  that differ in kind (create versus replace) are two verbs. A `Literal` or enum parameter is the same flag in a
-  different coat. ADR 0030 records the 28 old exceptions as debt to convert, not as precedent.
+  exist. A required thing that is absent raises a typed exception, and the caller that tolerates it catches that
+  exception. Lookup of an optional thing is a value in the return type (below), not an exception. Convergence ("make it
+  exist", "make it gone") is one idempotent verb (`ensure`). Two actions that differ in kind (create versus replace)
+  are two verbs. A `Literal` or enum parameter is the same flag in a different coat. ADR 0030 records the 28 old
+  exceptions as debt to convert, not as precedent.
 - **Two kinds of failure** (Go's returned `error` versus `panic`). An *expected outcome* is a normal result the
-  caller must branch on (a merge conflict, not found, a refused push): a value in the return type, a union such as
-  `Rebased | Conflict` that pyrefly checks exhaustively; never an exception, never a bool flag. A failure the
-  function *cannot continue from* (broken invariant, environment gone, caller misuse) is an exception, never
-  swallowed (no `except X: pass`, no `contextlib.suppress` of a typed failure), handled only where something useful
-  can be done, normally the edge. No Result type on every function: only where the outcome is expected.
+  caller must branch on (a merge conflict, an absent optional thing, a refused push): a value in the return type
+  (`X | None`, or a union such as `Rebased | Conflict`); never an exception, never a bool flag. The union is the
+  channel only: pyrefly lets a caller narrow it but does not force a look (a discarded value is legal), so consuming it
+  is a planned check: a discarded or non-exhaustively handled outcome union is a violation; consume with `match` plus
+  `assert_never`. A failure the function *cannot continue from* (broken invariant, environment gone, required thing
+  absent, caller misuse) is an exception, never swallowed (no `except X: pass`, no `contextlib.suppress` of a typed
+  failure), handled only where something useful can be done, normally the edge. No Result type on every function:
+  only where the outcome is expected.
+- **Failure plumbing.**
+  - *Owned thread* (a pump): a callback that raises stores the FIRST error under synchronization, is no longer
+    invoked, while draining continues so the child never blocks; the owner re-raises it at shutdown, after join.
+  - *Cleanup*: attempt every cleanup independently. One failure propagates unchanged; two or more raise an
+    `ExceptionGroup` (`BaseExceptionGroup` when cancellation or `KeyboardInterrupt` is among them; cancellation is
+    preserved, never swallowed). Async cleanup is bounded and shielded. Callers of such code use `except*`.
+  - *Exceptions of a package* share ONE base class: "recognized failures of this package", not everything it can
+    raise. A raw `OSError` may cross when its standard meaning stays useful. Wrap only to add domain meaning, always
+    `raise X(...) from exc`, never for catch convenience.
+  - *Log once, at the edge*: a library neither logs-and-swallows nor logs-and-reraises.
 - **No redundancy.** One implementation of a behaviour per repo. A duplicate is allowed only as a recorded
   task that reconciliation (Article VIII) must resolve, never as the end state.
 Each rule names its check; where the check does not exist yet, adopting the rule includes filing it:
@@ -74,6 +89,12 @@ Each rule names its check; where the check does not exist yet, adopting the rule
 | No silent failures | planted-violation test for a swallowed exception (effects research, task shelf-tyld.22) | task |
 | Tolerance is a handler | `tests/test_arch_bool_modes.py` public parameters named force/overwrite/missing_ok/exist_ok/ignore_errors/check, or annotated Literal/Enum (aliases included); `debt:` rows are conversions still owed | blocking |
 | Two kinds of failure (III) | swallowed handlers: `tests/test_arch_swallowed_exceptions.py` silent `except` handlers and `contextlib.suppress`, one exact-count reasoned row per file; a handler that returns a typed value is not flagged; the 38 `debt:` hits are conversions still owed | blocking |
+| Outcome unions are consumed (III) | a discarded or non-exhaustively handled outcome union is a violation (`match` plus `assert_never`; pyrefly `unused-call-result` is off) | task shelf-tyld.34 |
+| Cancellation is not lost (III) | a `BaseException` / `CancelledError` handler that does not re-raise | task shelf-tyld.35 |
+| No error erasure (III) | a handler or `finally` returning a constant that erases a failure; absence types (FileNotFoundError, KeyError, ProcessLookupError, StopIteration, typed Not-found) excepted | task shelf-tyld.35 |
+| No check-then-act (III) | an exists / is_file / access precheck before a mutation (TOCTOU) | task shelf-tyld.35 |
+| Bounded retry (III) | an unbounded retry loop, or retry without attempt accounting | task shelf-tyld.35 |
+| Package exception base (III) | every package-defined exception derives from the package base class | task shelf-tyld.35 |
 | Exception handled by the caller (III) | static call-graph check | refused for now: with types (pyrefly `--report-pysa`) 96.7% of calls resolve, but the shelf's 9 cross-package hits were all deliberate pass-through (docstring paperwork, 0 bugs), the check costs 114 s, and Result-everywhere contradicts ADR 0030; reopen if hits pass about 50 or another codebase shows real bugs; [research](research/checked-exceptions.md), [typed calls](research/typed-call-resolution.md) |
 | No redundancy | `tests/test_arch_rules.py` body-duplication tests, within and across packages | blocking |
 | Size limit (IV) | `tests/test_size_caps.py` file and function SLOC caps | blocking on changed files |

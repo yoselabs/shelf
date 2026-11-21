@@ -55,7 +55,7 @@ thing for that common use, and everything else must stay reachable by calling so
 
 7. **Failures are loud.** An exception is handled where someone can act on it, or it raises. Tolerance is the caller's
    `except`, never a flag; a failed shutdown is reported and the stop still happens (Article III).
-   Two kinds: an expected outcome is a value in the return type; a failure it cannot continue from is an exception (Article III).
+   Two kinds: an expected outcome is a value in the return type; a failure it cannot continue from is an exception; cleanup attempts every step and reports all failures; logging happens once, at the edge (Article III).
 
 8. **A small surface; the shelf is the standard library.** Every public name and parameter costs tokens for every AI that
    learns it. Prefer one idempotent verb and a typed exception over a verb-plus-flag matrix; add a name only when it is a

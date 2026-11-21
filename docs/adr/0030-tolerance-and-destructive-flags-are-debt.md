@@ -22,6 +22,9 @@ were debt, and they are converted (shelf-tyld.26). Article III now says it: **to
   `overwrite=`, `exist_ok=`, `check=` and kin are not public parameters. The call raises a typed exception; the caller
   that tolerates it catches that exception (`NotAWorktree`, `GitUnavailable`). A tiny typed exception class is added
   per package where none fits.
+- **Absence is an expected outcome, not always an exception** (amended 2026-11-21). Lookup of an OPTIONAL thing is a
+  value in the return type (`X | None`, or a small outcome type). A REQUIRED thing that is absent is a typed exception.
+  Convergence ("make it exist" / "make it gone") is one idempotent verb (`ensure`), never a `missing_ok=` flag.
 - **Two actions that differ in kind are two verbs** (`drop_worktree` / `discard_worktree`, `unclaim` / `evict`,
   `record` / `record_with_hooks` / `record_empty`), or ONE idempotent verb when that is the honest meaning
   (`abort_rebase` with nothing paused only restores). The smaller API wins: every public name costs tokens.
@@ -59,3 +62,4 @@ Why: a flag that makes a failure acceptable hides a second mode in one signature
 
 - 2026-11-20: first version, "a destructive opt-in bool is a justified exception" (shelf-tyld.13).
 - 2026-11-21: reversed and rewritten: these flags are debt; 20 rows converted (shelf-tyld.26).
+- 2026-11-21: amended after a Codex review: absence of an optional thing is a return value, absence of a required thing is a typed exception, convergence is `ensure`.
