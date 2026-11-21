@@ -15,26 +15,23 @@ from blueprint.model import (
     passing,
 )
 
-# Hooks (research/hooks-and-beads.md): prek owns them through .pre-commit-config.yaml, and bd's hooks
-# run from that file (`bd hooks run <event>`), never installed by bd itself. bd appends its block to
-# other managers' hook files, where a failing check then no longer blocks the commit.
+# Hooks (research/hooks-and-beads.md): prek owns them through .pre-commit-config.yaml. Nothing here knows about beads: the plugin
+# that does (backlog.hooks-recipe, backlog.hooks-installed) requires this one, never the other way round (mission blueprint-plugins).
 HOOK_CONFIG = ".pre-commit-config.yaml"
-BD_EVENTS = ("pre-commit", "post-merge", "pre-push", "post-checkout", "prepare-commit-msg")
 _OTHER_MANAGERS = {
     "lefthook": ("lefthook.yml", "lefthook.yaml", ".lefthook.yml", ".lefthook.yaml"),
     "husky": (".husky",),
     "githooks": (".githooks",),
 }
 _RECIPE = "`uv run blueprint init` (writes .pre-commit-config.yaml and runs `prek install`; `--no-hooks` skips both)"
-_BEADS_MARKER = "BEGIN BEADS INTEGRATION"
 
 
 # The fix for an existing hook config: merge the recipe in (shelf-3gl: `>` destroyed homelab's own ~20 hooks). Its `gate`
 # hook stays: it is pre-push only and `prek run --all-files` runs the pre-commit stage, so a gate that runs the hooks does
 # not recurse through it (homelab, 2026-10-11).
 _MERGE_FIX = (
-    f"merge the recipe into the existing {HOOK_CONFIG}, never overwrite it: `default_install_hook_types` at the top, the "
-    "recipe's bd `repo: local` block first under `repos:`, and keep every hook the repo already has after it "
+    f"merge the recipe into the existing {HOOK_CONFIG}, never overwrite it: `default_install_hook_types` at the top and the "
+    "recipe's hooks under `repos:`, and keep every hook the repo already has "
     "(`blueprint init` writes the recipe); then `prek install`"
 )
 
@@ -50,35 +47,26 @@ def _pre_push_gate(config: str) -> bool:
 
 
 def hooks_recipe(ctx: Context) -> Finding:
-    """The versioned half of the recipe: one config, bd's five events in it, no bd-owned hook files tracked."""
+    """The versioned half of the recipe: one hook config owned by prek, no second manager, and a pre-push hook that runs the gate."""
     others = [name for name, files in _OTHER_MANAGERS.items() if any(ctx.path(f).exists() for f in files)]
     config = ctx.read(HOOK_CONFIG)
-    tracked = (ctx.git("ls-files", ".beads/hooks", ".beads-hooks") or "").split()
     problems: list[str] = []
     if others:
         problems.append(f"hooks also owned by {', '.join(others)}: move their checks into {HOOK_CONFIG} and delete them")
-    if tracked:
-        problems.append(f"bd's own hook files are tracked ({len(tracked)}): git rm -r --cached .beads/hooks")
     if config is None:
         return not_set_up("; ".join(["no .pre-commit-config.yaml", *problems]), _RECIPE, FixedBy.AUTO)
-    if ctx.profile.tracker == "beads":
-        missing = [e for e in BD_EVENTS if f"bd hooks run {e}" not in config]
-        if missing:
-            problems.append(f"bd events not run from {HOOK_CONFIG}: {', '.join(missing)}")
-        if "default_install_hook_types" not in config:
-            problems.append("no default_install_hook_types, so `prek install` installs pre-commit only")
     if not _pre_push_gate(config):
         problems.append("no pre-push hook runs `just check`, so a push skips the gate (the recipe's `gate` hook)")
     if problems:
         return failing("; ".join(problems), _MERGE_FIX)
-    return passing(f"{HOOK_CONFIG} owns the hooks" + (", bd's five events run from it" if ctx.profile.tracker == "beads" else ""))
+    return passing(f"{HOOK_CONFIG} owns the hooks and pre-push runs the gate")
 
 
 def hooks_installed(ctx: Context) -> Finding:
-    """The clone-local half: core.hooksPath unset, prek's (or pre-commit's) script installed, no bd marker."""
+    """The clone-local half: core.hooksPath unset, prek's (or pre-commit's) script installed."""
     if ctx.git("rev-parse", "--git-dir") is None:
         return ctx.not_a_repository()
-    fix = "bd hooks uninstall; git config --unset core.hooksPath; prek install"
+    fix = "git config --unset core.hooksPath; prek install"
     hooks_path = (ctx.git("config", "--local", "core.hooksPath") or "").strip()
     if hooks_path:
         return failing(f"core.hooksPath is {hooks_path}: a fresh clone runs no hooks, and prek refuses to install", fix, FixedBy.AUTO)
@@ -87,14 +75,9 @@ def hooks_installed(ctx: Context) -> Finding:
     pre_commit = hooks_dir / "pre-commit"
     if not pre_commit.is_file():
         return not_set_up("no pre-commit hook installed", "prek install", FixedBy.AUTO)
-    injected = sorted(
-        p.name for p in hooks_dir.iterdir() if p.is_file() and _BEADS_MARKER in p.read_text(encoding="utf-8", errors="replace")
-    )  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
-    if injected:
-        return failing(f"bd injected its block into {', '.join(injected)}", fix, FixedBy.AUTO)
     text = pre_commit.read_text(
         encoding="utf-8", errors="replace"
     )  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
     if "File generated by prek" not in text and "File generated by pre-commit" not in text:
         return failing("the pre-commit hook is not prek's", "prek install --overwrite", FixedBy.AUTO)
-    return passing("prek's hooks installed in .git/hooks; no bd block injected")
+    return passing("prek's hooks installed in .git/hooks")

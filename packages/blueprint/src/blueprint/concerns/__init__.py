@@ -8,6 +8,7 @@ MODULES = (
     "gate",
     "backlog",
     "secrets",
+    "secrets_scanner",
     "hooks",
     "stack",
     "python_pin",

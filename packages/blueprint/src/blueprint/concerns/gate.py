@@ -13,12 +13,10 @@ check("gate.step-inputs", "every step `check` runs declares the files it reads i
 )
 check(
     "gate.hooks-recipe",
-    "prek owns the git hooks through .pre-commit-config.yaml, bd's hooks run from it, pre-push runs the gate",
-    version=3,
+    "prek owns the git hooks through .pre-commit-config.yaml and pre-push runs the gate",
+    version=4,
 )(gate_hooks.hooks_recipe)
-check("gate.hooks-installed", "the installed git hooks are prek's, in .git/hooks, with no bd block injected", version=2, audit_only=True)(
-    gate_hooks.hooks_installed
-)
+check("gate.hooks-installed", "the installed git hooks are prek's, in .git/hooks", version=3, audit_only=True)(gate_hooks.hooks_installed)
 check(
     "gate.runs-blueprint",
     "`just check` runs blueprint's per-commit checkpoints (`just blueprint`)",

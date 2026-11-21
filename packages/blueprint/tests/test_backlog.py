@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint.concerns.backlog import STRICT
+from blueprint.init import RECIPES
 from blueprint.model import Verdict
 from blueprint.runner import run, run_audit
 
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
 
 def _beads(repo: Repo, *, config: dict[str, str] | None = None, lint_exit: int = 0) -> None:
     repo.write(".beads/config.yaml", "")
+    repo.write(".pre-commit-config.yaml", (RECIPES / "pre-commit-config.yaml").read_text())
     repo.write(".gitignore", ".beads.gate.lock*\n")
     repo.write(".claude/settings.json", json.dumps({"env": {"BD_DISABLE_METRICS": "1"}}))
     repo.fake_bd(STRICT if config is None else config, lint_exit=lint_exit, lint_out="shelf-1 missing acceptance criteria")
@@ -294,3 +296,15 @@ def test_a_sync_remote_naming_another_repository_passes(repo: Repo) -> None:
 
 def test_no_sync_remote_passes(repo: Repo) -> None:
     assert _remote(repo, None, "https://github.com/o/r.git") is Verdict.PASSING
+
+
+def test_a_beads_repo_whose_hook_config_lacks_bds_events_fails_the_beads_hooks_row(repo: Repo) -> None:
+    _beads(repo)
+    repo.write(".pre-commit-config.yaml", "repos: []\n")
+    assert _verdicts(repo)["backlog.hooks-recipe"] is Verdict.FAILING
+
+
+def test_a_beads_repo_without_a_hook_config_is_not_set_up(repo: Repo) -> None:
+    _beads(repo)
+    (repo.root / ".pre-commit-config.yaml").unlink()
+    assert _verdicts(repo)["backlog.hooks-recipe"] is Verdict.NOT_SET_UP

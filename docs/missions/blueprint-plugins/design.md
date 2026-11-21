@@ -79,3 +79,12 @@ assigning every row:
   frameworks require stacks (python also for uv). mise is NOT required by the stacks: a repo that pins no tools still wants its stack rows.
 - Each manifest lists its `modules` (the `concerns/*.py` files it owns until step 5). `tests/test_arch_plugin_imports.py` (any-arch Rule, no
   rows) fails a concern module importing another plugin's module without a `requires`, and a module no plugin owns.
+
+## Step 4 as built: the straddling rows
+
+- `gate.hooks-recipe` and `gate.hooks-installed` (git-hooks) no longer know beads. Their bd halves became `backlog.hooks-recipe` (bd's five
+  events run from the prek config, `default_install_hook_types`, no tracked bd hook files) and `backlog.hooks-installed` (no bd block
+  injected, audit only), owned by beads, which already requires git-hooks. The arrow now points one way. Versions: recipe 3 to 4, installed 2 to 3.
+- `secrets.scanner` moved to its own plugin `secret-scan` (default on), module `secrets_scanner.py`, requires mise and git-hooks. `secrets`
+  keeps the sops rows. The row id is unchanged, so overrides and audit records still match.
+- `gate.git-remote` stays with gate: an origin is needed for any push, and bd now takes its remote from origin. No beads knowledge in it.

@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter
+from pathlib import Path
 
+from blueprint.concerns.gate_hooks import HOOK_CONFIG
 from blueprint.model import Context, Finding, FixedBy, Profile, check, failing, not_checked, not_set_up, passing, uses_beads
 
 # Effective values bd must report (`bd config show --json`), owner rounds 5-8.
@@ -189,6 +191,66 @@ def no_duplicate_remote(ctx: Context) -> Finding:
         "delete the `sync:` block from .beads/config.yaml: bd takes the Dolt remote from git origin, so the clone's own transport "
         "always works; a copy goes wrong the day one machine uses ssh and another https",
     )
+
+
+# bd's hooks run from the prek config (`bd hooks run <event>`), never installed by bd itself: bd appends its block to other
+# managers' hook files, where a failing check then no longer blocks the commit (research/hooks-and-beads.md).
+_BD_EVENTS = ("pre-commit", "post-merge", "pre-push", "post-checkout", "prepare-commit-msg")
+_BEADS_MARKER = "BEGIN BEADS INTEGRATION"
+
+
+@check(
+    "backlog.hooks-recipe",
+    "bd's five events run from the prek config (`bd hooks run <event>`), the config installs every stage, and no bd hook files are tracked",
+    applies=uses_beads,
+    version=1,
+)
+def hooks_recipe(ctx: Context) -> Finding:
+    """The beads half of the hooks recipe, split out of gate.hooks-recipe so git-hooks knows nothing of beads."""
+    config = ctx.read(HOOK_CONFIG)
+    if config is None:
+        return not_set_up(
+            f"no {HOOK_CONFIG}", "`uv run blueprint init` writes the recipe (gate.hooks-recipe asks for it too)", FixedBy.AUTO
+        )
+    problems: list[str] = []
+    tracked = (ctx.git("ls-files", ".beads/hooks", ".beads-hooks") or "").split()
+    if tracked:
+        problems.append(f"bd's own hook files are tracked ({len(tracked)}): git rm -r --cached .beads/hooks")
+    missing = [e for e in _BD_EVENTS if f"bd hooks run {e}" not in config]
+    if missing:
+        problems.append(f"bd events not run from {HOOK_CONFIG}: {', '.join(missing)}")
+    if "default_install_hook_types" not in config:
+        problems.append("no default_install_hook_types, so `prek install` installs pre-commit only")
+    if problems:
+        return failing(
+            "; ".join(problems),
+            f"merge the recipe's bd `repo: local` block first under `repos:` in {HOOK_CONFIG} and `default_install_hook_types` at the top, "
+            "keeping the hooks the repo already has (`blueprint init` writes the recipe); then `prek install`",
+        )
+    return passing(f"{HOOK_CONFIG} runs bd's five events")
+
+
+@check(
+    "backlog.hooks-installed",
+    "bd has injected no block into the installed git hooks",
+    applies=uses_beads,
+    audit_only=True,
+    version=1,
+)
+def hooks_installed(ctx: Context) -> Finding:
+    """The beads half of gate.hooks-installed: bd's own block in a hook file means a failing check no longer blocks."""
+    if ctx.git("rev-parse", "--git-dir") is None:
+        return ctx.not_a_repository()
+    hooks_dir = Path((ctx.git("rev-parse", "--git-path", "hooks") or ".git/hooks").strip())
+    hooks_dir = hooks_dir if hooks_dir.is_absolute() else ctx.repo / hooks_dir
+    if not hooks_dir.is_dir():
+        return passing("no hooks directory, so nothing injected")
+    injected = sorted(
+        p.name for p in hooks_dir.iterdir() if p.is_file() and _BEADS_MARKER in p.read_text(encoding="utf-8", errors="replace")
+    )  # lossy-ok: parse: the text is matched for a yes/no, never stored or hashed
+    if injected:
+        return failing(f"bd injected its block into {', '.join(injected)}", "bd hooks uninstall; prek install", FixedBy.AUTO)
+    return passing("no bd block in the installed hooks")
 
 
 @check(
