@@ -3,15 +3,15 @@ id: 0033
 title: Blueprint owns the standard gate steps; a repo that differs declares it, and nothing it runs goes unchecked
 statement: Test units, node-tooling, recipe shadowing and calls, docker build --check, and worktree scope: gaps a2kay and homelab found are fixed in blueprint, never by weakening a checkpoint or silent override.
 concerns: [gate]
-status: proposed
-decided_by: agent
-updated: 2026-11-21
+status: accepted
+decided_by: owner
+updated: 2026-11-22
 distilled_into: blueprint gate_units.py, unit_runner.py, gate.recipe-shadowing, gate.recipe-calls, node-tooling profile; beads shelf-scdi, shelf-xgi5, shelf-zmi5, shelf-nmdo, shelf-a6uy, shelf-cmbg, shelf-5j27
 ---
 
 # 0033 — Blueprint owns the standard gate steps
 
-Proposed by the agent; the owner has not decided. Choices for the owner to confirm: `docker build --check` counts; no `--gate` alias; the `node-tooling` detection rule; checkJs/JSDoc not a standard; the cache is per checkout; a unit's key fails closed beside reached code.
+Proposed by the agent; the owner accepted all six choices on 2026-11-22: `docker build --check` counts; no `--gate` alias; the `node-tooling` detection rule; checkJs/JSDoc not a standard; the cache is per checkout; a unit's key fails closed beside reached code.
 
 Owner rule (2026-11-21): the shelf decides which gates are standard; a repo does not need its own. If blueprint lacks something, fix blueprint; if the repo is wrong, fix the repo; never weaken a checkpoint to make a consumer pass; never override without a justification.
 
@@ -42,3 +42,4 @@ Owner rule (2026-11-21): the shelf decides which gates are standard; a repo does
 - 2026-11-21: proposed, from the a2kay and homelab onboarding (a2kay-nhnh, a2kay-4r2p).
 - 2026-11-22: recipe meanings added (owner: `check` is the full gate; affected tests only).
 - 2026-11-22: `check-all` made opt-in; `[tool.blueprint.gate] release-gate = true` is built, and shelf opts in.
+- 2026-11-22: accepted by the owner (all six choices).
