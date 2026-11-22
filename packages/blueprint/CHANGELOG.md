@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.13.1
+
+- Snapshot only, no blueprint change: carries any-agent 0.23.0 (`Harness.effort_levels`, `Summary.res["tokens"]["reasoning"]`).
+
 ## 0.13.0
 
 - Node coverage floors and alternatives are judged in the node project's folder (`ui/`), not the repo root; the coverage config accepts any `vitest.config.*` extension.
