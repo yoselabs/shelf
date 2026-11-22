@@ -27,6 +27,7 @@ the file holds the reasons, the rejected options and the history.
 - [0027](0027-no-repository-has-ci.md) **No repository has GitHub Actions CI; the local gate is the gate**: No repository holds GitHub Actions configuration. Done is the local `just check` green on the tree pushed and on a merged tree; blueprint's `gate.no-ci` fails a repo with workflows.
 - [0029](0029-the-justfile-imports-blueprint-rendered-parts.md) **A repo's justfile imports blueprint-rendered parts; `import`, not `mod`**: The gate's common recipes are files `blueprint gate render` writes per stack; the repo's justfile imports them (`import`, not `mod`) and owns the rest; `render --check` is the drift check.
 - [0031](0031-gate-steps-declare-their-inputs.md) **Every gate step declares the files it reads; a step whose inputs did not change is not started**: gate-inputs.toml lists each step's input globs; any-gate does not start a step none of whose inputs changed; blueprint checkpoints stay one step reading the whole repo.
+- [0033](0033-blueprint-owns-the-standard-gate-steps.md) **Blueprint owns the standard gate steps; a repo that differs declares it, and nothing it runs goes unchecked**: Test units, node-tooling, recipe shadowing and calls, docker build --check, and worktree scope: gaps a2kay and homelab found are fixed in blueprint, never by weakening a checkpoint or silent override.
 
 ## knowledge
 
@@ -62,4 +63,3 @@ the file holds the reasons, the rejected options and the history.
 ## Proposed, not in force
 
 - [0032](0032-one-local-service-domain-package.md) **Local serving belongs to one held service**: Group local ASGI access, readiness, serving and discovery in any-local-service; reuse token and scope primitives and keep consumer policy in the apps.
-- [0033](0033-blueprint-owns-the-standard-gate-steps.md) **Blueprint owns the standard gate steps; a repo that differs declares it, and nothing it runs goes unchecked**: Test units, node-tooling, recipe shadowing and calls, docker build --check, and worktree scope: gaps a2kay and homelab found are fixed in blueprint, never by weakening a checkpoint or silent override.
