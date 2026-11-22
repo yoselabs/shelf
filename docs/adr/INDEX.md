@@ -62,3 +62,4 @@ the file holds the reasons, the rejected options and the history.
 ## Proposed, not in force
 
 - [0032](0032-one-local-service-domain-package.md) **Local serving belongs to one held service**: Group local ASGI access, readiness, serving and discovery in any-local-service; reuse token and scope primitives and keep consumer policy in the apps.
+- [0033](0033-blueprint-owns-the-standard-gate-steps.md) **Blueprint owns the standard gate steps; a repo that differs declares it, and nothing it runs goes unchecked**: Test units, node-tooling, recipe shadowing and calls, docker build --check, and worktree scope: gaps a2kay and homelab found are fixed in blueprint, never by weakening a checkpoint or silent override.

@@ -42,6 +42,51 @@ def test_a_role_configured_and_run_by_the_gate_passes(repo: Repo) -> None:
     assert rows["stack.python-uv.toolchain"][0] is Verdict.PASSING
 
 
+@pytest.mark.parametrize("config_path", ["pyproject.toml", "ruff.toml", ".ruff.toml"])
+@pytest.mark.parametrize("role", ["formatter", "linter"])
+def test_ruff_config_locations_pass_formatter_and_linter(repo: Repo, config_path: str, role: str) -> None:
+    # shelf-fo0g: standalone ruff config must count just like pyproject tables.
+    _python_repo(repo)
+    if config_path != "pyproject.toml":
+        repo.write("pyproject.toml", '[project]\nname = "x"\nrequires-python = ">=3.12"\n')
+        repo.write(config_path, 'line-length = 100\n\n[lint]\nselect = ["ALL"]\n')
+    assert _rows(repo)[f"stack.python-uv.{role}"][0] is Verdict.PASSING
+
+
+@pytest.mark.parametrize("config_path", ["ruff.toml", ".ruff.toml"])
+@pytest.mark.parametrize("config", ["", "line-length = 100\n"])
+def test_ruff_config_without_lint_table_does_not_set_up_linter(repo: Repo, config_path: str, config: str) -> None:
+    # shelf-fo0g: the config file's existence alone proves no lint setting.
+    _python_repo(repo)
+    repo.write("pyproject.toml", '[project]\nname = "x"\nrequires-python = ">=3.12"\n')
+    repo.write(config_path, config)
+    assert _rows(repo)["stack.python-uv.linter"][0] is Verdict.NOT_SET_UP
+
+
+@pytest.mark.parametrize("config_path", ["pyproject.toml", "pyrefly.toml"])
+@pytest.mark.parametrize(
+    ("config", "verdict"),
+    [
+        ('preset = "strict"\nuse-ignore-files = false\n', Verdict.PASSING),
+        ('preset = "strict"\n', Verdict.NOT_SET_UP),
+        ("use-ignore-files = false\n", Verdict.NOT_SET_UP),
+        ('preset = "default"\nuse-ignore-files = false\n', Verdict.NOT_SET_UP),
+        ("", Verdict.NOT_SET_UP),
+    ],
+)
+def test_pyrefly_config_locations_require_strict_preset_and_ignore_files_disabled(
+    repo: Repo, config_path: str, config: str, verdict: Verdict
+) -> None:
+    # shelf-fo0g: both config locations must preserve every types requirement.
+    _python_repo(repo)
+    repo.write("Makefile", _MAKEFILE + "\tuv run pyrefly check\n")
+    if config_path == "pyproject.toml":
+        repo.write(config_path, _PYPROJECT + "\n[tool.pyrefly]\n" + config)
+    else:
+        repo.write(config_path, config)
+    assert _rows(repo)["stack.python-uv.types"][0] is verdict
+
+
 def test_a_justfile_gate_is_read_through_its_graph_and_a_recipe_nothing_reaches_does_not_count(repo: Repo) -> None:
     _python_repo(repo)
     repo.write("Makefile", "")
@@ -174,6 +219,22 @@ def test_check_all_counts_as_the_gate(repo: Repo) -> None:
     _python_repo(repo)
     repo.write("Makefile", _MAKEFILE + "check-all: lint cov\ncov:\n\tuv run pytest --cov-fail-under=80\n")
     assert _rows(repo)["stack.python-uv.coverage"][0] is Verdict.PASSING
+
+
+@pytest.mark.parametrize(
+    ("settings", "command", "expected"),
+    [
+        ('coverage = "coverage"\nfloor = 80\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "test", Verdict.PASSING),
+        ('coverage = "pytest-cov"\nfloor = 80\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "test", Verdict.PASSING),
+        ('coverage = "coverage"\nfloor = 80', "test", Verdict.FAILING),
+        ('floor = 80\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "test", Verdict.NOT_SET_UP),
+        ('coverage = "coverage"\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "test", Verdict.FAILING),
+        ('coverage = "coverage"\nfloor = 80\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "format", Verdict.FAILING),
+    ],
+)
+def test_unit_floor_requires_measured_units_and_the_gate_test_command(repo: Repo, settings: str, command: str, expected: Verdict) -> None:
+    _gate_with_cov(repo, f"uv run blueprint gate {command}", pyproject=_PYPROJECT + f"\n[tool.blueprint.test]\n{settings}\n")
+    assert _rows(repo)["stack.python-uv.coverage"][0] is expected
 
 
 def _gate_with_cov(repo: Repo, recipe: str, *, pyproject: str = _PYPROJECT) -> None:

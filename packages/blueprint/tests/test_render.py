@@ -40,7 +40,7 @@ def test_a_python_repo_gets_the_base_and_the_python_part(repo: Repo) -> None:
     _python(repo)
     parts = render.parts(repo.root)
     assert sorted(parts) == [".blueprint/base.just", ".blueprint/python.just"]
-    assert '"lint" "typecheck"' in parts[".blueprint/base.just"]
+    assert '"lint-changed" "typecheck"' in parts[".blueprint/base.just"]
     assert "\ntypecheck:" in parts[".blueprint/python.just"]
 
 
@@ -55,7 +55,7 @@ def test_every_repo_gets_the_secret_scan_step_and_its_recipes(repo: Repo) -> Non
     base = render.parts(repo.root)[".blueprint/base.just"]
     assert '"blueprint" "secrets"' in base
     assert "\nsecrets:\n    uv run python -m blueprint.secret_scan range" in base
-    assert "\nsecrets-all:\n    uv run python -m blueprint.secret_scan full" in base
+    assert "\nsecrets-all:" not in base
 
 
 def test_a_repo_with_no_known_stack_gets_only_the_base(repo: Repo) -> None:
@@ -65,6 +65,34 @@ def test_a_repo_with_no_known_stack_gets_only_the_base(repo: Repo) -> None:
 def test_rendering_is_deterministic(repo: Repo) -> None:
     _python_and_shell(repo)
     assert render.parts(repo.root) == render.parts(repo.root)
+
+
+@pytest.mark.parametrize(
+    ("manifests", "install_lines"),
+    [
+        (("pyproject.toml",), ()),
+        (("package.json",), ("npm ci --no-audit --no-fund",)),
+        (("package.json", "pyproject.toml"), ("npm ci --no-audit --no-fund",)),
+    ],
+    ids=["python-only", "node-tooling", "python-and-node-tooling"],
+)
+def test_tools_installs_each_stacks_dependencies_after_mise(repo: Repo, manifests: tuple[str, ...], install_lines: tuple[str, ...]) -> None:
+    for manifest in manifests:
+        repo.write(manifest, '{"scripts": {"build": "vite build"}}' if manifest == "package.json" else '[project]\nname = "x"\n')
+    base = render.parts(repo.root)[".blueprint/base.just"]
+    tools = base.split("\ntools:\n", 1)[1].split("\n\n", 1)[0]
+    assert tools.splitlines() == [
+        "    mise trust --yes .",
+        '    MISE_IGNORED_CONFIG_PATHS="$HOME/.config/mise" mise install --locked',
+        *(f"    {line}" for line in install_lines),
+    ]
+
+
+@pytest.mark.parametrize("stacks", [("node",), ("node", "node-tooling"), ("node-tooling", "node")])
+def test_node_install_is_rendered_once_for_either_node_stack(repo: Repo, monkeypatch: pytest.MonkeyPatch, stacks: tuple[str, ...]) -> None:
+    monkeypatch.setattr(render, "detect_stacks", lambda _repo: stacks)
+    base = render.parts(repo.root)[".blueprint/base.just"]
+    assert base.count("    npm ci --no-audit --no-fund\n") == 1
 
 
 def test_write_creates_the_parts_and_a_justfile_importing_them(repo: Repo) -> None:
@@ -152,10 +180,28 @@ def test_the_cli_writes_then_checks(repo: Repo, tmp_path: Path) -> None:
 
 
 def test_the_release_gate_runs_the_whole_form_of_each_step_and_a_floor(repo: Repo) -> None:
-    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    repo.write("pyproject.toml", '[project]\nname = "x"\n[tool.blueprint.gate]\nrelease-gate = true\n')
     repo.write("uv.lock", "")
     parts = render.parts(repo.root)
     assert '"secrets-all"' in parts[".blueprint/base.just"]
     assert '"test-all"' in parts[".blueprint/base.just"]
-    assert "--cov-fail-under" in parts[".blueprint/python.just"]
+    assert "blueprint gate test-all" in parts[".blueprint/python.just"]
     assert "\ntest-all:" in parts[".blueprint/python.just"]
+
+
+def test_release_recipes_are_absent_by_default(repo: Repo) -> None:
+    _python(repo)
+    text = "\n".join(render.parts(repo.root).values())
+    for name in ("check-all", "steps-all", "test-all", "lint", "spell", "secrets-all"):
+        assert f"\n{name}:" not in text
+        assert f"\n{name} +" not in text
+    assert "\ncheck-extra:" in text
+
+
+@pytest.mark.parametrize("step", ["lint", "spell", "test-all", "steps-all"])
+def test_a_whole_recipe_referenced_by_the_repo_stays_without_release_gate(repo: Repo, step: str) -> None:
+    _python(repo)
+    repo.write("justfile", f"check-extra: {step}\n")
+    text = "\n".join(render.parts(repo.root).values())
+    assert f"\n{step}:" in text or f"\n{step} +" in text
+    assert "\ncheck-all:" not in text

@@ -2,5 +2,5 @@ id = "agents"
 title = "Agent instructions and worktrees"
 default = "on"
 requires = []
-rows = ["agents.instructions", "agents.worktrees", "agents.worktrees-in-sync"]
+rows = ["agents.instructions", "agents.other-worktrees", "agents.worktrees", "agents.worktrees-in-sync"]
 modules = ["agents.agents"]

@@ -2,5 +2,5 @@ id = "node"
 title = "Node"
 default = "detected"
 requires = ["stacks"]
-rows = ["stack.node.*"]
+rows = ["stack.node.*", "stack.node-tooling.*"]
 modules = []

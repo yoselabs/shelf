@@ -1,4 +1,4 @@
-# Rendered by `blueprint gate render` -- never edit; a recipe of the same name in the repo's justfile replaces it.
+# Rendered by `blueprint gate render` -- never edit; a recipe of the same name in the repo's justfile replaces it only through a declared override (gate.recipe-shadowing).
 # The shell stack: every tracked shell script passes shellcheck (pinned in mise.toml), at its default severity.
 
 [group('gate')]

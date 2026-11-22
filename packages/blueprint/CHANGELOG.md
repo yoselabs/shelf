@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Release recipes render only with `[tool.blueprint.gate] release-gate = true`; measured test units can enforce their floor inside `check`.
+- Rendered `tools` installs Node dependencies once after mise for `node` and `node-tooling` stacks (`npm ci --no-audit --no-fund`).
+- `[tool.blueprint.test]` `pytest-args`, `marks` and `env` configure every test run and invalidate every unit's cached key.
+- The `python-uv` stack accepts `ruff.toml` / `.ruff.toml` and `pyrefly.toml`, preserving lint-table and strict-preset requirements.
+- `gate test-all` uses `[tool.coverage.report] fail_under` when `[tool.blueprint.test] floor` is unset, before falling back to 65.
+- **Test units for a repo that is not a workspace**: `[tool.blueprint.test]` units, keys from the import graph, per-unit coverage data cached and combined before the floor (`coverage run` or pytest-cov). `gate_test.run`'s `pytest_args` defaults to none with coverage.
+- New rows: `gate.recipe-shadowing`, `gate.recipe-calls`, `agents.other-worktrees` (audit-only). `agents.worktrees-in-sync` (version 2) judges this worktree only.
+- New stack `node-tooling` for a build-tool-only `package.json`.
+- **The python steps are engine commands**: `blueprint gate lint|format|spell|test-all`, with `lint-changed` and `spell-changed` in `check`; a repo's paths, extra steps and floor are data in `[tool.blueprint.gate]` and `[tool.blueprint.test]`, so it defines no recipe of its own. `check-all` runs `check-extra`. `stack.roles` is version 4.
+- `stack.dockerfile.tests` needs a `docker build` line naming the path (`--check` counts). `gate.clean-clone` shows the failing step and 20 lines of its log. See ADR 0033.
+
 ## 0.12.0
 
 - `blueprint` opts in to the public-`Any` rule: each remaining `Any` in a public signature is parsed TOML and says so. `check_dockerfile_pins` and `testing` bound their git calls with `timeout=` (a git timeout in the recipe falls back to the file walk).

@@ -36,7 +36,9 @@ def _sound(repo: Repo) -> None:
 
 def test_a_sound_harness_passes_every_agent_checkpoint(repo: Repo) -> None:
     _sound(repo)
-    assert set(_verdicts(repo).values()) == {Verdict.PASSING}
+    verdicts = _verdicts(repo)
+    assert set(verdicts.values()) <= {Verdict.PASSING, Verdict.NOT_APPLICABLE}
+    assert verdicts["agents.worktrees-in-sync"] is Verdict.NOT_APPLICABLE  # the main checkout is no linked worktree
 
 
 def test_a_separate_claude_md_fails(repo: Repo) -> None:

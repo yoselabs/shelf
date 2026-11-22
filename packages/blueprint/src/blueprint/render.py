@@ -5,17 +5,20 @@ not `mod`). The parts are plain text, rendered from the files under `just/` and 
 `blueprint gate render --check` fails on any difference between what is committed and what the blueprint would write now. A consumer stops
 copying recipe text: it re-renders, and the repo's own `justfile` keeps only what is its own.
 
-Extension points, all in the repo's own justfile: a recipe defined there replaces the base or stack recipe of the same name
-(`set allow-duplicate-recipes`), and `check-extra` runs one more thing in the gate.
+Extension points: `check-extra` in the repo's justfile runs one more thing in the gate; `[tool.blueprint.gate]` in pyproject.toml holds
+the repo's paths and extra steps (`gate_py`). A recipe defined there with a rendered name replaces it (`set allow-duplicate-recipes`),
+but `gate.recipe-shadowing` fails that unless an `[[override]]` says why (ADR 0033).
 
 Exit codes of the check: 0 current · 1 drift (a part differs, is missing, is stale, or the justfile does not import it).
 """
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
+from blueprint import gate_py
 from blueprint.profile import detect_stacks
 
 FOLDER = ".blueprint"
@@ -29,12 +32,16 @@ _HEADER = (
 
 # stack -> (part name, the gate steps it adds to `check`, in order). A stack with no row has no recipes to render.
 _STACKS = {
-    "python-uv": ("python", ("lint", "typecheck", "spell", "deps", "test")),
-    "python": ("python", ("lint", "typecheck", "spell", "deps", "test")),
+    "python-uv": ("python", ("lint-changed", "typecheck", "spell-changed", "deps", "test")),
+    "python": ("python", ("lint-changed", "typecheck", "spell-changed", "deps", "test")),
     "shell": ("shell", ("scripts",)),
 }
+_STACK_INSTALLS = {
+    "node": ("npm ci --no-audit --no-fund",),
+    "node-tooling": ("npm ci --no-audit --no-fund",),
+}
 # What the release gate runs instead of a step: the whole-history and whole-suite form.
-_WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all"}
+_WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all", "lint-changed": "lint", "spell-changed": "spell"}
 _COMMON_STEPS = ("guard", "preset", "render", "blueprint", "secrets")
 
 
@@ -50,14 +57,58 @@ def _stack_parts(repo: Path) -> list[tuple[str, tuple[str, ...]]]:
 def parts(repo: Path) -> dict[str, str]:
     """`{path relative to the repo: text}` of every part this repo's stacks call for."""
     stack_parts = _stack_parts(repo)
-    steps = [*_COMMON_STEPS, *(step for _, group in stack_parts for step in group)]
-    whole = [_WHOLE.get(s, s) for s in steps]
+    steps = [*_COMMON_STEPS, *(step for _, group in stack_parts for step in group), *gate_py.extra_steps(repo)]
+    whole: list[str] = [_WHOLE.get(s, s) for s in steps] if gate_py.release_gate(repo) else []
     base = (_TEMPLATES / "base.just").read_text()
     base = base.replace("@STEPS@", " ".join(f'"{s}"' for s in steps)).replace("@STEPS_ALL@", " ".join(f'"{s}"' for s in whole))
+    installs = dict.fromkeys(line for stack in sorted(detect_stacks(repo)) for line in _STACK_INSTALLS.get(stack, ()))
+    base = base.replace("@TOOLS@\n", "".join(f"    {line}\n" for line in installs))
     rendered = {f"{FOLDER}/base.just": base}
     for name, _ in stack_parts:
         rendered[f"{FOLDER}/{name}.just"] = (_TEMPLATES / f"{name}.just").read_text()
+    if not gate_py.release_gate(repo):
+        rendered = _without_release_recipes(repo, rendered, steps)
     return rendered
+
+
+def _without_release_recipes(repo: Path, rendered: dict[str, str], steps: list[str]) -> dict[str, str]:
+    """Drop release-only recipes, retaining any that the repo or another retained recipe references."""
+    optional = {"check-all", "steps-all", "secrets-all", "scripts-all", "test-all", "lint", "spell"}
+    blocks = {path: text.split("\n\n") for path, text in rendered.items()}
+    recipe = re.compile(r"(?m)^([\w-]+)(?:\s+[^\n:]*)?:")
+    references = set(steps) | _referenced_recipes(_own_recipe_text(repo))
+    for groups in blocks.values():
+        references |= _referenced_recipes("\n".join(b for b in groups if not (m := recipe.search(b)) or m[1] not in optional))
+    retained: set[str] = set()
+    while found := (optional - retained - {"check-all"}) & references:
+        retained |= found
+        added = "\n".join(b for groups in blocks.values() for b in groups if (m := recipe.search(b)) and m[1] in found)
+        references |= _referenced_recipes(added)
+    return {
+        path: "\n\n".join(b for b in groups if not (m := recipe.search(b)) or m[1] not in optional - retained)
+        for path, groups in blocks.items()
+    }
+
+
+def _referenced_recipes(text: str) -> set[str]:
+    headers = re.findall(r"(?m)^[\w-]+(?:[^\n:]*)?:([^\n]*)", text)
+    calls = re.findall(r"(?:\bjust\s+|{{\s*just_executable\(\)\s*}}\s+)([^\n]*)", text)
+    return set(re.findall(r"[\w-]+", " ".join([*headers, *calls])))
+
+
+def _own_recipe_text(repo: Path) -> str:
+    pending = [repo / name for name in _JUSTFILES]
+    seen: set[Path] = set()
+    texts: list[str] = []
+    while pending:
+        path = pending.pop().resolve()
+        if path in seen or not path.is_relative_to(repo.resolve()) or not path.is_file() or path.is_relative_to((repo / FOLDER).resolve()):
+            continue
+        seen.add(path)
+        text = "\n".join(line for line in path.read_text().splitlines() if not line.lstrip().startswith("#"))
+        texts.append(text)
+        pending += [path.parent / name for name in re.findall(r"(?m)^import\??\s+['\"]([^'\"]+)['\"]", text)]
+    return "\n".join(texts)
 
 
 def _justfile(repo: Path) -> Path:

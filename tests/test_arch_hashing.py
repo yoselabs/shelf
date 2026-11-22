@@ -25,6 +25,7 @@ _HASHLIB_IMPORTERS = {
         "any-failure-fp/src/any_failure_fp/fingerprint.py": "legitimate: sha1 suffix of a cut fingerprint is a key; sha256 would change it",
         "anyembed/src/anyembed/testing.py": "legitimate: raw digest bytes seed a fake vector, not an identity",
         "blueprint/src/blueprint/report.py": "legitimate: sha256[:12] fingerprints stored in written reports; stdlib-only engine",
+        "blueprint/src/blueprint/gate_units.py": "legitimate: sha256[:32] test-unit key; stdlib-only engine",
         "blueprint/src/blueprint/runner.py": "legitimate: sha256[:12] checkpoint-set hash stored in reports; stdlib-only engine",
         "dir-trust/src/dir_trust/__init__.py": (
             "legitimate: incremental hash with NUL framing, kept in trust grants; no content-digest door"
