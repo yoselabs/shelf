@@ -84,7 +84,7 @@ def gate_text(ctx: Context) -> str:
     if gate_graph.HOOK_RUN.search(parts[0]):
         parts.append(ctx.read(gate_graph.HOOK_CONFIG) or "")
     parts += [ctx.read(f) or "" for f in ("lefthook.yml", "lefthook.yaml")]
-    return "\n".join(parts)
+    return gate_graph.executable("\n".join(parts))
 
 
 def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
@@ -382,7 +382,7 @@ def _profile_row(stack: str, prof: StackProfile | None, origin: str = "") -> Sub
     return Sub(f"stack/{stack}", f"stack.{stack}.profile", statement, passing(f"{prof.status} profile: {tools}{note}{seen}"))
 
 
-@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `just check`", layer="stack", version=4)
+@check_each("stack.roles", "each stack's tool for each role, from its profile, is set up and run by `just check`", layer="stack", version=5)
 def roles(ctx: Context) -> list[Sub]:
     """Per detected stack: one profile row, then one row per role."""
     if not ctx.profile.stacks:

@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 COVERAGE_MODES = ("coverage", "pytest-cov")
 _SOURCE_ROOTS = ("", "src")
 _SKIP_PARTS = frozenset({"__pycache__", ".venv", "node_modules", ".git"})
+_NOT_INPUTS = frozenset({".py", ".pyc", ".pyo", ".DS_Store", ".swp"})  # beside reached code, but never an input to it
 
 
 @dataclass(frozen=True)
@@ -253,7 +254,12 @@ def key(repo: Path, unit: Unit) -> str:
     code = reached(repo, starts)
     # Fail closed where the import graph cannot see: files that sit beside reached code (templates, SQL, JS) change the key, and a
     # module imported by a computed name widens it to its whole package.
-    beside = sorted(f for py in sorted(code - set(starts)) for f in py.parent.iterdir() if f.is_file() and f.suffix != ".py")
+    beside = sorted(
+        f
+        for py in sorted(code - set(starts))
+        for f in py.parent.iterdir()
+        if f.is_file() and f.suffix not in _NOT_INPUTS and f.name not in _NOT_INPUTS
+    )
     wide = {f for py in code if _computes_imports(py) for f in _files(repo, _top_package(repo, py).relative_to(repo).as_posix())}
     files = sorted({*starts, *code, *read, *beside, *wide})
     digest = hashlib.sha256()
