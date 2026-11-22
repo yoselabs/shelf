@@ -43,13 +43,14 @@ deps:
     fi
 
 # The tests the change reaches, through any-gate (`blueprint gate test`): suites that already passed on this input are skipped, the rest
-# queue for one test slot. No coverage floor: it is a whole-repo measure.
+# queue for one test slot. Declared test units combine cached coverage before enforcing their whole-repo floor.
 [group('gate')]
 test:
     uv run blueprint gate test
 
 # Every test, with the coverage floor (the release gate's test step). Coverage is a whole-repo measure, so a floor cannot ride
-# on `test`, which runs only what the change reaches. The floor is `[tool.blueprint.test] floor` (default 65, low on purpose: a rot-guard; raise it as coverage climbs). Queues behind any-lease when installed.
+# on a partial run without cached unit coverage. The floor is `[tool.blueprint.test] floor` (default 65).
+# Queues behind any-lease when installed.
 [group('gate')]
 test-all:
     uv run blueprint gate test-all

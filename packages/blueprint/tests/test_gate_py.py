@@ -17,6 +17,7 @@ _PYPROJECT = """\
 name = "x"
 
 [tool.blueprint.gate]
+release-gate = true
 lint-paths = ["src", "tests"]
 spell-paths = ["src", "README.md"]
 steps = ["arch", "tag-check"]
@@ -51,6 +52,12 @@ def test_check_all_runs_the_extension_point_too(repo: Repo) -> None:
     base = render.parts(repo.root)[".blueprint/base.just"]
     assert "check-all: beads-lint" in base
     assert base.split("check-all:")[1].splitlines()[0].endswith("check-extra")
+
+
+@pytest.mark.parametrize("setting", ["", "release-gate = false", 'release-gate = "true"', "release-gate = 1", "release-gate = true"])
+def test_only_an_explicit_boolean_enables_the_release_gate(repo: Repo, setting: str) -> None:
+    repo.write("pyproject.toml", f"[tool.blueprint.gate]\n{setting}\n")
+    assert gate_py.release_gate(repo.root) is (setting == "release-gate = true")
 
 
 def test_lint_reads_only_the_declared_paths(repo: Repo) -> None:

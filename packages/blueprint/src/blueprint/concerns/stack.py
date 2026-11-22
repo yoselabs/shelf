@@ -14,7 +14,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from blueprint import gate_graph
+from blueprint import gate_graph, gate_test, gate_units
 from blueprint.concerns.profile_data import Role, StackProfile, load_profiles
 from blueprint.model import (
     Finding,
@@ -90,6 +90,8 @@ def gate_text(ctx: Context) -> str:
 def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
     if "any" in spec:
         return any(_config_holds(ctx, alt, root) for alt in spec["any"])
+    if spec.get("test-coverage"):
+        return bool(gate_units.read_config(ctx.repo).coverage)
     path = spec["path"].replace("{root}", root).removeprefix("./")
     if any(ch in path for ch in "*?["):
         hits = (p.relative_to(ctx.repo) for p in sorted(ctx.repo.glob(path)))
@@ -308,6 +310,10 @@ OUTCOMES = ("runs", "floor")
 
 
 def _floor_holds(ctx: Context, floor: dict[str, Any], gate_text: str) -> bool:
+    if floor.get("units"):
+        config = gate_units.load(ctx.repo)
+        if gate_test.is_workspace(ctx.repo) or config is None or not config.coverage or config.floor is None:
+            return False
     return bool(re.search(floor["gate"], gate_text)) and ("path" not in floor or _config_holds(ctx, floor))
 
 

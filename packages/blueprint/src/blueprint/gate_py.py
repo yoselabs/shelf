@@ -53,6 +53,12 @@ def extra_steps(repo: Path) -> tuple[str, ...]:
     return tuple(_paths(repo, "steps"))
 
 
+def release_gate(repo: Path) -> bool:
+    """Only an explicit boolean opts a repo into rendering the release gate."""
+    gate = settings(repo).get("gate", {})
+    return isinstance(gate, dict) and gate.get("release-gate") is True
+
+
 def _globs(repo: Path, paths: list[str], suffix: str) -> list[str]:
     """`any_gate changed` patterns for `paths`: a folder is everything below it (with `suffix`), a file is itself."""
     if not paths:

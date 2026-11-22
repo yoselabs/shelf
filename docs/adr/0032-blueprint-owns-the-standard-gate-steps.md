@@ -38,4 +38,4 @@ Owner rule (2026-11-21): the shelf decides which gates are standard; a repo does
 
 - 2026-11-21: proposed, from the a2kay and homelab onboarding (a2kay-nhnh, a2kay-4r2p).
 - 2026-11-22: recipe meanings added (owner: `check` is the full gate; affected tests only).
-- 2026-11-22: `check-all` made opt-in; the setting that turns it on is not built yet.
+- 2026-11-22: `check-all` made opt-in; `[tool.blueprint.gate] release-gate = true` is built, and shelf opts in.

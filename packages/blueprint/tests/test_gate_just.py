@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from blueprint.model import Verdict
+from blueprint import gate_graph
+from blueprint.model import Context, Profile, Verdict
 from blueprint.runner import run, run_audit
 
 if TYPE_CHECKING:
@@ -24,6 +25,15 @@ def test_one_command_passes_when_just_dry_run_resolves(repo: Repo) -> None:
     verdict, evidence = _row(repo, "gate.one-command")
     assert verdict is Verdict.PASSING
     assert "just --dry-run check" in evidence
+
+
+def test_gate_graph_needs_no_release_recipe(repo: Repo) -> None:
+    repo.write("justfile", "check: test\ntest:\n    uv run blueprint gate test\nunused:\n    uv run blueprint gate test-all\n")
+    gate = gate_graph.load(Context(repo.root, Profile("library", (), (), (), None), env=repo.env))
+    assert gate is not None
+    assert not gate.has_recipe("check-all")
+    assert "blueprint gate test" in gate.gate_recipes()
+    assert "test-all" not in gate.gate_recipes()
 
 
 def test_one_command_fails_when_check_names_a_missing_recipe(repo: Repo) -> None:

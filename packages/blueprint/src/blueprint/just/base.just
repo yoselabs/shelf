@@ -11,7 +11,7 @@
 check: gate-start beads-lint (steps @STEPS@) check-extra
     uv run python -m any_gate passed --gate check
 
-# The release gate, rare (before a tag): every step over everything (all files, all history, every test, the coverage floor).
+# Opt-in release gate (`[tool.blueprint.gate] release-gate = true`): every step over everything before a tag.
 [group('gate')]
 check-all: beads-lint (steps-all @STEPS_ALL@) check-extra
 

@@ -122,6 +122,7 @@ tool = "pytest-cov with a floor"
 install = "uv add --dev pytest-cov; run pytest with --cov-fail-under=65 (the default floor: low on purpose, a backstop; set it higher only when the owner asks)"
 # Coverage is set up when something measures it; a gate that measures without a floor is the failing case.
 config = [{ any = [
+    { path = "pyproject.toml", test-coverage = true },
     { path = "pyproject.toml", contains = "pytest-cov" },
     { path = "pyproject.toml", contains = "[tool.coverage" },
     { path = "justfile", contains = "coverage run" },
@@ -140,6 +141,11 @@ gate = '--cov-fail-under|\bcoverage report\b[^\n]*--fail-under'
 [[role.floor]]
 label = "blueprint's own `gate test-all`: `[tool.blueprint.test] floor`, then `[tool.coverage.report] fail_under`, then 65"
 gate = 'blueprint gate test-all'
+
+[[role.floor]]
+label = "blueprint's `gate test` combines measured test units before enforcing `[tool.blueprint.test] floor`"
+gate = 'blueprint gate test(?:\s|$)'
+units = true
 
 # A floor in pyproject only bites when the gate reports (`coverage report`) or measures with pytest-cov, which reads it.
 [[role.floor]]

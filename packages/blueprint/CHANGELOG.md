@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Release recipes render only with `[tool.blueprint.gate] release-gate = true`; measured test units can enforce their floor inside `check`.
 - Rendered `tools` installs Node dependencies once after mise for `node` and `node-tooling` stacks (`npm ci --no-audit --no-fund`).
 - `[tool.blueprint.test]` `pytest-args`, `marks` and `env` configure every test run and invalidate every unit's cached key.
 - The `python-uv` stack accepts `ruff.toml` / `.ruff.toml` and `pyrefly.toml`, preserving lint-table and strict-preset requirements.

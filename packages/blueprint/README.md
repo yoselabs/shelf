@@ -7,6 +7,8 @@ the remediation with who applies it (auto, agent, owner). Stdlib only.
 
 ## Run it
 
+Release recipes (`check-all`) are opt-in: set `[tool.blueprint.gate] release-gate = true` in `pyproject.toml`, then re-render.
+
 `blueprint init` sets a repo up; `blueprint check` judges it; `blueprint gate <step>` runs one step of `just check` (the justfile and hooks call those). From any repo, with a shelf clone beside it — no install:
 
 ```bash

@@ -221,6 +221,22 @@ def test_check_all_counts_as_the_gate(repo: Repo) -> None:
     assert _rows(repo)["stack.python-uv.coverage"][0] is Verdict.PASSING
 
 
+@pytest.mark.parametrize(
+    ("settings", "command", "expected"),
+    [
+        ('coverage = "coverage"\nfloor = 80\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "test", Verdict.PASSING),
+        ('coverage = "pytest-cov"\nfloor = 80\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "test", Verdict.PASSING),
+        ('coverage = "coverage"\nfloor = 80', "test", Verdict.FAILING),
+        ('floor = 80\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "test", Verdict.NOT_SET_UP),
+        ('coverage = "coverage"\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "test", Verdict.FAILING),
+        ('coverage = "coverage"\nfloor = 80\n[tool.blueprint.test.units.core]\npaths = ["tests"]', "format", Verdict.FAILING),
+    ],
+)
+def test_unit_floor_requires_measured_units_and_the_gate_test_command(repo: Repo, settings: str, command: str, expected: Verdict) -> None:
+    _gate_with_cov(repo, f"uv run blueprint gate {command}", pyproject=_PYPROJECT + f"\n[tool.blueprint.test]\n{settings}\n")
+    assert _rows(repo)["stack.python-uv.coverage"][0] is expected
+
+
 def _gate_with_cov(repo: Repo, recipe: str, *, pyproject: str = _PYPROJECT) -> None:
     _python_repo(repo)
     repo.write("pyproject.toml", pyproject)
