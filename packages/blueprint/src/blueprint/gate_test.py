@@ -89,11 +89,21 @@ def run(
     """
     config = None if is_workspace(repo) else gate_units.load(repo)
     measuring = config is not None and bool(config.coverage)
+    if config is not None:
+        problems = list(config.problems)
+        if config.units and (uncovered := gate_units.uncovered_test_folders(repo, config)):
+            problems.append(f"test folders outside declared units: {', '.join(uncovered)}")
+        if problems:
+            sys.stderr.write("blueprint: " + "; ".join(problems) + "\n")
+            return 2
     args = pytest_args if pytest_args is not None else ("" if measuring else DEFAULT_PYTEST_ARGS)
+    filtered = bool(pytest_args and shlex.split(pytest_args))
     where = cache or cache_dir(repo)
     plan_cmd, test_cmd = commands(repo, receipts=receipts, lease_root=lease_root, pytest_args=args, cache=where)
     if config is not None:
-        plan = gate_units.plan(repo, config, cached=unit_runner.cached(where, config, repo) if measuring else None)
+        plan = gate_units.plan(repo, config, cached=unit_runner.cached(where, config, repo) if measuring and not filtered else None)
+        if filtered:
+            plan = "".join(f"{path}\t\n" for unit in config.units for path in unit.paths)
     elif plan_cmd is None:
         plan = whole_suite_plan()
     else:
@@ -102,6 +112,6 @@ def run(
             return code
     test_env = {**env, **gate_units.read_config(repo).env}
     code = execute(test_cmd, cwd=repo, stdin=plan, env=test_env)[0]
-    if code != 0 or config is None or not measuring:
+    if code != 0 or config is None or not measuring or filtered:
         return code
     return unit_runner.combine(repo, where, config)

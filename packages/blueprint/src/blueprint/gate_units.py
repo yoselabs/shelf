@@ -21,8 +21,10 @@ where the reading is blind: a file beside reached code (a template, SQL, JS) cha
 from __future__ import annotations
 
 import ast
+import configparser
 import hashlib
 import json
+import shlex
 import tomllib
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -50,6 +52,8 @@ class Config:
     pytest_args: tuple[str, ...] = ()
     env: dict[str, str] = field(default_factory=dict)
     marks: str = ""
+    problems: tuple[str, ...] = ()
+    test_roots: tuple[str, ...] = ("tests",)
 
     def arguments(self) -> list[str]:
         return [*self.pytest_args, *(["-m", self.marks] if self.marks else [])]
@@ -59,13 +63,13 @@ class Config:
 
 
 def load(repo: Path) -> Config | None:
-    """The declared units, or None when the repo declares none (or its pyproject cannot be read)."""
+    """The declared units or their validation problems; None when the repo declares none."""
     config = read_config(repo)
-    return config if config.units else None
+    return config if config.units or config.problems else None
 
 
 def read_config(repo: Path) -> Config:
-    """Test settings, including repos with no declared units; invalid settings keep their defaults."""
+    """Test settings, including repos with no declared units; invalid unit paths remain visible as problems."""
     manifest = repo / "pyproject.toml"
     if not manifest.is_file():
         return Config(())
@@ -75,23 +79,58 @@ def read_config(repo: Path) -> Config:
         return Config(())
     table: dict[str, Any] = data.get("tool", {}).get("blueprint", {}).get("test", {})  # Any: parsed TOML
     raw_units = table.get("units", {})
-    units = tuple(
-        Unit(name, tuple(spec.get("paths", ())), tuple(spec.get("reads", ())))
-        for name, spec in sorted(raw_units.items())
-        if isinstance(spec, dict) and spec.get("paths")
-    )
+    units: list[Unit] = []
+    problems: list[str] = []
+    for name, spec in sorted(raw_units.items()):
+        paths = spec.get("paths") if isinstance(spec, dict) else None
+        if not isinstance(paths, list) or not paths or not all(isinstance(p, str) and p for p in paths):
+            problems.append(f"unit {name}: paths must be a non-empty list of paths")
+        else:
+            units.append(Unit(name, tuple(paths), tuple(spec.get("reads", ()))))
     mode = table.get("coverage", "")
     floor = table.get("floor")
     args = table.get("pytest-args", [])
     env = table.get("env", {})
     marks = table.get("marks", "")
     return Config(
-        units,
+        tuple(units),
         mode if mode in COVERAGE_MODES else "",
         float(floor) if isinstance(floor, int | float) else None,
         tuple(args) if isinstance(args, list) and all(isinstance(arg, str) for arg in args) else (),
         dict(env) if isinstance(env, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in env.items()) else {},
         marks if isinstance(marks, str) else "",
+        tuple(problems),
+        _unit_test_roots(repo, data),
+    )
+
+
+def _unit_test_roots(repo: Path, data: dict[str, Any]) -> tuple[str, ...]:
+    """The configured pytest roots; the conventional tests folder is checked too."""
+    roots = data.get("tool", {}).get("pytest", {}).get("ini_options", {}).get("testpaths", [])
+    if isinstance(roots, str):
+        roots = shlex.split(roots)
+    for name, section in (("pytest.ini", "pytest"), ("tox.ini", "pytest"), ("setup.cfg", "tool:pytest")):
+        if (repo / name).is_file():
+            parser = configparser.ConfigParser(interpolation=None)
+            parser.read(repo / name)
+            roots = shlex.split(parser.get(section, "testpaths", fallback="")) or roots
+            break
+    return tuple(dict.fromkeys(["tests", *roots]))
+
+
+def uncovered_test_folders(repo: Path, config: Config) -> list[str]:
+    """Folders containing conventional pytest files outside every declared unit, without collecting tests."""
+    paths = [repo / path for unit in config.units for path in unit.paths]
+    return sorted(
+        {
+            file.parent.relative_to(repo).as_posix()
+            for root in config.test_roots
+            for pattern in ("test_*.py", "*_test.py")
+            for file in (repo / root).rglob(pattern)
+            if file.is_file()
+            and not _SKIP_PARTS & set(file.relative_to(repo).parts)
+            and not any(file == path or file.is_relative_to(path) for path in paths)
+        }
     )
 
 
@@ -209,7 +248,7 @@ def key(repo: Path, unit: Unit) -> str:
     """The hash of everything `unit`'s tests can see (see the module doc)."""
     own = [f for p in unit.paths for f in _files(repo, p)]
     folders = {repo, *(d for p in unit.paths for d in [repo / p, *(repo / p).parents] if d == repo or repo in d.parents)}
-    starts = [*own, *(d / "conftest.py" for d in sorted(folders) if (d / "conftest.py").is_file())]
+    starts = [*own, *(d / name for d in sorted(folders) for name in ("conftest.py", "__init__.py") if (d / name).is_file())]
     read = sorted(f for glob in unit.reads for f in repo.glob(glob) if f.is_file())
     code = reached(repo, starts)
     # Fail closed where the import graph cannot see: files that sit beside reached code (templates, SQL, JS) change the key, and a
@@ -222,7 +261,7 @@ def key(repo: Path, unit: Unit) -> str:
         digest.update(file.relative_to(repo).as_posix().encode())
         digest.update(b"\0")
         digest.update(file.read_bytes())
-    for rel in ("uv.lock",):
+    for rel in ("uv.lock", "pytest.ini", ".coveragerc", "setup.cfg", "tox.ini", ".python-version"):
         if (repo / rel).is_file():
             digest.update(rel.encode())
             digest.update((repo / rel).read_bytes())

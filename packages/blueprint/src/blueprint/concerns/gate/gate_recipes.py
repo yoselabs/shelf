@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import re
+import shlex
 from typing import TYPE_CHECKING
 
-from blueprint import gate_graph
-from blueprint.model import Context, Finding, failing, not_applicable, passing
+from blueprint import gate_graph, render
+from blueprint.model import Context, Finding, failing, not_applicable, not_checked, passing
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -15,24 +17,40 @@ ID = "gate.recipe-shadowing"
 FOLDER = ".blueprint"
 # The extension point base.just declares for a repo to define; every other rendered name is blueprint's.
 EXTENSION_POINTS = frozenset({"check-extra"})
-_RECIPE = re.compile(r"^@?([A-Za-z_][\w-]*)(?:[ \t]+[^:=\n]*)?:(?!=)", re.MULTILINE)
 
 
-def recipe_names(text: str) -> set[str]:
-    """The names of the recipes `text` defines (a line at column 0 that is `name [params]:`, never an assignment)."""
-    return set(_RECIPE.findall(text))
+def _dump_recipe_names(ctx: Context, path: str) -> set[str] | None:
+    """Recipe names come from Just's parser, including defaulted parameters and imported definitions."""
+    done = ctx.run(gate_graph.just_command(ctx), "--justfile", path, "--dump", "--dump-format", "json", timeout=60)
+    if done is None or done.returncode != 0:
+        return None
+    return set(json.loads(done.stdout)["recipes"])
 
 
 def shadowing(ctx: Context) -> Finding:
     """The justfile imports blueprint's rendered parts and defines a recipe of the same name."""
-    own = next((t for n in gate_graph.JUSTFILES if (t := ctx.read(n)) is not None), None)
+    own = next((n for n in gate_graph.JUSTFILES if ctx.path(n).is_file()), None)
     parts: list[Path] = sorted(ctx.path(FOLDER).glob("*.just")) if ctx.path(FOLDER).is_dir() else []
     if own is None or not parts:
         return not_applicable("the gate imports no blueprint-rendered parts")
+    definitions = _dump_recipe_names(ctx, own)
+    if definitions is None:
+        return not_checked("just could not dump the repo's recipe definitions; fix the justfile or install its pinned just")
     owned: set[str] = set()
     for part in parts:
-        owned |= recipe_names(part.read_text(encoding="utf-8"))
-    clashes = sorted(recipe_names(own) & owned - EXTENSION_POINTS)
+        baseline = _dump_recipe_names(ctx, part.relative_to(ctx.repo).as_posix())
+        if baseline is None:
+            return not_checked(f"just could not dump rendered recipe definitions in {part.name}")
+        owned |= baseline
+    # The dump flattens imports and loses source locations. Attribute its validated names to consumer declarations; do not interpret
+    # parameter/default syntax. Assignments have a separate := token and indented lines belong to recipe bodies.
+    consumer: set[str] = set()
+    for line in render.own_recipe_text(ctx.repo).splitlines():
+        if line and not line[0].isspace():
+            words = line.split(maxsplit=1)
+            if not (":=" in words[0] or (len(words) > 1 and words[1].startswith(":="))):
+                consumer.add(words[0].removeprefix("@").split(":", 1)[0])
+    clashes = sorted(consumer & definitions & owned - EXTENSION_POINTS)
     excused = {name: o for name in clashes if (o := ctx.excused(ID, name)) is not None}
     open_ = [name for name in clashes if name not in excused]
     if open_:
@@ -67,12 +85,20 @@ def calls(ctx: Context) -> Finding:
     for name, recipe in sorted(gate.recipes.items()):
         if _LIVE_CLONE.search(recipe.body):
             problems.append(f"{name} runs blueprint from a shelf clone (it changes with whatever is checked out there)")
-        for call in _CALL.findall(recipe.body):
-            words = call.split("#", 1)[0].split()
+        for call in _CALL.findall(recipe.body.replace("\\\n", " ")):
+            words = shlex.split(call, comments=True)
             command, known = known_flags(words)
             problems += [
                 f"{name} runs `blueprint {command}` with {flag}, which it does not have"
-                for flag in sorted({w.split("=", 1)[0] for w in words if w.startswith("--")} - known - {"--help"})
+                for flag in sorted(
+                    {
+                        word.split("=", 1)[0]
+                        for index, word in enumerate(words)
+                        if word.startswith("--") and not (index and words[index - 1] == "--pytest-args")
+                    }
+                    - known
+                    - {"--help"}
+                )
             ]
     if problems:
         return failing(

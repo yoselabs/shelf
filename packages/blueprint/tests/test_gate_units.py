@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint import gate_test, gate_units, unit_runner
+from blueprint.__main__ import main
 from blueprint.model import Verdict
 from blueprint.runner import run
 
@@ -58,6 +59,45 @@ def _keys(repo: Repo) -> dict[str, str]:
 def test_a_repo_with_no_declared_units_has_none(repo: Repo) -> None:
     repo.write("pyproject.toml", '[project]\nname = "x"\n')
     assert gate_units.load(repo.root) is None
+
+
+@pytest.mark.parametrize("paths", ['path = ["tests/core"]', "paths = []", 'paths = "tests/core"'])
+def test_gate_test_refuses_invalid_unit_paths(repo: Repo, capsys: pytest.CaptureFixture[str], paths: str) -> None:
+    repo.write("pyproject.toml", f"[tool.blueprint.test.units.broken]\n{paths}\n")
+    assert main(["gate", "test", "--repo", str(repo.root)]) == 2
+    assert "broken" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("root", ["tests", "scenarios"])
+def test_gate_test_refuses_test_folders_outside_units(repo: Repo, capsys: pytest.CaptureFixture[str], root: str) -> None:
+    _app(repo)
+    repo.write("pyproject.toml", _PYPROJECT + f'\n[tool.pytest.ini_options]\ntestpaths = ["{root}"]\n')
+    repo.write(f"{root}/forgotten/example_test.py", "def test_forgotten():\n    assert False\n")
+    assert main(["gate", "test", "--repo", str(repo.root)]) == 2
+    assert f"{root}/forgotten" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("file", ["pytest.ini", ".coveragerc", "setup.cfg", "tox.ini", ".python-version", "tests/__init__.py"])
+def test_test_configuration_and_parent_initializers_invalidate_keys(repo: Repo, file: str) -> None:
+    _app(repo)
+    repo.write(file, "# before\n")
+    before = _keys(repo)
+    repo.write(file, "# after\n")
+    assert all(_keys(repo)[name] != before[name] for name in before)
+
+
+def test_filtered_run_cannot_supply_a_plain_runs_coverage(repo: Repo, tmp_path: Path) -> None:
+    _app(repo)
+    repo.write("tests/core/test_core.py", "def test_ok():\n    assert True\n\ndef test_bad():\n    assert False\n")
+
+    def filtered_go(args: str) -> int:
+        return gate_test.run(
+            repo.root, receipts=tmp_path / "r", lease_root=tmp_path / "leases", cache=tmp_path / "cache", env=repo.env, pytest_args=args
+        )
+
+    assert filtered_go("--deselect=tests/core/test_core.py::test_bad") == 0
+    assert not list((tmp_path / "cache").glob("*.cov"))
+    assert filtered_go("") != 0
 
 
 @pytest.mark.parametrize(
@@ -187,7 +227,7 @@ def test_a_green_run_caches_each_units_data_and_combines_it_whole_repo(repo: Rep
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], ["-p", "no:cacheprovider"]) == 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) == 0
     assert unit_runner.cached(cache, config, repo.root) == {f"{n}:{k}" for n, k in _keys(repo).items()}
     assert unit_runner.combine(repo.root, cache, config) == 0
 
@@ -245,7 +285,7 @@ def test_combine_refuses_when_a_unit_has_no_data(repo: Repo, tmp_path: Path) -> 
 def _gate(repo: Repo, justfile: str) -> tuple[Verdict, str]:
     repo.write(".blueprint/base.just", "check:\n    true\n\n[private]\ncheck-extra:\n    @:\n")
     repo.write(".blueprint/python.just", "[group('gate')]\ntest:\n    uv run blueprint gate test\n\nlint:\n    true\n")
-    repo.write("justfile", justfile)
+    repo.write("justfile", "set allow-duplicate-recipes\n" + justfile.removeprefix("set allow-duplicate-recipes\n"))
     rows = {r.id: r for r in run(repo.root, concern="gate", env=repo.env).rows}
     return rows["gate.recipe-shadowing"].verdict, rows["gate.recipe-shadowing"].evidence
 
@@ -254,6 +294,18 @@ def test_a_justfile_that_redefines_a_rendered_recipe_fails_naming_it(repo: Repo)
     verdict, evidence = _gate(repo, "import '.blueprint/base.just'\nimport '.blueprint/python.just'\n\ntest:\n    pytest\n")
     assert verdict is Verdict.FAILING
     assert "test" in evidence
+
+
+@pytest.mark.parametrize("header", ['lint path=".":', 'test x="a:b":'])
+@pytest.mark.parametrize("location", ["justfile", "local.just"])
+def test_defaulted_and_imported_recipe_shadows_are_reported(repo: Repo, header: str, location: str) -> None:
+    own = header + "\n    true\n"
+    if location != "justfile":
+        repo.write(location, own)
+        own = f"import '{location}'\n"
+    verdict, evidence = _gate(repo, "set allow-duplicate-recipes\nimport '.blueprint/base.just'\nimport '.blueprint/python.just'\n" + own)
+    assert verdict is Verdict.FAILING
+    assert header.split(maxsplit=1)[0] in evidence
 
 
 def test_check_extra_is_the_declared_extension_point_and_is_not_shadowing(repo: Repo) -> None:

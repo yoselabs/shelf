@@ -105,7 +105,8 @@ def _run_lint(repo: Path, *, only_changed: bool) -> int:
     ruff = [sys.executable, "-m", "ruff"]
     check = [*ruff, "check", *(["--force-exclude"] if only_changed else []), *targets]
     form = [*ruff, "format", "--check", *(["--force-exclude"] if only_changed else []), *targets]
-    return max(_call(check, repo), _call(form, repo))
+    checked, formatted = _call(check, repo), _call(form, repo)
+    return checked or formatted
 
 
 def format_(repo: Path) -> int:

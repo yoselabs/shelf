@@ -3,8 +3,9 @@
     python -m blueprint.unit_runner --repo R --cache C --pytest-args "ARGS" PATH...
 
 `PATH...` are the unit paths any-gate left to run. Each unit runs once, with `COVERAGE_FILE` pointing into the cache, and its data is kept
-as `<unit>-<key>.cov` only when its tests passed. `combine` then joins the data of every unit's current key (run now or earlier), so the
-floor is the whole repo's whatever was skipped. Both `coverage run -m pytest` and pytest-cov are supported: pytest-cov breaks some C
+as `<unit>-<key>.cov` only when its tests passed without CLI pytest arguments. `combine` joins every unit's current key (run now or
+earlier), so the floor covers the whole repo, including skipped units. Both `coverage run -m pytest` and pytest-cov are supported:
+pytest-cov breaks some C
 extensions' lazy import (duckdb), so a repo may need the first.
 """
 
@@ -79,6 +80,8 @@ def run_units(repo: Path, cache: Path, config: gate_units.Config, paths: list[st
             done = subprocess.run(command, cwd=repo, env=env, check=False, timeout=RUN_TIMEOUT)
             if done.returncode != 0:
                 return done.returncode
+            if pytest_args:
+                continue  # CLI selection is not proof that the unit's plain suite passed.
             if (problem := _gather(target)) is not None:
                 sys.stderr.write(f"blueprint: unit {unit.name} passed but {problem} ({config.coverage}); is it installed and enabled?\n")
                 return 1

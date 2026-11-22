@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+- Gate tests refuse invalid or unowned units; CLI-filtered runs cannot populate plain-run coverage caches. Keys include external test
+  configuration and test package initializers. Recipe checks resolve imported/defaulted recipes and quoted or continued calls; Node
+  installs use the detected folder and its lockfile. Lint preserves the first failure, including signal exits, while running both tools.
 - Release recipes render only with `[tool.blueprint.gate] release-gate = true`; measured test units can enforce their floor inside `check`.
-- Rendered `tools` installs Node dependencies once after mise for `node` and `node-tooling` stacks (`npm ci --no-audit --no-fund`).
+- Rendered `tools` installs Node dependencies after mise in the detected folder, using npm, pnpm or yarn only with its lockfile.
 - `[tool.blueprint.test]` `pytest-args`, `marks` and `env` configure every test run and invalidate every unit's cached key.
 - The `python-uv` stack accepts `ruff.toml` / `.ruff.toml` and `pyrefly.toml`, preserving lint-table and strict-preset requirements.
 - `gate test-all` uses `[tool.coverage.report] fail_under` when `[tool.blueprint.test] floor` is unset, before falling back to 65.

@@ -67,12 +67,33 @@ def test_rendering_is_deterministic(repo: Repo) -> None:
     assert render.parts(repo.root) == render.parts(repo.root)
 
 
+@pytest.mark.parametrize("folder", ["", "web/", "apps/web/"])
+@pytest.mark.parametrize(
+    ("lock", "command"),
+    [
+        ("package-lock.json", "npm ci --no-audit --no-fund"),
+        ("pnpm-lock.yaml", "pnpm install --frozen-lockfile"),
+        ("yarn.lock", "yarn install --immutable"),
+        ("", ""),
+    ],
+)
+def test_tools_installs_in_detected_node_folder_using_its_lock(repo: Repo, folder: str, lock: str, command: str) -> None:
+    repo.write(folder + "package.json", '{"scripts": {"build": "vite build"}}')
+    if lock:
+        repo.write(folder + lock, "")
+    tools = render.parts(repo.root)[".blueprint/base.just"].split("\ntools:\n", 1)[1].split("\n\n", 1)[0]
+    lines = tools.splitlines()[2:]
+    expected = f"cd {folder.rstrip('/')} && {command}" if folder else command
+    assert lines == ([f"    {expected}"] if command else [])
+    assert render.parts(repo.root) == render.parts(repo.root)
+
+
 @pytest.mark.parametrize(
     ("manifests", "install_lines"),
     [
         (("pyproject.toml",), ()),
-        (("package.json",), ("npm ci --no-audit --no-fund",)),
-        (("package.json", "pyproject.toml"), ("npm ci --no-audit --no-fund",)),
+        (("package.json", "package-lock.json"), ("npm ci --no-audit --no-fund",)),
+        (("package.json", "package-lock.json", "pyproject.toml"), ("npm ci --no-audit --no-fund",)),
     ],
     ids=["python-only", "node-tooling", "python-and-node-tooling"],
 )
@@ -90,6 +111,8 @@ def test_tools_installs_each_stacks_dependencies_after_mise(repo: Repo, manifest
 
 @pytest.mark.parametrize("stacks", [("node",), ("node", "node-tooling"), ("node-tooling", "node")])
 def test_node_install_is_rendered_once_for_either_node_stack(repo: Repo, monkeypatch: pytest.MonkeyPatch, stacks: tuple[str, ...]) -> None:
+    repo.write("package.json", "{}")
+    repo.write("package-lock.json", "{}")
     monkeypatch.setattr(render, "detect_stacks", lambda _repo: stacks)
     base = render.parts(repo.root)[".blueprint/base.just"]
     assert base.count("    npm ci --no-audit --no-fund\n") == 1

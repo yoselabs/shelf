@@ -15,11 +15,12 @@ Exit codes of the check: 0 current · 1 drift (a part differs, is missing, is st
 from __future__ import annotations
 
 import re
+import shlex
 import sys
 from pathlib import Path
 
 from blueprint import gate_py
-from blueprint.profile import detect_stacks
+from blueprint.profile import detect_stacks, detected_stack_roots
 
 FOLDER = ".blueprint"
 _TEMPLATES = Path(__file__).resolve().parent / "just"
@@ -37,8 +38,9 @@ _STACKS = {
     "shell": ("shell", ("scripts",)),
 }
 _STACK_INSTALLS = {
-    "node": ("npm ci --no-audit --no-fund",),
-    "node-tooling": ("npm ci --no-audit --no-fund",),
+    "package-lock.json": "npm ci --no-audit --no-fund",
+    "pnpm-lock.yaml": "pnpm install --frozen-lockfile",
+    "yarn.lock": "yarn install --immutable",
 }
 # What the release gate runs instead of a step: the whole-history and whole-suite form.
 _WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all", "lint-changed": "lint", "spell-changed": "spell"}
@@ -61,7 +63,13 @@ def parts(repo: Path) -> dict[str, str]:
     whole: list[str] = [_WHOLE.get(s, s) for s in steps] if gate_py.release_gate(repo) else []
     base = (_TEMPLATES / "base.just").read_text()
     base = base.replace("@STEPS@", " ".join(f'"{s}"' for s in steps)).replace("@STEPS_ALL@", " ".join(f'"{s}"' for s in whole))
-    installs = dict.fromkeys(line for stack in sorted(detect_stacks(repo)) for line in _STACK_INSTALLS.get(stack, ()))
+    installs = []
+    for stack, folder in sorted(detected_stack_roots(repo)):
+        if stack not in {"node", "node-tooling"}:
+            continue
+        command = next((cmd for lock, cmd in _STACK_INSTALLS.items() if (repo / folder / lock).is_file()), "")
+        if command:
+            installs.append(f"cd {shlex.quote(folder)} && {command}" if folder != "." else command)
     base = base.replace("@TOOLS@\n", "".join(f"    {line}\n" for line in installs))
     rendered = {f"{FOLDER}/base.just": base}
     for name, _ in stack_parts:
@@ -76,7 +84,7 @@ def _without_release_recipes(repo: Path, rendered: dict[str, str], steps: list[s
     optional = {"check-all", "steps-all", "secrets-all", "scripts-all", "test-all", "lint", "spell"}
     blocks = {path: text.split("\n\n") for path, text in rendered.items()}
     recipe = re.compile(r"(?m)^([\w-]+)(?:\s+[^\n:]*)?:")
-    references = set(steps) | _referenced_recipes(_own_recipe_text(repo))
+    references = set(steps) | _referenced_recipes(own_recipe_text(repo))
     for groups in blocks.values():
         references |= _referenced_recipes("\n".join(b for b in groups if not (m := recipe.search(b)) or m[1] not in optional))
     retained: set[str] = set()
@@ -96,7 +104,8 @@ def _referenced_recipes(text: str) -> set[str]:
     return set(re.findall(r"[\w-]+", " ".join([*headers, *calls])))
 
 
-def _own_recipe_text(repo: Path) -> str:
+def own_recipe_text(repo: Path) -> str:
+    """The consumer's just sources, following nested imports but excluding rendered blueprint parts."""
     pending = [repo / name for name in _JUSTFILES]
     seen: set[Path] = set()
     texts: list[str] = []
