@@ -19,5 +19,4 @@ def published_endpoint(path: Path, url: str) -> Generator[None]:
     try:
         yield
     finally:
-        with contextlib.suppress(FileNotFoundError):
-            path.unlink()
+        path.unlink(missing_ok=True)

@@ -2,6 +2,10 @@
 
 **Hold one local ASGI service; stop caring about browser access, health, serving and discovery.**
 
+Default view: `LocalService(app, token=...)` is ready at once; it answers `/healthz` before the token, requires the token
+header (or the cookie it sets) on every other request, refuses a foreign Host or Origin, and serves on `127.0.0.1`.
+Opt-ins: `header` and `cookie` names, `version`, and a `Readiness` for staged boot; nothing else is switched on implicitly.
+
 ```python
 import secrets
 

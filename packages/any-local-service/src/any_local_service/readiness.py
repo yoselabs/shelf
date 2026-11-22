@@ -56,8 +56,9 @@ class Readiness:
             self._listeners.append(listener)
 
         def remove() -> None:
-            with self._lock, contextlib.suppress(ValueError):
-                self._listeners.remove(listener)
+            with self._lock:
+                if listener in self._listeners:
+                    self._listeners.remove(listener)
 
         return remove
 
@@ -67,8 +68,9 @@ class Readiness:
             self._blockers.append(blocker)
 
         def remove() -> None:
-            with self._lock, contextlib.suppress(ValueError):
-                self._blockers.remove(blocker)
+            with self._lock:
+                if blocker in self._blockers:
+                    self._blockers.remove(blocker)
 
         return remove
 
