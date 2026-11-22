@@ -20,10 +20,19 @@ class RolloutUsage:
     requests: int
     total: dict[str, int]
     before: dict[str, int]
+    reported: bool = False  # the token_count records carried `reasoning_output_tokens`
 
     def tokens(self) -> dict[str, Json]:
-        """The thread's running total in the shape of `Summary.res["tokens"]` (input, cached, output)."""
-        return {"in": self.total["input_tokens"], "cached": self.total["cached_input_tokens"], "out": self.total["output_tokens"]}
+        """The thread's running total in the shape of `Summary.res["tokens"]` (input, cached, output, reasoning).
+        `reasoning` is the reasoning share of `out`, present only when the rollout reports it."""
+        t: dict[str, Json] = {
+            "in": self.total["input_tokens"],
+            "cached": self.total["cached_input_tokens"],
+            "out": self.total["output_tokens"],
+        }
+        if self.reported:
+            t["reasoning"] = self.total["reasoning_output_tokens"]
+        return t
 
 
 @dataclass(frozen=True)
@@ -78,7 +87,7 @@ def read(sessions: Path, ref: str, since: float = 0.0) -> RolloutUsage | None:
     if path is None:
         return None
     zero = dict.fromkeys(KEYS, 0)
-    before, total, requests = dict(zero), dict(zero), 0
+    before, total, requests, reported = dict(zero), dict(zero), 0, False
     try:
         with path.open(encoding="utf-8", errors="replace") as f:  # lossy-ok: parse: token counts from JSON lines, bad lines skipped
             for line in f:
@@ -92,6 +101,7 @@ def read(sessions: Path, ref: str, since: float = 0.0) -> RolloutUsage | None:
                 running = obj(obj(rec.get("info")).get("total_token_usage"))
                 if not running:
                     continue  # a rate-limit update carries no usage
+                reported = reported or "reasoning_output_tokens" in running
                 now = {k: int(num(running.get(k))) for k in KEYS}
                 if now == total:
                     continue  # the same running total again: the same request
@@ -102,4 +112,4 @@ def read(sessions: Path, ref: str, since: float = 0.0) -> RolloutUsage | None:
                 total = now
     except OSError:
         return None
-    return RolloutUsage(requests=requests, total=total, before=before)
+    return RolloutUsage(requests=requests, total=total, before=before, reported=reported)

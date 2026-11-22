@@ -265,11 +265,18 @@ class OpenCodeHarness(Quiet):
             "cached": num(tk["cached"]) + num(c.get("read")),
             "out": num(tk["out"]) + num(u.get("output")) + num(u.get("reasoning")),
         }
+        if "reasoning" in u or "reasoning" in tk:  # the share of `out` that was reasoning
+            e.tokens["reasoning"] = num(tk.get("reasoning")) + num(u.get("reasoning"))
         e.steps.append({"tokens": u, "cost": part.get("cost")})
         e.turns += 1
         e.requests += 1
         e.context_k = round(whole / 1000, 1)
-        t = ev.Tokens(in_=int(whole), cached=int(num(c.get("read"))), out=int(num(u.get("output")) + num(u.get("reasoning"))))
+        t = ev.Tokens(
+            in_=int(whole),
+            cached=int(num(c.get("read"))),
+            out=int(num(u.get("output")) + num(u.get("reasoning"))),
+            reasoning=int(num(u.get("reasoning"))) if "reasoning" in u else None,
+        )
         return [ev.TurnDone(usage=t)] if part.get("reason") in FINAL_REASONS else [t]
 
     def _tool_use(self, part: dict[str, Json]) -> list[ev.HarnessEvent]:

@@ -180,6 +180,9 @@ def sealed_argv(i: LaunchInputs) -> list[str]:
     return argv
 
 
+CLAUDE_EFFORTS = ("low", "medium", "high", "xhigh", "max")  # `claude --help`: --effort <level>; the CLI states no per-model list
+
+
 class ClaudeHarness(Quiet):
     kind = "claude"
     limits = LIMITS
@@ -192,6 +195,10 @@ class ClaudeHarness(Quiet):
         self.open: dict[str | None, tuple[bool, str, str]] = {}  # tool_use id -> (shell, name, arg), until its tool_result
         self.seen_usage: set[str | None] = set()
         self.sealed_dir: SealedDir | None = None
+
+    @override
+    def effort_levels(self, model: str) -> tuple[str, ...] | None:
+        return CLAUDE_EFFORTS
 
     @override
     def cleanup(self) -> None:

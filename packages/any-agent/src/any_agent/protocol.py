@@ -122,6 +122,10 @@ class Quiet:
     def export(self, env: dict[str, str]) -> None:
         pass
 
+    def effort_levels(self, model: str) -> tuple[str, ...] | None:
+        """The reasoning-effort levels `model` accepts, read from local files only; None = this harness cannot tell (accept anything)."""
+        return None
+
 
 class Harness(Protocol):
     kind: str
@@ -150,6 +154,11 @@ class Harness(Protocol):
     def cleanup(self) -> None: ...
 
     def export(self, env: dict[str, str]) -> None: ...
+
+    def effort_levels(self, model: str) -> tuple[str, ...] | None:
+        """The reasoning-effort levels `model` accepts (the values of `LaunchInputs.effort`), in the CLI's order; None = unknown, no
+        network and no process: local files only. An empty `model` asks for the CLI's default model."""
+        ...
 
     def summary(self, rc: int | None, out: str, err: str, stop: str | None, timed_out: bool) -> Summary: ...
 

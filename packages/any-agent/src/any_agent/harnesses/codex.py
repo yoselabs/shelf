@@ -66,6 +66,14 @@ def tool_parts(item: dict[str, Json]) -> tuple[str, str]:
     return kind.split("_")[0], text(item.get("query"))
 
 
+def tokens_of(u: ev.Tokens) -> dict[str, Json]:
+    """The `Summary.res["tokens"]` shape of one usage; `reasoning` only when the stream reported it."""
+    t: dict[str, Json] = {"in": u.in_, "cached": u.cached, "out": u.out}
+    if u.reasoning is not None:
+        t["reasoning"] = u.reasoning
+    return t
+
+
 class CodexHarness(Quiet):
     kind = "codex"
     limits = LIMITS
@@ -85,6 +93,20 @@ class CodexHarness(Quiet):
     @staticmethod
     def _home(env: Mapping[str, str]) -> Path:
         return tool_home("codex", "CODEX_HOME", env=env)
+
+    @override
+    def effort_levels(self, model: str) -> tuple[str, ...] | None:
+        """The model's `supported_reasoning_levels` in CODEX_HOME/models_cache.json (codex's own model list); None when the file, the
+        model or the list is missing or unreadable."""
+        try:
+            raw = json.loads((self._home(self.env) / "models_cache.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):  # lossy-ok: strictly decoded; an undecodable file is "cannot tell"
+            return None
+        for m in objs(obj(raw).get("models")):
+            if m.get("slug") == model:
+                levels = tuple(text(x.get("effort")) for x in objs(m.get("supported_reasoning_levels")))
+                return levels if levels and all(levels) else None
+        return None
 
     @override
     def cleanup(self) -> None:
@@ -170,6 +192,7 @@ class CodexHarness(Quiet):
                         in_=opt_int(u.get("input_tokens")),
                         cached=opt_int(u.get("cached_input_tokens")),
                         out=opt_int(u.get("output_tokens")),
+                        reasoning=opt_int(u.get("reasoning_output_tokens")),
                     )
                 )
             ]
@@ -209,7 +232,10 @@ class CodexHarness(Quiet):
             return None
         self.evidence.last_total = key
         return ev.Tokens(
-            in_=opt_int(last.get("input_tokens")), cached=opt_int(last.get("cached_input_tokens")), out=opt_int(last.get("output_tokens"))
+            in_=opt_int(last.get("input_tokens")),
+            cached=opt_int(last.get("cached_input_tokens")),
+            out=opt_int(last.get("output_tokens")),
+            reasoning=opt_int(last.get("reasoning_output_tokens")),
         )
 
     def _item(self, kind: str, item: dict[str, Json]) -> list[ev.HarnessEvent]:
@@ -248,7 +274,7 @@ class CodexHarness(Quiet):
             if isinstance(x, ev.Started):
                 e.ref = x.ref
             elif isinstance(x, ev.TurnDone) and x.usage:
-                e.tokens = {"in": x.usage.in_, "cached": x.usage.cached, "out": x.usage.out}
+                e.tokens = tokens_of(x.usage)
                 e.cumulative = dict(e.tokens)
                 e.turns += 1
             elif isinstance(x, ev.Tokens):
