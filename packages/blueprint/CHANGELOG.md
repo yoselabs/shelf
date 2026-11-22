@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.13.0
+
 - Node coverage floors and alternatives are judged in the node project's folder (`ui/`), not the repo root; the coverage config accepts any `vitest.config.*` extension.
 - Python stack rows recognize pinned Ruff commands through `uv tool run` and `uvx`; mixed-stack tests verify `node-tooling` edges.
 - Gate tests refuse invalid or unowned units; CLI-filtered runs cannot populate plain-run coverage caches. Keys include external test
