@@ -432,13 +432,19 @@ class RealWorktree:
     def amend(self, message: str = "") -> RecordResult:
         return real_write.amend(self, message)
 
-    def take_branch(self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None) -> TakeResult:
-        return real_write.take_branch(self, branch=branch, base=base, clean_keep=clean_keep)
+    def take_branch(self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None, track: str | None = None) -> TakeResult:
+        return real_write.take_branch(self, branch=branch, base=base, clean_keep=clean_keep, track=track)
 
     def restart_branch(
-        self, branch: str, base: str, *, keep_aside_as: str | None = None, clean_keep: Sequence[str] | None = None
+        self,
+        branch: str,
+        base: str,
+        *,
+        keep_aside_as: str | None = None,
+        clean_keep: Sequence[str] | None = None,
+        track: str | None = None,
     ) -> TakeResult:
-        return real_write.restart_branch(self, branch=branch, base=base, keep_aside_as=keep_aside_as, clean_keep=clean_keep)
+        return real_write.restart_branch(self, branch=branch, base=base, keep_aside_as=keep_aside_as, clean_keep=clean_keep, track=track)
 
     def release_branch(self, holder: Path) -> Released | StillHeld:
         return real_write.release_branch(self, holder)

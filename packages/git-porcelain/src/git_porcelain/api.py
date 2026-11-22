@@ -450,17 +450,26 @@ class Worktree(Protocol):
         Hooks are skipped. ``GitUnavailable`` on an unborn branch."""
         ...
 
-    def take_branch(self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None) -> TakeResult:
+    def take_branch(self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None, track: str | None = None) -> TakeResult:
         """Check out ``branch`` as it is (created at ``base`` when absent). ``BranchHeld`` when another worktree holds it.
-        ``clean_keep`` (not None) then deletes untracked files except those patterns."""
+        ``clean_keep`` (not None) then deletes untracked files except those patterns. ``track`` (a remote-tracking ref such
+        as ``origin/main``) becomes the upstream of a branch this call creates, so ``@{upstream}`` readers see the base; an
+        existing branch keeps its own. ``ValueError`` when ``track`` is not an existing remote-tracking ref.
+        ``BranchTaken.upstream`` is the upstream the branch has afterwards (None when none)."""
         ...
 
     def restart_branch(
-        self, branch: str, base: str, *, keep_aside_as: str | None = None, clean_keep: Sequence[str] | None = None
+        self,
+        branch: str,
+        base: str,
+        *,
+        keep_aside_as: str | None = None,
+        clean_keep: Sequence[str] | None = None,
+        track: str | None = None,
     ) -> TakeResult:
         """Check out ``branch`` at ``base``, dropping its old tip; with ``keep_aside_as`` an old tip holding work beyond
         ``base`` is renamed to that name first (``ValueError`` when it exists). ``BranchHeld`` and ``clean_keep`` as in
-        :meth:`take_branch`."""
+        :meth:`take_branch`; ``track`` is always set on the restarted branch."""
         ...
 
     def release_branch(self, holder: Path) -> Released | StillHeld:

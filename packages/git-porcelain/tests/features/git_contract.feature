@@ -1691,6 +1691,38 @@ Feature: One Repo and Worktree, real or fake
     And the result's kept_aside is None
     And the result's created is False
 
+  Scenario Outline: A new task branch tracks the remote base it is given
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    When "r" calls <call>
+    Then the result's upstream is "origin/main"
+
+    Examples:
+      | call                                                              |
+      | take_branch("task/x", "origin/main", track="origin/main")         |
+      | restart_branch("task/x", "origin/main", track="origin/main")      |
+
+  Scenario: Without track a new task branch has no upstream, and an existing branch keeps its own
+    Given an origin "o"
+    And the origin "o" holds a="root\n"
+    And "r" is a clone of the origin "o"
+    When "r" calls take_branch("task/x", "origin/main")
+    Then the result's upstream is None
+    When "r" calls take_branch("task/y", "origin/main", track="origin/main")
+    And "r" calls take_branch("task/y", "origin/main")
+    Then the result's upstream is "origin/main"
+
+  Scenario: A track that is not a remote-tracking ref is refused before the checkout changes
+    Given a repository "r"
+    And "r" commits "one" with a.txt="1\n"
+    When "r" tries take_branch("task/x", "HEAD", track="nowhere/main")
+    Then the call raises ValueError
+    When "r" tries restart_branch("task/x", "HEAD", track="nowhere/main")
+    Then the call raises ValueError
+    When "r" calls branch()
+    Then the result is "main"
+
   Scenario: A branch another worktree holds is not taken
     Given a repository "r"
     And "r" commits "one" with a.txt="1\n"
