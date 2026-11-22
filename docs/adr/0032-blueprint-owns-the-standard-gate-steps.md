@@ -26,6 +26,8 @@ Owner rule (2026-11-21): the shelf decides which gates are standard; a repo does
 - **`gate.clean-clone`** prints the failing step (`gate: failed: …`) and the first 20 lines of its log; it no longer carries the unmerged-branches note (that note answers "is the gate missing", a different question).
 - **`agents.worktrees-in-sync`** judges only the worktree the run is in, and the agent fixes it. The list of other sessions' worktrees is `agents.other-worktrees`, audit-only, the owner's.
 
+- **Recipe meanings, the same in every repo** (owner, 2026-11-22: `check` is the full gate): `check` runs every step, narrowed to what the change reaches (changed files for per-file linters, affected tests only); `check-all` runs everything over everything, with the coverage floor, before a release tag; `lint` is the static steps alone; `test` is the affected tests alone. A repo whose `check` is static-only renames it to `lint` and lets the rendered `check` stand (shelf-iost, closed: no setting names the gate recipe).
+
 ## Rejected
 
 - A deprecated `--gate` alias: the removal was deliberate (`test_cli_topology`); the call check finds the stale recipe at the audit instead.
@@ -35,3 +37,4 @@ Owner rule (2026-11-21): the shelf decides which gates are standard; a repo does
 ## History
 
 - 2026-11-21: proposed, from the a2kay and homelab onboarding (a2kay-nhnh, a2kay-4r2p).
+- 2026-11-22: recipe meanings added (owner: `check` is the full gate; affected tests only).
