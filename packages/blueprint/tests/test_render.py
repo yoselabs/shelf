@@ -215,13 +215,21 @@ def test_the_release_gate_runs_the_whole_form_of_each_step_and_a_floor(repo: Rep
 def test_release_recipes_are_absent_by_default(repo: Repo) -> None:
     _python(repo)
     text = "\n".join(render.parts(repo.root).values())
-    for name in ("check-all", "steps-all", "test-all", "lint", "spell", "secrets-all"):
+    for name in ("check-all", "steps-all", "test-all", "secrets-all"):
         assert f"\n{name}:" not in text
         assert f"\n{name} +" not in text
     assert "\ncheck-extra:" in text
 
 
-@pytest.mark.parametrize("step", ["lint", "spell", "test-all", "steps-all"])
+def test_the_linters_over_the_whole_repo_are_always_rendered(repo: Repo) -> None:
+    # They are seconds, not a full run: a repo's static gate (`lint`, `spell`) never needs release-gate.
+    _python(repo)
+    text = "\n".join(render.parts(repo.root).values())
+    assert "\nlint:" in text
+    assert "\nspell:" in text
+
+
+@pytest.mark.parametrize("step", ["test-all", "steps-all"])
 def test_a_whole_recipe_referenced_by_the_repo_stays_without_release_gate(repo: Repo, step: str) -> None:
     _python(repo)
     repo.write("justfile", f"check-extra: {step}\n")

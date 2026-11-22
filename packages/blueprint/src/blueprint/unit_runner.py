@@ -43,7 +43,8 @@ def cached(cache: Path, config: gate_units.Config, repo: Path) -> set[str]:
 
 def _command(mode: str, pytest_args: list[str], paths: tuple[str, ...]) -> list[str]:
     if mode == "pytest-cov":
-        return [sys.executable, "-m", "pytest", "--cov", *pytest_args, *paths]
+        # `fail_under` in the coverage config would fail one unit alone against the whole repo's floor; `combine` applies it.
+        return [sys.executable, "-m", "pytest", "--cov", "--cov-fail-under=0", *pytest_args, *paths]
     return [sys.executable, "-m", "coverage", "run", "-m", "pytest", *pytest_args, *paths]
 
 

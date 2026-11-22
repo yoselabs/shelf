@@ -383,3 +383,10 @@ def test_a_second_run_starts_no_test_process(repo: Repo, tmp_path: Path) -> None
     repo.write("src/app/ui/view.py", "from app.core import add\n\ndef show():\n    return add(1, 1)\n# edit\n")
     assert go() == 0
     assert count.read_text() == "xyy"  # only the ui unit
+
+
+def test_a_pytest_cov_unit_never_fails_alone_on_the_whole_repo_floor() -> None:
+    # `fail_under` in [tool.coverage.report] is the whole repo's floor, applied once by `combine`, not per unit.
+    command = unit_runner._command("pytest-cov", [], ("tests/a",))
+    assert "--cov-fail-under=0" in command
+    assert command.index("--cov-fail-under=0") < command.index("tests/a")

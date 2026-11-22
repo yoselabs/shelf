@@ -65,6 +65,10 @@ Do not define your own `test` recipe: `gate.recipe-shadowing` fails it unless an
 `blueprint gate test-all` runs every test with a coverage floor: `[tool.blueprint.test] floor` takes precedence over
 `[tool.coverage.report] fail_under`, with 65 as the fallback. The resolved floor is passed explicitly to pytest-cov.
 
+`fail_under` in `[tool.coverage.report]` is the whole repo's floor: with units, each unit runs under `--cov-fail-under=0` and the
+combined data is judged once. A package that tests run against its installed wheel measures 0% unless `[tool.coverage.run]`
+sets `source_pkgs = ["<package>"]` and `[tool.coverage.paths]` maps the installed path back to `src/`.
+
 ## Run the pinned engine
 
 A recipe calls `uv run blueprint ...` (blueprint is a dev dependency, pinned by the lock), never `PYTHONPATH=<shelf clone>` or `--reference <shelf file>`: a clone

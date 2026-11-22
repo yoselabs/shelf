@@ -6,7 +6,7 @@
 lint:
     uv run blueprint gate lint
 
-# `lint` over the files changed against the base (any-gate changed), for `check`; check-all runs `lint` over everything.
+# `lint` over the files changed against the base (any-gate changed), for `check`; `lint` itself is the whole repo.
 [group('gate')]
 lint-changed:
     uv run blueprint gate lint --changed
