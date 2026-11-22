@@ -1,0 +1,7 @@
+consumer = "ogy"
+software = "any-local-service"
+why = "The owner requests one shelf package for ogy's loopback board and MCP serving substrate; this is the active demand for the candidate, with donor repointing reserved for coordinator review and release."
+needs = "LocalService over ogy's injected Starlette/MCP app; X-Ogy-Token and ogy_session names, public health, Host/Origin refusal, ephemeral ports and graceful lifespan shutdown. No token path or board API in the shelf."
+sponsor = "yoselabs"
+requester = "ogy"
+status = "active"

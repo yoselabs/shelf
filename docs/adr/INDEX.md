@@ -58,3 +58,7 @@ the file holds the reasons, the rejected options and the history.
 - [0012](0012-sharp-edges-are-a-promotion-trigger.md) **Sharp edges are a promotion trigger**: A bug rooted in a dependency's behaviour is a promotion trigger fired at bugfix time; the lesson ships as a feature of a capability package, never as a library-shaped package.
 - [0013](0013-promote-to-be-challenged.md) **Promote to be challenged**: Unproven shape and unfinished verification are not reasons to hold a promotion; promote real substrate so a second consumer can challenge it, and ship its verification lane in the same change.
 - [0015](0015-ergonomics-is-a-capability.md) **Ergonomics is a capability**: A verbose-but-correct dependency is a promotion trigger; any-* promises a whole domain, not a backend swap, and where a domain has a thing, promote the thing, not a bag of functions.
+
+## Proposed, not in force
+
+- [0032](0032-one-local-service-domain-package.md) **Local serving belongs to one held service**: Group local ASGI access, readiness, serving and discovery in any-local-service; reuse token and scope primitives and keep consumer policy in the apps.

@@ -28,6 +28,7 @@ members = [
     "any-json-doc",
     "any-knowledge",
     "any-lease",
+    "any-local-service",
     "any-mailbox",
     "any-markdown",
     "any-net",
@@ -644,6 +645,45 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
+[[package]]
+name = "any-local-service"
+version = "0.1.0"
+source = { editable = "packages/any-local-service" }
+dependencies = [
+    { name = "anyio" },
+    { name = "asgi-token-gate" },
+    { name = "async-scope", extra = ["asgi"] },
+    { name = "atomic-io" },
+    { name = "starlette" },
+    { name = "uvicorn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anyio", specifier = ">=4,<5" },
+    { name = "asgi-token-gate", editable = "packages/asgi-token-gate" },
+    { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "starlette", specifier = ">=1.3,<2" },
+    { name = "uvicorn", specifier = ">=0.30,<1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "hypothesis", specifier = ">=6.100,<7" },
     { name = "pytest", specifier = ">=8,<9" },
     { name = "pytest-asyncio", specifier = ">=0.24,<1" },
@@ -1280,7 +1320,7 @@ dev = [
 
 [[package]]
 name = "async-scope"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "packages/async-scope" }
 
 [package.optional-dependencies]
