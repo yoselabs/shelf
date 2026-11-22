@@ -229,7 +229,9 @@ def _check_track(wt: RealWorktree, track: str | None) -> None:
 
 def _taken(wt: RealWorktree, branch: str, *, created: bool, kept: str | None) -> BranchTaken:
     up = wt.try_run("rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}")
-    return BranchTaken(branch, some(real_read.head_of(wt)), created=created, kept_aside=kept, upstream=up.out.strip() if up.rc == 0 else None)
+    return BranchTaken(
+        branch, some(real_read.head_of(wt)), created=created, kept_aside=kept, upstream=up.out.strip() if up.rc == 0 else None
+    )
 
 
 def take_branch(wt: RealWorktree, *, branch: str, base: str, clean_keep: Sequence[str] | None, track: str | None = None) -> TakeResult:

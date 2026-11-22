@@ -450,9 +450,7 @@ class Worktree(Protocol):
         Hooks are skipped. ``GitUnavailable`` on an unborn branch."""
         ...
 
-    def take_branch(
-        self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None, track: str | None = None
-    ) -> TakeResult:
+    def take_branch(self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None, track: str | None = None) -> TakeResult:
         """Check out ``branch`` as it is (created at ``base`` when absent). ``BranchHeld`` when another worktree holds it.
         ``clean_keep`` (not None) then deletes untracked files except those patterns. ``track`` (a remote-tracking ref such
         as ``origin/main``) becomes the upstream of a branch this call creates, so ``@{upstream}`` readers see the base; an

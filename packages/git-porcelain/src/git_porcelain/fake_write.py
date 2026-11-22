@@ -133,7 +133,7 @@ def _holders(repo: RepoState, wt: CheckoutState, ref: str) -> tuple[WorktreeInfo
     )
 
 
-def _check_track(repo: RepoState, track: str | None) -> None:
+def _require_remote_ref(repo: RepoState, track: str | None) -> None:
     if track is None:
         return
     validate_revisions(track)
@@ -150,7 +150,7 @@ def take_branch(
     repo: RepoState, wt: CheckoutState, *, branch: str, base: str, clean_keep: Sequence[str] | None, track: str | None = None
 ) -> TakeResult:
     validate_revisions(branch, base)
-    _check_track(repo, track)
+    _require_remote_ref(repo, track)
     ref = branch_ref(branch)
     if held := _holders(repo, wt, ref):
         return BranchHeld(held)
@@ -179,7 +179,7 @@ def restart_branch(
     track: str | None = None,
 ) -> TakeResult:
     validate_revisions(branch, base)
-    _check_track(repo, track)
+    _require_remote_ref(repo, track)
     ref = branch_ref(branch)
     if held := _holders(repo, wt, ref):
         return BranchHeld(held)
@@ -207,7 +207,11 @@ def restart_branch(
     if clean_keep is not None:
         clean(repo, wt, clean_keep)
     return BranchTaken(
-        branch, Sha(_head(repo, wt)), created=not exists or kept is not None, kept_aside=kept, upstream=repo.config.get(_upstream_key(branch))
+        branch,
+        Sha(_head(repo, wt)),
+        created=not exists or kept is not None,
+        kept_aside=kept,
+        upstream=repo.config.get(_upstream_key(branch)),
     )
 
 

@@ -422,9 +422,7 @@ class FakeWorktree:
     def amend(self, message: str = "") -> RecordResult:
         return write.amend(self._repo, self.state(), message)
 
-    def take_branch(
-        self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None, track: str | None = None
-    ) -> TakeResult:
+    def take_branch(self, branch: str, base: str, *, clean_keep: Sequence[str] | None = None, track: str | None = None) -> TakeResult:
         return write.take_branch(self._repo, self.state(), branch=branch, base=base, clean_keep=clean_keep, track=track)
 
     def restart_branch(
