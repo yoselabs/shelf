@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.14.1
+
+- Version files corrected: tag `blueprint-v0.14.0` was cut on a commit whose `pyproject.toml` still said 0.13.2 (0.13.1 and 0.13.2 had been released meanwhile). The code in `blueprint-v0.14.0` is the 0.14.0 content below; pin `blueprint-v0.14.1`, which carries it with the right version.
+
+- The mcp framework rows (`build`, `tests`, `surface-integrity`) accept `blueprint gate test` as running pytest, so a repo on the standard rendered test step no longer fails them.
+
 ## 0.14.0
 
 - **A comment or a message naming a tool no longer counts as running it**: the gate text the stack rows read drops comment lines and the text of `echo`/`printf` lines (a command chained after them still counts). Before, `# ruff check .` or `echo "docker build -f Dockerfile ."` passed the linter and Dockerfile-tests rows.

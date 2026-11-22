@@ -153,6 +153,23 @@ def test_a_repo_shaped_like_a2kay_passes_the_configured_roles(repo: Repo) -> Non
     assert "framework.mcp.agent-guidance" not in rows
 
 
+def test_the_rendered_test_step_counts_as_running_pytest_for_the_mcp_rows(repo: Repo) -> None:
+    # The standard step is `uv run blueprint gate test`, which runs pytest without the word (a2kay, 2026-11-23).
+    _a2kay_shaped(repo)
+    repo.write("Makefile", "check:\n\tuv run blueprint gate test\n")
+    rows = _rows(repo)
+    for role in ("build", "tests", "surface-integrity"):
+        assert rows[f"framework.mcp.{role}"][0] is Verdict.PASSING, role
+
+
+def test_the_mcp_rows_still_fail_when_the_gate_runs_no_tests(repo: Repo) -> None:
+    _a2kay_shaped(repo)
+    repo.write("Makefile", "check:\n\ttrue\n")
+    rows = _rows(repo)
+    for role in ("build", "tests", "surface-integrity"):
+        assert rows[f"framework.mcp.{role}"][0] is Verdict.FAILING, role
+
+
 def test_a_server_without_a_tool_list_snapshot_is_not_set_up(repo: Repo) -> None:
     _a2kay_shaped(repo)
     (repo.root / "tests/contracts/tools.snapshot.json").unlink()
