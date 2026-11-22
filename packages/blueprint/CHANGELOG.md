@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `agents.worktrees-in-sync` and `agents.other-worktrees` compare against `origin/main` when it exists (a clone's local `main` goes stale beside worktrees), else `main`.
+- `lint` and `spell` (whole-repo linters) render without `release-gate`; only the release recipes are opt-in.
+- Units under `pytest-cov` run with `--cov-fail-under=0`: the floor is applied once, to the combined data.
 ## 0.13.2
 
 - Snapshot only, no blueprint change: carries git-porcelain 0.31.0 (`take_branch`/`restart_branch` `track=`, `BranchTaken.upstream`).

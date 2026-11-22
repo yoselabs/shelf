@@ -118,3 +118,19 @@ def test_the_audit_list_leaves_this_worktrees_own_branch_out(repo: Repo) -> None
     assert "theirs" in row.evidence
     assert "mine" not in row.evidence
     assert row.fixed_by is FixedBy.OWNER
+
+
+def test_a_stale_local_main_does_not_fail_a_worktree_already_merged_into_origin_main(repo: Repo) -> None:
+    _commit(repo.root, "base", 3 * _DAY)
+    tree = _worktree(repo, "mine")
+    _commit(tree, "work", 2 * _DAY)
+    tip = repo.git("rev-parse", "mine").strip()
+    repo.git("update-ref", "refs/remotes/origin/main", tip)
+    assert _own(repo, tree).verdict is Verdict.PASSING
+
+
+def test_without_origin_main_the_local_main_is_the_base(repo: Repo) -> None:
+    _commit(repo.root, "base", 3 * _DAY)
+    tree = _worktree(repo, "mine")
+    _commit(tree, "work", 2 * _DAY)
+    assert _own(repo, tree).verdict is Verdict.FAILING

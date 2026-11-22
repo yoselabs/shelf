@@ -81,7 +81,7 @@ def parts(repo: Path) -> dict[str, str]:
 
 def _without_release_recipes(repo: Path, rendered: dict[str, str], steps: list[str]) -> dict[str, str]:
     """Drop release-only recipes, retaining any that the repo or another retained recipe references."""
-    optional = {"check-all", "steps-all", "secrets-all", "scripts-all", "test-all", "lint", "spell"}
+    optional = {"check-all", "steps-all", "secrets-all", "scripts-all", "test-all"}
     blocks = {path: text.split("\n\n") for path, text in rendered.items()}
     recipe = re.compile(r"(?m)^([\w-]+)(?:\s+[^\n:]*)?:")
     references = set(steps) | _referenced_recipes(own_recipe_text(repo))

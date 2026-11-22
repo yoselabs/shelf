@@ -141,13 +141,19 @@ def _current_branch(ctx: Context) -> str | None:
     return branch if branch and branch != "HEAD" else None
 
 
+def _merge_base_ref(ctx: Context) -> str:
+    """What worktrees merge into: `origin/main` when it exists (a clone's local `main` goes stale beside worktrees), else `main`."""
+    return "origin/main" if ctx.git("rev-parse", "--verify", "-q", "refs/remotes/origin/main") else "main"
+
+
 def _stale(ctx: Context, branches: list[str]) -> list[str]:
     """Each branch with work unmerged, or main commits missing, past the limit, as a line saying how long."""
     limit = time.time() - float(str(ctx.settings.get("worktree-sync-hours", _SYNC_HOURS))) * 3600
     stale: list[str] = []
+    base = _merge_base_ref(ctx)
     for branch in branches:
-        unmerged = _oldest(ctx, f"main..{branch}")
-        missing = _oldest(ctx, f"{branch}..main")
+        unmerged = _oldest(ctx, f"{base}..{branch}")
+        missing = _oldest(ctx, f"{branch}..{base}")
         if unmerged is not None and unmerged < limit:
             stale.append(f"{branch}: work unmerged since {_ago(unmerged)}")
         if missing is not None and missing < limit:
