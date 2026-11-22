@@ -66,7 +66,7 @@ runs = ['\bvitest\b', '\bjest\b', '\bnode --test\b', '\b(?:pnpm|npm|yarn)(?: run
 role = "coverage"
 tool = "vitest coverage with thresholds that fail the run (any runner whose gate enforces a floor)"
 install = "pnpm add -D @vitest/coverage-v8; vitest.config.ts test.coverage.thresholds {lines, branches}; the gate runs `vitest run --coverage` (a floor only rises)"
-config = [{ any = [{ path = "{root}/package.json", contains = "coverage" }, { path = "{root}/vitest.config.ts", contains = "coverage" }, { path = "{root}/vitest.config.mts", contains = "coverage" }] }]
+config = [{ any = [{ path = "{root}/package.json", contains = "coverage" }, { path = "{root}/vitest.config.*", contains = "coverage" }] }]
 outcome = "floor"
 
 [[role.floor]]
