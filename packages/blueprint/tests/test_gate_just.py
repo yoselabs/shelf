@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
 from blueprint import gate_graph
 from blueprint.model import Context, Profile, Verdict
 from blueprint.runner import run, run_audit
@@ -52,6 +53,19 @@ def test_the_dry_run_executes_nothing(repo: Repo) -> None:
     repo.write("justfile", "check:\n    touch ran.txt\n")
     _row(repo, "gate.one-command")
     assert not (repo.root / "ran.txt").exists()
+
+
+@pytest.mark.parametrize("value", ["-p no:cov --maxfail=1", "--maxfail=1"])
+def test_recipe_calls_preserves_quoted_flag_values(repo: Repo, value: str) -> None:
+    repo.write("justfile", f'check:\n    uv run blueprint gate test --pytest-args "{value}"\n')
+    assert _row(repo, "gate.recipe-calls", audit=False)[0] is Verdict.PASSING
+
+
+def test_recipe_calls_checks_continued_lines(repo: Repo) -> None:
+    repo.write("justfile", "check:\n    uv run blueprint gate test \\\n        --bogus\n")
+    verdict, evidence = _row(repo, "gate.recipe-calls", audit=False)
+    assert verdict is Verdict.FAILING
+    assert "--bogus" in evidence
 
 
 def test_a_justfile_passes_the_runner_row(repo: Repo) -> None:

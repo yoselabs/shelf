@@ -294,8 +294,8 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
     if images := dockerfiles(repo, skip):
         found["dockerfile"] = [p.relative_to(repo).as_posix() for p in images]
     for stack, manifest in (("node", "package.json"), ("go", "go.mod"), ("rust", "Cargo.toml")):
-        # One folder per unit: a manifest at the root, else the ones one level down (web/package.json); never inside a dependency folder.
-        if manifests := walk(repo, manifest, 2, skip):
+        # Node manifests may sit two folders down (apps/web/package.json); never descend into dependency folders.
+        if manifests := walk(repo, manifest, 3 if stack == "node" else 2, skip):
             files = sorted((p.relative_to(repo).as_posix() for p in manifests), key=lambda rel: (rel.count("/"), rel))
             found["node-tooling" if stack == "node" and _builds_tooling_only(repo / files[0]) else stack] = files
     if scripts := _shell_scripts(repo, skip):
@@ -311,6 +311,11 @@ def _stack_roots(found: dict[str, list[str]]) -> tuple[tuple[str, str], ...]:
 def detect_stacks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[str, ...]:
     """The stacks present, from their manifests."""
     return tuple(_stack_files(repo, skip))
+
+
+def detected_stack_roots(repo: Path) -> tuple[tuple[str, str], ...]:
+    """The same manifest folders used by profile detection, for commands run in those stacks."""
+    return _stack_roots(_stack_files(repo, ()))
 
 
 def _evidence_files(files: list[str]) -> str:

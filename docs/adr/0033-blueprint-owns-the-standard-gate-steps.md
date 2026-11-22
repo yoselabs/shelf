@@ -36,6 +36,9 @@ Owner rule (2026-11-21): the shelf decides which gates are standard; a repo does
 
 ## History
 
+- 2026-11-22: reviewed gate bugs fixed: invalid and unowned units refuse, filtered runs bypass coverage caches, test configuration and
+  initializers invalidate keys, Just dumps resolve defaulted and imported shadows, calls respect quoting and continuations, Node installs
+  follow the detected folder and lockfile, and lint preserves signal failures while running both tools.
 - 2026-11-21: proposed, from the a2kay and homelab onboarding (a2kay-nhnh, a2kay-4r2p).
 - 2026-11-22: recipe meanings added (owner: `check` is the full gate; affected tests only).
 - 2026-11-22: `check-all` made opt-in; `[tool.blueprint.gate] release-gate = true` is built, and shelf opts in.

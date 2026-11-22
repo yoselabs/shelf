@@ -69,6 +69,21 @@ def test_lint_reads_only_the_declared_paths(repo: Repo) -> None:
     assert gate_py.lint(repo.root) == 0  # scripts/ is not a declared path
 
 
+@pytest.mark.parametrize(("codes", "expected"), [((-15, 0), -15), ((0, -9), -9), ((2, 1), 2)])
+def test_lint_runs_both_tools_and_preserves_first_failure(
+    repo: Repo, monkeypatch: pytest.MonkeyPatch, codes: tuple[int, int], expected: int
+) -> None:
+    calls: list[list[str]] = []
+
+    def lint_process(command: list[str], **kwargs: object) -> SimpleNamespace:
+        calls.append(command)
+        return SimpleNamespace(returncode=codes[len(calls) - 1])
+
+    monkeypatch.setattr(gate_py.subprocess, "run", lint_process)
+    assert gate_py.lint(repo.root) == expected
+    assert len(calls) == 2
+
+
 def test_the_changed_form_skips_when_nothing_changed(
     repo: Repo, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
