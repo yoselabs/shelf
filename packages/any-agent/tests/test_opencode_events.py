@@ -95,7 +95,7 @@ class TestStream:
             "ses_1",
             "opencode answer",
             2,
-            {"in": 38, "cached": 5, "out": 6},
+            {"in": 38, "cached": 5, "out": 6, "reasoning": 1},
             0.0,
             True,
         )

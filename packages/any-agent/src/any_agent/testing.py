@@ -49,3 +49,13 @@ class FakeRun:
                 for ref in self._refs:
                     hooks.ref(ref)
         return self._outcome
+
+
+class FakeEffortLevels:
+    """The `effort_levels` answer of a harness, per model: a model absent from `levels` (or mapped to None) is unknown."""
+
+    def __init__(self, levels: dict[str, tuple[str, ...] | None]) -> None:
+        self._levels = levels
+
+    def effort_levels(self, model: str) -> tuple[str, ...] | None:
+        return self._levels.get(model)

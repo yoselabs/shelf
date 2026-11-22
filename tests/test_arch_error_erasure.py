@@ -195,10 +195,11 @@ _ALLOWED = {
         ("packages/stream-proc/src/stream_proc/proctable.py:group_alive", 1),
         ("packages/stream-proc/src/stream_proc/tree.py:_Sent.call", 1),
     ),
-    # --- outcome-absent: 19 rows, 20 hits ---
+    # --- outcome-absent: 20 rows, 21 hits ---
     **rows(
         _OUTCOME_ABSENT,
         ("packages/any-agent/src/any_agent/harnesses/codex_rollout.py:read", 1),
+        ("packages/any-agent/src/any_agent/harnesses/codex.py:CodexHarness.effort_levels", 1),
         ("packages/any-gate-python/src/any_gate_python/graph.py:lock_touched", 1),
         ("packages/any-gate-python/src/any_gate_python/graph.py:touched_between", 1),
         ("packages/any-gate/src/any_gate/state.py:_git", 1),

@@ -61,6 +61,7 @@ class Tokens:
     cached: int | None
     out: int | None
     cache_write: int | None = None
+    reasoning: int | None = None  # reasoning output tokens, when the harness reports them apart; None = not reported
 
 
 @record

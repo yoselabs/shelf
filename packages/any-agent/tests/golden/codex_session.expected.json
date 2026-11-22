@@ -109,7 +109,8 @@
      "in_": 100,
      "cached": 40,
      "out": 7,
-     "cache_write": null
+     "cache_write": null,
+     "reasoning": null
     }
    }
   ]

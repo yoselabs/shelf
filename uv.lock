@@ -232,7 +232,7 @@ wheels = [
 
 [[package]]
 name = "any-agent"
-version = "0.22.0"
+version = "0.23.0"
 source = { editable = "packages/any-agent" }
 dependencies = [
     { name = "app-dirs" },
