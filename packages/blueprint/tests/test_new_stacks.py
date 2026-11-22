@@ -174,6 +174,34 @@ def test_a_declared_edge_with_its_contract_file_passes(repo: Repo) -> None:
     assert _all_rows(repo)["stack.edges"] is Verdict.PASSING
 
 
+@pytest.mark.parametrize(
+    ("source", "target", "verdict"),
+    [
+        ("node-tooling", "python-uv", Verdict.PASSING),
+        ("python-uv", "node-tooling", Verdict.PASSING),
+        ("go", "python-uv", Verdict.FAILING),
+        ("python-uv", "go", Verdict.FAILING),
+    ],
+)
+def test_python_and_scripts_only_node_edges_resolve_only_present_stacks(repo: Repo, source: str, target: str, verdict: Verdict) -> None:
+    # shelf-xgi5: the detected node-tooling name is valid at either end of an edge.
+    repo.write("pyproject.toml", _PYPROJECT)
+    repo.write("uv.lock", "")
+    repo.write("package.json", '{"scripts": {"build": "tailwindcss -i in.css -o out.css"}}')
+    repo.write("schema/api.json", "{}")
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        f'[[edge]]\nfrom = "{source}"\nto = "{target}"\nvia = "schema/api.json"\nreason = "shared schema"\n',
+    )
+    assert set(detect_stacks(repo.root)) == {"python-uv", "node-tooling"}
+    row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == "stack.edges")
+    assert row.verdict is verdict
+    if verdict is Verdict.PASSING:
+        assert "not a stack" not in row.evidence
+    else:
+        assert "names go, not a stack of this repo" in row.evidence
+
+
 def test_two_code_stacks_with_no_declared_edge_are_not_set_up(repo: Repo) -> None:
     _mixed(repo, edge=False)
     result = run(repo.root, concern="stack", env=repo.env)
