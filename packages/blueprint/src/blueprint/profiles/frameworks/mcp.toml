@@ -55,6 +55,10 @@ config = [
 ]
 gate = "pytest"
 
+[[role.alternative]]
+label = "blueprint's rendered test step, `blueprint gate test`, which runs pytest"
+gate = '\bblueprint gate test(?:-all)?\b'
+
 [[role]]
 role = "tests"
 tool = "in-memory contract tests: `Client(server)` against the built FastMCP object, no subprocess, no network; Gherkin through the shelf's mcp-steps where the steps are shared; a bad-argument call returns an is_error result an agent can act on"
@@ -72,6 +76,10 @@ config = [
     ] },
 ]
 gate = "pytest"
+
+[[role.alternative]]
+label = "blueprint's rendered test step, `blueprint gate test`, which runs pytest"
+gate = '\bblueprint gate test(?:-all)?\b'
 
 [[role]]
 role = "surface-integrity"
@@ -98,6 +106,10 @@ config = [
     ] },
 ]
 gate = "pytest"
+
+[[role.alternative]]
+label = "blueprint's rendered test step, `blueprint gate test`, which runs pytest"
+gate = '\bblueprint gate test(?:-all)?\b'
 
 [[role]]
 role = "architecture"
