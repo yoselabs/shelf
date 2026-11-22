@@ -160,10 +160,10 @@ def _describe(spec: dict[str, Any]) -> str:
     return str(spec["path"]) + (f" with {spec['contains']!r}" if "contains" in spec else "")
 
 
-def _alternative_runs(ctx: Context, alt: dict[str, Any], gate_text: str) -> bool:
+def _alternative_runs(ctx: Context, alt: dict[str, Any], gate_text: str, root: str) -> bool:
     if not re.search(alt["gate"], gate_text):
         return False
-    return "path" not in alt or _config_holds(ctx, alt)
+    return "path" not in alt or _config_holds(ctx, alt, root)
 
 
 @dataclass(frozen=True)
@@ -199,7 +199,7 @@ def _judge_set_up(ctx: Context, stack: str, spec: Role, role: str, gate_text: st
     if missing or forbidden:
         why = "; ".join([*([f"missing {'; '.join(missing)}"] if missing else []), *forbidden])
         return _Judged(stack, "not-set-up", f"{spec.tool} not set up ({why})", spec.install)
-    judged = _gate_verdict(ctx, stack, spec, gate_text)
+    judged = _gate_verdict(ctx, stack, spec, gate_text, root)
     if judged.verdict == "pass" and spec.installs and stack == "dotnet" and role == "toolchain":
         return _sdk_installs(ctx, stack, spec, judged)
     return judged
@@ -280,13 +280,13 @@ def _sdk_installs(ctx: Context, stack: str, spec: Role, judged: _Judged) -> _Jud
     )
 
 
-def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judged:
+def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str, root: str) -> _Judged:
     """Pass when the gate runs the role's command, or one of its alternatives; else failing."""
     if spec.outcome:
-        return _outcome_verdict(ctx, stack, spec, gate_text)
+        return _outcome_verdict(ctx, stack, spec, gate_text, root)
     if not spec.gate or re.search(re.escape(spec.gate), gate_text):
         return _Judged(stack, "pass", spec.tool + (f", run by the gate (`{spec.gate}`)" if spec.gate else ""))
-    via = next((a for a in spec.alternatives if _alternative_runs(ctx, a, gate_text)), None)
+    via = next((a for a in spec.alternatives if _alternative_runs(ctx, a, gate_text, root)), None)
     if via is not None:
         return _Judged(stack, "pass", f"{via['label']}, run by the gate")
     others = "".join(f", or {a['label']}" for a in spec.alternatives)
@@ -309,22 +309,22 @@ def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judg
 OUTCOMES = ("runs", "floor")
 
 
-def _floor_holds(ctx: Context, floor: dict[str, Any], gate_text: str) -> bool:
+def _floor_holds(ctx: Context, floor: dict[str, Any], gate_text: str, root: str) -> bool:
     if floor.get("units"):
         config = gate_units.load(ctx.repo)
         if gate_test.is_workspace(ctx.repo) or config is None or not config.coverage or config.floor is None:
             return False
-    return bool(re.search(floor["gate"], gate_text)) and ("path" not in floor or _config_holds(ctx, floor))
+    return bool(re.search(floor["gate"], gate_text)) and ("path" not in floor or _config_holds(ctx, floor, root))
 
 
-def _outcome_verdict(ctx: Context, stack: str, spec: Role, gate_text: str) -> _Judged:
+def _outcome_verdict(ctx: Context, stack: str, spec: Role, gate_text: str, root: str) -> _Judged:
     """Judge a role by its outcome: a test runner is reached, or a floor is enforced, by any tool the profile accepts."""
     if spec.outcome == "runs":
         if any(re.search(pattern, gate_text) for pattern in spec.runs):
             return _Judged(stack, "pass", f"{spec.tool}; the gate reaches a test runner")
         problem, fix = f"the gate reaches no test runner (accepted: {', '.join(spec.runs)})", "run the tests from `just check`"
     else:
-        if via := next((f for f in spec.floors if _floor_holds(ctx, f, gate_text)), None):
+        if via := next((f for f in spec.floors if _floor_holds(ctx, f, gate_text, root)), None):
             return _Judged(stack, "pass", f"{via['label']}, run by the gate")
         accepted = " or ".join(f["label"] for f in spec.floors)
         problem, fix = f"the gate enforces no floor (accepted: {accepted})", f"enforce a floor from `just check`: {accepted}"
