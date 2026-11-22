@@ -498,7 +498,8 @@ def test_measuring_without_any_floor_fails_the_coverage_outcome(repo: Repo) -> N
 
 def _gate_with_tests(repo: Repo, recipe: str) -> None:
     _python_repo(repo)
-    repo.write("pyproject.toml", _PYPROJECT + "\n[tool.pytest.ini_options]\naddopts = '-q'\n")
+    # pytest-timeout and `timeout =` are part of the tests role: a hung test must fail, not hang the gate.
+    repo.write("pyproject.toml", _PYPROJECT + "\n# pytest-timeout\n[tool.pytest.ini_options]\naddopts = '-q'\ntimeout = 900\n")
     repo.write("Makefile", f"check: lint t\n{_MAKEFILE.split(chr(10), 1)[1]}t:\n\t{recipe}\n")
 
 
@@ -522,3 +523,40 @@ def test_tests_fail_when_the_gate_reaches_no_test_runner(repo: Repo) -> None:
     verdict, evidence, _ = _rows(repo)["stack.python-uv.tests"]
     assert verdict is Verdict.FAILING
     assert "runner" in evidence
+
+
+@pytest.mark.parametrize(
+    ("line", "verdict"),
+    [
+        ("uv run ruff check .", Verdict.PASSING),
+        ("# uv run ruff check .", Verdict.FAILING),
+        ('echo "uv run ruff check ."', Verdict.FAILING),
+        ("echo uv run ruff check .", Verdict.FAILING),
+        ("printf 'ruff check .\\n'", Verdict.FAILING),
+        ('echo "linting" && uv run ruff check .', Verdict.PASSING),
+        ('echo "linting"; uv run ruff check .', Verdict.PASSING),
+    ],
+)
+def test_a_comment_or_a_message_naming_a_tool_does_not_run_it(repo: Repo, line: str, verdict: Verdict) -> None:
+    # A recipe that only talks about `ruff check` ran nothing: it must not satisfy the linter row.
+    _python_repo(repo)
+    repo.write("Makefile", "")
+    repo.write("justfile", f"check:\n    {line}\n    true\n")
+    assert _rows(repo)["stack.python-uv.linter"][0] is verdict
+
+
+@pytest.mark.parametrize(
+    "line", ['echo "docker build -f Dockerfile ."', "# docker build -f Dockerfile .", "echo docker build -f Dockerfile ."]
+)
+def test_a_message_naming_a_docker_build_is_not_a_build(repo: Repo, line: str) -> None:
+    repo.write("Dockerfile", "FROM scratch\n")
+    repo.write("justfile", f"check:\n    {line}\n")
+    assert _rows(repo)["stack.dockerfile.tests"][0] is not Verdict.PASSING
+
+
+def test_tests_are_not_set_up_without_a_timeout(repo: Repo) -> None:
+    _gate_with_tests(repo, "uv run pytest")
+    repo.write("pyproject.toml", _PYPROJECT + "\n[tool.pytest.ini_options]\naddopts = '-q'\n")
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.tests"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert "timeout" in evidence

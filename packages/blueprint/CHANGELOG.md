@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **A comment or a message naming a tool no longer counts as running it**: the gate text the stack rows read drops comment lines and the text of `echo`/`printf` lines (a command chained after them still counts). Before, `# ruff check .` or `echo "docker build -f Dockerfile ."` passed the linter and Dockerfile-tests rows.
+- `stack.roles` version 5: the python-uv `tests` role also needs `pytest-timeout` in the dependencies and `timeout = <seconds>` in `[tool.pytest.ini_options]` (a hung test fails the run; no repository has CI to kill it). It warns until the next audit (ADR 0018).
+- Editor and interpreter litter (`.DS_Store`, `.pyc`, `.swp`) beside reached code no longer changes a test unit's key. The rendered `deps` recipe hands package folders to `xargs` NUL-separated.
 - `agents.worktrees-in-sync` and `agents.other-worktrees` compare against `origin/main` when it exists (a clone's local `main` goes stale beside worktrees), else `main`.
 - `lint` and `spell` (whole-repo linters) render without `release-gate`; only the release recipes are opt-in.
 - Units under `pytest-cov` run with `--cov-fail-under=0`: the floor is applied once, to the combined data.

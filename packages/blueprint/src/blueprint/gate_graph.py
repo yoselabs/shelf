@@ -71,7 +71,26 @@ class Gate:
         `check-all` counts: a repo may narrow `check` to what a change touches and keep the whole
         run (coverage floor included) in `check-all`, which is run before a release tag.
         """
-        return "\n".join(dict.fromkeys(self.reachable("check") + self.reachable("check-all")))
+        return executable("\n".join(dict.fromkeys(self.reachable("check") + self.reachable("check-all"))))
+
+
+_PRINTS = frozenset({"echo", "printf"})
+_CHAIN = re.compile(r"&&|\|\||;|\|")
+
+
+def executable(text: str) -> str:
+    """`text` without the lines that only talk about a command: comments, and `echo`/`printf` (a name in a message runs nothing)."""
+    kept = []
+    for line in text.splitlines():
+        words = line.lstrip(" \t@-").split(None, 1)
+        if words and words[0].startswith("#"):
+            continue
+        if words and words[0] in _PRINTS:
+            # what the message says runs nothing; a command chained after it (`echo "lint" && ruff check`) still does
+            kept.append("".join(_CHAIN.split(line, maxsplit=1)[1:]))
+            continue
+        kept.append(line)
+    return "\n".join(kept)
 
 
 def just_command(ctx: Context) -> str:

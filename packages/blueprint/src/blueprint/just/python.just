@@ -36,7 +36,7 @@ deps:
     set -euo pipefail
     env -u UV_FROZEN uv lock --check
     if [ -d packages ]; then
-        printf '%s\n' packages/*/ | xargs -P "$(getconf _NPROCESSORS_ONLN)" -I{} bash -c \
+        printf '%s\0' packages/*/ | xargs -0 -P "$(getconf _NPROCESSORS_ONLN)" -I{} bash -c \
             'p={}; imp=$(ls "$p/src"); out=$(cd "$p" && uv run deptry . --known-first-party "$imp" 2>&1) || { printf -- "-- deptry %s\n%s\n" "$p" "$out"; exit 1; }'
     else
         uv run deptry .

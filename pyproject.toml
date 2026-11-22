@@ -101,6 +101,7 @@ dev = [
     "any-frontmatter[merge]",  # with_frontmatter's comment-keeping merge (yaml-merge) — an extra so a consumer that pins yaml-merge itself is not handed a second source for it
     "sse-starlette>=2,<4",  # NOT an async-scope dependency — the library whose unreset module-global the asgi lane exists to defend against, installed so that defence is actually exercised rather than suppressed away
     "pytest-xdist>=3.6,<4",
+    "pytest-timeout>=2.3,<3",  # a hung test fails the run instead of hanging the gate (no repository has CI to kill it)
     "prek>=0.5,<1",
     "import-linter>=2.15,<3",
     "rust-just>=1.58,<2",  # the gate runner (ADR 0023): `uv run just check`
@@ -267,6 +268,7 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 "packages/any-work/src/any_work/work.py" = ["S311"]
 
 [tool.pytest.ini_options]
+timeout = 900
 # testpaths lists the shelf's own fitness tests + every package's tests.
 # HAND-MAINTAINED, and therefore guarded: `tests/test_gate_covers_every_package.py`
 # asserts this list is exactly the set of `packages/*/tests` on disk. It went

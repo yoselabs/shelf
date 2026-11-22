@@ -340,6 +340,14 @@ def test_a_file_beside_reached_code_changes_the_key(repo: Repo) -> None:
     assert _keys(repo)["core"] != before["core"]  # core.py sits in src/app beside it
 
 
+@pytest.mark.parametrize("junk", [".DS_Store", "core.cpython-312.pyc", "notes.swp"])
+def test_editor_and_interpreter_litter_beside_reached_code_does_not_change_the_key(repo: Repo, junk: str) -> None:
+    _app(repo)
+    before = _keys(repo)
+    repo.write(f"src/app/{junk}", "x")
+    assert _keys(repo) == before
+
+
 def test_a_module_imported_by_a_computed_name_widens_the_key_to_its_package(repo: Repo) -> None:
     _app(repo)
     repo.write("src/app/loader.py", "import importlib\n\ndef load(name):\n    return importlib.import_module(name)\n")
