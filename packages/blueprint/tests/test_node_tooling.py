@@ -67,8 +67,12 @@ def test_the_typescript_and_test_runner_rows_do_not_apply_and_say_why(repo: Repo
 def test_the_rows_the_profile_still_asks_for_do_not_pass_on_a_bare_manifest(repo: Repo) -> None:
     repo.write("package.json", json.dumps(_BUILD))
     rows = _rows(repo)
-    for role in ("formatter", "linter", "dependencies", "architecture"):
-        assert rows[f"stack.node-tooling.{role}"][0] in {Verdict.NOT_SET_UP, Verdict.FAILING}
+    assert {role: rows[f"stack.node-tooling.{role}"][0] for role in ("formatter", "linter", "dependencies", "architecture")} == {
+        "formatter": Verdict.NOT_SET_UP,
+        "linter": Verdict.NOT_SET_UP,
+        "dependencies": Verdict.NOT_SET_UP,
+        "architecture": Verdict.NOT_SET_UP,
+    }
 
 
 _SET_UP = {

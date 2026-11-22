@@ -42,6 +42,18 @@ def test_a_role_configured_and_run_by_the_gate_passes(repo: Repo) -> None:
     assert rows["stack.python-uv.toolchain"][0] is Verdict.PASSING
 
 
+@pytest.mark.parametrize("ruff", ['uv tool run "ruff@$(just pin ruff)"', "uv tool run ruff@0.9.1", "uvx ruff@0.9.1"])
+@pytest.mark.parametrize(("role", "args"), [("linter", "check"), ("formatter", "format --check")])
+@pytest.mark.parametrize(("prefix", "verdict"), [("", Verdict.PASSING), ("# ", Verdict.FAILING), ("echo ", Verdict.FAILING)])
+def test_pinned_ruff_counts_only_when_the_gate_runs_it(
+    repo: Repo, *, ruff: str, role: str, args: str, prefix: str, verdict: Verdict
+) -> None:
+    _python_repo(repo)
+    repo.write("Makefile", "")
+    repo.write("justfile", f"check:\n    {prefix}{ruff} {args} .\n    true\n")
+    assert _rows(repo)[f"stack.python-uv.{role}"][0] is verdict
+
+
 @pytest.mark.parametrize("config_path", ["pyproject.toml", "ruff.toml", ".ruff.toml"])
 @pytest.mark.parametrize("role", ["formatter", "linter"])
 def test_ruff_config_locations_pass_formatter_and_linter(repo: Repo, config_path: str, role: str) -> None:

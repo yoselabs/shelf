@@ -46,6 +46,10 @@ config = [{ any = [
 gate = "ruff format --check"
 
 [[role.alternative]]
+label = "version-pinned Ruff through `uv tool run` or `uvx`"
+gate = '(?m)^[ \t]*@?(?:uv tool run|uvx) (?:"ruff@[^"\n]+"|ruff@[^\s"\x27]+) format --check(?:\s|$)'
+
+[[role.alternative]]
 label = "ruff-pre-commit's `ruff-format` hook, run by the gate's `pre-commit run`"
 gate = '(?m)id:\s*ruff-format\b'
 
@@ -63,6 +67,10 @@ config = [{ any = [
     { path = ".ruff.toml", contains = "[lint]" },
 ] }]
 gate = "ruff check"
+
+[[role.alternative]]
+label = "version-pinned Ruff through `uv tool run` or `uvx`"
+gate = '(?m)^[ \t]*@?(?:uv tool run|uvx) (?:"ruff@[^"\n]+"|ruff@[^\s"\x27]+) check(?:\s|$)'
 
 [[role.alternative]]
 label = "ruff-pre-commit's `ruff` hook, run by the gate's `pre-commit run`"

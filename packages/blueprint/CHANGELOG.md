@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Python stack rows recognize pinned Ruff commands through `uv tool run` and `uvx`; mixed-stack tests verify `node-tooling` edges.
 - Gate tests refuse invalid or unowned units; CLI-filtered runs cannot populate plain-run coverage caches. Keys include external test
   configuration and test package initializers. Recipe checks resolve imported/defaulted recipes and quoted or continued calls; Node
   installs use the detected folder and its lockfile. Lint preserves the first failure, including signal exits, while running both tools.
