@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.13.2
+
+- Snapshot only, no blueprint change: carries git-porcelain 0.31.0 (`take_branch`/`restart_branch` `track=`, `BranchTaken.upstream`).
+
 ## 0.13.1
 
 - Snapshot only, no blueprint change: carries any-agent 0.23.0 (`Harness.effort_levels`, `Summary.res["tokens"]["reasoning"]`).
