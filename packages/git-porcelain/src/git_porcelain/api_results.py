@@ -282,6 +282,7 @@ class BranchTaken:
     head: Sha
     created: bool
     kept_aside: str | None
+    upstream: str | None = None
 
 
 @dataclass(frozen=True)

@@ -218,22 +218,42 @@ def _held(wt: RealWorktree, branch: str) -> BranchHeld | None:
     return BranchHeld(holders) if holders else None
 
 
-def take_branch(wt: RealWorktree, *, branch: str, base: str, clean_keep: Sequence[str] | None) -> TakeResult:
+def _check_track(wt: RealWorktree, track: str | None) -> None:
+    if track is None:
+        return
+    validate_revisions(track)
+    if wt.try_run("rev-parse", "--verify", "-q", f"refs/remotes/{track}").rc != 0:
+        msg = f"track {track!r} is not a remote-tracking ref"
+        raise ValueError(msg)
+
+
+def _taken(wt: RealWorktree, branch: str, *, created: bool, kept: str | None) -> BranchTaken:
+    up = wt.try_run("rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}")
+    return BranchTaken(branch, some(real_read.head_of(wt)), created=created, kept_aside=kept, upstream=up.out.strip() if up.rc == 0 else None)
+
+
+def take_branch(wt: RealWorktree, *, branch: str, base: str, clean_keep: Sequence[str] | None, track: str | None = None) -> TakeResult:
     validate_revisions(branch, base)
+    _check_track(wt, track)
     if (held := _held(wt, branch)) is not None:
         return held
     base = real_checkout.resolve_commit(wt, base)
     exists = wt.try_run("rev-parse", "--verify", "-q", f"refs/heads/{branch}").rc == 0
     try:
         wt.run("checkout", "-q", branch, "--") if exists else wt.run("checkout", "-q", "-b", branch, "--end-of-options", base, "--")
+        if track is not None and not exists:
+            wt.run("branch", "-q", f"--set-upstream-to={track}", "--", branch)
         _clean(wt, clean_keep)
-        return BranchTaken(branch, some(real_read.head_of(wt)), created=not exists, kept_aside=None)
+        return _taken(wt, branch, created=not exists, kept=None)
     finally:
         wt.repo.invalidate()
 
 
-def restart_branch(wt: RealWorktree, *, branch: str, base: str, keep_aside_as: str | None, clean_keep: Sequence[str] | None) -> TakeResult:
+def restart_branch(
+    wt: RealWorktree, *, branch: str, base: str, keep_aside_as: str | None, clean_keep: Sequence[str] | None, track: str | None = None
+) -> TakeResult:
     validate_revisions(branch, base)
+    _check_track(wt, track)
     if (held := _held(wt, branch)) is not None:
         return held
     base = real_checkout.resolve_commit(wt, base)
@@ -247,8 +267,10 @@ def restart_branch(wt: RealWorktree, *, branch: str, base: str, keep_aside_as: s
             wt.run("branch", "-m", "--", branch, keep_aside_as)
             kept = keep_aside_as
         wt.run("checkout", "-q", "-B", branch, "--end-of-options", base, "--")
+        if track is not None:
+            wt.run("branch", "-q", f"--set-upstream-to={track}", "--", branch)
         _clean(wt, clean_keep)
-        return BranchTaken(branch, some(real_read.head_of(wt)), created=not exists or kept is not None, kept_aside=kept)
+        return _taken(wt, branch, created=not exists or kept is not None, kept=kept)
     finally:
         wt.repo.invalidate()
 

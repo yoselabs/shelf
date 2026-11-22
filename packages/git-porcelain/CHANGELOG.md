@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.31.0
+
+- `take_branch(..., track="origin/main")` and `restart_branch(..., track=...)`: the remote-tracking ref becomes the upstream of a branch the call creates (`take_branch` over an existing branch keeps its own; `restart_branch` always sets it), so `@{upstream}` readers (secret scans, change selection) see the base instead of all history. A `track` that is not an existing remote-tracking ref is a `ValueError` before anything changes. `BranchTaken.upstream` reports the upstream afterwards (`None` when none). Real and fake agree (contract scenarios).
+
 ## 0.30.0
 
 - New `Worktree.clean_nested(keep=())` (`git clean -ffdx`): `clean_ignored` that also deletes nested repositories, the mode `clean(nested=True)` had before 0.27. Destructive: a nested repository goes with its history and uncommitted work. `FakeRepo` holds no nested repositories, so there it equals `clean_ignored`.

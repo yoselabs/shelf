@@ -133,8 +133,24 @@ def _holders(repo: RepoState, wt: CheckoutState, ref: str) -> tuple[WorktreeInfo
     )
 
 
-def take_branch(repo: RepoState, wt: CheckoutState, *, branch: str, base: str, clean_keep: Sequence[str] | None) -> TakeResult:
+def _check_track(repo: RepoState, track: str | None) -> None:
+    if track is None:
+        return
+    validate_revisions(track)
+    if f"refs/remotes/{track}" not in repo.refs:
+        msg = f"track {track!r} is not a remote-tracking ref"
+        raise ValueError(msg)
+
+
+def _upstream_key(branch: str) -> str:
+    return f"branch.{branch}.upstream"
+
+
+def take_branch(
+    repo: RepoState, wt: CheckoutState, *, branch: str, base: str, clean_keep: Sequence[str] | None, track: str | None = None
+) -> TakeResult:
     validate_revisions(branch, base)
+    _check_track(repo, track)
     ref = branch_ref(branch)
     if held := _holders(repo, wt, ref):
         return BranchHeld(held)
@@ -145,15 +161,25 @@ def take_branch(repo: RepoState, wt: CheckoutState, *, branch: str, base: str, c
         _land(repo, wt, repo.refs[ref], ref)
     else:
         _checkout_branch(repo, wt, ref, target)
+        if track is not None:
+            repo.config[_upstream_key(branch)] = track
     if clean_keep is not None:
         clean(repo, wt, clean_keep)
-    return BranchTaken(branch, Sha(_head(repo, wt)), created=not exists, kept_aside=None)
+    return BranchTaken(branch, Sha(_head(repo, wt)), created=not exists, kept_aside=None, upstream=repo.config.get(_upstream_key(branch)))
 
 
 def restart_branch(
-    repo: RepoState, wt: CheckoutState, *, branch: str, base: str, keep_aside_as: str | None, clean_keep: Sequence[str] | None
+    repo: RepoState,
+    wt: CheckoutState,
+    *,
+    branch: str,
+    base: str,
+    keep_aside_as: str | None,
+    clean_keep: Sequence[str] | None,
+    track: str | None = None,
 ) -> TakeResult:
     validate_revisions(branch, base)
+    _check_track(repo, track)
     ref = branch_ref(branch)
     if held := _holders(repo, wt, ref):
         return BranchHeld(held)
@@ -173,10 +199,16 @@ def restart_branch(
                 if other.head_ref == ref:
                     other.head_ref = aside
             kept = keep_aside_as
+            if _upstream_key(branch) in repo.config:
+                repo.config[_upstream_key(keep_aside_as)] = repo.config.pop(_upstream_key(branch))
     _checkout_branch(repo, wt, ref, target)
+    if track is not None:
+        repo.config[_upstream_key(branch)] = track
     if clean_keep is not None:
         clean(repo, wt, clean_keep)
-    return BranchTaken(branch, Sha(_head(repo, wt)), created=not exists or kept is not None, kept_aside=kept)
+    return BranchTaken(
+        branch, Sha(_head(repo, wt)), created=not exists or kept is not None, kept_aside=kept, upstream=repo.config.get(_upstream_key(branch))
+    )
 
 
 def release_branch(repo: RepoState, wt: CheckoutState, holder: Path) -> Released | StillHeld:

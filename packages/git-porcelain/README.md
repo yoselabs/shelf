@@ -128,6 +128,9 @@ land(FakeRepo.init(Path("/virtual")).worktree(Path("/virtual")))   # memory, no 
   `DirtyTree`. A branch held by another worktree raises `BranchPinned` with its `holder`.
   `checkout_force(branch, start)` runs checkout with `-B -f`: create or reset the branch and
   discard local changes, while still respecting another worktree's branch pin.
+- **Task branches** (0.31): `take_branch(branch, base, track="origin/main")` and `restart_branch(..., track=...)` make `track` (an existing
+  remote-tracking ref, else `ValueError`) the upstream of the branch they create, so `@{upstream}` readers see the base, not all history;
+  `take_branch` over an existing branch keeps its own. `BranchTaken.upstream` reports the result.
 - **Cleanup and reset**: `clean(keep=())` removes untracked files and directories
   except gitignore-style `keep` patterns, without moving HEAD or changing tracked files.
   `clean_ignored(keep=())` also removes ignored files (`git clean -fdx`); a nested repository (a directory
