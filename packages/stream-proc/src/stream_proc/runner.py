@@ -53,12 +53,6 @@ class Result:
     split_lines: int = 0
 
 
-def _emit(cb: Callable[[bytes], None] | None, raw: bytes) -> None:
-    if cb is not None:
-        with contextlib.suppress(Exception):
-            cb(raw)
-
-
 def _text(cb: Callable[[str], None] | None) -> Callable[[bytes], None] | None:
     # lossy-ok: input: child output returned as text; a line callback wants text; the exact bytes are `capture`
     return None if cb is None else lambda raw: cb(raw.decode("utf-8", "replace"))

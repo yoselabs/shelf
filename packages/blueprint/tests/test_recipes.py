@@ -8,10 +8,10 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pytest
 from blueprint.init import RECIPE_TARGETS, RECIPES
 
 if TYPE_CHECKING:
-    import pytest
     from blueprint.testing import Repo
 
 _GUID = "0123456789abcdef0123456789abcdef"
@@ -287,11 +287,11 @@ def test_the_old_command_line_still_reads_a_top_level_exempt_block(repo: Repo) -
     assert "compose.privileged" in out.stdout
 
 
-# a2kay's owner, 2026-10-12: a hook that cannot fail tells nothing. `bd dolt push` failed over HTTPS on an SSH-only box and
+# a2kay's owner, 2026-10-12: a hook that cannot fail tells nothing. `bd dolt push` (now `bd sync`) failed over HTTPS on an SSH-only box and
 # the pre-push hook still printed Passed.
 def _dolt_push_entry() -> str:
     text = (RECIPES / RECIPE_FILES["hooks"]).read_text()
-    block = text[text.index("id: bd-dolt-push") :]
+    block = text[text.index("id: bd-sync-push") :]
     line = next(ln for ln in block.splitlines() if ln.strip().startswith("entry:"))
     return line.split("entry:", 1)[1].strip()
 
@@ -323,3 +323,43 @@ def test_a_good_dolt_push_passes(repo: Repo) -> None:
 
 # shelf-3xm, shelf-dof (incident 2026-10-20): four gates at once on one box took 11-14 min each, and a push re-ran
 # the gate on the tree that had just passed it.
+
+
+def _sync_script(hook_id: str) -> str:
+    text = (RECIPES / RECIPE_FILES["hooks"]).read_text()
+    block = text[text.index(f"id: {hook_id}") :]
+    line = next(ln for ln in block.splitlines() if ln.strip().startswith("entry:"))
+    return line.split("entry:", 1)[1].strip().removeprefix("sh -c '").removesuffix("'")
+
+
+def _run_script(repo: Repo, script: str, bd_exit: int, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    repo.fake_tool(repo.bin_dir / "bd", "")
+    (repo.bin_dir / "bd").write_text(f"#!/bin/sh\nexit {bd_exit}\n")
+    return subprocess.run(["sh", "-c", script], env={**repo.env, **(env or {})}, capture_output=True, text=True, check=False)
+
+
+@pytest.mark.parametrize(
+    ("code", "words"),
+    [(1, "credentials"), (2, "conflict"), (3, "push again"), (4, "stuck"), (9, "credentials")],
+)
+def test_each_bd_sync_failure_tells_what_to_do(repo: Repo, code: int, words: str) -> None:
+    result = _run_script(repo, _sync_script("bd-sync-push"), code)
+    assert result.returncode != 0
+    assert f"exit {code}" in result.stderr
+    assert words in result.stderr
+
+
+def test_a_failed_pull_hook_fails_loudly(repo: Repo) -> None:
+    result = _run_script(repo, _sync_script("bd-sync-pull"), 2)
+    assert result.returncode != 0
+    assert "FAILED" in result.stderr
+    assert _run_script(repo, _sync_script("bd-sync-pull"), 0).returncode == 0
+
+
+def test_the_recipe_has_no_unquoted_colon_space_in_a_hook_value() -> None:
+    text = (RECIPES / RECIPE_FILES["hooks"]).read_text()
+    for line in text.splitlines():
+        stripped = line.strip().removeprefix("- ")
+        if stripped.startswith(("entry:", "name:")):
+            value = stripped.split(":", 1)[1].strip()
+            assert value[:1] in "'\"" or ": " not in value, line

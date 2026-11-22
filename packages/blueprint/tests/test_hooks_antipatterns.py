@@ -46,7 +46,7 @@ def _rows(repo: Repo, config: str | None) -> dict[str, tuple[Verdict, str]]:
 def test_a_lean_config_passes_every_hook_checkpoint(repo: Repo) -> None:
     rows = _rows(repo, _GOOD)
     assert {v for v, _ in rows.values()} == {Verdict.PASSING}
-    assert len(rows) == 5
+    assert len(rows) == 6
 
 
 def test_a_repo_without_a_hook_config_has_nothing_to_judge(repo: Repo) -> None:
@@ -80,9 +80,7 @@ def test_a_pre_push_hook_that_is_not_the_gate_fails(repo: Repo) -> None:
 
 def test_bds_pre_push_hooks_are_not_a_second_gate(repo: Repo) -> None:
     config = (
-        _GOOD
-        + _hook("bd-pre-push", "bd hooks run pre-push", stages="[pre-push]")
-        + _hook("bd-dolt-push", "bd dolt push", stages="[pre-push]")
+        _GOOD + _hook("bd-pre-push", "bd hooks run pre-push", stages="[pre-push]") + _hook("bd-sync-push", "bd sync", stages="[pre-push]")
     )
     assert _rows(repo, config)["hooks.pre-push-is-the-gate"][0] is Verdict.PASSING
 
@@ -97,9 +95,9 @@ def test_a_hook_that_always_exits_zero_fails(repo: Repo, entry: str) -> None:
     assert "soft" in evidence
 
 
-def test_bds_dolt_push_that_exits_zero_on_success_is_fail_closed(repo: Repo) -> None:
-    entry = "sh -c 'bd dolt push && exit 0; echo FAILED >&2; test -n \"${OPTIONAL:-}\"'"
-    assert _rows(repo, _GOOD + _hook("bd-dolt-push", entry, stages="[pre-push]"))["hooks.fail-closed"][0] is Verdict.PASSING
+def test_bds_sync_that_exits_zero_on_success_is_fail_closed(repo: Repo) -> None:
+    entry = "sh -c 'bd sync && exit 0; echo FAILED >&2; test -n \"${OPTIONAL:-}\"'"
+    assert _rows(repo, _GOOD + _hook("bd-sync-push", entry, stages="[pre-push]"))["hooks.fail-closed"][0] is Verdict.PASSING
 
 
 @pytest.mark.parametrize(
@@ -130,3 +128,39 @@ def test_a_gate_hook_filtered_by_files_fails(repo: Repo) -> None:
 def test_a_repo_with_no_gate_hook_leaves_it_to_the_recipe_checkpoint(repo: Repo) -> None:
     verdict, _ = _rows(repo, _hook("ruff", "ruff check"))["hooks.gate-always-runs"]
     assert verdict is Verdict.NOT_APPLICABLE
+
+
+def _beads_rows(repo: Repo, config: str) -> dict[str, tuple[Verdict, str]]:
+    repo.write(".beads/config.yaml", "no-git-ops: true\n")
+    return _rows(repo, config)
+
+
+_SYNC_HOOKS = _hook("bd-sync-push", "bd sync", stages="[pre-push]") + _hook("bd-sync-pull", "bd sync", stages="[post-merge, post-checkout]")
+
+
+def test_a_beads_repo_that_syncs_at_push_merge_and_checkout_passes(repo: Repo) -> None:
+    assert _beads_rows(repo, _GOOD + _SYNC_HOOKS)["hooks.beads-sync"][0] is Verdict.PASSING
+
+
+def test_a_beads_repo_pushing_with_bare_dolt_push_and_never_pulling_fails(repo: Repo) -> None:
+    config = _GOOD + _hook("bd-dolt-push", "bd dolt push", stages="[pre-push]")
+    verdict, evidence = _beads_rows(repo, config)["hooks.beads-sync"]
+    assert verdict is Verdict.FAILING
+    assert "pre-push" in evidence
+    assert "post-checkout" in evidence
+
+
+def test_a_repo_without_beads_is_not_asked_for_bd_sync(repo: Repo) -> None:
+    assert "hooks.beads-sync" not in _rows(repo, _GOOD)
+
+
+def test_an_unquoted_colon_space_in_an_entry_fails_and_names_the_line(repo: Repo) -> None:
+    config = _GOOD + _hook("bad", "sh -c 'echo FAILED: now'")
+    verdict, evidence = _rows(repo, config)["hooks.parses"]
+    assert verdict is Verdict.FAILING
+    assert "line 18" in evidence
+
+
+def test_a_quoted_entry_with_a_colon_is_readable(repo: Repo) -> None:
+    config = _GOOD + _hook("ok", "\"sh -c 'echo FAILED: now'\"")
+    assert _rows(repo, config)["hooks.parses"][0] is Verdict.PASSING

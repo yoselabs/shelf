@@ -1,0 +1,6 @@
+id = "mise"
+title = "Tool pins through mise"
+default = "on"
+requires = ["stacks"]
+rows = ["stack.tool-pins", "stack.agent-cli-pins", "stack.tools-installed"]
+modules = ["mise.tool_pins"]

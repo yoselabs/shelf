@@ -9,14 +9,15 @@ from __future__ import annotations
 
 import inspect
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import TYPE_CHECKING
 
 from blueprint import concerns
-from blueprint.concerns.framework import FRAMEWORK_DIR
-from blueprint.concerns.profile_data import PROFILE_DIR, Role, StackProfile, load_profiles
-from blueprint.concerns.stack import FRAMEWORK_ROLES, ROLES, is_checkpoint, purpose_fact
+from blueprint.concerns.frameworks.framework import FRAMEWORK_DIR
+from blueprint.concerns.stacks.profile_data import PROFILE_DIR, Role, StackProfile, load_profiles
+from blueprint.concerns.stacks.stack import FRAMEWORK_ROLES, ROLES, is_checkpoint, purpose_fact
 from blueprint.model import REGISTRY, Check
+from blueprint.plugins import load_plugins, plugin_of
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -31,6 +32,7 @@ class Listed:
     id: str
     statement: str
     turned_on_by: str
+    plugin: str = ""
 
 
 def _turned_on_by(check: Check) -> str:
@@ -81,7 +83,11 @@ def listing(prefix: str = "") -> list[Listed]:
         *_profile_rows("stack", PROFILE_DIR, ROLES),
         *_profile_rows("framework", FRAMEWORK_DIR, FRAMEWORK_ROLES),
     ]
-    return sorted((c for c in everything if c.id.startswith(prefix)), key=lambda c: c.id)
+    plugins = load_plugins()
+    return sorted(
+        (replace(c, plugin=plugin_of(c.id, plugins)) for c in everything if c.id.startswith(prefix)),
+        key=lambda c: c.id,
+    )
 
 
 def as_json(rows: list[Listed]) -> str:
@@ -89,8 +95,9 @@ def as_json(rows: list[Listed]) -> str:
 
 
 def as_table(rows: list[Listed]) -> str:
-    header = Listed("ID", "STATEMENT", "TURNED ON BY")
+    header = Listed("ID", "STATEMENT", "TURNED ON BY", "PLUGIN")
     shown = [header, *rows]
     id_w = max(len(r.id) for r in shown)
     st_w = max(len(r.statement) for r in shown)
-    return "\n".join(f"{r.id:<{id_w}}  {r.statement:<{st_w}}  {r.turned_on_by}".rstrip() for r in shown)
+    pl_w = max(len(r.plugin) for r in shown)
+    return "\n".join(f"{r.id:<{id_w}}  {r.plugin:<{pl_w}}  {r.statement:<{st_w}}  {r.turned_on_by}".rstrip() for r in shown)

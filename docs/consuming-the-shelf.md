@@ -50,7 +50,7 @@ change). `blueprint init` writes `.pre-commit-config.yaml` and runs `prek instal
 | `ruff check`, `ruff format --check` | pre-commit | lint and format on the staged Python files |
 | `just check` | pre-push | the whole gate before code leaves the machine |
 
-Print the recipe with `uv run blueprint recipe hooks`. A consumer recipe runs the pinned engine (`uv run blueprint ...`), never a shelf clone: `gate.recipe-calls` (ADR 0032).
+Print the recipe with `uv run blueprint recipe hooks`. A consumer recipe runs the pinned engine (`uv run blueprint ...`), never a shelf clone: `gate.recipe-calls` (ADR 0033).
 Both are the same trade the guard makes: the hook is fast feedback, `just check` is the enforcement.
 
 Idempotent. It asks git where hooks live (`git rev-parse --git-path hooks`, which honors

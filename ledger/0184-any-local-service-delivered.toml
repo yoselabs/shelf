@@ -1,0 +1,10 @@
+seq = 184
+date = "2026-11-22"
+event = "delivery"
+software = "any-local-service"
+release = "any-local-service-v0.1.0"
+actor = "codex"
+consumer = "ogy"
+verdict = ""
+cost = ""
+note = "One area package promoted from ogy and a2kay: local browser authority/access, health/readiness, serving/discovery, response-once and build identity/skew. Reuses the token gate, resource scope and atomic I/O. The graceful-lifespan scenario exposed async-scope forcing shutdown before lifespan exit; fixed at its owner. Candidate delivery only: donors untouched, no adoption verdict or tag."

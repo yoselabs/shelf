@@ -7,7 +7,7 @@ copying recipe text: it re-renders, and the repo's own `justfile` keeps only wha
 
 Extension points: `check-extra` in the repo's justfile runs one more thing in the gate; `[tool.blueprint.gate]` in pyproject.toml holds
 the repo's paths and extra steps (`gate_py`). A recipe defined there with a rendered name replaces it (`set allow-duplicate-recipes`),
-but `gate.recipe-shadowing` fails that unless an `[[override]]` says why (ADR 0032).
+but `gate.recipe-shadowing` fails that unless an `[[override]]` says why (ADR 0033).
 
 Exit codes of the check: 0 current · 1 drift (a part differs, is missing, is stale, or the justfile does not import it).
 """

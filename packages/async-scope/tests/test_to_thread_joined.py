@@ -65,17 +65,18 @@ async def test_bare_to_thread_does_not_wait() -> None:
     await asyncio.to_thread(finished.wait, 2)
 
 
-async def test_cancel_still_propagates_when_the_work_raises() -> None:
+async def test_a_failure_of_the_thread_during_a_cancel_is_not_lost() -> None:
     started = threading.Event()
 
     def work() -> None:
         started.set()
-        time.sleep(0.05)
-        msg = "late failure"
-        raise RuntimeError(msg)
+        time.sleep(0.1)
+        msg = "work failed while cancelled"
+        raise ValueError(msg)
 
     task = asyncio.ensure_future(to_thread_joined(work))
     await asyncio.to_thread(started.wait, 2)
     task.cancel()
-    with pytest.raises(asyncio.CancelledError):
+    with pytest.raises(BaseExceptionGroup) as caught:
         await task
+    assert {type(e) for e in caught.value.exceptions} == {asyncio.CancelledError, ValueError}

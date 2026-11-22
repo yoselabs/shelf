@@ -5,20 +5,23 @@ from __future__ import annotations
 import importlib
 
 MODULES = (
-    "gate",
-    "backlog",
-    "secrets",
-    "hooks",
-    "stack",
-    "python_pin",
-    "cli_parse",
-    "shell",
-    "uv_tool",
-    "tool_pins",
-    "owners",
-    "shelf_sources",
-    "framework",
-    "agents",
+    "gate.gate",
+    "beads.backlog",
+    "beads.hooks",
+    "beads.agents",
+    "secrets.secrets",
+    "secret_scan.secrets_scanner",
+    "git_hooks.hooks",
+    "stacks.stack",
+    "python.python_pin",
+    "stacks.cli_parse",
+    "shell.shell",
+    "uv.uv_tool",
+    "mise.tool_pins",
+    "stacks.owners",
+    "stacks.shelf_sources",
+    "frameworks.framework",
+    "agents.agents",
 )
 
 

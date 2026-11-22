@@ -1,0 +1,10 @@
+# One MicroSoftware instance; its executable contract lives with the package.
+name = "any-supervise"
+kind = "any-lib"
+tier = "T1"
+release = "any-supervise-v0.1.0"
+capability = "Stop hand-tracking long-lived worker processes: a TOML spec of workers and replicas, one state file per replica (pid plus process start time, so a recycled pid is never signalled), and up / status / roll / down / logs where status flags a replica STALE when the code version it started on differs from the one a version command prints now, and roll restarts replicas one at a time so a lane with count > 1 never drops to zero."
+implementation = "ours"
+status = "candidate"
+owner = "yoselabs"
+notes = "Trigger 2026-11-22: channel-research ran 9 hand-started detached loops (setsid+nohup), kept running old code after a fix merged with nothing saying so, was restarted by killing PIDs read from ps (killing by pattern once killed another session's processes), lost every in-flight job on a restart-all, and had a launch wrapper that kept stdout open and hung its caller. Composes stream-proc 0.17.0 (spawn_detached added for this, stop_pid, alive, capture), process-lock, atomic-io and child-env. Never signals by name or pattern; stale detection needs no cooperation from the worker. Does not restart a worker that dies by itself (reports dead; a timer runs up). Single host, POSIX. Born candidate; no release tag created by this change."

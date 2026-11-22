@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "any-browser"
+software = "async-scope"
+why = "The playwright and zendriver backends closed contexts, pages, the browser and the stderr pipe under 18 `suppress(Exception)` blocks; those are cleanups that must each be attempted, bounded and shielded, and their failures raised (constitution Article III; shelf-tyld.36)."
+needs = "cleanup(*steps, within=) and cleanup_sync(*steps): every step attempted, one failure unchanged, several as an ExceptionGroup, a cancel never swallowed."
+sponsor = "yoselabs"
+requester = "any-browser"
+status = "active" # active | retired

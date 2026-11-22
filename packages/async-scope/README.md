@@ -104,13 +104,12 @@ Cleared before every serve — through `sys.modules`, never an import: sse-starl
 not a dependency here and must not become one, and if nothing loaded it there is no
 global to poison.
 
-**`force_exit` is not enough to stop a stuck server.** `should_exit` alone asks for
-a graceful shutdown, which waits for open connections to drain; a server-sent-event
-stream or a request blocked on a subprocess never drains. `force_exit` is documented
-to skip that wait and is set — but measured against uvicorn 0.51 with a handler
-holding an open response, `serve()` does not return at all. So the wait is a short
-grace (`shutdown_grace`, ~0.15s is what a clean exit actually costs) and then the
-task is cancelled outright. Teardown never wedges and never pays an open-ended wait.
+**A bounded graceful stop preserves lifespan cleanup.** `should_exit` asks for
+graceful shutdown; a server-sent-event stream or blocked request may never drain.
+The connection timeout is half `shutdown_grace`, rounded down to whole seconds,
+leaving the remaining grace for application lifespan shutdown. `force_exit` is
+not set: it skips that cleanup even on a clean stop. If the complete stop still
+exceeds the grace, the serve task is cancelled. Teardown never waits indefinitely.
 
 **A failed startup is a `SystemExit`, not an exception.** uvicorn is written to be a
 program, so an app that raises during lifespan ends in `sys.exit(3)`. That matters

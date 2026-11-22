@@ -16,6 +16,8 @@ members = ["packages/*"]
 # The dev group references convert-md's [documents] and anyllm's SDK extras (so
 # their engine/provider tests resolve); resolve both from the workspace, not PyPI.
 [tool.uv.sources]
+asgi-token-gate = { workspace = true }
+any-local-service = { workspace = true }
 convert-md = { workspace = true }
 # Named here only because the dev group installs `async-scope[asgi]` to exercise
 # the real-socket lane; the package itself depends on no sibling.
@@ -45,6 +47,8 @@ any-arch = { workspace = true }
 any-lease = { workspace = true }
 # any-work composes any-lease, any-failure-fp and sqlite-store.
 any-work = { workspace = true }
+# any-supervise composes atomic-io, child-env, process-lock and stream-proc.
+any-supervise = { workspace = true }
 any-failure-fp = { workspace = true }
 sqlite-store = { workspace = true }
 content-digest = { workspace = true }
@@ -215,6 +219,8 @@ builtins-allowed-modules = ["types"]
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.ruff.lint.per-file-ignores]
+# Boot failures are retained, published as readiness refusals and delivered to the injected failure handler.
+"packages/any-local-service/src/any_local_service/health.py" = ["BLE001"]
 # The isolated gate must exec-replace itself to retain the durably registered PID.
 # Its validated private payload is explicit caller argv, never shell text (shelf-4426).
 # S606 flags the required exec primitive itself; keep it enabled everywhere else.
@@ -280,6 +286,7 @@ testpaths = [
     "packages/anyllm/tests",
     "packages/app-dirs/tests",
     "packages/asgi-token-gate/tests",
+    "packages/any-local-service/tests",
     "packages/async-scope/tests",
     "packages/bdd-tags/tests",
     "packages/beads-client/tests",
@@ -326,6 +333,7 @@ testpaths = [
     "packages/any-path-glob/tests",
     "packages/any-failure-fp/tests",
     "packages/any-work/tests",
+    "packages/any-supervise/tests",
     "packages/any-shell-policy/tests",
     "packages/any-net/tests",
     "packages/any-clock/tests",
@@ -382,6 +390,7 @@ asyncio_mode = "auto"
 # `just arch` runs it; a violation prints the importing line.
 [tool.importlinter]
 root_packages = [
+    "any_local_service",
     "a2effect",
     "any_agent",
     "any_browser",
@@ -440,6 +449,7 @@ root_packages = [
     "any_path_glob",
     "any_failure_fp",
     "any_work",
+    "any_supervise",
     "any_shell_policy",
     "any_net",
     "any_clock",
@@ -481,6 +491,7 @@ include_external_packages = true
 name = "no shelf package imports a consumer app"
 type = "forbidden"
 source_modules = [
+    "any_local_service",
     "a2effect",
     "any_agent",
     "any_browser",
@@ -539,6 +550,7 @@ source_modules = [
     "any_path_glob",
     "any_failure_fp",
     "any_work",
+    "any_supervise",
     "any_shell_policy",
     "any_net",
     "any_clock",
@@ -582,6 +594,7 @@ allow_indirect_imports = true
 name = "shelf packages are independent except declared edges"
 type = "independence"
 modules = [
+    "any_local_service",
     "a2effect",
     "any_agent",
     "any_browser",
@@ -640,6 +653,7 @@ modules = [
     "any_path_glob",
     "any_failure_fp",
     "any_work",
+    "any_supervise",
     "any_shell_policy",
     "any_net",
     "any_clock",
@@ -673,6 +687,10 @@ modules = [
     "yaml_merge",
 ]
 ignore_imports = [
+    "any_local_service.access -> asgi_token_gate",
+    "any_local_service.health -> async_scope",
+    "any_local_service.serve -> async_scope.asgi",
+    "any_local_service.endpoint -> atomic_io",
     "any_frontmatter.document -> yaml_merge",
     "any_frontmatter.document -> atomic_io",
     "any_frontmatter.version -> content_digest",
@@ -701,6 +719,10 @@ ignore_imports = [
     "page_tsv.render -> lean_wire",
     "any_lease.leases -> process_lock",
     "process_lock -> stream_proc",
+    "stream_proc.pump -> async_scope",
+    "any_browser.playwright -> async_scope.cleanup",
+    "any_browser.playwright -> async_scope",
+    "any_browser.zendriver -> async_scope.cleanup",
     "any_lease._keyfile -> content_digest",
     "any_pipeline.filestore -> content_digest",
     "launchd_agent -> child_env",
@@ -711,6 +733,11 @@ ignore_imports = [
     "any_work.work -> any_failure_fp.backoff",
     "any_work.work -> any_lease",
     "any_work.work -> sqlite_store",
+    "any_supervise.fleet -> child_env",
+    "any_supervise.fleet -> process_lock",
+    "any_supervise.fleet -> stream_proc",
+    "any_supervise.fleet -> stream_proc.capture",
+    "any_supervise.store -> atomic_io",
     "any_yaml -> yaml_merge",
     "any_yaml.write -> yaml_merge",
     "any_yaml.write -> atomic_io",
@@ -954,12 +981,12 @@ exclude_lines = [
 ]
 
 # Shared SLOC caps, copied to consumers with the linter preset.
-# The shelf's gate differs from the rendered python steps in data only (blueprint gate_py, ADR 0032).
+# The shelf's gate differs from the rendered python steps in data only (blueprint gate_py, ADR 0033).
 [tool.blueprint.gate]
 release-gate = true
 lint-paths = ["packages", "tests", "tools", "conftest.py"]
 spell-paths = ["packages", "tests", "tools", "docs", "catalog", "use-cases", "ledger", "README.md", "AGENTS.md", "conftest.py"]
-steps = ["scripts", "arch", "tag-check"]
+steps = ["scripts", "arch", "tag-check", "stdlib-shadow"]
 
 [tool.blueprint.test]
 floor = 65

@@ -16,8 +16,8 @@ from dataclasses import asdict, dataclass
 from fnmatch import fnmatch
 from typing import TYPE_CHECKING, Literal
 
-from blueprint.concerns.cli_parse import _scripts
-from blueprint.concerns.secrets import _RULES, _sops_files
+from blueprint.concerns.secrets.secrets import _RULES, _sops_files
+from blueprint.concerns.stacks.cli_parse import _scripts
 from blueprint.model import walk
 
 if TYPE_CHECKING:

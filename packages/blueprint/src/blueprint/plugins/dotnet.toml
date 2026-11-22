@@ -1,0 +1,6 @@
+id = "dotnet"
+title = ".NET"
+default = "detected"
+requires = ["stacks"]
+rows = ["stack.dotnet.*"]
+modules = []

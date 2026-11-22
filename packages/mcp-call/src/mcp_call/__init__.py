@@ -132,14 +132,15 @@ class McpEndpoint:
         self.close()
 
     def close(self) -> None:
-        """End the session (best effort: a server may not support ending one) and the connection."""
+        """End the session and the connection; a failed session DELETE is raised as :class:`McpCallError` after the connection is closed."""
         if self._http is None:
             return
         try:
             if self._session is not None:
                 self._http.delete(self.url, headers=self._send_headers())
-        except httpx.HTTPError:
-            pass
+        except httpx.HTTPError as exc:
+            msg = f"ending the session at {self.url} failed: {exc}"
+            raise McpCallError(msg) from exc
         finally:
             self._http.close()
             self._http = None

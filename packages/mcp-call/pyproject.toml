@@ -1,6 +1,6 @@
 [project]
 name = "mcp-call"
-version = "0.2.0"
+version = "0.3.0"
 description = "Call a tool on a Streamable HTTP MCP server with httpx alone: no MCP SDK and no fastmcp to import, for a short-lived process that makes one call and exits."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

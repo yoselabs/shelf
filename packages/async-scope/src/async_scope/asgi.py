@@ -26,6 +26,8 @@ import socket
 import sys
 from typing import TYPE_CHECKING, Any, cast
 
+from async_scope.cleanup import cleanup
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
@@ -88,15 +90,13 @@ async def serve_asgi(
 
     sock = bind_loopback(host, port)
     bound_port = int(cast("tuple[Any, ...]", sock.getsockname())[1])
-    server = uvicorn.Server(uvicorn.Config(app, log_level=log_level, lifespan="on"))
+    server = uvicorn.Server(uvicorn.Config(app, log_level=log_level, lifespan="on", timeout_graceful_shutdown=int(shutdown_grace / 2)))
     task = asyncio.create_task(_serve_without_exiting(server, sock))
     try:
         await _await_started(server, task, within=startup_timeout)
         yield f"http://{host}:{bound_port}"
     finally:
-        await _stop(server, task, grace=shutdown_grace)
-        with contextlib.suppress(Exception):
-            sock.close()
+        await cleanup(lambda: _stop(server, task, grace=shutdown_grace), sock.close, within=shutdown_grace + 10.0)
 
 
 async def _serve_without_exiting(server: Any, sock: socket.socket) -> None:
@@ -136,14 +136,13 @@ def _reset_sse_starlette_shutdown_flag() -> None:
     poison and nothing to do — importing it here to reset a flag nobody set would
     be work, and a dependency, in exchange for nothing.
 
-    Suppressed wholesale beyond that: this is a workaround for somebody else's bug,
-    and a serve must not fail because that library moved its internals.
+    A library version without ``AppStatus`` has no flag to reset: that absence is the
+    answer, not an error.
     """
     module = sys.modules.get("sse_starlette.sse")
-    if module is None:
-        return
-    with contextlib.suppress(Exception):
-        module.AppStatus.should_exit = False
+    status = getattr(module, "AppStatus", None)
+    if status is not None:
+        status.should_exit = False
 
 
 async def _await_started(server: Any, task: asyncio.Task[Any], *, within: float) -> None:
@@ -175,23 +174,21 @@ async def _stop(server: Any, task: asyncio.Task[Any], *, grace: float) -> None:
     the shutdown, and the ``await`` behind it, hang with no traceback while the
     listening socket stays held.
 
-    ``force_exit`` is documented to skip that drain and it is set here, but on
-    uvicorn 0.51 it is **not sufficient on its own**: measured against a handler
-    holding an open response, `serve()` does not return at all, and a caller that
-    only waits ends up paying its entire timeout on every teardown. So the wait is
-    a short grace for the ordinary case — measured at ~0.15s when nothing is stuck
-    — after which the task is cancelled outright. The shield matters: it lets the
+    The server's connection-drain timeout uses half the grace, leaving time for
+    lifespan shutdown. Setting ``force_exit`` here would skip the app's lifespan
+    and leak its resources even on an ordinary stop. If the whole stop exceeds
+    the grace, the task is cancelled outright. The shield matters: it lets the
     grace expire without the wait cancelling the task first, so the cancel is this
     function's own deliberate step rather than a timeout's side effect.
     """
     server.should_exit = True
-    server.force_exit = True
     try:
         await asyncio.wait_for(asyncio.shield(task), timeout=grace)
-    except Exception:  # noqa: BLE001 — TimeoutError is the expected one; anything else still has to reach the cancel
+    except TimeoutError:
         task.cancel()
-        with contextlib.suppress(BaseException):
-            await task
+        await asyncio.wait([task])
+        if not task.cancelled() and (failure := task.exception()) is not None:
+            raise failure from None
 
 
 __all__ = ["LOOPBACK", "ServeError", "bind_loopback", "serve_asgi"]

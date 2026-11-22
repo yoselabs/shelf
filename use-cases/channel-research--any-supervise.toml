@@ -1,0 +1,11 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+# One file per (consumer x software); the consumer owns it. This is the retention
+# claim: the software cannot be retired while an active UseCase points at it (Article VIII;
+# the Requester controls retirement, the Owner controls shape -- the two hats).
+consumer = "channel-research"
+software = "any-supervise"
+why = "channel-research runs nine long-lived detached workers (snapshots x4, process, model x4) started by hand with setsid+nohup and restarted by killing PIDs read from ps. They kept running old code after a merged fix with nothing saying so, a restart-all dropped every in-flight job, and a launch wrapper holding stdout hung its caller. A spec, identity-checked state files, STALE status and a rolling restart replace the hand bookkeeping. Not yet adopted."
+needs = "load_spec(path); up(spec, host) idempotent and detached; status(spec, host) with STALE from version_cmd and exit code; roll(spec, host, parallel=) one replica at a time; down(spec, name); logs; never a signal to a process without a matching (pid, start time) state file."
+sponsor = "yoselabs"
+requester = "channel-research"
+status = "active"          # active | retired -- the planned retention claim until the consumer's migration lands

@@ -1,0 +1,4 @@
+# Paths allowed to share a name with a standard library module (tools/stdlib_shadow.py). Every entry needs its one-line reason, keyed by the
+# repo-relative path of the file or package folder; an entry that no longer shadows anything fails the check until it is deleted.
+[allow]
+"packages/blueprint/src/blueprint/profile.py" = "imported by ~10 modules and pinned consumers (public module); its sibling secret_scan.py is only run as python -m blueprint.secret_scan (.blueprint/base.just, pre-commit hook), never by path"

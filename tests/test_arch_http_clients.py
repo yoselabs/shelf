@@ -14,6 +14,9 @@ _CLIENTS = {"Client", "AsyncClient"}
 
 _SOURCE_OWNERS = ("mcp-call/src/", "mcp-feedback/src/")
 _TEST_FILES = {
+    "any-local-service/tests/test_serve.py": "legitimate: verifies real loopback serving, discovery and lifespan cleanup",
+    "any-local-service/tests/test_health.py": "legitimate: observes staged readiness over a real loopback socket",
+    "any-local-service/tests/test_once.py": "legitimate: observes late ASGI transport errors through an in-process client",
     "async-scope/tests/test_asgi.py": "legitimate: drives serve_asgi over a local socket",
     "asgi-token-gate/tests/test_asgi_token_gate.py": "legitimate: in-process ASGI transport",
 }

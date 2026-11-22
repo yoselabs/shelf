@@ -28,6 +28,7 @@ members = [
     "any-json-doc",
     "any-knowledge",
     "any-lease",
+    "any-local-service",
     "any-mailbox",
     "any-markdown",
     "any-net",
@@ -38,6 +39,7 @@ members = [
     "any-recorded-fixture",
     "any-shell-policy",
     "any-speech",
+    "any-supervise",
     "any-ttl-cache",
     "any-versioned",
     "any-work",
@@ -303,8 +305,11 @@ dev = [
 
 [[package]]
 name = "any-browser"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/any-browser" }
+dependencies = [
+    { name = "async-scope" },
+]
 
 [package.optional-dependencies]
 patchright = [
@@ -324,6 +329,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "async-scope", editable = "packages/async-scope" },
     { name = "patchright", marker = "extra == 'patchright'", specifier = ">=1.60,<2" },
     { name = "zendriver", marker = "extra == 'zendriver'", specifier = ">=0.15,<1" },
 ]
@@ -617,7 +623,7 @@ dev = [
 
 [[package]]
 name = "any-lease"
-version = "0.3.2"
+version = "0.4.0"
 source = { editable = "packages/any-lease" }
 dependencies = [
     { name = "content-digest" },
@@ -639,6 +645,45 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
+[[package]]
+name = "any-local-service"
+version = "0.1.0"
+source = { editable = "packages/any-local-service" }
+dependencies = [
+    { name = "anyio" },
+    { name = "asgi-token-gate" },
+    { name = "async-scope", extra = ["asgi"] },
+    { name = "atomic-io" },
+    { name = "starlette" },
+    { name = "uvicorn" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anyio", specifier = ">=4,<5" },
+    { name = "asgi-token-gate", editable = "packages/asgi-token-gate" },
+    { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "starlette", specifier = ">=1.3,<2" },
+    { name = "uvicorn", specifier = ">=0.30,<1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "hypothesis", specifier = ">=6.100,<7" },
     { name = "pytest", specifier = ">=8,<9" },
     { name = "pytest-asyncio", specifier = ">=0.24,<1" },
@@ -934,6 +979,39 @@ dev = [
 ]
 
 [[package]]
+name = "any-supervise"
+version = "0.1.0"
+source = { editable = "packages/any-supervise" }
+dependencies = [
+    { name = "atomic-io" },
+    { name = "child-env" },
+    { name = "process-lock" },
+    { name = "stream-proc" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "atomic-io", editable = "packages/atomic-io" },
+    { name = "child-env", editable = "packages/child-env" },
+    { name = "process-lock", editable = "packages/process-lock" },
+    { name = "stream-proc", editable = "packages/stream-proc" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100,<7" },
+    { name = "pytest", specifier = ">=8,<9" },
+    { name = "pytest-asyncio", specifier = ">=0.24,<1" },
+]
+
+[[package]]
 name = "any-ttl-cache"
 version = "0.1.0"
 source = { editable = "packages/any-ttl-cache" }
@@ -981,7 +1059,7 @@ dev = [
 
 [[package]]
 name = "any-work"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-work" }
 dependencies = [
     { name = "any-failure-fp" },
@@ -1242,7 +1320,7 @@ dev = [
 
 [[package]]
 name = "async-scope"
-version = "0.3.0"
+version = "0.4.1"
 source = { editable = "packages/async-scope" }
 
 [package.optional-dependencies]
@@ -1415,7 +1493,7 @@ wheels = [
 
 [[package]]
 name = "blueprint"
-version = "0.12.0"
+version = "0.12.1"
 source = { editable = "packages/blueprint" }
 
 [package.dev-dependencies]
@@ -1790,7 +1868,7 @@ dev = [
 
 [[package]]
 name = "content-extract"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/content-extract" }
 dependencies = [
     { name = "convert-md" },
@@ -3974,7 +4052,7 @@ dev = [
 
 [[package]]
 name = "mcp-call"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/mcp-call" }
 dependencies = [
     { name = "httpx" },
@@ -4685,7 +4763,7 @@ wheels = [
 
 [[package]]
 name = "page-tsv"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "packages/page-tsv" }
 dependencies = [
     { name = "lean-wire" },
@@ -6404,8 +6482,11 @@ dev = [
 
 [[package]]
 name = "stream-proc"
-version = "0.15.0"
+version = "0.17.0"
 source = { editable = "packages/stream-proc" }
+dependencies = [
+    { name = "async-scope" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -6415,6 +6496,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "async-scope", editable = "packages/async-scope" }]
 
 [package.metadata.requires-dev]
 dev = [

@@ -1,0 +1,8 @@
+# A UseCase — one consumer PUBLISHES its dependency (glossary: satisfies -> UseCase).
+consumer = "stream-proc"
+software = "async-scope"
+why = "Pump.release closed its three pipes under `contextlib.suppress(OSError)` and dropped a raising callback silently; both are cleanup failures that must be attempted independently and raised (constitution Article III, no silent failures; shelf-tyld.36)."
+needs = "cleanup_sync(*steps): run every step, one failure unchanged, several as an ExceptionGroup."
+sponsor = "yoselabs"
+requester = "stream-proc"
+status = "active" # active | retired

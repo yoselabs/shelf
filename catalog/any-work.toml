@@ -2,7 +2,7 @@
 name = "any-work"
 kind = "any-lib"
 tier = "T1"
-release = "any-work-v0.1.0"
+release = "any-work-v0.2.0"
 capability = "Stop hand-rolling the 'which keys are left, which failed, retry when' loop of a long job: a SQLite work table (add idempotent, claim the next due key under a per-key flock, finish ok or with a transient/permanent/unknown failure, progress and retry queries) and a drain loop that exits when idle."
 implementation = "ours"
 status = "candidate"

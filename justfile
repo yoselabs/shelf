@@ -48,6 +48,12 @@ scripts-all: (scripts "all")
 tag-check:
     python3 -I tools/tag_check.py
 
+# No tracked `*.py` file or package folder is named like a standard library module where a script run puts it first on sys.path (a consumer's
+# `queue.py` in scripts/ broke 729 jobs, 2026-11: `module 'queue' has no attribute 'SimpleQueue'`). Reasoned exceptions: tools/stdlib_shadow_allow.toml.
+[group('gate')]
+stdlib-shadow:
+    python3 -I tools/stdlib_shadow.py
+
 # the import graph against the contracts in [tool.importlinter] (pyproject.toml): no package
 # imports a consumer app, packages stay independent except their declared workspace edges.
 # Banned APIs are ruff's TID251 and ride `lint`. A violation prints the importing line.

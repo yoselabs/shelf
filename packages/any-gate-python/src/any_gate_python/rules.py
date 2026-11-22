@@ -9,7 +9,7 @@ repo-tests = "tests"                   # whole-repo tests that always run (the f
 tests = ["test_onboard_*"]             # file-name globs under `repo-tests`
 inputs = ["tools/onboard/", "justfile"]
 [tool.any-gate.python.gated.reads]     # what one gated test reads beyond `inputs`
-"test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/backlog.py"]
+"test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/beads/backlog.py"]
 ```
 
 A path entry is a file (`justfile`) or, with a trailing `/`, a directory prefix.

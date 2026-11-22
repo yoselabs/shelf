@@ -119,6 +119,23 @@ class State:
     rejected: tuple[Judgement, ...] = ()
     # `[[edge]]`: contact between two stacks in one repo, as (from, to, via) with the repo-relative contract file.
     edges: tuple[tuple[str, str, str], ...] = ()
+    # `[plugins]`: one switch per plugin, `beads = false` (mission blueprint-plugins). Absent means the plugin's default.
+    plugins: tuple[tuple[str, bool], ...] = ()
+
+
+def _load_plugin_switches(data: dict[str, Any], problems: list[str]) -> tuple[tuple[str, bool], ...]:
+    from blueprint.plugins import load_plugins  # noqa: PLC0415 -- plugins.py must not import profile.py back
+
+    known = load_plugins()
+    switches: list[tuple[str, bool]] = []
+    for name, value in data.get("plugins", {}).items():
+        if name not in known:
+            problems.append(f"[plugins] {name!r} is not a plugin (known: {', '.join(sorted(known))})")
+        elif not isinstance(value, bool):
+            problems.append(f"[plugins] {name} must be true or false, not {value!r}")
+        else:
+            switches.append((name, value))
+    return tuple(switches)
 
 
 def _load_edges(data: dict[str, Any], problems: list[str]) -> tuple[tuple[str, str, str], ...]:
@@ -216,7 +233,10 @@ def load_state(repo: Path, today: date | None = None) -> State:
     ]
     classified, rejected = _load_judgements(declared, problems)
     edges = _load_edges(data, problems)
-    return State(declared, tuple(overrides), data.get("settings", {}), tuple(problems), skip, tuple(notices), classified, rejected, edges)
+    switches = _load_plugin_switches(data, problems)
+    return State(
+        declared, tuple(overrides), data.get("settings", {}), tuple(problems), skip, tuple(notices), classified, rejected, edges, switches
+    )
 
 
 # Compose files by name; a repo with many (one per service folder) still gets one `compose` table.

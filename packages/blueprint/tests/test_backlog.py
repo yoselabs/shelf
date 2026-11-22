@@ -6,16 +6,20 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
-from blueprint.concerns.backlog import STRICT
+from blueprint.concerns.beads.backlog import STRICT
+from blueprint.init import RECIPES
 from blueprint.model import Verdict
 from blueprint.runner import run, run_audit
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from blueprint.testing import Repo
 
 
 def _beads(repo: Repo, *, config: dict[str, str] | None = None, lint_exit: int = 0) -> None:
     repo.write(".beads/config.yaml", "")
+    repo.write(".pre-commit-config.yaml", (RECIPES / "pre-commit-config.yaml").read_text())
     repo.write(".gitignore", ".beads.gate.lock*\n")
     repo.write(".claude/settings.json", json.dumps({"env": {"BD_DISABLE_METRICS": "1"}}))
     repo.fake_bd(STRICT if config is None else config, lint_exit=lint_exit, lint_out="shelf-1 missing acceptance criteria")
@@ -90,6 +94,21 @@ def test_a_tracked_jsonl_export_fails(repo: Repo) -> None:
     repo.write(".beads/issues.jsonl", "{}\n")
     repo.commit()
     assert _verdicts(repo)["backlog.no-tracked-export"] is Verdict.FAILING
+
+
+def test_an_ignored_issues_jsonl_still_fails_and_says_to_delete_it(repo: Repo) -> None:
+    _beads(repo)
+    repo.write(".beads/.gitignore", "*.jsonl\n")
+    repo.write(".beads/issues.jsonl", "{}\n")
+    repo.commit()
+    verdicts = _verdicts(repo)
+    assert verdicts["backlog.no-tracked-export"] is Verdict.PASSING
+    assert verdicts["backlog.no-export-file"] is Verdict.FAILING
+
+
+def test_no_issues_jsonl_passes(repo: Repo) -> None:
+    _beads(repo)
+    assert _verdicts(repo)["backlog.no-export-file"] is Verdict.PASSING
 
 
 @pytest.mark.parametrize("plant", ["local-file", "session-env"])
@@ -249,3 +268,73 @@ def test_a_top_level_exclude_of_beads_covers_every_hook(repo: Repo) -> None:
     _beads(repo)
     repo.write(".pre-commit-config.yaml", "exclude: ^(\\.beads/|vendor/)\n" + _FIXER.format(extra=""))
     assert _verdicts(repo)["backlog.hooks-spare-beads"] is Verdict.PASSING
+
+
+def _remote(repo: Repo, remote: str | None, origin: str | None) -> Verdict:
+    _beads(repo)
+    if remote:
+        repo.write(".beads/config.yaml", f'no-git-ops: true\nsync:\n    remote: "{remote}"\n')
+    if origin:
+        repo.git("remote", "add", "origin", origin)
+    repo.commit()
+    return _verdicts(repo)["backlog.no-duplicate-remote"]
+
+
+@pytest.mark.parametrize(
+    "remote",
+    [
+        "git+https://github.com/o/r.git",
+        "git+ssh://git@github.com/o/r.git",
+        "git@github.com:o/r.git",
+    ],
+)
+def test_a_sync_remote_that_repeats_origin_in_any_transport_fails(repo: Repo, remote: str) -> None:
+    assert _remote(repo, remote, "https://github.com/o/r.git") is Verdict.FAILING
+
+
+def test_a_sync_remote_naming_another_repository_passes(repo: Repo) -> None:
+    assert _remote(repo, "git+https://github.com/o/other.git", "https://github.com/o/r.git") is Verdict.PASSING
+
+
+def test_no_sync_remote_passes(repo: Repo) -> None:
+    assert _remote(repo, None, "https://github.com/o/r.git") is Verdict.PASSING
+
+
+def test_a_beads_repo_whose_hook_config_lacks_bds_events_fails_the_beads_hooks_row(repo: Repo) -> None:
+    _beads(repo)
+    repo.write(".pre-commit-config.yaml", "repos: []\n")
+    assert _verdicts(repo)["backlog.hooks-recipe"] is Verdict.FAILING
+
+
+def test_a_beads_repo_without_a_hook_config_is_not_set_up(repo: Repo) -> None:
+    _beads(repo)
+    (repo.root / ".pre-commit-config.yaml").unlink()
+    assert _verdicts(repo)["backlog.hooks-recipe"] is Verdict.NOT_SET_UP
+
+
+def _worktree(repo: Repo) -> Path:
+    _beads(repo)
+    repo.commit()
+    folder = repo.root.parent / f"{repo.root.name}-wt"
+    repo.git("worktree", "add", str(folder), "-b", "wt")
+    return folder
+
+
+def test_a_worktree_with_its_own_bd_database_fails(repo: Repo) -> None:
+    folder = _worktree(repo)
+    (folder / ".beads" / "embeddeddolt").mkdir(parents=True)
+    row = {r.id: r for r in run(folder, concern="backlog", env=repo.env).rows}["backlog.worktree-database"]
+    assert row.verdict is Verdict.FAILING
+    assert "BEADS_DIR" in row.evidence
+
+
+def test_a_worktree_without_its_own_database_passes(repo: Repo) -> None:
+    folder = _worktree(repo)
+    row = {r.id: r for r in run(folder, concern="backlog", env=repo.env).rows}["backlog.worktree-database"]
+    assert row.verdict is Verdict.PASSING
+
+
+def test_the_main_checkout_may_hold_the_database(repo: Repo) -> None:
+    _beads(repo)
+    (repo.root / ".beads" / "embeddeddolt").mkdir(parents=True)
+    assert _verdicts(repo)["backlog.worktree-database"] is Verdict.PASSING

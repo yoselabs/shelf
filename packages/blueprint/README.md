@@ -60,7 +60,7 @@ default `-n auto` unless `pytest-args` contains `-n`.
 
 The key of a unit hashes its files, every first-party module they import (found by reading the imports), the `conftest.py` above them, the `reads` files,
 `uv.lock` and the dependency and pytest/coverage parts of `pyproject.toml`. An import it cannot see (`importlib` with a computed name) goes in `reads`.
-Do not define your own `test` recipe: `gate.recipe-shadowing` fails it unless an `[[override]]` says why (ADR 0032).
+Do not define your own `test` recipe: `gate.recipe-shadowing` fails it unless an `[[override]]` says why (ADR 0033).
 
 `blueprint gate test-all` runs every test with a coverage floor: `[tool.blueprint.test] floor` takes precedence over
 `[tool.coverage.report] fail_under`, with 65 as the fallback. The resolved floor is passed explicitly to pytest-cov.
@@ -165,5 +165,6 @@ Blueprint checks and seeds none of it: decision records, the glossary and `docs/
 The run survey is data, `survey.toml` (experience, completeness, correctness, cost; closed answers); the skill
 fills it into `docs/blueprint/survey.md` after every run. There is no verb for it.
 
-A new checkpoint is one decorated function in `blueprint/concerns/<concern>.py` returning a
-`Finding`, with a passing test and a planted-violation test (`blueprint.testing.Repo`).
+A new checkpoint is one decorated function in the module of the plugin that owns it, `blueprint/concerns/<plugin>/<module>.py`
+(each plugin is a manifest, `blueprint/plugins/<id>.toml`, listing its rows and modules; a repo switches one off in
+`[plugins]` of `docs/blueprint/blueprint.toml`), returning a `Finding`, with a passing test and a planted-violation test (`blueprint.testing.Repo`).

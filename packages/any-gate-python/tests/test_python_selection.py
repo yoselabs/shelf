@@ -32,7 +32,7 @@ tests = ["test_onboard_*", "test_bootstrap_target.py"]
 inputs = ["tools/onboard/", "tests/conftest.py", "justfile", "pyproject.toml", "uv.lock"]
 
 [tool.any-gate.python.gated.reads]
-"test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/backlog.py"]
+"test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/beads/backlog.py"]
 """
 
 
@@ -59,7 +59,7 @@ def _fitness_tests(repo: Path) -> None:
 
 def test_an_onboarding_test_runs_alone_when_only_it_or_what_it_reads_changes(repo: Path) -> None:
     _fitness_tests(repo)
-    for changed in (["tests/test_onboard_beads.py"], ["packages/blueprint/src/blueprint/concerns/backlog.py"]):
+    for changed in (["tests/test_onboard_beads.py"], ["packages/blueprint/src/blueprint/concerns/beads/backlog.py"]):
         fitness = [p for p in affected.affected(repo, changed) if p.startswith("tests")]
         assert fitness == ["tests/test_arch.py", "tests/test_onboard_beads.py"], changed
     assert [p for p in affected.affected(repo, ["packages/blueprint/src/blueprint/x.py"]) if p.startswith("tests")] == [

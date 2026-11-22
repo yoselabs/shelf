@@ -1,0 +1,6 @@
+id = "dockerfile"
+title = "Dockerfile"
+default = "detected"
+requires = ["stacks"]
+rows = ["stack.dockerfile.*"]
+modules = []

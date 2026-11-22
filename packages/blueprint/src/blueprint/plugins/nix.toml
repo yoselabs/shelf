@@ -1,0 +1,6 @@
+id = "nix"
+title = "Nix"
+default = "detected"
+requires = ["stacks"]
+rows = ["stack.nix.*"]
+modules = []

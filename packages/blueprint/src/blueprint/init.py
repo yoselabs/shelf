@@ -24,8 +24,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import preset, render, shelf_sources
-from blueprint.concerns import tool_pins
-from blueprint.concerns.profile_data import load_profiles, profile_for
+from blueprint.concerns.mise import tool_pins
+from blueprint.concerns.stacks.profile_data import load_profiles, profile_for
 from blueprint.model import Context, Verdict
 from blueprint.profile import detect, load_state
 from blueprint.runner import run as audit_run

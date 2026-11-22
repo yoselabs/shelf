@@ -1,0 +1,6 @@
+id = "git-hooks"
+title = "Git hooks owned by prek"
+default = "on"
+requires = []
+rows = ["hooks.fail-closed", "hooks.gate-always-runs", "hooks.no-clone-path", "hooks.no-tests-at-commit", "hooks.parses", "hooks.pre-push-is-the-gate", "gate.hooks-installed", "gate.hooks-recipe"]
+modules = ["git_hooks.hooks", "git_hooks.gate_hooks"]

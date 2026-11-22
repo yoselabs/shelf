@@ -1,6 +1,6 @@
 """The python stack's gate steps as engine commands, so a repo's justfile defines none of them: `lint`, `format`, `spell`, `test-all`.
 
-What a repo may differ in is data, in `pyproject.toml`, never a replacement recipe (ADR 0032):
+What a repo may differ in is data, in `pyproject.toml`, never a replacement recipe (ADR 0033):
 
     [tool.blueprint.gate]
     lint-paths = ["packages", "tests", "tools", "conftest.py"]   # what ruff reads; default: the repo root

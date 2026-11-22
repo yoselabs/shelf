@@ -57,6 +57,27 @@ await pacer.apace("proxy-2081", every=1.0)                  # same, sleeping on 
   store it as `next_try_at` (the slot is spent: act at or after it). No retry or backoff inside. The first pass on a key is free. Wall time (`time.time`) so processes agree;
   a clock jump forward delays callers by that jump.
 
+## Block a key: the pool is down
+
+```python
+pacer.penalize("proxy-pool", 3600, reason="blocked: cookies")   # one worker saw the block: record it once, returns blocked_until
+pacer.wait("proxy-pool", every=1.0)                            # every other worker sleeps through it, then paces as usual
+pacer.status("proxy-pool")                                     # PaceStatus(next_slot, blocked_until, reason): a board reads it, no slot booked
+```
+
+A worker that sees a pool-wide block penalizes the key once; every other worker sleeps through it; a board reads `status`.
+The primitive stores only `max(existing, now + seconds)`; how long, and whether to escalate on a repeat, is the caller's policy.
+
+| Call | Contract |
+|---|---|
+| `penalize(key, seconds, *, reason="") -> float` | `blocked_until = max(existing, now + seconds)`; returns it; never shortens; `seconds < 0` is `ValueError`; the reason is kept with the block that wins |
+| `blocked_until(key) -> float \| None` | wall-clock end of the block, None when not blocked or it has passed; read under the lock |
+| `wait` / `apace` / `reserve` | the slot is never before `blocked_until`; unchanged when nothing was penalized |
+| `clear(key)` | drops the block (not the booked slots); no-op when none |
+| `status(key) -> PaceStatus(next_slot, blocked_until, reason)` | frozen; `next_slot` is what `reserve` would return now; books nothing, creates no file |
+
+The block is `<root>/<slug>-<hash>.block` (JSON), read and written under the key's `.pace` flock, so the slot and the block are one state.
+
 ## Rules
 
 - **Counting.** `acquire(name, limit)` tries units `0..limit-1` in order (`<root>/<name>-<slot>.lock`),
