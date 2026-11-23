@@ -32,6 +32,9 @@ _TESTS = re.compile(
 )
 _GATE = re.compile(r"\b(?:just|make)\s+check\b")
 _BD = re.compile(r"\bbd\s+(?:hooks\s+run|dolt\s+push|sync)\b")
+# Git LFS uploads its objects from its own pre-push hook, which prek replaces: a hook that runs it is not a second gate.
+_LFS = re.compile(r"\bgit\s+lfs\s+push\b")
+_SCRIPT = re.compile(r"^(?:ba|z)?sh\s+(\S+\.sh)\b")
 _ALWAYS_OK = re.compile(r"\|\|\s*(?:true|exit\s+0|:)(?!\w)|;\s*exit\s+0\s*['\"]?\s*$")
 _CLONE = re.compile(r"\bSHELF_HOME\b|\.\./shelf\b|~/Workspaces/shelf|\$HOME/Workspaces/shelf|\$\{HOME\}/Workspaces/shelf")
 
@@ -66,6 +69,12 @@ def _is_gate(hook: Hook) -> bool:
     return "pre-push" in hook.stages and bool(_GATE.search(hook.entry))
 
 
+def _runs_gate_script(ctx: Context, hook: Hook) -> bool:
+    """A pre-push hook whose entry is `bash <script>.sh` and whose script runs `just check`: the gate behind a wrapper."""
+    shell = _SCRIPT.match(hook.entry)
+    return "pre-push" in hook.stages and shell is not None and bool(_GATE.search(ctx.read(shell.group(1)) or ""))
+
+
 def _named(hooks: list[Hook]) -> str:
     return ", ".join(f"{h.id} (line {h.line})" for h in hooks)
 
@@ -85,13 +94,17 @@ def no_tests_at_commit(ctx: Context) -> Finding:
     return passing("no commit-time hook runs tests or the gate")
 
 
-@check("hooks.pre-push-is-the-gate", "the only pre-push hooks are the gate and bd's own: no second, partial gate")
+@check("hooks.pre-push-is-the-gate", "pre-push hooks are only the gate, bd's own and git lfs push: no second, partial gate")
 def pre_push_is_the_gate(ctx: Context) -> Finding:
     """A pre-push lint or test beside the gate disagrees with it, and one of the two is what people trust."""
     config = ctx.read(_CONFIG)
     if config is None:
         return not_applicable(_NONE)
-    extra = [h for h in hooks_in(config) if "pre-push" in h.stages and not _is_gate(h) and not _BD.search(h.entry)]
+    extra = [
+        h
+        for h in hooks_in(config)
+        if "pre-push" in h.stages and not (_is_gate(h) or _runs_gate_script(ctx, h) or _BD.search(h.entry) or _LFS.search(h.entry))
+    ]
     if extra:
         return failing(
             f"pre-push runs something other than the gate: {_named(extra)}",

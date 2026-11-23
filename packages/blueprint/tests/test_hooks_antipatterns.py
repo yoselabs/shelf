@@ -85,6 +85,21 @@ def test_bds_pre_push_hooks_are_not_a_second_gate(repo: Repo) -> None:
     assert _rows(repo, config)["hooks.pre-push-is-the-gate"][0] is Verdict.PASSING
 
 
+def test_git_lfs_push_is_not_a_second_gate(repo: Repo) -> None:
+    entry = "sh -c 'git lfs push --all \"$PRE_COMMIT_REMOTE_NAME\"'"
+    config = _GOOD + _hook("git-lfs-push", entry, stages="[pre-push]")
+    assert _rows(repo, config)["hooks.pre-push-is-the-gate"][0] is Verdict.PASSING
+
+
+def test_a_gate_behind_a_wrapper_script_is_the_gate(repo: Repo) -> None:
+    repo.write("tools/gate_hook.sh", "#!/usr/bin/env bash\nset -euo pipefail\nuv run just check\n")
+    wrapped = _rows(repo, _GOOD + _hook("gate2", "bash tools/gate_hook.sh", stages="[pre-push]"))["hooks.pre-push-is-the-gate"]
+    assert wrapped[0] is Verdict.PASSING
+    repo.write("tools/lint_hook.sh", "#!/usr/bin/env bash\nruff check .\n")
+    other = _rows(repo, _GOOD + _hook("lint2", "bash tools/lint_hook.sh", stages="[pre-push]"))["hooks.pre-push-is-the-gate"]
+    assert other[0] is Verdict.FAILING
+
+
 @pytest.mark.parametrize(
     "entry",
     ["ruff check || true", "sh -c 'ruff check; exit 0'", "ruff check || :", "sh -c 'ruff check || exit 0'"],
