@@ -24,7 +24,6 @@ STRICT = {
 }
 _METRICS_ENV = "BD_DISABLE_METRICS"
 # `bd lint` prints a bead line (`<id> [<type>]: <title>`), then one `Missing: ## <section>` line per gap.
-_LINT_BEAD = re.compile(r"^(\S+) \[[^\]]+\]:", re.MULTILINE)
 _LINT_MISSING = re.compile(r"Missing: ## (.+?)\s*$", re.MULTILINE)
 _LINT_BLOCK = re.compile(r"^(\S+) \[[^\]]+\]:.*(?:\n(?!\S+ \[).*)*", re.MULTILINE)
 _LINT_NAMED = 5

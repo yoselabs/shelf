@@ -326,12 +326,6 @@ class Context:
         return done.stdout if done is not None and done.returncode == 0 else None
 
 
-# What part of the setup a concern judges: generic (any repo), stack (one language's tools),
-# framework (an engine or framework on top of a stack), or agent (the agent harness: instructions,
-# session settings, session hooks). Reports group by it.
-LAYERS = ("generic", "stack", "framework", "agent")
-
-
 @dataclass(frozen=True)
 class Sub:
     """One row a multi-row check emits: its own concern label, id and statement."""

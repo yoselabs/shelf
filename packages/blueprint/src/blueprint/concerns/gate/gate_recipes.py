@@ -67,7 +67,6 @@ def shadowing(ctx: Context) -> Finding:
 
 # --- gate.recipe-calls: what a recipe runs of blueprint must exist, and come from the pinned engine ----------------------------
 
-CALLS_ID = "gate.recipe-calls"
 # `uv run blueprint check ...`, `python3 -m blueprint gate test ...`, `blueprint check ...`: the words after the program name.
 _CALL = re.compile(r"(?:\bblueprint|-m\s+blueprint)\s+((?:check|gate|init)\b[^\n;&|]*)")
 # The engine run from a shelf clone: it moves with whatever is checked out there, so another session's commit breaks this gate.

@@ -306,9 +306,6 @@ def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str, root: st
     )
 
 
-OUTCOMES = ("runs", "floor")
-
-
 def _floor_holds(ctx: Context, floor: dict[str, Any], gate_text: str, root: str) -> bool:
     if floor.get("units"):
         config = gate_units.load(ctx.repo)

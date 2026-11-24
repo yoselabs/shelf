@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dead code removed (`LAYERS`, `OUTCOMES`, `_LINT_BEAD`, `CALLS_ID`); `render` uses `gate_graph.JUSTFILES`. No behaviour change.
+
 ## 0.14.1
 
 - Version files corrected: tag `blueprint-v0.14.0` was cut on a commit whose `pyproject.toml` still said 0.13.2 (0.13.1 and 0.13.2 had been released meanwhile). The code in `blueprint-v0.14.0` is the 0.14.0 content below; pin `blueprint-v0.14.1`, which carries it with the right version.
