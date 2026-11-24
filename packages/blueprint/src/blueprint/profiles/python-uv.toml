@@ -118,11 +118,12 @@ gate = "deptry"
 [[role]]
 role = "tests"
 tool = "pytest, strict markers"
-install = "uv add --dev pytest pytest-xdist pytest-timeout; set `timeout = 900` (seconds, generous) in [tool.pytest.ini_options]: with no CI a hung test otherwise hangs the gate"
+install = "uv add --dev pytest pytest-xdist pytest-timeout; set `timeout = 900` (seconds, generous) in [tool.pytest.ini_options]: with no CI a hung test otherwise hangs the gate; `--strict-markers` in `addopts` so a typo in a marker fails instead of silently selecting nothing"
 config = [
     { path = "pyproject.toml", contains = "[tool.pytest.ini_options]" },
     { path = "pyproject.toml", contains = "pytest-timeout" },
     { path = "pyproject.toml", contains = "timeout =" },
+    { path = "pyproject.toml", contains = "strict-markers" },
 ]
 # Outcome (shelf-jc7r.3): the gate reaches a test runner, whichever one: pytest itself, or the shared runners that run it.
 outcome = "runs"
