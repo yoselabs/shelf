@@ -35,6 +35,7 @@ _WALL_CLOCK_DELTA = {
         "timefmt/src/timefmt/__init__.py": "fmt_until: a deadline given as epoch seconds minus now; a wall-clock instant",
         "jsonl-log/src/jsonl_log/_retention.py": "age cutoff against file mtimes, which are wall-clock",
         "blueprint/src/blueprint/concerns/agents/agents.py": "age of a git commit time (wall-clock epoch seconds), shown as hours",
+        "any-gate/src/any_gate/cli.py": "wait_message: a lock holder's age from the epoch time in its lock file",
     }.items()
 }
 _DEFAULT_STR_ALLOWED = {
