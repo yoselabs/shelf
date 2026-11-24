@@ -20,11 +20,11 @@ import sys
 from pathlib import Path
 
 from blueprint import gate_py
+from blueprint.gate_graph import JUSTFILES
 from blueprint.profile import detect_stacks, detected_stack_roots
 
 FOLDER = ".blueprint"
 _TEMPLATES = Path(__file__).resolve().parent / "just"
-_JUSTFILES = ("justfile", "Justfile", ".justfile")
 _SETTING = "set allow-duplicate-recipes"
 _HEADER = (
     "# The gate runner is just (ADR 0023), pinned as the `rust-just` dev dependency: `uv run just check`.\n"
@@ -106,7 +106,7 @@ def _referenced_recipes(text: str) -> set[str]:
 
 def own_recipe_text(repo: Path) -> str:
     """The consumer's just sources, following nested imports but excluding rendered blueprint parts."""
-    pending = [repo / name for name in _JUSTFILES]
+    pending = [repo / name for name in JUSTFILES]
     seen: set[Path] = set()
     texts: list[str] = []
     while pending:
@@ -121,7 +121,7 @@ def own_recipe_text(repo: Path) -> str:
 
 
 def _justfile(repo: Path) -> Path:
-    return next((repo / n for n in _JUSTFILES if (repo / n).is_file()), repo / "justfile")
+    return next((repo / n for n in JUSTFILES if (repo / n).is_file()), repo / "justfile")
 
 
 def _imports(name: str) -> str:
