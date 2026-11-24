@@ -14,6 +14,7 @@ from blueprint.concerns.gate import gate_clone
 from blueprint.init import RECIPES
 from blueprint.model import FixedBy, Verdict
 from blueprint.report import gate as gate_report
+from blueprint.report import markdown as markdown_report
 from blueprint.runner import run, run_audit
 
 if TYPE_CHECKING:
@@ -91,6 +92,18 @@ def test_gate_no_ci_warns_new_in_a_consumer_audited_before_it_existed(repo: Repo
     assert row.verdict is Verdict.FAILING
     assert row.new
     assert "gate.no-ci" in gate_report(result)
+
+
+def test_the_brief_form_clips_long_evidence_and_points_to_the_full_report(repo: Repo) -> None:
+    for n in range(6):  # the evidence lists every file: six long names pass 200 characters
+        repo.write(f".github/workflows/{'x' * 60}{n}.yml", "on: [push]\n")
+    result = run(repo.root, concern="gate", env=repo.env)
+    brief = gate_report(result)
+    line = next(ln for ln in brief.splitlines() if "gate.no-ci" in ln)
+    assert "…" in line
+    assert "x" * 60 + "5" not in brief
+    assert "cut text: `blueprint check`" in brief
+    assert "x" * 60 + "5" in markdown_report(result)
 
 
 def test_a_leftover_override_of_a_removed_ci_checkpoint_is_a_notice_not_a_failure(repo: Repo) -> None:
