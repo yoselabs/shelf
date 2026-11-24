@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint import preset
+from blueprint.testing import run_cli
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -47,12 +48,7 @@ def _run(repo: Path, shelf: Path) -> subprocess.CompletedProcess[str]:
     reference = shelf / "reference.toml"
     if (shelf / "pyproject.toml").is_file():
         reference.write_text(preset.render(preset.snapshot(shelf)))
-    return subprocess.run(
-        [sys.executable, "-m", "blueprint", "gate", "preset", "--repo", str(repo), "--reference", str(reference)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    return run_cli(["gate", "preset", "--repo", str(repo), "--reference", str(reference)])
 
 
 @pytest.fixture

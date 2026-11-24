@@ -14,10 +14,10 @@ confirmed the wrong belief.
 from __future__ import annotations
 
 import subprocess
-import sys
 from typing import TYPE_CHECKING
 
 import pytest
+from blueprint.testing import run_cli
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -69,13 +69,7 @@ def repo(tmp_path: Path) -> Path:
 
 
 def _run(repo: Path, *flags: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "-m", "blueprint", "gate", "guard", *flags],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    return run_cli(["gate", "guard", *flags], cwd=repo)
 
 
 def _commit(repo: Path, content: str) -> None:

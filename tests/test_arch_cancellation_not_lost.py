@@ -79,6 +79,7 @@ _ALLOWED = {
         "outcome: `SystemExit` here is argparse rejecting its own input inside the call; the usage message is the answer",
         ("packages/argparse-mcp/src/argparse_mcp/tools.py", 1),
         ("packages/verb-cli/src/verb_cli/testing.py", 1),
+        ("packages/blueprint/src/blueprint/testing.py", 1),
     ),
 }
 

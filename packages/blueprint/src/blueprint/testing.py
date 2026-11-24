@@ -5,13 +5,35 @@ Stdlib only; used by this package's tests and by anyone writing a new concern's 
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import subprocess
-from typing import TYPE_CHECKING
+from pathlib import Path
 
-if TYPE_CHECKING:
-    from pathlib import Path
+
+def run_cli(argv: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    """`blueprint <argv>` in this process, as a CompletedProcess: no interpreter start and no package import per call.
+
+    `cwd` is the process directory for the call (a guard judges the repo it runs in), restored after.
+    """
+    from blueprint.__main__ import main  # noqa: PLC0415 -- the engine imports the whole package; tests that never call this skip it
+
+    out, err = io.StringIO(), io.StringIO()
+    before = Path.cwd()
+    code = 0
+    try:
+        if cwd is not None:
+            os.chdir(cwd)
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            try:
+                code = main(argv)
+            except SystemExit as stop:  # argparse exits 2 on a bad flag
+                code = stop.code if isinstance(stop.code, int) else 1
+    finally:
+        os.chdir(before)
+    return subprocess.CompletedProcess(["blueprint", *argv], code, out.getvalue(), err.getvalue())
 
 
 class Repo:
@@ -60,7 +82,15 @@ class Repo:
         return path
 
     def git(self, *args: str) -> str:
-        return subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True, text=True, timeout=60).stdout
+        # Signing off: a developer's global `commit.gpgsign` must not hang or fail a throwaway repo's commits.
+        return subprocess.run(
+            ["git", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", *args],
+            cwd=self.root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        ).stdout
 
     def commit(self) -> None:
         self.git("add", "-A")

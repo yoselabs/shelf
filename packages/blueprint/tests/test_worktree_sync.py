@@ -23,7 +23,7 @@ def _commit(cwd: Path, name: str, age_s: int) -> None:
     (cwd / name).write_text(name)
     env = {**os.environ, "GIT_AUTHOR_DATE": stamp, "GIT_COMMITTER_DATE": stamp}
     subprocess.run(["git", "add", name], cwd=cwd, check=True)
-    subprocess.run(["git", "commit", "-qm", name], cwd=cwd, check=True, env=env)
+    subprocess.run(["git", "-c", "commit.gpgsign=false", "commit", "-qm", name, "--no-verify"], cwd=cwd, check=True, env=env)
 
 
 def _rows(repo: Repo) -> dict[str, Row]:
