@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Dead code removed (`LAYERS`, `OUTCOMES`, `_LINT_BEAD`, `CALLS_ID`); `render` uses `gate_graph.JUSTFILES`. No behaviour change.
+- python-uv `tests` row also requires `--strict-markers` in pytest `addopts` (a marker typo fails instead of selecting nothing). New row: warns until the next audit (ADR 0018).
 
 ## 0.14.1
 

@@ -499,7 +499,9 @@ def test_measuring_without_any_floor_fails_the_coverage_outcome(repo: Repo) -> N
 def _gate_with_tests(repo: Repo, recipe: str) -> None:
     _python_repo(repo)
     # pytest-timeout and `timeout =` are part of the tests role: a hung test must fail, not hang the gate.
-    repo.write("pyproject.toml", _PYPROJECT + "\n# pytest-timeout\n[tool.pytest.ini_options]\naddopts = '-q'\ntimeout = 900\n")
+    repo.write(
+        "pyproject.toml", _PYPROJECT + "\n# pytest-timeout\n[tool.pytest.ini_options]\naddopts = '-q --strict-markers'\ntimeout = 900\n"
+    )
     repo.write("Makefile", f"check: lint t\n{_MAKEFILE.split(chr(10), 1)[1]}t:\n\t{recipe}\n")
 
 
@@ -516,6 +518,16 @@ def _gate_with_tests(repo: Repo, recipe: str) -> None:
 def test_tests_pass_when_the_gate_reaches_any_test_runner(repo: Repo, recipe: str) -> None:
     _gate_with_tests(repo, recipe)
     assert _rows(repo)["stack.python-uv.tests"][0] is Verdict.PASSING
+
+
+def test_tests_are_not_set_up_without_strict_markers(repo: Repo) -> None:
+    missing = "strict-markers"
+    _gate_with_tests(repo, "uv run pytest")
+    pyproject = (repo.root / "pyproject.toml").read_text(encoding="utf-8")
+    repo.write("pyproject.toml", pyproject.replace(missing, "gone"))
+    verdict, evidence, _ = _rows(repo)["stack.python-uv.tests"]
+    assert verdict is Verdict.NOT_SET_UP
+    assert missing in evidence
 
 
 def test_tests_fail_when_the_gate_reaches_no_test_runner(repo: Repo) -> None:
