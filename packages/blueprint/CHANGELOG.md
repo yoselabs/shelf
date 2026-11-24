@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.14.2
+
+- Snapshot also carries any-gate (the test-slot waiter names a hung holder's pid and age, repeats every 5 minutes) and the any-knowledge `working-with-agents` template (delivery scope for multi-ticket work).
+
 - `blueprint check --brief` (what `just blueprint` prints) clips evidence to 200 and the fix to 240 characters, and says when it cut; the full text stays in `blueprint check`. A not-set-up standard row was ~1 KB each.
 
 - Dead code removed (`LAYERS`, `OUTCOMES`, `_LINT_BEAD`, `CALLS_ID`); `render` uses `gate_graph.JUSTFILES`. No behaviour change.
