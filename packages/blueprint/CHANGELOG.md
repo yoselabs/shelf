@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `blueprint check --brief` (what `just blueprint` prints) clips evidence to 200 and the fix to 240 characters, and says when it cut; the full text stays in `blueprint check`. A not-set-up standard row was ~1 KB each.
+
 - Dead code removed (`LAYERS`, `OUTCOMES`, `_LINT_BEAD`, `CALLS_ID`); `render` uses `gate_graph.JUSTFILES`. No behaviour change.
 - python-uv `tests` row also requires `--strict-markers` in pytest `addopts` (a marker typo fails instead of selecting nothing). New row: warns until the next audit (ADR 0018).
 - `blueprint.testing`: `run_cli` runs the engine in-process (no interpreter start per call); `Repo.git` turns commit and tag signing off so a developer's global config cannot hang a throwaway repo.

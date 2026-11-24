@@ -12,8 +12,10 @@ import argparse
 import os
 import shlex
 import sys
+import tempfile
 from pathlib import Path
 
+from any_gate_python.compact import Compact
 from any_gate_python.graph import lock_touched, workspace
 from any_gate_python.select import affected, changed_files, merge_base, plan, reach, wide_alarm
 from any_gate_python.stages import run_tests
@@ -24,6 +26,12 @@ def _run(args: argparse.Namespace) -> int:
         sys.stdout.write(line)
         sys.stdout.flush()
 
+    compact: Compact | None = None
+    if not os.environ.get("ANY_GATE_FULL"):
+        folder = Path(tempfile.gettempdir()) / "any-gate-python"
+        folder.mkdir(exist_ok=True)
+        compact = Compact(show, folder / f"{Path.cwd().name}-last-test.log")
+
     workers = None if args.workers == "auto" else int(args.workers)
     outcome = run_tests(
         args.paths,
@@ -32,10 +40,12 @@ def _run(args: argparse.Namespace) -> int:
         env=os.environ,
         wall=args.wall,
         idle=args.idle,
-        on_output=show,
+        on_output=compact.feed if compact else show,
         extra=shlex.split(args.pytest_args),
         nice=args.nice,
     )
+    if compact:
+        compact.finish()
     for stage in outcome.stages:
         if stage.stopped:
             sys.stderr.write(f"any-gate-python: {stage.name} stage stopped by the {stage.stopped} limit\n")

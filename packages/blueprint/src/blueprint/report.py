@@ -216,6 +216,11 @@ def markdown(run: Run) -> str:
     return "\n".join(out)
 
 
+_BRIEF_EVIDENCE = 200  # the one-line form is read every day: the long standard text lives in the full report
+_BRIEF_FIX = 240
+_QUIET = {Verdict.PASSING, Verdict.NOT_APPLICABLE}
+
+
 def gate(run: Run) -> str:
     """The `just blueprint` form: one line per checkpoint that is not passing."""
     lines = [f"blueprint: {p}" for p in run.problems]
@@ -223,13 +228,14 @@ def gate(run: Run) -> str:
     lines += [
         f"blueprint: {'🆕' if r.new else mark(r)} {r.id} -- {r.verdict}"
         + (" (new since the last audit: warns until /blueprint runs)" if r.new else "")
-        + f": {r.evidence}"
-        + (f" -> {r.remediation}" if r.remediation else "")
+        + f": {clip(r.evidence, _BRIEF_EVIDENCE)}"
+        + (f" -> {clip(r.remediation, _BRIEF_FIX)}" if r.remediation else "")
         for r in run.rows
-        if r.verdict not in {Verdict.PASSING, Verdict.NOT_APPLICABLE}
+        if r.verdict not in _QUIET
     ]
     passed = sum(r.verdict is Verdict.PASSING for r in run.rows)
-    lines.append(f"blueprint: {passed}/{len(run.rows)} passing (set {run.set_hash})")
+    cut = any(len(r.evidence) > _BRIEF_EVIDENCE or len(r.remediation) > _BRIEF_FIX for r in run.rows if r.verdict not in _QUIET)
+    lines.append(f"blueprint: {passed}/{len(run.rows)} passing (set {run.set_hash})" + (" · cut text: `blueprint check`" if cut else ""))
     return "\n".join(lines)
 
 
