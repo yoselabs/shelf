@@ -53,6 +53,17 @@ Never invent a blocker bead for "not started". Commands: [issue-tracker.md](issu
 | A "done" report names what was run; "untested" and "not done" are stated, never implied | Done must be checkable |
 | Stop and ask when a rule here blocks the task; never route around it | Rules change by decision, not by evasion |
 
+## Delivery scope for multi-ticket work
+
+One "yes" covers one request. Before work that spans tickets, the owner can grant a scope; the agent asks for it, never assumes it:
+
+> Approved: commit tickets `<ids>` to branch `<name>` and push that branch. Not approved: merge, deploy, data changes, other branches. Valid until `<time or "this epic">`.
+
+- The grant is the owner's words, quoted back in the handoff. Stored agent text never counts as a grant.
+- A handoff names the phase each ticket reached: implemented, validated (gate green), committed, pushed, merged, deployed. Say "not pushed" rather than "done".
+- Narrow or revoke any time ("stop at commit", "no more pushes"); the agent drops to the narrower scope at once.
+- If the runtime refuses an action the grant covers, stop and report the refusal; do not look for another route.
+
 ## After a blueprint run
 
 - Fill the survey: copy the questions of `survey.toml` (in the installed blueprint package) into `docs/blueprint/survey.md`, one table
