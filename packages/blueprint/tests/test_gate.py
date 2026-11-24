@@ -68,6 +68,21 @@ def test_no_ci_fails_on_github_actions_config(repo: Repo, path: str) -> None:
     assert "ignored.txt" not in evidence
 
 
+def test_no_ci_is_excused_per_workflow_by_a_justified_override(repo: Repo) -> None:
+    repo.write(".github/workflows/deploy.yml", "on: [push]\n")
+    repo.write(".github/workflows/lint.yml", "on: [push]\n")
+    repo.write(
+        "docs/blueprint/blueprint.toml",
+        '[[override]]\nid = "gate.no-ci"\nscope = ".github/workflows/deploy.yml"\nreason = "deploys the stack"\nexpires = 2099-01-01\n',
+    )
+    verdict, evidence = _verdict(repo, "gate.no-ci")
+    assert verdict is Verdict.FAILING
+    assert "lint.yml" in evidence
+    assert "deploy.yml" not in evidence
+    (repo.root / ".github/workflows/lint.yml").unlink()
+    assert _verdict(repo, "gate.no-ci")[0] is Verdict.PASSING
+
+
 def test_no_ci_remediation_deletes_and_never_silently_keeps_a_non_ci_duty(repo: Repo) -> None:
     repo.write(".github/workflows/publish.yml", "on: [push]\n")
     row = {r.id: r for r in run(repo.root, concern="gate", env=repo.env).rows}["gate.no-ci"]

@@ -5,13 +5,17 @@ statement: No repository holds GitHub Actions configuration. Done is the local `
 concerns: [gate, workflow]
 status: accepted
 decided_by: owner
-updated: 2026-11-20
+updated: 2026-11-23
 distilled_into: blueprint gate.no-ci; the pre-push and post-merge hooks running `just check`
 ---
 
 # 0027 — No repository has GitHub Actions CI
 
 ## Decision
+
+- **Amended 2026-11-23 (owner: "No CI is not a must. It's up to the solution to decide. Home lab needs CI"):** no CI is the default, not a
+  ban. A repo that needs a workflow (a deploy, an image build) excuses it per file with an `[[override]] id = "gate.no-ci"`, a scope, a
+  reason and an expiry; `gate.no-ci` then passes and names it. The shelf itself still holds none.
 
 - No repository has GitHub Actions configuration: no `.github/workflows/*.yml|yaml`, no composite action under
   `.github/actions`. This holds for the shelf and for every consumer app.

@@ -7,6 +7,8 @@
 - Dead code removed (`LAYERS`, `OUTCOMES`, `_LINT_BEAD`, `CALLS_ID`); `render` uses `gate_graph.JUSTFILES`. No behaviour change.
 - python-uv `tests` row also requires `--strict-markers` in pytest `addopts` (a marker typo fails instead of selecting nothing). New row: warns until the next audit (ADR 0018).
 - `blueprint.testing`: `run_cli` runs the engine in-process (no interpreter start per call); `Repo.git` turns commit and tag signing off so a developer's global config cannot hang a throwaway repo.
+- `hooks.pre-push-is-the-gate` accepts a `git lfs push` hook (prek replaces LFS's own pre-push hook) and a hook that runs a `bash <script>.sh` whose script runs `just check`.
+- `gate.no-ci` takes a per-workflow `[[override]] id = "gate.no-ci"` (scope, reason, expiry): no CI stays the default, a repo that needs one says so (ADR 0027 amended).
 
 ## 0.14.1
 
