@@ -20,8 +20,8 @@ FAKE = textwrap.dedent(
     #!/bin/sh
     case "$1" in
       ok) echo "ok output" ;;
-      one) touch "$MEET/a"; n=0; while [ ! -e "$MEET/b" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done; [ -e "$MEET/b" ] && echo one ;;
-      two) touch "$MEET/b"; n=0; while [ ! -e "$MEET/a" ] && [ $n -lt 100 ]; do sleep 0.1; n=$((n+1)); done; [ -e "$MEET/a" ] && echo two ;;
+      one) touch "$MEET/a"; n=0; while [ ! -e "$MEET/b" ] && [ $n -lt 300 ]; do sleep 0.1; n=$((n+1)); done; [ -e "$MEET/b" ] && echo one ;;
+      two) touch "$MEET/b"; n=0; while [ ! -e "$MEET/a" ] && [ $n -lt 300 ]; do sleep 0.1; n=$((n+1)); done; [ -e "$MEET/a" ] && echo two ;;
       slow) sleep 2; echo slow output ;;
       fail) echo "boom: the reason"; exit 3 ;;
       skip) echo "skipped lint: no file changed" ;;
