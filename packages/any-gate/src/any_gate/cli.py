@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
 
@@ -53,6 +54,20 @@ LEASE_NAME = "tests"
 
 class PlanError(ValueError):
     """A plan line that is not `path` or `path<TAB>key`."""
+
+
+REPEAT_WAIT_NOTICE = 300.0  # seconds between "still waiting" notices: a hung holder shows as a growing age, not as silence
+
+
+def wait_message(wait: Waiting, *, now: float | None = None) -> str:
+    """Who holds the slot, since when, and how to free it: a holder that hangs never releases (the kernel frees only a dead one)."""
+    holder = wait.occupants[0].holder if wait.occupants else None
+    if holder is None:
+        return "waiting for a test slot, held by an unnamed run"
+    age = (time.time() if now is None else now) - holder.created if holder.created else None
+    held = f", held for {age / 60:.0f} min" if age is not None else ""
+    hint = f"; if it hangs (no output, idle CPU): kill {holder.pid}" if age is not None and age > 600 else ""
+    return f"waiting for a test slot, held by {holder.label or 'an unnamed run'} (pid {holder.pid}{held}){hint}"
 
 
 def notice(text: str) -> None:
@@ -109,14 +124,13 @@ def _run_under_lease(args: argparse.Namespace, left: Callable[[], list[tuple[str
 
     Returns the units run and the runner's result; no result when nothing was left once the slot came."""
     cwd = Path(args.cwd).resolve()
-    said = False
+    told = -1.0
 
     def waiting(wait: Waiting) -> None:
-        nonlocal said
-        if not said:
-            said = True
-            holder = wait.occupants[0].holder if wait.occupants else None
-            notice(f"waiting for a test slot, held by {(holder.label if holder else None) or 'an unnamed run'}")
+        nonlocal told
+        if told < 0 or wait.elapsed - told >= REPEAT_WAIT_NOTICE:
+            told = wait.elapsed
+            notice(wait_message(wait))
 
     with Leases(_lease_root(args.lease_root)).acquire(LEASE_NAME, args.slots, label=f"gate in {cwd}", on_wait=waiting) as held:
         if held.waited >= 1:
