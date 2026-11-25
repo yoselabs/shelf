@@ -6,17 +6,38 @@ import subprocess
 import sys
 import threading
 import time
+from typing import TYPE_CHECKING
 
 import pytest
 from stream_proc import Pump, PumpStuckError
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 PY = sys.executable
 
 
+_spawned: list[subprocess.Popen[bytes]] = []
+
+
+@pytest.fixture(autouse=True)
+def _reap_spawned() -> Iterator[None]:
+    yield
+    while _spawned:
+        child = _spawned.pop()
+        child.kill()
+        child.wait()
+        for stream in (child.stdin, child.stdout, child.stderr):
+            if stream is not None:
+                stream.close()
+
+
 def spawn(code: str, *, stdin: bool = False) -> subprocess.Popen[bytes]:
-    return subprocess.Popen(
+    child = subprocess.Popen(
         [PY, "-c", code], stdin=subprocess.PIPE if stdin else subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
+    _spawned.append(child)
+    return child
 
 
 def closed(p: subprocess.Popen[bytes]) -> bool:

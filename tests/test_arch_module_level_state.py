@@ -254,6 +254,11 @@ def _rows(reason: str, *paths: tuple[str, int]) -> dict[str, Row]:
 
 
 _ALLOWED = {
+    **_rows(
+        "outcome: the children this process spawned detached and has not yet reaped: the process table is per process by nature, and a "
+        "dropped Popen leaves a zombie and a ResourceWarning; reaped on the next spawn",
+        ("stream-proc/src/stream_proc/detach.py", 1),
+    ),
     # --- debt: global state still owed a conversion to an injected collaborator ---
     **_rows(
         "debt: a lazy builtins cache rebound by `global` and an extension dict, both reset by `reset_for_testing`; an injected "

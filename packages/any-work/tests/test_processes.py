@@ -29,10 +29,17 @@ def said(proc: subprocess.Popen[str]) -> str:
     return out.readline().strip()
 
 
+def _close_pipes(proc: subprocess.Popen[str]) -> None:
+    for pipe in (proc.stdin, proc.stdout):
+        if pipe is not None:
+            pipe.close()
+
+
 def stop(proc: subprocess.Popen[str]) -> None:
     assert proc.stdin is not None
     proc.stdin.close()
     proc.wait(timeout=30)
+    _close_pipes(proc)
 
 
 def test_two_processes_never_claim_the_same_key(tmp_path: Path) -> None:
@@ -56,6 +63,7 @@ def test_a_claimer_killed_with_sigkill_frees_its_key_at_once(tmp_path: Path) -> 
     assert work.claim() is None  # alive: held
     child.send_signal(signal.SIGKILL)
     child.wait(timeout=30)  # the kernel has dropped the flock once the process is reaped
+    _close_pipes(child)
     again = work.claim()
     assert again is not None
     assert (again.key, again.attempts) == ("k", 0)  # the dead claimer's attempt was never recorded

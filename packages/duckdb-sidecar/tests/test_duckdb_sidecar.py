@@ -97,6 +97,8 @@ def _another_process_holding(target: Path) -> Generator[None]:
         if proc.stdin is not None:
             proc.stdin.close()
         proc.wait(timeout=10)
+        if proc.stdout is not None:
+            proc.stdout.close()
 
 
 def test_is_lock_conflict_recognizes_a_real_second_writer(tmp_path: Path) -> None:

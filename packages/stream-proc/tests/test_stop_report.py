@@ -22,6 +22,7 @@ def test_a_child_that_ignores_sigterm_is_killed_and_the_report_says_so() -> None
     p = subprocess.Popen([sys.executable, "-c", code], start_new_session=True, stdout=subprocess.PIPE)
     assert p.stdout is not None
     p.stdout.readline()
+    p.stdout.close()
     rep = stop_tree_report(p, grace=0.3)
     assert (rep.survivors, rep.term_delivered, rep.kill_sent, rep.kill_delivered) == ((), True, True, True)
 

@@ -52,6 +52,9 @@ def _release(holder: subprocess.Popen[str]) -> None:
         holder.stdin.write("\n")
         holder.stdin.flush()
         holder.wait(timeout=10)
+    for pipe in (holder.stdin, holder.stdout):
+        if pipe is not None:
+            pipe.close()
 
 
 def _can_acquire_elsewhere(lock_path: Path) -> bool:
@@ -93,6 +96,7 @@ def test_a_killed_holder_leaves_no_lock(tmp_path: Path) -> None:
     proc = _hold(tmp_path / "owner.lock")
     os.kill(proc.pid, signal.SIGKILL)
     proc.wait(timeout=10)
+    _release(proc)  # already dead: closes the pipes
 
     lock = ProcessLock.acquire(tmp_path / "owner.lock")
     lock.release()
