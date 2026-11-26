@@ -31,10 +31,10 @@ def repo(tmp_path: Path) -> Path:
     return work
 
 
-def check(repo: Path, allow: str = "") -> int:
+def check(repo: Path, allow: str = "", today: str = "2026-12-01") -> int:
     allow_file = repo / "allow.toml"
     allow_file.write_text(allow, encoding="utf-8")
-    return tag_check.main(["--repo", str(repo), "--allow", str(allow_file)])
+    return tag_check.main(["--repo", str(repo), "--allow", str(allow_file), "--today", today])
 
 
 def tag(repo: Path, name: str) -> None:
@@ -120,3 +120,27 @@ def test_a_mismatched_tag_can_be_allowed_with_a_reason_and_a_stale_entry_fails(r
     capsys.readouterr()
     assert check(repo, '[mismatched-tag]\n"b-v0.9.0" = "cut early"\n"a-v0.1.0" = "fine"\n') == 1
     assert "a-v0.1.0 is not mismatched" in capsys.readouterr().err
+
+
+_DATED = '[allow]\nb = { reason = "candidate, never released", until = 2026-12-01 }\n'
+
+
+def test_a_dated_allowance_holds_through_its_last_day(repo):
+    tag(repo, "a-v0.1.0")
+    assert check(repo, _DATED, today="2026-12-01") == 0
+
+
+def test_a_dated_allowance_past_its_day_fails_and_names_the_package(repo, capsys):
+    tag(repo, "a-v0.1.0")
+    assert check(repo, _DATED, today="2026-12-02") == 1
+    assert "b 0.2.0 ran out on 2026-12-01" in capsys.readouterr().err
+
+
+def test_a_dated_mismatched_tag_past_its_day_fails(repo, capsys):
+    tag(repo, "a-v0.1.0")
+    tag(repo, "b-v0.2.0")
+    tag(repo, "b-v0.9.0")
+    entry = '[mismatched-tag]\n"b-v0.9.0" = { reason = "cut early", until = 2026-12-01 }\n'
+    assert check(repo, entry, today="2026-12-01") == 0
+    assert check(repo, entry, today="2026-12-02") == 1
+    assert "[mismatched-tag] b-v0.9.0 ran out on 2026-12-01" in capsys.readouterr().err

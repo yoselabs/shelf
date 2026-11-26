@@ -20,10 +20,10 @@ def put(repo: Path, rel: str, text: str = "x = 1\n") -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def check(repo: Path, allow: str | None = None) -> int:
+def check(repo: Path, allow: str | None = None, today: str = "2026-12-01") -> int:
     allow_file = repo / "allow.toml"
     allow_file.write_text(allow or "", encoding="utf-8")
-    return stdlib_shadow.main(["--repo", str(repo), "--allow", str(allow_file)])
+    return stdlib_shadow.main(["--repo", str(repo), "--allow", str(allow_file), "--today", today])
 
 
 def test_a_stdlib_named_file_in_scripts_fails_and_names_the_stdlib_module(repo, capsys):
@@ -134,3 +134,18 @@ def test_a_clean_tree_passes(repo):
     put(repo, "scripts/build.py", 'if __name__ == "__main__":\n    pass\n')
     put(repo, "tools/check_things.py")
     assert check(repo) == 0
+
+
+_DATED = '[allow]\n"scripts/queue.py" = { reason = "the job queue, run only as python -m", until = 2026-12-01 }\n'
+
+
+def test_a_dated_entry_holds_through_its_last_day(repo):
+    put(repo, "scripts/queue.py")
+    assert check(repo, _DATED, today="2026-12-01") == 0
+
+
+def test_a_dated_entry_past_its_day_fails_and_names_the_path(repo, capsys):
+    put(repo, "scripts/queue.py")
+    assert check(repo, _DATED, today="2026-12-02") == 1
+    err = capsys.readouterr().err
+    assert "scripts/queue.py ran out on 2026-12-01" in err

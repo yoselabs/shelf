@@ -1,12 +1,12 @@
-# Packages allowed to sit at a version with no tag on origin (tools/tag_check.py). Every entry needs its reason; an entry whose package
+# Packages allowed to sit at a version with no tag on origin (tools/tag_check.py). Every entry needs its reason, and an entry may carry `until` (tools/exemption.py: the last day it holds); an entry whose package
 # gets tagged, or goes away, fails the check until it is deleted. Tag a package when it is first released, then delete its line.
 [allow]
-any-breaker = "candidate, never released: catalog status candidate, no tag yet"
-any-contract = "candidate, never released: catalog status candidate, no tag yet"
-any-failure-fp = "candidate, never released: catalog status candidate, no tag yet"
-any-plugin-cache = "candidate, never released: catalog status candidate, no tag yet"
-any-shell-policy = "candidate, never released: catalog status candidate, no tag yet"
-task-spec = "candidate, never released: catalog status candidate, no tag yet"
+any-breaker = { reason = "candidate, never released: catalog status candidate, no tag yet", until = 2026-12-27 }
+any-contract = { reason = "candidate, never released: catalog status candidate, no tag yet", until = 2026-12-27 }
+any-failure-fp = { reason = "candidate, never released: catalog status candidate, no tag yet", until = 2026-12-27 }
+any-plugin-cache = { reason = "candidate, never released: catalog status candidate, no tag yet", until = 2026-12-27 }
+any-shell-policy = { reason = "candidate, never released: catalog status candidate, no tag yet", until = 2026-12-27 }
+task-spec = { reason = "candidate, never released: catalog status candidate, no tag yet", until = 2026-12-27 }
 
 # Tags cut on a commit that declares another version (tools/tag_check.py). Tags are never moved or deleted; each entry names why it stays.
 [mismatched-tag]

@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING
 import pytest
 from any_arch import Rule, check, plant, rows
 
+from tests.arch_keys import DEBT_UNTIL
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -98,6 +100,7 @@ WHICH = Rule(
     _uses_which,
     _WHICH_ALLOWED,
     ("debt",),
+    debt_until=DEBT_UNTIL,
 )
 WHOLE_ENV = Rule(
     "whole-environment",
@@ -105,6 +108,7 @@ WHOLE_ENV = Rule(
     _passes_whole_environ,
     _WHOLE_ENV_ALLOWED,
     ("debt",),
+    debt_until=DEBT_UNTIL,
 )
 
 

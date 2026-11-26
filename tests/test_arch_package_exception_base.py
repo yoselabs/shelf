@@ -33,6 +33,8 @@ import pytest
 from any_arch import Row, Rule, check, plant, rows
 from any_arch.source import sources
 
+from tests.arch_keys import DEBT_UNTIL
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
@@ -133,6 +135,7 @@ def _rule(root: Path, allowed: dict[str, Row]) -> Rule:
         allowed,
         ("debt", "outcome"),
         _SCOPE,
+        debt_until=DEBT_UNTIL,
     )
 
 
