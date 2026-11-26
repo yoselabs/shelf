@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `agents.worktrees-in-sync` ignores the age of unmerged work while prek runs the pre-push hooks (`PRE_COMMIT_TO_REF` set): the push is the step that lands it, and the row used to refuse that push. Being behind main still fails. An ordinary audit is unchanged.
+
 - `[tool.blueprint.test] randomize = true`: `blueprint gate test-all` (the release run) passes `-p randomly`; `check` does not. The repo keeps `-p no:randomly` in `addopts`.
 
 - python-uv `tests` row also requires `filterwarnings` in `pyproject.toml` (`["error", ...]`: a leaked process, file or stream fails the test that made it). The `linter` row requires the bandit (`S`) and complexity (`C90`) rules, by name or through `ALL`. Both warn until the next audit (ADR 0018). Corpus diff against 0.14.2: 7 of 42 repos move to not set up (a2kay tests; a2skill, a2web, iorlas-task-loop, mcp-gateway, mempalace, yosefactory linter).

@@ -134,3 +134,23 @@ def test_without_origin_main_the_local_main_is_the_base(repo: Repo) -> None:
     tree = _worktree(repo, "mine")
     _commit(tree, "work", 2 * _DAY)
     assert _own(repo, tree).verdict is Verdict.FAILING
+
+
+def test_the_pre_push_run_does_not_count_unmerged_work_against_the_push_that_lands_it(repo: Repo) -> None:
+    _commit(repo.root, "base", 3 * _DAY)
+    tree = _worktree(repo, "mine")
+    _commit(tree, "work", 2 * _DAY)
+    assert _own(repo, tree).verdict is Verdict.FAILING  # an ordinary audit still says: land this
+    pushing = {**repo.env, "PRE_COMMIT_TO_REF": "abc123"}  # what prek sets while it runs the pre-push hooks
+    row = {r.id: r for r in run_audit(tree, concern="agents", env=pushing).rows}["agents.worktrees-in-sync"]
+    assert row.verdict is Verdict.PASSING
+
+
+def test_the_pre_push_run_still_fails_a_worktree_behind_main(repo: Repo) -> None:
+    _commit(repo.root, "base", 3 * _DAY)
+    tree = _worktree(repo, "mine")
+    _commit(repo.root, "main-moved", 2 * _DAY)
+    pushing = {**repo.env, "PRE_COMMIT_TO_REF": "abc123"}
+    row = {r.id: r for r in run_audit(tree, concern="agents", env=pushing).rows}["agents.worktrees-in-sync"]
+    assert row.verdict is Verdict.FAILING
+    assert "behind main" in row.evidence
