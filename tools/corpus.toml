@@ -1,0 +1,10 @@
+# The repositories a blueprint release is judged against (tools/corpus_diff.py): the ones the owner works in, audited by name under the
+# corpus root (`--root`, default ~/Workspaces). A repo missing on this machine is skipped and named, never an error.
+repos = [
+  "a2atlassian", "a2db", "a2kay", "a2kit", "a2peer", "a2sdlc-demo3", "a2sdlc-security-eval", "a2sdlc-smoke", "a2skill", "a2web",
+  "agent-harness", "agent-weiss", "agentic-web-stack-demo", "agentic-web-stack", "aggre", "budget", "digital-battery-passport",
+  "dokployctl", "factory-sandbox", "full-stack-fastapi-template", "fullstack-web-typescript-wasp", "ha-core", "homelab",
+  "iorlas-canvas", "iorlas-kay", "iorlas-perform", "iorlas-task-loop", "iorlas.github.io", "joi-hub", "lifesim", "litellm-proxy",
+  "mcp-gateway", "mempalace", "novnc", "protea-sanity", "protea-woo", "proxy-hub", "reco", "reelm", "shen-mlflow", "skillopt",
+  "yosefactory",
+]
