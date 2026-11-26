@@ -146,19 +146,29 @@ def _merge_base_ref(ctx: Context) -> str:
     return "origin/main" if ctx.git("rev-parse", "--verify", "-q", "refs/remotes/origin/main") else "main"
 
 
+def _aged(ctx: Context, branches: list[str], span: str, what: str) -> list[str]:
+    """Each branch whose oldest commit in `span` (`{b}` is the branch, `{base}` main) is past the limit, as a line saying how long."""
+    limit = time.time() - float(str(ctx.settings.get("worktree-sync-hours", _SYNC_HOURS))) * 3600
+    base = _merge_base_ref(ctx)
+    lines = []
+    for branch in branches:
+        oldest = _oldest(ctx, span.format(b=branch, base=base))
+        if oldest is not None and oldest < limit:
+            lines.append(f"{branch}: {what} {_ago(oldest)}")
+    return lines
+
+
+def _unmerged(ctx: Context, branches: list[str]) -> list[str]:
+    return _aged(ctx, branches, "{base}..{b}", "work unmerged since")
+
+
+def _behind(ctx: Context, branches: list[str]) -> list[str]:
+    return _aged(ctx, branches, "{b}..{base}", "behind main since")
+
+
 def _stale(ctx: Context, branches: list[str]) -> list[str]:
     """Each branch with work unmerged, or main commits missing, past the limit, as a line saying how long."""
-    limit = time.time() - float(str(ctx.settings.get("worktree-sync-hours", _SYNC_HOURS))) * 3600
-    stale: list[str] = []
-    base = _merge_base_ref(ctx)
-    for branch in branches:
-        unmerged = _oldest(ctx, f"{base}..{branch}")
-        missing = _oldest(ctx, f"{branch}..{base}")
-        if unmerged is not None and unmerged < limit:
-            stale.append(f"{branch}: work unmerged since {_ago(unmerged)}")
-        if missing is not None and missing < limit:
-            stale.append(f"{branch}: behind main since {_ago(missing)}")
-    return stale
+    return [*_unmerged(ctx, branches), *_behind(ctx, branches)]
 
 
 @check(
@@ -176,7 +186,9 @@ def worktrees_in_sync(ctx: Context) -> Finding:
     branch = _current_branch(ctx)
     if branch is None:
         return not_applicable("this is not a linked worktree (other sessions' worktrees: agents.other-worktrees, in the audit)")
-    if stale := _stale(ctx, [branch]):
+    # While prek runs the pre-push hooks the work is being pushed: that is the step that lands it, so its age is not held against it.
+    pushing = "PRE_COMMIT_TO_REF" in ctx.env
+    if stale := (_behind(ctx, [branch]) if pushing else _stale(ctx, [branch])):
         return failing(
             "; ".join(stale),
             "land this worktree's work into main, or take main's changes into it (merge main), in this session",

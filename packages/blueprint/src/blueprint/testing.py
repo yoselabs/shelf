@@ -63,6 +63,8 @@ class Repo:
             "BLUEPRINT_SYSTEM_ROOT": str(self.sysroot),
         }
         self.env.pop("DOTNET_ROOT", None)  # the developer's own install is not a fixture
+        for name in [n for n in self.env if n.startswith("PRE_COMMIT_")]:  # prek sets these while it runs a hook: a test is not a push
+            del self.env[name]
 
     def fake_tool(self, path: Path, output: str) -> None:
         """An executable at `path` that prints `output` and exits 0, whatever it is asked."""
