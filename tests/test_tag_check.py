@@ -97,3 +97,26 @@ def test_no_released_branch_checks_nothing(tmp_path):
     empty = tmp_path / "empty"
     subprocess.run(["git", "init", "-q", "-b", "main", str(empty)], check=True)
     assert tag_check.main(["--repo", str(empty)]) == 0
+
+
+def test_a_tag_cut_on_a_commit_with_another_version_blocks(repo, capsys):
+    tag(repo, "a-v0.1.0")
+    tag(repo, "b-v0.2.0")
+    (repo / "packages" / "a" / "pyproject.toml").write_text('[project]\nname = "a"\nversion = "0.2.0"\n', encoding="utf-8")
+    run(repo, "commit", "-aqm", "bump")
+    tag(repo, "a-v0.3.0")  # the bump says 0.2.0, the tag says 0.3.0
+    run(repo, "push", "-q", "origin", "main")
+    assert check(repo) == 1
+    assert "tag a-v0.3.0 points at a commit that declares 0.2.0" in capsys.readouterr().err
+
+
+def test_a_mismatched_tag_can_be_allowed_with_a_reason_and_a_stale_entry_fails(repo, capsys):
+    tag(repo, "a-v0.1.0")
+    tag(repo, "b-v0.2.0")
+    run(repo, "tag", "b-v0.9.0")
+    run(repo, "push", "-q", "origin", "b-v0.9.0")
+    assert check(repo) == 1
+    assert check(repo, '[mismatched-tag]\n"b-v0.9.0" = "cut early"\n') == 0
+    capsys.readouterr()
+    assert check(repo, '[mismatched-tag]\n"b-v0.9.0" = "cut early"\n"a-v0.1.0" = "fine"\n') == 1
+    assert "a-v0.1.0 is not mismatched" in capsys.readouterr().err
