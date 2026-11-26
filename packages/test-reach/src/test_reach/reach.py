@@ -9,6 +9,7 @@ import contextlib
 import importlib
 import io
 import sys
+import warnings
 from collections.abc import Generator, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -105,7 +106,10 @@ def run(
     plugin = _PerTest(root, frozenset(wanted))
     files = sorted({test.split("::")[0] for test in wanted if (root / test.split("::")[0]).is_file()})
     if files:
-        with _importable(root, import_roots), contextlib.redirect_stdout(io.StringIO()):
+        # The measured repository owns its warning policy: the outer session's filters (an "error" among them) must not
+        # turn a warning raised while the inner session configures into a failed run of the tests it was asked for.
+        with _importable(root, import_roots), contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
+            warnings.resetwarnings()
             pytest.main([*_PYTEST_ARGS, "--rootdir", str(root), *(str(root / name) for name in files)], plugins=[plugin])
     skipped = tuple(exclude)
     results: dict[str, Reach] = {}

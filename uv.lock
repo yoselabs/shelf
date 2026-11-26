@@ -4027,6 +4027,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "anyio" },
     { name = "async-scope", extra = ["asgi"] },
     { name = "fastmcp-slim" },
     { name = "hypothesis" },
@@ -4043,6 +4044,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "anyio", specifier = ">=4,<5" },
     { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
     { name = "fastmcp-slim", specifier = ">=3.4,<4" },
     { name = "hypothesis", specifier = ">=6.100,<7" },
@@ -4061,6 +4063,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "anyio" },
     { name = "async-scope", extra = ["asgi"] },
     { name = "fastmcp-slim", extra = ["server"] },
     { name = "hypothesis" },
@@ -4074,6 +4077,7 @@ requires-dist = [{ name = "httpx", specifier = ">=0.28,<1" }]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "anyio", specifier = ">=4,<5" },
     { name = "async-scope", extras = ["asgi"], editable = "packages/async-scope" },
     { name = "fastmcp-slim", extras = ["server"], specifier = ">=3.4,<4" },
     { name = "hypothesis", specifier = ">=6.100,<7" },

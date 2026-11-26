@@ -53,6 +53,11 @@ def _spawn_holder(path: Path, mode: str) -> tuple[subprocess.Popen[str], int]:
     return proc, int(proc.stdout.readline())
 
 
+def _close_stdout(proc: subprocess.Popen[str]) -> None:
+    if proc.stdout is not None:
+        proc.stdout.close()
+
+
 def test_two_processes_racing_never_hold_the_lock_together(tmp_path: Path) -> None:
     log = tmp_path / "log"
     procs = [subprocess.Popen([sys.executable, "-c", _RACER, str(tmp_path / "r.lock"), str(log), name]) for name in ("a", "b")]
@@ -77,6 +82,7 @@ def test_a_sigkilled_holder_whose_forked_child_keeps_the_descriptor_stays_locked
         assert holder(path) == caught.value.holder  # nothing was broken or rewritten
     finally:
         os.kill(child, signal.SIGKILL)
+        _close_stdout(proc)
 
 
 def test_a_sigkilled_holder_with_no_inheritor_is_released_by_the_kernel(tmp_path: Path) -> None:
@@ -84,6 +90,7 @@ def test_a_sigkilled_holder_with_no_inheritor_is_released_by_the_kernel(tmp_path
     proc, _ = _spawn_holder(path, "alone")
     os.kill(proc.pid, signal.SIGKILL)
     proc.wait(timeout=10)
+    _close_stdout(proc)
     with ProcessLock.acquire(path) as lock:
         record = holder(lock.path)
         assert record is not None

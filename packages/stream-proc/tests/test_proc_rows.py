@@ -38,6 +38,8 @@ def test_group_rss_counts_every_process_of_the_group_in_bytes() -> None:
     finally:
         p.kill()
         p.wait()
+        if p.stdout is not None:
+            p.stdout.close()
 
 
 def test_group_rss_of_an_empty_group_is_zero() -> None:

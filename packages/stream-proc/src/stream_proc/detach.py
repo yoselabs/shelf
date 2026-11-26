@@ -23,6 +23,14 @@ class Detached:
     start: str
 
 
+# Detached children stay ours to reap: a dropped Popen leaves a zombie in a long-lived parent and warns when collected.
+_CHILDREN: list[subprocess.Popen[bytes]] = []
+
+
+def _reap_finished() -> None:
+    _CHILDREN[:] = [c for c in _CHILDREN if c.poll() is None]
+
+
 def spawn_detached(argv: Sequence[str], *, cwd: Path, env: Mapping[str, str], log: Path) -> Detached:
     """Start ``argv`` in a session of its own and return at once; the caller's pipes are never inherited.
 
@@ -32,6 +40,7 @@ def spawn_detached(argv: Sequence[str], *, cwd: Path, env: Mapping[str, str], lo
     read (no process table, or the child is already gone) the child is stopped and :class:`IdentityUnavailableError` raised:
     a worker nobody can recognise later is never left running.
     """
+    _reap_finished()
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("ab") as out:
         p = subprocess.Popen(
@@ -49,4 +58,5 @@ def spawn_detached(argv: Sequence[str], *, cwd: Path, env: Mapping[str, str], lo
         stop_tree(p)
         msg = f"cannot read the start identity of pid {p.pid} ({argv[0]}): no process table, or it exited at once"
         raise IdentityUnavailableError(msg)
+    _CHILDREN.append(p)
     return Detached(p.pid, start)

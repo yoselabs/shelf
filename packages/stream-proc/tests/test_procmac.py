@@ -121,6 +121,8 @@ def test_a_spawned_child_and_its_grandchild_are_listed() -> None:
     finally:
         p.kill()
         p.wait()
+        if p.stdout is not None:
+            p.stdout.close()
 
 
 @darwin
@@ -151,6 +153,8 @@ def test_start_token_is_stable_and_differs_per_process() -> None:
     finally:
         p.kill()
         p.wait()
+        if p.stdout is not None:
+            p.stdout.close()
     assert procmac.proc_start(p.pid) is None
     assert not procmac.alive(p.pid)
 
