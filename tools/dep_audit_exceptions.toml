@@ -1,0 +1,136 @@
+# Known vulnerabilities in the locked dependencies that are allowed for now (tools/dep_audit.py). Every entry needs a reason and an end date:
+# past the date the entry stops covering its advisories and the gate fails again; an advisory no longer reported fails the entry (delete it).
+# Prefer upgrading the package. Baseline: the audit was added 2026-11-26 and found these; none is triaged yet.
+
+[[exception]]
+package = "anyio"
+version = "4.14.1"
+ids = ["PYSEC-2026-4023", "PYSEC-2026-4024", "PYSEC-2026-4025"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "authlib"
+version = "1.7.2"
+ids = ["CVE-2026-116672", "CVE-2026-96760", "PYSEC-2026-4354", "PYSEC-2026-4355", "PYSEC-2026-4356", "PYSEC-2026-4357", "PYSEC-2026-4358", "PYSEC-2026-4359", "PYSEC-2026-4360"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "certifi"
+version = "2026.6.17"
+ids = ["PYSEC-2026-4320"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "claude-agent-sdk"
+version = "0.2.113"
+ids = ["CVE-2026-96620"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "cryptography"
+version = "49.0.0"
+ids = ["PYSEC-2026-3552"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "diskcache"
+version = "5.6.3"
+ids = ["PYSEC-2026-2447"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "dnspython"
+version = "2.8.0"
+ids = ["CVE-2026-114605", "CVE-2026-128089"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "fastmcp"
+version = "3.4.4"
+ids = ["GHSA-7xgj-8392-5q4r"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "filelock"
+version = "3.29.6"
+ids = ["CVE-2026-112907", "CVE-2026-112909", "CVE-2026-112910", "CVE-2026-112913", "CVE-2026-112915", "CVE-2026-112935", "CVE-2026-112936", "CVE-2026-112939", "CVE-2026-112940"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "joserfc"
+version = "1.7.3"
+ids = ["CVE-2026-119283", "CVE-2026-119284"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "mcp"
+version = "1.28.1"
+ids = ["CVE-2026-115563", "CVE-2026-116684", "CVE-2026-116685", "CVE-2026-116686", "CVE-2026-59951"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "opentelemetry-api"
+version = "1.43.0"
+ids = ["CVE-2026-114603", "CVE-2026-126360"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "pillow"
+version = "12.3.0"
+ids = ["CVE-2026-112390", "CVE-2026-112391", "CVE-2026-112393", "CVE-2026-112395", "CVE-2026-112399", "CVE-2026-112400", "CVE-2026-112401", "CVE-2026-112404", "CVE-2026-112406", "CVE-2026-112891", "CVE-2026-112892", "CVE-2026-112893", "CVE-2026-112894", "CVE-2026-112895", "CVE-2026-112897", "CVE-2026-112899", "CVE-2026-112900", "CVE-2026-128066", "CVE-2026-128067", "CVE-2026-96638", "CVE-2026-96640", "CVE-2026-96778", "GHSA-78g4-xqwv-q3g8", "PYSEC-2026-4326", "PYSEC-2026-4327", "PYSEC-2026-4328", "PYSEC-2026-4329", "PYSEC-2026-4330", "PYSEC-2026-4331", "PYSEC-2026-4332", "PYSEC-2026-4333", "PYSEC-2026-4334", "PYSEC-2026-4335", "PYSEC-2026-4336", "PYSEC-2026-4337", "PYSEC-2026-4338", "PYSEC-2026-4339", "PYSEC-2026-4340", "PYSEC-2026-4341", "PYSEC-2026-4342", "PYSEC-2026-4343", "PYSEC-2026-4363"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "pyjwt"
+version = "2.13.0"
+ids = ["GHSA-pxh4-856f-4h89", "PYSEC-2026-4140", "PYSEC-2026-4141", "PYSEC-2026-4142", "PYSEC-2026-4143", "PYSEC-2026-4144", "PYSEC-2026-4145", "PYSEC-2026-4146", "PYSEC-2026-4147", "PYSEC-2026-4148", "PYSEC-2026-4149", "PYSEC-2026-4150", "PYSEC-2026-4151", "PYSEC-2026-4152", "PYSEC-2026-4183"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "pytest"
+version = "8.4.2"
+ids = ["PYSEC-2026-1845"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "setuptools"
+version = "81.0.0"
+ids = ["GHSA-xmj3-9gf7-h52w", "PYSEC-2026-3447"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "soupsieve"
+version = "2.8.4"
+ids = ["CVE-2026-126190", "CVE-2026-126191", "CVE-2026-126192", "CVE-2026-126193", "PYSEC-2026-4170", "PYSEC-2026-4171"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "torch"
+version = "2.12.1"
+ids = ["PYSEC-2025-194"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26
+
+[[exception]]
+package = "urllib3"
+version = "2.7.0"
+ids = ["PYSEC-2026-4175", "PYSEC-2026-4176", "PYSEC-2026-4177"]
+reason = "baseline 2026-11-26: found when the audit was added, not yet triaged"
+until = 2026-12-26

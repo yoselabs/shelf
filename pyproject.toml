@@ -106,6 +106,8 @@ dev = [
     "import-linter>=2.15,<3",
     "rust-just>=1.58,<2",  # the gate runner (ADR 0023): `uv run just check`
     "vulture>=2.14,<3",        # dead private code (tests/test_arch_no_dead_private_code.py)
+    "pytest-randomly>=3.15,<5",
+    "pip-audit>=2.7,<3",         # known vulnerabilities in the lock (tools/dep_audit.py)
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
@@ -380,7 +382,7 @@ testpaths = [
 # ordinary gate launches a real engine (that needs a Chromium binary). The
 # `just test-browser` lane re-includes it via `-m browser`, and CI runs that
 # lane with SHELF_REQUIRE_BROWSER=1 where a non-launching engine is a hard fail.
-addopts = '-ra --strict-markers -m "not browser and not engines"'
+addopts = '-ra --strict-markers -p no:randomly -m "not browser and not engines"'
 markers = [
     "engines: runs a real speech engine (any-speech: FluidAudio, parakeet-mlx) on a real clip named by ANY_SPEECH_CLIP; needs GB of model weights, so it is opt-in and excluded from the default run; `-m engines` runs it and each test skips when its engine or input is missing.",
     "contract: a scenario of a package's contract suite that runs the same steps against the real implementation and its in-memory fake (git-porcelain's RealRepo and FakeRepo), so the fake cannot drift. Runs in the default gate and in `just check`; `-m contract` runs just this lane.",
@@ -995,10 +997,12 @@ exclude_lines = [
 release-gate = true
 lint-paths = ["packages", "tests", "tools", "conftest.py"]
 spell-paths = ["packages", "tests", "tools", "docs", "catalog", "use-cases", "ledger", "README.md", "AGENTS.md", "conftest.py"]
-steps = ["scripts", "arch", "tag-check", "stdlib-shadow"]
+steps = ["scripts", "arch", "tag-check", "stdlib-shadow", "dep-audit"]
 
 [tool.blueprint.test]
 floor = 65
+# `just check-all` runs the suite in random order (pytest-randomly, seed printed): an order dependency fails the release run, not a task's gate.
+randomize = true
 
 [tool.shelf-size]
 code-file = 400
