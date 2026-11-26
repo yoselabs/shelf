@@ -59,7 +59,7 @@ settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 # Declared here because pytest accepts `pytest_plugins` only in the rootdir conftest.
 # `tools.blueprint_fitness` is the blueprint registry fitness (W2): every checkpoint seen passing and not passing over a
 # whole blueprint-suite run.
-pytest_plugins = ["pytester", "tools.blueprint_fitness"]
+pytest_plugins = ["pytester", "tools.blueprint_fitness", "tools.test_budget"]
 
 
 @pytest.fixture(autouse=True)

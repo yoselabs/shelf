@@ -14,6 +14,7 @@ def test_surfaces_model_id_and_dim() -> None:
     assert isinstance(emb, Embedder)
 
 
+@pytest.mark.slow(budget=90, reason="the first transformers import loads torch: 41 s cold, and no smaller stand-in raises the same error")
 def test_missing_model_fails_loud_offline() -> None:
     # A nonexistent model with offline=True must raise AnyEmbedError, never download.
     emb = LocalEmbedder(model_name="definitely-not/a-real-model-xyz", dim=8, offline=True)
