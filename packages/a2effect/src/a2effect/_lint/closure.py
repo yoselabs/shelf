@@ -10,20 +10,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _is_inside_handler_that_translates(raise_node: ast.Raise, fn: ast.FunctionDef | ast.AsyncFunctionDef, declared: set[str]) -> bool:  # noqa: ARG001 - fn kept for signature symmetry with sibling helpers
-    """Whether a `raise X(...)` in an `except` handler is translation-safe.
-
-    True when X is one of the declared raises (the handler is rewriting an
-    untranslated underlying error into a declared one).
-    """
-    if raise_node.exc is None:
-        return True  # bare re-raise
-    name = dotted_name(raise_node.exc.func) if isinstance(raise_node.exc, ast.Call) else dotted_name(raise_node.exc)
-    if name is None:
-        return False
-    return _matches_declared(name, declared)
-
-
 def _matches_declared(name: str, declared: set[str]) -> bool:
     tail = name.rsplit(".", 1)[-1]
     return name in declared or tail in {d.rsplit(".", 1)[-1] for d in declared}
