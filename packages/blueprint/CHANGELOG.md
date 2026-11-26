@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Test doubles: `Repo.env` drops the developer's `BLUEPRINT_TIMEOUT`, and `gate_py._lease_installed` is the one seam where the machine's `any_lease` changes the release run's command (both shapes tested).
+
 - `agents.worktrees-in-sync` ignores the age of unmerged work while prek runs the pre-push hooks (`PRE_COMMIT_TO_REF` set): the push is the step that lands it, and the row used to refuse that push. Being behind main still fails. An ordinary audit is unchanged.
 
 - `[tool.blueprint.test] randomize = true`: `blueprint gate test-all` (the release run) passes `-p randomly`; `check` does not. The repo keeps `-p no:randomly` in `addopts`.

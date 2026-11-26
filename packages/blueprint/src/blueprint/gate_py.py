@@ -160,9 +160,14 @@ def test_all_command(repo: Path, env: dict[str, str]) -> list[str]:
         f"--cov-fail-under={floor:g}",
         *test.arguments(),
     ]
-    if importlib.util.find_spec("any_lease") is None:
+    if not _lease_installed():
         return pytest
     return [sys.executable, "-m", "any_lease", "run", "--root", str(lease_root(env)), "tests", "1", "check-all", "--", *pytest]
+
+
+def _lease_installed() -> bool:
+    """Whether the machine has `any_lease`; the one ambient fact that changes the release run's command (tests set it)."""
+    return importlib.util.find_spec("any_lease") is not None
 
 
 def test_all(repo: Path, env: dict[str, str]) -> int:

@@ -121,6 +121,25 @@ def test_test_all_shuffles_only_when_the_repo_asks_for_it(repo: Repo) -> None:
     assert cmd[cmd.index("-p") + 1] == "randomly"
 
 
+@pytest.mark.parametrize("installed", [False, True])
+def test_the_release_command_depends_on_any_lease_only_through_one_wrapper(
+    repo: Repo, monkeypatch: pytest.MonkeyPatch, installed: bool
+) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    monkeypatch.setattr(gate_py, "_lease_installed", lambda: installed)
+    cmd = gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
+    pytest_at = cmd.index("pytest")
+    assert ("any_lease" in cmd) is installed
+    assert "--cov-fail-under=65" in cmd[pytest_at:]  # the same pytest arguments either way
+
+
+def test_a_test_repo_does_not_inherit_the_developers_blueprint_timeout(monkeypatch: pytest.MonkeyPatch, repo: Repo) -> None:
+    monkeypatch.setenv("BLUEPRINT_TIMEOUT", "600")
+    from blueprint.testing import Repo as TestRepo  # noqa: PLC0415
+
+    assert "BLUEPRINT_TIMEOUT" not in TestRepo(repo.root, repo.bin_dir).env
+
+
 def test_test_all_has_a_default_floor(repo: Repo) -> None:
     repo.write("pyproject.toml", '[project]\nname = "x"\n')
     assert "--cov-fail-under=65" in gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
