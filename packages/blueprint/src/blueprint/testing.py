@@ -49,6 +49,7 @@ class Repo:
         repo.git("init", "-q", "-b", "main")
         repo.git("config", "user.email", "t@example.invalid")
         repo.git("config", "user.name", "t")
+        repo.fake_bd({})  # the developer's own `bd` starts a database server (5 s a call): a test is not a backlog
         return repo
 
     def __init__(self, root: Path, bin_dir: Path) -> None:
