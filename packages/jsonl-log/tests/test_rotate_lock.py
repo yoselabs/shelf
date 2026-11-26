@@ -117,6 +117,7 @@ def _appender(path: str, count: int, locked: bool) -> None:
                 log.append_json({"tag": "w", "i": i})
 
 
+@pytest.mark.slow(budget=60, reason="a stress run: concurrent appenders against a rewrite, 20 s by design")
 @pytest.mark.parametrize("locked", [False, True])
 def test_rewrite_under_concurrent_appends_loses_no_kept_line(tmp_path: Path, locked: bool) -> None:
     path = tmp_path / "log.jsonl"

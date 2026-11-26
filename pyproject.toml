@@ -242,6 +242,8 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 "tools/**" = ["T201"]
 # the pytest plugin the root conftest loads as `tools.blueprint_fitness` (implicit namespace package, like the tests).
 "tools/blueprint_fitness.py" = ["INP001"]
+# the per-test time budget plugin, loaded the same way as `tools.test_budget`.
+"tools/test_budget.py" = ["INP001"]
 # package benches (convert-md's engine-comparison harnesses, D4): throwaway CLI
 # probe scripts + fixture generators, not shipped library code — same shape as
 # tools/**, plus INP001 (deliberately not a package), PLC0415 (isolated engines

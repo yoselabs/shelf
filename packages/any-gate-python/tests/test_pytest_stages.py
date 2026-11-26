@@ -59,6 +59,7 @@ def test_a_stage_with_no_tests_is_not_a_failure(project: Callable[..., Path]) ->
     assert _run(root).ok
 
 
+@pytest.mark.slow(budget=90, reason="starts two pytest-xdist workers, each importing the whole sandbox plugin set: 34 s under load")
 def test_workers_run_the_parallel_stage_across_processes(project: Callable[..., Path]) -> None:
     root = project(a="def test_a():\n    assert True\n", b="def test_b():\n    assert True\n")
     assert _run(root, workers=2).ok
