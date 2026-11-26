@@ -60,12 +60,30 @@ gate = 'blueprint gate lint'
 [[role]]
 role = "linter"
 tool = "ruff check, the shelf's rule set"
-install = "copy [tool.ruff.lint] from the shelf (`blueprint init` writes it)"
-config = [{ any = [
+install = "copy [tool.ruff.lint] from the shelf (`blueprint init` writes it); it selects `S` (security) and `C90` (complexity), or `ALL`"
+config = [
+  { any = [
     { path = "pyproject.toml", contains = "[tool.ruff.lint]" },
     { path = "ruff.toml", contains = "[lint]" },
     { path = ".ruff.toml", contains = "[lint]" },
-] }]
+] },
+    { any = [
+    { path = "pyproject.toml", contains = '"ALL"' },
+    { path = "pyproject.toml", contains = '"S"' },
+    { path = "ruff.toml", contains = '"ALL"' },
+    { path = "ruff.toml", contains = '"S"' },
+    { path = ".ruff.toml", contains = '"ALL"' },
+    { path = ".ruff.toml", contains = '"S"' },
+    ] },
+    { any = [
+    { path = "pyproject.toml", contains = '"ALL"' },
+    { path = "pyproject.toml", contains = '"C90"' },
+    { path = "ruff.toml", contains = '"ALL"' },
+    { path = "ruff.toml", contains = '"C90"' },
+    { path = ".ruff.toml", contains = '"ALL"' },
+    { path = ".ruff.toml", contains = '"C90"' },
+    ] },
+]
 gate = "ruff check"
 
 [[role.alternative]]
@@ -118,12 +136,14 @@ gate = "deptry"
 [[role]]
 role = "tests"
 tool = "pytest, strict markers"
-install = "uv add --dev pytest pytest-xdist pytest-timeout; set `timeout = 900` (seconds, generous) in [tool.pytest.ini_options]: with no CI a hung test otherwise hangs the gate; `--strict-markers` in `addopts` so a typo in a marker fails instead of silently selecting nothing"
+install = "uv add --dev pytest pytest-xdist pytest-timeout; set `timeout = 900` (seconds, generous) in [tool.pytest.ini_options]: with no CI a hung test otherwise hangs the gate; `--strict-markers` in `addopts`; `filterwarnings = [\"error\", ...]` (list a third party's own warning as a scoped ignore, never drop the error) so a typo in a marker fails instead of silently selecting nothing"
 config = [
     { path = "pyproject.toml", contains = "[tool.pytest.ini_options]" },
     { path = "pyproject.toml", contains = "pytest-timeout" },
     { path = "pyproject.toml", contains = "timeout =" },
     { path = "pyproject.toml", contains = "strict-markers" },
+    # `filterwarnings = ["error", ...]`: a leaked process, file or stream fails the test that made it (shelf-uaub).
+    { path = "pyproject.toml", contains = "filterwarnings" },
 ]
 # Outcome (shelf-jc7r.3): the gate reaches a test runner, whichever one: pytest itself, or the shared runners that run it.
 outcome = "runs"

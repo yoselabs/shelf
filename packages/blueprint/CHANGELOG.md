@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- python-uv `tests` row also requires `filterwarnings` in `pyproject.toml` (`["error", ...]`: a leaked process, file or stream fails the test that made it). The `linter` row requires the bandit (`S`) and complexity (`C90`) rules, by name or through `ALL`. Both warn until the next audit (ADR 0018). Corpus diff against 0.14.2: 7 of 42 repos move to not set up (a2kay tests; a2skill, a2web, iorlas-task-loop, mcp-gateway, mempalace, yosefactory linter).
+
 ## 0.14.2
 
 - Snapshot also carries any-gate (the test-slot waiter names a hung holder's pid and age, repeats every 5 minutes) and the any-knowledge `working-with-agents` template (delivery scope for multi-ticket work).
