@@ -24,9 +24,16 @@ actually needs: never blocking a PR for a reason unrelated to what it touched.
 
 from __future__ import annotations
 
+import asyncio
 import os
+import warnings
+from typing import TYPE_CHECKING
 
+import pytest
 from hypothesis import HealthCheck, settings
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 # A git hook (pre-push runs `just check`) exports the variables that locate its repository. Inherited, they point
 # every test's `git -C <tmp repo>` at the shelf itself: from a worktree, guard tests wrote into its README and
@@ -53,3 +60,24 @@ settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "default"))
 # `tools.blueprint_fitness` is the blueprint registry fitness (W2): every checkpoint seen passing and not passing over a
 # whole blueprint-suite run.
 pytest_plugins = ["pytester", "tools.blueprint_fitness"]
+
+
+@pytest.fixture(autouse=True)
+def _close_orphan_event_loop() -> Iterator[None]:
+    """Close the clean loop pytest-asyncio leaves installed after an async test.
+
+    pytest-asyncio (0.26, `asyncio_mode = "auto"`) installs a fresh loop after every async test and never closes it. A later sync
+    test that calls `asyncio.run()` ends with `set_event_loop(None)`, dropping the last reference to that loop; it is then collected at
+    an arbitrary point and `BaseEventLoop.__del__` raises "unclosed event loop" (and its AF_UNIX self-pipe) inside whichever test runs
+    then. With `filterwarnings = ["error"]` that failed a different innocent test on every full run. This fixture is outermost, so its
+    teardown runs after pytest-asyncio's own and closes the loop before an `asyncio.run` can orphan it.
+    """
+    yield
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        try:
+            loop = asyncio.get_event_loop_policy().get_event_loop()
+        except RuntimeError:
+            return
+    if not loop.is_running() and not loop.is_closed():
+        loop.close()

@@ -269,6 +269,12 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 
 [tool.pytest.ini_options]
 timeout = 900
+# A leaked process, file or stream fails the test that leaked it. Two known ignores, each for a third party's own warning.
+filterwarnings = [
+    "error",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+    "ignore:builtin type .* has no __module__ attribute:DeprecationWarning",  # pymupdf's swig; an error here segfaults the run
+]
 # testpaths lists the shelf's own fitness tests + every package's tests.
 # HAND-MAINTAINED, and therefore guarded: `tests/test_gate_covers_every_package.py`
 # asserts this list is exactly the set of `packages/*/tests` on disk. It went
