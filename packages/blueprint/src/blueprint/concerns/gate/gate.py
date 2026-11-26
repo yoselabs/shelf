@@ -12,6 +12,9 @@ check("gate.no-ci", "the repo holds no GitHub Actions configuration (no reposito
 check("gate.step-inputs", "every step `check` runs declares the files it reads in gate-inputs.toml, so an unaffected commit does no work")(
     gate_inputs.step_inputs
 )
+check("gate.wide-inputs-have-a-reason", "every gate step declared `*` (runs on any change) says why in gate-inputs.toml's [wide]")(
+    gate_inputs.wide_inputs
+)
 check(
     "gate.hooks-recipe",
     "prek owns the git hooks through .pre-commit-config.yaml and pre-push runs the gate",

@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    import subprocess
-
     from blueprint.model import Context
 
 JUSTFILES = ("justfile", "Justfile", ".justfile")
@@ -100,7 +99,17 @@ def just_command(ctx: Context) -> str:
 
 
 def load(ctx: Context) -> Gate | None:
-    """The repo's gate: its justfile when it has one (a Makefile beside it is leftover), else its Makefile, else None."""
+    """The repo's gate: its justfile when it has one (a Makefile beside it is leftover), else its Makefile, else None.
+
+    Read once per run: a dozen checkpoints ask, and each ask used to run `just --dump` again (measured on a2kay, 2026-11-27).
+    """
+    if "gate" not in ctx.memo:
+        ctx.memo["gate"] = _read_gate(ctx)
+    gate = ctx.memo["gate"]
+    return gate if isinstance(gate, Gate) or gate is None else None
+
+
+def _read_gate(ctx: Context) -> Gate | None:
     for name in JUSTFILES:
         if (text := ctx.read(name)) is not None:
             return _just(ctx, name, _with_imports(ctx, text))
@@ -124,20 +133,29 @@ def has_makefile_only(ctx: Context) -> bool:
 # --- just ---------------------------------------------------------------------------------------------
 
 
+def dump(ctx: Context, name: str) -> subprocess.CompletedProcess[str] | None:
+    """`just --justfile <name> --dump --dump-format json`, run once per file per run (the graph and the shadowing check both ask)."""
+    key = f"dump:{name}"
+    if key not in ctx.memo:
+        ctx.memo[key] = ctx.run(just_command(ctx), "--justfile", name, "--dump", "--dump-format", "json", timeout=60)
+    cached = ctx.memo[key]
+    return cached if isinstance(cached, subprocess.CompletedProcess) else None
+
+
 def _just(ctx: Context, name: str, text: str) -> Gate:
-    done = ctx.run(just_command(ctx), "--justfile", name, "--dump", "--dump-format", "json", timeout=60)
+    done = dump(ctx, name)
     if done is None:
         return Gate("just", name, text, unread="`just` is not installed or timed out")
     if done.returncode != 0:
         return Gate("just", name, text, unread=_last_line(done))
     try:
-        dump = json.loads(done.stdout)
+        graph = json.loads(done.stdout)
     except json.JSONDecodeError:
         return Gate("just", name, text, unread="`just --dump` printed no JSON")
-    assignments = {n: a.get("value") for n, a in dump.get("assignments", {}).items()}
-    known = set(dump["recipes"])
+    assignments = {n: a.get("value") for n, a in graph.get("assignments", {}).items()}
+    known = set(graph["recipes"])
     recipes: dict[str, Recipe] = {}
-    for recipe_name, recipe in dump["recipes"].items():
+    for recipe_name, recipe in graph["recipes"].items():
         body = "\n".join("".join(_fragment(part, assignments, 0) for part in line) for line in recipe["body"])
         names = [dep["recipe"] for dep in recipe["dependencies"]]
         # An argument that is a recipe's name is an edge: check -> steps("lint") reaches lint.
@@ -147,7 +165,7 @@ def _just(ctx: Context, name: str, text: str) -> Gate:
     stepped = tuple(
         dict.fromkeys(
             arg
-            for dep in dump["recipes"].get("check", {}).get("dependencies", [])
+            for dep in graph["recipes"].get("check", {}).get("dependencies", [])
             if dep["recipe"] == "steps"
             for arg in dep["arguments"]
             if isinstance(arg, str)

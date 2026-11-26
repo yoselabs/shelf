@@ -100,8 +100,11 @@ def run(
     prove: float = 2.0,
     drain: float = 5.0,
     max_line: int = MAX_LINE,
+    pass_fds: Sequence[int] = (),
 ) -> Result:
     """Run ``argv`` in a session of its own and stream each output line (newline kept) to the callbacks.
+
+    ``pass_fds`` are descriptors the child inherits (everything else is closed), e.g. the terminal a step writes a notice to.
 
     ``timeout`` is the wall limit, ``idle`` the longest silence on both streams, ``stop`` a flag checked while
     the child runs. A limit or the flag stops the whole tree (``stop_tree``: SIGTERM, ``grace``, SIGKILL, proof
@@ -121,6 +124,7 @@ def run(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=True,
+        pass_fds=tuple(pass_fds),
     )
     limits = _Limits(timeout, idle, stop, grace, prove, drain, max_line)
     return _supervise(p, (_text(on_stdout), _text(on_stderr)), t0=t0, replay=hold.replay, limits=limits)

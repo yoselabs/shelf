@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `gate.wide-inputs-have-a-reason` (new, warns until the next audit): a step declared `["*"]` in gate-inputs.toml needs a `[wide]` entry `<step> = "<kind>: <why>"`, kind one of change-set, self-keyed, reads-everything, outside-files. It does not guess what a recipe reads.
+- The audit reads the justfile once per run (a2kay: 30 processes and 2.4 s became 20 and 1.8 s); the steps runner shows a failure as it lands and takes `--fail-fast` and `--step-limit` (any-gate 0.4.0).
+
 - Test doubles: `Repo.env` drops the developer's `BLUEPRINT_TIMEOUT`, and `gate_py._lease_installed` is the one seam where the machine's `any_lease` changes the release run's command (both shapes tested).
 
 - `agents.worktrees-in-sync` ignores the age of unmerged work while prek runs the pre-push hooks (`PRE_COMMIT_TO_REF` set): the push is the step that lands it, and the row used to refuse that push. Being behind main still fails. An ordinary audit is unchanged.

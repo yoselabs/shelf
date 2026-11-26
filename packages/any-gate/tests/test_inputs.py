@@ -66,7 +66,7 @@ def _steps(clone: Path, tmp_path: Path, *names: str, flags: tuple[str, ...] = ()
     return read(runs), (gits.read_text().splitlines() if gits.is_file() else [])
 
 
-STEPS = sorted(tomllib.loads(REPO_INPUTS.read_text()))
+STEPS = sorted(name for name, value in tomllib.loads(REPO_INPUTS.read_text()).items() if isinstance(value, list))  # [wide] is a table
 
 
 def test_the_gates_own_steps_are_all_declared() -> None:
@@ -128,3 +128,15 @@ def test_a_skipped_step_is_reported_as_a_skipped_line(clone: Path, tmp_path: Pat
     )
     assert done.returncode == 0
     assert "skipped guard: none of its declared inputs changed" in done.stderr
+
+
+def test_moving_a_file_out_of_a_steps_folder_still_starts_that_step(clone: Path) -> None:
+    (clone / inputs.FILE).write_text('ui = ["ui/*"]\n')
+    (clone / "ui").mkdir()
+    (clone / "ui" / "x.ts").write_text("x\n")
+    _git(clone, "add", "-A")
+    _git(clone, "commit", "-q", "-m", "ui")
+    _git(clone, "push", "-q")
+    assert "ui" in inputs.unaffected(clone, ["ui"])  # pushed: nothing changed since the base, the step is skipped
+    _git(clone, "mv", "ui/x.ts", "docs_x.ts")
+    assert inputs.unaffected(clone, ["ui"]) == {}  # the old path is a changed input of `ui`

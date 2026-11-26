@@ -21,7 +21,7 @@ EXTENSION_POINTS = frozenset({"check-extra"})
 
 def _dump_recipe_names(ctx: Context, path: str) -> set[str] | None:
     """Recipe names come from Just's parser, including defaulted parameters and imported definitions."""
-    done = ctx.run(gate_graph.just_command(ctx), "--justfile", path, "--dump", "--dump-format", "json", timeout=60)
+    done = gate_graph.dump(ctx, path)
     if done is None or done.returncode != 0:
         return None
     return set(json.loads(done.stdout)["recipes"])

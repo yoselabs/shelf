@@ -72,6 +72,11 @@ def test_a_renamed_file_is_selected_by_its_new_path(clone: Path) -> None:
     assert changed.select(clone, ["*.py"]) == ["moved.py"]
 
 
+def test_a_move_changes_both_its_old_and_its_new_path(clone: Path) -> None:
+    _git(clone, "mv", "a.py", "moved.py")
+    assert changed.changed(clone) == ["a.py", "moved.py"]
+
+
 def test_a_changed_config_file_selects_every_matching_file(clone: Path) -> None:
     _write(clone, "pyproject.toml", "[tool.ruff]\n")
     assert changed.select(clone, ["*.py"], ["pyproject.toml"]) == ["a.py", "b.py"]

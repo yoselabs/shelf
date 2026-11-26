@@ -498,7 +498,7 @@ dev = [
 
 [[package]]
 name = "any-gate"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/any-gate" }
 dependencies = [
     { name = "any-lease" },
@@ -6656,7 +6656,7 @@ dev = [
 
 [[package]]
 name = "stream-proc"
-version = "0.17.0"
+version = "0.18.0"
 source = { editable = "packages/stream-proc" }
 dependencies = [
     { name = "async-scope" },
