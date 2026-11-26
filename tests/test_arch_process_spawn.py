@@ -43,6 +43,11 @@ _KILL_ALLOWED = {
 # to be emptied by the consumer wave: files outside the spawners that run a subprocess with no timeout=
 _UNBOUNDED_ALLOWED = {
     **rows(
+        "kept: Popen runs up to four audits at once, each read through communicate(timeout=RUN_TIMEOUT) and killed on expiry; "
+        "Popen itself has no timeout argument",
+        "tools/corpus_diff.py",
+    ),
+    **rows(
         "kept: the run wrapper waits on an arbitrary user command, a deadline would kill it",
         "packages/any-lease/src/any_lease/__main__.py",
     ),
