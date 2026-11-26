@@ -54,10 +54,6 @@ _UNBOUNDED_ALLOWED = {
         "packages/any-lease/src/any_lease/__main__.py",
     ),
     **rows("kept: runs the repo's whole test suite, which has no fixed duration", "packages/blueprint/src/blueprint/gate_test.py"),
-    **rows(
-        "kept: recipes may run long (budgets only warn), get pass_fds; stream-proc.run lacks both",
-        "packages/any-gate/src/any_gate/steps.py",
-    ),
 }
 
 

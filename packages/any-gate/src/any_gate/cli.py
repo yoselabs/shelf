@@ -1,7 +1,8 @@
 """`python -m any_gate`: `test`, `changed`, `steps`, and the gate's state verbs `start`, `passed` and `pre-push`.
 
-`steps [--runner just] STEP...` runs the gate's steps at once, each into its own log, then prints one timing line and the log of every step
-that failed (see `any_gate.steps`); exit 1 when one failed. `$GATE_STEP_BUDGET` (default 60) and `$GATE_BUDGET` (default 180) are seconds.
+`steps [--runner just] [--fail-fast] [--step-limit S] STEP...` runs the gate's steps at once, each into its own log, shows a failed
+step's log the moment it ends, then prints one timing line (see `any_gate.steps`); exit 1 when one failed.
+`$GATE_STEP_BUDGET` (default 60) and `$GATE_BUDGET` (default 180) are seconds.
 
 A step that declares its input files in `gate-inputs.toml` and whose inputs did not change is not started (`any_gate.inputs`);
 `--all` runs every step.
@@ -31,6 +32,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
@@ -42,7 +44,7 @@ from any_gate import inputs
 from any_gate.receipts import Receipts
 from any_gate.runner import RunResult, run_runner
 from any_gate.state import GateState, common_dir
-from any_gate.steps import GATE_BUDGET, STEP_BUDGET, run_and_report
+from any_gate.steps import GATE_BUDGET, STEP_BUDGET, STEP_LIMIT, run_and_report
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -198,9 +200,20 @@ def _say(line: str) -> None:
 
 
 def _steps(args: argparse.Namespace) -> int:
+    if args.fail_fast and args.all:
+        notice("steps: --fail-fast and --all do not mix: the release gate shows every failure")
+        return 2
     skip = {} if args.all else inputs.unaffected(Path(args.repo).resolve(), args.names)
     return run_and_report(
-        args.names, env=os.environ, runner=args.runner, step_budget=args.step_budget, gate_budget=args.gate_budget, say=_say, skip=skip
+        args.names,
+        env=os.environ,
+        runner=args.runner,
+        step_budget=args.step_budget,
+        gate_budget=args.gate_budget,
+        say=_say,
+        skip=skip,
+        step_limit=args.step_limit,
+        halt=threading.Event() if args.fail_fast else None,
     )
 
 
@@ -275,6 +288,13 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
     st.add_argument(
         "--gate-budget", type=float, default=float(os.environ.get("GATE_BUDGET") or GATE_BUDGET), help="seconds the gate may take"
     )
+    st.add_argument(
+        "--step-limit",
+        type=float,
+        default=float(os.environ.get("GATE_STEP_LIMIT") or STEP_LIMIT),
+        help="seconds before a step's whole process tree is stopped (a hang guard; default 3600)",
+    )
+    st.add_argument("--fail-fast", action="store_true", help="on the first failure stop the other steps (reported as not judged)")
     st.add_argument("--all", action="store_true", help="run every step, whatever changed (the release gate)")
     st.add_argument("--repo", default=".", help="the repo whose gate-inputs.toml and changes decide what is skipped")
     st.add_argument("names", nargs="+", metavar="STEP")

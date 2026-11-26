@@ -336,3 +336,21 @@ def test_no_piece_exceeds_the_cap_on_a_large_newline_less_stream() -> None:
 def test_a_cap_below_one_is_refused() -> None:
     with pytest.raises(ValueError, match="max_line"):
         run(py("pass"), max_line=0)
+
+
+def test_a_passed_descriptor_reaches_the_child_and_nothing_else_does() -> None:
+    read_end, write_end = os.pipe()
+    stray_read, stray_write = os.pipe()
+    try:
+        code = (
+            f"import os; os.write({write_end}, b'kept')\n"
+            f"try:\n    os.write({stray_write}, b'x')\nexcept OSError:\n    print('stray closed')"
+        )
+        lines: list[str] = []
+        result = run([sys.executable, "-c", code], on_stdout=lines.append, pass_fds=[write_end], timeout=30)
+        assert result.returncode == 0
+        assert os.read(read_end, 10) == b"kept"
+        assert lines == ["stray closed\n"]
+    finally:
+        for fd in (read_end, write_end, stray_read, stray_write):
+            os.close(fd)

@@ -240,6 +240,9 @@ class Context:
     timeouts: list[tuple[tuple[str, ...], float]] = field(default_factory=list, compare=False, repr=False)
     # `(id, scope)` of every scoped override that excused an offender this run: one never in here excused nothing.
     used_overrides: set[tuple[str, str]] = field(default_factory=set, compare=False, repr=False)
+    # Answers computed once per run (the gate graph: one `just --dump` instead of one per checkpoint that asks). The repo does not
+    # change while a run reads it, so a key is never invalidated.
+    memo: dict[str, object] = field(default_factory=dict, compare=False, repr=False)
 
     def excused(self, checkpoint_id: str, path: str | None = None, line: int | None = None, service: str | None = None) -> Override | None:
         """The justified, unexpired, scoped override that excuses this offender of `checkpoint_id`, or None.

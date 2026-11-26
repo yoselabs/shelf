@@ -804,6 +804,7 @@ ignore_imports = [
     "any_gate.receipts -> atomic_io",
     "any_gate.receipts -> content_digest",
     "any_gate.runner -> stream_proc",
+    "any_gate.steps -> stream_proc",
     "any_gate_python.stages -> stream_proc",
     "any_gate.changed -> stream_proc.capture",
     "any_gate.plan -> stream_proc.capture",

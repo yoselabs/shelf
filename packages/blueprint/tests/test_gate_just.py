@@ -5,6 +5,7 @@ The Makefile cases in test_gate.py stay: a repo not yet migrated is still judged
 
 from __future__ import annotations
 
+import shutil
 from typing import TYPE_CHECKING
 
 import pytest
@@ -35,6 +36,19 @@ def test_gate_graph_needs_no_release_recipe(repo: Repo) -> None:
     assert not gate.has_recipe("check-all")
     assert "blueprint gate test" in gate.gate_recipes()
     assert "test-all" not in gate.gate_recipes()
+
+
+def test_the_justfile_is_dumped_once_per_run_however_many_checks_ask(repo: Repo) -> None:
+    repo.write("justfile", "check:\n    true\n")
+    counter = repo.bin_dir / "dumps"
+    real = shutil.which("just", path=repo.env["PATH"])
+    assert real is not None
+    (repo.bin_dir / "just").write_text(f'#!/bin/sh\necho x >> "{counter}"\nexec "{real}" "$@"\n')
+    (repo.bin_dir / "just").chmod(0o755)
+    ctx = Context(repo.root, Profile("library", (), (), (), None), env=repo.env)
+    first, second = gate_graph.load(ctx), gate_graph.load(ctx)
+    assert first is second
+    assert counter.read_text().count("x") == 1
 
 
 def test_one_command_fails_when_check_names_a_missing_recipe(repo: Repo) -> None:
@@ -216,6 +230,7 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
         ("gate.runner", 1, False),
         ("gate.no-ci", 1, False),
         ("gate.step-inputs", 1, False),
+        ("gate.wide-inputs-have-a-reason", 1, False),
         ("gate.hooks-recipe", 4, False),
         ("gate.hooks-installed", 3, True),
         ("gate.runs-blueprint", 2, False),
@@ -269,3 +284,38 @@ def test_step_inputs_passes_when_every_step_declares(repo: Repo) -> None:
 def test_step_inputs_is_not_applicable_when_the_gate_runs_no_steps(repo: Repo) -> None:
     repo.write("justfile", "check: lint\nlint:\n    true\n")
     assert _row(repo, "gate.step-inputs")[0] is Verdict.NOT_APPLICABLE
+
+
+def test_a_step_run_on_any_change_without_a_reason_fails_and_is_named(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write("gate-inputs.toml", 'lint = ["*.py"]\ntest = ["*"]\n')
+    verdict, evidence = _row(repo, "gate.wide-inputs-have-a-reason")
+    assert verdict is Verdict.FAILING
+    assert "test" in evidence
+    assert "lint" not in evidence
+
+
+def test_a_wide_step_passes_with_a_reason_of_a_known_kind(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write("gate-inputs.toml", 'lint = ["*.py"]\ntest = ["*"]\n[wide]\ntest = "self-keyed: units hash what each reaches"\n')
+    assert _row(repo, "gate.wide-inputs-have-a-reason")[0] is Verdict.PASSING
+
+
+@pytest.mark.parametrize("reason", ["because", "self-keyed:", "reads everything: yes", ""])
+def test_a_wide_reason_must_start_with_a_known_kind_and_say_something(repo: Repo, reason: str) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write("gate-inputs.toml", f'lint = ["*.py"]\ntest = ["*"]\n[wide]\ntest = "{reason}"\n')
+    assert _row(repo, "gate.wide-inputs-have-a-reason")[0] is Verdict.FAILING
+
+
+def test_a_wide_entry_for_a_step_that_is_no_longer_wide_is_stale(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write("gate-inputs.toml", 'lint = ["*.py"]\ntest = ["*.py"]\n[wide]\ntest = "self-keyed: units"\n')
+    verdict, evidence = _row(repo, "gate.wide-inputs-have-a-reason")
+    assert verdict is Verdict.FAILING
+    assert "test" in evidence
+
+
+def test_the_wide_row_is_not_applicable_with_no_declarations(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    assert _row(repo, "gate.wide-inputs-have-a-reason")[0] is Verdict.NOT_APPLICABLE

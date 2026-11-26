@@ -2,7 +2,7 @@
 
 A file counts when it differs from the upstream merge-base (the base the test selector diffs against): committed on the branch, staged,
 unstaged, or untracked and not ignored. A deleted file never counts (only existing files are returned); a renamed one counts by its
-new path.
+new path. `changed()` itself lists both paths of a move, so a step whose inputs name only the old folder still starts.
 
 Everything (every tracked or untracked-not-ignored file matching the globs) is returned instead when:
 - `scope="all"` (what `just check-all` passes), or
@@ -58,7 +58,8 @@ def changed(repo: Path) -> list[str] | None:
     start = base(repo)
     if start is None:
         return None
-    tracked = _git(repo, "diff", "-z", "--name-only", start)
+    # --no-renames: a move changes BOTH paths, and a step reading the old one must see it
+    tracked = _git(repo, "diff", "-z", "--name-only", "--no-renames", start)
     untracked = _git(repo, "ls-files", "-z", "--others", "--exclude-standard")
     if tracked is None or untracked is None:
         return None

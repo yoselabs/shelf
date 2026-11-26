@@ -23,6 +23,7 @@ FAKE = textwrap.dedent(
       one) touch "$MEET/a"; n=0; while [ ! -e "$MEET/b" ] && [ $n -lt 300 ]; do sleep 0.1; n=$((n+1)); done; [ -e "$MEET/b" ] && echo one ;;
       two) touch "$MEET/b"; n=0; while [ ! -e "$MEET/a" ] && [ $n -lt 300 ]; do sleep 0.1; n=$((n+1)); done; [ -e "$MEET/a" ] && echo two ;;
       slow) sleep 2; echo slow output ;;
+      hang) sleep 60 ;;
       fail) echo "boom: the reason"; exit 3 ;;
       skip) echo "skipped lint: no file changed" ;;
       wait) [ -n "$GATE_NOTICE_FD" ] && echo "gate-lock: waiting for a slot" >&"$GATE_NOTICE_FD"; echo "quiet log line" ;;
@@ -40,8 +41,8 @@ def fake(tmp_path: Path) -> str:
     return str(path)
 
 
-def _steps(fake: str, *names: str, **env: str) -> subprocess.CompletedProcess[str]:
-    cmd = [sys.executable, "-m", "any_gate", "steps", "--runner", fake, *names]
+def _steps(fake: str, *names: str, flags: tuple[str, ...] = (), **env: str) -> subprocess.CompletedProcess[str]:
+    cmd = [sys.executable, "-m", "any_gate", "steps", "--runner", fake, *flags, *names]
     return subprocess.run(cmd, capture_output=True, text=True, check=False, env={**os.environ, **env})
 
 
@@ -62,7 +63,7 @@ def test_the_steps_run_at_once(fake: str, tmp_path: Path) -> None:
 def test_a_failing_step_fails_the_gate_and_prints_its_log_and_marks_it(fake: str) -> None:
     done = _steps(fake, "ok", "fail")
     assert done.returncode == 1
-    assert "--- fail\nboom: the reason" in done.stderr
+    assert re.search(r"--- fail ✗ \d+s\nboom: the reason", done.stderr)
     assert re.search(r"fail \d+s ✗", done.stderr)
     assert "gate: failed: fail" in done.stderr
     assert "ok output" not in done.stderr  # a passing step's output stays in its log
@@ -109,4 +110,42 @@ def test_the_runner_defaults_to_just_and_a_missing_one_is_an_error() -> None:
 
 def test_no_step_names_is_a_usage_error(fake: str) -> None:
     done = _steps(fake)
+    assert done.returncode == 2
+
+
+def test_a_failure_is_shown_while_the_other_steps_are_still_running(fake: str) -> None:
+    cmd = [sys.executable, "-m", "any_gate", "steps", "--runner", fake, "slow", "fail"]
+    with subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True) as proc:
+        assert proc.stderr is not None
+        seen = []
+        for line in proc.stderr:
+            seen.append(line)
+            if line.startswith("--- fail"):
+                assert proc.poll() is None  # `slow` has two seconds left: the failure did not wait for it
+                break
+        rest = proc.stderr.read()
+        assert proc.wait() == 1
+    assert "boom: the reason" in rest
+    assert "gate: failed: fail" in rest
+
+
+def test_a_step_over_its_limit_has_its_whole_tree_stopped_and_is_named(fake: str) -> None:
+    done = _steps(fake, "hang", "ok", flags=("--step-limit", "1"))
+    assert done.returncode == 1
+    assert "hang" in done.stderr
+    assert "ran over its 1s limit" in done.stderr
+    assert re.search(r"hang \d+s ✗", done.stderr)
+
+
+def test_fail_fast_stops_the_others_and_never_calls_them_passed(fake: str) -> None:
+    done = _steps(fake, "hang", "fail", flags=("--fail-fast",))
+    assert done.returncode == 1
+    assert re.search(r"hang \d+s ○", done.stderr)
+    assert "gate: failed: fail" in done.stderr
+    assert "not judged" in done.stderr
+    assert "gate: failed: fail hang" not in done.stderr
+
+
+def test_the_release_gate_refuses_fail_fast(fake: str) -> None:
+    done = _steps(fake, "ok", flags=("--fail-fast", "--all"))
     assert done.returncode == 2
