@@ -72,11 +72,6 @@ def _identity_args(repo: RealRepo) -> list[str]:
     return [] if who is None else ["-c", f"user.name={who.name}", "-c", f"user.email={who.email}"]
 
 
-def _done[T](repo: RealRepo, result: T) -> T:
-    repo.invalidate()
-    return result
-
-
 # -- Repo -------------------------------------------------------------------------------------------------
 def sync(repo: RealRepo, remote: str) -> SyncResult:
     validate_remote(remote)

@@ -105,6 +105,7 @@ dev = [
     "prek>=0.5,<1",
     "import-linter>=2.15,<3",
     "rust-just>=1.58,<2",  # the gate runner (ADR 0023): `uv run just check`
+    "vulture>=2.14,<3",        # dead private code (tests/test_arch_no_dead_private_code.py)
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
