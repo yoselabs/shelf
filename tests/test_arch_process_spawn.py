@@ -20,6 +20,8 @@ from typing import TYPE_CHECKING
 import pytest
 from any_arch import Rule, check, plant, rows
 
+from tests.arch_keys import DEBT_UNTIL
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -104,6 +106,7 @@ KILLS = Rule(
     _kills,
     _KILL_ALLOWED,
     scope=_SCOPE,
+    debt_until=DEBT_UNTIL,
 )
 UNBOUNDED = Rule(
     "unbounded-subprocess",
@@ -111,6 +114,7 @@ UNBOUNDED = Rule(
     _unbounded,
     _UNBOUNDED_ALLOWED,
     scope=_SCOPE,
+    debt_until=DEBT_UNTIL,
 )
 
 

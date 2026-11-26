@@ -27,11 +27,15 @@ import re
 import subprocess
 import sys
 import tomllib
+from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # `python3 -I` leaves this folder off the path
+from exemption import lapsed, reason_of
 
 ALLOW_FILE = Path(__file__).with_name("stdlib_shadow_allow.toml")
 ROOT = PurePosixPath()  # the repo root, spelled as a folder
@@ -87,19 +91,22 @@ def shadows(repo: Path, paths: Sequence[str]) -> dict[str, str]:
     return out
 
 
-def problems(found: dict[str, str], allow: dict[str, object]) -> list[str]:
-    """The lines to print: shadows not allowed, allowance entries with no reason, and entries that no longer shadow."""
+def problems(found: dict[str, str], allow: dict[str, object], today: date) -> list[str]:
+    """The lines to print: shadows not allowed, entries with no reason, entries that no longer shadow, and entries that ran out."""
     out = [
         f"{path}: shadows the standard library module `{name}` for any script run from its folder "
         f"(rename it, or allow it in {ALLOW_FILE.name} with a reason)"
         for path, name in found.items()
         if path not in allow
     ]
-    for path, reason in sorted(allow.items()):
-        if not isinstance(reason, str) or not reason.strip():
+    for path, entry in sorted(allow.items()):
+        reason = reason_of(entry)
+        if not reason.strip():
             out.append(f"{ALLOW_FILE.name}: {path} has no reason; every entry needs a one-line reason")
         elif path not in found:
             out.append(f"{ALLOW_FILE.name}: {path} no longer shadows anything; delete its entry ({reason})")
+        elif (late := lapsed(entry, today)) is not None:
+            out.append(f"{ALLOW_FILE.name}: {path} {late}; rename it, or extend `until` with the reason it still stands")
     return out
 
 
@@ -107,9 +114,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", maxsplit=1)[0])
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--allow", type=Path, default=ALLOW_FILE)
+    parser.add_argument("--today", type=date.fromisoformat, default=date.today(), help="the date the entries are judged on")  # noqa: DTZ011
     args = parser.parse_args(argv)
     allow = tomllib.loads(args.allow.read_text(encoding="utf-8")).get("allow", {}) if args.allow.is_file() else {}
-    bad = problems(shadows(args.repo, tracked_python(args.repo)), allow)
+    bad = problems(shadows(args.repo, tracked_python(args.repo)), allow, args.today)
     for line in bad:
         sys.stderr.write(f"stdlib-shadow: {line}\n")
     return 1 if bad else 0

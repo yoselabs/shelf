@@ -22,11 +22,15 @@ import re
 import subprocess
 import sys
 import tomllib
+from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # `python3 -I` leaves this folder off the path
+from exemption import lapsed, reason_of
 
 ALLOW_FILE = Path(__file__).with_name("tag_check_allow.toml")
 GIT_TIMEOUT = 60.0  # seconds one git call may take: `ls-remote` on a dead network must not hang a push
@@ -62,18 +66,20 @@ def remote_tags(repo: Path, remote: str) -> tuple[set[str], bool]:
     return set((git(repo, "tag", "--list") or "").split()), False
 
 
-def problems(found: dict[str, str], tags: set[str], allow: dict[str, str]) -> list[str]:
-    """The lines to print: untagged packages not allowed, and allowance entries that no longer mean anything."""
+def problems(found: dict[str, str], tags: set[str], allow: dict[str, object], today: date) -> list[str]:
+    """The lines to print: untagged packages not allowed, and allowance entries that no longer mean anything or ran out."""
     out = [
         f"{name} {version}: no tag {name}-v{version} (tag the commit that released it, or allow it in {ALLOW_FILE.name} with a reason)"
         for name, version in sorted(found.items())
         if f"{name}-v{version}" not in tags and name not in allow
     ]
-    for name, reason in sorted(allow.items()):
+    for name, entry in sorted(allow.items()):
         if name not in found:
             out.append(f"{ALLOW_FILE.name}: {name} is not a package on the checked branch; delete its entry")
         elif f"{name}-v{found[name]}" in tags:
-            out.append(f"{ALLOW_FILE.name}: {name} {found[name]} is tagged; delete its entry ({reason})")
+            out.append(f"{ALLOW_FILE.name}: {name} {found[name]} is tagged; delete its entry ({reason_of(entry)})")
+        elif (late := lapsed(entry, today)) is not None:
+            out.append(f"{ALLOW_FILE.name}: {name} {found[name]} {late}; tag it, or extend `until` with the reason it still waits")
     return out
 
 
@@ -87,7 +93,7 @@ def version_at(repo: Path, rev: str, name: str) -> str | None:
     return version if isinstance(version, str) else None
 
 
-def mismatched_tags(repo: Path, tags: set[str], found: dict[str, str], allow: dict[str, str]) -> list[str]:
+def mismatched_tags(repo: Path, tags: set[str], found: dict[str, str], allow: dict[str, object], today: date) -> list[str]:
     """Tags of current packages whose commit declares another version, minus the ones allowed; stale allowances fail too."""
     wrong: dict[str, str] = {}
     for tag in sorted(tags):
@@ -108,6 +114,11 @@ def mismatched_tags(repo: Path, tags: set[str], found: dict[str, str], allow: di
         for tag in sorted(allow)
         if tag not in wrong
     ]
+    out += [
+        f"{ALLOW_FILE.name}: [mismatched-tag] {tag} {late}; extend `until` with the reason it still stands"
+        for tag in sorted(allow)
+        if tag in wrong and (late := lapsed(allow[tag], today)) is not None
+    ]
     return out
 
 
@@ -117,6 +128,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--rev", default="origin/main", help="the branch whose versions must be tagged")
     parser.add_argument("--allow", type=Path, default=ALLOW_FILE)
+    parser.add_argument("--today", type=date.fromisoformat, default=date.today(), help="the date the entries are judged on")  # noqa: DTZ011
     args = parser.parse_args(argv)
     repo = args.repo
     git(repo, "fetch", "--quiet", args.remote, args.rev.removeprefix(f"{args.remote}/"))  # best effort: a stale ref only checks older state
@@ -128,7 +140,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write(f"tag-check: {args.remote} unreachable; checked the local tags\n")
     table = tomllib.loads(args.allow.read_text(encoding="utf-8")) if args.allow.is_file() else {}
     found = versions(repo, args.rev)
-    bad = problems(found, tags, table.get("allow", {})) + mismatched_tags(repo, tags, found, table.get("mismatched-tag", {}))
+    allow: dict[str, object] = table.get("allow", {})
+    mismatched: dict[str, object] = table.get("mismatched-tag", {})
+    bad = problems(found, tags, allow, args.today) + mismatched_tags(repo, tags, found, mismatched, args.today)
     for line in bad:
         sys.stderr.write(f"tag-check: {line}\n")
     return 1 if bad else 0

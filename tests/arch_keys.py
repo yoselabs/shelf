@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import ast
+from datetime import date
+
+# The day every `debt:` row of the shelf's arch tests lapses (set 2026-11-27, 30 days). Past it the gate is red until each
+# row is fixed or renewed with a reason it still stands; the date is one place, so renewing is a decision, not a drift.
+DEBT_UNTIL = date(2026, 12, 27)
 
 
 def qualnames(tree: ast.Module) -> dict[ast.AST, str]:

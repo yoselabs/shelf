@@ -37,6 +37,8 @@ import pytest
 from any_arch import Row, Rule, check, plant, rows
 from any_arch.source import sources
 
+from tests.arch_keys import DEBT_UNTIL
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
@@ -268,7 +270,7 @@ _ALLOWED = {
 
 
 def _rule(root: Path, allowed: dict[str, Row]) -> Rule:
-    return Rule("outcome-unions-consumed", _FIX, _finder(root), allowed, ("debt", "outcome"), _SCOPE)
+    return Rule("outcome-unions-consumed", _FIX, _finder(root), allowed, ("debt", "outcome"), _SCOPE, DEBT_UNTIL)
 
 
 def _finder(root: Path) -> Callable[[Source], Iterable[Hit]]:

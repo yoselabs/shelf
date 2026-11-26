@@ -13,7 +13,7 @@ def prints(source):                                   # Source -> (key, line) hi
             yield source.rel, node.lineno
 
 NO_PRINT = Rule("no-print", "log, or add a reasoned row", prints, rows("debt: move to the log", ("packages/a/src/a/cli.py", 2)),
-                kinds=("debt", "outcome"))
+                kinds=("debt", "outcome"), debt_until=date(2026, 12, 27))
 
 def test_no_print():   check(NO_PRINT, ROOT)                                   # new hit, over count, stale row, bad reason
 def test_planted(tmp_path): assert plant(NO_PRINT, tmp_path, "print(1)\n") == {"packages/pkg/src/pkg/mod.py": [1]}
@@ -22,7 +22,7 @@ def test_planted(tmp_path): assert plant(NO_PRINT, tmp_path, "print(1)\n") == {"
 | name | does |
 |---|---|
 | `Rule(name, fix, find, rows, kinds=(), scope=("packages/*/src/**/*.py",))` | the finder, its allowlist, the fix text, the allowed reason prefixes, the globs it sees |
-| `Row(reason, count=None)`, `rows(reason, *keys)` | one allowed key; `count` is exact (`None`: any number of at least one); `rows` shares one reason, a `(key, n)` pair sets a count |
+| `Row(reason, count=None, until=None)`, `rows(reason, *keys, until=None)` | one allowed key; `count` is exact (`None`: any number of at least one); `until` is the last day the row covers it (the day after, `check` fails it by name); `rows` shares one reason and date, a `(key, n)` pair sets a count. A `debt:` row must have a date: its own `until`, or its rule's `debt_until`, else `check` fails it as `undated`. `check(rule, root, today=None)` takes the clock for tests |
 | `check(rule, root)` | raises one `AssertionError`: the fix text, then each `new` / `over` / `stale` / `reason` line |
 | `plant(rule, tmp_path, source, path=...)` | writes `source` under `tmp_path`, returns key -> lines the rule finds |
 | `debt(*rules)`, `debt_text(*rules)` | every `debt:` row, grouped by rule, as data and as text |

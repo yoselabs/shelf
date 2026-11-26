@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 import pytest
 from any_arch import Rule, check, plant, rows
 
-from tests.arch_keys import qualnames
+from tests.arch_keys import DEBT_UNTIL, qualnames
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -228,6 +228,7 @@ ERASURE = Rule(
     _erased,
     _ALLOWED,
     ("debt", "outcome"),
+    debt_until=DEBT_UNTIL,
 )
 
 

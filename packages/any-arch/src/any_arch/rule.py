@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import TYPE_CHECKING
 
 from any_arch.source import sources
@@ -18,10 +19,15 @@ Hit = tuple[str, int]  # (key, line): the row key the hit belongs to, and where 
 
 @dataclass(frozen=True)
 class Row:
-    """One allowed key. `count` is the exact number of hits the key may have; None means any number of at least one."""
+    """One allowed key. `count` is the exact number of hits the key may have; None means any number of at least one.
+
+    `until` is the last day the row covers its key; the day after, `check` fails it. A `debt:` row must have one, its
+    own or its rule's `debt_until`: owed work has a deadline, or it is not owed, it is kept (`outcome:`).
+    """
 
     reason: str
     count: int | None = None
+    until: date | None = None
 
 
 @dataclass(frozen=True)
@@ -30,6 +36,7 @@ class Rule:
 
     `kinds` are the reason prefixes a row may use (`debt`, `outcome`, ...); empty means any non-blank reason.
     `scope` are the globs, relative to the repo root, of the files `find` sees.
+    `debt_until` is the deadline of every `debt:` row that has no `until` of its own.
     """
 
     name: str
@@ -38,11 +45,12 @@ class Rule:
     rows: Mapping[str, Row]
     kinds: tuple[str, ...] = ()
     scope: tuple[str, ...] = ("packages/*/src/**/*.py",)
+    debt_until: date | None = None
 
 
-def rows(reason: str, *keys: str | tuple[str, int]) -> dict[str, Row]:
-    """One reason shared by many keys; a `(key, count)` pair makes that key an exact-count row."""
-    return {k if isinstance(k, str) else k[0]: Row(reason, None if isinstance(k, str) else k[1]) for k in keys}
+def rows(reason: str, *keys: str | tuple[str, int], until: date | None = None) -> dict[str, Row]:
+    """One reason (and one `until`) shared by many keys; a `(key, count)` pair makes that key an exact-count row."""
+    return {k if isinstance(k, str) else k[0]: Row(reason, None if isinstance(k, str) else k[1], until) for k in keys}
 
 
 def findings(rule: Rule, root: Path) -> dict[str, list[int]]:
@@ -60,8 +68,21 @@ def _bad_reason(reason: str, kinds: tuple[str, ...]) -> bool:
     return bool(kinds) and not reason.startswith(tuple(f"{kind}: " for kind in kinds))
 
 
-def check(rule: Rule, root: Path) -> None:
-    """Fail, with the rule's fix text, on a hit beyond its row, a row with no hit, a wrong count, or a bad reason."""
+def _deadline_problem(key: str, row: Row, rule: Rule, today: date) -> str | None:
+    until = row.until or (rule.debt_until if row.reason.startswith("debt:") else None)
+    if until is None and row.reason.startswith("debt:"):
+        return f"undated: {key} is debt with no `until`; give the row (or the rule's `debt_until`) a date, or make it `outcome:`"
+    if until is not None and today > until:
+        return f"expired: {key} was covered until {until}; fix the hit, or renew the row with a new date and the reason it still stands"
+    return None
+
+
+def check(rule: Rule, root: Path, today: date | None = None) -> None:
+    """Fail, with the rule's fix text, on a hit beyond its row, a row with no hit, a wrong count, a bad reason, or a late debt row.
+
+    `today` is the clock, injected for tests; it defaults to the real date.
+    """
+    today = today or date.today()  # noqa: DTZ011 -- the deadline is a calendar day on the owner's machine, no timezone
     found = findings(rule, root)
     problems: list[str] = []
     for key, lines in found.items():
@@ -76,6 +97,8 @@ def check(rule: Rule, root: Path) -> None:
             problems.append(f"stale: {key} has no hit; delete its row")
         elif row.count is not None and hits < row.count:
             problems.append(f"stale: {key} has {hits} hits, its row says {row.count}")
+        if (late := _deadline_problem(key, row, rule, today)) is not None:
+            problems.append(late)
         if _bad_reason(row.reason, rule.kinds):
             problems.append(f"reason: {key} needs a non-blank reason starting with one of {list(rule.kinds) or 'any text'}")
     if problems:

@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING
 
 from any_arch import Rule, check, plant, rows
 
+from tests.arch_keys import DEBT_UNTIL
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -95,6 +97,7 @@ SLEEPS = Rule(
     _ALLOWED,
     kinds=("kept", "debt"),
     scope=_SCOPE,
+    debt_until=DEBT_UNTIL,
 )
 
 

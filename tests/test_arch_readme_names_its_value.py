@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING
 import pytest
 from any_arch import Rule, check, plant, rows
 
+from tests.arch_keys import DEBT_UNTIL
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -76,6 +78,7 @@ def _readme_rule(root: Path) -> Rule:
         _ALLOWED,
         ("debt", "outcome"),
         scope=("packages/*/src/*/__init__.py",),
+        debt_until=DEBT_UNTIL,
     )
 
 

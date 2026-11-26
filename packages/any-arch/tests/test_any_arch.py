@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from datetime import date
 from typing import TYPE_CHECKING
 
 import pytest
@@ -63,8 +64,8 @@ def test_a_file_is_parsed_once_and_again_after_it_changes(tmp_path: Path) -> Non
 
 def test_a_clean_repo_with_matching_rows_passes(tmp_path: Path) -> None:
     _write(tmp_path, "packages/a/src/a/m.py", "print(1)\nprint(2)\n")
-    check(_rule({"a": Row("debt: log it", 2)}), tmp_path)
-    check(_rule({"a": Row("debt: log it")}), tmp_path)
+    check(_rule({"a": Row("outcome: log it", 2)}), tmp_path)
+    check(_rule({"a": Row("outcome: log it")}), tmp_path)
 
 
 def test_a_new_hit_fails_with_the_fix_text_and_its_lines(tmp_path: Path) -> None:
@@ -133,3 +134,47 @@ def test_the_command_prints_the_debt_of_the_rules_a_module_defines(tmp_path: Pat
 def test_the_command_refuses_a_path_it_cannot_load(tmp_path: Path) -> None:
     with pytest.raises(SystemExit, match="cannot load"):
         main([str(tmp_path / "not_python.txt")])
+
+
+_TODAY = date(2026, 12, 1)
+
+
+def _debt_rule(row: Row, debt_until: date | None = None) -> Rule:
+    return Rule("prints", "use the log", _prints, {"a": row}, debt_until=debt_until)
+
+
+def _one_print(tmp_path: Path) -> None:
+    _write(tmp_path, "packages/a/src/a/m.py", "print(1)\n")
+
+
+def test_a_row_covers_its_key_through_its_last_day(tmp_path: Path) -> None:
+    _one_print(tmp_path)
+    check(_debt_rule(Row("outcome: kept", until=_TODAY)), tmp_path, today=_TODAY)
+
+
+def test_a_row_past_its_until_fails_and_names_the_row(tmp_path: Path) -> None:
+    _one_print(tmp_path)
+    with pytest.raises(AssertionError, match=r"expired: a was covered until 2026-12-01"):
+        check(_debt_rule(Row("outcome: kept", until=_TODAY)), tmp_path, today=date(2026, 12, 2))
+
+
+def test_a_debt_row_with_no_date_fails(tmp_path: Path) -> None:
+    _one_print(tmp_path)
+    with pytest.raises(AssertionError, match=r"undated: a is debt"):
+        check(_debt_rule(Row("debt: owed")), tmp_path, today=_TODAY)
+
+
+def test_a_debt_row_takes_its_rules_deadline_and_it_expires_too(tmp_path: Path) -> None:
+    _one_print(tmp_path)
+    check(_debt_rule(Row("debt: owed"), debt_until=_TODAY), tmp_path, today=_TODAY)
+    with pytest.raises(AssertionError, match=r"expired: a"):
+        check(_debt_rule(Row("debt: owed"), debt_until=_TODAY), tmp_path, today=date(2026, 12, 2))
+
+
+def test_a_row_of_its_own_date_wins_over_the_rules(tmp_path: Path) -> None:
+    _one_print(tmp_path)
+    check(_debt_rule(Row("debt: owed", until=date(2027, 1, 1)), debt_until=_TODAY), tmp_path, today=date(2026, 12, 2))
+
+
+def test_rows_shares_one_until_across_its_keys() -> None:
+    assert rows("debt: owed", "a", ("b", 2), until=_TODAY) == {"a": Row("debt: owed", None, _TODAY), "b": Row("debt: owed", 2, _TODAY)}

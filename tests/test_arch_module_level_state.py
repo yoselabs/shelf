@@ -32,6 +32,8 @@ from typing import TYPE_CHECKING
 import pytest
 from any_arch import Row, Rule, check, plant, rows
 
+from tests.arch_keys import DEBT_UNTIL
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -328,6 +330,7 @@ MODULE_LEVEL_STATE = Rule(
     _global_state,
     _ALLOWED,
     ("outcome", "debt"),
+    debt_until=DEBT_UNTIL,
 )
 
 
