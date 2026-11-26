@@ -8,12 +8,12 @@
 # The gate: every step at once (`steps`), one timing line, a warning for a step over its budget. A green run records the tree it
 # checked (any-gate), so the pre-push hook does not run it again on that tree.
 [group('gate')]
-check: gate-start beads-lint (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "spell-changed" "deps" "test" "scripts" "arch" "tag-check" "stdlib-shadow") check-extra
+check: gate-start beads-lint (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "spell-changed" "deps" "test" "scripts" "arch" "tag-check" "stdlib-shadow" "dep-audit") check-extra
     uv run python -m any_gate passed --gate check
 
 # Opt-in release gate (`[tool.blueprint.gate] release-gate = true`): every step over everything before a tag.
 [group('gate')]
-check-all: beads-lint (steps-all "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "spell" "deps" "test-all" "scripts-all" "arch" "tag-check" "stdlib-shadow") check-extra
+check-all: beads-lint (steps-all "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "spell" "deps" "test-all" "scripts-all" "arch" "tag-check" "stdlib-shadow" "dep-audit") check-extra
 
 # Extension point: a repo defines `check-extra` in its own justfile to run one more thing in the gate (after the steps, before the record).
 [private]

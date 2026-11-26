@@ -148,11 +148,13 @@ def test_all_command(repo: Path, env: dict[str, str]) -> list[str]:
     floor = config.get("test", {}).get("floor", config.get("coverage-report", {}).get("fail_under", DEFAULT_FLOOR))
     test = gate_units.read_config(repo)
     workers = [] if "-n" in test.pytest_args else ["-n", "auto"]
+    shuffle = ["-p", "randomly"] if config.get("test", {}).get("randomize") is True else []  # the release run shuffles; `check` does not
     pytest = [
         sys.executable,
         "-m",
         "pytest",
         *workers,
+        *shuffle,
         "--cov",
         "--cov-report=term-missing",
         f"--cov-fail-under={floor:g}",

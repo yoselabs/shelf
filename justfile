@@ -44,6 +44,12 @@ scripts scope="changed":
 [group('gate')]
 scripts-all: (scripts "all")
 
+# No locked dependency has a known vulnerability, except those tools/dep_audit_exceptions.toml allows until a date. `check` runs it when uv.lock or
+# a pyproject.toml changed (gate-inputs.toml); `check-all` always. Needs the network: offline it says so and passes.
+[group('gate')]
+dep-audit:
+    python3 -I tools/dep_audit.py
+
 [group('gate')]
 tag-check:
     python3 -I tools/tag_check.py

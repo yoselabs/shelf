@@ -113,6 +113,14 @@ def test_test_all_takes_its_floor_from_the_repo(repo: Repo) -> None:
     assert "-n" in cmd
 
 
+def test_test_all_shuffles_only_when_the_repo_asks_for_it(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n')
+    assert "randomly" not in gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
+    repo.write("pyproject.toml", '[project]\nname = "x"\n[tool.blueprint.test]\nrandomize = true\n')
+    cmd = gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
+    assert cmd[cmd.index("-p") + 1] == "randomly"
+
+
 def test_test_all_has_a_default_floor(repo: Repo) -> None:
     repo.write("pyproject.toml", '[project]\nname = "x"\n')
     assert "--cov-fail-under=65" in gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
