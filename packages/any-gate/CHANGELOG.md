@@ -2,6 +2,7 @@
 
 AI-facing only: one line per contract-shape change, arrow notation.
 
+- unreleased: the gate prints at most `FAILED_LOG_LINES` (60) lines of a failed step's log, then `... N more lines: `just <step>` prints them all`; the head names the failures.
 - 0.3.0: child output read through `Captured.text` (stream-proc 0.13.0); requires `stream-proc>=0.13.0,<1`. Contract unchanged.
 - 0.2.0: breaking: `GateState(repo, receipts, env)`, `working_key`, `head_key`, `common_dir` take the environment git runs in (`PRE_COMMIT_TO_REF` is read from it); `run_steps` and `run_and_report` take `env=`; the CLI passes `os.environ`. Git and `vm_stat` calls run through `stream_proc.capture` with a timeout (600s per git call). No receipt or key byte changes.
 - unreleased (in 0.2.0): `GateState` computes the tree from a copy of the index that keeps its mtime (a copy stamped now hid a same-size edit made in the entry's own timestamp tick: the wrong tree was recorded, `green` said no).

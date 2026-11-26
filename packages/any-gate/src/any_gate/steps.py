@@ -97,11 +97,17 @@ def run_steps(
     return Report(tuple(results[name] for name in names), int(time.monotonic() - began))
 
 
+FAILED_LOG_LINES = 60  # lines of one failed step's log the gate prints: the head names the failures, the rest is `just <step>` away
+
+
 def render(report: Report, *, step_budget: float, gate_budget: float) -> list[str]:
     """The lines the gate prints after its steps: skipped lines, failed logs, the timing line, warnings, the failures."""
     lines = [line for step in report.steps for line in step.log.splitlines() if line.startswith(SKIPPED)]
     for step in report.failed:
-        lines += [f"--- {step.name}", *step.log.rstrip("\n").splitlines()]
+        log = step.log.rstrip("\n").splitlines()
+        lines += [f"--- {step.name}", *log[:FAILED_LOG_LINES]]
+        if len(log) > FAILED_LOG_LINES:
+            lines.append(f"... {len(log) - FAILED_LOG_LINES} more lines: `just {step.name}` prints them all")
     cells = []
     for step in report.steps:
         mark = f" ⚠ over {step_budget:g}s" if step.seconds > step_budget else ""
