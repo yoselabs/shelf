@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint.model import check, failing, not_applicable, passing
@@ -50,6 +51,12 @@ class Hook:
     @property
     def at_commit(self) -> bool:
         return bool(self.stages & _AT_COMMIT)
+
+
+def installed_hooks_dir(ctx: Context) -> Path:
+    """The clone's git hooks directory (`core.hooksPath` aside), absolute."""
+    path = Path((ctx.git("rev-parse", "--git-path", "hooks") or ".git/hooks").strip())
+    return path if path.is_absolute() else ctx.repo / path
 
 
 def hooks_in(config: str) -> list[Hook]:

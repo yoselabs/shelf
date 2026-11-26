@@ -8,12 +8,12 @@ imports a name its old dependency lacks (a2kay: the daemon died on start, the KB
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
 from blueprint.model import Finding, Sub, check_each, failing, not_applicable, not_checked, passing
+from blueprint.names import canonical_name
 
 if TYPE_CHECKING:
     from blueprint.model import Context, Profile
@@ -27,11 +27,6 @@ _INSTALL_RECIPES = ("install", "reinstall", "tool-install", "install-tool")
 def _applies(profile: Profile) -> bool:
     """The repo is an application on the python-uv stack."""
     return profile.kind == "application" and "python-uv" in profile.stacks
-
-
-def _norm(name: str) -> str:
-    """PEP 503 normal form: how uv.lock and `uv pip list` may each spell one project."""
-    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def _reinstall_step(ctx: Context) -> str | None:
@@ -59,21 +54,23 @@ def uv_tool(ctx: Context) -> list[Sub]:
     tool_dir = ctx.run("uv", "tool", "dir", timeout=30)
     if tool_dir is None or tool_dir.returncode != 0:
         return _single(not_checked("`uv tool dir` did not answer: uv is not installed"))
-    env = next((d for d in (Path(tool_dir.stdout.strip()) / n for n in (name, _norm(name))) if d.is_dir()), None)
+    env = next((d for d in (Path(tool_dir.stdout.strip()) / n for n in (name, canonical_name(name))) if d.is_dir()), None)
     if env is None:
         return _single(not_applicable(f"{name} is not installed as a uv tool on this machine"))
     listed = ctx.run("uv", "pip", "list", "--python", str(env / "bin" / "python"), "--format", "json", timeout=60)
     installed: dict[str, str] = {}
     try:
-        installed = {_norm(str(p["name"])): str(p["version"]) for p in json.loads(listed.stdout)} if listed else installed
+        installed = {canonical_name(str(p["name"])): str(p["version"]) for p in json.loads(listed.stdout)} if listed else installed
     except (json.JSONDecodeError, KeyError, TypeError):
         installed = {}
     if not installed:
         return _single(not_checked(f"could not list the packages of the {name} tool environment"))
     raw = ctx.toml("uv.lock").get("package")
     packages: list[object] = raw if isinstance(raw, list) else []
-    locked = {_norm(str(p["name"])): str(p["version"]) for p in packages if isinstance(p, dict) and "name" in p and "version" in p}
-    drift = [f"{n} {v} (lock {locked[n]})" for n, v in sorted(installed.items()) if n in locked and n != _norm(name) and locked[n] != v]
+    locked = {canonical_name(str(p["name"])): str(p["version"]) for p in packages if isinstance(p, dict) and "name" in p and "version" in p}
+    drift = [
+        f"{n} {v} (lock {locked[n]})" for n, v in sorted(installed.items()) if n in locked and n != canonical_name(name) and locked[n] != v
+    ]
     if not drift:
         return _single(passing(f"the {name} tool environment matches uv.lock ({len(installed)} packages)"))
     step = _reinstall_step(ctx)

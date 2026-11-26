@@ -11,6 +11,8 @@ import tomllib
 from importlib import metadata
 from pathlib import Path
 
+from blueprint.names import canonical_name
+
 TABLE = Path(__file__).resolve().parent / "shelf_sources.toml"
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
 _SHELF = "yoselabs/shelf"
@@ -56,7 +58,7 @@ def problems(pyproject: dict[str, object]) -> list[str]:
         out.append(f"the shelf sources have no tag; use {snapshot_tag()} for all")
     for line in _overrides(pyproject):
         match = _NAME.match(line.strip())
-        if match and match.group().lower().replace("_", "-") in {n.lower().replace("_", "-") for n in shelf}:
+        if match and canonical_name(match.group()) in {canonical_name(n) for n in shelf}:
             out.append(f"override-dependencies re-pins the shelf package {match.group()}: delete it, one snapshot tag needs none")
     return out
 

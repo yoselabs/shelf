@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import itertools
 import re
-from pathlib import Path
 
+from blueprint.concerns.git_hooks.hooks import installed_hooks_dir
 from blueprint.model import (
     Context,
     Finding,
@@ -70,8 +70,7 @@ def hooks_installed(ctx: Context) -> Finding:
     hooks_path = (ctx.git("config", "--local", "core.hooksPath") or "").strip()
     if hooks_path:
         return failing(f"core.hooksPath is {hooks_path}: a fresh clone runs no hooks, and prek refuses to install", fix, FixedBy.AUTO)
-    hooks_dir = Path((ctx.git("rev-parse", "--git-path", "hooks") or ".git/hooks").strip())
-    hooks_dir = hooks_dir if hooks_dir.is_absolute() else ctx.repo / hooks_dir
+    hooks_dir = installed_hooks_dir(ctx)
     pre_commit = hooks_dir / "pre-commit"
     if not pre_commit.is_file():
         return not_set_up("no pre-commit hook installed", "prek install", FixedBy.AUTO)
