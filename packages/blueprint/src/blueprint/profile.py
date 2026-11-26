@@ -13,6 +13,7 @@ from typing import Any
 
 from blueprint.facts import KINDS, SURFACES, TRAITS, Judgement, detect_facts, judgement_problem, package_json
 from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, is_skipped, override_toml, walk
+from blueprint.names import canonical_name
 
 STATE_DIR = "docs/blueprint"
 STATE_FILE = f"{STATE_DIR}/blueprint.toml"
@@ -365,7 +366,7 @@ def _runtime_dependencies(pyproject: Path) -> set[str]:
     for extra in project.get("optional-dependencies", {}).values():
         specs += extra
     names = (re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", str(spec).strip()) for spec in specs)
-    return {re.sub(r"[-_.]+", "-", m.group().lower()) for m in names if m}
+    return {canonical_name(m.group()) for m in names if m}
 
 
 def _source_uses(folder: Path, needles: tuple[str, ...]) -> bool:

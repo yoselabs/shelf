@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
 from blueprint.concerns.git_hooks.gate_hooks import HOOK_CONFIG
+from blueprint.concerns.git_hooks.hooks import hooks_in
 from blueprint.model import (
     Context,
     Finding,
@@ -31,7 +32,6 @@ _SCRIPT = re.compile(rf"(?:{_INTERPRETER}(?:\s+-[\w-]+(?:=\S+)?)*\s+|\b[A-Za-z_]
 _TEST_GLOBS = ("test_*.py", "*.test.*", "*.spec.*", "*_test.go")
 
 
-_HOOK_ENTRY = re.compile(r"^\s*(?:-\s*)?entry:\s*(.+?)\s*$", re.MULTILINE)
 # Any `.py` path in a hook's entry (`uv run tools/x.py`, `python x.py`, a bare path); a glob such as `test_*.py` has no match.
 _HOOK_SCRIPT = re.compile(rf"(?<![\w./-])((?:[\w.-]+/)*[\w.-]+\.{_EXT})\b")
 
@@ -47,7 +47,7 @@ def _hook_entries(ctx: Context, recipes: str) -> list[str]:
     """
     if not gate_graph.HOOK_RUN.search(recipes):
         return []
-    return _HOOK_ENTRY.findall(ctx.read(HOOK_CONFIG) or "")
+    return [h.entry for h in hooks_in(ctx.read(HOOK_CONFIG) or "") if h.entry]
 
 
 def _gate_commands(ctx: Context, gate: Gate) -> str:

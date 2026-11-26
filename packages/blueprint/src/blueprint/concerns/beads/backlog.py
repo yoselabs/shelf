@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter
-from pathlib import Path
 
 from blueprint.concerns.git_hooks.gate_hooks import HOOK_CONFIG
+from blueprint.concerns.git_hooks.hooks import installed_hooks_dir
 from blueprint.model import Context, Finding, FixedBy, Profile, check, failing, not_checked, not_set_up, passing, uses_beads
 
 # Effective values bd must report (`bd config show --json`), owner rounds 5-8.
@@ -240,8 +240,7 @@ def hooks_installed(ctx: Context) -> Finding:
     """The beads half of gate.hooks-installed: bd's own block in a hook file means a failing check no longer blocks."""
     if ctx.git("rev-parse", "--git-dir") is None:
         return ctx.not_a_repository()
-    hooks_dir = Path((ctx.git("rev-parse", "--git-path", "hooks") or ".git/hooks").strip())
-    hooks_dir = hooks_dir if hooks_dir.is_absolute() else ctx.repo / hooks_dir
+    hooks_dir = installed_hooks_dir(ctx)
     if not hooks_dir.is_dir():
         return passing("no hooks directory, so nothing injected")
     injected = sorted(
