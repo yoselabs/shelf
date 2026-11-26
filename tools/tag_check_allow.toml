@@ -7,3 +7,7 @@ any-failure-fp = "candidate, never released: catalog status candidate, no tag ye
 any-plugin-cache = "candidate, never released: catalog status candidate, no tag yet"
 any-shell-policy = "candidate, never released: catalog status candidate, no tag yet"
 task-spec = "candidate, never released: catalog status candidate, no tag yet"
+
+# Tags cut on a commit that declares another version (tools/tag_check.py). Tags are never moved or deleted; each entry names why it stays.
+[mismatched-tag]
+"blueprint-v0.14.0" = "cut on a commit whose pyproject still said 0.13.2; blueprint-v0.14.1 carries the same code with the right version"
