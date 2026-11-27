@@ -22,6 +22,18 @@ The repo's own paths are read from `[tool.any-gate.python]` in the root `pyproje
 see, `repo-tests` (the whole-repo tests that always run), and `gated` tests that run only when an input they read changed. A path entry is a file,
 or a directory with a trailing `/`. With no config every path outside `packages/` selects every package.
 
+`[tool.any-gate.python.reads]` maps a root file (an fnmatch glob, `*` crosses `/`) to the packages whose tests read it: a change to it selects those
+packages and their dependents, and each of them keys its passes on the file's content. An empty list says no suite reads it. A root path in neither
+`no-effect` nor `reads` still selects every package. The map is a claim, held by `reads_audit.audit(repo)` (the shelf runs it as
+`tests/test_root_reads_are_mapped.py`): it fails when a package's tests name a mapped file (or a folder holding one) the package is not mapped for, when
+the root conftest or a plugin it loads names one, or when a test finds the repo root through `parents[3]` and its package is mapped for no file. It is a
+static scan: a path built at run time, a constant defined in another module, and `src` code the tests point at the real repo are not seen.
+
+`[tool.any-gate.python.repo-reads]` keys the repo's own tests (`repo-tests`): a test-file glob -> the path globs it reads (`*` applies to every test). A keyed test
+runs when its own file or a path it reads changed; a test no key names runs on every change; `!path/*` names a path the test only skips. Whole-repo scans
+list the folders they scan, so a docs-only or yaml-only change skips them. `reads_audit.audit_repo_tests` fails when a test is not keyed or names a
+top-level path (a string constant, an import of a workspace package or `tools`) that no pattern of its key covers.
+
 ## The runner
 
 `run [--workers auto|N] [--wall S] [--idle S] [--nice N] [--pytest-args "ARGS"] PATH...` is the runner `any-gate test` calls: pytest in stages, parallel
