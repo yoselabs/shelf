@@ -35,6 +35,8 @@ class Role:
     installs: tuple[str, ...] = ()
     # A purpose (ADR 0026): the row applies only to a repo with this fact, `shipped-image` or `deployed`, else it is not applicable.
     requires: str = ""
+    # Optional: a repo that has not set the role up is not judged (not applicable); one that has must still run it (failing otherwise).
+    optional: bool = False
 
 
 @dataclass(frozen=True)
@@ -85,6 +87,7 @@ def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
                 floors=tuple(r.get("floor", ())),
                 installs=tuple(r.get("installs", ())),
                 requires=r.get("requires", ""),
+                optional=bool(r.get("optional", False)),
             )
             for r in data.get("role", [])
         }

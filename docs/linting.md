@@ -166,8 +166,8 @@ directly runnable script: a `*.py` other than `__main__.py` with a `__main__` gu
 `src/<pkg>/` first on the path, so `queue.py` beside it shadows the standard library). A stdlib-named file that is itself that script
 counts. `__main__.py` does not: `python -m <pkg>` leads with the working directory. A script in a sub-package does not count for its parent
 folder. Exceptions go in
-`.config/stdlib-shadow/allow.toml`, one reason per path; an entry without a reason, or for a path that no longer shadows, fails. Declared
-inputs in `gate-inputs.toml` ([ADR 0031](adr/0031-gate-steps-declare-their-inputs.md)): `*.py` and the allowlist.
+`.config/stdlib-shadow/allow.toml`, one reason per path; an entry without a reason, or for a path that no longer shadows, fails. The step is `stdlib-shadow`; its
+inputs are the Python files and the allowlist (`gate-inputs.toml`) ([ADR 0031](adr/0031-gate-steps-declare-their-inputs.md)).
 
 ## Architectural fitness rules (native, not OPA — ADR 0005)
 

@@ -9,6 +9,7 @@ from blueprint import gate_test
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
     from blueprint.testing import Repo
 
 
@@ -54,3 +55,52 @@ def test_a_failing_plan_is_not_a_pass(repo: Repo) -> None:
         return 3, ""
 
     assert gate_test.run(repo.root, receipts=None, lease_root=None, pytest_args="", execute=fake, env=repo.env) == 3
+
+
+def test_an_override_run_of_a_workspace_writes_no_receipts(repo: Repo) -> None:
+    """Pytest arguments (`-m slow`) change what runs: a receipt for them would let a later normal run skip a unit it never ran."""
+    repo.write("packages/a/pyproject.toml", '[project]\nname = "a"\n')
+    seen: list[str | None] = []
+
+    def fake(cmd: list[str], *, cwd: Path, stdin: str | None, env: dict[str, str]) -> tuple[int, str]:
+        seen.append(stdin)
+        return 0, "packages/a/tests\tk1\npackages/b/tests\tk2\n" if stdin is None else ""
+
+    assert gate_test.run(repo.root, receipts=None, lease_root=None, pytest_args="-m slow", execute=fake, env=repo.env) == 0
+    assert seen[1] == "packages/a/tests\t\npackages/b/tests\t\n"  # empty keys: any-gate never skips and never records them
+
+
+def test_a_normal_run_keeps_the_plans_keys(repo: Repo) -> None:
+    repo.write("packages/a/pyproject.toml", '[project]\nname = "a"\n')
+    seen: list[str | None] = []
+
+    def fake(cmd: list[str], *, cwd: Path, stdin: str | None, env: dict[str, str]) -> tuple[int, str]:
+        seen.append(stdin)
+        return 0, "packages/a/tests\tk1\n" if stdin is None else ""
+
+    gate_test.run(repo.root, receipts=None, lease_root=None, pytest_args=None, execute=fake, env=repo.env)
+    assert seen[1] == "packages/a/tests\tk1\n"
+
+
+def test_the_rest_of_the_command_line_after_two_dashes_is_the_pytest_arguments(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
+    import shlex  # noqa: PLC0415
+
+    from blueprint.__main__ import main  # noqa: PLC0415
+
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(gate_test, "run", lambda *a, **kw: seen.update(kw) or 0)
+    assert main(["gate", "test", "--repo", str(repo.root), "--", "-m", "slow and not net", "-k", "x"]) == 0
+    assert shlex.split(str(seen["pytest_args"])) == ["-m", "slow and not net", "-k", "x"]
+    seen.clear()
+    assert main(["gate", "test", "--repo", str(repo.root)]) == 0
+    assert seen["pytest_args"] is None
+
+
+def test_the_rendered_python_recipes_hand_their_arguments_to_blueprint_unsplit() -> None:
+    from blueprint import render  # noqa: PLC0415
+
+    text = (render._TEMPLATES / "python.just").read_text()
+    for recipe, verb in (("test", "test"), ("test-all", "test-all")):
+        block = text.split(f"\n{recipe} *args:\n", 1)[1].split("\n\n", 1)[0]
+        assert f'uv run blueprint gate {verb} -- "$@"' in block
+        assert "[positional-arguments]" in text.split(f"\n{recipe} *args:\n", 1)[0].rsplit("\n\n", 1)[1]

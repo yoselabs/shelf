@@ -17,14 +17,18 @@ from __future__ import annotations
 import re
 import shlex
 import sys
+import tomllib
 from pathlib import Path
+from typing import Any
 
-from blueprint import gate_py
+from blueprint import gate_py, images_gate, node_gate
 from blueprint.gate_graph import JUSTFILES
 from blueprint.profile import detect_stacks, detected_stack_roots
 
 FOLDER = ".blueprint"
 _TEMPLATES = Path(__file__).resolve().parent / "just"
+_STEP_DEFAULTS = Path(__file__).resolve().parent / "step_inputs.toml"
+INPUTS_PART = f"{FOLDER}/step-inputs.toml"
 _SETTING = "set allow-duplicate-recipes"
 _HEADER = (
     "# The gate runner is just (ADR 0023), pinned as the `rust-just` dev dependency: `uv run just check`.\n"
@@ -59,7 +63,19 @@ def _stack_parts(repo: Path) -> list[tuple[str, tuple[str, ...]]]:
 def parts(repo: Path) -> dict[str, str]:
     """`{path relative to the repo: text}` of every part this repo's stacks call for."""
     stack_parts = _stack_parts(repo)
-    steps = [*_COMMON_STEPS, *(step for _, group in stack_parts for step in group), *gate_py.extra_steps(repo)]
+    node = node_gate.plan(repo)
+    contracts = _import_contracts(repo)
+    images = images_gate.render(repo)
+    generated = gate_py.generated(repo)
+    steps = [
+        *_COMMON_STEPS,
+        *(step for name, group in stack_parts for step in (*group, *(("arch",) if name == "python" and contracts else ()))),
+        *(node.steps if node else ()),
+        *((images_gate.STEP,) if images else ()),
+        *(f"generated-{g['name']}" for g in generated),
+        *gate_py.extra_steps(repo),
+    ]
+    steps = list(dict.fromkeys(steps))
     whole: list[str] = [_WHOLE.get(s, s) for s in steps] if gate_py.release_gate(repo) else []
     base = (_TEMPLATES / "base.just").read_text()
     base = base.replace("@STEPS@", " ".join(f'"{s}"' for s in steps)).replace("@STEPS_ALL@", " ".join(f'"{s}"' for s in whole))
@@ -72,11 +88,85 @@ def parts(repo: Path) -> dict[str, str]:
             installs.append(f"cd {shlex.quote(folder)} && {command}" if folder != "." else command)
     base = base.replace("@TOOLS@\n", "".join(f"    {line}\n" for line in installs))
     rendered = {f"{FOLDER}/base.just": base}
+    if node:
+        rendered[f"{FOLDER}/node.just"] = node.text
+    if images:
+        rendered[f"{FOLDER}/images.just"] = images
+    if generated:
+        rendered[f"{FOLDER}/generated.just"] = _generated_part(generated)
+    if inputs := _step_inputs(steps, node.folder if node else ".", generated):
+        rendered[INPUTS_PART] = inputs
     for name, _ in stack_parts:
-        rendered[f"{FOLDER}/{name}.just"] = (_TEMPLATES / f"{name}.just").read_text()
+        text = (_TEMPLATES / f"{name}.just").read_text()
+        rendered[f"{FOLDER}/{name}.just"] = text + (
+            "\n" + (_TEMPLATES / "python_arch.just").read_text() if name == "python" and contracts else ""
+        )
     if not gate_py.release_gate(repo):
         rendered = _without_release_recipes(repo, rendered, steps)
     return rendered
+
+
+def _generated_inputs(entry: dict[str, Any]) -> list[str]:
+    """A `generated-<name>` step's default inputs: its outputs, what it reads and pyproject (the declaration); `*` if none declared."""
+    reads = [str(r) for r in entry.get("reads", [])]
+    if not reads:
+        return ["*"]
+    outputs = [f"{o}/*" if not Path(str(o)).suffix else str(o) for o in entry.get("outputs", [])]
+    return [*outputs, *reads, "*pyproject.toml"]
+
+
+def _generated_part(generated: list[dict[str, Any]]) -> str:
+    recipes = "\n\n".join(
+        f"# {g['name']}: what `{g['command']}` writes into a temp folder equals the committed "
+        f"{', '.join(map(str, g.get('outputs', [])))}.\n"
+        f"[group('gate')]\ngenerated-{g['name']}:\n    uv run python -I -m blueprint.generated {g['name']}"
+        for g in generated
+    )
+    return (
+        "# Rendered by `blueprint gate render` -- never edit; a recipe of the same name in the repo's justfile replaces it\n"
+        "# only through a declared override (gate.recipe-shadowing).\n"
+        "# Generated files are current: each `[[tool.blueprint.gate.generated]]` entry is one step.\n\n" + recipes + "\n"
+    )
+
+
+def _import_contracts(repo: Path) -> bool:
+    """Whether the repo declares import-linter contracts: `[tool.importlinter]` in the root pyproject.toml, or a `.importlinter` file."""
+    if (repo / ".importlinter").is_file():
+        return True
+    pyproject = repo / "pyproject.toml"
+    if not pyproject.is_file():
+        return False
+    tool = tomllib.loads(pyproject.read_text()).get("tool", {})
+    return isinstance(tool, dict) and "importlinter" in tool
+
+
+def _step_inputs(steps: list[str], node_folder: str = ".", generated: list[dict[str, Any]] | None = None) -> str:
+    """The default input globs of the steps this gate runs that the blueprint knows, in the shape of the repo's `gate-inputs.toml`."""
+    table = tomllib.loads(_STEP_DEFAULTS.read_text())
+    wide = table.pop("wide", {})
+    for g in generated or []:
+        table[f"generated-{g['name']}"] = _generated_inputs(g)
+    known = [s for s in dict.fromkeys(steps) if isinstance(table.get(s), list)]
+    if not known:
+        return ""
+    lines = [
+        "# Rendered by `blueprint gate render` -- never edit. The files each gate step reads (any-gate):",
+        "# a step none of whose inputs changed is not started.",
+        "# The repo's gate-inputs.toml holds only its exceptions: a list there widens a step, `[narrow]` with a reason narrows it.",
+    ]
+    glob = node_gate.inputs_folder(node_folder)
+    for s in known:
+        globs = list(dict.fromkeys(glob if g == "@NODE@/*" else g for g in table[s]))
+        lines.append(f"{s} = [{', '.join(_quote(g) for g in (['*'] if '*' in globs else globs))}]")
+    reasons = [s for s in known if s in wide]
+    if reasons:
+        lines += ["", "[wide]", *(f"{s} = {_quote(wide[s])}" for s in reasons)]
+    return "\n".join(lines) + "\n"
+
+
+def _quote(text: str) -> str:
+    """A TOML basic string for `text` (a glob or a reason: no control characters)."""
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def _without_release_recipes(repo: Path, rendered: dict[str, str], steps: list[str]) -> dict[str, str]:
@@ -146,7 +236,7 @@ def write(repo: Path) -> list[str]:
     lines = [] if existing else [_HEADER]
     if _SETTING not in existing:
         lines.append(_SETTING)
-    lines += [_imports(name) for name in rendered if _imports(name) not in existing]
+    lines += [_imports(name) for name in rendered if name.endswith(".just") and _imports(name) not in existing]
     if lines:
         head = "\n".join(lines).rstrip("\n") + "\n"
         justfile.write_text(head + ("\n" + existing if existing else ""))
@@ -156,7 +246,9 @@ def write(repo: Path) -> list[str]:
 
 def _present(repo: Path) -> list[str]:
     folder = repo / FOLDER
-    return sorted(f"{FOLDER}/{p.name}" for p in folder.glob("*.just")) if folder.is_dir() else []
+    return (
+        sorted(f"{FOLDER}/{p.name}" for pattern in ("*.just", "step-inputs.toml") for p in folder.glob(pattern)) if folder.is_dir() else []
+    )
 
 
 def drift(repo: Path) -> list[str]:
@@ -172,7 +264,7 @@ def drift(repo: Path) -> list[str]:
     found += [f"  {name}: no stack of this repo renders it" for name in sorted(set(_present(repo)) - set(rendered))]
     justfile = _justfile(repo)
     text = justfile.read_text() if justfile.is_file() else ""
-    found += [f"  {justfile.name}: does not {_imports(name)}" for name in rendered if _imports(name) not in text]
+    found += [f"  {justfile.name}: does not {_imports(name)}" for name in rendered if name.endswith(".just") and _imports(name) not in text]
     if _SETTING not in text:
         found.append(f"  {justfile.name}: does not `{_SETTING}` (a recipe of its own could not replace a base one)")
     return found

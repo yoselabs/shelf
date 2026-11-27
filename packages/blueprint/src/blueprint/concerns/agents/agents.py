@@ -166,6 +166,11 @@ def _behind(ctx: Context, branches: list[str]) -> list[str]:
     return _aged(ctx, branches, "{b}..{base}", "behind main since")
 
 
+def _merging_main(ctx: Context) -> bool:
+    """Whether this worktree is in the middle of a merge (MERGE_HEAD exists): it is taking main's commits right now."""
+    return bool((ctx.git("rev-parse", "-q", "--verify", "MERGE_HEAD") or "").strip())
+
+
 def _stale(ctx: Context, branches: list[str]) -> list[str]:
     """Each branch with work unmerged, or main commits missing, past the limit, as a line saying how long."""
     return [*_unmerged(ctx, branches), *_behind(ctx, branches)]
@@ -174,7 +179,7 @@ def _stale(ctx: Context, branches: list[str]) -> list[str]:
 @check(
     "agents.worktrees-in-sync",
     "the worktree this agent works in merges into main and takes main's changes within a day",
-    version=2,
+    version=3,
     layer="agent",
 )
 def worktrees_in_sync(ctx: Context) -> Finding:
@@ -188,13 +193,18 @@ def worktrees_in_sync(ctx: Context) -> Finding:
         return not_applicable("this is not a linked worktree (other sessions' worktrees: agents.other-worktrees, in the audit)")
     # While prek runs the pre-push hooks the work is being pushed: that is the step that lands it, so its age is not held against it.
     pushing = "PRE_COMMIT_TO_REF" in ctx.env
-    if stale := (_behind(ctx, [branch]) if pushing else _stale(ctx, [branch])):
+    # A merge of main in progress is the fix for being behind: the missing commits are arriving, so they are not held against it.
+    merging = _merging_main(ctx)
+    unmerged = [] if pushing else [f"{line} -> land it into main" for line in _unmerged(ctx, [branch])]
+    behind = [] if merging else [f"{line} -> merge main: `git merge {_merge_base_ref(ctx)}`" for line in _behind(ctx, [branch])]
+    if stale := [*unmerged, *behind]:
         return failing(
             "; ".join(stale),
             "land this worktree's work into main, or take main's changes into it (merge main), in this session",
             FixedBy.AGENT,
         )
-    return passing(f"{branch} is within {_SYNC_HOURS}h of main both ways")
+    note = ", merging main now" if merging else ""
+    return passing(f"{branch} is within {_SYNC_HOURS}h of main both ways{note}")
 
 
 @check(

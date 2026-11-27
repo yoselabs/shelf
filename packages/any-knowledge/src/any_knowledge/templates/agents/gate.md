@@ -52,9 +52,27 @@ Makefile fails `gate.runner`. Three rules keep the file readable by blueprint, w
 
 ## Steps declare their inputs
 
-Each step `check` hands to `steps` lists the files it reads in `gate-inputs.toml` (`lint = ["*.py", "*.toml"]`; `["*"]` for the whole
-repo). A step none of whose inputs changed since the upstream merge-base is not started: no process, no file read. `check-all` runs
-every step (`steps-all`). A step with no entry always runs, and `gate.step-inputs` says so (shelf ADR 0031).
+Each step `check` hands to `steps` has the files it reads: blueprint's defaults per stack (rendered to `.blueprint/step-inputs.toml`) plus
+the repo's exceptions in `gate-inputs.toml` (`lint = ["*.cfg"]` widens a default; a step of the repo's own declares its globs; `["*"]` for
+the whole repo, with a `[wide]` reason). Narrowing a default needs `[narrow] <step> = "<why>"`. A step none of whose inputs changed since
+the upstream merge-base is not started: no process, no file read. `check-all` runs every step (`steps-all`). A step with no default and no
+entry always runs, and `gate.step-inputs` says so (shelf ADR 0031).
+
+## Generated files are current
+
+A file a generator writes (a stylesheet, a schema, samples) is committed, so a change to its inputs must come with its regeneration. Declare
+each generator in `pyproject.toml`; blueprint renders one `generated-<name>` step per entry, which runs the command into a temp folder and
+compares:
+
+```toml
+[[tool.blueprint.gate.generated]]
+name = "contract"
+command = "uv run python scripts/contract.py --out {out}"   # {out}: a folder to write the outputs into, at their repo paths
+outputs = ["contract"]                                      # files or folders
+reads = ["src/*", "scripts/*"]                              # optional, fnmatch: what it reads; absent: the step runs on any change
+```
+
+A file that differs, is missing, or is left over (in an output folder, not generated) fails and names the fix: the same command with `{out}` as `.`.
 
 ## One box, many gates
 

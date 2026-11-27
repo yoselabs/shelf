@@ -81,10 +81,14 @@ gate = '(?:c8|nyc)[^\n]*--check-coverage'
 
 [[role]]
 role = "spelling"
-tool = "typos (crate-ci) with a committed config; splits identifiers"
+tool = "typos (crate-ci) or codespell with a committed config"
 install = "typos.toml with [default.extend-words] for domain terms; the gate runs `typos`"
-config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
+config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }, { path = ".codespellrc" }, { path = "pyproject.toml", contains = "[tool.codespell]" }] }]
 gate = "typos"
+
+[[role.alternative]]
+label = "codespell (a committed `.codespellrc` or `[tool.codespell]`)"
+gate = '\bcodespell\b'
 
 [[role]]
 role = "architecture"
@@ -99,4 +103,4 @@ gate = "depcruise"
 role = "hooks"
 tool = "prek runs biome and typos on staged files (pre-commit); just check on pre-push"
 install = "add local hooks `biome check --staged` style entry and typos to .pre-commit-config.yaml after bd's; the gate on pre-push"
-config = [{ path = ".pre-commit-config.yaml", contains = "biome" }, { path = ".pre-commit-config.yaml", contains = "typos" }]
+config = [{ path = ".pre-commit-config.yaml", contains = "biome" }, { any = [{ path = ".pre-commit-config.yaml", contains = "typos" }, { path = ".pre-commit-config.yaml", contains = "codespell" }] }]

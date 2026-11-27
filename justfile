@@ -56,22 +56,10 @@ tag-check:
 
 # No tracked `*.py` file or package folder is named like a standard library module where a script run puts it first on sys.path (a consumer's
 # `queue.py` in scripts/ broke 729 jobs, 2026-11: `module 'queue' has no attribute 'SimpleQueue'`). Reasoned exceptions: .config/stdlib-shadow/allow.toml.
+# Its inputs: the Python files (a step of the repo's own, so gate-inputs.toml declares it).
 [group('gate')]
 stdlib-shadow:
     python3 -I tools/stdlib_shadow/stdlib_shadow.py
-
-# the import graph against the contracts in [tool.importlinter] (pyproject.toml): no package
-# imports a consumer app, packages stay independent except their declared workspace edges.
-# Banned APIs are ruff's TID251 and ride `lint`. A violation prints the importing line. Also runs `stdlib-shadow` (both read the Python
-# file tree and finish in seconds): both always run, the step fails when either does.
-[group('gate')]
-arch:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    rc=0
-    uv run lint-imports || rc=1
-    python3 -I tools/stdlib_shadow/stdlib_shadow.py || rc=1
-    exit "$rc"
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. Run

@@ -1,6 +1,6 @@
 [project]
 name = "any-gate"
-version = "0.5.0"
+version = "0.6.0"
 description = "Stop re-running what already passed: green results remembered under a key of exactly what they ran on, the units left run through a stack's runner under a lease and limits that stop a hang."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

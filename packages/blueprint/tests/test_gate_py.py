@@ -146,14 +146,13 @@ def test_test_all_has_a_default_floor(repo: Repo) -> None:
 
 
 @pytest.mark.parametrize("args", ['["-q"]', '["-n", "2", "--dist", "loadgroup", "-q"]'])
-def test_test_all_uses_configured_arguments_and_marks_without_duplicate_workers(repo: Repo, args: str) -> None:
+def test_test_all_uses_configured_arguments_without_duplicate_workers(repo: Repo, args: str) -> None:
     _repo(repo)
     repo.write("pyproject.toml", _PYPROJECT.replace("floor = 80", f'floor = 80\npytest-args = {args}\nmarks = "not slow"'))
     command = gate_py.test_all_command(repo.root, repo.env)
     assert command.count("-n") == 1
     assert command[command.index("-n") + 1] == ("2" if '"2"' in args else "auto")
     assert "-q" in command
-    assert command[command.index("-m", command.index("pytest")) + 1] == "not slow"
 
 
 def test_test_all_adds_configured_environment_to_the_supplied_environment(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -191,3 +190,19 @@ def test_the_cli_exposes_the_steps(repo: Repo) -> None:
     _repo(repo)
     assert main(["gate", "format", "--repo", str(repo.root)]) == 0
     assert main(["gate", "lint", "--repo", str(repo.root)]) == 0
+
+
+def test_test_all_runs_every_test_whatever_marks_the_per_commit_run_skips(repo: Repo) -> None:
+    _repo(repo)
+    repo.write("pyproject.toml", _PYPROJECT.replace("floor = 80", 'floor = 80\nmarks = "not slow"'))
+    command = gate_py.test_all_command(repo.root, repo.env)
+    assert "-m" not in command[command.index("pytest") :]
+    assert "--cov-fail-under=80" in command
+
+
+def test_test_all_with_pytest_arguments_passes_them_through_and_drops_the_floor(repo: Repo) -> None:
+    _repo(repo)
+    command = gate_py.test_all_command(repo.root, repo.env, ("-m", "slow", "-k", "wheel"))
+    assert command[-4:] == ["-m", "slow", "-k", "wheel"]
+    assert "--cov-fail-under=0" in command  # a partial run cannot meet a whole-repo floor
+    assert not any(arg.startswith("--cov-fail-under=") and arg != "--cov-fail-under=0" for arg in command)

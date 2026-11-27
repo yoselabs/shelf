@@ -25,6 +25,7 @@ def _calls(repo: Repo, body: str) -> tuple[Verdict, str]:
         "uv run blueprint gate test --repo . --pytest-args=''",
         "python3 -m blueprint check --repo . --json",
         "uv run blueprint gate preset",
+        'uv run blueprint gate test -- -m slow --maxfail=1 "$@"',  # after `--` the words are pytest's, not blueprint's
         "echo nothing to see",
     ],
 )
@@ -65,3 +66,9 @@ def test_the_engine_run_from_a_shelf_clone_fails(repo: Repo, body: str) -> None:
     verdict, evidence = _calls(repo, body)
     assert verdict is Verdict.FAILING
     assert "shelf clone" in evidence
+
+
+def test_a_flag_before_the_double_dash_is_still_judged(repo: Repo) -> None:
+    verdict, evidence = _calls(repo, "uv run blueprint gate test --nonsense -- -m slow")
+    assert verdict is Verdict.FAILING
+    assert "--nonsense" in evidence

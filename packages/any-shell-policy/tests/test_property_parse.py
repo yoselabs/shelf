@@ -24,8 +24,9 @@ def test_parse_of_joined_argv_is_that_argv(argv: list[str]) -> None:
 
 
 def _keyword_or_assign_head(argv: list[str]) -> bool:
-    # A leading `if`, `FOO=1`, `for`... is shell syntax, not an argument: the property is about plain commands.
-    return argv[0] in _SYNTAX or "=" in argv[0]
+    # A leading `if`, `FOO=1`, `for`... is shell syntax, not an argument, and `eval X` is parsed as the script X:
+    # the property is about plain commands.
+    return argv[0] in _SYNTAX or "=" in argv[0] or (argv[0] == "eval" and len(argv) > 1)
 
 
 @given(st.lists(_WORD, min_size=1, max_size=4), st.sampled_from(_SEPARATORS))

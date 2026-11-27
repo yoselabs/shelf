@@ -20,9 +20,12 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from blueprint import gate_units
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 DEFAULT_FLOOR = 65
 LINT_CONFIGS = ("pyproject.toml", "ruff.toml", ".ruff.toml")
@@ -51,6 +54,13 @@ def _paths(repo: Path, key: str) -> list[str]:
 def extra_steps(repo: Path) -> tuple[str, ...]:
     """The steps `[tool.blueprint.gate] steps` adds to `check`, in order."""
     return tuple(_paths(repo, "steps"))
+
+
+def generated(repo: Path) -> list[dict[str, Any]]:  # Any: parsed TOML
+    """The `[[tool.blueprint.gate.generated]]` entries that name a generator, a command with `{out}` and outputs."""
+    raw: object = settings(repo).get("gate", {}).get("generated", [])
+    entries: list[Any] = raw if isinstance(raw, list) else []
+    return [e for e in entries if isinstance(e, dict) and e.get("name") and "{out}" in str(e.get("command", "")) and e.get("outputs")]
 
 
 def release_gate(repo: Path) -> bool:
@@ -144,8 +154,11 @@ def lease_root(env: dict[str, str]) -> Path:
     return Path(env.get("GATE_LEASE_ROOT") or Path(cache) / "gate-leases")
 
 
-def test_all_command(repo: Path, env: dict[str, str]) -> list[str]:
-    """pytest over every test, with coverage and its floor; behind the lease when `any_lease` is installed."""
+def test_all_command(repo: Path, env: dict[str, str], extra: Sequence[str] = ()) -> list[str]:
+    """pytest over every test (`marks` that `check` skips run too), with coverage and its floor; behind `any_lease` when installed.
+
+    `extra` is the caller's pytest arguments (`-m slow`, `-k name`): the run is then partial, so the whole-repo floor is off (0).
+    """
     config = settings(repo)
     floor = config.get("test", {}).get("floor", config.get("coverage-report", {}).get("fail_under", DEFAULT_FLOOR))
     test = gate_units.read_config(repo)
@@ -159,8 +172,9 @@ def test_all_command(repo: Path, env: dict[str, str]) -> list[str]:
         *shuffle,
         "--cov",
         "--cov-report=term-missing",
-        f"--cov-fail-under={floor:g}",
-        *test.arguments(),
+        f"--cov-fail-under={0 if extra else floor:g}",
+        *test.pytest_args,
+        *extra,
     ]
     if not _lease_installed():
         return pytest
@@ -172,6 +186,6 @@ def _lease_installed() -> bool:
     return importlib.util.find_spec("any_lease") is not None
 
 
-def test_all(repo: Path, env: dict[str, str]) -> int:
+def test_all(repo: Path, env: dict[str, str], extra: Sequence[str] = ()) -> int:
     test_env = {**env, **gate_units.read_config(repo).env}
-    return subprocess.run(test_all_command(repo, test_env), cwd=repo, env=test_env, check=False, timeout=_TIMEOUT).returncode
+    return subprocess.run(test_all_command(repo, test_env, extra), cwd=repo, env=test_env, check=False, timeout=_TIMEOUT).returncode

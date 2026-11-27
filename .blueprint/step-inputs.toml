@@ -1,0 +1,17 @@
+# Rendered by `blueprint gate render` -- never edit. The files each gate step reads (any-gate):
+# a step none of whose inputs changed is not started.
+# The repo's gate-inputs.toml holds only its exceptions: a list there widens a step, `[narrow]` with a reason narrows it.
+blueprint = ["*"]
+secrets = ["*"]
+lint-changed = ["*"]
+typecheck = ["*.py", "*.pyi", "*pyproject.toml", "*uv.lock", "*pyrefly.toml", ".python-version"]
+deps = ["*.py", "*.pyi", "*pyproject.toml", "*uv.lock", ".python-version"]
+test = ["*"]
+arch = ["*.py", "*.pyi", "*pyproject.toml", "*uv.lock", "*.importlinter"]
+scripts = ["*.sh", "*.shellcheckrc"]
+
+[wide]
+blueprint = "reads-everything: guard, preset, the render check and the audit read repo-wide facts"
+secrets = "change-set: scans the commits since the base"
+lint-changed = "change-set: codespell checks the changed files, whatever they are"
+test = "self-keyed: each unit and the reach selection key their own inputs"

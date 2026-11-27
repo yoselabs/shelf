@@ -1002,7 +1002,7 @@ exclude_lines = [
 release-gate = true
 lint-paths = ["packages", "tests", "tools", "conftest.py"]
 spell-paths = ["packages", "tests", "tools", "docs", "catalog", "use-cases", "ledger", "README.md", "AGENTS.md", "conftest.py"]
-steps = ["scripts", "arch", "tag-check", "dep-audit"]
+steps = ["scripts", "stdlib-shadow", "tag-check", "dep-audit"]
 
 [tool.blueprint.test]
 floor = 65

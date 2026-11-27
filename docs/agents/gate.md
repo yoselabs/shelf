@@ -50,6 +50,22 @@ Makefile fails `gate.runner`. Three rules keep the file readable by blueprint, w
 - Loops and multi-line shell go in a shebang recipe (`#!/usr/bin/env bash`, then `set -euo pipefail`); just has no loops.
 - A dependency, or a recipe argument that names a recipe (`check: (steps "lint")`), is an edge in the graph.
 
+## Generated files are current
+
+A file a generator writes (a stylesheet, a schema, samples) is committed, so a change to its inputs must come with its regeneration. Declare
+each generator in `pyproject.toml`; blueprint renders one `generated-<name>` step per entry, which runs the command into a temp folder and
+compares:
+
+```toml
+[[tool.blueprint.gate.generated]]
+name = "contract"
+command = "uv run python scripts/contract.py --out {out}"   # {out}: a folder to write the outputs into, at their repo paths
+outputs = ["contract"]                                      # files or folders
+reads = ["src/*", "scripts/*"]                              # optional, fnmatch: what it reads; absent: the step runs on any change
+```
+
+A file that differs, is missing, or is left over (in an output folder, not generated) fails and names the fix: the same command with `{out}` as `.`.
+
 ## One box, many gates
 
 Several agents share one machine, and each test run takes every core: on 2026-10-20 four gates at once on a 6-CPU box
