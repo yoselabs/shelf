@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.15.0
+
+- The gate has fewer steps. `blueprint` now runs the commit guard, the linter preset check, the render check and the audit in one process (`blueprint gate blueprint`); `lint-changed` (and `lint`) also run codespell; the standard list drops `guard`, `preset`, `render` and `spell-changed` (their recipes stay for hooks and humans). A consumer's `gate-inputs.toml` keys for dropped steps match nothing (an unkeyed step always runs); re-key `lint-changed` to `*` and `blueprint` to `*`. `gate.runs-blueprint` accepts `blueprint gate blueprint`; the python-uv spelling row accepts `blueprint gate lint`. Corpus diff against 0.14.2: no `passing -> failing`; the moves are the linter/tests rows below and `gate.wide-inputs-have-a-reason` on a2kay (absent -> failing: its six `*` steps need `[wide]` entries).
+- The steps runner (any-gate 0.5.0): SIGTERM and SIGHUP stop every step's tree; a step the gate stopped is a flag, not exit 125; a crashed step is a failed step; `GATE_FAIL_FAST`; a clean tree no gate has passed runs every declared step once.
 
 - `gate.wide-inputs-have-a-reason` (new, warns until the next audit): a step declared `["*"]` in gate-inputs.toml needs a `[wide]` entry `<step> = "<kind>: <why>"`, kind one of change-set, self-keyed, reads-everything, outside-files. It does not guess what a recipe reads.
 - The audit reads the justfile once per run (a2kay: 30 processes and 2.4 s became 20 and 1.8 s); the steps runner shows a failure as it lands and takes `--fail-fast` and `--step-limit` (any-gate 0.4.0).
