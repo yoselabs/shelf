@@ -1,7 +1,7 @@
 ---
 id: 0018
 title: A blueprint checkpoint is enforced from the pin; a waiver is the only way to wait
-statement: The pinned blueprint tag decides which checkpoints a repo is judged by, so a new checkpoint fails like any other after a pin bump; a repo waives one in its own config with a reason and an expiry date, and an expired waiver fails.
+statement: The pinned blueprint tag decides which checkpoints judge a repo, so a new one fails after a pin bump; a repo waives one in its config with a reason and an expiry, and an expired waiver fails.
 concerns: [gate]
 status: accepted
 decided_by: owner
