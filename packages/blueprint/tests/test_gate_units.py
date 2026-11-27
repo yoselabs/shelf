@@ -509,3 +509,79 @@ def test_a_repo_with_no_floor_skips_combine(repo: Repo, tmp_path: Path, monkeypa
     )
     assert code == 0
     assert called == []
+
+
+# ── globs in `paths` and the `rest` unit ─────────────────────────────────────────────────────────────────────────────────────────────
+
+_ROOT_FILES = ("tests/test_a.py", "tests/test_b.py", "tests/b_test.py")
+
+
+def _loose(repo: Repo, units: str) -> gate_units.Config:
+    """`_app` plus loose test files under `tests/`, with `units` as the repo's unit table."""
+    _app(repo)
+    for path in _ROOT_FILES:
+        repo.write(path, "from app.core import add\n\ndef test_x():\n    assert add(1, 1) == 2\n")
+    repo.write("tests/helpers.py", "X = 1\n")
+    repo.write(
+        "pyproject.toml",
+        _PYPROJECT.split("[tool.blueprint.test.units.core]", maxsplit=1)[0] + units + "\n[tool.coverage.run]\nsource = ['src/app']\n",
+    )
+    config = gate_units.load(repo.root)
+    assert config is not None
+    return config
+
+
+def test_a_glob_in_paths_names_every_match_sorted(repo: Repo) -> None:
+    config = _loose(repo, '[tool.blueprint.test.units.root]\npaths = ["tests/test_*.py", "tests/*_test.py"]\n')
+    assert config.problems == ()
+    assert config.units[0].paths == ("tests/b_test.py", "tests/test_a.py", "tests/test_b.py")
+
+
+def test_a_globbed_unit_has_the_key_of_the_hand_listed_one(repo: Repo) -> None:
+    globbed = _loose(repo, '[tool.blueprint.test.units.root]\npaths = ["tests/test_*.py", "tests/*_test.py"]\n')
+    by_glob = gate_units.keys(repo.root, globbed)
+    listed = _loose(repo, '[tool.blueprint.test.units.root]\npaths = ["tests/b_test.py", "tests/test_a.py", "tests/test_b.py"]\n')
+    assert gate_units.keys(repo.root, listed) == by_glob
+
+
+def test_a_glob_that_matches_nothing_is_a_problem_not_an_empty_unit(repo: Repo) -> None:
+    config = _loose(repo, '[tool.blueprint.test.units.root]\npaths = ["tests/nothing_*.py"]\n')
+    assert any("matches nothing" in p and "root" in p for p in config.problems)
+
+
+def test_the_rest_unit_is_every_test_file_no_other_unit_claims(repo: Repo) -> None:
+    config = _loose(
+        repo,
+        '[tool.blueprint.test.units.core]\npaths = ["tests/core"]\n[tool.blueprint.test.units.rest]\nrest = true\n'
+        '[tool.blueprint.test.units.ui]\npaths = ["tests/ui", "tests/test_b.py"]\n',
+    )
+    assert config.problems == ()
+    rest = next(u for u in config.units if u.name == "rest")
+    assert rest.paths == ("tests/b_test.py", "tests/test_a.py")  # the folders and the file other units name are not in it
+    assert gate_units.uncovered_test_folders(repo.root, config) == []
+
+
+def test_a_new_test_file_joins_the_rest_unit_and_changes_only_its_key(repo: Repo) -> None:
+    units = (
+        '[tool.blueprint.test.units.core]\npaths = ["tests/core"]\n[tool.blueprint.test.units.rest]\nrest = true\n'
+        '[tool.blueprint.test.units.ui]\npaths = ["tests/ui"]\n'
+    )
+    config = _loose(repo, units)
+    before = gate_units.keys(repo.root, config)
+    repo.write("tests/test_new.py", "def test_new():\n    assert True\n")
+    after_config = gate_units.load(repo.root)
+    assert after_config is not None
+    after = gate_units.keys(repo.root, after_config)
+    assert "tests/test_new.py" in next(u for u in after_config.units if u.name == "rest").paths
+    assert after["rest"] != before["rest"]
+    assert (after["core"], after["ui"]) == (before["core"], before["ui"])
+
+
+def test_a_rest_unit_whose_files_are_all_claimed_is_no_unit(repo: Repo) -> None:
+    config = _loose(repo, '[tool.blueprint.test.units.all]\npaths = ["tests"]\n[tool.blueprint.test.units.rest]\nrest = true\n')
+    assert [u.name for u in config.units] == ["all"]
+
+
+def test_only_one_rest_unit_is_allowed(repo: Repo) -> None:
+    config = _loose(repo, "[tool.blueprint.test.units.a]\nrest = true\n[tool.blueprint.test.units.b]\nrest = true\n")
+    assert any("rest" in p for p in config.problems)

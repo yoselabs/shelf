@@ -50,12 +50,20 @@ env = { COVERAGE_CORE = "sysmon" }
 [tool.blueprint.test.units.ui]
 paths = ["tests/ui"]
 reads = ["src/app/ui/*.js"]   # files tests read that no import names (JS run under node, fixtures)
+
+[tool.blueprint.test.units.root]
+rest = true                   # every test file and folder under the test roots that no other unit claims
 ```
 
 `marks = "not slow"` keeps `slow` tests out of the per-commit pass, not out of `check`: a second pass runs `-m slow` for each suite whose key has no slow-green
 receipt (`slow-gate-receipts.json` beside the normal receipts; the unit runner keeps no coverage data for it), so editing a slow test, or code it
 reaches, runs it, and a change the suite cannot see (docs) runs nothing. A repo whose suites have no key (a bare `tests` folder) runs slow tests only in
 `check-all`. `test-all` runs every mark and skips the pass.
+
+A unit's `paths` may hold globs (`tests/test_*.py`): each is replaced by its sorted matches when the settings are read, so a globbed unit has the key of
+the hand-listed one, and a glob that matches nothing is a problem. A unit with `rest = true` owns the test files and folders under the test roots
+(`testpaths`, `tests`) that no other unit names, so a new test file joins it without editing the table; it is no unit when nothing is left, and only
+one may be `rest`.
 
 `pytest-args` and `marks` apply to every pytest run, before the CLI's `--pytest-args`.
 `env` adds string values to the test processes' inherited environment; the coverage runner's
