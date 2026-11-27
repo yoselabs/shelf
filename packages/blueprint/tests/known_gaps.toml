@@ -67,37 +67,7 @@ direction = "passing"
 bead = "shelf-fkx.11"
 
 [[gap]]
-id = "stack.compose.formatter"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
 id = "stack.compose.hooks"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "stack.compose.linter"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "stack.compose.spelling"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "stack.compose.types"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "stack.dockerfile.dependencies"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
-id = "stack.dockerfile.formatter"
 direction = "passing"
 bead = "shelf-fkx.11"
 

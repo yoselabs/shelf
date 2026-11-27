@@ -1,14 +1,20 @@
 """Which gate steps a change can affect: each step declares the files it reads, a step whose inputs did not change does no work.
 
-The declaration is `gate-inputs.toml` at the repo root, plain text, one key per step (the recipe's name) and a list of globs
-(fnmatch on the whole path, `*` crosses `/`, as in `any_gate.changed`):
+Two files, one shape: one key per step (the recipe's name) and a list of globs (fnmatch on the whole path, `*` crosses `/`, as in
+`any_gate.changed`):
 
     lint = ["*.py", "pyproject.toml"]
     test = ["*"]
 
-A step with no entry always runs (it declared nothing, so it may read anything). Everything runs when the changed files cannot be told
-(no base, git failed), when `gate-inputs.toml` itself or the gate's own files changed (`justfile`, `.blueprint/*`), or when asked for
-everything (`check-all`). A step skipped here is never started: no process, no file read beyond `gate-inputs.toml` and git's answer.
+`.blueprint/step-inputs.toml` is the blueprint's DEFAULT for each step it renders (per stack, rendered with the justfile parts). The
+repo's `gate-inputs.toml` holds only its exceptions: a list there WIDENS the step's default (the union); a step the blueprint knows
+nothing about (a repo's own) declares its inputs there. A repo may NARROW a step only with a reason, `[narrow] step = "why"`: then
+its own list replaces the default (the audit fails a `[narrow]` entry with no reason).
+
+A step with no default and no entry always runs (it declared nothing, so it may read anything). Everything runs when the changed
+files cannot be told (no base, git failed), when either file or the gate's own files changed (`justfile`, `.blueprint/*`), or when
+asked for everything (`check-all`). A step skipped here is never started: no process, no file read beyond the two files and git's
+answer.
 """
 
 from __future__ import annotations
@@ -24,17 +30,29 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 FILE = "gate-inputs.toml"
+DEFAULTS = ".blueprint/step-inputs.toml"
 # The gate's own definition: a change to it can change what any step does, so every step runs.
-_DEFINITION = (FILE, "justfile", "Justfile", ".blueprint/*")
+_DEFINITION = (FILE, DEFAULTS, "justfile", "Justfile", ".blueprint/*")
+
+
+def _load(path: Path) -> dict[str, object]:
+    return tomllib.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+
+
+def _lists(data: dict[str, object]) -> dict[str, list[str]]:
+    return {name: [str(g) for g in globs] for name, globs in data.items() if isinstance(globs, list)}
 
 
 def declared(repo: Path) -> dict[str, list[str]]:
-    """Step name -> globs, from `gate-inputs.toml`; empty when there is no file."""
-    path = repo / FILE
-    if not path.is_file():
-        return {}
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
-    return {name: [str(g) for g in globs] for name, globs in data.items() if isinstance(globs, list)}
+    """Step name -> globs: the blueprint's defaults widened by the repo's list; a `[narrow]`ed step takes the repo's list alone."""
+    effective = _lists(_load(repo / DEFAULTS))
+    own = _load(repo / FILE)
+    narrowed = own.get("narrow")
+    narrow = set(narrowed) if isinstance(narrowed, dict) else set()
+    for name, globs in _lists(own).items():
+        base = [] if name in narrow else effective.get(name, [])
+        effective[name] = [*base, *(g for g in globs if g not in base)]
+    return effective
 
 
 def unaffected(repo: Path, names: Sequence[str], recorded: Callable[[], bool] = lambda: False) -> dict[str, str]:

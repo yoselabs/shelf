@@ -6,13 +6,14 @@ import os
 import shutil
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
 from any_gate import inputs
 
-REPO_INPUTS = Path(__file__).resolve().parents[3] / inputs.FILE
+ROOT = Path(__file__).resolve().parents[3]
+REPO_INPUTS = ROOT / inputs.FILE
+DEFAULTS = ROOT / inputs.DEFAULTS
 # A stand-in for `just`: records each step it is asked to run, one line per process, in $RUNS.
 FAKE = '#!/bin/sh\necho "$1" >> "$RUNS"\n'
 # A stand-in for `git` ahead of the real one on PATH: records each process, then runs the real git.
@@ -36,6 +37,8 @@ def fresh(tmp_path: Path) -> Path:
     work.mkdir()
     _git(work, "init", "-q", "-b", "main")
     shutil.copy(REPO_INPUTS, work / inputs.FILE)
+    (work / ".blueprint").mkdir()
+    shutil.copy(DEFAULTS, work / inputs.DEFAULTS)
     (work / "a.py").write_text("x\n")
     _git(work, "add", "-A")
     _git(work, "commit", "-q", "-m", "base")
@@ -79,7 +82,7 @@ def _steps(clone: Path, tmp_path: Path, *names: str, flags: tuple[str, ...] = ()
     return read(runs), (gits.read_text().splitlines() if gits.is_file() else [])
 
 
-STEPS = sorted(name for name, value in tomllib.loads(REPO_INPUTS.read_text()).items() if isinstance(value, list))  # [wide] is a table
+STEPS = sorted(inputs.declared(ROOT))  # the defaults plus the repo's exceptions
 
 
 def test_the_gates_own_steps_are_all_declared() -> None:
@@ -158,3 +161,59 @@ def test_moving_a_file_out_of_a_steps_folder_still_starts_that_step(clone: Path)
     assert "ui" in inputs.unaffected(clone, ["ui"], lambda: True)  # pushed: nothing changed since the base, the step is skipped
     _git(clone, "mv", "ui/x.ts", "docs_x.ts")
     assert inputs.unaffected(clone, ["ui"]) == {}  # the old path is a changed input of `ui`
+
+
+def _repo_with(tmp_path: Path, defaults: str | None, repo_file: str | None) -> Path:
+    """A clone with the given default and repo declaration files committed; one gate has passed it."""
+    origin, work = tmp_path / "o.git", tmp_path / "w"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+    work.mkdir()
+    _git(work, "init", "-q", "-b", "main")
+    if defaults is not None:
+        (work / ".blueprint").mkdir()
+        (work / inputs.DEFAULTS).write_text(defaults)
+    if repo_file is not None:
+        (work / inputs.FILE).write_text(repo_file)
+    (work / "a.py").write_text("x\n")
+    _git(work, "add", "-A")
+    _git(work, "commit", "-q", "-m", "base")
+    _git(work, "remote", "add", "origin", str(origin))
+    _git(work, "push", "-q", "-u", "origin", "main")
+    _green(work)
+    return work
+
+
+def test_a_repo_with_no_declaration_file_skips_on_the_rendered_defaults(tmp_path: Path) -> None:
+    work = _repo_with(tmp_path, 'typecheck = ["*.py"]\nscripts = ["*.sh"]\n', None)
+    (work / "b.py").write_text("y\n")
+    runs, _ = _steps(work, tmp_path, "typecheck", "scripts")
+    assert runs == ["typecheck"]
+
+
+def test_a_repo_list_widens_the_default_and_never_narrows_it(tmp_path: Path) -> None:
+    work = _repo_with(tmp_path, 'typecheck = ["*.py"]\n', 'typecheck = ["*.cfg"]\n')
+    assert inputs.declared(work)["typecheck"] == ["*.py", "*.cfg"]
+    (work / "x.cfg").write_text("c\n")
+    assert _steps(work, tmp_path, "typecheck")[0] == ["typecheck"]
+    (work / "x.cfg").unlink()
+    (work / "b.py").write_text("y\n")
+    again = tmp_path / "again"
+    again.mkdir()
+    assert _steps(work, again, "typecheck")[0] == ["typecheck"]  # the default still applies
+
+
+def test_a_narrowed_step_uses_only_the_repo_list(tmp_path: Path) -> None:
+    repo_file = 'typecheck = ["src/*.py"]\n[narrow]\ntypecheck = "only src is typed"\n'
+    work = _repo_with(tmp_path, 'typecheck = ["*.py"]\n', repo_file)
+    assert inputs.declared(work)["typecheck"] == ["src/*.py"]
+
+
+def test_a_step_with_neither_default_nor_declaration_always_runs(tmp_path: Path) -> None:
+    work = _repo_with(tmp_path, 'typecheck = ["*.py"]\n', None)
+    assert _steps(work, tmp_path, "custom")[0] == ["custom"]
+
+
+def test_a_changed_defaults_file_runs_every_step(tmp_path: Path) -> None:
+    work = _repo_with(tmp_path, 'typecheck = ["*.py"]\nscripts = ["*.sh"]\n', None)
+    (work / inputs.DEFAULTS).write_text('typecheck = ["*.py"]\nscripts = ["*.sh"]\n# edited\n')
+    assert sorted(_steps(work, tmp_path, "typecheck", "scripts")[0]) == ["scripts", "typecheck"]

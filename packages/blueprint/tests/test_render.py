@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tomllib
 from typing import TYPE_CHECKING
 
 import pytest
 from blueprint import render
 from blueprint.__main__ import main
+from blueprint.concerns.gate import gate_inputs
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -39,7 +41,7 @@ def _just(repo: Repo, *args: str) -> subprocess.CompletedProcess[str]:
 def test_a_python_repo_gets_the_base_and_the_python_part(repo: Repo) -> None:
     _python(repo)
     parts = render.parts(repo.root)
-    assert sorted(parts) == [".blueprint/base.just", ".blueprint/python.just"]
+    assert sorted(parts) == [".blueprint/base.just", ".blueprint/python.just", ".blueprint/step-inputs.toml"]
     assert '"lint-changed" "typecheck"' in parts[".blueprint/base.just"]
     assert "\ntypecheck:" in parts[".blueprint/python.just"]
 
@@ -47,7 +49,7 @@ def test_a_python_repo_gets_the_base_and_the_python_part(repo: Repo) -> None:
 def test_two_stacks_render_two_parts_and_the_check_names_both_steps(repo: Repo) -> None:
     _python_and_shell(repo)
     parts = render.parts(repo.root)
-    assert sorted(parts) == [".blueprint/base.just", ".blueprint/python.just", ".blueprint/shell.just"]
+    assert sorted(parts) == [".blueprint/base.just", ".blueprint/python.just", ".blueprint/shell.just", ".blueprint/step-inputs.toml"]
     assert '"scripts"' in parts[".blueprint/base.just"]
 
 
@@ -59,7 +61,7 @@ def test_every_repo_gets_the_secret_scan_step_and_its_recipes(repo: Repo) -> Non
 
 
 def test_a_repo_with_no_known_stack_gets_only_the_base(repo: Repo) -> None:
-    assert sorted(render.parts(repo.root)) == [".blueprint/base.just"]
+    assert sorted(render.parts(repo.root)) == [".blueprint/base.just", ".blueprint/step-inputs.toml"]
 
 
 def test_rendering_is_deterministic(repo: Repo) -> None:
@@ -123,7 +125,8 @@ def test_write_creates_the_parts_and_a_justfile_importing_them(repo: Repo) -> No
     render.write(repo.root)
     text = (repo.root / "justfile").read_text()
     for name in render.parts(repo.root):
-        assert f"import '{name}'" in text
+        if name.endswith(".just"):
+            assert f"import '{name}'" in text
     assert "set allow-duplicate-recipes" in text
     assert render.check(repo.root) == 0
 
@@ -209,7 +212,7 @@ def test_the_release_gate_runs_the_whole_form_of_each_step_and_a_floor(repo: Rep
     assert '"secrets-all"' in parts[".blueprint/base.just"]
     assert '"test-all"' in parts[".blueprint/base.just"]
     assert "blueprint gate test-all" in parts[".blueprint/python.just"]
-    assert "\ntest-all:" in parts[".blueprint/python.just"]
+    assert "\ntest-all *args:" in parts[".blueprint/python.just"]
 
 
 def test_release_recipes_are_absent_by_default(repo: Repo) -> None:
@@ -234,5 +237,64 @@ def test_a_whole_recipe_referenced_by_the_repo_stays_without_release_gate(repo: 
     _python(repo)
     repo.write("justfile", f"check-extra: {step}\n")
     text = "\n".join(render.parts(repo.root).values())
-    assert f"\n{step}:" in text or f"\n{step} +" in text
+    assert f"\n{step}:" in text or f"\n{step} +" in text or f"\n{step} *args:" in text
     assert "\ncheck-all:" not in text
+
+
+def test_the_defaults_cover_exactly_the_steps_this_gate_runs(repo: Repo) -> None:
+    _python(repo)
+    table = tomllib.loads(render.parts(repo.root)[render.INPUTS_PART])
+    assert {k for k, v in table.items() if isinstance(v, list)} == {"blueprint", "secrets", "lint-changed", "typecheck", "deps", "test"}
+    assert "*.py" in table["typecheck"]
+
+
+def test_a_shell_stack_adds_the_scripts_default(repo: Repo) -> None:
+    _python_and_shell(repo)
+    table = tomllib.loads(render.parts(repo.root)[render.INPUTS_PART])
+    assert table["scripts"] == ["*.sh", "*.shellcheckrc"]
+
+
+def test_every_wide_default_says_why_in_a_known_kind(repo: Repo) -> None:
+    _python(repo)
+    table = tomllib.loads(render.parts(repo.root)[render.INPUTS_PART])
+    wide = [s for s, v in table.items() if isinstance(v, list) and "*" in v]
+    assert sorted(wide) == sorted(table["wide"])
+    assert all(reason.split(":")[0] in gate_inputs.WIDE_KINDS for reason in table["wide"].values())
+
+
+def test_an_extra_step_named_like_a_default_gets_that_default(repo: Repo) -> None:
+    repo.write("pyproject.toml", '[project]\nname = "x"\n[tool.blueprint.gate]\nsteps = ["arch"]\n')
+    repo.write("uv.lock", "")
+    table = tomllib.loads(render.parts(repo.root)[render.INPUTS_PART])
+    assert "*.py" in table["arch"]
+
+
+_IMPORTLINTER = '[project]\nname = "x"\n[tool.importlinter]\nroot_package = "x"\n'
+
+
+def test_a_python_repo_with_import_linter_contracts_renders_the_arch_step(repo: Repo) -> None:
+    repo.write("pyproject.toml", _IMPORTLINTER)
+    repo.write("uv.lock", "")
+    parts = render.parts(repo.root)
+    assert "\narch:\n    uv run lint-imports" in parts[".blueprint/python.just"]
+    assert '"arch"' in parts[".blueprint/base.just"]
+    assert "*.py" in tomllib.loads(parts[render.INPUTS_PART])["arch"]
+
+
+def test_a_python_repo_without_contracts_renders_no_arch_step(repo: Repo) -> None:
+    _python(repo)
+    parts = render.parts(repo.root)
+    assert "arch:" not in parts[".blueprint/python.just"]
+    assert '"arch"' not in parts[".blueprint/base.just"]
+
+
+def test_an_importlinter_file_also_counts_as_contracts(repo: Repo) -> None:
+    _python(repo)
+    repo.write(".importlinter", "[importlinter]\nroot_package = x\n")
+    assert "\narch:" in render.parts(repo.root)[".blueprint/python.just"]
+
+
+def test_a_step_named_twice_is_run_once(repo: Repo) -> None:
+    repo.write("pyproject.toml", _IMPORTLINTER + '[tool.blueprint.gate]\nsteps = ["arch"]\n')
+    repo.write("uv.lock", "")
+    assert render.parts(repo.root)[".blueprint/base.just"].count('"arch"') == 1

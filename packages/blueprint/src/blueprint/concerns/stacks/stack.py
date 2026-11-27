@@ -182,13 +182,17 @@ def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str
         return _Judged(stack, "untested", f"no standard yet: {spec.untested if spec else 'the profile does not cover this role'}")
     if spec.na:
         return _Judged(stack, "na", spec.na)
+    about = ""
     if spec.requires:
         applies, about = _purpose(ctx, spec.requires)
         if not applies:
             return _Judged(stack, "na", f"not applicable here: it applies to {purpose_fact(spec.requires)}, and none is found")
-        judged = _judge_set_up(ctx, stack, spec, role, gate_text, root=root)
-        return replace(judged, evidence=f"{judged.evidence} [{spec.requires}: {about}]")
-    return _judge_set_up(ctx, stack, spec, role, gate_text, root=root)
+    judged = _judge_set_up(ctx, stack, spec, role, gate_text, root=root)
+    if spec.requires:
+        judged = replace(judged, evidence=f"{judged.evidence} [{spec.requires}: {about}]")
+    if spec.optional and judged.verdict == "not-set-up":
+        return _Judged(stack, "na", f"optional, not used here: {spec.tool}")
+    return judged
 
 
 def _judge_set_up(ctx: Context, stack: str, spec: Role, role: str, gate_text: str, *, root: str) -> _Judged:

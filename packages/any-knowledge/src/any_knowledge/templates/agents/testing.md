@@ -27,6 +27,20 @@ Stack-neutral doctrine. The stack file names the tools.
 | a shelf package's own contract | that package's tests, in the shelf | never here; one wiring scenario here |
 | an architecture rule | the architecture check ([architecture.md](architecture.md)) | `{{architecture_dir}}` |
 
+## Slow tests
+
+A test that costs seconds (a real build, a wheel, a browser) carries the `slow` marker; the per-commit run leaves it out, the release run keeps it.
+
+| run | what runs | how |
+|---|---|---|
+| `just check` | every test but `slow` | `[tool.blueprint.test] marks = "not slow"` in `pyproject.toml` (never in pytest's `addopts`: `check-all` would skip them too) |
+| `just check-all` | every test, `slow` too, with the coverage floor | `test-all` ignores `marks` |
+| only the slow ones | `just test-all -m slow` (floor off: a partial run cannot meet a whole-repo floor) | arguments go to pytest |
+| a name | `just test -k name`, `just test -m "not net"` | the later `-m` wins over the configured one |
+
+`test` and `test-all` take pytest's arguments. A run with arguments is an override and writes **no receipts**: a receipt says "this unit
+passed on this input", and an override ran a different set, so a later plain run would skip a unit nobody ran in full.
+
 ## Do not
 
 - Pin a test to private structure: a refactor with no behaviour change must not break tests.

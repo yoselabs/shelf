@@ -329,3 +329,17 @@ def test_a_build_continued_over_lines_and_a_buildx_build_count(repo: Repo) -> No
     repo.write("b/Dockerfile", "FROM python:3.12-slim\n")
     repo.write("justfile", "check: img\nimg:\n    docker build -q \\\n      -f a/Dockerfile .\n    docker buildx build -f b/Dockerfile b\n")
     assert _rows(repo)["stack.dockerfile.tests"][0] is Verdict.PASSING
+
+
+def test_the_compose_spelling_row_accepts_codespell(repo: Repo) -> None:
+    repo.write("compose.yml", "services:\n  db:\n    image: postgres:17\n")
+    repo.write(".codespellrc", "[codespell]\nskip = x\n")
+    repo.write("justfile", "check: spell\nspell:\n    codespell compose.yml\n")
+    assert _rows(repo)["stack.compose.spelling"][0] is Verdict.PASSING
+
+
+def test_the_compose_spelling_row_still_accepts_typos(repo: Repo) -> None:
+    repo.write("compose.yml", "services:\n  db:\n    image: postgres:17\n")
+    repo.write("typos.toml", "[default]\n")
+    repo.write("justfile", "check: spell\nspell:\n    typos\n")
+    assert _rows(repo)["stack.compose.spelling"][0] is Verdict.PASSING

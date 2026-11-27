@@ -229,3 +229,21 @@ def test_a_single_stack_repo_has_no_edges_row(repo: Repo) -> None:
     repo.write("pyproject.toml", _PYPROJECT)
     repo.write("uv.lock", "")
     assert "stack.edges" not in _all_rows(repo)
+
+
+def test_the_node_spelling_and_hooks_rows_accept_codespell_for_typos(repo: Repo) -> None:
+    files = {k: v for k, v in _NODE_FILES.items() if k != "typos.toml"}
+    files[_HOOKS_FILE] = "biome codespell\n"
+    for rel, text in {**files, ".codespellrc": "[codespell]\nskip = x\n"}.items():
+        repo.write(rel, text)
+    repo.write("Makefile", "check:\n" + "".join(f"\t{c}\n" for c in [*_NODE_STEPS[:-1], "codespell"]))
+    rows = _rows(repo, "node")
+    assert rows["stack.node.spelling"] is Verdict.PASSING
+    assert rows["stack.node.hooks"] is Verdict.PASSING
+
+
+def test_the_node_spelling_row_still_fails_with_neither_tool_configured(repo: Repo) -> None:
+    for rel, text in _NODE_FILES.items():
+        repo.write(rel, text)
+    rows = _rows(repo, "node")
+    assert rows["stack.node.spelling"] is Verdict.NOT_SET_UP

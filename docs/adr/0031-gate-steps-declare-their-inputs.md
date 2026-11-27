@@ -13,11 +13,11 @@ distilled_into: any-gate inputs.py (`steps` skips, `--all` for check-all), gate-
 
 ## Decision
 
-- **Declared, plain text.** `gate-inputs.toml` at the repo root: one key per step (the recipe name), a list of fnmatch globs. `["*"]` says the step reads the whole repo. No entry means the step always runs.
+- **Declared, plain text.** One key per step (the recipe name), a list of fnmatch globs; `["*"]` says the step reads the whole repo. No entry means the step always runs. Amended 2026-11-27: the blueprint owns each known step's DEFAULT inputs per stack and renders them to `.blueprint/step-inputs.toml`; the repo's `gate-inputs.toml` holds only exceptions: a list there widens a default or declares a step of the repo's own, and `[narrow] <step> = "<why>"` replaces a default with the repo's list (audit row `gate.narrowed-inputs-have-a-reason`). A repo with no file works.
 - **Unaffected means not started.** `any-gate steps` compares the changed files (the upstream merge-base, as `any-gate changed`) with each declared step; a step none of whose inputs changed gets no process and no file read. Git is asked three times at most, and not at all when no step declares anything.
 - **Everything runs** when the changed files cannot be told (no base), when `gate-inputs.toml`, the `justfile` or `.blueprint/` changed, and in `check-all` (`steps-all`, `--all`), the release gate.
 - **A golden test per step** (`packages/any-gate/tests/test_inputs.py`): on an unchanged tree no declared step starts a process and git is asked at most three times.
-- **Audit row** `gate.step-inputs` (new checkpoints warn first, ADR 0018): every step `check` hands to `steps` declares its inputs.
+- **Audit row** `gate.step-inputs` (new checkpoints warn first, ADR 0018): every step `check` hands to `steps` has inputs (the blueprint's default or the repo's own declaration).
 - **Blueprint checkpoints are not scoped.** The `blueprint` step declares `["*"]`: a checkpoint reads repo-wide facts, so per-checkpoint scoping would need each to declare inputs, and a wrong declaration is a silent miss. The cost that earlier kept them unscoped was 0 s on Linux; on Windows with Defender each process start costs about 20 ms, and the one `blueprint` step is one process, which an unaffected commit now skips whole. Revisit when one checkpoint's work is measured, not before.
 
 ## Rejected

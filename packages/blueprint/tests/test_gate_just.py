@@ -230,6 +230,7 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
         ("gate.runner", 1, False),
         ("gate.no-ci", 1, False),
         ("gate.step-inputs", 1, False),
+        ("gate.narrowed-inputs-have-a-reason", 1, False),
         ("gate.wide-inputs-have-a-reason", 1, False),
         ("gate.hooks-recipe", 4, False),
         ("gate.hooks-installed", 3, True),
@@ -271,8 +272,7 @@ def test_step_inputs_names_the_step_that_declares_nothing(repo: Repo) -> None:
     repo.write("gate-inputs.toml", 'lint = ["*.py"]\n')
     verdict, evidence = _row(repo, "gate.step-inputs")
     assert verdict is Verdict.FAILING
-    assert "test" in evidence
-    assert "lint" not in evidence.split("for")[1]
+    assert evidence.startswith("test:")
 
 
 def test_step_inputs_passes_when_every_step_declares(repo: Repo) -> None:
@@ -319,3 +319,62 @@ def test_a_wide_entry_for_a_step_that_is_no_longer_wide_is_stale(repo: Repo) -> 
 def test_the_wide_row_is_not_applicable_with_no_declarations(repo: Repo) -> None:
     repo.write("justfile", _STEPS)
     assert _row(repo, "gate.wide-inputs-have-a-reason")[0] is Verdict.NOT_APPLICABLE
+
+
+_DEFAULTS = 'lint = ["*.py"]\ntest = ["*"]\n[wide]\ntest = "self-keyed: units"\n'
+_MINE = 'check: (steps "lint" "test" "mine")\nsteps +names:\n    true\nlint:\n    true\ntest:\n    true\nmine:\n    true\n'
+
+
+def test_a_repo_with_no_declaration_file_passes_on_the_rendered_defaults(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write(".blueprint/step-inputs.toml", _DEFAULTS)
+    assert _row(repo, "gate.step-inputs")[0] is Verdict.PASSING
+
+
+def test_a_step_with_no_default_and_no_declaration_fails_and_is_named(repo: Repo) -> None:
+    repo.write("justfile", _MINE)
+    repo.write(".blueprint/step-inputs.toml", _DEFAULTS)
+    verdict, evidence = _row(repo, "gate.step-inputs")
+    assert verdict is Verdict.FAILING
+    assert evidence.startswith("mine:")
+
+
+def test_the_defaults_wide_steps_need_no_reason_from_the_repo(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write(".blueprint/step-inputs.toml", _DEFAULTS)
+    assert _row(repo, "gate.wide-inputs-have-a-reason")[0] is Verdict.NOT_APPLICABLE
+
+
+def test_a_widening_list_needs_no_reason(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write(".blueprint/step-inputs.toml", _DEFAULTS)
+    repo.write("gate-inputs.toml", 'lint = ["*.cfg"]\n')
+    assert _row(repo, "gate.narrowed-inputs-have-a-reason")[0] is Verdict.NOT_APPLICABLE
+    assert _row(repo, "gate.step-inputs")[0] is Verdict.PASSING
+
+
+def test_narrowing_with_a_reason_passes(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write(".blueprint/step-inputs.toml", _DEFAULTS)
+    repo.write("gate-inputs.toml", 'lint = ["src/*.py"]\n[narrow]\nlint = "only src is linted; scripts are shellchecked elsewhere"\n')
+    assert _row(repo, "gate.narrowed-inputs-have-a-reason")[0] is Verdict.PASSING
+
+
+@pytest.mark.parametrize("reason", ["", "because", "   "])
+def test_narrowing_without_a_reason_fails(repo: Repo, reason: str) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write(".blueprint/step-inputs.toml", _DEFAULTS)
+    repo.write("gate-inputs.toml", f'lint = ["src/*.py"]\n[narrow]\nlint = "{reason}"\n')
+    verdict, evidence = _row(repo, "gate.narrowed-inputs-have-a-reason")
+    assert verdict is Verdict.FAILING
+    assert "lint" in evidence
+
+
+def test_a_narrow_entry_with_no_list_or_no_default_fails(repo: Repo) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write(".blueprint/step-inputs.toml", _DEFAULTS)
+    repo.write("gate-inputs.toml", 'mine = ["*.x"]\n[narrow]\nlint = "a long enough reason here"\nmine = "a long enough reason here"\n')
+    verdict, evidence = _row(repo, "gate.narrowed-inputs-have-a-reason")
+    assert verdict is Verdict.FAILING
+    assert "no `lint = [...]` list" in evidence
+    assert "no default to narrow" in evidence

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import sys
 from datetime import date
 from pathlib import Path
@@ -97,6 +98,8 @@ def _parser() -> argparse.ArgumentParser:
     fmt.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     ta = steps.add_parser("test-all", help="every test with the coverage floor, queued behind any-lease (`just test-all`)")
     ta.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+    for sub_parser in (tst, ta):
+        sub_parser.set_defaults(rest=[])
     return parser
 
 
@@ -115,7 +118,14 @@ def known_flags(argv: list[str]) -> tuple[str, set[str]]:
 
 def main(argv: list[str] | None = None) -> int:
     """The command line."""
-    args = _parser().parse_args(argv)
+    words = sys.argv[1:] if argv is None else argv
+    rest: list[str] = []
+    if "--" in words:  # everything after `--` is pytest's: `blueprint gate test -- -m slow`
+        cut = words.index("--")
+        words, rest = words[:cut], words[cut + 1 :]
+    args = _parser().parse_args(words)
+    if rest:
+        args.rest = rest
     if args.command == "init":
         return init.run(args.repo, hooks=not args.no_hooks, beads=args.beads, env=os.environ)
     if args.command == "gate":
@@ -168,7 +178,7 @@ def _test(args: argparse.Namespace) -> int:
         args.repo.expanduser().resolve(),
         receipts=args.receipts,
         lease_root=args.lease_root,
-        pytest_args=args.pytest_args,
+        pytest_args=_pytest_args(args),
         env=dict(os.environ),
     )
 
@@ -188,7 +198,13 @@ def _format(args: argparse.Namespace) -> int:
 
 
 def _test_all(args: argparse.Namespace) -> int:
-    return gate_py.test_all(args.repo.expanduser().resolve(), dict(os.environ))
+    return gate_py.test_all(args.repo.expanduser().resolve(), dict(os.environ), args.rest)
+
+
+def _pytest_args(args: argparse.Namespace) -> str | None:
+    """`--pytest-args` plus what followed `--`, as one string; None when neither was given (the defaults apply)."""
+    words = [*shlex.split(args.pytest_args or ""), *args.rest]
+    return shlex.join(words) if words else args.pytest_args
 
 
 _GATE_STEPS = {

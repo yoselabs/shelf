@@ -9,8 +9,12 @@ from blueprint.model import check
 check("gate.one-command", "`just check` exists and every recipe it names resolves")(gate_command.one_command)
 check("gate.runner", "the gate runner is just: a justfile holds the gate, not a Makefile")(gate_command.runner)
 check("gate.no-ci", "the repo holds no GitHub Actions configuration (no repository has CI, ADR 0027)")(gate_no_ci.no_ci)
-check("gate.step-inputs", "every step `check` runs declares the files it reads in gate-inputs.toml, so an unaffected commit does no work")(
-    gate_inputs.step_inputs
+check(
+    "gate.step-inputs",
+    "every `check` step has inputs: the blueprint default or the repo exception in gate-inputs.toml, so an unaffected commit does no work",
+)(gate_inputs.step_inputs)
+check("gate.narrowed-inputs-have-a-reason", "a step whose default inputs gate-inputs.toml narrows says why in [narrow]")(
+    gate_inputs.narrowed_inputs
 )
 check("gate.wide-inputs-have-a-reason", "every gate step declared `*` (runs on any change) says why in gate-inputs.toml's [wide]")(
     gate_inputs.wide_inputs

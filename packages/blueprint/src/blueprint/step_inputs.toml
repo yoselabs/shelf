@@ -1,0 +1,27 @@
+# The files each gate step reads, by step name: the blueprint's DEFAULT, rendered into a repo's `.blueprint/step-inputs.toml` for the
+# steps that repo's gate runs (any-gate reads it with the repo's own `gate-inputs.toml`, which holds only exceptions).
+# fnmatch on the whole path, `*` crosses `/`. A tool's config file is an input too: an under-declared step skips a change that breaks it.
+# Same names across stacks where the slot is the same (`arch`: import-linter for python, dependency-cruiser for node).
+blueprint = ["*"]
+secrets = ["*"]
+lint-changed = ["*"]
+test = ["*"]
+typecheck = ["*.py", "*.pyi", "*pyproject.toml", "*uv.lock", "*pyrefly.toml", ".python-version"]
+deps = ["*.py", "*.pyi", "*pyproject.toml", "*uv.lock", ".python-version"]
+arch = ["*.py", "*.pyi", "*pyproject.toml", "*uv.lock", "*.importlinter"]
+scripts = ["*.sh", "*.shellcheckrc"]
+# The node steps: the node folder (`@NODE@/*`, rendered) and the pinned node and tools (mise.toml, mise.lock).
+# The image tools read the Dockerfiles, the compose files, their configs and the pinned tools (mise.toml, mise.lock).
+images = ["*Dockerfile*", "*Containerfile*", "*compose*", ".dockerignore", "*.hadolint.yaml", "*.dclintrc*", "*dclint.config.js", "*.yamlfmt*", "mise.*"]
+ui-lint = ["@NODE@/*", "mise.*"]
+ui-types = ["@NODE@/*", "mise.*"]
+ui-deps = ["@NODE@/*", "mise.*"]
+ui-arch = ["@NODE@/*", "mise.*"]
+ui-test = ["@NODE@/*", "mise.*"]
+
+# Why a default step runs on any change (kind: why), the kinds of the audit row gate.wide-inputs-have-a-reason.
+[wide]
+blueprint = "reads-everything: guard, preset, the render check and the audit read repo-wide facts"
+secrets = "change-set: scans the commits since the base"
+lint-changed = "change-set: codespell checks the changed files, whatever they are"
+test = "self-keyed: each unit and the reach selection key their own inputs"

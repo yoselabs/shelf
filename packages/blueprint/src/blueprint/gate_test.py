@@ -110,6 +110,8 @@ def run(
         code, plan = execute(plan_cmd, cwd=repo, stdin=None, env=env)
         if code != 0:
             return code
+        if filtered:  # pytest arguments change what runs: no key, so no receipt a later normal run could skip on
+            plan = "".join(f"{line.split(chr(9))[0]}\t\n" for line in plan.splitlines() if line)
     test_env = {**env, **gate_units.read_config(repo).env}
     code = execute(test_cmd, cwd=repo, stdin=plan, env=test_env)[0]
     if code != 0 or config is None or not measuring or filtered:

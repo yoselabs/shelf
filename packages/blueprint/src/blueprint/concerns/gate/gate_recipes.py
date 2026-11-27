@@ -86,6 +86,7 @@ def calls(ctx: Context) -> Finding:
             problems.append(f"{name} runs blueprint from a shelf clone (it changes with whatever is checked out there)")
         for call in _CALL.findall(recipe.body.replace("\\\n", " ")):
             words = shlex.split(call, comments=True)
+            words = words[: words.index("--")] if "--" in words else words  # what follows `--` is the tool's own (pytest's)
             command, known = known_flags(words)
             problems += [
                 f"{name} runs `blueprint {command}` with {flag}, which it does not have"

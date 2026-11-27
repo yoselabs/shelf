@@ -1,23 +1,11 @@
-# The files each gate step reads (any-gate, ADR 0031): a step none of whose inputs changed since the upstream merge-base is not started.
-# fnmatch on the whole path, `*` crosses `/`. A step with no entry always runs. `["*"]` means any change: the step reads the whole repo
-# (checkpoints read repo-wide facts; tests and secrets select their own narrower scope inside the step). Change to this file, the justfile
-# or .blueprint/ runs everything; so does `just check-all`.
-blueprint = ["*"]
-secrets = ["*"]
-lint-changed = ["*"]
-typecheck = ["*.py", "*.toml", "uv.lock"]
-scripts = ["*.sh", ".shellcheckrc"]
-arch = ["*.py", "*.toml"]
-deps = ["*.py", "*.toml", "uv.lock"]
+# This repo's exceptions to the blueprint's default step inputs (.blueprint/step-inputs.toml, rendered; any-gate, ADR 0031).
+# A list here WIDENS a step's default, or declares a step of the repo's own (no default: it runs on any change until it declares).
+# fnmatch on the whole path, `*` crosses `/`. `[narrow] step = "why"` would replace a default with the list; this repo narrows nothing.
+# Change to this file, the justfile or .blueprint/ runs everything; so does `just check-all`.
+stdlib-shadow = ["*.py", "*.config/stdlib-shadow/*"]
 tag-check = ["*"]
-test = ["*"]
 dep-audit = ["uv.lock", "*pyproject.toml", "*dep_audit/*", "*.config/dep-audit/*"]
 
-# Why a step runs on any change (blueprint's gate.wide-inputs-have-a-reason): `<kind>: <why>`, kind one of change-set, self-keyed,
-# reads-everything, outside-files.
+# Why a step of the repo's own runs on any change (blueprint's gate.wide-inputs-have-a-reason): `<kind>: <why>`.
 [wide]
-blueprint = "reads-everything: guard, preset, the render check and the audit read repo-wide facts"
-secrets = "change-set: scans the commits since the base"
-lint-changed = "change-set: codespell checks the changed files, whatever they are"
 tag-check = "outside-files: compares versions with the tags on origin"
-test = "self-keyed: each unit and the reach selection key their own inputs"

@@ -154,3 +154,41 @@ def test_the_pre_push_run_still_fails_a_worktree_behind_main(repo: Repo) -> None
     row = {r.id: r for r in run_audit(tree, concern="agents", env=pushing).rows}["agents.worktrees-in-sync"]
     assert row.verdict is Verdict.FAILING
     assert "behind main" in row.evidence
+
+
+def test_a_worktree_in_the_middle_of_merging_main_is_not_held_for_the_commits_it_is_taking(repo: Repo) -> None:
+    _commit(repo.root, "base", 3 * _DAY)
+    tree = _worktree(repo, "mine")
+    _commit(tree, "work", 3600)
+    _commit(repo.root, "main-moved", 2 * _DAY)
+    assert "behind main" in _own(repo, tree).evidence  # before the merge: failing, and it says how to fix it
+    subprocess.run(["git", "merge", "--no-commit", "--no-ff", "main"], cwd=tree, check=True, capture_output=True)
+    assert (tree / "main-moved").is_file()
+    merging = _own(repo, tree)
+    assert merging.verdict is Verdict.PASSING
+    assert "merging main" in merging.evidence
+
+
+def test_the_failure_names_the_merge_main_fix_for_a_branch_behind_and_the_landing_fix_for_unmerged_work(repo: Repo) -> None:
+    _commit(repo.root, "base", 3 * _DAY)
+    tree = _worktree(repo, "mine")
+    _commit(tree, "work", 2 * _DAY)
+    _commit(repo.root, "main-moved", 2 * _DAY)
+    row = _own(repo, tree)
+    assert row.verdict is Verdict.FAILING
+    assert "behind main since" in row.evidence
+    assert "merge main: `git merge main`" in row.evidence
+    assert "work unmerged since" in row.evidence
+    assert "land it into main" in row.evidence
+
+
+def test_unmerged_work_is_still_failing_while_a_merge_of_main_is_in_progress(repo: Repo) -> None:
+    _commit(repo.root, "base", 3 * _DAY)
+    tree = _worktree(repo, "mine")
+    _commit(tree, "work", 2 * _DAY)
+    _commit(repo.root, "main-moved", 2 * _DAY)
+    subprocess.run(["git", "merge", "--no-commit", "--no-ff", "main"], cwd=tree, check=True, capture_output=True)
+    row = _own(repo, tree)
+    assert row.verdict is Verdict.FAILING
+    assert "work unmerged since" in row.evidence
+    assert "behind main" not in row.evidence
