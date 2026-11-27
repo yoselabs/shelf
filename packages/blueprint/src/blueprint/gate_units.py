@@ -139,6 +139,39 @@ def uncovered_test_folders(repo: Path, config: Config) -> list[str]:
     )
 
 
+class Reader:
+    """Reads each file once for a whole run: its bytes (hashed), and what parsing them says (imports, computed imports).
+
+    A file's bytes are read once however many units reach it, and parsed from those same bytes; the key hashes the same bytes it always did.
+    """
+
+    def __init__(self) -> None:
+        self._bytes: dict[Path, bytes] = {}
+        self._parsed: dict[Path, tuple[tuple[tuple[str, ...], ...], bool]] = {}
+        self._project: dict[Path, str] = {}
+
+    def data(self, file: Path) -> bytes:
+        if file not in self._bytes:
+            self._bytes[file] = file.read_bytes()
+        return self._bytes[file]
+
+    def parsed(self, repo: Path, file: Path) -> tuple[tuple[tuple[str, ...], ...], bool]:
+        """`(the dotted names the file imports, whether it imports by a computed name)`; empty and False when it cannot be parsed."""
+        if file not in self._parsed:
+            try:
+                tree = ast.parse(self.data(file).decode("utf-8"))
+            except (OSError, SyntaxError, UnicodeDecodeError, ValueError):
+                self._parsed[file] = ((), False)
+            else:
+                self._parsed[file] = (tuple(tuple(n) for n in _import_names(repo, file, tree)), _computes_imports(tree))
+        return self._parsed[file]
+
+    def project(self, repo: Path, config: Config) -> str:
+        if repo not in self._project:
+            self._project[repo] = _project_part(repo, config, self)
+        return self._project[repo]
+
+
 def _files(repo: Path, rel: str) -> list[Path]:
     root = repo / rel
     if root.is_file():
@@ -169,12 +202,8 @@ def _initializers(repo: Path, module: Path) -> list[Path]:
     return found
 
 
-def _import_names(repo: Path, file: Path) -> list[list[str]]:
+def _import_names(repo: Path, file: Path, tree: ast.AST) -> list[list[str]]:
     """The dotted module names `file` imports, absolute, as lists of parts (a `from x import y` also tries `x.y`)."""
-    try:
-        tree = ast.parse(file.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError, UnicodeDecodeError):
-        return []
     package = file.relative_to(repo).with_suffix("").parts[:-1]
     if package and package[0] == "src":
         package = package[1:]
@@ -192,8 +221,9 @@ def _import_names(repo: Path, file: Path) -> list[list[str]]:
     return names
 
 
-def reached(repo: Path, starts: list[Path]) -> set[Path]:
+def reached(repo: Path, starts: list[Path], reader: Reader | None = None) -> set[Path]:
     """Every first-party Python file the `starts` import, transitively, with the `__init__.py` files above them."""
+    reader = reader or Reader()
     seen: set[Path] = set()
     queue = list(starts)
     while queue:
@@ -201,19 +231,15 @@ def reached(repo: Path, starts: list[Path]) -> set[Path]:
         if file in seen or file.suffix != ".py":
             continue
         seen.add(file)
-        for parts in _import_names(repo, file):
-            target = _module_file(repo, parts)
+        for parts in reader.parsed(repo, file)[0]:
+            target = _module_file(repo, list(parts))
             if target is not None:
                 queue += [target, *_initializers(repo, target)]
     return seen
 
 
-def _computes_imports(file: Path) -> bool:
-    """Whether `file` imports a module by a computed name (`importlib.import_module(name)`, `__import__(name)`): no import graph sees it."""
-    try:
-        tree = ast.parse(file.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError, UnicodeDecodeError):
-        return False
+def _computes_imports(tree: ast.AST) -> bool:
+    """Whether the file imports by a computed name (`importlib.import_module(name)`, `__import__(name)`): no import graph sees it."""
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -230,11 +256,11 @@ def _top_package(repo: Path, file: Path) -> Path:
     return repo.joinpath(*rel[:depth]) if len(rel) > depth else file.parent
 
 
-def _project_part(repo: Path) -> str:
+def _project_part(repo: Path, config: Config, reader: Reader) -> str:
     """What of `pyproject.toml` a test run can see: dependencies and how pytest and coverage run (lint and type config never)."""
     try:
-        data = tomllib.loads((repo / "pyproject.toml").read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError):
+        data = tomllib.loads(reader.data(repo / "pyproject.toml").decode("utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
         return ""
     tool = data.get("tool", {})
     seen = {
@@ -244,18 +270,25 @@ def _project_part(repo: Path) -> str:
         "coverage": tool.get("coverage", {}),
         "uv": tool.get("uv", {}),
     }
-    config = read_config(repo)
     seen["blueprint-test"] = {"pytest-args": config.pytest_args, "env": config.env, "marks": config.marks}
     return json.dumps(seen, sort_keys=True, default=repr)
 
 
-def key(repo: Path, unit: Unit) -> str:
+def keys(repo: Path, config: Config) -> dict[str, str]:
+    """The key of every unit, by name: one run's worth, each file read once however many units reach it."""
+    reader = Reader()
+    return {unit.name: key(repo, unit, reader, config) for unit in config.units}
+
+
+def key(repo: Path, unit: Unit, reader: Reader | None = None, config: Config | None = None) -> str:
     """The hash of everything `unit`'s tests can see (see the module doc)."""
+    reader = reader or Reader()
+    config = config or read_config(repo)
     own = [f for p in unit.paths for f in _files(repo, p)]
     folders = {repo, *(d for p in unit.paths for d in [repo / p, *(repo / p).parents] if d == repo or repo in d.parents)}
     starts = [*own, *(d / name for d in sorted(folders) for name in ("conftest.py", "__init__.py") if (d / name).is_file())]
     read = sorted(f for glob in unit.reads for f in repo.glob(glob) if f.is_file())
-    code = reached(repo, starts)
+    code = reached(repo, starts, reader)
     # Fail closed where the import graph cannot see: files that sit beside reached code (templates, SQL, JS) change the key, and a
     # module imported by a computed name widens it to its whole package.
     beside = sorted(
@@ -264,31 +297,32 @@ def key(repo: Path, unit: Unit) -> str:
         for f in py.parent.iterdir()
         if f.is_file() and f.suffix not in _NOT_INPUTS and f.name not in _NOT_INPUTS
     )
-    wide = {f for py in code if _computes_imports(py) for f in _files(repo, _top_package(repo, py).relative_to(repo).as_posix())}
+    wide = {f for py in code if reader.parsed(repo, py)[1] for f in _files(repo, _top_package(repo, py).relative_to(repo).as_posix())}
     files = sorted({*starts, *code, *read, *beside, *wide})
     digest = hashlib.sha256()
     for file in files:
         digest.update(file.relative_to(repo).as_posix().encode())
         digest.update(b"\0")
-        digest.update(file.read_bytes())
+        digest.update(reader.data(file))
     for rel in ("uv.lock", "pytest.ini", ".coveragerc", "setup.cfg", "tox.ini", ".python-version"):
         if (repo / rel).is_file():
             digest.update(rel.encode())
-            digest.update((repo / rel).read_bytes())
-    digest.update(_project_part(repo).encode())
+            digest.update(reader.data(repo / rel))
+    digest.update(reader.project(repo, config).encode())
     return digest.hexdigest()[:32]
 
 
-def plan(repo: Path, config: Config, *, cached: set[str] | None = None) -> str:
+def plan(repo: Path, config: Config, *, cached: set[str] | None = None, unit_keys: dict[str, str] | None = None) -> str:
     """`path<TAB>key` per unit path.
 
     With `cached` (the `unit:key` names whose coverage data exists) the data is the receipt: a unit with data is left out of the
     plan, and one without is listed with no key (it runs, and its data is then the proof). A receipt there would be one more thing
     to keep true: any-gate records none for a blank key, so a unit would run twice before it was skipped.
     """
+    unit_keys = unit_keys if unit_keys is not None else keys(repo, config)
     lines: list[str] = []
     for unit in config.units:
-        unit_key = key(repo, unit)
+        unit_key = unit_keys[unit.name]
         if cached is None:
             lines += [f"{path}\t{unit_key}\n" for path in unit.paths]
         elif f"{unit.name}:{unit_key}" not in cached:

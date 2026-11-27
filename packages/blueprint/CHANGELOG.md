@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Unit keys are computed once per `gate test` run (shelf-8r18): `gate_units.keys` reads each file once and parses it from the same bytes (it was parsed twice and read a third time, and every unit's key was recomputed by the cache check, the plan and `combine`). The keys go to the unit runner as `--keys`; `combine` is skipped when the repo declares no floor. Keys are byte-identical to 0.17.0's (a golden test, and a2kay's nine keys compared old against new). a2kay's key code: 22,509 file opens a no-op run before, 862 after.
 - One test path (shelf-m0xw, absorbs shelf-nvj1): `blueprint gate test-all` is `gate test` over every suite (`any_gate_python plan --all`) and every mark, receipts ignored (blank keys), `randomize` honoured; `gate_py.test_all_command` is deleted. A floor applies only when the repo declares one (`[tool.blueprint.test] floor`, else `[tool.coverage.report] fail_under`): the built-in 65 is gone. A repo with `-p no:cov` in `pytest-args` passes `check-all` (the old path passed `--cov` and pytest exited 4); its floor is reported as not judged unless `coverage` mode measures it. Without `coverage` mode a declared floor is measured by pytest-cov across the stages (`--cov-append`) and one `coverage report --fail-under` judges it. `unit_runner --whole` runs every mark. Pytest arguments still make an override run: no receipts, no floor.
 
 ## 0.17.0

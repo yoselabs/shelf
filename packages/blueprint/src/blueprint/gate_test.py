@@ -13,6 +13,7 @@ floor stays whole-repo while units are skipped. A repo that declares nothing run
 
 from __future__ import annotations
 
+import json
 import shlex
 import subprocess
 import sys
@@ -45,7 +46,14 @@ def cache_dir(repo: Path) -> Path:
 
 
 def commands(
-    repo: Path, *, receipts: Path | None, lease_root: Path | None, pytest_args: str, whole: bool, cache: Path | None = None
+    repo: Path,
+    *,
+    receipts: Path | None,
+    lease_root: Path | None,
+    pytest_args: str,
+    whole: bool,
+    cache: Path | None = None,
+    unit_keys: dict[str, str] | None = None,
 ) -> tuple[list[str] | None, list[str]]:
     """`(plan command or None, test command)`; the plan command's stdout is the test command's stdin.
 
@@ -62,7 +70,8 @@ def commands(
     if config is not None and config.coverage:
         where = cache or cache_dir(repo)
         runner = [py, "-m", "blueprint.unit_runner", "--repo", str(repo), "--cache", str(where), f"--pytest-args={pytest_args}"]
-        test += ["--", *runner, *(["--whole"] if whole else [])]
+        given = [f"--keys={json.dumps(unit_keys, sort_keys=True)}"] if unit_keys is not None else []
+        test += ["--", *runner, *given, *(["--whole"] if whole else [])]
     else:
         settings = gate_units.read_config(repo)
         pytest_args = shlex.join([*(settings.every_mark() if whole else settings.arguments()), *shlex.split(pytest_args)])
@@ -121,14 +130,17 @@ def run(
     filtered = bool(pytest_args and shlex.split(pytest_args))
     args, floor = _arguments(repo, pytest_args, whole=whole, measuring=measuring)
     where = cache or cache_dir(repo)
-    plan_cmd, test_cmd = commands(repo, receipts=receipts, lease_root=lease_root, pytest_args=args, cache=where, whole=whole)
-    blank = filtered or whole  # pytest arguments, or the release run: no key, so no receipt a later normal run could skip on
+    blank = filtered or whole
+    unit_keys = gate_units.keys(repo, config) if config is not None and (measuring or not blank) else None  # once per run
+    plan_cmd, test_cmd = commands(
+        repo, receipts=receipts, lease_root=lease_root, pytest_args=args, cache=where, whole=whole, unit_keys=unit_keys
+    )  # pytest arguments, or the release run: no key, so no receipt a later normal run could skip on
     if config is not None:
-        cached = unit_runner.cached(where, config, repo) if measuring and not blank else None
+        cached = unit_runner.cached(where, config, unit_keys or {}) if measuring and not blank else None
         plan = (
             "".join(f"{path}\t\n" for unit in config.units for path in unit.paths)
             if blank
-            else gate_units.plan(repo, config, cached=cached)
+            else gate_units.plan(repo, config, cached=cached, unit_keys=unit_keys)
         )
     elif plan_cmd is None:
         plan = whole_suite_plan()
@@ -148,9 +160,9 @@ def run(
         if floor is not None:
             report = [sys.executable, "-m", "coverage", "report", "--show-missing", f"--fail-under={floor:g}"]
             return execute(report, cwd=repo, stdin="", env=test_env)[0]
-    if config is None or not measuring or filtered:
-        return 0
-    return unit_runner.combine(repo, where, config)
+    if config is None or not measuring or filtered or declared_floor(repo) is None:
+        return 0  # without a floor nothing is judged from the combined data
+    return unit_runner.combine(repo, where, config, unit_keys)
 
 
 def _problems(repo: Path, config: gate_units.Config) -> list[str]:

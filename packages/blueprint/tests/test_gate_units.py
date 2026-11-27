@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from typing import TYPE_CHECKING
@@ -237,7 +238,7 @@ def test_a_green_run_caches_each_units_data_and_combines_it_whole_repo(repo: Rep
     assert config is not None
     cache = tmp_path / "cache"
     assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) == 0
-    assert unit_runner.cached(cache, config, repo.root) == {f"{n}:{k}" for n, k in _keys(repo).items()}
+    assert unit_runner.cached(cache, config, _keys(repo)) == {f"{n}:{k}" for n, k in _keys(repo).items()}
     assert unit_runner.combine(repo.root, cache, config) == 0
 
 
@@ -437,3 +438,74 @@ _GOLDEN_KEYS = {"core": "978a12d6328662c03aedd39746ecf0f1", "ui": "0785155ef09e2
 def test_a_unit_key_is_the_one_it_has_always_been(repo: Repo) -> None:
     _golden_app(repo)
     assert _keys(repo) == _GOLDEN_KEYS
+
+
+# ── keys are computed once per run, each file read once (shelf-8r18) ─────────────────────────────────────────────────────────────────
+
+
+def _count_reads(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
+    """Every file `Path.read_bytes` / `read_text` opens, by name, counted."""
+    from pathlib import Path as RealPath  # noqa: PLC0415
+
+    seen: dict[str, int] = {}
+    read_bytes, read_text = RealPath.read_bytes, RealPath.read_text
+
+    def bytes_(self: Path) -> bytes:
+        seen[str(self)] = seen.get(str(self), 0) + 1
+        return read_bytes(self)
+
+    def text(self: Path, *args: object, **kwargs: object) -> str:
+        seen[str(self)] = seen.get(str(self), 0) + 1
+        return read_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(RealPath, "read_bytes", bytes_)
+    monkeypatch.setattr(RealPath, "read_text", text)
+    return seen
+
+
+def test_every_unit_key_of_a_run_is_computed_with_each_file_read_once(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
+    _golden_app(repo)
+    config = gate_units.load(repo.root)
+    assert config is not None
+    seen = _count_reads(monkeypatch)
+    keys = gate_units.keys(repo.root, config)
+    assert keys == _GOLDEN_KEYS
+    assert seen, "the keys read files"
+    assert {name: n for name, n in seen.items() if n > 1} == {}  # a file two units share, or a parse and a hash, is still one read
+
+
+def test_a_no_op_run_reads_each_file_once_and_hands_the_runner_the_keys(
+    repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _golden_app(repo)
+    repo.write("pyproject.toml", _PYPROJECT.replace("floor = 50\n", ""))  # no floor: nothing to combine
+    cache = tmp_path / "cache"
+    config = gate_units.load(repo.root)
+    assert config is not None
+    for unit in config.units:
+        unit_runner.data_file(cache, unit.name, _GOLDEN_KEYS[unit.name]).parent.mkdir(parents=True, exist_ok=True)
+        unit_runner.data_file(cache, unit.name, _GOLDEN_KEYS[unit.name]).write_bytes(b"")
+    seen = _count_reads(monkeypatch)
+    ran: list[list[str]] = []
+
+    def execute(cmd: list[str], *, cwd: Path, stdin: str | None, env: dict[str, str]) -> tuple[int, str]:
+        ran.append(cmd)
+        return 0, ""
+
+    code = gate_test.run(repo.root, whole=False, receipts=None, lease_root=None, cache=cache, execute=execute, env=repo.env)
+    assert code == 0
+    key_reads = {name: n for name, n in seen.items() if not name.endswith("pyproject.toml")}
+    assert {name: n for name, n in key_reads.items() if n > 1} == {}
+    assert "--keys=" + json.dumps(_GOLDEN_KEYS, sort_keys=True) in ran[-1]
+
+
+def test_a_repo_with_no_floor_skips_combine(repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _golden_app(repo)
+    repo.write("pyproject.toml", _PYPROJECT.replace("floor = 50\n", ""))
+    called: list[str] = []
+    monkeypatch.setattr(unit_runner, "combine", lambda *a, **k: called.append("combine") or 1)
+    code = gate_test.run(
+        repo.root, whole=False, receipts=None, lease_root=None, cache=tmp_path / "c", env=repo.env, execute=lambda *a, **k: (0, "")
+    )
+    assert code == 0
+    assert called == []
