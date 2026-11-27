@@ -113,7 +113,9 @@ def test_a_second_run_waits_for_the_first_and_says_who_it_waits_for(tmp_path: Pa
 
 def test_the_command_gets_the_callers_whole_environment_and_the_held_names(tmp_path: Path) -> None:
     """A lock around a command is transparent: credentials and agent-session variables pass, and the held list is added."""
-    env = {**os.environ, "GH_TOKEN": "gh", "ANTHROPIC_API_KEY": "key", "MY_SERVICE_TOKEN": "s3cret"}
+    # A gate that holds a lease itself (`just test-all`) exports ANY_LEASE_HELD; the test starts from a caller that holds nothing.
+    held = {k: v for k, v in os.environ.items() if k != "ANY_LEASE_HELD"}
+    env = {**held, "GH_TOKEN": "gh", "ANTHROPIC_API_KEY": "key", "MY_SERVICE_TOKEN": "s3cret"}
     show = "import os; print(*(os.environ.get(k) for k in ('GH_TOKEN', 'ANTHROPIC_API_KEY', 'MY_SERVICE_TOKEN', 'ANY_LEASE_HELD')))"
     proc = _run(tmp_path / "locks", "unity", 1, "job", sys.executable, "-c", show, env=env)
     out, _ = proc.communicate(timeout=30)
