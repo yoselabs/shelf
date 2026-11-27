@@ -2,7 +2,7 @@
 
 AI-facing only: one line per contract-shape change, arrow notation.
 
-- unreleased: `inputs.declared(repo)` = `.blueprint/step-inputs.toml` (blueprint's defaults) widened by the repo's `gate-inputs.toml`; a `[narrow]` step takes the repo's list alone; a change to the defaults file runs every step; `inputs.DEFAULTS`.
+- 0.6.0: `inputs.declared(repo)` = `.blueprint/step-inputs.toml` (blueprint's defaults) widened by the repo's `gate-inputs.toml`; a `[narrow]` step takes the repo's list alone; a change to the defaults file runs every step; `inputs.DEFAULTS`.
 
 - 0.5.0: SIGTERM/SIGHUP stop every step tree; `Step.stopped` replaces exit 125 as "stopped by the gate"; a crashed step thread is a failed step (70); `GATE_FAIL_FAST`; `inputs.unaffected(repo, names, recorded)` runs everything on an empty change set no gate passed; a step named twice is refused. Contract otherwise unchanged.
 - 0.4.0: live failures, `--step-limit`, `--fail-fast`, rename hole closed.

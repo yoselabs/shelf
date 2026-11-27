@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.16.0
 
+- Corpus diff against 0.15.0 (42 repos): no verdict moved to worse except `stack.compose.spelling` on yosefactory (not set up -> warning): it configures `[tool.codespell]`, which the row now recognises, and its Makefile gate is not read (already `gate.runner`). New row `gate.narrowed-inputs-have-a-reason` and the optional `stack.dockerfile.dependencies` read not applicable on every repo that does not use them.
 - `agents.worktrees-in-sync` (v3, shelf-tpq2): a worktree in the middle of merging main (MERGE_HEAD exists) is not held for the commits it is taking; the evidence now names the fix per line, `merge main: git merge origin/main` for being behind and `land it into main` for unmerged work (a2kay stayed red on this row: 22 ahead, 2 behind, and the message did not say which fix applied). Unmerged work still fails during a merge of main.
 
 - Test standard (shelf-4wj3): a test marked `slow` is skipped by `check` (`[tool.blueprint.test] marks = "not slow"`) and run by `check-all`: `test-all` no longer applies `marks` (it used to skip them too). `just test` and `just test-all` take pytest's arguments (`just test-all -m slow`, `just test -k name`; `blueprint gate test|test-all -- <pytest args>`); an override run writes no receipt (the plan's keys are dropped), and `test-all` with arguments turns the coverage floor off. Docs: testing.md "Slow tests". A repo whose addopts excluded slow tests from `check-all` moves the exclusion to `marks`.
