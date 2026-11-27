@@ -383,3 +383,26 @@ def test_a_repo_test_runs_when_a_path_it_reads_changes(keyed: Path, changed: lis
 def test_every_repo_test_keyed_and_nothing_changed_selects_none(keyed: Path) -> None:
     (keyed / "tests" / "test_unlisted.py").unlink()
     assert _ran(keyed, ["ci.yaml"]) == []
+
+
+# --- `packages`: the package directories a change reaches, for a step that runs once per package (the deps step) ---
+
+
+def test_the_packages_command_names_the_affected_packages_one_per_line(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from any_gate_python import cli  # noqa: PLC0415 -- patched below
+
+    monkeypatch.setattr(cli, "changed_files", lambda _repo: ["packages/base/src/base/x.py", "docs/a.md"])
+    monkeypatch.setattr(cli, "lock_touched", lambda *_a, **_k: set())
+    assert cli.main(["packages", "--repo", str(repo)]) == 0
+    assert capsys.readouterr().out.split() == ["base", "middle", "top"]  # the package and its dependents
+
+
+def test_the_packages_command_names_every_package_when_asked_or_when_no_package_is_touched_by_all(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from any_gate_python import cli  # noqa: PLC0415
+
+    assert cli.main(["packages", "--repo", str(repo), "--all"]) == 0
+    assert capsys.readouterr().out.split() == ["base", "leaf", "middle", "plug", "top"]

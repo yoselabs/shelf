@@ -13,7 +13,7 @@ check: gate-start beads-lint (steps "blueprint" "secrets" "lint-changed" "typech
 
 # Opt-in release gate (`[tool.blueprint.gate] release-gate = true`): every step over everything before a tag.
 [group('gate')]
-check-all: beads-lint (steps-all "blueprint" "secrets-all" "lint" "typecheck" "deps" "test-all" "arch" "scripts-all" "stdlib-shadow" "tag-check" "dep-audit") check-extra
+check-all: beads-lint (steps-all "blueprint" "secrets-all" "lint" "typecheck" "deps-all" "test-all" "arch" "scripts-all" "stdlib-shadow" "tag-check" "dep-audit") check-extra
 
 # Extension point: a repo defines `check-extra` in its own justfile to run one more thing in the gate (after the steps, before the record).
 [private]

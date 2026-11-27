@@ -44,7 +44,16 @@ def test_the_repos_extra_steps_join_check_and_their_whole_form_joins_check_all(r
     assert '"test" "arch" "tag-check")' in base
     assert '"test-all" "arch" "tag-check")' in base
     assert '"lint-changed"' in base
-    assert '"lint" "typecheck" "deps"' in base  # the release gate runs the whole form of the changed-only steps
+    assert '"lint" "typecheck" "deps-all"' in base  # the release gate runs the whole form of the changed-only steps
+
+
+def test_deps_checks_the_packages_the_change_reaches_and_deps_all_every_package(repo: Repo) -> None:
+    _repo(repo)
+    python = render.parts(repo.root)[".blueprint/python.just"]
+    assert "deps scope=" in python
+    assert "any_gate_python packages" in python  # the reached packages; the adapter absent -> every package
+    assert "pkgs=$every" in python
+    assert 'deps-all: (deps "all")' in python
 
 
 def test_check_all_runs_the_extension_point_too(repo: Repo) -> None:

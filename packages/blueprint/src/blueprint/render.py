@@ -47,7 +47,7 @@ _STACK_INSTALLS = {
     "yarn.lock": "yarn install --immutable",
 }
 # What the release gate runs instead of a step: the whole-history and whole-suite form.
-_WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all", "lint-changed": "lint"}
+_WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all", "lint-changed": "lint", "deps": "deps-all"}
 _COMMON_STEPS = ("blueprint", "secrets")
 
 
@@ -178,7 +178,7 @@ def _quote(text: str) -> str:
 
 def _without_release_recipes(repo: Path, rendered: dict[str, str], steps: list[str]) -> dict[str, str]:
     """Drop release-only recipes, retaining any that the repo or another retained recipe references."""
-    optional = {"check-all", "steps-all", "secrets-all", "scripts-all", "test-all"}
+    optional = {"check-all", "steps-all", "secrets-all", "scripts-all", "test-all", "deps-all"}
     blocks = {path: text.split("\n\n") for path, text in rendered.items()}
     recipe = re.compile(r"(?m)^([\w-]+)(?:\s+[^\n:]*)?:")
     references = set(steps) | _referenced_recipes(own_recipe_text(repo))
