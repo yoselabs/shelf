@@ -32,17 +32,22 @@ GATE_BUDGET = 180.0
 STEP_LIMIT = 3600.0  # seconds before a step's tree is stopped: a hang guard (no repository has CI to kill it), not a budget
 SKIPPED = "skipped "
 TIMED_OUT = 124  # a step stopped at its limit
-NOT_JUDGED = 125  # a step stopped because another failed under --fail-fast: it says nothing
+INTERNAL = 70  # the gate itself failed while running a step (an unreadable log, a callback that raised): never a pass
 
 
 @dataclass(frozen=True)
 class Step:
-    """How one step ended: exit code (127 when the runner could not start), whole seconds taken, and its log."""
+    """How one step ended: exit code (127 when the runner could not start), whole seconds taken, and its log.
+
+    `stopped` says the gate stopped it because another step failed under --fail-fast: it judged nothing. A flag, not an exit code: a
+    recipe may itself exit with any number (docker and xargs exit 125).
+    """
 
     name: str
     returncode: int
     seconds: int
     log: str
+    stopped: bool = False
 
 
 @dataclass(frozen=True)
@@ -54,17 +59,17 @@ class Report:
 
     @property
     def failed(self) -> tuple[Step, ...]:
-        return tuple(step for step in self.steps if step.returncode not in (0, NOT_JUDGED))
+        return tuple(step for step in self.steps if step.returncode != 0 and not step.stopped)
 
     @property
     def not_judged(self) -> tuple[Step, ...]:
-        return tuple(step for step in self.steps if step.returncode == NOT_JUDGED)
+        return tuple(step for step in self.steps if step.stopped)
 
 
 def _run_step(
     name: str, log: Path, *, runner: str, cwd: Path | None, env: Mapping[str, str], tty: int, limit: float, stop: threading.Event
-) -> int:
-    """Run `runner name` in a session of its own into `log`; its exit code (see `_code`)."""
+) -> tuple[int, bool]:
+    """Run `runner name` in a session of its own into `log`; its exit code (see `_code`) and whether the gate stopped it."""
     writing = threading.Lock()  # stdout and stderr arrive from two reader threads
     with log.open("w", encoding="utf-8", errors="replace") as sink:  # lossy-ok: display: a step's log is shown, never stored or hashed
 
@@ -78,10 +83,12 @@ def _run_step(
             )
         except OSError as err:
             write(f"cannot run {runner}: {err}\n")
-            return 127
+            return 127, False
         if done.timed_out == "wall":
             write(f"gate: {name} ran over its {limit:g}s limit; its process tree was stopped\n")
-        return _code(done)
+        if done.survivors:
+            write(f"gate: {name}: processes left running after the stop: {' '.join(map(str, done.survivors))}\n")
+        return _code(done), done.timed_out in ("stopped", "idle")
 
 
 def run_steps(
@@ -116,12 +123,15 @@ def run_steps(
             if name in skipped:
                 results[name] = Step(name, 0, 0, skipped[name] + "\n")
                 return
-            log = Path(scratch) / f"{name}.log"
             started = time.monotonic()
-            code = _run_step(name, log, runner=runner, cwd=cwd, env=child_env, tty=tty, limit=step_limit, stop=stopper)
-            step = Step(name, code, int(time.monotonic() - started), log.read_text(errors="replace"))  # lossy-ok: display: never stored
+            try:
+                log = Path(scratch) / f"{name}.log"
+                code, stopped = _run_step(name, log, runner=runner, cwd=cwd, env=child_env, tty=tty, limit=step_limit, stop=stopper)
+                step = Step(name, code, int(time.monotonic() - started), log.read_text(errors="replace"), stopped)  # lossy-ok: display
+            except Exception as err:  # noqa: BLE001 -- the gate's own failure becomes a failed step: a lost step must never read as a pass
+                step = Step(name, INTERNAL, int(time.monotonic() - started), f"gate: internal error running {name}: {err!r}\n")
             results[name] = step
-            if code in (0, NOT_JUDGED):
+            if step.returncode == 0 or step.stopped:
                 return
             if halt is not None:
                 halt.set()
@@ -129,28 +139,45 @@ def run_steps(
                 with heard:
                     on_done(step)
 
-        threads = [threading.Thread(target=one, args=(name,)) for name in names]
-        try:
-            for thread in threads:
-                thread.start()
-            for thread in threads:
-                thread.join()
-        except KeyboardInterrupt:
-            stopper.set()  # each step runs in a session of its own: the terminal's Ctrl-C does not reach them, so stop their trees
-            for thread in threads:
-                thread.join()
-            raise
+        _run_threads(names, one, stopper)
     if own:
         os.close(tty)
     return Report(tuple(results[name] for name in names), int(time.monotonic() - began))
 
 
+def _run_threads(names: Sequence[str], one: Callable[[str], None], stopper: threading.Event) -> None:
+    """Run `one(name)` in a thread per name and wait for all; on Ctrl-C, SIGTERM or a failed start set `stopper`, wait for every
+    step that started to end, re-raise."""
+    ended: list[threading.Event] = []
+
+    def worker(name: str, flag: threading.Event) -> None:
+        try:
+            one(name)
+        finally:
+            flag.set()
+
+    threads: list[threading.Thread] = []
+    try:
+        for name in names:
+            flag = threading.Event()
+            thread = threading.Thread(target=worker, args=(name, flag))
+            thread.start()  # only a started thread gets waited for: its flag is registered after
+            threads.append(thread)
+            ended.append(flag)
+        for thread in threads:
+            thread.join()
+    except BaseException:
+        stopper.set()  # each step runs in a session of its own: the terminal's Ctrl-C does not reach them, so stop their trees
+        for flag in ended:  # not join()/is_alive(): a join the signal interrupted reports its thread over while it still runs
+            while not flag.wait(0.5):
+                pass
+        raise
+
+
 def _code(done: stream_proc.Result) -> int:
-    """The step's exit code: 124 at its limit, 125 when stopped by the gate, 128 + signal for a killed child."""
+    """The step's exit code: 124 at its limit, 128 + signal for a killed child (a stop by the gate reads as one)."""
     if done.timed_out == "wall":
         return TIMED_OUT
-    if done.timed_out is not None:
-        return NOT_JUDGED
     if done.returncode is None:
         return 128 + (done.signal or 0)
     return done.returncode
@@ -177,7 +204,7 @@ def render(report: Report, *, step_budget: float, gate_budget: float, shown: Col
     cells = []
     for step in report.steps:
         mark = f" ⚠ over {step_budget:g}s" if step.seconds > step_budget else ""
-        mark += " ○" if step.returncode == NOT_JUDGED else (" ✗" if step.returncode != 0 else "")
+        mark += " ○" if step.stopped else (" ✗" if step.returncode != 0 else "")
         cells.append(f"{step.name} {step.seconds}s{mark}")
     lines.append(f"gate: {' · '.join(cells)} -- total {report.total}s")
     if report.total > gate_budget:

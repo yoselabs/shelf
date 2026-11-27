@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import os
 import re
+import signal
 import subprocess
 import sys
 import textwrap
+import threading
 from typing import TYPE_CHECKING
 
 import pytest
+from any_gate.steps import INTERNAL, _run_threads, run_steps
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -24,6 +27,8 @@ FAKE = textwrap.dedent(
       two) touch "$MEET/b"; n=0; while [ ! -e "$MEET/a" ] && [ $n -lt 300 ]; do sleep 0.1; n=$((n+1)); done; [ -e "$MEET/a" ] && echo two ;;
       slow) sleep 2; echo slow output ;;
       hang) sleep 60 ;;
+      pidhang) echo $$ > "$MEET/pid"; sleep 60 ;;
+      x125) echo "docker said no"; exit 125 ;;
       fail) echo "boom: the reason"; exit 3 ;;
       skip) echo "skipped lint: no file changed" ;;
       wait) [ -n "$GATE_NOTICE_FD" ] && echo "gate-lock: waiting for a slot" >&"$GATE_NOTICE_FD"; echo "quiet log line" ;;
@@ -149,3 +154,78 @@ def test_fail_fast_stops_the_others_and_never_calls_them_passed(fake: str) -> No
 def test_the_release_gate_refuses_fail_fast(fake: str) -> None:
     done = _steps(fake, "ok", flags=("--fail-fast", "--all"))
     assert done.returncode == 2
+
+
+def test_fail_fast_is_reachable_through_the_environment(fake: str) -> None:
+    done = _steps(fake, "hang", "fail", GATE_FAIL_FAST="1")
+    assert re.search(r"hang \d+s ○", done.stderr)
+
+
+def test_a_recipe_that_itself_exits_125_is_a_failure_not_a_stop(fake: str) -> None:
+    done = _steps(fake, "x125", "ok")
+    assert done.returncode == 1
+    assert "gate: failed: x125" in done.stderr
+    assert "not judged" not in done.stderr
+
+
+def test_a_step_the_gate_could_not_run_fails_and_the_report_survives(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(*_args: object, **_kwargs: object) -> tuple[int, bool]:
+        message = "disk full"
+        raise RuntimeError(message)
+
+    monkeypatch.setattr("any_gate.steps._run_step", boom)
+    report = run_steps(["a", "b"], env={})
+    assert [step.returncode for step in report.steps] == [INTERNAL, INTERNAL]
+    assert "disk full" in report.steps[0].log
+    assert len(report.failed) == 2
+
+
+def test_sigterm_stops_every_steps_tree(fake: str, tmp_path: Path) -> None:
+    fifo = tmp_path / "pid"
+    os.mkfifo(fifo)
+    cmd = [sys.executable, "-m", "any_gate", "steps", "--runner", fake, "pidhang"]
+    proc = subprocess.Popen(cmd, stderr=subprocess.PIPE, env={**os.environ, "MEET": str(tmp_path)})
+    with fifo.open() as started:  # blocks until the step wrote its pid: it is running
+        pid = int(started.read())
+    proc.send_signal(signal.SIGTERM)
+    proc.wait(timeout=30)
+    assert proc.stderr is not None
+    proc.stderr.close()
+    with pytest.raises(ProcessLookupError):  # the gate waited for the stop: nothing is left behind
+        os.kill(pid, 0)
+
+
+def test_a_failed_thread_start_stops_the_started_steps_and_does_not_hang(monkeypatch: pytest.MonkeyPatch) -> None:
+    started = threading.Event()
+    release = threading.Event()
+    calls = 0
+    real = threading.Thread.start
+
+    def start(self: threading.Thread) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            message = "can't start new thread"
+            raise RuntimeError(message)
+        real(self)
+
+    monkeypatch.setattr(threading.Thread, "start", start)
+
+    def one(_name: str) -> None:
+        started.set()
+        release.wait(10)
+
+    stopper = threading.Event()
+    threading.Thread(target=lambda: (stopper.wait(10), release.set()), daemon=True).start()
+    with pytest.raises(RuntimeError):
+        _run_threads(["a", "b"], one, stopper)
+    assert stopper.is_set()
+
+
+def test_a_false_value_leaves_fail_fast_off(fake: str) -> None:
+    done = _steps(fake, "slow", "fail", GATE_FAIL_FAST="0")
+    assert "not judged" not in done.stderr
+
+
+def test_a_step_named_twice_is_refused(fake: str) -> None:
+    assert _steps(fake, "ok", "ok").returncode == 2

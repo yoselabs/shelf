@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 from any_gate import changed
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from pathlib import Path
 
 FILE = "gate-inputs.toml"
@@ -37,13 +37,17 @@ def declared(repo: Path) -> dict[str, list[str]]:
     return {name: [str(g) for g in globs] for name, globs in data.items() if isinstance(globs, list)}
 
 
-def unaffected(repo: Path, names: Sequence[str]) -> dict[str, str]:
-    """The steps among `names` that declare inputs none of which changed, each with the reason to print."""
+def unaffected(repo: Path, names: Sequence[str], recorded: Callable[[], bool] = lambda: False) -> dict[str, str]:
+    """The steps among `names` that declare inputs none of which changed, each with the reason to print.
+
+    An empty change set skips them only when `recorded()` says a gate already passed this tree: a clean tree no gate judged (a fresh
+    clone, a merge, a reset) has nothing "changed" and so would judge nothing.
+    """
     wanted = declared(repo)
     if not any(name in wanted for name in names):
         return {}  # nothing declared: ask git nothing
     moved = changed.changed(repo)
-    if moved is None or any(fnmatch.filter(moved, d) for d in _DEFINITION):
+    if moved is None or any(fnmatch.filter(moved, d) for d in _DEFINITION) or (not moved and not recorded()):
         return {}
     return {
         name: f"{changed.SKIPPED_PREFIX}{name}: none of its declared inputs changed"
