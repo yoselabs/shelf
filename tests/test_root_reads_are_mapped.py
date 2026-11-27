@@ -15,3 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_no_test_names_a_mapped_root_file_its_package_is_not_mapped_for() -> None:
     assert reads_audit.audit(ROOT) == []
+
+
+def test_every_repo_test_is_keyed_for_what_it_names() -> None:
+    assert reads_audit.audit_repo_tests(ROOT) == []

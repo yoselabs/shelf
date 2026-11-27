@@ -1150,3 +1150,75 @@ repo-tests = "tests"
 ".python-version" = ["blueprint"]
 ".gitleaks.toml" = ["blueprint"]
 ".config/*" = ["blueprint"]
+
+# What each repo test (tests/test_*.py) reads, as fnmatch globs (`*` crosses `/`): a test runs when a path it reads changed, else it is skipped.
+# `*`: what every test sees (the root conftest and its plugins, the pytest settings, the lock, the shared helpers in tests/). A test no key
+# names runs on every change. Granularity is the folder a test names (`tools/*`), tighter only for `packages/` (src, tests, bench, pyproject).
+# Whole-repo scans stay triggered by any change in what they scan; a docs-only or yaml-only change skips them. `tests/test_root_reads_are_mapped.py`
+# (any_gate_python.reads_audit.audit_repo_tests) fails when a test is not keyed or names a top-level path no pattern of its key covers.
+[tool.any-gate.python.repo-reads]
+"*" = [
+    "conftest.py",
+    "pyproject.toml",
+    "uv.lock",
+    ".python-version",
+    "tests/__init__.py",
+    "tests/arch_*",
+    "tests/tool_path.py",
+    "tools/blueprint_fitness/*",
+    "tools/test_budget/*",
+]
+"test_adr_distillation.py" = ["docs/*"]
+"test_api_surface.py" = ["README.md", "packages/*/README.md", "packages/*/src/*", "tools/*"]
+"test_arch_atomic_writes.py" = ["packages/*/src/*"]
+"test_arch_bool_modes.py" = ["packages/*/src/*"]
+"test_arch_bounded_retry.py" = ["packages/*/src/*"]
+"test_arch_cancellation_not_lost.py" = ["packages/*/src/*"]
+"test_arch_check_then_act.py" = ["packages/*/src/*"]
+"test_arch_cli_surfaces.py" = ["packages/*/src/*", "tools/*"]
+# It prunes docs, catalog and ledger (`_PRUNE`): named, never read, hence the `!`.
+"test_arch_dead_public_api.py" = ["README.md", "justfile", "pyproject.toml", "packages/*", "tests/*", "tools/*", "skills/*", "use-cases/*", "evals/*", "!docs/*", "!catalog/*", "!ledger/*"]
+"test_arch_duplicate_names.py" = ["packages/*/src/*"]
+"test_arch_environment.py" = ["packages/*/src/*"]
+"test_arch_error_erasure.py" = ["packages/*/src/*"]
+"test_arch_exe_env.py" = ["packages/*/src/*"]
+"test_arch_hashing.py" = ["packages/*/src/*"]
+"test_arch_http_clients.py" = ["packages/*/src/*", "packages/*/tests/*"]
+"test_arch_module_level_state.py" = ["packages/*/src/*"]
+"test_arch_no_dead_private_code.py" = ["packages/*/src/*", "tools/*"]
+"test_arch_no_sleep_in_tests.py" = ["packages/*/src/*", "packages/*/tests/*", "tests/*"]
+"test_arch_outcome_unions_consumed.py" = ["packages/*/src/*"]
+"test_arch_output_shape_flags.py" = ["packages/*/src/*"]
+"test_arch_package_exception_base.py" = ["packages/*/src/*"]
+"test_arch_platform_sites.py" = ["packages/*/src/*"]
+"test_arch_plugin_imports.py" = ["packages/*/src/*"]
+"test_arch_process_spawn.py" = ["packages/*/src/*", "tools/*"]
+"test_arch_public_any.py" = ["packages/*/pyproject.toml", "packages/*/src/*"]
+"test_arch_readme_names_its_value.py" = ["README.md", "packages/*/README.md", "packages/*/src/*"]
+"test_arch_rules.py" = ["packages/*/pyproject.toml", "packages/*/src/*", "tools/*"]
+"test_arch_sqlite_access.py" = ["packages/*/src/*", "packages/*/tests/*", "skills/*", "tests/*", "tools/*"]
+"test_arch_swallowed_exceptions.py" = ["packages/*/src/*"]
+"test_arch_test_module_names.py" = ["packages/*/src/*", "packages/*/tests/*"]
+"test_arch_text_hygiene.py" = ["packages/*/bench/*", "packages/*/src/*", "tools/*"]
+"test_arch_threads.py" = ["packages/*/src/*", "tools/*"]
+"test_arch_time_json.py" = ["packages/*/src/*", "tools/*"]
+"test_arch_ttl_cache.py" = ["packages/*/src/*"]
+"test_blueprint_skill.py" = ["skills/*"]
+"test_catalog_projection.py" = ["catalog/*", "tools/*", "use-cases/*"]
+"test_catalog_release_is_current.py" = ["catalog/*", "packages/*/pyproject.toml", "packages/*/src/*", "skills/*"]
+"test_corpus_diff.py" = ["tools/*"]
+"test_dep_audit.py" = ["tools/*"]
+"test_gate_covers_every_package.py" = ["packages/*/pyproject.toml", "packages/*/src/*", "packages/*/tests/*"]
+"test_gate_covers_every_skill.py" = ["evals/*", "skills/*"]
+"test_hermetic_git_env.py" = ["conftest.py"]
+"test_package_tests_declare_their_dependencies.py" = ["packages/*/pyproject.toml", "packages/*/src/*", "packages/*/tests/*", "tests/*"]
+"test_preset_refresh_script.py" = ["packages/*/src/*", "tools/*"]
+"test_preset_snapshot_is_fresh.py" = ["packages/*/src/*"]
+"test_root_reads_are_mapped.py" = ["packages/*", "tools/*"]
+"test_scripts_answer_help.py" = ["packages/*/bench/*", "packages/*/src/*", "tools/*"]
+"test_size_caps.py" = ["packages/*/pyproject.toml", "packages/*/src/*", "packages/*/tests/*", "tests/*", "tools/*"]
+"test_stdlib_shadow.py" = ["tools/*"]
+"test_tag_check.py" = ["packages/*/pyproject.toml", "packages/*/src/*", "tools/*"]
+"test_test_budget.py" = ["tools/*"]
+"test_typecheck_covers_workspace.py" = ["packages/*", "tools/*"]
+"test_workspace_imports_are_declared.py" = ["packages/*/pyproject.toml", "packages/*/src/*", "packages/*/tests/*", "tests/*"]

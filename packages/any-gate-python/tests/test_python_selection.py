@@ -307,3 +307,57 @@ def test_a_mapped_root_file_is_part_of_its_readers_key_and_their_dependents(mapp
     (mapped / ".blueprint" / "x.just").write_text("2")
     two = keys()
     assert {p.split("/")[1] for p in one if one[p] != two[p]} == {"leaf", "middle", "top"}
+
+
+# --- repo tests keyed by what they read (shelf-7aqn): a test file runs when a path it reads changed ---
+
+REPO_READS = """
+[tool.any-gate.python]
+no-effect = ["tests/", "docs/", "ci.yaml"]
+repo-tests = "tests"
+
+[tool.any-gate.python.repo-reads]
+"*" = ["conftest.py", "tests/helper.py"]
+"test_scan_*.py" = ["packages/*/src/*"]
+"test_docs.py" = ["docs/*"]
+"test_bang.py" = ["!docs/*", "tools/*"]
+"""
+
+
+@pytest.fixture
+def keyed(repo: Path) -> Path:
+    (repo / "pyproject.toml").write_text(REPO_READS)
+    (repo / "tests").mkdir()
+    for name in ("test_scan_a.py", "test_scan_b.py", "test_docs.py", "test_bang.py", "test_unlisted.py"):
+        (repo / "tests" / name).write_text("")
+    return repo
+
+
+def _ran(repo: Path, changed: list[str]) -> list[str]:
+    return [p.removeprefix("tests/") for p in affected.affected(repo, changed) if p.startswith("tests")]
+
+
+@pytest.mark.parametrize(
+    ("changed", "ran"),
+    [
+        (["docs/x.md"], ["test_docs.py", "test_unlisted.py"]),  # `!docs/*` names it without reading it
+        (["tools/x.py"], ["test_bang.py", "test_unlisted.py"]),  # a test no key names always runs: never a silent pass
+        (["ci.yaml"], ["test_unlisted.py"]),
+        (["packages/leaf/src/leaf/x.py"], ["test_scan_a.py", "test_scan_b.py", "test_unlisted.py"]),
+        (["packages/leaf/tests/test_x.py"], ["test_unlisted.py"]),
+        (["tests/test_docs.py"], ["test_docs.py", "test_unlisted.py"]),  # the test itself
+        (
+            ["conftest.py"],
+            ["test_bang.py", "test_docs.py", "test_scan_a.py", "test_scan_b.py", "test_unlisted.py"],
+        ),  # a "*" entry reaches every keyed test
+        (["tests/helper.py"], ["test_bang.py", "test_docs.py", "test_scan_a.py", "test_scan_b.py", "test_unlisted.py"]),
+        ([], ["test_unlisted.py"]),
+    ],
+)
+def test_a_repo_test_runs_when_a_path_it_reads_changes(keyed: Path, changed: list[str], ran: list[str]) -> None:
+    assert _ran(keyed, changed) == ran
+
+
+def test_every_repo_test_keyed_and_nothing_changed_selects_none(keyed: Path) -> None:
+    (keyed / "tests" / "test_unlisted.py").unlink()
+    assert _ran(keyed, ["ci.yaml"]) == []

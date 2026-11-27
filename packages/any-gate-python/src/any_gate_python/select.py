@@ -33,7 +33,7 @@ GIT_TIMEOUT = 600.0  # seconds one git call may take
 
 
 def _fitness(repo: Path, changed: list[str], rules: Rules) -> list[str]:
-    """The repo's own tests: whole when a gated test's input changed, else each file but the gated ones a change misses."""
+    """The repo's own tests: whole when a gated test's input changed, else each file whose reads a change touched (unkeyed: always)."""
     if not rules.repo_tests:
         return []
     root = rules.repo_tests
@@ -42,10 +42,12 @@ def _fitness(repo: Path, changed: list[str], rules: Rules) -> list[str]:
 
     def runs(name: str) -> bool:
         reads = (f"{root}/{name}", *rules.gated_reads.get(name, ()))
-        return not rules.is_gated(name) or any(p.startswith(reads) for p in changed)
+        if rules.is_gated(name):
+            return any(p.startswith(reads) for p in changed)
+        return not rules.keyed(name) or rules.reads_changed(name, f"{root}/{name}", changed)
 
-    files = [p.relative_to(repo).as_posix() for p in sorted((repo / root).glob("test_*.py")) if runs(p.name)]
-    return files or [root]
+    every = sorted((repo / root).glob("test_*.py"))
+    return [p.relative_to(repo).as_posix() for p in every if runs(p.name)] if every else [root]
 
 
 def affected_packages(

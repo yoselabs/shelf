@@ -7,16 +7,20 @@ the plugins it loads (those run in every suite, so a file they read cannot be ma
 for some file; which ones stays the map's owner's claim. What it cannot see: a path built at run
 time (an environment variable, a join of parts, `cwd`), a reader behind a constant defined in another module, and source code the
 tests run against the real repo. A reader found that way is the map's owner's to add; the audit narrows the risk, it does not close it.
+
+`audit_repo_tests` does the same for the repo's own tests: each test file must be keyed in `repo-reads`, and every top-level repo path its
+source names (a string constant's first segment, an import of a workspace package or of `tools`) must be covered by a pattern of its key.
 """
 
 from __future__ import annotations
 
 import ast
+import fnmatch
 import re
 from typing import TYPE_CHECKING
 
 from any_gate_python.graph import workspace
-from any_gate_python.rules import Rules
+from any_gate_python.rules import Rules, _glob
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -114,4 +118,69 @@ def audit(repo: Path, rules: Rules | None = None) -> list[str]:
             if _ROOT_HOP.search(text):
                 problems.append(f"{where} finds the repo root (parents[3] or deeper), but {package!r} is mapped for no root file")
                 break
+    return problems
+
+
+_SKIPPED_TOPS = frozenset(
+    {".git", ".venv", ".pytest_cache", ".ruff_cache", ".hypothesis", ".import_linter_cache", ".coverage", "node_modules"}
+)
+_PACKAGE_PARTS = {"tests": "tests", "bench": "bench"}  # a constant under `packages/`: the folder a package keeps beside `src`
+_PACKAGE_FILES = ("README.md", "CHANGELOG.md", "pyproject.toml")
+
+
+def _probes(repo: Path, source: str) -> set[str]:
+    """Paths standing for what `source` (one repo test) names: one invented path under each top-level folder or file it mentions."""
+    tops = {entry.name for entry in sorted(repo.iterdir())} - _SKIPPED_TOPS
+    modules = {m.name for m in sorted(repo.glob("packages/*/src/*")) if m.is_dir()}
+    constants: set[str] = set()
+    found: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            constants.add(node.value)
+            top = re.split(r"[/\\]", node.value)[0]
+            if top in tops:
+                found.add(top)
+            continue
+        if isinstance(node, ast.Import):
+            heads = {a.name.split(".")[0] for a in node.names}
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            heads = {node.module.split(".")[0]}
+        else:
+            continue
+        found.update("packages" for h in heads if h in modules)
+        found.update("tools" for h in heads if h == "tools")
+    probes = {_probe(repo, top) for top in found}
+    if "packages" in found:
+        probes.update(
+            f"packages/x/{part}/x.py" for part, name in _PACKAGE_PARTS.items() if any(name in re.split(r"[/\\]", c) for c in constants)
+        )
+        probes.update(f"packages/x/{name}" for name in _PACKAGE_FILES if name in constants)
+    return probes
+
+
+def _probe(repo: Path, top: str) -> str:
+    if top == "packages":
+        return "packages/x/src/x.py"
+    return f"{top}/x.py" if (repo / top).is_dir() else top
+
+
+def audit_repo_tests(repo: Path, rules: Rules | None = None) -> list[str]:
+    """What is wrong with the `repo-reads` keys: a test file not keyed, or one reading a path no pattern of its key covers."""
+    rules = rules or Rules.load(repo)
+    if not rules.repo_tests:
+        return []
+    problems: list[str] = []
+    for test in sorted((repo / rules.repo_tests).glob("test_*.py")):
+        patterns = [p for key, paths in rules.repo_reads.items() if key == "*" or fnmatch.fnmatchcase(test.name, key) for p in paths]
+        if not rules.keyed(test.name):
+            problems.append(f"{test.name} is not keyed in [tool.any-gate.python.repo-reads]: it runs on every change")
+            continue
+        uncovered = [
+            probe
+            for probe in sorted(_probes(repo, test.read_text(encoding="utf-8")))
+            if not any(_glob(probe, p.removeprefix("!")) for p in patterns)
+        ]
+        problems.extend(
+            f"{test.name} names {probe.split('/')[0]!r} ({probe}), which no pattern of its repo-reads key covers" for probe in uncovered
+        )
     return problems

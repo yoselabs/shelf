@@ -11,6 +11,10 @@ inputs = ["tools/onboard/", "justfile"]
 [tool.any-gate.python.gated.reads]     # what one gated test reads beyond `inputs`
 "test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/beads/backlog.py"]
 
+[tool.any-gate.python.repo-reads]      # what each repo test file reads (fnmatch on the file name -> path globs); `*` applies to all
+"test_arch_*.py" = ["packages/*/src/*"]
+"*" = ["conftest.py", "pyproject.toml"]
+
 [tool.any-gate.python.reads]           # a root file -> the packages whose tests read it (fnmatch, `*` crosses `/`)
 ".pre-commit-config.yaml" = ["blueprint"]
 ".blueprint/*" = ["blueprint", "any-gate"]
@@ -46,6 +50,7 @@ class Rules:
     gated_inputs: tuple[str, ...] = ()
     gated_reads: dict[str, tuple[str, ...]] = field(default_factory=dict)
     reads: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    repo_reads: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, repo: Path) -> Rules:
@@ -60,11 +65,29 @@ class Rules:
             gated_inputs=tuple(gated.get("inputs", ())),
             gated_reads={name: tuple(paths) for name, paths in gated.get("reads", {}).items()},
             reads={pattern: tuple(names) for pattern, names in section.get("reads", {}).items()},
+            repo_reads={name: tuple(paths) for name, paths in section.get("repo-reads", {}).items()},
         )
 
     def observable(self, path: str) -> bool:
         """False when no package test can see a change to `path`."""
         return not matches(path, self.no_effect)
+
+    def keyed(self, name: str) -> bool:
+        """Whether a `repo-reads` entry (other than `*`) names the repo test file `name`: an unkeyed test runs on every change."""
+        return any(key != "*" and fnmatch.fnmatchcase(name, key) for key in self.repo_reads)
+
+    # A pattern written `!path/*` says the test names that path without reading it (a skip list): the audit counts it as covered,
+    # a change to it does not run the test.
+    def reads_changed(self, name: str, own: str, changed: list[str]) -> bool:
+        """Whether a keyed repo test must run: it changed, or a path it (or every keyed test, `*`) reads did."""
+        patterns = [
+            p
+            for key, paths in self.repo_reads.items()
+            if key == "*" or fnmatch.fnmatchcase(name, key)
+            for p in paths
+            if not p.startswith("!")
+        ]
+        return any(path == own or any(_glob(path, p) for p in patterns) for path in changed)
 
     def is_gated(self, name: str) -> bool:
         return any(fnmatch.fnmatchcase(name, g) for g in self.gated_tests)

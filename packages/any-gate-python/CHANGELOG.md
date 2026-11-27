@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `[tool.any-gate.python.repo-reads]`: each repo test file keyed by the paths it reads; a change runs only the tests whose reads it touched (unkeyed tests always run). `reads_audit.audit_repo_tests` keeps the keys true.
 - `[tool.any-gate.python.reads]`: a root file -> the packages whose tests read it. A change selects those packages and their dependents (not every package); `fingerprint`/`plan` hash the mapped files into their readers' keys; an unmapped path still selects every package. `reads_audit.audit` is the fitness check that keeps the map true; `reach(rules=)` measures a rule set.
 
 ## 0.3.0

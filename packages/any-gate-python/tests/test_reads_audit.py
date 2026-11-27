@@ -74,3 +74,53 @@ def test_a_file_the_root_conftest_or_its_plugins_read_cannot_be_mapped(tmp_path:
 def test_a_reader_that_is_no_package_fails(tmp_path: Path) -> None:
     repo = _repo(tmp_path, '"ci.yaml" = ["ghost"]\n', a="")
     assert reads_audit.audit(repo) == ["ci.yaml: reader 'ghost' is not a package"]
+
+
+# --- the repo's own tests: every file keyed, every top-level path it names covered by a pattern of its key ---
+
+
+def _repo_tests(tmp_path: Path, keys: str, **tests: str) -> Path:
+    (tmp_path / "pyproject.toml").write_text(f'[tool.any-gate.python]\nrepo-tests = "tests"\n[tool.any-gate.python.repo-reads]\n{keys}')
+    (tmp_path / "tests").mkdir()
+    for name in ("docs", "tools", "packages/p/src/p"):
+        (tmp_path / name).mkdir(parents=True)
+    for name, text in tests.items():
+        (tmp_path / "tests" / name).write_text(text)
+    return tmp_path
+
+
+def test_a_repo_test_keyed_for_what_it_names_passes(tmp_path: Path) -> None:
+    repo = _repo_tests(tmp_path, '"test_a.py" = ["docs/*", "tools/*"]\n', **{"test_a.py": 'ROOT / "docs"; open("tools/x.py")'})
+    assert reads_audit.audit_repo_tests(repo) == []
+
+
+def test_a_repo_test_no_key_names_is_reported(tmp_path: Path) -> None:
+    repo = _repo_tests(tmp_path, '"test_a.py" = []\n', **{"test_a.py": "", "test_b.py": ""})
+    assert reads_audit.audit_repo_tests(repo) == ["test_b.py is not keyed in [tool.any-gate.python.repo-reads]: it runs on every change"]
+
+
+@pytest.mark.parametrize(
+    ("text", "named"),
+    [
+        ('ROOT / "docs" / "adr"', "docs"),
+        ("from tools.x import y", "tools"),
+        ("import p", "packages"),
+        ('"packages/a/tests/x.py"', "packages"),
+    ],
+)
+def test_a_repo_test_naming_a_path_none_of_its_patterns_covers_is_reported(tmp_path: Path, text: str, named: str) -> None:
+    repo = _repo_tests(tmp_path, '"test_a.py" = ["nothing/*"]\n', **{"test_a.py": text})
+    problems = reads_audit.audit_repo_tests(repo)
+    assert problems
+    assert all(f"names {named!r}" in p for p in problems)
+
+
+def test_a_star_key_covers_every_test_and_a_bang_pattern_counts_as_covered(tmp_path: Path) -> None:
+    repo = _repo_tests(tmp_path, '"*" = ["docs/*"]\n"test_a.py" = ["!tools/*"]\n', **{"test_a.py": 'x = "docs"; y = "tools"'})
+    assert reads_audit.audit_repo_tests(repo) == []
+
+
+def test_a_package_folder_beside_src_needs_its_own_pattern(tmp_path: Path) -> None:
+    repo = _repo_tests(tmp_path, '"test_a.py" = ["packages/*/src/*", "tests/*"]\n', **{"test_a.py": 'p / "packages" / "src"; q = "tests"'})
+    [problem] = reads_audit.audit_repo_tests(repo)
+    assert "packages/x/tests/x.py" in problem
