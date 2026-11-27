@@ -7,6 +7,7 @@ Declared in the repo's pyproject.toml, one entry per generator (blueprint render
     command = "uv run python scripts/contract.py --out {out}"   # {out}: a folder to write the outputs into, at their repo paths
     outputs = ["contract"]                                      # files or folders, relative to the repo
     reads = ["src/*", "scripts/*"]                              # optional: what the generator reads (fnmatch); absent: any change
+    needs = ["ui-install"]                                      # optional: recipes run first (just dependencies; a private recipe works)
 
 The command runs in the repo root. A folder output is compared whole: a file the generator did not write is "not generated" (a leftover),
 a file it wrote and the repo lacks is "missing". The repo is never written; the fix is the same command with `{out}` as `.`.

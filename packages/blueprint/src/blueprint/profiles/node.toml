@@ -90,6 +90,10 @@ gate = "typos"
 label = "codespell (a committed `.codespellrc` or `[tool.codespell]`)"
 gate = '\bcodespell\b'
 
+[[role.alternative]]
+label = "blueprint's own `gate lint` or `gate spell`, which run codespell (its `[tool.codespell]` config is the repo's)"
+gate = '\bblueprint gate (?:lint|spell)\b'
+
 [[role]]
 role = "architecture"
 tool = "dependency-cruiser: forbidden-edge rules between folders and workspace packages, no circular dependencies, one .dependency-cruiser.cjs"
@@ -103,4 +107,4 @@ gate = "depcruise"
 role = "hooks"
 tool = "prek runs biome and typos on staged files (pre-commit); just check on pre-push"
 install = "add local hooks `biome check --staged` style entry and typos to .pre-commit-config.yaml after bd's; the gate on pre-push"
-config = [{ path = ".pre-commit-config.yaml", contains = "biome" }, { any = [{ path = ".pre-commit-config.yaml", contains = "typos" }, { path = ".pre-commit-config.yaml", contains = "codespell" }] }]
+config = [{ path = ".pre-commit-config.yaml", contains = "biome" }, { any = [{ path = ".pre-commit-config.yaml", contains = "typos" }, { path = ".pre-commit-config.yaml", contains = "codespell" }, { path = ".pre-commit-config.yaml", contains = "blueprint gate" }] }]

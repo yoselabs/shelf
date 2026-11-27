@@ -141,6 +141,17 @@ def test_each_entry_renders_a_step_that_runs_the_package_entry_point(repo: Repo)
     assert {"generated-css", "generated-contract"} <= set(steps)
 
 
+def test_needs_renders_as_recipe_dependencies_and_drops_names_that_are_not_recipes(repo: Repo) -> None:
+    repo.write(
+        "pyproject.toml",
+        '[project]\nname = "x"\n[[tool.blueprint.gate.generated]]\nname = "css"\ncommand = "c {out}"\n'
+        'outputs = ["a.css"]\nneeds = ["ui-install", "x; rm -rf /"]\n',
+    )
+    generated = render.parts(repo.root)[".blueprint/generated.just"]
+    assert "\ngenerated-css: ui-install\n    uv run python -I -m blueprint.generated css" in generated
+    assert "rm" not in generated.split("generated-css:")[1].splitlines()[0]
+
+
 def test_a_repo_with_no_entries_renders_no_generated_part(repo: Repo) -> None:
     repo.write("pyproject.toml", '[project]\nname = "x"\n')
     assert ".blueprint/generated.just" not in render.parts(repo.root)

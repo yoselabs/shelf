@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING
 
 import stream_proc
 
+from any_gate import opens as step_opens
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Mapping, Sequence
 
@@ -102,11 +104,13 @@ def run_steps(
     step_limit: float = STEP_LIMIT,
     halt: threading.Event | None = None,
     on_done: Callable[[Step], None] | None = None,
+    opens: Path | None = None,
 ) -> Report:
     """Run `runner NAME` for every name at once in `env`; `terminal` is the descriptor notices go to (default: a copy of stderr).
 
     A name in `skip` is never started: its step is a pass whose log is the reason (a `skipped ...` line). `on_done` hears each step
     that failed, the moment it ends (under a lock: one call at a time). A step over `step_limit` seconds has its tree stopped (exit 124).
+    With `opens` (a folder) every step runs with the open counter of `any_gate.opens` and writes its counts there.
     With a `halt` event the first failure sets it and every running step's tree is stopped (fail-fast); without one the others finish.
     """
     own = terminal is None
@@ -126,7 +130,8 @@ def run_steps(
             started = time.monotonic()
             try:
                 log = Path(scratch) / f"{name}.log"
-                code, stopped = _run_step(name, log, runner=runner, cwd=cwd, env=child_env, tty=tty, limit=step_limit, stop=stopper)
+                step_env = child_env if opens is None else step_opens.env_for(name, opens, child_env)
+                code, stopped = _run_step(name, log, runner=runner, cwd=cwd, env=step_env, tty=tty, limit=step_limit, stop=stopper)
                 step = Step(name, code, int(time.monotonic() - started), log.read_text(errors="replace"), stopped)  # lossy-ok: display
             except Exception as err:  # noqa: BLE001 -- the gate's own failure becomes a failed step: a lost step must never read as a pass
                 step = Step(name, INTERNAL, int(time.monotonic() - started), f"gate: internal error running {name}: {err!r}\n")
@@ -230,8 +235,12 @@ def run_and_report(
     skip: Mapping[str, str] | None = None,
     step_limit: float = STEP_LIMIT,
     halt: threading.Event | None = None,
+    opens: Path | None = None,
 ) -> int:
-    """Run the steps, say each failure as it lands and the rest after, and return 0 when every step passed, else 1."""
+    """Run the steps, say each failure as it lands and the rest after; 0 when every step passed, else 1.
+
+    With an `opens` folder (made by `opens.prepare`) each step's file opens and process starts are counted and printed last.
+    """
     say(f"gate: {' '.join(names)} (in parallel)")
     shown: list[str] = []
 
@@ -240,7 +249,10 @@ def run_and_report(
         for line in failure_lines(step):
             say(line)
 
-    report = run_steps(names, env=env, runner=runner, cwd=cwd, skip=skip, step_limit=step_limit, halt=halt, on_done=land)
+    report = run_steps(names, env=env, runner=runner, cwd=cwd, skip=skip, step_limit=step_limit, halt=halt, on_done=land, opens=opens)
     for line in render(report, step_budget=step_budget, gate_budget=gate_budget, shown=shown):
         say(line)
+    if opens is not None:
+        for line in step_opens.lines(step_opens.collect(opens, names)):
+            say(line)
     return 1 if report.failed or report.not_judged else 0

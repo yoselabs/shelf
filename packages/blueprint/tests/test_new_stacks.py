@@ -247,3 +247,14 @@ def test_the_node_spelling_row_still_fails_with_neither_tool_configured(repo: Re
         repo.write(rel, text)
     rows = _rows(repo, "node")
     assert rows["stack.node.spelling"] is Verdict.NOT_SET_UP
+
+
+def test_the_node_spelling_and_hooks_rows_accept_blueprints_lint_changed_as_codespell(repo: Repo) -> None:
+    files = {k: v for k, v in _NODE_FILES.items() if k != "typos.toml"}
+    files[_HOOKS_FILE] = "biome\n  entry: uv run blueprint gate lint --changed\n"
+    for rel, text in {**files, ".codespellrc": "[codespell]\nskip = x\n"}.items():
+        repo.write(rel, text)
+    repo.write("Makefile", "check:\n" + "".join(f"\t{c}\n" for c in [*_NODE_STEPS[:-1], "uv run blueprint gate lint --changed"]))
+    rows = _rows(repo, "node")
+    assert rows["stack.node.spelling"] is Verdict.PASSING
+    assert rows["stack.node.hooks"] is Verdict.PASSING

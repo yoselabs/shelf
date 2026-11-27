@@ -54,6 +54,10 @@ def _sleeps(source: Source) -> Iterator[Hit]:
 
 _ALLOWED = {
     **rows(
+        "kept: a state poll with a deadline for a grandchild to start or a process group to vanish; there is no event to wait on",
+        ("packages/any-proc/tests/test_children.py", 1),
+    ),
+    **rows(
         "kept: holds a child process or a task open for a long time until the test kills or cancels it",
         ("packages/any-json-doc/tests/test_doc.py", 1),
         ("packages/any-pipeline/tests/test_pipeline_runs.py", 4),

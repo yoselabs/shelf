@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.0
+
+- Corpus diff against 0.16.0: 42 repos, no verdict moved (the new rows only turn a warning into a pass where a repo's gate runs codespell through `blueprint gate lint`).
+- `stack.compose.spelling`, `stack.node.spelling`, `stack.node.hooks` (and the node-tooling twins) accept `blueprint gate lint|spell` as codespell (a2kay's gate runs codespell only through `lint-changed`; its justfile never says the word); a repo with no spelling check still fails (shelf-ab0f).
+- `[tool.blueprint.gate] image-pins = true` also pins compose images: `images` runs `python -m blueprint.compose_pins`, one process over every tracked compose file, failing an `image:` that is not `name:tag@sha256:<64 hex>`; `image-pin-exempt = ["<prefix>"]` excuses an image whose text starts with the prefix (an image built from the same commit). A repo drops its own `compose-pins` (shelf-8p76).
+- A `[[tool.blueprint.gate.generated]]` entry may name `needs = ["recipe"]`: rendered as just dependencies of `generated-<name>` (a private recipe works), so the command need not call the recipe itself (shelf-mgno).
+
 ## 0.16.0
 
 - Corpus diff against 0.15.0 (42 repos): no verdict moved to worse except `stack.compose.spelling` on yosefactory (not set up -> warning): it configures `[tool.codespell]`, which the row now recognises, and its Makefile gate is not read (already `gate.runner`). New row `gate.narrowed-inputs-have-a-reason` and the optional `stack.dockerfile.dependencies` read not applicable on every repo that does not use them.

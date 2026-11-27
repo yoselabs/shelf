@@ -343,3 +343,12 @@ def test_the_compose_spelling_row_still_accepts_typos(repo: Repo) -> None:
     repo.write("typos.toml", "[default]\n")
     repo.write("justfile", "check: spell\nspell:\n    typos\n")
     assert _rows(repo)["stack.compose.spelling"][0] is Verdict.PASSING
+
+
+def test_the_compose_spelling_row_accepts_blueprints_lint_changed_and_still_fails_with_no_check(repo: Repo) -> None:
+    repo.write("compose.yml", "services:\n  db:\n    image: postgres:17\n")
+    repo.write(".codespellrc", "[codespell]\nskip = x\n")
+    repo.write("justfile", "check: lint-changed\nlint-changed:\n    uv run blueprint gate lint --changed\n")
+    assert _rows(repo)["stack.compose.spelling"][0] is Verdict.PASSING
+    repo.write("justfile", "check: lint-changed\nlint-changed:\n    ruff check .\n")
+    assert _rows(repo)["stack.compose.spelling"][0] is not Verdict.PASSING
