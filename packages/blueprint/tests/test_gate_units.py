@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from typing import TYPE_CHECKING
@@ -92,7 +93,13 @@ def test_filtered_run_cannot_supply_a_plain_runs_coverage(repo: Repo, tmp_path: 
 
     def filtered_go(args: str) -> int:
         return gate_test.run(
-            repo.root, receipts=tmp_path / "r", lease_root=tmp_path / "leases", cache=tmp_path / "cache", env=repo.env, pytest_args=args
+            repo.root,
+            whole=False,
+            receipts=tmp_path / "r",
+            lease_root=tmp_path / "leases",
+            cache=tmp_path / "cache",
+            env=repo.env,
+            pytest_args=args,
         )
 
     assert filtered_go("--deselect=tests/core/test_core.py::test_bad") == 0
@@ -136,7 +143,7 @@ def test_test_settings_change_every_units_key(repo: Repo, setting: str) -> None:
 @pytest.mark.parametrize("mode", ["coverage", "pytest-cov", ""])
 def test_test_processes_honor_configured_args_marks_and_environment(repo: Repo, tmp_path: Path, mode: str) -> None:
     _app(repo)
-    settings = '\npytest-args = ["-q", "--override-ini=markers=slow: excluded"]\nmarks = "not slow"'
+    settings = '\npytest-args = ["-q", "--override-ini=markers=skipme: excluded"]\nmarks = "not skipme"'
     settings += '\nenv = { BLUEPRINT_TEST_VALUE = "configured", COVERAGE_FILE = "wrong.cov" }'
     manifest = _PYPROJECT.replace('coverage = "coverage"', f'coverage = "{mode}"').replace("floor = 50", "floor = 50" + settings)
     repo.write("pyproject.toml", manifest)
@@ -144,10 +151,13 @@ def test_test_processes_honor_configured_args_marks_and_environment(repo: Repo, 
         "tests/core/test_core.py",
         "import os\nimport pytest\nfrom app.core import add\n\n"
         "def test_environment():\n    assert os.environ['BLUEPRINT_TEST_VALUE'] == 'configured'\n    assert add(1, 2) == 3\n\n"
-        "@pytest.mark.slow\ndef test_excluded():\n    assert False\n",
+        "@pytest.mark.skipme\ndef test_excluded():\n    assert False\n",
     )
     assert (
-        gate_test.run(repo.root, receipts=tmp_path / "r.json", lease_root=tmp_path / "leases", cache=tmp_path / "cache", env=repo.env) == 0
+        gate_test.run(
+            repo.root, whole=False, receipts=tmp_path / "r.json", lease_root=tmp_path / "leases", cache=tmp_path / "cache", env=repo.env
+        )
+        == 0
     )
     assert not (repo.root / "wrong.cov").exists()
 
@@ -156,7 +166,7 @@ def test_noncoverage_command_puts_configured_arguments_before_cli_arguments(repo
     _app(repo)
     manifest = _PYPROJECT.replace('coverage = "coverage"', 'pytest-args = ["-q"]\nmarks = "not slow"')
     repo.write("pyproject.toml", manifest)
-    _, command = gate_test.commands(repo.root, receipts=None, lease_root=None, pytest_args="-v")
+    _, command = gate_test.commands(repo.root, whole=False, receipts=None, lease_root=None, pytest_args="-v")
     assert command[-1] == "--pytest-args=-q -m 'not slow' -v"
 
 
@@ -218,7 +228,7 @@ def test_the_cache_lives_in_the_shared_git_directory_one_folder_per_checkout(rep
 
 def test_units_with_coverage_run_through_the_unit_runner(repo: Repo) -> None:
     _app(repo)
-    _, test = gate_test.commands(repo.root, receipts=None, lease_root=None, pytest_args="", cache=repo.root / "c")
+    _, test = gate_test.commands(repo.root, whole=False, receipts=None, lease_root=None, pytest_args="", cache=repo.root / "c")
     assert test[test.index("--") + 1 :][1:3] == ["-m", "blueprint.unit_runner"]
 
 
@@ -227,8 +237,8 @@ def test_a_green_run_caches_each_units_data_and_combines_it_whole_repo(repo: Rep
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) == 0
-    assert unit_runner.cached(cache, config, repo.root) == {f"{n}:{k}" for n, k in _keys(repo).items()}
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) == 0
+    assert unit_runner.cached(cache, config, _keys(repo)) == {f"{n}:{k}" for n, k in _keys(repo).items()}
     assert unit_runner.combine(repo.root, cache, config) == 0
 
 
@@ -237,9 +247,11 @@ def test_a_skipped_unit_still_counts_toward_the_floor(repo: Repo, tmp_path: Path
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) == 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) == 0
     repo.write("src/app/ui/view.py", "from app.core import add\n\ndef show():\n    return add(1, 1)\n# edit\n")
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/ui"], []) == 0  # core is skipped: its data comes from the cache
+    assert (
+        unit_runner.run_units(repo.root, cache, config, ["tests/ui"], [], marks=True) == 0
+    )  # core is skipped: its data comes from the cache
     out = subprocess.run(
         [sys.executable, "-m", "coverage", "report", "--data-file", str(next(cache.glob("core-*.cov")))],
         cwd=repo.root,
@@ -257,7 +269,7 @@ def test_a_failing_unit_caches_nothing_and_stops_the_run(repo: Repo, tmp_path: P
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) != 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) != 0
     assert not list(cache.glob("*.cov"))
 
 
@@ -268,7 +280,7 @@ def test_the_floor_fails_when_the_combined_coverage_is_under_it(repo: Repo, tmp_
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) == 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) == 0
     assert unit_runner.combine(repo.root, cache, config) == 1
 
 
@@ -368,7 +380,7 @@ def test_parallel_coverage_data_is_joined_into_the_units_one_file(repo: Repo, tm
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) == 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) == 0
     assert unit_runner.combine(repo.root, cache, config) == 0
 
 
@@ -381,7 +393,13 @@ def test_a_second_run_starts_no_test_process(repo: Repo, tmp_path: Path) -> None
 
     def go() -> int:
         return gate_test.run(
-            repo.root, receipts=tmp_path / "r.json", lease_root=tmp_path / "leases", pytest_args="", cache=tmp_path / "cache", env=repo.env
+            repo.root,
+            whole=False,
+            receipts=tmp_path / "r.json",
+            lease_root=tmp_path / "leases",
+            pytest_args="",
+            cache=tmp_path / "cache",
+            env=repo.env,
         )
 
     assert go() == 0
@@ -398,3 +416,172 @@ def test_a_pytest_cov_unit_never_fails_alone_on_the_whole_repo_floor() -> None:
     command = unit_runner._command("pytest-cov", [], ("tests/a",))
     assert "--cov-fail-under=0" in command
     assert command.index("--cov-fail-under=0") < command.index("tests/a")
+
+
+def _golden_app(repo: Repo) -> None:
+    """`_app` plus every way the key reaches a file: a relative import, a data file beside code, a computed import, `reads`, a lock."""
+    _app(repo)
+    repo.write("src/app/ui/rel.py", "from . import view\nfrom .. import core\n")
+    repo.write("src/app/ui/page.html", "<p>x</p>\n")
+    repo.write("src/app/plug/__init__.py", "import importlib\n\ndef load(name):\n    return importlib.import_module(name)\n")
+    repo.write("src/app/plug/a.py", "A = 1\n")
+    repo.write("src/app/plug/data.sql", "select 1;\n")
+    repo.write("tests/ui/test_rel.py", "from app.ui import rel\nfrom app import plug\n\ndef test_rel():\n    assert rel and plug\n")
+    repo.write("uv.lock", "version = 1\n")
+
+
+# Frozen from the keys the code produced before they were computed once per run (shelf-8r18): a faster key must be the same key, or
+# every receipt and every cached coverage file in every consumer is orphaned.
+_GOLDEN_KEYS = {"core": "978a12d6328662c03aedd39746ecf0f1", "ui": "0785155ef09e26e4c14748ce64fbed46"}
+
+
+def test_a_unit_key_is_the_one_it_has_always_been(repo: Repo) -> None:
+    _golden_app(repo)
+    assert _keys(repo) == _GOLDEN_KEYS
+
+
+# ── keys are computed once per run, each file read once (shelf-8r18) ─────────────────────────────────────────────────────────────────
+
+
+def _count_reads(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
+    """Every file `Path.read_bytes` / `read_text` opens, by name, counted."""
+    from pathlib import Path as RealPath  # noqa: PLC0415
+
+    seen: dict[str, int] = {}
+    read_bytes, read_text = RealPath.read_bytes, RealPath.read_text
+
+    def bytes_(self: Path) -> bytes:
+        seen[str(self)] = seen.get(str(self), 0) + 1
+        return read_bytes(self)
+
+    def text(self: Path, *args: object, **kwargs: object) -> str:
+        seen[str(self)] = seen.get(str(self), 0) + 1
+        return read_text(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(RealPath, "read_bytes", bytes_)
+    monkeypatch.setattr(RealPath, "read_text", text)
+    return seen
+
+
+def test_every_unit_key_of_a_run_is_computed_with_each_file_read_once(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
+    _golden_app(repo)
+    config = gate_units.load(repo.root)
+    assert config is not None
+    seen = _count_reads(monkeypatch)
+    keys = gate_units.keys(repo.root, config)
+    assert keys == _GOLDEN_KEYS
+    assert seen, "the keys read files"
+    assert {name: n for name, n in seen.items() if n > 1} == {}  # a file two units share, or a parse and a hash, is still one read
+
+
+def test_a_no_op_run_reads_each_file_once_and_hands_the_runner_the_keys(
+    repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _golden_app(repo)
+    repo.write("pyproject.toml", _PYPROJECT.replace("floor = 50\n", ""))  # no floor: nothing to combine
+    cache = tmp_path / "cache"
+    config = gate_units.load(repo.root)
+    assert config is not None
+    for unit in config.units:
+        unit_runner.data_file(cache, unit.name, _GOLDEN_KEYS[unit.name]).parent.mkdir(parents=True, exist_ok=True)
+        unit_runner.data_file(cache, unit.name, _GOLDEN_KEYS[unit.name]).write_bytes(b"")
+    seen = _count_reads(monkeypatch)
+    ran: list[list[str]] = []
+
+    def execute(cmd: list[str], *, cwd: Path, stdin: str | None, env: dict[str, str]) -> tuple[int, str]:
+        ran.append(cmd)
+        return 0, ""
+
+    code = gate_test.run(repo.root, whole=False, receipts=None, lease_root=None, cache=cache, execute=execute, env=repo.env)
+    assert code == 0
+    key_reads = {name: n for name, n in seen.items() if not name.endswith("pyproject.toml")}
+    assert {name: n for name, n in key_reads.items() if n > 1} == {}
+    assert "--keys=" + json.dumps(_GOLDEN_KEYS, sort_keys=True) in ran[-1]
+
+
+def test_a_repo_with_no_floor_skips_combine(repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _golden_app(repo)
+    repo.write("pyproject.toml", _PYPROJECT.replace("floor = 50\n", ""))
+    called: list[str] = []
+    monkeypatch.setattr(unit_runner, "combine", lambda *a, **k: called.append("combine") or 1)
+    code = gate_test.run(
+        repo.root, whole=False, receipts=None, lease_root=None, cache=tmp_path / "c", env=repo.env, execute=lambda *a, **k: (0, "")
+    )
+    assert code == 0
+    assert called == []
+
+
+# ── globs in `paths` and the `rest` unit ─────────────────────────────────────────────────────────────────────────────────────────────
+
+_ROOT_FILES = ("tests/test_a.py", "tests/test_b.py", "tests/b_test.py")
+
+
+def _loose(repo: Repo, units: str) -> gate_units.Config:
+    """`_app` plus loose test files under `tests/`, with `units` as the repo's unit table."""
+    _app(repo)
+    for path in _ROOT_FILES:
+        repo.write(path, "from app.core import add\n\ndef test_x():\n    assert add(1, 1) == 2\n")
+    repo.write("tests/helpers.py", "X = 1\n")
+    repo.write(
+        "pyproject.toml",
+        _PYPROJECT.split("[tool.blueprint.test.units.core]", maxsplit=1)[0] + units + "\n[tool.coverage.run]\nsource = ['src/app']\n",
+    )
+    config = gate_units.load(repo.root)
+    assert config is not None
+    return config
+
+
+def test_a_glob_in_paths_names_every_match_sorted(repo: Repo) -> None:
+    config = _loose(repo, '[tool.blueprint.test.units.root]\npaths = ["tests/test_*.py", "tests/*_test.py"]\n')
+    assert config.problems == ()
+    assert config.units[0].paths == ("tests/b_test.py", "tests/test_a.py", "tests/test_b.py")
+
+
+def test_a_globbed_unit_has_the_key_of_the_hand_listed_one(repo: Repo) -> None:
+    globbed = _loose(repo, '[tool.blueprint.test.units.root]\npaths = ["tests/test_*.py", "tests/*_test.py"]\n')
+    by_glob = gate_units.keys(repo.root, globbed)
+    listed = _loose(repo, '[tool.blueprint.test.units.root]\npaths = ["tests/b_test.py", "tests/test_a.py", "tests/test_b.py"]\n')
+    assert gate_units.keys(repo.root, listed) == by_glob
+
+
+def test_a_glob_that_matches_nothing_is_a_problem_not_an_empty_unit(repo: Repo) -> None:
+    config = _loose(repo, '[tool.blueprint.test.units.root]\npaths = ["tests/nothing_*.py"]\n')
+    assert any("matches nothing" in p and "root" in p for p in config.problems)
+
+
+def test_the_rest_unit_is_every_test_file_no_other_unit_claims(repo: Repo) -> None:
+    config = _loose(
+        repo,
+        '[tool.blueprint.test.units.core]\npaths = ["tests/core"]\n[tool.blueprint.test.units.rest]\nrest = true\n'
+        '[tool.blueprint.test.units.ui]\npaths = ["tests/ui", "tests/test_b.py"]\n',
+    )
+    assert config.problems == ()
+    rest = next(u for u in config.units if u.name == "rest")
+    assert rest.paths == ("tests/b_test.py", "tests/test_a.py")  # the folders and the file other units name are not in it
+    assert gate_units.uncovered_test_folders(repo.root, config) == []
+
+
+def test_a_new_test_file_joins_the_rest_unit_and_changes_only_its_key(repo: Repo) -> None:
+    units = (
+        '[tool.blueprint.test.units.core]\npaths = ["tests/core"]\n[tool.blueprint.test.units.rest]\nrest = true\n'
+        '[tool.blueprint.test.units.ui]\npaths = ["tests/ui"]\n'
+    )
+    config = _loose(repo, units)
+    before = gate_units.keys(repo.root, config)
+    repo.write("tests/test_new.py", "def test_new():\n    assert True\n")
+    after_config = gate_units.load(repo.root)
+    assert after_config is not None
+    after = gate_units.keys(repo.root, after_config)
+    assert "tests/test_new.py" in next(u for u in after_config.units if u.name == "rest").paths
+    assert after["rest"] != before["rest"]
+    assert (after["core"], after["ui"]) == (before["core"], before["ui"])
+
+
+def test_a_rest_unit_whose_files_are_all_claimed_is_no_unit(repo: Repo) -> None:
+    config = _loose(repo, '[tool.blueprint.test.units.all]\npaths = ["tests"]\n[tool.blueprint.test.units.rest]\nrest = true\n')
+    assert [u.name for u in config.units] == ["all"]
+
+
+def test_only_one_rest_unit_is_allowed(repo: Repo) -> None:
+    config = _loose(repo, "[tool.blueprint.test.units.a]\nrest = true\n[tool.blueprint.test.units.b]\nrest = true\n")
+    assert any("rest" in p for p in config.problems)
