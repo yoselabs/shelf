@@ -51,9 +51,9 @@ deps:
 test *args:
     uv run blueprint gate test -- "$@"
 
-# Every test, `slow` ones too, with the coverage floor (the release gate's test step). Coverage is a whole-repo measure, so a floor cannot
-# ride on a partial run: with arguments (`just test-all -m slow`) the floor is off. The floor is `[tool.blueprint.test] floor` (default 65).
-# Queues behind any-lease when installed.
+# `test` over every suite and every mark, receipts ignored (the release gate's test step): the same runner, plan and test slot. A coverage
+# floor applies only when the repo declares one (`[tool.blueprint.test] floor`, else `[tool.coverage.report] fail_under`); a whole-repo
+# measure cannot ride on a partial run, so with arguments (`just test-all -m slow`) the floor is off.
 [group('gate')]
 [positional-arguments]
 test-all *args:

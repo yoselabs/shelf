@@ -16,10 +16,11 @@ from __future__ import annotations
 import shlex
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
-from blueprint import gate_units, unit_runner
+from blueprint import gate_py, gate_units, unit_runner
 
 # Coverage is a whole-repo measure: a partial run cannot meet a floor, so the default run turns the plugin off (`just cov` measures).
 DEFAULT_PYTEST_ARGS = "-p no:cov"
@@ -44,12 +45,15 @@ def cache_dir(repo: Path) -> Path:
 
 
 def commands(
-    repo: Path, *, receipts: Path | None, lease_root: Path | None, pytest_args: str, cache: Path | None = None
+    repo: Path, *, receipts: Path | None, lease_root: Path | None, pytest_args: str, whole: bool, cache: Path | None = None
 ) -> tuple[list[str] | None, list[str]]:
-    """`(plan command or None, test command)`; the plan command's stdout is the test command's stdin."""
+    """`(plan command or None, test command)`; the plan command's stdout is the test command's stdin.
+
+    `whole` is the release run (`test-all`): the plan lists every suite and the runner runs every mark.
+    """
     py = sys.executable
     config = None if is_workspace(repo) else gate_units.load(repo)
-    plan = [py, "-m", "any_gate_python", "plan", "--explain", "--plan"] if is_workspace(repo) else None
+    plan = [py, "-m", "any_gate_python", "plan", "--explain", "--plan", *(["--all"] if whole else [])] if is_workspace(repo) else None
     test = [py, "-m", "any_gate", "test"]
     if receipts is not None:
         test += ["--receipts", str(receipts)]
@@ -57,9 +61,11 @@ def commands(
         test += ["--lease-root", str(lease_root)]
     if config is not None and config.coverage:
         where = cache or cache_dir(repo)
-        test += ["--", py, "-m", "blueprint.unit_runner", "--repo", str(repo), "--cache", str(where), f"--pytest-args={pytest_args}"]
+        runner = [py, "-m", "blueprint.unit_runner", "--repo", str(repo), "--cache", str(where), f"--pytest-args={pytest_args}"]
+        test += ["--", *runner, *(["--whole"] if whole else [])]
     else:
-        pytest_args = shlex.join([*gate_units.read_config(repo).arguments(), *shlex.split(pytest_args)])
+        settings = gate_units.read_config(repo)
+        pytest_args = shlex.join([*(settings.every_mark() if whole else settings.arguments()), *shlex.split(pytest_args)])
         test += ["--", py, "-m", "any_gate_python", "run", f"--pytest-args={pytest_args}"]
     return plan, test
 
@@ -72,6 +78,21 @@ def _execute(cmd: list[str], *, cwd: Path, stdin: str | None, env: dict[str, str
     return subprocess.run(cmd, cwd=cwd, env=env, input=stdin, text=True, check=False).returncode, ""
 
 
+def declared_floor(repo: Path) -> float | None:
+    """The whole-repo floor the repo declares (`[tool.blueprint.test] floor`, else `[tool.coverage.report] fail_under`), or None."""
+    config = gate_py.settings(repo)
+    for raw in (config.get("test", {}).get("floor"), config.get("coverage-report", {}).get("fail_under")):
+        if isinstance(raw, int | float) and not isinstance(raw, bool):
+            return float(raw)
+    return None
+
+
+def _cov_off(repo: Path, extra: str) -> bool:
+    """Whether the repo's pytest arguments (or this call's) turn the cov plugin off (`-p no:cov`): pytest then rejects `--cov`."""
+    words = [*gate_units.read_config(repo).pytest_args, *shlex.split(extra)]
+    return any(a == "-pno:cov" or (a == "no:cov" and i > 0 and words[i - 1] == "-p") for i, a in enumerate(words))
+
+
 def run(
     repo: Path,
     *,
@@ -79,6 +100,7 @@ def run(
     receipts: Path | None,
     lease_root: Path | None,
     pytest_args: str | None = None,
+    whole: bool,
     execute: Execute = _execute,
     cache: Path | None = None,
 ) -> int:
@@ -86,34 +108,70 @@ def run(
 
     Pytest arguments default to turning the cov plugin off, except when the repo measures coverage, where they default to none.
     With a coverage floor the units' data is combined after a green run and the floor applied: the floor is whole-repo.
+
+    `whole` is `test-all`, the release run: the same runner and plan as `test`, with every suite planned, no key (a receipt is neither
+    read nor written), every mark run, and `randomize` honoured. A floor is judged only when the repo declares one and the run is not an
+    override (pytest arguments given); a repo without `coverage` mode is measured by pytest-cov across the stages, one report at the end.
     """
     config = None if is_workspace(repo) else gate_units.load(repo)
     measuring = config is not None and bool(config.coverage)
-    if config is not None:
-        problems = list(config.problems)
-        if config.units and (uncovered := gate_units.uncovered_test_folders(repo, config)):
-            problems.append(f"test folders outside declared units: {', '.join(uncovered)}")
-        if problems:
-            sys.stderr.write("blueprint: " + "; ".join(problems) + "\n")
-            return 2
-    args = pytest_args if pytest_args is not None else ("" if measuring else DEFAULT_PYTEST_ARGS)
+    if config is not None and (problems := _problems(repo, config)):
+        sys.stderr.write("blueprint: " + "; ".join(problems) + "\n")
+        return 2
     filtered = bool(pytest_args and shlex.split(pytest_args))
+    args, floor = _arguments(repo, pytest_args, whole=whole, measuring=measuring)
     where = cache or cache_dir(repo)
-    plan_cmd, test_cmd = commands(repo, receipts=receipts, lease_root=lease_root, pytest_args=args, cache=where)
+    plan_cmd, test_cmd = commands(repo, receipts=receipts, lease_root=lease_root, pytest_args=args, cache=where, whole=whole)
+    blank = filtered or whole  # pytest arguments, or the release run: no key, so no receipt a later normal run could skip on
     if config is not None:
-        plan = gate_units.plan(repo, config, cached=unit_runner.cached(where, config, repo) if measuring and not filtered else None)
-        if filtered:
-            plan = "".join(f"{path}\t\n" for unit in config.units for path in unit.paths)
+        cached = unit_runner.cached(where, config, repo) if measuring and not blank else None
+        plan = (
+            "".join(f"{path}\t\n" for unit in config.units for path in unit.paths)
+            if blank
+            else gate_units.plan(repo, config, cached=cached)
+        )
     elif plan_cmd is None:
         plan = whole_suite_plan()
     else:
         code, plan = execute(plan_cmd, cwd=repo, stdin=None, env=env)
         if code != 0:
             return code
-        if filtered:  # pytest arguments change what runs: no key, so no receipt a later normal run could skip on
+        if blank:
             plan = "".join(f"{line.split(chr(9))[0]}\t\n" for line in plan.splitlines() if line)
     test_env = {**env, **gate_units.read_config(repo).env}
-    code = execute(test_cmd, cwd=repo, stdin=plan, env=test_env)[0]
-    if code != 0 or config is None or not measuring or filtered:
-        return code
+    with tempfile.TemporaryDirectory() as tmp:
+        if floor is not None:
+            test_env["COVERAGE_FILE"] = str(Path(tmp) / "data")
+        code = execute(test_cmd, cwd=repo, stdin=plan, env=test_env)[0]
+        if code != 0:
+            return code
+        if floor is not None:
+            report = [sys.executable, "-m", "coverage", "report", "--show-missing", f"--fail-under={floor:g}"]
+            return execute(report, cwd=repo, stdin="", env=test_env)[0]
+    if config is None or not measuring or filtered:
+        return 0
     return unit_runner.combine(repo, where, config)
+
+
+def _problems(repo: Path, config: gate_units.Config) -> list[str]:
+    problems = list(config.problems)
+    if config.units and (uncovered := gate_units.uncovered_test_folders(repo, config)):
+        problems.append(f"test folders outside declared units: {', '.join(uncovered)}")
+    return problems
+
+
+def _arguments(repo: Path, pytest_args: str | None, *, whole: bool, measuring: bool) -> tuple[str, float | None]:
+    """`(the pytest arguments for every stage, the floor to judge afterwards or None)`."""
+    given = pytest_args or ""
+    floor = declared_floor(repo) if whole and not measuring and not shlex.split(given) else None
+    if floor is not None and _cov_off(repo, given):
+        message = f'floor {floor:g} not judged: pytest-args turn the cov plugin off; set coverage = "coverage" to measure it'
+        sys.stderr.write(f"blueprint: {message}\n")
+        floor = None
+    own: list[str] = []
+    if whole and gate_py.settings(repo).get("test", {}).get("randomize") is True:
+        own += ["-p", "randomly"]  # the release run shuffles; `check` does not
+    if floor is not None:
+        own += ["--cov", "--cov-append", "--cov-report=", "--cov-fail-under=0"]  # one stage cannot meet a whole-repo floor
+    default = "" if measuring or floor is not None else DEFAULT_PYTEST_ARGS
+    return shlex.join([*own, *shlex.split(pytest_args if pytest_args is not None else default)]), floor

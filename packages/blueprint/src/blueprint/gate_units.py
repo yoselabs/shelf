@@ -59,6 +59,10 @@ class Config:
     def arguments(self) -> list[str]:
         return [*self.pytest_args, *(["-m", self.marks] if self.marks else [])]
 
+    def every_mark(self) -> list[str]:
+        """The configured pytest arguments without the mark expression: the release run runs every mark."""
+        return list(self.pytest_args)
+
     def unit_of(self, path: str) -> Unit | None:
         return next((u for u in self.units if path in u.paths), None)
 

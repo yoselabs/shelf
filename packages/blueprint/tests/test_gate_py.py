@@ -106,33 +106,6 @@ def test_spell_reads_the_declared_paths(repo: Repo) -> None:
     assert gate_py.spell(repo.root) != 0
 
 
-def test_test_all_takes_its_floor_from_the_repo(repo: Repo) -> None:
-    _repo(repo)
-    cmd = gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
-    assert "--cov-fail-under=80" in cmd
-    assert "-n" in cmd
-
-
-def test_test_all_shuffles_only_when_the_repo_asks_for_it(repo: Repo) -> None:
-    repo.write("pyproject.toml", '[project]\nname = "x"\n')
-    assert "randomly" not in gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
-    repo.write("pyproject.toml", '[project]\nname = "x"\n[tool.blueprint.test]\nrandomize = true\n')
-    cmd = gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
-    assert cmd[cmd.index("-p") + 1] == "randomly"
-
-
-@pytest.mark.parametrize("installed", [False, True])
-def test_the_release_command_depends_on_any_lease_only_through_one_wrapper(
-    repo: Repo, monkeypatch: pytest.MonkeyPatch, installed: bool
-) -> None:
-    repo.write("pyproject.toml", '[project]\nname = "x"\n')
-    monkeypatch.setattr(gate_py, "_lease_installed", lambda: installed)
-    cmd = gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
-    pytest_at = cmd.index("pytest")
-    assert ("any_lease" in cmd) is installed
-    assert "--cov-fail-under=65" in cmd[pytest_at:]  # the same pytest arguments either way
-
-
 def test_a_test_repo_does_not_inherit_the_developers_blueprint_timeout(monkeypatch: pytest.MonkeyPatch, repo: Repo) -> None:
     monkeypatch.setenv("BLUEPRINT_TIMEOUT", "600")
     from blueprint.testing import Repo as TestRepo  # noqa: PLC0415
@@ -140,69 +113,7 @@ def test_a_test_repo_does_not_inherit_the_developers_blueprint_timeout(monkeypat
     assert "BLUEPRINT_TIMEOUT" not in TestRepo(repo.root, repo.bin_dir).env
 
 
-def test_test_all_has_a_default_floor(repo: Repo) -> None:
-    repo.write("pyproject.toml", '[project]\nname = "x"\n')
-    assert "--cov-fail-under=65" in gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
-
-
-@pytest.mark.parametrize("args", ['["-q"]', '["-n", "2", "--dist", "loadgroup", "-q"]'])
-def test_test_all_uses_configured_arguments_without_duplicate_workers(repo: Repo, args: str) -> None:
-    _repo(repo)
-    repo.write("pyproject.toml", _PYPROJECT.replace("floor = 80", f'floor = 80\npytest-args = {args}\nmarks = "not slow"'))
-    command = gate_py.test_all_command(repo.root, repo.env)
-    assert command.count("-n") == 1
-    assert command[command.index("-n") + 1] == ("2" if '"2"' in args else "auto")
-    assert "-q" in command
-
-
-def test_test_all_adds_configured_environment_to_the_supplied_environment(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
-    _repo(repo)
-    repo.write("pyproject.toml", _PYPROJECT.replace("floor = 80", 'floor = 80\nenv = { COVERAGE_CORE = "sysmon" }'))
-    seen: dict[str, object] = {}
-
-    def execute(command: list[str], **kwargs: object) -> SimpleNamespace:
-        assert "pytest" in command
-        assert kwargs["cwd"] == repo.root
-        seen.update(kwargs)
-        return SimpleNamespace(returncode=0)
-
-    monkeypatch.setattr(gate_py.subprocess, "run", execute)
-    assert gate_py.test_all(repo.root, {"INHERITED": "yes", "COVERAGE_CORE": "old"}) == 0
-    assert seen["env"] == {"INHERITED": "yes", "COVERAGE_CORE": "sysmon"}
-
-
-def test_test_all_takes_its_floor_from_coverage_report(repo: Repo) -> None:
-    repo.write("pyproject.toml", "[tool.coverage.report]\nfail_under = 87.5\n")
-    assert "--cov-fail-under=87.5" in gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
-
-
-def test_test_all_prefers_the_blueprint_floor_over_coverage_report(repo: Repo) -> None:
-    repo.write("pyproject.toml", _PYPROJECT + "\n[tool.coverage.report]\nfail_under = 95\n")
-    assert "--cov-fail-under=80" in gate_py.test_all_command(repo.root, {"HOME": str(repo.root)})
-
-
-def test_the_lease_root_follows_the_environment() -> None:
-    assert str(gate_py.lease_root({"GATE_LEASE_ROOT": "/l"})) == "/l"
-    assert str(gate_py.lease_root({"XDG_CACHE_HOME": "/c"})) == "/c/gate-leases"
-
-
 def test_the_cli_exposes_the_steps(repo: Repo) -> None:
     _repo(repo)
     assert main(["gate", "format", "--repo", str(repo.root)]) == 0
     assert main(["gate", "lint", "--repo", str(repo.root)]) == 0
-
-
-def test_test_all_runs_every_test_whatever_marks_the_per_commit_run_skips(repo: Repo) -> None:
-    _repo(repo)
-    repo.write("pyproject.toml", _PYPROJECT.replace("floor = 80", 'floor = 80\nmarks = "not slow"'))
-    command = gate_py.test_all_command(repo.root, repo.env)
-    assert "-m" not in command[command.index("pytest") :]
-    assert "--cov-fail-under=80" in command
-
-
-def test_test_all_with_pytest_arguments_passes_them_through_and_drops_the_floor(repo: Repo) -> None:
-    _repo(repo)
-    command = gate_py.test_all_command(repo.root, repo.env, ("-m", "slow", "-k", "wheel"))
-    assert command[-4:] == ["-m", "slow", "-k", "wheel"]
-    assert "--cov-fail-under=0" in command  # a partial run cannot meet a whole-repo floor
-    assert not any(arg.startswith("--cov-fail-under=") and arg != "--cov-fail-under=0" for arg in command)

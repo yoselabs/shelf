@@ -249,3 +249,25 @@ def test_a_selection_over_half_the_suites_gets_an_alarm_that_names_the_count(rep
     assert "3 of 5" in alarm
     assert affected.wide_alarm(repo, narrow) is None
     assert affected.wide_alarm(repo, [*narrow, "tests"]) is None  # the repo's own tests are no package suite
+
+
+def test_every_suite_is_listed_whatever_changed_and_the_repos_own_tests_run_whole(repo: Path) -> None:
+    """The release run (`blueprint gate test-all`) plans every suite: the repo's own tests as one folder, then each package's tests."""
+    _fitness_tests(repo)
+    paths = affected.everything(repo)
+    assert paths[0] == "tests"
+    assert _pkgs(paths) == {"base", "middle", "top", "leaf", "plug"}
+    assert [p for p in paths if p.startswith("tests/")] == []
+
+
+def test_the_plan_flag_all_lists_every_suite_with_keys(
+    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from any_gate_python.cli import main  # noqa: PLC0415
+
+    _fitness_tests(repo)
+    monkeypatch.chdir(repo)
+    assert main(["plan", "--repo", str(repo), "--plan", "--all"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == "tests\t"
+    assert {line.split("\t")[0] for line in lines[1:]} == {f"packages/{d}/tests" for d in ("base", "middle", "top", "leaf", "plug")}

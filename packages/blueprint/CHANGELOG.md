@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- One test path (shelf-m0xw, absorbs shelf-nvj1): `blueprint gate test-all` is `gate test` over every suite (`any_gate_python plan --all`) and every mark, receipts ignored (blank keys), `randomize` honoured; `gate_py.test_all_command` is deleted. A floor applies only when the repo declares one (`[tool.blueprint.test] floor`, else `[tool.coverage.report] fail_under`): the built-in 65 is gone. A repo with `-p no:cov` in `pytest-args` passes `check-all` (the old path passed `--cov` and pytest exited 4); its floor is reported as not judged unless `coverage` mode measures it. Without `coverage` mode a declared floor is measured by pytest-cov across the stages (`--cov-append`) and one `coverage report --fail-under` judges it. `unit_runner --whole` runs every mark. Pytest arguments still make an override run: no receipts, no floor.
+
 ## 0.17.0
 
 - Corpus diff against 0.16.0: 42 repos, no verdict moved (the new rows only turn a warning into a pass where a repo's gate runs codespell through `blueprint gate lint`).

@@ -66,8 +66,11 @@ def _prune(cache: Path, unit: str) -> None:
         old.unlink(missing_ok=True)
 
 
-def run_units(repo: Path, cache: Path, config: gate_units.Config, paths: list[str], pytest_args: list[str]) -> int:
-    """Run each unit that owns one of `paths`; 0 when all passed, else the first failing exit code (the rest are not started)."""
+def run_units(repo: Path, cache: Path, config: gate_units.Config, paths: list[str], pytest_args: list[str], *, marks: bool) -> int:
+    """Run each unit that owns one of `paths`; 0 when all passed, else the first failing exit code (the rest are not started).
+
+    `marks=False` runs every mark (the release run); the data it keeps is of a superset, so it proves the unit just as well.
+    """
     cache.mkdir(parents=True, exist_ok=True)
     for unit in config.units:
         todo = tuple(p for p in unit.paths if p in paths)
@@ -77,7 +80,7 @@ def run_units(repo: Path, cache: Path, config: gate_units.Config, paths: list[st
         with tempfile.TemporaryDirectory(dir=cache) as tmp:
             target = Path(tmp) / "data"
             env = {**os.environ, **config.env, "COVERAGE_FILE": str(target)}
-            command = _command(config.coverage, [*config.arguments(), *pytest_args], todo)
+            command = _command(config.coverage, [*(config.arguments() if marks else config.every_mark()), *pytest_args], todo)
             done = subprocess.run(command, cwd=repo, env=env, check=False, timeout=RUN_TIMEOUT)
             if done.returncode != 0:
                 return done.returncode
@@ -119,13 +122,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--pytest-args", default="")
+    parser.add_argument("--whole", action="store_true", help="run every mark: the release run")
     parser.add_argument("paths", nargs="+")
     args = parser.parse_args(argv)
     config = gate_units.load(args.repo)
     if config is None:
         sys.stderr.write("blueprint: no [tool.blueprint.test.units] in pyproject.toml\n")
         return 2
-    return run_units(args.repo, args.cache, config, args.paths, shlex.split(args.pytest_args))
+    return run_units(args.repo, args.cache, config, args.paths, shlex.split(args.pytest_args), marks=not args.whole)
 
 
 if __name__ == "__main__":

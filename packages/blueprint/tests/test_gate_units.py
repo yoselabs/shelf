@@ -92,7 +92,13 @@ def test_filtered_run_cannot_supply_a_plain_runs_coverage(repo: Repo, tmp_path: 
 
     def filtered_go(args: str) -> int:
         return gate_test.run(
-            repo.root, receipts=tmp_path / "r", lease_root=tmp_path / "leases", cache=tmp_path / "cache", env=repo.env, pytest_args=args
+            repo.root,
+            whole=False,
+            receipts=tmp_path / "r",
+            lease_root=tmp_path / "leases",
+            cache=tmp_path / "cache",
+            env=repo.env,
+            pytest_args=args,
         )
 
     assert filtered_go("--deselect=tests/core/test_core.py::test_bad") == 0
@@ -147,7 +153,10 @@ def test_test_processes_honor_configured_args_marks_and_environment(repo: Repo, 
         "@pytest.mark.slow\ndef test_excluded():\n    assert False\n",
     )
     assert (
-        gate_test.run(repo.root, receipts=tmp_path / "r.json", lease_root=tmp_path / "leases", cache=tmp_path / "cache", env=repo.env) == 0
+        gate_test.run(
+            repo.root, whole=False, receipts=tmp_path / "r.json", lease_root=tmp_path / "leases", cache=tmp_path / "cache", env=repo.env
+        )
+        == 0
     )
     assert not (repo.root / "wrong.cov").exists()
 
@@ -156,7 +165,7 @@ def test_noncoverage_command_puts_configured_arguments_before_cli_arguments(repo
     _app(repo)
     manifest = _PYPROJECT.replace('coverage = "coverage"', 'pytest-args = ["-q"]\nmarks = "not slow"')
     repo.write("pyproject.toml", manifest)
-    _, command = gate_test.commands(repo.root, receipts=None, lease_root=None, pytest_args="-v")
+    _, command = gate_test.commands(repo.root, whole=False, receipts=None, lease_root=None, pytest_args="-v")
     assert command[-1] == "--pytest-args=-q -m 'not slow' -v"
 
 
@@ -218,7 +227,7 @@ def test_the_cache_lives_in_the_shared_git_directory_one_folder_per_checkout(rep
 
 def test_units_with_coverage_run_through_the_unit_runner(repo: Repo) -> None:
     _app(repo)
-    _, test = gate_test.commands(repo.root, receipts=None, lease_root=None, pytest_args="", cache=repo.root / "c")
+    _, test = gate_test.commands(repo.root, whole=False, receipts=None, lease_root=None, pytest_args="", cache=repo.root / "c")
     assert test[test.index("--") + 1 :][1:3] == ["-m", "blueprint.unit_runner"]
 
 
@@ -227,7 +236,7 @@ def test_a_green_run_caches_each_units_data_and_combines_it_whole_repo(repo: Rep
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) == 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) == 0
     assert unit_runner.cached(cache, config, repo.root) == {f"{n}:{k}" for n, k in _keys(repo).items()}
     assert unit_runner.combine(repo.root, cache, config) == 0
 
@@ -237,9 +246,11 @@ def test_a_skipped_unit_still_counts_toward_the_floor(repo: Repo, tmp_path: Path
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) == 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) == 0
     repo.write("src/app/ui/view.py", "from app.core import add\n\ndef show():\n    return add(1, 1)\n# edit\n")
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/ui"], []) == 0  # core is skipped: its data comes from the cache
+    assert (
+        unit_runner.run_units(repo.root, cache, config, ["tests/ui"], [], marks=True) == 0
+    )  # core is skipped: its data comes from the cache
     out = subprocess.run(
         [sys.executable, "-m", "coverage", "report", "--data-file", str(next(cache.glob("core-*.cov")))],
         cwd=repo.root,
@@ -257,7 +268,7 @@ def test_a_failing_unit_caches_nothing_and_stops_the_run(repo: Repo, tmp_path: P
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) != 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) != 0
     assert not list(cache.glob("*.cov"))
 
 
@@ -268,7 +279,7 @@ def test_the_floor_fails_when_the_combined_coverage_is_under_it(repo: Repo, tmp_
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) == 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) == 0
     assert unit_runner.combine(repo.root, cache, config) == 1
 
 
@@ -368,7 +379,7 @@ def test_parallel_coverage_data_is_joined_into_the_units_one_file(repo: Repo, tm
     config = gate_units.load(repo.root)
     assert config is not None
     cache = tmp_path / "cache"
-    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], []) == 0
+    assert unit_runner.run_units(repo.root, cache, config, ["tests/core", "tests/ui"], [], marks=True) == 0
     assert unit_runner.combine(repo.root, cache, config) == 0
 
 
@@ -381,7 +392,13 @@ def test_a_second_run_starts_no_test_process(repo: Repo, tmp_path: Path) -> None
 
     def go() -> int:
         return gate_test.run(
-            repo.root, receipts=tmp_path / "r.json", lease_root=tmp_path / "leases", pytest_args="", cache=tmp_path / "cache", env=repo.env
+            repo.root,
+            whole=False,
+            receipts=tmp_path / "r.json",
+            lease_root=tmp_path / "leases",
+            pytest_args="",
+            cache=tmp_path / "cache",
+            env=repo.env,
         )
 
     assert go() == 0
@@ -398,3 +415,25 @@ def test_a_pytest_cov_unit_never_fails_alone_on_the_whole_repo_floor() -> None:
     command = unit_runner._command("pytest-cov", [], ("tests/a",))
     assert "--cov-fail-under=0" in command
     assert command.index("--cov-fail-under=0") < command.index("tests/a")
+
+
+def _golden_app(repo: Repo) -> None:
+    """`_app` plus every way the key reaches a file: a relative import, a data file beside code, a computed import, `reads`, a lock."""
+    _app(repo)
+    repo.write("src/app/ui/rel.py", "from . import view\nfrom .. import core\n")
+    repo.write("src/app/ui/page.html", "<p>x</p>\n")
+    repo.write("src/app/plug/__init__.py", "import importlib\n\ndef load(name):\n    return importlib.import_module(name)\n")
+    repo.write("src/app/plug/a.py", "A = 1\n")
+    repo.write("src/app/plug/data.sql", "select 1;\n")
+    repo.write("tests/ui/test_rel.py", "from app.ui import rel\nfrom app import plug\n\ndef test_rel():\n    assert rel and plug\n")
+    repo.write("uv.lock", "version = 1\n")
+
+
+# Frozen from the keys the code produced before they were computed once per run (shelf-8r18): a faster key must be the same key, or
+# every receipt and every cached coverage file in every consumer is orphaned.
+_GOLDEN_KEYS = {"core": "978a12d6328662c03aedd39746ecf0f1", "ui": "0785155ef09e26e4c14748ce64fbed46"}
+
+
+def test_a_unit_key_is_the_one_it_has_always_been(repo: Repo) -> None:
+    _golden_app(repo)
+    assert _keys(repo) == _GOLDEN_KEYS

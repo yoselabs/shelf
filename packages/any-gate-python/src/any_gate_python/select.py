@@ -96,6 +96,14 @@ def affected(repo: Path, changed: list[str], lock: Callable[[], set[str] | None]
     return [*_fitness(repo, changed, rules), *tests]
 
 
+def everything(repo: Path, rules: Rules | None = None) -> list[str]:
+    """The pytest paths of every suite, whatever changed: the repo's own tests as one folder, then each package's tests."""
+    rules = rules or Rules.load(repo)
+    graph, _ = workspace(repo)
+    tests = (f"packages/{d}/tests" for d in sorted(graph) if (repo / "packages" / d / "tests").is_dir())
+    return [*([rules.repo_tests] if rules.repo_tests else []), *tests]
+
+
 def reach(repo: Path, count: int, exporter: Exporter = package_exports) -> list[tuple[str, int, int]]:
     """For each of the last `count` first-parent commits: `(short sha, changed files, package suites it reaches)`.
 
