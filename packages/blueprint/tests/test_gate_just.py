@@ -1,6 +1,6 @@
 """The gate read from a justfile (ADR 0023): the graph comes from `just --dump --dump-format json`.
 
-The Makefile cases in test_gate.py stay: a repo not yet migrated is still judged, and fails `gate.runner`.
+A Makefile is never read as a gate; a repo with one and no justfile fails `gate.runner`.
 """
 
 from __future__ import annotations
@@ -97,9 +97,10 @@ def test_a_makefile_only_repo_fails_the_runner_row_and_the_remediation_names_the
     assert "ADR 0023" in rows["gate.runner"].remediation
 
 
-def test_a_makefile_only_repo_is_still_judged_by_the_other_rows(repo: Repo) -> None:
+def test_a_makefile_is_not_read_as_a_gate(repo: Repo) -> None:
+    # shelf-rofp: ADR 0023 and 0028, no backward compatibility; the runner row says why.
     repo.write("Makefile", "check: lint\nlint:\n\ttrue\n")
-    assert _row(repo, "gate.one-command")[0] is Verdict.PASSING
+    assert _row(repo, "gate.one-command")[0] is Verdict.NOT_SET_UP
 
 
 def test_the_runner_row_does_not_apply_without_any_gate(repo: Repo) -> None:

@@ -1,11 +1,11 @@
 ---
 id: 0002
 title: Doctrine homes in the shelf
-statement: The shelf is the single self-contained home of its own operating model; consumers only point to it, and no external knowledge base is needed to use it.
+statement: The shelf is the single self-contained home of its own operating model; consumers only point to it, and no external knowledge base is needed to use it. Amended 2026-11-28 (ADR 0027): no CI.
 concerns: [doctrine]
 status: accepted
 decided_by: owner
-updated: 2026-10-11
+updated: 2026-11-28
 expires: 2027-01-08
 distilled_into: N/A — self-enforcing via CLAUDE.md's read order
 ---
@@ -38,7 +38,7 @@ Hard rules:
 ## Rejected
 
 - **Doctrine + ontology in Kay** (the exploration doc's original plan): a knowledge base is the wrong
-  home for a model that is *enforced* by this repo's hooks, tests and CI. Doctrine lives where it is
+  home for a model that is *enforced* by this repo's hooks, tests and gate. Doctrine lives where it is
   executed.
 
 ## History
@@ -47,3 +47,4 @@ Hard rules:
   2027-01-08. Track: governance.
 - 2026-10-11: the vocabulary file moved from `docs/glossary.md` to the root `CONTEXT.md`, and
   the `resolutions` folder became `adr/` (blueprint knowledge layout). The decision itself is unchanged.
+- 2026-11-28: amended by ADR 0027: no repository has CI, so the model is enforced by hooks, tests and the local gate. The decision itself is unchanged.

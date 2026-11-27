@@ -108,7 +108,7 @@ def _tool_row(repo: Repo) -> tuple[Verdict, str, str]:
 def _application(repo: Repo, makefile: str = "check:\n\ttrue\n") -> None:
     repo.write("pyproject.toml", _TOOL_PYPROJECT)
     repo.write("uv.lock", _LOCK)
-    repo.write("Makefile", makefile)
+    repo.write("justfile", makefile)
 
 
 def test_a_tool_env_older_than_the_lock_fails_and_names_the_repos_reinstall_step(repo: Repo) -> None:
@@ -119,7 +119,7 @@ def test_a_tool_env_older_than_the_lock_fails_and_names_the_repos_reinstall_step
     assert verdict is Verdict.FAILING
     assert "sqlite-sidecar 0.1.0 (lock 0.2.0)" in evidence
     assert "mytool 0.1.0" not in evidence  # the project itself is the lock's editable entry, not a dependency
-    assert "make install" in remediation
+    assert "just install" in remediation
 
 
 def test_the_reinstall_step_is_a_justfile_recipe_when_the_gate_is_just(repo: Repo) -> None:

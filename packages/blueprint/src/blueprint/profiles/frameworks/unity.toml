@@ -74,7 +74,7 @@ Cold Library import of a near-empty project took 95 s, warm run about 30 s (6000
 Deleting a .meta and importing with a COLD Library gives the asset a NEW GUID (seen: every reference to it breaks); with a warm Library Unity restores the same GUID. So the clean-tree check is only reliable on a cold clone or after `rm -rf Library`. \
 Player build: Assets/Editor/CiBuild.cs with `BuildPlayer(...)` and `EditorApplication.Exit(summary.result == Succeeded ? 0 : 1)`, run by `just unity-player` (not in check; macOS Mono standalone built in 2 min 21 s from a cold Library, 6000.7.0b4). Needs the platform module installed. \
 License: the Personal license activated in the Hub works headless on a desktop (the log shows a licensing handshake error and still runs, Unity Personal); a CI runner needs GameCI activation (see ci)"""
-config = [{ any = [{ path = "justfile", contains = "-batchmode" }, { path = "Makefile", contains = "-batchmode" }] }]
+config = [{ any = [{ path = "justfile", contains = "-batchmode" }] }]
 gate = "-batchmode"
 
 [[role]]
@@ -84,7 +84,7 @@ install = """`-runTests` runs EVERY test assembly in the project, third-party on
 justfile: `unity-test` (shebang recipe) runs `"{{unity}}" -batchmode -nographics -projectPath {root} -runTests -testPlatform EditMode -testResults "$PWD/results-editmode.xml" -logFile unity-editmode.log`, same for PlayMode (no -quit: -runTests exits itself; seen), then `test -s results-editmode.xml` and a check that result="Passed". Exit codes seen: 0 pass, 2 a test failed, 1 compile error and no XML written. -testResults needs an absolute path. PlayMode ran headless with -nographics (an `async Awaitable Start()` ran). \
 Pure core: tests/<Name>.Core.Tests (xunit.v3, Microsoft.Testing.Platform, global.json runner MTP, `dotnet test --project`) with `<Compile Include="../../{root}/Assets/Scripts/Core/**/*.cs" />`, `<LangVersion>9.0</LangVersion>` (seen green; the link makes C# 10+ syntax fail there and in Unity alike). Coverage floor: the dotnet profile's coverage role applies to that project only; Unity-side coverage (com.unity.testtools.codecoverage) is untested"""
 config = [
-    { any = [{ path = "justfile", contains = "-runTests" }, { path = "Makefile", contains = "-runTests" }] },
+    { any = [{ path = "justfile", contains = "-runTests" }] },
     { any = [
         { path = "{root}/Assets/*/*.asmdef", contains = "UnityEngine.TestRunner" },
         { path = "{root}/Assets/*/*/*.asmdef", contains = "UnityEngine.TestRunner" },
@@ -100,7 +100,7 @@ install = """Assets/Editor/CiValidate.cs (Editor-only asmdef): for each `t:Scene
 justfile: `unity-validate` runs `"{{unity}}" -batchmode -nographics -quit -projectPath {root} -executeMethod Game.EditorTools.CiValidate.Run -logFile unity-validate.log`; add to check. Seen red on a scene whose MonoBehaviour pointed at a GUID with no script. \
 Not covered, by test: broken texture/material/prefab-variant references (no editor API tried), shader compile errors (headless editor does not compile shaders), Addressables group integrity (not installed). \
 -quit with -executeMethod: the method's Exit code wins; without Exit() a throwing method gives exit 1 and a quiet one 0"""
-config = [{ any = [{ path = "justfile", contains = "CiValidate" }, { path = "Makefile", contains = "CiValidate" }] }]
+config = [{ any = [{ path = "justfile", contains = "CiValidate" }] }]
 gate = "CiValidate"
 
 [[role]]

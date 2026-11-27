@@ -20,7 +20,7 @@ but trailing comments are re-spaced to one space, so hand-aligned comment column
 Generated compose (homelab hosts/*/rendered, 20 of 20 files not clean) is not formatted: the renderer is its formatter, and it is changed at its source"""
 install = """mise.toml: yamlfmt = "0.21.0"; justfile recipe `yamlfmt -lint $(git ls-files 'stacks/*/compose.y*ml')` (exclude generated files); fix with `yamlfmt`. \
 Adopting on a repo whose compose files are deploy inputs (homelab: 14 of 19 not clean, 83 diff lines with retain_line_breaks_single) costs one redeploy-triggering reformat commit: plan it, do not disable the gate"""
-config = [{ any = [{ path = ".yamlfmt.yaml" }, { path = ".yamlfmt" }] }, { any = [{ path = "justfile", contains = "yamlfmt" }, { path = ".blueprint/images.just", contains = "yamlfmt" }, { path = "Makefile", contains = "yamlfmt" }, { path = ".pre-commit-config.yaml", contains = "yamlfmt" }] }]
+config = [{ any = [{ path = ".yamlfmt.yaml" }, { path = ".yamlfmt" }] }, { any = [{ path = "justfile", contains = "yamlfmt" }, { path = ".blueprint/images.just", contains = "yamlfmt" }, { path = ".pre-commit-config.yaml", contains = "yamlfmt" }] }]
 gate = "yamlfmt"
 
 [[role]]
@@ -33,7 +33,7 @@ install = """npm: `npx dclint@3.1.0 --max-warnings 0 $(git ls-files '*compose*.y
 the strict answer is to fix them, not to disable the rules. \
 Where compose files are deploy inputs (a change redeploys the service on push, homelab's ci_deploy), a fix costs a redeploy: batch fixes into a planned deploy, \
 or disable the rule in .dclintrc with that reason until one. Where the deployed files are rendered from templates, lint the rendered output and fix findings at the renderer"""
-config = [{ any = [{ path = ".dclintrc" }, { path = ".dclintrc.json" }, { path = "dclint.config.js" }, { path = ".pre-commit-config.yaml", contains = "dclint" }, { any = [{ path = "justfile", contains = "dclint" }, { path = ".blueprint/images.just", contains = "dclint" }, { path = "Makefile", contains = "dclint" }] }] }]
+config = [{ any = [{ path = ".dclintrc" }, { path = ".dclintrc.json" }, { path = "dclint.config.js" }, { path = ".pre-commit-config.yaml", contains = "dclint" }, { any = [{ path = "justfile", contains = "dclint" }, { path = ".blueprint/images.just", contains = "dclint" }] }] }]
 gate = "dclint"
 
 [[role]]
@@ -41,7 +41,7 @@ role = "types"
 tool = """`docker compose -f <file> config --no-interpolate -q` per compose file: Docker's own schema validation (unknown keys, wrong types), no environment needed. Seen red on a planted unknown key (`additional properties 'bogus_key' not allowed`) and on a wrong type (`restart must be a string`), green on three real stacks. \
 Without --no-interpolate the command fails on any `${VAR:?}` (homelab: A2WEB_ZYTE_KEY missing) and warns on every unset ${VAR}; homelab's own tools/doctor.py instead fills each referenced variable with a placeholder so types are checked after interpolation, which is stricter and also acceptable"""
 install = """justfile: `for f in $(git ls-files '*compose*.y*ml'); do docker compose -f $$f config --no-interpolate -q || exit 1; done`. Needs a Docker CLI with the compose plugin (Compose v2+); no daemon connection is made"""
-config = [{ any = [{ any = [{ path = "justfile", contains = "config --no-interpolate" }, { path = ".blueprint/images.just", contains = "config --no-interpolate" }, { path = "Makefile", contains = "config --no-interpolate" }] }, { path = "tools/doctor.py", contains = "compose" }] }]
+config = [{ any = [{ any = [{ path = "justfile", contains = "config --no-interpolate" }, { path = ".blueprint/images.just", contains = "config --no-interpolate" }] }, { path = "tools/doctor.py", contains = "compose" }] }]
 gate = "config --no-interpolate"
 [[role.alternative]]
 label = "tools/doctor.py runs `docker compose config` on every rendered compose"
@@ -53,7 +53,7 @@ role = "dependencies"
 tool = """every `image:` is `name:tag@sha256:<64 hex>` (tag for the human, digest for the machine): `docker compose -f <file> config --no-interpolate --format json | jq -e '[.services[].image // empty | select(test("@sha256:[0-9a-f]{64}$") | not)] | length == 0'`. Seen red on a planted `nginx:latest`, green on two real stacks; homelab has 0 unpinned images across its 19 files and already enforces the same rule in tools/doctor.py (DIGEST_RE), which CI runs but `just check` does not. \
 Staying current is a separate, reported job (homelab: tools/check-updates.py, read-only report of images behind upstream) so a pin never means a frozen stack"""
 install = "justfile recipe looping over compose files with the jq filter above (jq is preinstalled on macOS and the GitHub runners); an updater (Renovate's docker-compose manager or the repo's own check-updates) proposes digest bumps as reviewable commits"
-config = [{ any = [{ any = [{ path = "justfile", contains = "@sha256" }, { path = "Makefile", contains = "@sha256" }] }, { path = "tools/check-updates.py" }, { path = "renovate.json" }, { path = ".github/renovate.json" }] }]
+config = [{ any = [{ any = [{ path = "justfile", contains = "@sha256" }] }, { path = "tools/check-updates.py" }, { path = "renovate.json" }, { path = ".github/renovate.json" }] }]
 gate = "sha256"
 [[role.alternative]]
 label = "tools/doctor.py refuses an image not pinned by digest (DIGEST_RE)"
@@ -102,8 +102,8 @@ Five deny rules: privileged, network_mode: host, docker socket mount (short and 
 An exception is an `[[override]]` in docs/blueprint/blueprint.toml (the one override format): `id = "compose.<rule>"` (privileged, host_network, docker_socket, unbound_port, default_network, healthcheck), `scope = "service:<name>"`, a reason, `decided_by`, and `expires` or `adr`; a blank reason or an expired date does not count. It sits outside the compose files, so recording an exemption recreates no container (homelab 2026-10: a per-service key would have redeployed 19 placements). The old `x-policy-exempt` key still excuses, with a conftest warning that names the override to write; a run without `--combine` warns too and reads no overrides. Seen green on a clean planted file (exit 0), red on 6 of 6 planted violations (exit 1; the exempted 7th service passed), and the rego unit tests pass (`conftest verify`). \
 On homelab's 20 rendered files it reports 34 findings (privileged and host network: cadvisor/node-exporter/vector/victoria x2 hosts; docker.sock: traefik, vector, game-ops logs; unbound ports: traefik 80, game UDP ports; no network: 16 services), all of which homelab accepts today through stack.toml allow entries, so adopting means copying those into `[[override]]` entries. \
 The caveat: it reads the file as written, so `${VAR}`-built ports and multi-file merges (compose.override) are not resolved; run it on the merged `config --format json` where those exist"""
-install = """mise.toml: conftest = "0.71.1"; `blueprint init` writes policy/compose.rego; justfile recipe `conftest test --combine --policy policy docs/blueprint/blueprint.toml <compose files>`, a dependency of `check`; `conftest verify --policy policy` for the unit tests. Copy each existing allowance into an `[[override]]` (`id = \"compose.<rule>\"`, `scope = \"service:<name>\"`) in docs/blueprint/blueprint.toml"""
-config = [{ path = "policy/*.rego", contains = "deny contains" }, { any = [{ path = "justfile", contains = "conftest" }, { path = "Makefile", contains = "conftest" }, { path = ".pre-commit-config.yaml", contains = "conftest" }] }]
+install = """mise.toml: conftest = "0.71.1"; `blueprint init` writes policy/compose.rego for a deployed repo only; justfile recipe `conftest test --combine --policy policy docs/blueprint/blueprint.toml <compose files>`, a dependency of `check`; `conftest verify --policy policy` for the unit tests. Copy each existing allowance into an `[[override]]` (`id = \"compose.<rule>\"`, `scope = \"service:<name>\"`) in docs/blueprint/blueprint.toml"""
+config = [{ path = "policy/*.rego", contains = "deny contains" }, { any = [{ path = "justfile", contains = "conftest" }, { path = ".pre-commit-config.yaml", contains = "conftest" }] }]
 gate = "conftest"
 [[role.alternative]]
 label = "tools/stack_policy.py: deny-list (privileged, cap_add, docker.sock, host network/pid, host path, devices) at deploy time, with dated [[stack.exempt]]"

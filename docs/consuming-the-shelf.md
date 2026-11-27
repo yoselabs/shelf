@@ -46,8 +46,7 @@ change). `blueprint init` writes `.pre-commit-config.yaml` and runs `prek instal
 | entry | stage | what it does |
 |---|---|---|
 | bd's five events (`bd hooks run <event>`) | each git event | beads' own hook work; bd never installs hooks itself (`bd init --skip-hooks`) |
-| `shelf-guard` | pre-commit | refuses a committed local shelf source |
-| `ruff check`, `ruff format --check` | pre-commit | lint and format on the staged Python files |
+| `blueprint-hook` (`uv run blueprint gate hook`) | pre-commit | one process over the staged files: secret scan, the local-shelf-source guard, preset drift (when `pyproject.toml` is staged), `ruff check` and `ruff format --check` |
 | `just check` | pre-push | the whole gate before code leaves the machine |
 
 Print the recipe with `uv run blueprint recipe hooks`. A consumer recipe runs the pinned engine (`uv run blueprint ...`), never a shelf clone: `gate.recipe-calls` (ADR 0033).
@@ -73,8 +72,7 @@ silently dead, and nothing in your repo will tell you; only re-running checks.
 `.beads/hooks`, which `bd init` commits), the hooks are **tracked files that travel with a clone** —
 the "hooks are per-clone and cannot be committed" premise above has that exception.
 
-**Using the pre-commit framework instead?** the onboarding writes `.pre-commit-config.yaml` for you (prek). The guard entry is `uv run blueprint gate guard` and the preset
-check is `uv run blueprint gate preset --repo .`, both from the `blueprint` dev dependency the onboarding adds, pinned by git tag. The shelf ships no hook repository.
+**Using the pre-commit framework instead?** the onboarding writes `.pre-commit-config.yaml` for you (prek). The commit entry is `uv run blueprint gate hook` (guard, preset drift, secret scan, ruff, one process), from the `blueprint` dev dependency the onboarding adds, pinned by git tag. The shelf ships no hook repository.
 
 ## 3. The resolver block, in the project's `AGENTS.md`
 

@@ -69,9 +69,14 @@ def profile_for(stack: str, profiles: dict[str, StackProfile]) -> StackProfile |
 
 def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
     """Every `<stack>.toml` in `directory`."""
+    raw = [tomllib.loads(path.read_text()) for path in sorted(directory.glob("*.toml"))]  # frameworks/ is a subfolder, not read here
+    by_stack = {data["stack"]: data for data in raw}
     profiles: dict[str, StackProfile] = {}
-    for path in sorted(directory.glob("*.toml")):  # frameworks/ is a subfolder, not read here
-        data: dict[str, Any] = tomllib.loads(path.read_text())
+    for data in raw:
+        base: dict[str, Any] = by_stack[data["extends"]] if "extends" in data else {}
+        # `extends = "<stack>"`: the base's roles, with this file's own `[[role]]` rows replacing the ones of the same name.
+        mine = {r["role"]: r for r in data.get("role", [])}
+        rows = [mine.pop(r["role"], r) for r in base.get("role", [])] + list(mine.values())
         roles = {
             r["role"]: Role(
                 role=r["role"],
@@ -89,17 +94,17 @@ def load_profiles(directory: Path = PROFILE_DIR) -> dict[str, StackProfile]:
                 requires=r.get("requires", ""),
                 optional=bool(r.get("optional", False)),
             )
-            for r in data.get("role", [])
+            for r in rows
         }
         profiles[data["stack"]] = StackProfile(
             data["stack"],
-            data.get("status", "provisional"),
-            data.get("source", ""),
+            data.get("status", base.get("status", "provisional")),
+            data.get("source", base.get("source", "")),
             roles,
-            data.get("family", ""),
-            dict(data.get("pins", {})),
-            data.get("onboard", ""),
-            data.get("runner_pin", ""),
-            data.get("runner_run", ""),
+            data.get("family", base.get("family", "")),
+            dict(data.get("pins", base.get("pins", {}))),
+            data.get("onboard", base.get("onboard", "")),
+            data.get("runner_pin", base.get("runner_pin", "")),
+            data.get("runner_run", base.get("runner_run", "")),
         )
     return profiles
