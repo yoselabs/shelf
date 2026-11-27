@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import os
-import select
 import threading
 import time
 from typing import IO, TYPE_CHECKING
 
 from async_scope import cleanup_sync
+
+from stream_proc._wait import readable, writable
 
 if TYPE_CHECKING:
     import subprocess
@@ -88,7 +89,7 @@ class _Lines:
     def chunks(self) -> Iterator[bytes]:
         fd = self.stream.fileno()
         while not self.quit.is_set():
-            if not select.select([fd], [], [], _POLL_S)[0]:
+            if not readable(fd, _POLL_S):
                 continue
             chunk = os.read(fd, min(_CHUNK, self.max_line))
             if not chunk:
@@ -232,7 +233,7 @@ class Pump:
             view = memoryview(data)
             try:
                 while view and not self._quit.is_set():
-                    if not select.select([], [fd], [], _POLL_S)[1]:
+                    if not writable(fd, _POLL_S):
                         continue
                     try:
                         view = view[os.write(fd, view[:_CHUNK]) :]

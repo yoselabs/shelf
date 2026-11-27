@@ -17,7 +17,7 @@ from pathlib import Path
 
 from any_gate_python.compact import Compact
 from any_gate_python.graph import lock_touched, workspace
-from any_gate_python.select import affected, changed_files, merge_base, plan, reach, wide_alarm
+from any_gate_python.select import affected, changed_files, everything, merge_base, plan, reach, wide_alarm
 from any_gate_python.stages import run_tests
 
 
@@ -61,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     sel.add_argument("--repo", default=".", help="the repo (default: cwd)")
     sel.add_argument("--explain", action="store_true", help="also print the changed files to stderr")
     sel.add_argument("--plan", action="store_true", help="print `path<TAB>key` per suite (the input of `any-gate test`)")
+    sel.add_argument("--all", action="store_true", help="every suite, whatever changed (the release run)")
     sel.add_argument("--reach", type=int, metavar="N", help="print how many suites each of the last N commits reaches, then exit")
     run = sub.add_parser("run", help="run pytest paths in stages (the runner `any-gate test` calls)")
     run.add_argument(
@@ -88,8 +89,8 @@ def main(argv: list[str] | None = None) -> int:
         median, top = (sizes[len(sizes) // 2], sizes[-1]) if sizes else (0, 0)
         sys.stdout.write(f"commits={len(rows)} median={median} max={top} of {len(workspace(repo)[0])} packages\n")
         return 0
-    changed = changed_files(repo)
-    paths = affected(repo, changed, lambda: lock_touched(repo, merge_base(repo)))
+    changed = [] if args.all else changed_files(repo)
+    paths = everything(repo) if args.all else affected(repo, changed, lambda: lock_touched(repo, merge_base(repo)))
     if args.explain:
         sys.stderr.write(f"affected: {len(changed)} changed file(s): {' '.join(changed) or '-'}\n")
     if (alarm := wide_alarm(repo, paths)) is not None:

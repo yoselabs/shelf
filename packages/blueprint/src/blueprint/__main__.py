@@ -101,8 +101,11 @@ def _parser() -> argparse.ArgumentParser:
         sp.add_argument("--changed", action="store_true", help="only the files changed against the base (the per-commit gate)")
     fmt = steps.add_parser("format", help="ruff format over `[tool.blueprint.gate]` lint-paths (`just format`)")
     fmt.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
-    ta = steps.add_parser("test-all", help="every test with the coverage floor, queued behind any-lease (`just test-all`)")
+    ta = steps.add_parser("test-all", help="`test` over every suite and mark, receipts ignored, floor if declared (`just test-all`)")
     ta.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+    ta.add_argument("--receipts", type=Path, help=argparse.SUPPRESS)
+    ta.add_argument("--lease-root", type=Path, help="the test-slot lease folder (default: any-gate's)")
+    ta.add_argument("--pytest-args", default=None, help="extra arguments for every pytest stage, as one string")
     for sub_parser in (tst, ta):
         sub_parser.set_defaults(rest=[])
     return parser
@@ -182,13 +185,14 @@ def _blueprint(args: argparse.Namespace) -> int:
     return max(*codes, result.exit_code)
 
 
-def _test(args: argparse.Namespace) -> int:
+def _test(args: argparse.Namespace, *, whole: bool) -> int:
     return gate_test.run(
         args.repo.expanduser().resolve(),
         receipts=args.receipts,
         lease_root=args.lease_root,
         pytest_args=_pytest_args(args),
         env=dict(os.environ),
+        whole=whole,
     )
 
 
@@ -206,8 +210,12 @@ def _format(args: argparse.Namespace) -> int:
     return gate_py.format_(args.repo.expanduser().resolve())
 
 
+def _test_changed(args: argparse.Namespace) -> int:
+    return _test(args, whole=False)
+
+
 def _test_all(args: argparse.Namespace) -> int:
-    return gate_py.test_all(args.repo.expanduser().resolve(), dict(os.environ), args.rest)
+    return _test(args, whole=True)
 
 
 def _pytest_args(args: argparse.Namespace) -> str | None:
@@ -222,7 +230,7 @@ _GATE_STEPS = {
     "hook": _hook,
     "preset": _preset,
     "render": _render,
-    "test": _test,
+    "test": _test_changed,
     "lint": _lint,
     "spell": _spell,
     "format": _format,
