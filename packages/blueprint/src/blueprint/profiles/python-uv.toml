@@ -210,6 +210,6 @@ gate = "lint-imports"
 
 [[role]]
 role = "hooks"
-tool = "prek runs ruff check and ruff format --check on staged Python files"
-install = "add ruff-check and ruff-format local hooks (types: [python]) to .pre-commit-config.yaml after bd's entries"
-config = [{ path = ".pre-commit-config.yaml", contains = "ruff check" }, { path = ".pre-commit-config.yaml", contains = "ruff format" }]
+tool = "prek runs `blueprint gate hook` on the staged files: secret scan, guard, preset drift, ruff check and format --check"
+install = "add the blueprint-hook local hook (`uv run blueprint gate hook`) to .pre-commit-config.yaml after bd's entries"
+config = [{ any = [{ path = ".pre-commit-config.yaml", contains = "blueprint gate hook" }, { path = ".pre-commit-config.yaml", contains = "ruff check" }] }, { any = [{ path = ".pre-commit-config.yaml", contains = "blueprint gate hook" }, { path = ".pre-commit-config.yaml", contains = "ruff format" }] }]

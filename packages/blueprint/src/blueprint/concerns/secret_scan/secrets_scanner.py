@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from blueprint.model import Context, Finding
 
 _SCANNER_PIN = re.compile(r"^\s*[\"']?[\w:/.@-]*gitleaks[\w/.@-]*[\"']?\s*=", re.MULTILINE)
-_SCANNER_RUN = re.compile(r"blueprint\.secret_scan|\bgitleaks\b")
+_SCANNER_RUN = re.compile(r"blueprint\.secret_scan|blueprint gate hook|\bgitleaks\b")
 _FULL_SCAN = re.compile(r"secret_scan\s+full\b|gitleaks\s+git(?!\s+--(?:staged|pre-commit|log-opts))")
 
 
@@ -33,13 +33,13 @@ def scanner(ctx: Context) -> Finding:
     if not wired:
         return failing(
             "gitleaks is pinned but neither the justfile nor .pre-commit-config.yaml runs it",
-            "add a pre-commit hook `uv run python -m blueprint.secret_scan staged`, and `... range` to the gate",
+            "add the pre-commit hook `uv run blueprint gate hook` (it runs the staged scan), and `... range` to the gate",
         )
     # Only the hook config: a justfile may keep a `full` recipe for the release gate (`check-all`).
     slow = [name for name, text in wired.items() if name == ".pre-commit-config.yaml" and _FULL_SCAN.search(text)]
     if slow:
         return failing(
             f"the whole history is scanned on every run ({', '.join(slow)}): the `full` mode is for a release tag",
-            "run `staged` in the commit hook and `range` in the gate",
+            "run the staged scan in the commit hook and `range` in the gate",
         )
     return passing(f"gitleaks pinned; run from {', '.join(sorted(wired))}")

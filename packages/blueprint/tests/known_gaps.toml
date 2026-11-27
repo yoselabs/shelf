@@ -152,11 +152,6 @@ direction = "adverse"
 bead = "shelf-fkx.11"
 
 [[gap]]
-id = "stack.python-uv.hooks"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
 id = "stack.python-uv.spelling"
 direction = "passing"
 bead = "shelf-fkx.11"
