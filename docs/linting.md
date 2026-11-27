@@ -138,7 +138,7 @@ reached ten rule sets without anyone deciding to.
 `blueprint gate preset`, wired as `just preset` and copied verbatim like `guard`, compares three axes
 — `[tool.ruff.lint] select`/`ignore`, and `[tool.pyrefly.errors]` (the justfile is rendered and has its own check, `blueprint gate render --check`) — plus the ruff and
 pyrefly versions both `uv.lock` files hold and the shared size-cap table (one config under another ruff is another rule set: a2kay's ruff 0.17 raised
-30 findings the shelf's 0.15 does not), against the snapshot of the shelf's own config packaged in `blueprint` (`preset.toml`, regenerated with `tools/preset_refresh.py`, a test fails when stale), and fails on any difference the consumer has not declared in its own:
+30 findings the shelf's 0.15 does not), against the snapshot of the shelf's own config packaged in `blueprint` (`preset.toml`, regenerated with `tools/preset_refresh/preset_refresh.py`, a test fails when stale), and fails on any difference the consumer has not declared in its own:
 
 ```toml
 [tool.shelf-preset]
@@ -158,7 +158,7 @@ is not this one's. A check that fails on every consumer forever teaches everyone
 
 Python puts the running script's folder ahead of the standard library on `sys.path`, so a tracked `queue.py` in `scripts/` replaces
 `queue` for every script run from there (a consumer repo: 729 jobs failed with `module 'queue' has no attribute 'SimpleQueue'`; a
-`profile.py` shadows what `cProfile` imports). `tools/stdlib_shadow.py` fails on any `*.py` file or package folder whose name is in
+`profile.py` shadows what `cProfile` imports). `tools/stdlib_shadow/stdlib_shadow.py` fails on any `*.py` file or package folder whose name is in
 `sys.stdlib_module_names`, in a folder that can be first on the path: the repo root, `scripts/`, `tools/`, `bin/`, `src/`, `tests/`, `test/`,
 or any folder holding a script (a `__main__` guard or a PEP 723 `# /// script` header). Inside a package (the folder or one above it has
 `__init__.py`, e.g. `src/<pkg>/queue.py`) a name is imported through its package, so it is checked only when its own folder also holds a
@@ -166,14 +166,14 @@ directly runnable script: a `*.py` other than `__main__.py` with a `__main__` gu
 `src/<pkg>/` first on the path, so `queue.py` beside it shadows the standard library). A stdlib-named file that is itself that script
 counts. `__main__.py` does not: `python -m <pkg>` leads with the working directory. A script in a sub-package does not count for its parent
 folder. Exceptions go in
-`tools/stdlib_shadow_allow.toml`, one reason per path; an entry without a reason, or for a path that no longer shadows, fails. Declared
+`.config/stdlib-shadow/allow.toml`, one reason per path; an entry without a reason, or for a path that no longer shadows, fails. Declared
 inputs in `gate-inputs.toml` ([ADR 0031](adr/0031-gate-steps-declare-their-inputs.md)): `*.py` and the allowlist.
 
 ## Architectural fitness rules (native, not OPA — ADR 0005)
 
 Beyond ruff, the shelf enforces *architectural* rules as pure-stdlib pytest, reimplementing a2kit's Rego policies without dragging OPA in:
 
-- **`tests/test_arch_rules.py`** (blocking, via `tools/arch_rules.py`): dependency **upper-bounds**;
+- **`tests/test_arch_rules.py`** (blocking, via `tools/arch_rules/arch_rules.py`): dependency **upper-bounds**;
   **body-duplication** within a package and across packages, **private-name-collision** within a package.
   Suppress with a reasoned entry in `tests/arch_allowlist.toml`; a cross-package duplicate has no entry,
   the only exit is to lift the shared body into one package (promote or evolve) or fix the check.
@@ -187,6 +187,6 @@ the shelf bans the consumer apps there, which also covers `packages/*/tests`. AD
 |---|---|---|
 | import edges, layers, cycles | import-linter contracts in `pyproject.toml` | `just arch` |
 | banned APIs and modules | ruff `TID251` banned-api | `just lint` |
-| AST facts (RG001-RG004) | `tools/arch_rules.py` via `tests/test_arch_rules.py` | `just test` |
+| AST facts (RG001-RG004) | `tools/arch_rules/arch_rules.py` via `tests/test_arch_rules.py` | `just test` |
 
 Still un-ported (add when a real violation appears): the `dict[str,Any]`-ban.

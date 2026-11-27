@@ -1,4 +1,4 @@
-# Known vulnerabilities in the locked dependencies that are allowed for now (tools/dep_audit.py). Every entry needs a reason and an end date:
+# Known vulnerabilities in the locked dependencies that are allowed for now (tools/dep_audit/dep_audit.py). Every entry needs a reason and an end date:
 # past the date the entry stops covering its advisories and the gate fails again; an advisory no longer reported fails the entry (delete it).
 # Prefer upgrading the package. Baseline: the audit was added 2026-11-26 and found these; none is triaged yet.
 

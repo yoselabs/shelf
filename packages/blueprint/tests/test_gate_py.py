@@ -44,7 +44,7 @@ def test_the_repos_extra_steps_join_check_and_their_whole_form_joins_check_all(r
     assert '"test" "arch" "tag-check")' in base
     assert '"test-all" "arch" "tag-check")' in base
     assert '"lint-changed"' in base
-    assert '"lint" "typecheck" "spell"' in base  # the release gate runs the whole form of the changed-only steps
+    assert '"lint" "typecheck" "deps"' in base  # the release gate runs the whole form of the changed-only steps
 
 
 def test_check_all_runs_the_extension_point_too(repo: Repo) -> None:
@@ -69,9 +69,9 @@ def test_lint_reads_only_the_declared_paths(repo: Repo) -> None:
     assert gate_py.lint(repo.root) == 0  # scripts/ is not a declared path
 
 
-@pytest.mark.parametrize(("codes", "expected"), [((-15, 0), -15), ((0, -9), -9), ((2, 1), 2)])
-def test_lint_runs_both_tools_and_preserves_first_failure(
-    repo: Repo, monkeypatch: pytest.MonkeyPatch, codes: tuple[int, int], expected: int
+@pytest.mark.parametrize(("codes", "expected"), [((-15, 0, 0), -15), ((0, -9, 0), -9), ((2, 1, 0), 2), ((0, 0, 3), 3)])
+def test_lint_runs_all_tools_and_preserves_first_failure(
+    repo: Repo, monkeypatch: pytest.MonkeyPatch, codes: tuple[int, int, int], expected: int
 ) -> None:
     calls: list[list[str]] = []
 
@@ -81,7 +81,7 @@ def test_lint_runs_both_tools_and_preserves_first_failure(
 
     monkeypatch.setattr(gate_py.subprocess, "run", lint_process)
     assert gate_py.lint(repo.root) == expected
-    assert len(calls) == 2
+    assert len(calls) == 3  # ruff check, ruff format, codespell: all run, the first failure is the answer
 
 
 def test_the_changed_form_skips_when_nothing_changed(

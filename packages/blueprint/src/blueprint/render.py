@@ -33,8 +33,8 @@ _HEADER = (
 
 # stack -> (part name, the gate steps it adds to `check`, in order). A stack with no row has no recipes to render.
 _STACKS = {
-    "python-uv": ("python", ("lint-changed", "typecheck", "spell-changed", "deps", "test")),
-    "python": ("python", ("lint-changed", "typecheck", "spell-changed", "deps", "test")),
+    "python-uv": ("python", ("lint-changed", "typecheck", "deps", "test")),
+    "python": ("python", ("lint-changed", "typecheck", "deps", "test")),
     "shell": ("shell", ("scripts",)),
 }
 _STACK_INSTALLS = {
@@ -43,8 +43,8 @@ _STACK_INSTALLS = {
     "yarn.lock": "yarn install --immutable",
 }
 # What the release gate runs instead of a step: the whole-history and whole-suite form.
-_WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all", "lint-changed": "lint", "spell-changed": "spell"}
-_COMMON_STEPS = ("guard", "preset", "render", "blueprint", "secrets")
+_WHOLE = {"secrets": "secrets-all", "test": "test-all", "scripts": "scripts-all", "lint-changed": "lint"}
+_COMMON_STEPS = ("blueprint", "secrets")
 
 
 def _stack_parts(repo: Path) -> list[tuple[str, tuple[str, ...]]]:

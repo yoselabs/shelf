@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_ROOT / "tools"))
+sys.path.insert(0, str(_ROOT / "tools" / "arch_rules"))
 
 import arch_rules  # noqa: E402  -- path-injected tool module, imported after sys.path setup
 

@@ -83,13 +83,15 @@ def _call(cmd: list[str], repo: Path) -> int:
 
 
 def lint(repo: Path) -> int:
-    """Every declared path."""
-    return _run_lint(repo, only_changed=False)
+    """Every declared path: ruff, then codespell (one gate step for the per-file linters)."""
+    linted, spelled = _run_lint(repo, only_changed=False), _run_spell(repo, only_changed=False)
+    return linted or spelled
 
 
 def lint_changed(repo: Path) -> int:
-    """Only the files changed against the base; everything when none can be told."""
-    return _run_lint(repo, only_changed=True)
+    """Only the files changed against the base, by ruff and by codespell; everything when none can be told."""
+    linted, spelled = _run_lint(repo, only_changed=True), _run_spell(repo, only_changed=True)
+    return linted or spelled
 
 
 def _run_lint(repo: Path, *, only_changed: bool) -> int:

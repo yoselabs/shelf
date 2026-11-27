@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from tools import corpus_diff
+from tools.corpus_diff import corpus_diff
 
 
 def test_moved_names_every_row_whose_verdict_differs_or_that_one_engine_lacks():
@@ -45,6 +45,6 @@ def test_one_engine_against_itself_changes_nothing(tmp_path: Path, capsys):
 
 
 def test_help_exits_zero_and_prints_usage():
-    done = subprocess.run([sys.executable, "-I", "tools/corpus_diff.py", "--help"], capture_output=True, text=True, check=False)
+    done = subprocess.run([sys.executable, "-I", "tools/corpus_diff/corpus_diff.py", "--help"], capture_output=True, text=True, check=False)
     assert done.returncode == 0
     assert "usage" in done.stdout

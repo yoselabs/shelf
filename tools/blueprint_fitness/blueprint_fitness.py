@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     import pytest
     from blueprint.model import Check, Context, Sub
 
-SUITE = Path(__file__).resolve().parent.parent / "packages" / "blueprint" / "tests"
+SUITE = Path(__file__).resolve().parents[2] / "packages" / "blueprint" / "tests"
 GAPS = SUITE / "known_gaps.toml"
 DIRECTIONS = ("passing", "adverse")
 _BEAD = re.compile(r"shelf-[a-z0-9]+(\.[0-9]+)*")

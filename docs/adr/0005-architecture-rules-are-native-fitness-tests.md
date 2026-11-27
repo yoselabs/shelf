@@ -43,7 +43,7 @@ fitness tests, walk the AST
 - **Dependency upper bounds:** always blocking; an unbounded dep breaks silently on a major bump
   (ADR 0001's ethos). Exceptions go in `tests/arch_allowlist.toml` **with a reason** (RG003).
 
-Built: `tools/arch_rules.py` (engine: alpha-equivalence body hashing with local names and literals
+Built: `tools/arch_rules/arch_rules.py` (engine: alpha-equivalence body hashing with local names and literals
 abstracted but call targets/attributes kept for precision; private-name and dep-bound extractors;
 allowlist loader), the blocking rules, the allowlist, and upper bounds
 on package deps (`torch<3`, `docling<3`, ...); `html2text` is allowlisted (date-versioned upstream, no

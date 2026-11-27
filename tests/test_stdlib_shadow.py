@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tools import stdlib_shadow
+from tools.stdlib_shadow import stdlib_shadow
 
 
 @pytest.fixture

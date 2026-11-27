@@ -8,7 +8,7 @@ from pathlib import Path
 
 from blueprint import preset
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 TARGET = ROOT / "packages" / "blueprint" / "src" / "blueprint" / "preset.toml"
 
 

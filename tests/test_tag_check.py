@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tools import tag_check
+from tools.tag_check import tag_check
 
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"]
 

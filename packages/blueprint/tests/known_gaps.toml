@@ -1,4 +1,4 @@
-# Checkpoint directions the blueprint suite does not yet exercise through blueprint.runner (tools/blueprint_fitness.py).
+# Checkpoint directions the blueprint suite does not yet exercise through blueprint.runner (tools/blueprint_fitness/blueprint_fitness.py).
 # The list only shrinks: close a gap with a scenario, then delete its entry. Every entry names its bead.
 
 [[gap]]

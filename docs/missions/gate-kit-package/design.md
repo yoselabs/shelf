@@ -9,10 +9,10 @@
 | `tools/affected.py` | 238 | selection is stack-specific | Python adapter (graph, export fingerprint); the pass cache becomes core receipts |
 | `tools/preset_drift.py` | 228 | yes (config drift, justfile recipe set) | core drift check plus rendered-justfile compare |
 | `tools/hooks/forbid-local-shelf-source.py` | small | shelf rule consumers inherit | package, called by a hook entry that needs no clone |
-| `tools/size_caps.py` | 79 | shelf repo rule (caps 400/80/800) | stays; declared as an extra step |
-| `tools/arch_rules.py` | 214 | shelf repo rule | stays; extra step |
-| `tools/catalog.py` | 144 | shelf ontology projection | stays |
-| `tools/blueprint_fitness.py` | 171 | blueprint's own pytest plugin | stays in the blueprint package |
+| `tools/size_caps/size_caps.py` | 79 | shelf repo rule (caps 400/80/800) | stays; declared as an extra step |
+| `tools/arch_rules/arch_rules.py` | 214 | shelf repo rule | stays; extra step |
+| `tools/catalog/catalog.py` | 144 | shelf ontology projection | stays |
+| `tools/blueprint_fitness/blueprint_fitness.py` | 171 | blueprint's own pytest plugin | stays in the blueprint package |
 | `recipes/check_coverage.py` | 35 | stack: python | Python adapter |
 | `recipes/check_dockerfile_pins.py` | 136 | stack: dockerfile | its stack adapter |
 | `recipes/check_godot.py`, `unity_integrity.py` | 140, 83 | framework | framework profiles |

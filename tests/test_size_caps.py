@@ -9,7 +9,7 @@ from any_gate import changed
 from blueprint import preset as preset_drift
 
 _ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(_ROOT / "tools"))
+sys.path.insert(0, str(_ROOT / "tools" / "size_caps"))
 
 import size_caps  # noqa: E402 -- repository tool path
 from blueprint import init  # noqa: E402 -- grouped with the repository tool path above
