@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `[tool.any-gate.python.reads]`: a root file -> the packages whose tests read it. A change selects those packages and their dependents (not every package); `fingerprint`/`plan` hash the mapped files into their readers' keys; an unmapped path still selects every package. `reads_audit.audit` is the fitness check that keeps the map true; `reach(rules=)` measures a rule set.
+
 ## 0.3.0
 
 - Reads child output through `Captured` (stream-proc 0.13.0): git and uv text via `.text`, the `git archive` tarball as bytes; requires `stream-proc>=0.13.0,<1`. Contract unchanged.

@@ -249,3 +249,61 @@ def test_a_selection_over_half_the_suites_gets_an_alarm_that_names_the_count(rep
     assert "3 of 5" in alarm
     assert affected.wide_alarm(repo, narrow) is None
     assert affected.wide_alarm(repo, [*narrow, "tests"]) is None  # the repo's own tests are no package suite
+
+
+# --- root files read by named packages (shelf-7aqn): a change to one selects its readers, not every package ---
+
+READS = """
+[tool.any-gate.python.reads]
+"ci.yaml" = ["middle"]
+".blueprint/*" = ["leaf", "middle"]
+"none.toml" = []
+"typo.toml" = ["no-such-package"]
+"""
+
+
+@pytest.fixture
+def mapped(repo: Path) -> Path:
+    (repo / "pyproject.toml").write_text(RULES + READS)
+    return repo
+
+
+@pytest.mark.parametrize(
+    ("changed", "expected"),
+    [
+        (["ci.yaml"], {"middle", "top"}),  # the reader and its dependents
+        ([".blueprint/python.just"], {"leaf", "middle", "top"}),  # a glob entry
+        ([".blueprint/python.just", "ci.yaml"], {"leaf", "middle", "top"}),  # entries union
+        (["none.toml"], set()),  # mapped to nobody: no suite reads it
+        (["other.toml"], {"base", "middle", "top", "leaf", "plug"}),  # unmapped, observable: every package, never a silent pass
+        (["typo.toml"], {"base", "middle", "top", "leaf", "plug"}),  # a reader that is not a package cannot be trusted
+        (["ci.yaml", "other.toml"], {"base", "middle", "top", "leaf", "plug"}),
+        (["docs/x.md", "ci.yaml"], {"middle", "top"}),  # no-effect paths add nothing
+    ],
+)
+def test_a_root_file_selects_the_packages_that_read_it_and_their_dependents(mapped: Path, changed: list[str], expected: set[str]) -> None:
+    assert _pkgs(affected.affected(mapped, changed)) == expected
+
+
+def test_a_root_file_read_by_a_plugin_package_selects_every_package(mapped: Path) -> None:
+    (mapped / "pyproject.toml").write_text(RULES + '[tool.any-gate.python.reads]\n"x.toml" = ["plug"]\n')
+    assert _pkgs(affected.affected(mapped, ["x.toml"])) == {"base", "middle", "top", "leaf", "plug"}
+
+
+def test_a_mapped_root_file_is_part_of_its_readers_key_and_their_dependents(mapped: Path) -> None:
+    def keys() -> dict[str, str]:
+        return dict(affected.plan(mapped, [f"packages/{p}/tests" for p in PINS], pins_exporter))
+
+    _write_pins(mapped, PINS)
+    (mapped / "ci.yaml").write_text("a")
+    before = keys()
+    (mapped / "ci.yaml").write_text("b")
+    after = keys()
+    changed = {p.split("/")[1] for p in before if before[p] != after[p]}
+    assert changed == {"middle", "top"}
+    (mapped / ".blueprint").mkdir()
+    (mapped / ".blueprint" / "x.just").write_text("1")
+    one = keys()
+    (mapped / ".blueprint" / "x.just").write_text("2")
+    two = keys()
+    assert {p.split("/")[1] for p in one if one[p] != two[p]} == {"leaf", "middle", "top"}

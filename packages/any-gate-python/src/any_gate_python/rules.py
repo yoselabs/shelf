@@ -10,10 +10,16 @@ tests = ["test_onboard_*"]             # file-name globs under `repo-tests`
 inputs = ["tools/onboard/", "justfile"]
 [tool.any-gate.python.gated.reads]     # what one gated test reads beyond `inputs`
 "test_onboard_beads.py" = ["packages/blueprint/src/blueprint/concerns/beads/backlog.py"]
+
+[tool.any-gate.python.reads]           # a root file -> the packages whose tests read it (fnmatch, `*` crosses `/`)
+".pre-commit-config.yaml" = ["blueprint"]
+".blueprint/*" = ["blueprint", "any-gate"]
 ```
 
 A path entry is a file (`justfile`) or, with a trailing `/`, a directory prefix.
-With no config every path outside `packages/` selects every package.
+With no config every path outside `packages/` selects every package. A root file named in `reads` selects only the packages listed
+(and, through the graph, their dependents); an empty list says no suite reads it. A name that is no package selects every package.
+The reads map is a claim about the tests: `reads_audit` fails the gate when a test names a mapped file its package is not mapped for.
 """
 
 from __future__ import annotations
@@ -39,6 +45,7 @@ class Rules:
     gated_tests: tuple[str, ...] = ()
     gated_inputs: tuple[str, ...] = ()
     gated_reads: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    reads: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, repo: Path) -> Rules:
@@ -52,6 +59,7 @@ class Rules:
             gated_tests=tuple(gated.get("tests", ())),
             gated_inputs=tuple(gated.get("inputs", ())),
             gated_reads={name: tuple(paths) for name, paths in gated.get("reads", {}).items()},
+            reads={pattern: tuple(names) for pattern, names in section.get("reads", {}).items()},
         )
 
     def observable(self, path: str) -> bool:
@@ -60,3 +68,36 @@ class Rules:
 
     def is_gated(self, name: str) -> bool:
         return any(fnmatch.fnmatchcase(name, g) for g in self.gated_tests)
+
+    def readers(self, path: str) -> set[str] | None:
+        """The packages whose tests read root `path`, the union over every entry it matches; None when no entry names it."""
+        hit = [names for pattern, names in self.reads.items() if _glob(path, pattern)]
+        return {n for names in hit for n in names} if hit else None
+
+    def read_files(self, repo: Path, package: str) -> list[str]:
+        """The root files `package`'s tests read, as sorted repo-relative paths: what its key must hash."""
+        found: set[str] = set()
+        for pattern, names in self.reads.items():
+            if package not in names:
+                continue
+            if not any(c in pattern for c in "*?["):
+                if (repo / pattern.rstrip("/")).is_file():
+                    found.add(pattern)
+                elif pattern.endswith("/"):
+                    found.update(_walk(repo, pattern.rstrip("/"), pattern))
+                continue
+            literal = pattern.split("*")[0].split("?")[0].split("[")[0]
+            found.update(_walk(repo, literal.rpartition("/")[0], pattern))
+        return sorted(found)
+
+
+def _glob(path: str, pattern: str) -> bool:
+    return path.startswith(pattern) if pattern.endswith("/") else fnmatch.fnmatchcase(path, pattern)
+
+
+def _walk(repo: Path, base: str, pattern: str) -> list[str]:
+    start = repo / base if base else repo
+    if not start.is_dir():
+        return []
+    rels = (p.relative_to(repo).as_posix() for p in sorted(start.rglob("*")) if p.is_file())
+    return [r for r in rels if _glob(r, pattern)]
