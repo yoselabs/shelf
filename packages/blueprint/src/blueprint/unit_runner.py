@@ -26,6 +26,7 @@ KEY_LENGTH = 32
 KEEP = 3  # data files kept per unit: the newest keys, so switching branches does not rerun a unit
 RUN_TIMEOUT = 4 * 3600.0  # seconds one unit may take
 _TOOL_TIMEOUT = 600.0
+_NO_TESTS = 5  # pytest's exit code when nothing was selected
 
 
 def worktree_cache(shared: Path, repo: Path) -> Path:
@@ -40,6 +41,12 @@ def data_file(cache: Path, unit: str, key: str) -> Path:
 def cached(cache: Path, config: gate_units.Config, unit_keys: dict[str, str]) -> set[str]:
     """The `unit:key` of every unit whose current key has coverage data."""
     return {f"{u.name}:{unit_keys[u.name]}" for u in config.units if data_file(cache, u.name, unit_keys[u.name]).is_file()}
+
+
+def _selection(config: gate_units.Config, *, marks: bool, only: str) -> list[str]:
+    if only:
+        return [*config.every_mark(), "-m", only]
+    return config.arguments() if marks else config.every_mark()
 
 
 def _command(mode: str, pytest_args: list[str], paths: tuple[str, ...]) -> list[str]:
@@ -76,10 +83,14 @@ def run_units(
     *,
     marks: bool,
     unit_keys: dict[str, str] | None = None,
+    only: str = "",
 ) -> int:
     """Run each unit that owns one of `paths`; 0 when all passed, else the first failing exit code (the rest are not started).
 
     `marks=False` runs every mark (the release run); the data it keeps is of a superset, so it proves the unit just as well.
+    `only` runs just
+    that mark expression (the slow pass of `check`): a unit with none of them is fine (pytest's exit 5), and no data is kept, since the
+    unit's coverage data is the per-commit run's.
     """
     cache.mkdir(parents=True, exist_ok=True)
     unit_keys = unit_keys if unit_keys is not None else gate_units.keys(repo, config)
@@ -91,8 +102,10 @@ def run_units(
         with tempfile.TemporaryDirectory(dir=cache) as tmp:
             target = Path(tmp) / "data"
             env = {**os.environ, **config.env, "COVERAGE_FILE": str(target)}
-            command = _command(config.coverage, [*(config.arguments() if marks else config.every_mark()), *pytest_args], todo)
+            command = _command(config.coverage, [*_selection(config, marks=marks, only=only), *pytest_args], todo)
             done = subprocess.run(command, cwd=repo, env=env, check=False, timeout=RUN_TIMEOUT)
+            if only and done.returncode in (0, _NO_TESTS):
+                continue
             if done.returncode != 0:
                 return done.returncode
             if pytest_args:
@@ -135,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--pytest-args", default="")
     parser.add_argument("--keys", default="", help="the units' keys as JSON, computed by the caller (default: computed here)")
+    parser.add_argument("--only", default="", help="run just this mark expression (the slow pass); keeps no coverage data")
     parser.add_argument("--whole", action="store_true", help="run every mark: the release run")
     parser.add_argument("paths", nargs="+")
     args = parser.parse_args(argv)

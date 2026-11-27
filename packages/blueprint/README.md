@@ -52,6 +52,11 @@ paths = ["tests/ui"]
 reads = ["src/app/ui/*.js"]   # files tests read that no import names (JS run under node, fixtures)
 ```
 
+`marks = "not slow"` keeps `slow` tests out of the per-commit pass, not out of `check`: a second pass runs `-m slow` for each suite whose key has no slow-green
+receipt (`slow-gate-receipts.json` beside the normal receipts; the unit runner keeps no coverage data for it), so editing a slow test, or code it
+reaches, runs it, and a change the suite cannot see (docs) runs nothing. A repo whose suites have no key (a bare `tests` folder) runs slow tests only in
+`check-all`. `test-all` runs every mark and skips the pass.
+
 `pytest-args` and `marks` apply to every pytest run, before the CLI's `--pytest-args`.
 `env` adds string values to the test processes' inherited environment; the coverage runner's
 `COVERAGE_FILE` takes precedence. Invalid types for these keys are ignored. Changing any of

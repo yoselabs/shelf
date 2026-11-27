@@ -143,7 +143,7 @@ def test_test_settings_change_every_units_key(repo: Repo, setting: str) -> None:
 @pytest.mark.parametrize("mode", ["coverage", "pytest-cov", ""])
 def test_test_processes_honor_configured_args_marks_and_environment(repo: Repo, tmp_path: Path, mode: str) -> None:
     _app(repo)
-    settings = '\npytest-args = ["-q", "--override-ini=markers=slow: excluded"]\nmarks = "not slow"'
+    settings = '\npytest-args = ["-q", "--override-ini=markers=skipme: excluded"]\nmarks = "not skipme"'
     settings += '\nenv = { BLUEPRINT_TEST_VALUE = "configured", COVERAGE_FILE = "wrong.cov" }'
     manifest = _PYPROJECT.replace('coverage = "coverage"', f'coverage = "{mode}"').replace("floor = 50", "floor = 50" + settings)
     repo.write("pyproject.toml", manifest)
@@ -151,7 +151,7 @@ def test_test_processes_honor_configured_args_marks_and_environment(repo: Repo, 
         "tests/core/test_core.py",
         "import os\nimport pytest\nfrom app.core import add\n\n"
         "def test_environment():\n    assert os.environ['BLUEPRINT_TEST_VALUE'] == 'configured'\n    assert add(1, 2) == 3\n\n"
-        "@pytest.mark.slow\ndef test_excluded():\n    assert False\n",
+        "@pytest.mark.skipme\ndef test_excluded():\n    assert False\n",
     )
     assert (
         gate_test.run(

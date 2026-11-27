@@ -38,11 +38,26 @@ def is_workspace(repo: Path) -> bool:
     return any(repo.glob("packages/*/pyproject.toml"))
 
 
-def cache_dir(repo: Path) -> Path:
-    """Where unit coverage data is kept: `gate-coverage` in the git directory every worktree of `repo` shares."""
+def shared_git_dir(repo: Path) -> Path:
+    """The git directory every worktree of `repo` shares."""
     done = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=repo, capture_output=True, text=True, check=False, timeout=60)
     shared = Path(done.stdout.strip()) if done.returncode == 0 and done.stdout.strip() else Path(".git")
-    return unit_runner.worktree_cache((shared if shared.is_absolute() else repo / shared) / "gate-coverage", repo)
+    return shared if shared.is_absolute() else repo / shared
+
+
+def cache_dir(repo: Path) -> Path:
+    """Where unit coverage data is kept: `gate-coverage` in the git directory every worktree of `repo` shares."""
+    return unit_runner.worktree_cache(shared_git_dir(repo) / "gate-coverage", repo)
+
+
+def slow_receipts(repo: Path, receipts: Path | None) -> Path:
+    """Where a suite's slow-green keys are kept: beside the normal receipts, so a green per-commit run never stands for them."""
+    return receipts.with_name(f"slow-{receipts.name}") if receipts is not None else shared_git_dir(repo) / "gate-receipts-slow.json"
+
+
+def leaves_slow_out(repo: Path) -> bool:
+    """Whether the per-commit run's `marks` exclude `slow` (`not slow`): then a suite's slow tests have a pass of their own."""
+    return "notslow" in gate_units.read_config(repo).marks.replace(" ", "")
 
 
 def commands(
@@ -54,10 +69,12 @@ def commands(
     whole: bool,
     cache: Path | None = None,
     unit_keys: dict[str, str] | None = None,
+    only: str = "",
 ) -> tuple[list[str] | None, list[str]]:
     """`(plan command or None, test command)`; the plan command's stdout is the test command's stdin.
 
     `whole` is the release run (`test-all`): the plan lists every suite and the runner runs every mark.
+    `only` runs just that mark expression (the slow pass of `check`), whatever the configured `marks`.
     """
     py = sys.executable
     config = None if is_workspace(repo) else gate_units.load(repo)
@@ -71,10 +88,11 @@ def commands(
         where = cache or cache_dir(repo)
         runner = [py, "-m", "blueprint.unit_runner", "--repo", str(repo), "--cache", str(where), f"--pytest-args={pytest_args}"]
         given = [f"--keys={json.dumps(unit_keys, sort_keys=True)}"] if unit_keys is not None else []
-        test += ["--", *runner, *given, *(["--whole"] if whole else [])]
+        test += ["--", *runner, *given, *(["--whole"] if whole else []), *([f"--only={only}"] if only else [])]
     else:
         settings = gate_units.read_config(repo)
-        pytest_args = shlex.join([*(settings.every_mark() if whole else settings.arguments()), *shlex.split(pytest_args)])
+        base = settings.every_mark() if whole or only else settings.arguments()
+        pytest_args = shlex.join([*base, *(["-m", only] if only else []), *shlex.split(pytest_args)])
         test += ["--", py, "-m", "any_gate_python", "run", f"--pytest-args={pytest_args}"]
     return plan, test
 
@@ -155,14 +173,35 @@ def run(
         if floor is not None:
             test_env["COVERAGE_FILE"] = str(Path(tmp) / "data")
         code = execute(test_cmd, cwd=repo, stdin=plan, env=test_env)[0]
-        if code != 0:
-            return code
-        if floor is not None:
+        if code == 0 and not blank and leaves_slow_out(repo) and (slow_plan := _slow_plan(repo, config, plan, unit_keys)):
+            slow = commands(
+                repo,
+                receipts=slow_receipts(repo, receipts),
+                lease_root=lease_root,
+                pytest_args="",
+                cache=where,
+                whole=False,
+                unit_keys=unit_keys,
+                only="slow",
+            )[1]
+            code = execute(slow, cwd=repo, stdin=slow_plan, env=test_env)[0]
+        if code == 0 and floor is not None:
             report = [sys.executable, "-m", "coverage", "report", "--show-missing", f"--fail-under={floor:g}"]
-            return execute(report, cwd=repo, stdin="", env=test_env)[0]
-    if config is None or not measuring or filtered or declared_floor(repo) is None:
-        return 0  # without a floor nothing is judged from the combined data
+            code = execute(report, cwd=repo, stdin="", env=test_env)[0]
+    judged = config is not None and measuring and not filtered and declared_floor(repo) is not None
+    if code != 0 or not judged or config is None:
+        return code  # without a floor nothing is judged from the combined data
     return unit_runner.combine(repo, where, config, unit_keys)
+
+
+def _slow_plan(repo: Path, config: gate_units.Config | None, plan: str, unit_keys: dict[str, str] | None) -> str:
+    """The suites whose slow tests the per-commit run left out, each with its key (any-gate skips one whose key is already slow-green).
+
+    Empty for a repo whose suites have no key (a bare `tests` folder): nothing says what changed, so only `check-all` runs them.
+    """
+    if config is not None:
+        return gate_units.plan(repo, config, cached=None, unit_keys=unit_keys)
+    return plan if any(line.split("\t")[1:2] not in ([], [""]) for line in plan.splitlines()) else ""
 
 
 def _problems(repo: Path, config: gate_units.Config) -> list[str]:

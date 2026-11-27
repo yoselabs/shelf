@@ -245,3 +245,105 @@ def test_the_configured_environment_reaches_every_test_run(repo: Repo) -> None:
 
     assert gate_test.run(repo.root, receipts=None, lease_root=None, execute=fake, env={"INHERITED": "yes"}, whole=True) == 0
     assert envs[-1] == {"INHERITED": "yes", "COVERAGE_CORE": "sysmon"}
+
+
+# ── slow tests run in `check` when their suite's key changed since the last slow-green receipt (shelf-nqal) ────────────────────────────
+
+_SLOW = _WORKSPACE + '[tool.blueprint.test]\nmarks = "not slow"\n'
+
+
+def _tests(seen: list[tuple[list[str], str | None]]) -> list[tuple[list[str], str | None]]:
+    """The calls that ran tests (the `any_gate test` ones), in order."""
+    return [(cmd, stdin) for cmd, stdin in seen if stdin is not None and "any_gate" in cmd and "test" in cmd]
+
+
+def test_check_runs_the_slow_tests_of_a_suite_whose_key_has_no_slow_receipt(repo: Repo, tmp_path: Path) -> None:
+    repo.write("packages/a/pyproject.toml", _WORKSPACE)
+    repo.write("pyproject.toml", _SLOW)
+    seen: list[tuple[list[str], str | None]] = []
+    receipts = tmp_path / "r.json"
+    code = gate_test.run(repo.root, whole=False, receipts=receipts, lease_root=None, execute=_fake(seen), env=repo.env)
+    assert code == 0
+    normal, slow = _tests(seen)
+    assert "not slow" in " ".join(normal[0])
+    assert normal[0][normal[0].index("--receipts") + 1] == str(receipts)
+    assert slow[0][slow[0].index("--receipts") + 1] == str(tmp_path / "slow-r.json")  # its own record: a slow-green receipt
+    assert "-m slow" in " ".join(slow[0])
+    assert "not slow" not in " ".join(slow[0])
+    assert slow[1] == "packages/a/tests\tk1\n"  # the plan's key: unchanged key, receipt found, nothing runs
+
+
+@pytest.mark.parametrize(
+    ("settings", "args", "whole"),
+    [
+        ('[tool.blueprint.test]\nmarks = "not net"\n', None, False),  # nothing excludes slow
+        ("", None, False),  # no marks at all
+        ('[tool.blueprint.test]\nmarks = "not slow"\n', "-k x", False),  # an override run
+        ('[tool.blueprint.test]\nmarks = "not slow"\n', None, True),  # test-all already ran every mark
+    ],
+)
+def test_no_slow_pass_unless_the_per_commit_run_leaves_slow_out(repo: Repo, settings: str, args: str | None, whole: bool) -> None:
+    repo.write("packages/a/pyproject.toml", _WORKSPACE)
+    repo.write("pyproject.toml", _WORKSPACE + settings)
+    seen: list[tuple[list[str], str | None]] = []
+    code = gate_test.run(repo.root, whole=whole, receipts=None, lease_root=None, pytest_args=args, execute=_fake(seen), env=repo.env)
+    assert code == 0
+    assert len(_tests(seen)) == 1
+
+
+def test_a_failing_per_commit_run_skips_the_slow_pass(repo: Repo) -> None:
+    repo.write("packages/a/pyproject.toml", _WORKSPACE)
+    repo.write("pyproject.toml", _SLOW)
+    seen: list[tuple[list[str], str | None]] = []
+
+    def fake(cmd: list[str], *, cwd: Path, stdin: str | None, env: dict[str, str]) -> tuple[int, str]:
+        seen.append((cmd, stdin))
+        return (1, "") if stdin is not None else (0, "packages/a/tests\tk1\n")
+
+    assert gate_test.run(repo.root, whole=False, receipts=None, lease_root=None, execute=fake, env=repo.env) == 1
+    assert len(_tests(seen)) == 1
+
+
+def test_a_unit_repo_runs_its_slow_pass_through_the_unit_runner_without_keeping_data(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(unit_runner, "combine", lambda *_a, **_k: 0)
+    repo.write(
+        "pyproject.toml",
+        _SLOW + 'coverage = "coverage"\n[tool.blueprint.test.units.a]\npaths = ["tests/a"]\n',
+    )
+    repo.write("tests/a/test_a.py", "def test_a():\n    assert True\n")
+    seen: list[tuple[list[str], str | None]] = []
+    assert gate_test.run(repo.root, whole=False, receipts=None, lease_root=None, execute=_fake(seen), env=repo.env) == 0
+    slow = [cmd for cmd, stdin in seen if stdin is not None and "blueprint.unit_runner" in cmd][-1]
+    assert "--only=slow" in slow
+    assert any(a.startswith("--keys=") for a in slow)
+
+
+def test_editing_a_slow_test_runs_it_in_check_and_a_docs_change_does_not(repo: Repo, tmp_path: Path) -> None:
+    """shelf-nqal: the slow tests of a suite run when its key changed since they last passed, never for a change its tests cannot see."""
+    count = tmp_path / "count"
+    marker = (
+        f"from pathlib import Path\nimport pytest\n\n@pytest.mark.slow\ndef test_wheel():\n    Path({str(count)!r}).open('a').write('s')\n"
+    )
+    repo.write(
+        "pyproject.toml",
+        '[project]\nname = "x"\n[tool.pytest.ini_options]\nmarkers = ["slow: costs seconds"]\n'
+        '[tool.blueprint.test]\nmarks = "not slow"\n[tool.blueprint.test.units.packaging]\npaths = ["tests/packaging"]\n',
+    )
+    repo.write("tests/packaging/test_wheel_ui.py", marker)
+    repo.write("docs/notes.md", "one\n")
+
+    def check() -> int:
+        return gate_test.run(
+            repo.root, whole=False, receipts=tmp_path / "r.json", lease_root=tmp_path / "leases", cache=tmp_path / "cache", env=repo.env
+        )
+
+    assert check() == 0
+    assert count.read_text() == "s"  # first run: no slow-green receipt yet
+    assert check() == 0
+    assert count.read_text() == "s"  # same key: nothing runs
+    repo.write("docs/notes.md", "two\n")
+    assert check() == 0
+    assert count.read_text() == "s"  # a docs-only change does not reach the unit
+    repo.write("tests/packaging/test_wheel_ui.py", marker + "# edited\n")
+    assert check() == 0
+    assert count.read_text() == "ss"  # editing the slow test runs it in check
