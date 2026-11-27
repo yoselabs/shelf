@@ -35,6 +35,11 @@ _SCOPE = ("packages/*/src/**/*.py", "tools/**/*.py")
 
 # to be emptied by the consumer wave: files that kill, signal-0 probe or session-spawn themselves today
 _KILL_ALLOWED = {
+    **rows(
+        "debt: the child leads a group of its own and a watcher SIGKILLs the group by pgid after the owner is SIGKILLed; "
+        "stream_proc.run owns the pipes and wants callbacks, it hands back no raw Popen for a test to hold",
+        "packages/any-proc/src/any_proc/testing.py",
+    ),
     **rows("debt: session spawn only: wait4 alone gives ru_maxrss", "packages/any-speech/src/any_speech/adapters/_child.py"),
     **rows(
         "debt: SIGKILL of a worker group by pgid, no Popen in hand (stop_tree needs one)",

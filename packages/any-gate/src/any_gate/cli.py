@@ -2,6 +2,7 @@
 
 `steps [--runner just] [--fail-fast] [--step-limit S] STEP...` runs the gate's steps at once, each into its own log, shows a failed
 step's log the moment it ends, then prints one timing line (see `any_gate.steps`); exit 1 when one failed.
+`--opens` prints, after the timing line, the file opens and process starts each step's Python processes made (`any_gate.opens`).
 `$GATE_STEP_BUDGET` (default 60) and `$GATE_BUDGET` (default 180) are seconds.
 
 A step that declares its input files in `gate-inputs.toml` and whose inputs did not change is not started (`any_gate.inputs`);
@@ -34,6 +35,7 @@ import argparse
 import os
 import signal
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -43,6 +45,7 @@ from any_lease import Leases
 
 from any_gate import changed as changed_files
 from any_gate import inputs
+from any_gate import opens as step_opens
 from any_gate.receipts import Receipts
 from any_gate.runner import RunResult, run_runner
 from any_gate.state import GateState, common_dir
@@ -231,17 +234,20 @@ def _steps(args: argparse.Namespace) -> int:
             signal.signal(number, _stop_on_signal)
         except ValueError:  # not the main thread: the caller owns signals
             break
-    return run_and_report(
-        args.names,
-        env=os.environ,
-        runner=args.runner,
-        step_budget=args.step_budget,
-        gate_budget=args.gate_budget,
-        say=_say,
-        skip=_skips(args, Path(args.repo).resolve()),
-        step_limit=args.step_limit,
-        halt=threading.Event() if fail_fast else None,
-    )
+    with tempfile.TemporaryDirectory() as folder:
+        counted = step_opens.prepare(Path(folder)) if args.opens else None
+        return run_and_report(
+            args.names,
+            env=os.environ,
+            runner=args.runner,
+            step_budget=args.step_budget,
+            gate_budget=args.gate_budget,
+            say=_say,
+            skip=_skips(args, Path(args.repo).resolve()),
+            step_limit=args.step_limit,
+            halt=threading.Event() if fail_fast else None,
+            opens=counted,
+        )
 
 
 def _exec(cmd: Sequence[str]) -> int:
@@ -322,6 +328,9 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
         help="seconds before a step's whole process tree is stopped (a hang guard; default 3600)",
     )
     st.add_argument("--fail-fast", action="store_true", help="on the first failure stop the other steps (reported as not judged)")
+    st.add_argument(
+        "--opens", action="store_true", help="count each step's file opens and process starts (python only; see any_gate.opens)"
+    )
     st.add_argument("--all", action="store_true", help="run every step, whatever changed (the release gate)")
     st.add_argument("--repo", default=".", help="the repo whose gate-inputs.toml and changes decide what is skipped")
     st.add_argument("names", nargs="+", metavar="STEP")

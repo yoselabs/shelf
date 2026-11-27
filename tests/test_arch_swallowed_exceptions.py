@@ -87,6 +87,7 @@ _ALLOWED = {
         ("any-gate/src/any_gate/cli.py", 1),
         ("any-proc/src/any_proc/cpus.py", 2),
         ("any-proc/src/any_proc/run.py", 2),
+        ("any-proc/src/any_proc/testing.py", 1),
         ("git-porcelain/src/git_porcelain/real_observe.py", 1),
         ("jsonl-log/src/jsonl_log/_retention.py", 1),
         ("jsonl-log/src/jsonl_log/_rewrite.py", 1),

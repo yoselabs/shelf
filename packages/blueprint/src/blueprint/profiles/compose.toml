@@ -90,6 +90,10 @@ gate = "typos"
 label = "codespell (a committed `.codespellrc` or `[tool.codespell]`)"
 gate = '\bcodespell\b'
 
+[[role.alternative]]
+label = "blueprint's own `gate lint` or `gate spell`, which run codespell (its `[tool.codespell]` config is the repo's)"
+gate = '\bblueprint gate (?:lint|spell)\b'
+
 [[role]]
 role = "architecture"
 requires = "deployed"

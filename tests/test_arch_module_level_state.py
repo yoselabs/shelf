@@ -261,6 +261,11 @@ _ALLOWED = {
         "dropped Popen leaves a zombie and a ResourceWarning; reaped on the next spawn",
         ("stream-proc/src/stream_proc/detach.py", 1),
     ),
+    **_rows(
+        "outcome: the test children this process started and their watchers, not yet stopped: the process's own children are per "
+        "process by nature, and the atexit finalizer must find them when no fixture finalizer ran",
+        ("any-proc/src/any_proc/testing.py", 3),
+    ),
     # --- debt: global state still owed a conversion to an injected collaborator ---
     **_rows(
         "debt: a lazy builtins cache rebound by `global` and an extension dict, both reset by `reset_for_testing`; an injected "

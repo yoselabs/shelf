@@ -115,11 +115,18 @@ def _generated_inputs(entry: dict[str, Any]) -> list[str]:
     return [*outputs, *reads, "*pyproject.toml"]
 
 
+def _needs(entry: dict[str, Any]) -> str:
+    """` recipe ...`: the recipes a generated step runs first, as just dependencies (a private one is fine); a non-name is dropped."""
+    raw = entry.get("needs", [])
+    names: list[str] = [n for n in raw if isinstance(n, str) and re.fullmatch(r"[A-Za-z_][\w-]*", n)] if isinstance(raw, list) else []
+    return "".join(f" {n}" for n in names)
+
+
 def _generated_part(generated: list[dict[str, Any]]) -> str:
     recipes = "\n\n".join(
         f"# {g['name']}: what `{g['command']}` writes into a temp folder equals the committed "
         f"{', '.join(map(str, g.get('outputs', [])))}.\n"
-        f"[group('gate')]\ngenerated-{g['name']}:\n    uv run python -I -m blueprint.generated {g['name']}"
+        f"[group('gate')]\ngenerated-{g['name']}:{_needs(g)}\n    uv run python -I -m blueprint.generated {g['name']}"
         for g in generated
     )
     return (

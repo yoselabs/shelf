@@ -796,6 +796,7 @@ ignore_imports = [
     "any_agent.harnesses.codex -> stream_proc",
     "any_agent.harnesses.opencode -> stream_proc",
     "any_proc.run -> stream_proc",
+    "any_proc.testing -> stream_proc",
     "git_porcelain.real -> stream_proc",
     "git_porcelain.real -> child_env",
     "git_porcelain.porcelain -> child_env",

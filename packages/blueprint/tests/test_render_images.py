@@ -160,3 +160,55 @@ def test_the_pins_row_fails_when_the_check_is_named_but_the_gate_never_runs_it(r
     repo.commit()
     rows = {r.id: r.verdict for r in run(repo.root, concern="stack", env=repo.env).rows}
     assert rows["stack.dockerfile.dependencies"] is Verdict.FAILING
+
+
+def _pin_repo(repo: Repo, *, exempt: str = "") -> None:
+    repo.write("pyproject.toml", f'[project]\nname = "x"\n[tool.blueprint.gate]\nimage-pins = true\n{exempt}')
+    repo.commit()
+
+
+def test_image_pins_true_renders_one_compose_pin_pass_with_the_exemptions(repo: Repo) -> None:
+    repo.write("compose.yml", COMPOSE)
+    _pin_repo(repo, exempt='image-pin-exempt = ["ghcr.io/org/app:${IMAGE_TAG:?"]\n')
+    images = _images(repo)
+    assert images.count("blueprint.compose_pins") == 1
+    assert "--exempt 'ghcr.io/org/app:${IMAGE_TAG:?'" in images
+
+
+def test_the_compose_pin_pass_is_off_without_image_pins(repo: Repo) -> None:
+    repo.write("compose.yml", COMPOSE)
+    repo.commit()
+    assert "compose_pins" not in _images(repo)
+
+
+def _pins(tmp_path: Path, text: str, *flags: str) -> tuple[int, str]:
+    path = tmp_path / "compose.yml"
+    path.write_text(text)
+    done = subprocess.run(
+        [sys.executable, "-I", "-m", "blueprint.compose_pins", *flags, str(path)], capture_output=True, text=True, check=False
+    )
+    return done.returncode, done.stdout
+
+
+def test_the_compose_pin_pass_fails_an_undigested_image_and_names_it(tmp_path: Path) -> None:
+    code, out = _pins(tmp_path, COMPOSE)
+    assert code == 1
+    assert "compose.yml:3 'postgres:17' has no @sha256" in out
+
+
+def test_the_compose_pin_pass_accepts_digests_quoted_listed_and_commented(tmp_path: Path) -> None:
+    pinned = "postgres:17@sha256:" + "a" * 64
+    text = f'services:\n  db:\n    image: {pinned} # why\n  web:\n    image: "{pinned}"\n# image: ignored:1\n'
+    assert _pins(tmp_path, text)[0] == 0
+
+
+def test_the_compose_pin_pass_honours_the_exemption_by_prefix_only(tmp_path: Path) -> None:
+    own = "services:\n  app:\n    image: ghcr.io/org/app:${IMAGE_TAG:?set}\n  db:\n    image: postgres:17\n"
+    code, out = _pins(tmp_path, own, "--exempt", "ghcr.io/org/app:${IMAGE_TAG:?")
+    assert code == 1
+    assert "app" not in out
+    assert "postgres:17" in out
+
+
+def test_a_digest_must_be_64_hex_at_the_end(tmp_path: Path) -> None:
+    assert _pins(tmp_path, "services:\n  a:\n    image: x:1@sha256:abc\n")[0] == 1

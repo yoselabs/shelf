@@ -1,7 +1,7 @@
 # any-proc
 
-**Stop caring how a child process is started, limited, read back and kept alive.** Two
-modules, imported by name; stdlib only, POSIX.
+**Stop caring how a child process is started, limited, read back and kept alive.** Four
+modules, imported by name; stdlib plus `stream-proc`, POSIX.
 
 ## `any_proc.run` — run a child once
 
@@ -67,6 +67,25 @@ sup.state, sup.reason, sup.version, sup.terminal
   healthy `up` forgives the past.
 - **`start` never raises** and never spawns over a live child.
 - `rotate_log(path, keep=2)` rolls `log` to `log.1`, `log.2` before a run opens it fresh.
+
+## `any_proc.testing` — a test's child dies with the test
+
+**Value: no server a test started outlives the run.** A test child that survives a SIGKILL, a crashed xdist worker or a closed
+terminal keeps its port and its files for days (a2kay-71ou); a plain `Popen` plus a fixture finalizer cannot help, because
+the finalizer never runs.
+
+```python
+from any_proc.testing import kill_group, start_child
+
+child = start_child([sys.executable, "-m", "my_server"], stdout=subprocess.PIPE)
+...
+kill_group(child)   # SIGTERM to the group, SIGKILL after `grace` (10 s); pipes closed, watcher reaped
+```
+
+- `start_child(argv, **popen_kwargs)` — `Popen` as the leader of a new process group, plus a detached watcher that SIGTERMs, then
+  SIGKILLs, the group once the test process is gone. A child's own children die with it.
+- `kill_group(child, grace=10.0)` — the orderly stop (`stream_proc.stop_tree`); an `atexit` finalizer does it for every child
+  still live, so no `ResourceWarning` reaches `filterwarnings = ["error"]`.
 
 ## cpus
 

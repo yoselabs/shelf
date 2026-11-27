@@ -35,6 +35,7 @@ _ALLOWED = {
         key: Row(reason)
         for key, reason in {
             "packages/blueprint/src/blueprint/secret_scan.py": "blueprint is stdlib only (bare clone, PYTHONPATH): no verb-cli",
+            "packages/blueprint/src/blueprint/compose_pins.py": "blueprint is stdlib only (the gate runs it as `python -m`): no verb-cli",
             "packages/blueprint/src/blueprint/generated.py": "blueprint is stdlib only (the gate runs it as `python -m`): no verb-cli",
             "packages/blueprint/src/blueprint/unit_runner.py": "the runner any-gate spawns: blueprint is stdlib only, no verb-cli",
             "packages/stream-proc/src/stream_proc/_exec_gate.py": "a child-side gate script run by path: stdlib only, no shelf import",

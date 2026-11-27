@@ -4,7 +4,9 @@ a2kay wrote it by hand: hadolint, dockerfmt and BuildKit's `docker build --check
 schema check over the compose files. Each tool runs only for the kind of file the repo has;
 a missing tool is named (exit 2), never skipped.
 The digest-pin check is optional (`[tool.blueprint.gate] image-pins = true`, `image-pin-contexts = ["<build context>"]`): it runs
-from the package, `python -m blueprint.recipes.check_dockerfile_pins`, so a repo copies no script.
+from the package, `python -m blueprint.recipes.check_dockerfile_pins`, so a repo copies no script. The same option makes every
+compose `image:` carry a digest too (`python -m blueprint.compose_pins`, one process over every tracked compose file;
+`image-pin-exempt = ["<image prefix>"]` excuses an image built from the same commit).
 """
 
 from __future__ import annotations
@@ -43,7 +45,7 @@ def render(repo: Path) -> str | None:
     if dockerfiles:
         lines += _dockerfile_lines(repo)
     if composes:
-        lines += _compose_lines()
+        lines += _compose_lines(repo)
     lines.append('exit "$rc"')
     body = "\n".join(f"    {line}" for line in lines)
     kinds = " and ".join(
@@ -80,9 +82,16 @@ def _dockerfile_lines(repo: Path) -> list[str]:
     return lines
 
 
-def _compose_lines() -> list[str]:
+def _compose_lines(repo: Path) -> list[str]:
     files = f"git ls-files -z {_COMPOSES}"
+    gate = gate_py.settings(repo).get("gate", {})
+    pins = []
+    if isinstance(gate, dict) and gate.get("image-pins") is True:
+        exempt = gate.get("image-pin-exempt", [])
+        flags = "".join(f" --exempt {shlex.quote(str(e))}" for e in exempt) if isinstance(exempt, list) else ""
+        pins.append(f"uv run python -I -m blueprint.compose_pins{flags} || rc=1")
     return [
+        *pins,
         f"{files} | xargs -0 -r dclint --max-warnings 0 || rc=1",
         f"{files} | xargs -0 -r yamlfmt -lint || rc=1",
         'compose() { if command -v docker-compose >/dev/null; then docker-compose "$@"; else docker compose "$@"; fi; }',
