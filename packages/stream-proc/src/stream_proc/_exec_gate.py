@@ -50,11 +50,17 @@ def arguments() -> tuple[int, int, float]:
     return parsed.control, parsed.status, parsed.timeout
 
 
+def _readable(fd: int, timeout: float) -> bool:
+    poller = select.poll()  # not select.select: it raises ValueError for descriptors >= 1024
+    poller.register(fd, select.POLLIN)
+    return bool(poller.poll(max(0, math.ceil(timeout * 1000))))
+
+
 def read_exact(fd: int, size: int, deadline: float) -> bytes:
     data = bytearray()
     while len(data) < size:
         remaining = deadline - time.monotonic()
-        if remaining <= 0 or not select.select([fd], [], [], remaining)[0]:
+        if remaining <= 0 or not _readable(fd, remaining):
             raise TimeoutError
         chunk = os.read(fd, size - len(data))
         if not chunk:

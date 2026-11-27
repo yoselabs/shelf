@@ -6,7 +6,6 @@ import contextlib
 import json
 import math
 import os
-import select
 import struct
 import subprocess
 import sys
@@ -14,6 +13,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from stream_proc._wait import readable, writable
 from stream_proc.hold import TermHold, popen_held
 from stream_proc.owned import IdentityUnavailableError, OwnedProcess, inspect_process
 
@@ -73,7 +73,7 @@ def _send(fd: int, payload: bytes, deadline: float) -> None:
     pending = memoryview(payload)
     while pending:
         remaining = deadline - time.monotonic()
-        if remaining <= 0 or not select.select([], [fd], [], remaining)[1]:
+        if remaining <= 0 or not writable(fd, remaining):
             raise TimeoutError
         with contextlib.suppress(BlockingIOError):
             pending = pending[os.write(fd, pending) :]
@@ -81,7 +81,7 @@ def _send(fd: int, payload: bytes, deadline: float) -> None:
 
 def _ready(fd: int, deadline: float) -> None:
     remaining = deadline - time.monotonic()
-    if remaining <= 0 or not select.select([fd], [], [], remaining)[0]:
+    if remaining <= 0 or not readable(fd, remaining):
         raise TimeoutError
     if os.read(fd, 1) != b"R":
         msg = "Isolated process bootstrap failed before registration"
@@ -92,7 +92,7 @@ def _exec_status(fd: int, deadline: float) -> int | None:
     data = bytearray()
     while len(data) < 4:
         remaining = deadline - time.monotonic()
-        if remaining <= 0 or not select.select([fd], [], [], remaining)[0]:
+        if remaining <= 0 or not readable(fd, remaining):
             raise TimeoutError
         chunk = os.read(fd, 4 - len(data))
         if not chunk:
