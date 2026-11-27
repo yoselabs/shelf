@@ -50,20 +50,36 @@ env = { COVERAGE_CORE = "sysmon" }
 [tool.blueprint.test.units.ui]
 paths = ["tests/ui"]
 reads = ["src/app/ui/*.js"]   # files tests read that no import names (JS run under node, fixtures)
+
+[tool.blueprint.test.units.root]
+rest = true                   # every test file and folder under the test roots that no other unit claims
 ```
+
+`marks = "not slow"` keeps `slow` tests out of the per-commit pass, not out of `check`: a second pass runs `-m slow` for each suite whose key has no slow-green
+receipt (`slow-gate-receipts.json` beside the normal receipts; the unit runner keeps no coverage data for it), so editing a slow test, or code it
+reaches, runs it, and a change the suite cannot see (docs) runs nothing. A repo whose suites have no key (a bare `tests` folder) runs slow tests only in
+`check-all`. `test-all` runs every mark and skips the pass.
+
+A unit's `paths` may hold globs (`tests/test_*.py`): each is replaced by its sorted matches when the settings are read, so a globbed unit has the key of
+the hand-listed one, and a glob that matches nothing is a problem. A unit with `rest = true` owns the test files and folders under the test roots
+(`testpaths`, `tests`) that no other unit names, so a new test file joins it without editing the table; it is no unit when nothing is left, and only
+one may be `rest`.
 
 `pytest-args` and `marks` apply to every pytest run, before the CLI's `--pytest-args`.
 `env` adds string values to the test processes' inherited environment; the coverage runner's
 `COVERAGE_FILE` takes precedence. Invalid types for these keys are ignored. Changing any of
-the three settings changes every unit's key. `gate test-all` honors them too, keeping its
-default `-n auto` unless `pytest-args` contains `-n`.
+the three settings changes every unit's key. `gate test-all` honors them too, except `marks` (every mark runs).
 
 The key of a unit hashes its files, every first-party module they import (found by reading the imports), the `conftest.py` above them, the `reads` files,
 `uv.lock` and the dependency and pytest/coverage parts of `pyproject.toml`. An import it cannot see (`importlib` with a computed name) goes in `reads`.
 Do not define your own `test` recipe: `gate.recipe-shadowing` fails it unless an `[[override]]` says why (ADR 0033).
 
-`blueprint gate test-all` runs every test with a coverage floor: `[tool.blueprint.test] floor` takes precedence over
-`[tool.coverage.report] fail_under`, with 65 as the fallback. The resolved floor is passed explicitly to pytest-cov.
+`blueprint gate test-all` is `gate test` over every suite and mark with receipts ignored: one runner, one plan shape, one queue for the
+test slot, so `check` and `check-all` run the same steps and `check` only filters by what changed. A floor applies only when the repo
+declares one (`[tool.blueprint.test] floor`, else `[tool.coverage.report] fail_under`; none declared, none judged). With `coverage`
+set the units' data is combined as in `test`; without it pytest-cov measures across the stages and one `coverage report` judges the
+floor. A repo whose `pytest-args` hold `-p no:cov` and no `coverage` mode gets a notice that the floor was not judged. Pytest arguments
+(`just test-all -m slow`) make it an override: no receipts, no floor.
 
 `fail_under` in `[tool.coverage.report]` is the whole repo's floor: with units, each unit runs under `--cov-fail-under=0` and the
 combined data is judged once. A package that tests run against its installed wheel measures 0% unless `[tool.coverage.run]`

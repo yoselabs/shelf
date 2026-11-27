@@ -43,17 +43,18 @@ deps:
     fi
 
 # The tests the change reaches, through any-gate (`blueprint gate test`): suites that already passed on this input are skipped, the rest
-# queue for one test slot. Declared test units combine cached coverage before enforcing their whole-repo floor. A test marked `slow` is
-# left out of this run when `[tool.blueprint.test] marks = "not slow"`. Arguments go to pytest: `just test -m slow`, `just test -k name`.
+# queue for one test slot. Declared test units combine cached coverage before enforcing their whole-repo floor. With
+# `[tool.blueprint.test] marks = "not slow"` a suite's `slow` tests run in a second pass, only when that suite's key changed since they last
+# passed (a docs-only change runs none). Arguments go to pytest: `just test -m slow`, `just test -k name`.
 # A run with arguments is an override: it writes no receipt, so a later plain run cannot skip a unit this one never ran in full.
 [group('gate')]
 [positional-arguments]
 test *args:
     uv run blueprint gate test -- "$@"
 
-# Every test, `slow` ones too, with the coverage floor (the release gate's test step). Coverage is a whole-repo measure, so a floor cannot
-# ride on a partial run: with arguments (`just test-all -m slow`) the floor is off. The floor is `[tool.blueprint.test] floor` (default 65).
-# Queues behind any-lease when installed.
+# `test` over every suite and every mark, receipts ignored (the release gate's test step): the same runner, plan and test slot. A coverage
+# floor applies only when the repo declares one (`[tool.blueprint.test] floor`, else `[tool.coverage.report] fail_under`); a whole-repo
+# measure cannot ride on a partial run, so with arguments (`just test-all -m slow`) the floor is off.
 [group('gate')]
 [positional-arguments]
 test-all *args:
