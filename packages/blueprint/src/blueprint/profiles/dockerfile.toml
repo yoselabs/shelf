@@ -20,7 +20,7 @@ It formats directives and the shell inside RUN (shfmt). Seen red (exit 1, no dif
 Maintained: v0.5.4 released 2026-06-27, 4 open issues. dockerfile-utils (last release 2025-07) and prettier-plugin-dockerfile (no such npm package found) are out. \
 Adopting is a one-time reformat of every Dockerfile; a repo that will not reformat keeps `untested` rather than a gate that is red from day one"""
 install = "mise.toml: \"aqua:reteps/dockerfmt\" = \"0.5.4\"; justfile: `git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\\.dockerignore$' | xargs -0 -n1 dockerfmt --check -n` (it takes one file per call when mixed with errors, and a missing file kills the whole run); run `dockerfmt -w -n` once first"
-config = [{ any = [{ path = "justfile", contains = "dockerfmt" }, { path = ".blueprint/images.just", contains = "dockerfmt" }, { path = "Makefile", contains = "dockerfmt" }, { path = ".pre-commit-config.yaml", contains = "dockerfmt" }] }]
+config = [{ any = [{ path = "justfile", contains = "dockerfmt" }, { path = ".blueprint/images.just", contains = "dockerfmt" }, { path = ".pre-commit-config.yaml", contains = "dockerfmt" }] }]
 gate = "dockerfmt"
 
 [[role]]
@@ -30,7 +30,7 @@ Exit 1 on any warning (the default threshold); seen red on four real files (DL30
 and on a planted `FROM ubuntu:latest` with a bare `apt-get install` (DL3007, DL3008, DL3014, DL3015). Never `--failure-threshold error`: it passed a file with real warnings"""
 install = """mise.toml: hadolint = "2.15.1"; justfile: an `images` recipe, `git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\\.dockerignore$' | xargs -0 -r hadolint`, a dependency of `check`; \
 .hadolint.yaml with an `ignored:` list, each rule with a comment saying why. DL3022 is a false positive for `COPY --from=<name>` where <name> is a `docker build --build-context`: ignore it with that reason"""
-config = [{ path = ".hadolint.yaml" }, { any = [{ path = "justfile", contains = "hadolint" }, { path = ".blueprint/images.just", contains = "hadolint" }, { path = "Makefile", contains = "hadolint" }, { path = ".pre-commit-config.yaml", contains = "hadolint" }] }]
+config = [{ path = ".hadolint.yaml" }, { any = [{ path = "justfile", contains = "hadolint" }, { path = ".blueprint/images.just", contains = "hadolint" }, { path = ".pre-commit-config.yaml", contains = "hadolint" }] }]
 gate = "hadolint"
 
 [[role]]
@@ -45,7 +45,7 @@ judged by the `dockerfile-pins` recipe (stdlib, no network). Exempt: `scratch`, 
 Seen red (exit 1) on a planted file (`:latest`, a bare `nginx`, an ARG-built `python:${PY}-slim`, a `COPY --from=uv:0.13.0`) and on 9 real unpinned references in 4 Dockerfiles; green (exit 0) on homelab's images/devbox (digest-pinned) and on a planted file of pinned forms. \
 The digest to write comes from `crane digest <image:tag>` (network; seen: exit 0, one sha256 line). Keeping a pin from freezing a shipped image is the ship-updater row's"""
 install = "optional: `[tool.blueprint.gate] image-pins = true` (and `image-pin-contexts = [\"<name>\"]`) makes the rendered `images` step run `python -m blueprint.recipes.check_dockerfile_pins`, so a repo copies no script; pin with `crane digest`"
-config = [{ any = [{ path = "justfile", contains = "check_dockerfile_pins" }, { path = "Makefile", contains = "check_dockerfile_pins" }, { path = ".blueprint/images.just", contains = "check_dockerfile_pins" }] }]
+config = [{ any = [{ path = "justfile", contains = "check_dockerfile_pins" }, { path = ".blueprint/images.just", contains = "check_dockerfile_pins" }] }]
 gate = "check_dockerfile_pins"
 
 [[role]]

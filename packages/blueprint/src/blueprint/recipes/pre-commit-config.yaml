@@ -62,10 +62,11 @@ repos:
     stages: [prepare-commit-msg]
 - repo: local
   hooks:
-  - id: secret-scan
-    name: secrets in the staged changes
-    # gitleaks (pinned in mise.toml) over the index only, so it costs a fraction of a second; the gate scans the changed range.
-    entry: uv run python -m blueprint.secret_scan staged
+  - id: blueprint-hook
+    name: staged files (secrets, guard, preset, ruff)
+    # One process, not five `uv run` starts: the secret scan (gitleaks, pinned in mise.toml, over the index), the local-shelf-source
+    # guard, preset drift (only when pyproject.toml is staged) and ruff check and format over the staged Python files.
+    entry: uv run blueprint gate hook
     language: system
     always_run: true
     pass_filenames: false

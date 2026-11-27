@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 # The runner's own trailer (`make: *** [check] Error 2`, "error: Recipe `lint` failed on line 9 ...") names no cause.
-_RUNNER_LINE = re.compile(r"^(?:g?make(\[\d+\])?: |error: Recipe `)")
+_RUNNER_LINE = re.compile(r"^error: [Rr]ecipe `")
 
 
 def _cause(done: subprocess.CompletedProcess[str]) -> str:
@@ -56,15 +56,15 @@ def failed_steps(done: subprocess.CompletedProcess[str]) -> tuple[list[str], str
     return names, "\n".join(logs)
 
 
-def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budget: object, ctx: Context, word: str = "just") -> Finding:
+def _judge_clone(done: subprocess.CompletedProcess[str] | None, took: int, budget: object, ctx: Context) -> Finding:
     if done is None:
-        return failing(f"`{word} check` in a fresh clone did not finish within an hour", "find the step that hangs")
+        return failing("`just check` in a fresh clone did not finish within an hour", "find the step that hangs")
     if done.returncode != 0:
         names, logs = failed_steps(done)
         step = f"step {', '.join(names)} " if names else ""
         shown = f"\n{logs}" if logs else ""
         return failing(
-            f"`{word} check` {step}fails in a fresh clone ({took}s): {_cause(done)}{shown}",
+            f"`just check` {step}fails in a fresh clone ({took}s): {_cause(done)}{shown}",
             "make the gate pass from a clean checkout (a clone of a worktree also needs MISE_TRUSTED_CONFIG_PATHS set for bd's mise shim)",
         )
     if not isinstance(budget, int):
@@ -144,21 +144,20 @@ def _fresh_clone_steps(ctx: Context, clone: Path) -> Finding | None:
 
 
 def clean_clone(ctx: Context) -> Finding:
-    """Clone HEAD into a temp dir and run `just check` (a Makefile repo: `make check`) there, timed.
+    """Clone HEAD into a temp dir and run `just check` there, timed.
 
     When HEAD fails and the working tree holds uncommitted changes, the same run on a snapshot of the working tree tells
     "commit to verify" (mid-remediation, a2kay: shelf-83g) from a real failure; the row passes only on HEAD.
     """
     if ctx.git("rev-parse", "HEAD") is None:
         return not_checked("no commit to clone")
-    word = "make" if gate_graph.has_makefile_only(ctx) else "just"
     budget = ctx.settings.get("clean-clone-seconds")
     with tempfile.TemporaryDirectory(prefix="blueprint-clone-") as tmp:
         # GIT_LFS_SKIP_SMUDGE: a git-lfs on PATH that fails (a mise shim in an untrusted checkout) must not fail the clone itself.
         clone = ctx.run("git", "clone", "--quiet", str(ctx.repo), tmp, timeout=300, env={**ctx.env, "GIT_LFS_SKIP_SMUDGE": "1"})
         if clone is None or clone.returncode != 0:
             return not_checked("could not clone the repository")
-        judged = (_pull_lfs(ctx, Path(tmp)) if uses_lfs(ctx) else None) or _gate_in(ctx, Path(tmp), word, budget)
+        judged = (_pull_lfs(ctx, Path(tmp)) if uses_lfs(ctx) else None) or _gate_in(ctx, Path(tmp), budget)
     uncommitted = [
         line[3:] for line in (ctx.git("status", "--porcelain", "--untracked-files=all", "--ignore-submodules=all") or "").splitlines()
     ]
@@ -167,7 +166,7 @@ def clean_clone(ctx: Context) -> Finding:
     with tempfile.TemporaryDirectory(prefix="blueprint-snapshot-") as tmp:
         if not _snapshot(ctx, Path(tmp)):
             return judged
-        if _gate_in(ctx, Path(tmp), word, budget).verdict is Verdict.FAILING:
+        if _gate_in(ctx, Path(tmp), budget).verdict is Verdict.FAILING:
             return judged
     named = ", ".join(uncommitted[:5]) + (f" and {len(uncommitted) - 5} more" if len(uncommitted) > 5 else "")
     return not_checked(
@@ -191,13 +190,13 @@ def _pull_lfs(ctx: Context, clone: Path) -> Finding | None:
     return None
 
 
-def _gate_in(ctx: Context, folder: Path, word: str, budget: object) -> Finding:
+def _gate_in(ctx: Context, folder: Path, budget: object) -> Finding:
     """The after-clone steps, then the gate, in `folder`, timed against the recorded budget."""
     start = time.monotonic()
     if (failed := _fresh_clone_steps(ctx, folder)) is not None:
         return failed
-    done = ctx.run(gate_graph.just_command(ctx) if word == "just" else word, "check", cwd=folder, timeout=3600)
-    return _judge_clone(done, round(time.monotonic() - start), budget, ctx, word)
+    done = ctx.run(gate_graph.just_command(ctx), "check", cwd=folder, timeout=3600)
+    return _judge_clone(done, round(time.monotonic() - start), budget, ctx)
 
 
 def _snapshot(ctx: Context, folder: Path) -> bool:

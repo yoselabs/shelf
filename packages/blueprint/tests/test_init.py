@@ -209,3 +209,18 @@ def test_a_tool_whose_version_cannot_be_read_stays_a_left_row(repo: Repo, capsys
     _, out = _init(repo, capsys)
     assert not (repo.root / "mise.toml").exists()
     assert "stack.tool-pins" in out.split("left:")[1]
+
+
+def test_init_writes_no_compose_policy_for_a_repo_that_is_not_deployed(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    # shelf-rabg: nothing runs policy/compose.rego in a repo that deploys nothing, and its rows are not applicable there.
+    repo.write("compose.yml", "services:\n  db:\n    image: postgres:17\n")
+    _init(repo, capsys)
+    assert not (repo.root / "policy/compose.rego").exists()
+
+
+def test_init_writes_the_compose_policy_for_a_deployed_repo(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
+    # The deployed repo's architecture and tests rows read policy/*.rego, so it is the one repo init still writes it for.
+    repo.write("compose.yml", "services:\n  db:\n    image: postgres:17\n")
+    repo.write("docs/blueprint/blueprint.toml", '[profile]\nkind = "infrastructure"\ntraits = ["deployed"]\n')
+    _init(repo, capsys)
+    assert (repo.root / "policy/compose.rego").is_file()

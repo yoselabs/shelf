@@ -275,11 +275,15 @@ class Context:
         return self.repo / rel
 
     def read(self, rel: str) -> str | None:
-        """The text of `rel`, or None when it is not a file."""
-        p = self.repo / rel
-        return (
-            p.read_text(encoding="utf-8", errors="replace") if p.is_file() else None
-        )  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
+        """The text of `rel`, or None when it is not a file. Read once per run: the repo does not change while a run reads it."""
+        key = f"read:{rel}"
+        if key not in self.memo:
+            p = self.repo / rel
+            self.memo[key] = (
+                p.read_text(encoding="utf-8", errors="replace") if p.is_file() else None
+            )  # lossy-ok: parse: the text is matched for a yes/no or one value, never stored or hashed
+        found = self.memo[key]
+        return found if isinstance(found, str) else None
 
     def toml(self, rel: str) -> dict[str, object]:
         """The parsed TOML file `rel`; empty when it is absent or not valid TOML (the checks that need it report that themselves)."""
@@ -324,9 +328,13 @@ class Context:
         return not_checked("not a git repository")
 
     def git(self, *args: str) -> str | None:
-        """stdout of a git command, or None when it failed."""
-        done = self.run("git", *args)
-        return done.stdout if done is not None and done.returncode == 0 else None
+        """stdout of a read-only git command, or None when it failed. Asked once per run: the repo does not change while a run reads it."""
+        key = f"git:{args}"
+        if key not in self.memo:
+            done = self.run("git", *args)
+            self.memo[key] = done.stdout if done is not None and done.returncode == 0 else None
+        found = self.memo[key]
+        return found if isinstance(found, str) else None
 
 
 @dataclass(frozen=True)

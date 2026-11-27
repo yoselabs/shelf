@@ -19,7 +19,7 @@ evidence, then return to where the run was and show the pending decision again. 
 holds becomes a `blueprint lacks:` bead (§6), not an exception granted in chat.
 
 **Resume rule:** after compaction or a new session, re-invoke the skill, read
-`docs/blueprint/README.md` in the repo, and continue from the first concern that is not all ✅.
+`.blueprint/reports/README.md` in the repo (re-run `check --audit --write` if it is missing: the folder is git-ignored), and continue from the first concern that is not all ✅.
 
 **Verdicts** come from the engine, never from your judgment: `not set up` · `failing` ·
 `passing` · `not applicable` · `not checked`. `not checked` is never a pass.
@@ -55,7 +55,7 @@ what passed, a lease queues runs); `check --brief` is the per-commit step. A rep
 
 ## 2. Audit
 
-1. `check --repo . --audit --write` writes `docs/blueprint/README.md` (one row per concern,
+1. `check --repo . --audit --write` writes `.blueprint/reports/README.md` (git-ignored; one row per concern,
    grouped by layer) and one table per concern. Read the README and `--audit` only; open a
    concern's file only to remediate it. The JSON (`--json`) is for scripts, not for reading.
 2. A `not checked` row that is not a blueprint gap: find why (a missing tool, no commits).

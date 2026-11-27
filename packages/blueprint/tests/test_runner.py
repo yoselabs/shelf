@@ -136,7 +136,7 @@ def test_write_produces_one_table_per_concern(repo: Repo) -> None:
     paths = report.write(result, repo.root, date(2026, 10, 10))
     concerns = ("gate", "backlog", "secrets", "hooks", "stack", "agents")
     assert {p.name for p in paths} == {"README.md", "checkpoints.txt", *(f"{c}.md" for c in concerns)}
-    text = (repo.root / "docs/blueprint/gate.md").read_text()
+    text = (repo.root / ".blueprint/reports/gate.md").read_text()
     assert "| | checkpoint | set up | working | evidence | remediation | fixed by |" in text
     assert "`gate.one-command`" in text
 
@@ -144,11 +144,11 @@ def test_write_produces_one_table_per_concern(repo: Repo) -> None:
 def test_write_removes_the_report_of_a_concern_that_no_longer_applies(repo: Repo) -> None:
     result = run(repo.root, env=repo.env)
     report.write(result, repo.root, date(2026, 10, 10))
-    stale = repo.root / "docs/blueprint/stack-shell.md"
+    stale = repo.root / ".blueprint/reports/stack-shell.md"
     stale.write_text(
         "# Blueprint: stack/shell (Stack-specific)\n\nWritten by `blueprint check --write` on 2026-10-09; rewritten on every run.\n"
     )
-    own = repo.root / "docs/blueprint/notes.md"
+    own = repo.root / ".blueprint/reports/notes.md"
     own.write_text("# Notes the owner keeps here\n")
     report.write(result, repo.root, date(2026, 10, 10))
     assert not stale.exists()
@@ -158,7 +158,7 @@ def test_write_removes_the_report_of_a_concern_that_no_longer_applies(repo: Repo
 def test_a_run_of_one_concern_keeps_the_other_reports(repo: Repo) -> None:
     report.write(run(repo.root, env=repo.env), repo.root, date(2026, 10, 10))
     report.write_concern(run(repo.root, concern="gate", env=repo.env), repo.root, date(2026, 10, 10))
-    assert (repo.root / "docs/blueprint/backlog.md").exists()
+    assert (repo.root / ".blueprint/reports/backlog.md").exists()
 
 
 def test_the_cli_prints_json_and_exits_with_the_runs_code(repo: Repo, capsys: pytest.CaptureFixture[str]) -> None:
@@ -206,7 +206,7 @@ def test_the_summary_without_audit_says_it_omits_audit_rows_and_matches_the_read
     root = str(repo.root)
     main(["check", "--repo", root, "--concern", "scratch", "--audit", "--write"])
     capsys.readouterr()
-    readme = (repo.root / "docs/blueprint/README.md").read_text()
+    readme = (repo.root / ".blueprint/reports/README.md").read_text()
 
     audited = report.summary(run_audit(repo.root, concern="scratch", env=repo.env))
     assert audited.strip() in readme
@@ -466,7 +466,7 @@ def test_a_written_report_names_the_engine_and_the_scope(repo: Repo) -> None:
     result = run(repo.root, concern="gate", env=repo.env)
     report.write(result, repo.root, date(2026, 10, 11))
     for name in ("README.md", "gate.md"):
-        head = (repo.root / "docs/blueprint" / name).read_text().split("\n\n")[:6]
+        head = (repo.root / ".blueprint/reports" / name).read_text().split("\n\n")[:6]
         text = "\n".join(head)
         assert f"`{result.set_hash}`" in text
         assert re.search(r"engine: (shelf `[0-9a-f]{7,}`|blueprint \d)", text)
@@ -500,3 +500,12 @@ def test_a_hooks_git_variables_never_reach_the_repo_they_name(repo: Repo, tmp_pa
     leaked = {**repo.env, "GIT_DIR": str(victim / ".git/worktrees/wt"), "GIT_WORK_TREE": str(tmp_path / "wt")}
     run(repo.root, env=leaked)
     assert (victim / ".git/config").read_text() == before
+
+
+def test_write_leaves_git_status_clean_apart_from_the_audit_record(repo: Repo) -> None:
+    # shelf-rabg: the narrative reports go to an ignored folder; only docs/blueprint/checkpoints.txt (the audit baseline) is tracked output.
+    repo.write("README.md", "x\n")
+    repo.commit()
+    report.write(run(repo.root, env=repo.env), repo.root, date(2026, 10, 10))
+    assert (repo.root / ".blueprint/reports/README.md").is_file()
+    assert repo.git("status", "--porcelain", "--untracked-files=all").splitlines() == ["?? docs/blueprint/checkpoints.txt"]

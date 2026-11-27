@@ -1,4 +1,4 @@
-"""The python stack's gate steps as engine commands, so a repo's justfile defines none of them: `lint`, `format`, `spell`, `test-all`.
+"""The python stack's gate steps as engine commands, so a repo's justfile defines none of them: `lint`, `format`, `spell`.
 
 What a repo may differ in is data, in `pyproject.toml`, never a replacement recipe (ADR 0033):
 
@@ -8,26 +8,19 @@ What a repo may differ in is data, in `pyproject.toml`, never a replacement reci
     steps = ["arch", "tag-check"]                                  # more steps after the rendered ones (recipes the repo defines)
 
 `--changed` (the per-commit gate) lints only the files changed against the base through `any_gate changed`: a changed config file, or no
-base, selects everything. `test-all` takes its coverage floor from `[tool.blueprint.test] floor`, then
-`[tool.coverage.report] fail_under`, then 65, queued behind
-`any_lease` when it is installed so gates started at once wait for one slot instead of thrashing.
+base, selects everything. `test-all` is `blueprint gate test` over every suite (`gate_test`): one runner, one queue for the test slot.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import subprocess
 import sys
 import tomllib
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from blueprint import gate_units
-
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from pathlib import Path
 
-DEFAULT_FLOOR = 65
 LINT_CONFIGS = ("pyproject.toml", "ruff.toml", ".ruff.toml")
 SPELL_CONFIGS = ("pyproject.toml", ".codespellrc")
 _TIMEOUT = 3600.0  # seconds one tool may take
@@ -146,46 +139,3 @@ def _run_spell(repo: Path, *, only_changed: bool) -> int:
                 return 0
             targets = files
     return _call([sys.executable, "-m", "codespell_lib", *targets], repo)
-
-
-def lease_root(env: dict[str, str]) -> Path:
-    """Where whole test runs queue: the folder `any-gate test` queues in too."""
-    cache = env.get("XDG_CACHE_HOME") or str(Path(env.get("HOME", "~")).expanduser() / ".cache")
-    return Path(env.get("GATE_LEASE_ROOT") or Path(cache) / "gate-leases")
-
-
-def test_all_command(repo: Path, env: dict[str, str], extra: Sequence[str] = ()) -> list[str]:
-    """pytest over every test (`marks` that `check` skips run too), with coverage and its floor; behind `any_lease` when installed.
-
-    `extra` is the caller's pytest arguments (`-m slow`, `-k name`): the run is then partial, so the whole-repo floor is off (0).
-    """
-    config = settings(repo)
-    floor = config.get("test", {}).get("floor", config.get("coverage-report", {}).get("fail_under", DEFAULT_FLOOR))
-    test = gate_units.read_config(repo)
-    workers = [] if "-n" in test.pytest_args else ["-n", "auto"]
-    shuffle = ["-p", "randomly"] if config.get("test", {}).get("randomize") is True else []  # the release run shuffles; `check` does not
-    pytest = [
-        sys.executable,
-        "-m",
-        "pytest",
-        *workers,
-        *shuffle,
-        "--cov",
-        "--cov-report=term-missing",
-        f"--cov-fail-under={0 if extra else floor:g}",
-        *test.pytest_args,
-        *extra,
-    ]
-    if not _lease_installed():
-        return pytest
-    return [sys.executable, "-m", "any_lease", "run", "--root", str(lease_root(env)), "tests", "1", "check-all", "--", *pytest]
-
-
-def _lease_installed() -> bool:
-    """Whether the machine has `any_lease`; the one ambient fact that changes the release run's command (tests set it)."""
-    return importlib.util.find_spec("any_lease") is not None
-
-
-def test_all(repo: Path, env: dict[str, str], extra: Sequence[str] = ()) -> int:
-    test_env = {**env, **gate_units.read_config(repo).env}
-    return subprocess.run(test_all_command(repo, test_env, extra), cwd=repo, env=test_env, check=False, timeout=_TIMEOUT).returncode

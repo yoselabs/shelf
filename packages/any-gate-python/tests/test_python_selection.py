@@ -249,3 +249,137 @@ def test_a_selection_over_half_the_suites_gets_an_alarm_that_names_the_count(rep
     assert "3 of 5" in alarm
     assert affected.wide_alarm(repo, narrow) is None
     assert affected.wide_alarm(repo, [*narrow, "tests"]) is None  # the repo's own tests are no package suite
+
+
+def test_every_suite_is_listed_whatever_changed_and_the_repos_own_tests_run_whole(repo: Path) -> None:
+    """The release run (`blueprint gate test-all`) plans every suite: the repo's own tests as one folder, then each package's tests."""
+    _fitness_tests(repo)
+    paths = affected.everything(repo)
+    assert paths[0] == "tests"
+    assert _pkgs(paths) == {"base", "middle", "top", "leaf", "plug"}
+    assert [p for p in paths if p.startswith("tests/")] == []
+
+
+def test_the_plan_flag_all_lists_every_suite_with_keys(
+    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from any_gate_python.cli import main  # noqa: PLC0415
+
+    _fitness_tests(repo)
+    monkeypatch.chdir(repo)
+    assert main(["plan", "--repo", str(repo), "--plan", "--all"]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == "tests\t"
+    assert {line.split("\t")[0] for line in lines[1:]} == {f"packages/{d}/tests" for d in ("base", "middle", "top", "leaf", "plug")}
+
+
+# --- root files read by named packages (shelf-7aqn): a change to one selects its readers, not every package ---
+
+READS = """
+[tool.any-gate.python.reads]
+"ci.yaml" = ["middle"]
+".blueprint/*" = ["leaf", "middle"]
+"none.toml" = []
+"typo.toml" = ["no-such-package"]
+"""
+
+
+@pytest.fixture
+def mapped(repo: Path) -> Path:
+    (repo / "pyproject.toml").write_text(RULES + READS)
+    return repo
+
+
+@pytest.mark.parametrize(
+    ("changed", "expected"),
+    [
+        (["ci.yaml"], {"middle", "top"}),  # the reader and its dependents
+        ([".blueprint/python.just"], {"leaf", "middle", "top"}),  # a glob entry
+        ([".blueprint/python.just", "ci.yaml"], {"leaf", "middle", "top"}),  # entries union
+        (["none.toml"], set()),  # mapped to nobody: no suite reads it
+        (["other.toml"], {"base", "middle", "top", "leaf", "plug"}),  # unmapped, observable: every package, never a silent pass
+        (["typo.toml"], {"base", "middle", "top", "leaf", "plug"}),  # a reader that is not a package cannot be trusted
+        (["ci.yaml", "other.toml"], {"base", "middle", "top", "leaf", "plug"}),
+        (["docs/x.md", "ci.yaml"], {"middle", "top"}),  # no-effect paths add nothing
+    ],
+)
+def test_a_root_file_selects_the_packages_that_read_it_and_their_dependents(mapped: Path, changed: list[str], expected: set[str]) -> None:
+    assert _pkgs(affected.affected(mapped, changed)) == expected
+
+
+def test_a_root_file_read_by_a_plugin_package_selects_every_package(mapped: Path) -> None:
+    (mapped / "pyproject.toml").write_text(RULES + '[tool.any-gate.python.reads]\n"x.toml" = ["plug"]\n')
+    assert _pkgs(affected.affected(mapped, ["x.toml"])) == {"base", "middle", "top", "leaf", "plug"}
+
+
+def test_a_mapped_root_file_is_part_of_its_readers_key_and_their_dependents(mapped: Path) -> None:
+    def keys() -> dict[str, str]:
+        return dict(affected.plan(mapped, [f"packages/{p}/tests" for p in PINS], pins_exporter))
+
+    _write_pins(mapped, PINS)
+    (mapped / "ci.yaml").write_text("a")
+    before = keys()
+    (mapped / "ci.yaml").write_text("b")
+    after = keys()
+    changed = {p.split("/")[1] for p in before if before[p] != after[p]}
+    assert changed == {"middle", "top"}
+    (mapped / ".blueprint").mkdir()
+    (mapped / ".blueprint" / "x.just").write_text("1")
+    one = keys()
+    (mapped / ".blueprint" / "x.just").write_text("2")
+    two = keys()
+    assert {p.split("/")[1] for p in one if one[p] != two[p]} == {"leaf", "middle", "top"}
+
+
+# --- repo tests keyed by what they read (shelf-7aqn): a test file runs when a path it reads changed ---
+
+REPO_READS = """
+[tool.any-gate.python]
+no-effect = ["tests/", "docs/", "ci.yaml"]
+repo-tests = "tests"
+
+[tool.any-gate.python.repo-reads]
+"*" = ["conftest.py", "tests/helper.py"]
+"test_scan_*.py" = ["packages/*/src/*"]
+"test_docs.py" = ["docs/*"]
+"test_bang.py" = ["!docs/*", "tools/*"]
+"""
+
+
+@pytest.fixture
+def keyed(repo: Path) -> Path:
+    (repo / "pyproject.toml").write_text(REPO_READS)
+    (repo / "tests").mkdir()
+    for name in ("test_scan_a.py", "test_scan_b.py", "test_docs.py", "test_bang.py", "test_unlisted.py"):
+        (repo / "tests" / name).write_text("")
+    return repo
+
+
+def _ran(repo: Path, changed: list[str]) -> list[str]:
+    return [p.removeprefix("tests/") for p in affected.affected(repo, changed) if p.startswith("tests")]
+
+
+@pytest.mark.parametrize(
+    ("changed", "ran"),
+    [
+        (["docs/x.md"], ["test_docs.py", "test_unlisted.py"]),  # `!docs/*` names it without reading it
+        (["tools/x.py"], ["test_bang.py", "test_unlisted.py"]),  # a test no key names always runs: never a silent pass
+        (["ci.yaml"], ["test_unlisted.py"]),
+        (["packages/leaf/src/leaf/x.py"], ["test_scan_a.py", "test_scan_b.py", "test_unlisted.py"]),
+        (["packages/leaf/tests/test_x.py"], ["test_unlisted.py"]),
+        (["tests/test_docs.py"], ["test_docs.py", "test_unlisted.py"]),  # the test itself
+        (
+            ["conftest.py"],
+            ["test_bang.py", "test_docs.py", "test_scan_a.py", "test_scan_b.py", "test_unlisted.py"],
+        ),  # a "*" entry reaches every keyed test
+        (["tests/helper.py"], ["test_bang.py", "test_docs.py", "test_scan_a.py", "test_scan_b.py", "test_unlisted.py"]),
+        ([], ["test_unlisted.py"]),
+    ],
+)
+def test_a_repo_test_runs_when_a_path_it_reads_changes(keyed: Path, changed: list[str], ran: list[str]) -> None:
+    assert _ran(keyed, changed) == ran
+
+
+def test_every_repo_test_keyed_and_nothing_changed_selects_none(keyed: Path) -> None:
+    (keyed / "tests" / "test_unlisted.py").unlink()
+    assert _ran(keyed, ["ci.yaml"]) == []

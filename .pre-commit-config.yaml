@@ -64,44 +64,13 @@ repos:
 # keeps commits fast: the local-source guard, ruff on staged files, preset drift on pyproject.
 - repo: local
   hooks:
-  - id: secret-scan
-    name: secrets in the staged changes
-    # gitleaks (pinned in mise.toml) over the index only, so it costs a fraction of a second; the gate scans the changed range.
-    entry: uv run python -m blueprint.secret_scan staged
+  - id: blueprint-hook
+    name: staged files (secrets, guard, preset, ruff)
+    # One process, not five `uv run` starts: secret scan, local-shelf-source guard, preset drift (only when pyproject.toml is
+    # staged), ruff check and format over the staged files under `[tool.blueprint.gate] lint-paths`.
+    entry: uv run blueprint gate hook
     language: system
     always_run: true
-    pass_filenames: false
-    stages: [pre-commit]
-- repo: local
-  hooks:
-  - id: shelf-guard
-    name: no local shelf source
-    entry: uv run blueprint gate guard
-    language: system
-    always_run: true
-    pass_filenames: false
-    stages: [pre-commit]
-  - id: ruff-check
-    # the same paths `just lint` covers, so the hook never refuses what the gate accepts
-    files: ^(packages|tests|tools)/|^conftest\.py$
-    name: ruff check
-    entry: uv run --frozen ruff check --force-exclude
-    language: system
-    types: [python]
-    stages: [pre-commit]
-  - id: ruff-format
-    # the same paths `just lint` covers, so the hook never refuses what the gate accepts
-    files: ^(packages|tests|tools)/|^conftest\.py$
-    name: ruff format
-    entry: uv run --frozen ruff format --check --force-exclude
-    language: system
-    types: [python]
-    stages: [pre-commit]
-  - id: preset-drift
-    name: preset drift
-    entry: uv run blueprint gate preset --repo .
-    language: system
-    files: ^pyproject\.toml$
     pass_filenames: false
     stages: [pre-commit]
   - id: gate

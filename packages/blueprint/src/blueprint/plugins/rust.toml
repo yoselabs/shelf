@@ -1,6 +1,0 @@
-id = "rust"
-title = "Rust"
-default = "detected"
-requires = ["stacks"]
-rows = ["stack.rust.*"]
-modules = []

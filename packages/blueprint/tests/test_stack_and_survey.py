@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint.model import FixedBy, Verdict
+from blueprint.profile import detect_stacks
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ def _rows(repo: Repo) -> dict[str, tuple[Verdict, str, bool]]:
 def _python_repo(repo: Repo) -> None:
     repo.write("pyproject.toml", _PYPROJECT)
     repo.write("uv.lock", "")
-    repo.write("Makefile", _MAKEFILE)
+    repo.write("justfile", _MAKEFILE)
 
 
 def test_a_role_configured_and_run_by_the_gate_passes(repo: Repo) -> None:
@@ -49,7 +50,7 @@ def test_pinned_ruff_counts_only_when_the_gate_runs_it(
     repo: Repo, *, ruff: str, role: str, args: str, prefix: str, verdict: Verdict
 ) -> None:
     _python_repo(repo)
-    repo.write("Makefile", "")
+    repo.write("justfile", "")
     repo.write("justfile", f"check:\n    {prefix}{ruff} {args} .\n    true\n")
     assert _rows(repo)[f"stack.python-uv.{role}"][0] is verdict
 
@@ -91,7 +92,7 @@ def test_pyrefly_config_locations_require_strict_preset_and_ignore_files_disable
 ) -> None:
     # shelf-fo0g: both config locations must preserve every types requirement.
     _python_repo(repo)
-    repo.write("Makefile", _MAKEFILE + "\tuv run pyrefly check\n")
+    repo.write("justfile", _MAKEFILE + "\tuv run pyrefly check\n")
     if config_path == "pyproject.toml":
         repo.write(config_path, _PYPROJECT + "\n[tool.pyrefly]\n" + config)
     else:
@@ -101,7 +102,7 @@ def test_pyrefly_config_locations_require_strict_preset_and_ignore_files_disable
 
 def test_a_justfile_gate_is_read_through_its_graph_and_a_recipe_nothing_reaches_does_not_count(repo: Repo) -> None:
     _python_repo(repo)
-    repo.write("Makefile", "")
+    repo.write("justfile", "")
     gate = 'check: (gate "lint")\n\n[private]\ngate target:\n    just {{ target }}\n\n'
     repo.write("justfile", gate + "lint:\n    uv lock --check\n    uv run ruff format --check .\n    uv run ruff check .\n")
     assert _rows(repo)["stack.python-uv.formatter"][0] is Verdict.PASSING
@@ -111,7 +112,7 @@ def test_a_justfile_gate_is_read_through_its_graph_and_a_recipe_nothing_reaches_
 
 def test_a_gate_without_the_lock_check_fails_the_toolchain(repo: Repo) -> None:
     _python_repo(repo)
-    repo.write("Makefile", _MAKEFILE.replace("\tuv lock --check\n", ""))
+    repo.write("justfile", _MAKEFILE.replace("\tuv lock --check\n", ""))
     verdict, evidence, _ = _rows(repo)["stack.python-uv.toolchain"]
     assert verdict is Verdict.FAILING
     assert "uv lock --check" in evidence
@@ -119,7 +120,7 @@ def test_a_gate_without_the_lock_check_fails_the_toolchain(repo: Repo) -> None:
 
 def test_a_role_configured_but_not_in_the_gate_fails(repo: Repo) -> None:
     _python_repo(repo)
-    repo.write("Makefile", "check:\n\tuv run ruff check .\n")
+    repo.write("justfile", "check:\n\tuv run ruff check .\n")
     verdict, evidence, _ = _rows(repo)["stack.python-uv.formatter"]
     assert verdict is Verdict.FAILING
     assert "ruff format --check" in evidence
@@ -163,7 +164,7 @@ def test_a_green_row_from_a_provisional_profile_stays_the_agents(repo: Repo) -> 
 
 def test_a_red_row_from_an_evidenced_profile_stays_the_agents(repo: Repo) -> None:
     _python_repo(repo)
-    repo.write("Makefile", "check:\n\tuv run ruff check .\n")
+    repo.write("justfile", "check:\n\tuv run ruff check .\n")
     row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == "stack.python-uv.formatter")
     assert row.verdict is Verdict.FAILING
     assert row.fixed_by is FixedBy.AGENT
@@ -199,9 +200,9 @@ def test_a_justified_override_is_the_only_way_past_a_stack_without_a_profile(rep
     assert row.verdict is Verdict.PASSING
 
 
-@pytest.mark.parametrize(("manifest", "stack"), [("package.json", "node"), ("go.mod", "go"), ("Cargo.toml", "rust")])
-def test_node_go_and_rust_have_profiles_with_an_architecture_row(repo: Repo, manifest: str, stack: str) -> None:
-    repo.write(manifest, "{}" if stack == "node" else "x\n")
+@pytest.mark.parametrize(("manifest", "stack"), [("package.json", "node")])
+def test_node_has_a_profile_with_an_architecture_row(repo: Repo, manifest: str, stack: str) -> None:
+    repo.write(manifest, "{}")
     rows = _rows(repo)
     assert rows[f"stack.{stack}.profile"][0] is Verdict.PASSING
     assert rows[f"stack.{stack}.architecture"][0] is Verdict.NOT_SET_UP
@@ -223,13 +224,13 @@ def test_the_architecture_role_wants_import_linter_configured_and_run_by_the_gat
     assert "[tool.importlinter" in evidence
     repo.write("pyproject.toml", _PYPROJECT + '\n[tool.importlinter]\nroot_packages = ["x"]\n')
     assert _rows(repo)["stack.python-uv.architecture"][0] is Verdict.FAILING  # configured, not in the gate
-    repo.write("Makefile", _MAKEFILE.replace("check: lint", "check: lint arch") + "arch:\n\tuv run lint-imports\n")
+    repo.write("justfile", _MAKEFILE.replace("check: lint", "check: lint arch") + "arch:\n\tuv run lint-imports\n")
     assert _rows(repo)["stack.python-uv.architecture"][0] is Verdict.PASSING
 
 
 def test_check_all_counts_as_the_gate(repo: Repo) -> None:
     _python_repo(repo)
-    repo.write("Makefile", _MAKEFILE + "check-all: lint cov\ncov:\n\tuv run pytest --cov-fail-under=80\n")
+    repo.write("justfile", _MAKEFILE + "check-all: lint cov\ncov:\n\tuv run pytest --cov-fail-under=80\n")
     assert _rows(repo)["stack.python-uv.coverage"][0] is Verdict.PASSING
 
 
@@ -252,7 +253,7 @@ def test_unit_floor_requires_measured_units_and_the_gate_test_command(repo: Repo
 def _gate_with_cov(repo: Repo, recipe: str, *, pyproject: str = _PYPROJECT) -> None:
     _python_repo(repo)
     repo.write("pyproject.toml", pyproject)
-    repo.write("Makefile", f"check: lint cov\n{_MAKEFILE.split(chr(10), 1)[1]}cov:\n\t{recipe}\n")
+    repo.write("justfile", f"check: lint cov\n{_MAKEFILE.split(chr(10), 1)[1]}cov:\n\t{recipe}\n")
 
 
 @pytest.mark.parametrize(
@@ -436,7 +437,7 @@ _HOOKS = """repos:
 def test_checks_a_make_gate_runs_through_pre_commit_count_as_run(repo: Repo) -> None:
     # homelab (shelf-0kz): `make check` -> `make lint` -> `pre-commit run --all-files`; every tool lives in the hook config.
     _python_repo(repo)
-    repo.write("Makefile", "check: lint\nlint:\n\tuvx pre-commit run --all-files\n")
+    repo.write("justfile", "check: lint\nlint:\n\tuvx pre-commit run --all-files\n")
     repo.write(".pre-commit-config.yaml", _HOOKS)
     rows = _rows(repo)
     assert rows["stack.python-uv.linter"][0] is Verdict.PASSING
@@ -446,7 +447,7 @@ def test_checks_a_make_gate_runs_through_pre_commit_count_as_run(repo: Repo) -> 
 
 def test_a_hook_config_the_gate_never_runs_counts_for_nothing(repo: Repo) -> None:
     _python_repo(repo)
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write(".pre-commit-config.yaml", _HOOKS)
     verdict, evidence, _ = _rows(repo)["stack.python-uv.linter"]
     assert verdict is Verdict.FAILING
@@ -504,7 +505,7 @@ def _gate_with_tests(repo: Repo, recipe: str) -> None:
         _PYPROJECT
         + "\n# pytest-timeout\n[tool.pytest.ini_options]\naddopts = '-q --strict-markers'\ntimeout = 900\nfilterwarnings = ['error']\n",
     )
-    repo.write("Makefile", f"check: lint t\n{_MAKEFILE.split(chr(10), 1)[1]}t:\n\t{recipe}\n")
+    repo.write("justfile", f"check: lint t\n{_MAKEFILE.split(chr(10), 1)[1]}t:\n\t{recipe}\n")
 
 
 @pytest.mark.parametrize(
@@ -581,7 +582,7 @@ def test_tests_fail_when_the_gate_reaches_no_test_runner(repo: Repo) -> None:
 def test_a_comment_or_a_message_naming_a_tool_does_not_run_it(repo: Repo, line: str, verdict: Verdict) -> None:
     # A recipe that only talks about `ruff check` ran nothing: it must not satisfy the linter row.
     _python_repo(repo)
-    repo.write("Makefile", "")
+    repo.write("justfile", "")
     repo.write("justfile", f"check:\n    {line}\n    true\n")
     assert _rows(repo)["stack.python-uv.linter"][0] is verdict
 
@@ -601,3 +602,10 @@ def test_tests_are_not_set_up_without_a_timeout(repo: Repo) -> None:
     verdict, evidence, _ = _rows(repo)["stack.python-uv.tests"]
     assert verdict is Verdict.NOT_SET_UP
     assert "timeout" in evidence
+
+
+def test_go_and_rust_manifests_make_no_stack(repo: Repo) -> None:
+    # shelf-rofp: no consumer ever used the go or rust profiles; their manifests are not detected.
+    repo.write("go.mod", "module x\n")
+    repo.write("Cargo.toml", "[package]\n")
+    assert set(detect_stacks(repo.root)) == set()

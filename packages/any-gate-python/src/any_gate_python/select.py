@@ -33,7 +33,7 @@ GIT_TIMEOUT = 600.0  # seconds one git call may take
 
 
 def _fitness(repo: Path, changed: list[str], rules: Rules) -> list[str]:
-    """The repo's own tests: whole when a gated test's input changed, else each file but the gated ones a change misses."""
+    """The repo's own tests: whole when a gated test's input changed, else each file whose reads a change touched (unkeyed: always)."""
     if not rules.repo_tests:
         return []
     root = rules.repo_tests
@@ -42,10 +42,12 @@ def _fitness(repo: Path, changed: list[str], rules: Rules) -> list[str]:
 
     def runs(name: str) -> bool:
         reads = (f"{root}/{name}", *rules.gated_reads.get(name, ()))
-        return not rules.is_gated(name) or any(p.startswith(reads) for p in changed)
+        if rules.is_gated(name):
+            return any(p.startswith(reads) for p in changed)
+        return not rules.keyed(name) or rules.reads_changed(name, f"{root}/{name}", changed)
 
-    files = [p.relative_to(repo).as_posix() for p in sorted((repo / root).glob("test_*.py")) if runs(p.name)]
-    return files or [root]
+    every = sorted((repo / root).glob("test_*.py"))
+    return [p.relative_to(repo).as_posix() for p in every if runs(p.name)] if every else [root]
 
 
 def affected_packages(
@@ -71,6 +73,8 @@ def affected_packages(
             if not asked:
                 from_lock, asked = lock(), True
             touched.update(every if from_lock is None else from_lock & graph.keys())
+        elif (readers := rules.readers(path)) is not None and readers <= graph.keys():
+            touched.update(readers)
         else:
             touched.update(every)
     if touched & plugins:
@@ -96,10 +100,19 @@ def affected(repo: Path, changed: list[str], lock: Callable[[], set[str] | None]
     return [*_fitness(repo, changed, rules), *tests]
 
 
-def reach(repo: Path, count: int, exporter: Exporter = package_exports) -> list[tuple[str, int, int]]:
+def everything(repo: Path, rules: Rules | None = None) -> list[str]:
+    """The pytest paths of every suite, whatever changed: the repo's own tests as one folder, then each package's tests."""
+    rules = rules or Rules.load(repo)
+    graph, _ = workspace(repo)
+    tests = (f"packages/{d}/tests" for d in sorted(graph) if (repo / "packages" / d / "tests").is_dir())
+    return [*([rules.repo_tests] if rules.repo_tests else []), *tests]
+
+
+def reach(repo: Path, count: int, exporter: Exporter = package_exports, rules: Rules | None = None) -> list[tuple[str, int, int]]:
     """For each of the last `count` first-parent commits: `(short sha, changed files, package suites it reaches)`.
 
-    The selection a commit would have had: the same rules, the lock read against the commit's parent. A measure of how wide the
+    The selection a commit would have had: the same rules (`rules`, else each commit's own), the lock read against the
+    commit's parent. A measure of how wide the
     gate runs, so a rule that quietly widens it (a lock rule once selected every package for 45 of 50 commits) shows up.
     """
     rows: list[tuple[str, int, int]] = []
@@ -111,7 +124,7 @@ def reach(repo: Path, count: int, exporter: Exporter = package_exports) -> list[
                 extract_base(repo, sha, Path(new))
             except ExportError:
                 continue
-            reached = affected_packages(Path(new), changed, lambda: touched_between(Path(old), Path(new), exporter))
+            reached = affected_packages(Path(new), changed, lambda: touched_between(Path(old), Path(new), exporter), rules)
         rows.append((sha, len(changed), len(reached)))
     return rows
 
@@ -138,8 +151,11 @@ def _exports(repo: Path, graph: dict[str, set[str]], exporter: Exporter) -> dict
         return None
 
 
-def fingerprint(repo: Path, graph: dict[str, set[str]], package: str, exports: dict[str, str] | None) -> str:
+def fingerprint(repo: Path, graph: dict[str, set[str]], package: str, exports: dict[str, str] | None, rules: Rules | None = None) -> str:
     """Hash of everything `package`'s tests can see: its files, its dependencies' files and resolved sets, the root inputs.
+
+    The root files a package (or a dependency of it) is mapped to in `reads` are hashed too: a mapped file selects its readers, and
+    a key blind to it would let them pass again unrun.
 
     With no exports (uv cannot answer) the whole lock and root pyproject stand in: any change to them invalidates every package.
     """
@@ -148,6 +164,9 @@ def fingerprint(repo: Path, graph: dict[str, set[str]], package: str, exports: d
         _hash_tree(digest, repo / "packages" / name, repo)
         if exports is not None:
             digest.update(f"{name}:{exports[name]}".encode())
+        for rel in rules.read_files(repo, name) if rules else ():
+            digest.update(f"root:{rel}".encode())
+            digest.update((repo / rel).read_bytes())
     if exports is None:
         for rel in ("uv.lock", "pyproject.toml"):
             if (repo / rel).is_file():
@@ -165,7 +184,8 @@ def plan(repo: Path, paths: list[str], exporter: Exporter = package_exports) -> 
     """`(path, key)` for each of `paths`: a package suite's key is its fingerprint; any other path has none and always runs."""
     graph, _ = workspace(repo)
     exports = _exports(repo, graph, exporter)
-    return [(p, fingerprint(repo, graph, p.split("/")[1], exports) if p.startswith("packages/") else "") for p in paths]
+    rules = Rules.load(repo)
+    return [(p, fingerprint(repo, graph, p.split("/")[1], exports, rules) if p.startswith("packages/") else "") for p in paths]
 
 
 def wide_alarm(repo: Path, paths: list[str]) -> str | None:

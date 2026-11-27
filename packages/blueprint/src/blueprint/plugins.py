@@ -6,6 +6,7 @@ into the set of plugins asked, with the reason each other one is not.
 
 from __future__ import annotations
 
+import functools
 import tomllib
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
@@ -32,7 +33,17 @@ class Plugin:
 
 
 def load_plugins(directory: Path = PLUGIN_DIR) -> dict[str, Plugin]:
-    """Every manifest in `directory`, by id."""
+    """Every manifest in `directory`, by id. The shipped folder is parsed once per process (it cannot change under a run);
+    any other is read on each call."""
+    return dict(_shipped()) if directory == PLUGIN_DIR else _parse(directory)
+
+
+@functools.cache
+def _shipped() -> dict[str, Plugin]:
+    return _parse(PLUGIN_DIR)
+
+
+def _parse(directory: Path) -> dict[str, Plugin]:
     found: dict[str, Plugin] = {}
     for path in sorted(directory.glob("*.toml")):
         data = tomllib.loads(path.read_text())
