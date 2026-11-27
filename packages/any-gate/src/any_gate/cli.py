@@ -5,7 +5,8 @@ step's log the moment it ends, then prints one timing line (see `any_gate.steps`
 `$GATE_STEP_BUDGET` (default 60) and `$GATE_BUDGET` (default 180) are seconds.
 
 A step that declares its input files in `gate-inputs.toml` and whose inputs did not change is not started (`any_gate.inputs`);
-`--all` runs every step.
+`--all` runs every step. So does a clean tree no gate has passed (a fresh clone, a merge, a reset: nothing "changed", so nothing was
+judged). `$GATE_FAIL_FAST` set is `--fail-fast`. SIGTERM and SIGHUP stop every step's tree, as Ctrl-C does.
 
 `changed [--scope all] [--config FILE]... [--not GLOB]... GLOB...` prints the files a per-file linter must check, NUL-separated
 (`xargs -0`): those changed against the upstream merge-base matching a glob, or every matching file when `--scope all`, a `--config` file
@@ -31,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import signal
 import sys
 import threading
 import time
@@ -199,11 +201,36 @@ def _say(line: str) -> None:
     sys.stderr.flush()
 
 
+def _stop_on_signal(_number: int, _frame: object) -> None:
+    """SIGTERM and SIGHUP end the gate the way Ctrl-C does: every step's tree is stopped, none orphaned."""
+    raise KeyboardInterrupt
+
+
+def _skips(args: argparse.Namespace, repo: Path) -> dict[str, str]:
+    """The steps not to start: those whose inputs did not change (see `inputs.unaffected`); none under --all."""
+    if args.all:
+        return {}
+
+    def recorded() -> bool:
+        receipts = _receipts(None, repo)
+        return receipts is not None and GateState(repo, receipts, os.environ).green("check")
+
+    return inputs.unaffected(repo, args.names, recorded)
+
+
 def _steps(args: argparse.Namespace) -> int:
-    if args.fail_fast and args.all:
+    fail_fast = args.fail_fast or os.environ.get("GATE_FAIL_FAST", "").lower() not in ("", "0", "false", "no")
+    if len(set(args.names)) != len(args.names):
+        notice("steps: a step is named twice")
+        return 2
+    if fail_fast and args.all:
         notice("steps: --fail-fast and --all do not mix: the release gate shows every failure")
         return 2
-    skip = {} if args.all else inputs.unaffected(Path(args.repo).resolve(), args.names)
+    for number in (signal.SIGTERM, signal.SIGHUP):
+        try:
+            signal.signal(number, _stop_on_signal)
+        except ValueError:  # not the main thread: the caller owns signals
+            break
     return run_and_report(
         args.names,
         env=os.environ,
@@ -211,9 +238,9 @@ def _steps(args: argparse.Namespace) -> int:
         step_budget=args.step_budget,
         gate_budget=args.gate_budget,
         say=_say,
-        skip=skip,
+        skip=_skips(args, Path(args.repo).resolve()),
         step_limit=args.step_limit,
-        halt=threading.Event() if args.fail_fast else None,
+        halt=threading.Event() if fail_fast else None,
     )
 
 

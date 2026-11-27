@@ -29,8 +29,8 @@ def _git(repo: Path, *args: str) -> None:
 
 
 @pytest.fixture
-def clone(tmp_path: Path) -> Path:
-    """A clone tracking origin/main, with the gate's own gate-inputs.toml committed."""
+def fresh(tmp_path: Path) -> Path:
+    """A clone tracking origin/main, with the gate's own gate-inputs.toml committed; no gate has passed it."""
     origin, work = tmp_path / "origin.git", tmp_path / "work"
     subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
     work.mkdir()
@@ -42,6 +42,19 @@ def clone(tmp_path: Path) -> Path:
     _git(work, "remote", "add", "origin", str(origin))
     _git(work, "push", "-q", "-u", "origin", "main")
     return work
+
+
+@pytest.fixture
+def clone(fresh: Path) -> Path:
+    """The same clone after a gate passed it: its empty change set means "nothing to judge"."""
+    _green(fresh)
+    return fresh
+
+
+def _green(clone: Path) -> None:
+    """Record HEAD's tree as passed by `check`, the way a finished gate does."""
+    for verb in ("start", "passed"):
+        subprocess.run([sys.executable, "-m", "any_gate", verb, "--repo", str(clone)], check=True, capture_output=True)
 
 
 def _steps(clone: Path, tmp_path: Path, *names: str, flags: tuple[str, ...] = ()) -> tuple[list[str], list[str]]:
@@ -79,7 +92,12 @@ def test_golden_an_unchanged_tree_starts_no_process_for_a_step_and_asks_git_at_m
 ) -> None:
     runs, gits = _steps(clone, tmp_path, step)
     assert runs == []
-    assert len(gits) <= 3
+    assert len(gits) <= 7  # the change set (3), the git dir, and the green tree record (status, tree key)
+
+
+def test_an_empty_change_set_no_gate_passed_runs_every_declared_step(fresh: Path, tmp_path: Path) -> None:
+    runs, _ = _steps(fresh, tmp_path, "typecheck", "guard")
+    assert sorted(runs) == ["guard", "typecheck"]  # a fresh clone, a merge or a reset: nothing "changed", so nothing was judged
 
 
 def test_a_step_with_a_matching_changed_file_runs_and_one_without_is_skipped(clone: Path, tmp_path: Path) -> None:
@@ -137,6 +155,6 @@ def test_moving_a_file_out_of_a_steps_folder_still_starts_that_step(clone: Path)
     _git(clone, "add", "-A")
     _git(clone, "commit", "-q", "-m", "ui")
     _git(clone, "push", "-q")
-    assert "ui" in inputs.unaffected(clone, ["ui"])  # pushed: nothing changed since the base, the step is skipped
+    assert "ui" in inputs.unaffected(clone, ["ui"], lambda: True)  # pushed: nothing changed since the base, the step is skipped
     _git(clone, "mv", "ui/x.ts", "docs_x.ts")
     assert inputs.unaffected(clone, ["ui"]) == {}  # the old path is a changed input of `ui`
