@@ -48,7 +48,7 @@ def test_a_rerun_with_the_same_verdicts_does_not_touch_the_report(repo: Repo, sc
         return failing(state["evidence"], "fix it")
 
     _write(repo, date(2026, 11, 1))
-    path = repo.root / "docs/blueprint/scratch.md"
+    path = repo.root / ".blueprint/reports/scratch.md"
     first = path.read_text()
     state["evidence"] = "two"  # the same verdict, other words
     _write(repo, date(2026, 11, 2))  # another day
@@ -63,7 +63,7 @@ def test_a_changed_verdict_rewrites_only_its_concern(repo: Repo, scratch: None) 
         return passing("fine") if state["ok"] else failing("bad", "fix")
 
     _write(repo, date(2026, 11, 1))
-    path = repo.root / "docs/blueprint/scratch.md"
+    path = repo.root / ".blueprint/reports/scratch.md"
     state["ok"] = True
     _write(repo, date(2026, 11, 2))
     text = path.read_text()

@@ -63,4 +63,4 @@ five shapes in two days.
   shelf. Consumers' changed-file recipe is shelf-6q1.9.
 - 2026-11-05: the shelf itself no longer pins hadolint or dockerfmt (its Docker gate is gone, ADR 0027); the Dockerfile checkpoints above stay for consumer repos that have Dockerfiles, via blueprint's dockerfile profile.
 - 2026-11-20: ADR 0027 (no repository has CI): no workflow is read, so `ships-image`, `deployed` and `scheduled-jobs` are classified by the agent, not detected; `ship-smoke` is gone and `ship-updater` applies once `ships-image` is classified; high-confidence `deployed` evidence no longer exists.
-- 2026-11-28: amended by ADR 0027: the whole-repo run is `just check-all`, not CI. The compose policy file `policy/compose.rego` is no longer written by `blueprint init` (nothing ran it in a consumer).
+- 2026-11-28: amended by ADR 0027: the whole-repo run is `just check-all`, not CI. `blueprint init` writes the compose policy `policy/compose.rego` only for a deployed repo (nothing ran it in a consumer that deploys nothing).

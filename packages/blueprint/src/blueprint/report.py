@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 
 from blueprint import facts
 from blueprint.model import FixedBy, Verdict, without_git_location
-from blueprint.profile import STATE_DIR
 from blueprint.runner import ACCEPTED, active
 
 if TYPE_CHECKING:
@@ -272,11 +271,14 @@ def as_json(run: Run) -> str:
     )
 
 
+# Where `check --write` puts the narrative reports: ignored by git (its own `.gitignore`), so they never show in a diff or go stale in a
+# commit. The audit record stays tracked (runner.ACCEPTED).
+REPORTS_DIR = ".blueprint/reports"
 _STAMP_OPENING = "Written by `blueprint check --write` on "
 
 
 def write(run: Run, repo: Path, today: date) -> list[Path]:
-    """Write `docs/blueprint/README.md` (the summary) and `<concern>.md` per concern; return the paths.
+    """Write `.blueprint/reports/README.md` (the summary) and `<concern>.md` per concern; return the paths.
 
     It removes the reports this command wrote for a concern the run no longer has (a stack that became
     another, a report left by a stack name that no longer exists).
@@ -290,8 +292,11 @@ def write_concern(run: Run, repo: Path, today: date) -> list[Path]:
 
 
 def _write(run: Run, repo: Path, today: date, *, prune: bool) -> list[Path]:
-    out_dir = repo / STATE_DIR
+    out_dir = repo / REPORTS_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / ".gitignore").write_text(
+        "*\n", encoding="utf-8"
+    )  # the folder ignores itself, this file included: no edit of the repo's .gitignore
     # Not "Generated ...; do not edit": a repo's own generated-file guard fails a tracked file that claims a generator it does
     # not know (homelab's tools/generate.py did).
     stamp = f"{_STAMP_OPENING}{today.isoformat()}; rewritten only when a checkpoint verdict changes."
@@ -310,6 +315,7 @@ def _write(run: Run, repo: Path, today: date, *, prune: bool) -> list[Path]:
     accepted = repo / ACCEPTED
     record = "".join(f"{r.key}\n" for r in sorted(run.rows, key=lambda r: r.key))
     if not accepted.is_file() or accepted.read_text() != record:
+        accepted.parent.mkdir(parents=True, exist_ok=True)
         accepted.write_text(record)
     written.append(accepted)
     for layer, concern in _concerns(run):

@@ -64,7 +64,9 @@ def _parser() -> argparse.ArgumentParser:
     form = chk.add_mutually_exclusive_group()
     form.add_argument("--json", action="store_true", help="print JSON")
     form.add_argument("--brief", action="store_true", help="print only what is not passing, one line each (what `just blueprint` prints)")
-    chk.add_argument("--write", action="store_true", help="write docs/blueprint/<concern>.md reports")
+    chk.add_argument(
+        "--write", action="store_true", help="write the reports to .blueprint/reports/ (git-ignored), the audit record to docs/blueprint/"
+    )
     gate = sub.add_parser(
         "gate",
         help="the steps of `just check` (guard, preset, render, test): for the justfile and hooks",
