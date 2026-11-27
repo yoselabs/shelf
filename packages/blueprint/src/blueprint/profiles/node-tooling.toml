@@ -6,53 +6,13 @@
 # Decisions: strict `tsc` is not required of plain JS (no types to check; checkJs/JSDoc stays an owner choice, not a standard); vitest and its
 # coverage are `na` because the other stack's runner and floor judge those tests; the rest stays as the node profile: unproven rows keep warning.
 stack = "node-tooling"
-family = "language"
+extends = "node"  # every role of the node profile, but the three below
 status = "provisional"
 source = "a2kay onboarding 2026-11-21 (shelf-handoff item 2); the rows below are the node profile's, never run red and green on a consumer"
 
 [[role]]
-role = "toolchain"
-tool = "a declared Node range (`engines.node`) and package manager (`packageManager`), one lockfile committed, installed with the lockfile frozen"
-install = "set \"engines\": {\"node\": \">=<x>\"} and \"packageManager\": \"pnpm@<x.y.z>\" in package.json; commit the lockfile; the gate installs with `pnpm install --frozen-lockfile` (npm: `npm ci`)"
-config = [
-    { path = "{root}/package.json", contains = '"engines"' },
-    { path = "{root}/package.json", contains = '"packageManager"' },
-    { any = [{ path = "{root}/pnpm-lock.yaml" }, { path = "{root}/package-lock.json" }, { path = "{root}/yarn.lock" }] },
-]
-gate = "--frozen-lockfile"
-
-[[role.alternative]]
-label = "`npm ci`"
-gate = '\bnpm ci\b'
-
-[[role.alternative]]
-label = "yarn `--immutable`"
-gate = "--immutable"
-
-[[role]]
-role = "formatter"
-tool = "Biome (format and lint in one binary, one config)"
-install = "pnpm add -D -E @biomejs/biome; biome.json (or biome.jsonc); the gate runs `biome ci .`"
-config = [{ any = [{ path = "{root}/biome.json" }, { path = "{root}/biome.jsonc" }] }]
-gate = "biome ci"
-
-[[role]]
-role = "linter"
-tool = "Biome recommended rules raised to errors; type-aware rules through tsc, not a second linter"
-install = "biome.json: linter.enabled, rules.recommended true, and the rule groups you want as \"error\"; `biome ci .` runs format check and lint"
-config = [{ any = [{ path = "{root}/biome.json", contains = "linter" }, { path = "{root}/biome.jsonc", contains = "linter" }] }]
-gate = "biome ci"
-
-[[role]]
 role = "types"
 na = "plain JavaScript: there is no TypeScript to type-check; checkJs/JSDoc is the owner's choice, not a standard the shelf asks for"
-
-[[role]]
-role = "dependencies"
-tool = "knip (unused and missing dependencies, unused exports); versions pinned by the lockfile"
-install = "pnpm add -D knip; knip.json; the gate runs `knip`"
-config = [{ any = [{ path = "{root}/knip.json" }, { path = "{root}/knip.jsonc" }, { path = "{root}/package.json", contains = '"knip"' }] }]
-gate = "knip"
 
 [[role]]
 role = "tests"
@@ -61,33 +21,3 @@ na = "the tests of this code run under another stack's runner; its tests row jud
 [[role]]
 role = "coverage"
 na = "the other stack's coverage floor covers the tests that run this code; a JS-side floor would measure nothing"
-
-[[role]]
-role = "spelling"
-tool = "typos (crate-ci) or codespell with a committed config"
-install = "typos.toml with [default.extend-words] for domain terms; the gate runs `typos`"
-config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }, { path = ".codespellrc" }, { path = "pyproject.toml", contains = "[tool.codespell]" }] }]
-gate = "typos"
-
-[[role.alternative]]
-label = "codespell (a committed `.codespellrc` or `[tool.codespell]`)"
-gate = '\bcodespell\b'
-
-[[role.alternative]]
-label = "blueprint's own `gate lint` or `gate spell`, which run codespell (its `[tool.codespell]` config is the repo's)"
-gate = '\bblueprint gate (?:lint|spell)\b'
-
-[[role]]
-role = "architecture"
-tool = "dependency-cruiser: forbidden-edge rules between folders and workspace packages, no circular dependencies, one .dependency-cruiser.cjs"
-install = """pnpm add -D dependency-cruiser; `npx depcruise --init`; in .dependency-cruiser.cjs keep `no-circular` and `no-orphans` at error severity and add one `forbidden` rule per layer edge \
-(from { path: \"^src/domain\" } to { path: \"^src/(infra|ui)\" }); the gate runs `depcruise src --config .dependency-cruiser.cjs`; \
-plant a forbidden import and see it fail. eslint-plugin-boundaries is an editor-feedback extra, not the gate"""
-config = [{ any = [{ path = "{root}/.dependency-cruiser.cjs" }, { path = "{root}/.dependency-cruiser.js" }, { path = "{root}/.dependency-cruiser.mjs" }] }]
-gate = "depcruise"
-
-[[role]]
-role = "hooks"
-tool = "prek runs biome and typos on staged files (pre-commit); just check on pre-push"
-install = "add local hooks `biome check --staged` style entry and typos to .pre-commit-config.yaml after bd's; the gate on pre-push"
-config = [{ path = ".pre-commit-config.yaml", contains = "biome" }, { any = [{ path = ".pre-commit-config.yaml", contains = "typos" }, { path = ".pre-commit-config.yaml", contains = "codespell" }, { path = ".pre-commit-config.yaml", contains = "blueprint gate" }] }]

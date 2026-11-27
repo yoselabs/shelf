@@ -22,14 +22,15 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from blueprint import checkpoints, gate_py, gate_test, guard, init, preset, render, report
+from blueprint import checkpoints, gate_hook, gate_py, gate_test, guard, init, preset, render, report
 from blueprint.runner import run, run_audit
 
 _GATE_HELP = """\
 The steps of `just check`. The justfile and the git hooks run them; each one is also a recipe (`just guard`, `just preset`, ...).
 
   blueprint  guard, preset, the render check and every checkpoint, in one process (`just blueprint`): the gate's one step for them
-  guard      refuse a local shelf path in [tool.uv.sources] (the commit hook, and `just guard`)
+  hook       the commit hook, one process: secret scan, guard, preset drift, ruff check and format over the staged files
+  guard      refuse a local shelf path in [tool.uv.sources] (`just guard`)
   preset     compare the repo's ruff and pyrefly config with the shelf's preset, or with the differences it declares (`just preset`)
   render     write the justfile parts blueprint owns (.blueprint/*.just); with --check, fail on any difference (`just render`)
   test       run the tests the change reaches, through any-gate (`just test`)
@@ -63,7 +64,9 @@ def _parser() -> argparse.ArgumentParser:
     form = chk.add_mutually_exclusive_group()
     form.add_argument("--json", action="store_true", help="print JSON")
     form.add_argument("--brief", action="store_true", help="print only what is not passing, one line each (what `just blueprint` prints)")
-    chk.add_argument("--write", action="store_true", help="write docs/blueprint/<concern>.md reports")
+    chk.add_argument(
+        "--write", action="store_true", help="write the reports to .blueprint/reports/ (git-ignored), the audit record to docs/blueprint/"
+    )
     gate = sub.add_parser(
         "gate",
         help="the steps of `just check` (guard, preset, render, test): for the justfile and hooks",
@@ -73,6 +76,8 @@ def _parser() -> argparse.ArgumentParser:
     steps = gate.add_subparsers(dest="step", required=True, metavar="STEP")
     grd = steps.add_parser("guard", help="refuse a local shelf source in [tool.uv.sources] (the commit hook and `just guard`)")
     grd.add_argument("--committed", action="store_true", help="check HEAD (the gate's question); the default checks the index (the hook's)")
+    hk = steps.add_parser("hook", help="the commit hook: one process over the staged files")
+    hk.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     pre = steps.add_parser("preset", help="compare the repo's linter config with the shelf's preset (`just preset`)")
     pre.add_argument("--repo", default=".", type=Path, help="the repository to check (default: cwd)")
     pre.add_argument("--reference", type=Path, help="compare with this snapshot instead of the packaged one")
@@ -155,6 +160,10 @@ def _guard(args: argparse.Namespace) -> int:
     return guard.check(committed=args.committed)
 
 
+def _hook(args: argparse.Namespace) -> int:
+    return gate_hook.run(args.repo.expanduser().resolve())
+
+
 def _preset(args: argparse.Namespace) -> int:
     return preset.check(args.repo.expanduser().resolve(), args.reference)
 
@@ -218,6 +227,7 @@ def _pytest_args(args: argparse.Namespace) -> str | None:
 _GATE_STEPS = {
     "blueprint": _blueprint,
     "guard": _guard,
+    "hook": _hook,
     "preset": _preset,
     "render": _render,
     "test": _test_changed,

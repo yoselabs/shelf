@@ -1,11 +1,11 @@
 ---
 id: 0004
 title: Linters are a config-preset, not a CLI
-statement: The shelf's own pyproject [tool.*] blocks and justfile recipes are the lint reference; a consumer copies them and owns the copy. No lint CLI, no runtime dependency.
+statement: The shelf's pyproject [tool.*] blocks are the lint reference; consumers copy and own them. Amended 2026-11-28: the engine runs the standard steps (`blueprint gate lint`); no other lint CLI.
 concerns: [gate, tooling]
 status: accepted
 decided_by: owner
-updated: 2026-07-08
+updated: 2026-11-28
 expires: 2027-01-08
 distilled_into: N/A — self-enforcing via docs/linting.md + justfile
 ---
@@ -43,3 +43,4 @@ on onboarding (`consuming-the-shelf.md`) and owns the copy. Full toolchain and i
 ## History
 
 - 2026-07-08: decided. Expires 2027-01-08. Track: tooling / how-things-are-done.
+- 2026-11-28: amended: the engine now owns the standard gate steps (`blueprint gate lint`, `format`, `spell`, ADR 0033); a repo's differences are data in `[tool.blueprint.gate]`. The preset is still copied config; there is no linter wrapper beyond those steps.

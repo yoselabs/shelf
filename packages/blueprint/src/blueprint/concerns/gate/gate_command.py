@@ -23,7 +23,7 @@ def _stack_profiles(ctx: Context) -> list[StackProfile]:
 
 
 def one_command(ctx: Context) -> Finding:
-    """The justfile has a `check` recipe and `just --dry-run check` resolves (a Makefile: `make -n check`)."""
+    """The justfile has a `check` recipe and `just --dry-run check` resolves."""
     onboard = next((p.onboard for p in _stack_profiles(ctx) if p.onboard), "")
     generic = "add a justfile whose `check` recipe runs every linter and the tests"
     if not ctx.profile.stacks:
@@ -36,26 +36,25 @@ def one_command(ctx: Context) -> Finding:
     if gate is None:
         return not_set_up("no justfile", *fixer)
     if not gate.has_recipe("check"):
-        if gate.unread and gate.runner == "just":
+        if gate.unread:
             return not_checked(
                 f"the justfile cannot be read: {gate.unread} "
                 "(pin the runner: `uv add --dev rust-just` with a pyproject.toml, else just in mise.toml)"
             )
-        return not_set_up(f"the {gate.path} has no `check` {'recipe' if gate.runner == 'just' else 'target'}", *fixer)
-    argv = _DRY_RUN[gate.runner]
-    dry = ctx.run(gate_graph.just_command(ctx) if gate.runner == "just" else argv[0], *argv[1:], timeout=60)
-    shown = " ".join(argv)
+        return not_set_up(f"the {gate.path} has no `check` recipe", *fixer)
+    dry = ctx.run(gate_graph.just_command(ctx), *_DRY_RUN[1:], timeout=60)
+    shown = " ".join(_DRY_RUN)
     if dry is None:
-        return not_checked(f"`{gate.runner}` is not installed or timed out")
+        return not_checked("`just` is not installed or timed out")
     if dry.returncode != 0:
         lines = (dry.stderr.strip() or dry.stdout.strip()).splitlines() or ["no output"]
-        # just prints "error: <what>" first and a source excerpt after it; make's last line is the error.
+        # just prints "error: <what>" first and a source excerpt after it.
         complaint = next((line for line in lines if line.startswith("error")), lines[-1])
         return failing(f"`{shown}` fails: {complaint}", "add or fix the recipe the gate names")
     return passing(f"`{shown}` resolves")
 
 
-_DRY_RUN = {"just": ("just", "--dry-run", "check"), "make": ("make", "-n", "check")}
+_DRY_RUN = ("just", "--dry-run", "check")
 _PORT = "port each target to a recipe (same names; loops go in shebang recipes; no backticks)"
 
 
@@ -74,8 +73,8 @@ def _migration(ctx: Context) -> str:
 
 def runner(ctx: Context) -> Finding:
     """One runner for every repo, so blueprint reads the gate graph from one JSON dump (ADR 0023)."""
-    if gate_graph.load(ctx) is None:
-        return not_applicable("no gate: gate.one-command reports the missing one")
     if gate_graph.has_makefile_only(ctx):
         return failing("the gate is a Makefile; the shelf's runner is just (a justfile)", _migration(ctx))
+    if gate_graph.load(ctx) is None:
+        return not_applicable("no gate: gate.one-command reports the missing one")
     return passing("a justfile holds the gate")

@@ -35,7 +35,7 @@ def _reinstall_step(ctx: Context) -> str | None:
     if gate is not None:
         for name in _INSTALL_RECIPES:
             if name in gate.recipes and "uv tool install" in gate.recipes[name].body:
-                return f"{gate.runner} {name}"
+                return f"just {name}"
     return "the post-merge hook in .pre-commit-config.yaml" if "uv tool install" in (ctx.read(".pre-commit-config.yaml") or "") else None
 
 

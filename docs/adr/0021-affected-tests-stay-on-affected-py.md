@@ -1,11 +1,11 @@
 ---
 id: 0021
 title: The gate core is the shelf's own, one adapter per stack; moon is rejected
-statement: Affected selection, receipts and the run guard live in a shelf-owned neutral core with one adapter per stack (Python first, via uv export). No external build tool.
+statement: Affected selection, receipts and the run guard live in a shelf-owned core, one adapter per stack. Amended 2026-11-28: steps declare their inputs (ADR 0031); the engine owns the standard steps (0033).
 concerns: [gate, tooling]
 status: accepted
 decided_by: owner
-updated: 2026-11-19
+updated: 2026-11-28
 distilled_into: docs/missions/gate-kit-package; packages/any-gate, packages/any-gate-python
 ---
 
@@ -42,3 +42,4 @@ languages. The first non-Python package (the old trigger) now starts that second
 - 2026-10-11: decided to keep the `tools/affected.py` script and name moon the migration target for the first non-Python package, after round 3.
 - 2026-11-05: the Turborepo trial's "drops the container gate" note is moot: the shelf has no container gate (ADR 0027).
 - 2026-11-19: owner chose the own core over moon, after a replay of the last 50 commits showed the lock rule, not the selector, was the cost.
+- 2026-11-28: amended by ADR 0031 and 0033: selection is per gate step through declared inputs, and the standard steps (`blueprint gate test`, `lint`) are the engine's; a repo declares only what differs.

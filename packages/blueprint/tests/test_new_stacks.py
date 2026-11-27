@@ -1,4 +1,4 @@
-"""node, go and rust: a repo set up the profile's way passes every role; the same repo with an empty gate fails the gate-run ones."""
+"""node: a repo set up the profile's way passes every role; the same repo with an empty gate fails the gate-run ones."""
 
 from __future__ import annotations
 
@@ -41,48 +41,10 @@ _NODE_STEPS = [
 ]
 _NODE_GATE = "\n".join(_NODE_STEPS)
 
-_GO_FILES = {
-    "go.mod": "module x\ngo 1.25.0\ntoolchain go1.25.1\n",
-    "go.sum": "",
-    ".golangci.yml": 'version: "2"\nlinters:\n  default: none\nformatters:\n  enable: [gofumpt]\n',
-    ".testcoverage.yml": "threshold:\n  total: 80\n",
-    ".go-arch-lint.yml": "version: 3\n",
-    "docs/agents/go.md": "go\n",
-    "AGENTS.md": "docs/agents/go.md\n",
-    _HOOKS_FILE: "golangci-lint typos\n",
-}
-_GO_STEPS = [
-    "go mod verify",
-    "golangci-lint fmt --diff",
-    "golangci-lint run",
-    "go mod tidy -diff",
-    "go test -race ./...",
-    "go-test-coverage --config=.testcoverage.yml",
-    "go-arch-lint check",
-    "typos",
-]
-_GO_GATE = "\n".join(_GO_STEPS)
-
-_RUST_FILES = {
-    "Cargo.toml": '[workspace.lints.rust]\nunsafe_code = "forbid"\n',
-    "Cargo.lock": "",
-    "rust-toolchain.toml": '[toolchain]\nchannel = "1.95.0"\n',
-    "deny.toml": '[bans]\nwildcards = "deny"\ndeny = [{ crate = "core", wrappers = ["app"] }]\n',
-    "docs/agents/rust.md": "rust\n",
-    "AGENTS.md": "docs/agents/rust.md\n",
-    _HOOKS_FILE: "cargo fmt typos\n",
-}
-_RUST_GATE = (
-    "cargo fmt --all --check --locked\ncargo clippy --workspace --all-targets --locked -- -D warnings\ncargo deny check\n"
-    "cargo nextest run --workspace --locked\ncargo llvm-cov --workspace --locked --fail-under-lines 80\ntypos"
-)
-
 _STACKS = {
     "node": (_NODE_FILES, _NODE_GATE),
-    "go": (_GO_FILES, _GO_GATE),
-    "rust": (_RUST_FILES, _RUST_GATE),
 }
-_MANIFEST = {"node": "package.json", "go": "go.mod", "rust": "Cargo.toml"}
+_MANIFEST = {"node": "package.json"}
 
 
 def _set_up(repo: Repo, stack: str, *, gate: bool = True) -> None:
@@ -90,7 +52,7 @@ def _set_up(repo: Repo, stack: str, *, gate: bool = True) -> None:
     for rel, text in {**_TYPOS, **files}.items():
         repo.write(rel, text)
     body = "".join(f"\t{c}\n" for c in commands.splitlines()) if gate else "\ttrue\n"
-    repo.write("Makefile", f"check:\n{body}")
+    repo.write("justfile", f"check:\n{body}")
 
 
 def _rows(repo: Repo, stack: str) -> dict[str, Verdict]:
@@ -134,7 +96,7 @@ def _mixed(repo: Repo, *, node_steps: bool = True, edge: bool = True, contract: 
     for rel, text in {**_TYPOS, **_NODE_FILES}.items():
         repo.write(rel if rel in {"typos.toml", ".pre-commit-config.yaml", "AGENTS.md"} or rel.startswith("docs/") else f"web/{rel}", text)
     node_body = "".join(f"\t{c}\n" for c in _NODE_GATE.splitlines()) if node_steps else ""
-    repo.write("Makefile", f"check: lint web\n{_PY_GATE}web:\n{node_body or chr(9) + 'true' + chr(10)}")
+    repo.write("justfile", f"check: lint web\n{_PY_GATE}web:\n{node_body or chr(9) + 'true' + chr(10)}")
     if contract:
         repo.write("schema/api.json", "{}")
     if edge:
@@ -179,8 +141,8 @@ def test_a_declared_edge_with_its_contract_file_passes(repo: Repo) -> None:
     [
         ("node-tooling", "python-uv", Verdict.PASSING),
         ("python-uv", "node-tooling", Verdict.PASSING),
-        ("go", "python-uv", Verdict.FAILING),
-        ("python-uv", "go", Verdict.FAILING),
+        ("dotnet", "python-uv", Verdict.FAILING),
+        ("python-uv", "dotnet", Verdict.FAILING),
     ],
 )
 def test_python_and_scripts_only_node_edges_resolve_only_present_stacks(repo: Repo, source: str, target: str, verdict: Verdict) -> None:
@@ -199,7 +161,7 @@ def test_python_and_scripts_only_node_edges_resolve_only_present_stacks(repo: Re
     if verdict is Verdict.PASSING:
         assert "not a stack" not in row.evidence
     else:
-        assert "names go, not a stack of this repo" in row.evidence
+        assert "names dotnet, not a stack of this repo" in row.evidence
 
 
 def test_two_code_stacks_with_no_declared_edge_are_not_set_up(repo: Repo) -> None:
@@ -219,10 +181,10 @@ def test_an_edge_whose_contract_file_is_missing_fails(repo: Repo) -> None:
 
 def test_an_edge_naming_a_stack_the_repo_lacks_fails(repo: Repo) -> None:
     _mixed(repo)
-    repo.write("docs/blueprint/blueprint.toml", '[[edge]]\nfrom = "go"\nto = "python-uv"\nvia = "schema/api.json"\nreason = "x"\n')
+    repo.write("docs/blueprint/blueprint.toml", '[[edge]]\nfrom = "dotnet"\nto = "python-uv"\nvia = "schema/api.json"\nreason = "x"\n')
     row = next(r for r in run(repo.root, concern="stack", env=repo.env).rows if r.id == "stack.edges")
     assert row.verdict is Verdict.FAILING
-    assert "go" in row.evidence
+    assert "dotnet" in row.evidence
 
 
 def test_a_single_stack_repo_has_no_edges_row(repo: Repo) -> None:
@@ -236,7 +198,7 @@ def test_the_node_spelling_and_hooks_rows_accept_codespell_for_typos(repo: Repo)
     files[_HOOKS_FILE] = "biome codespell\n"
     for rel, text in {**files, ".codespellrc": "[codespell]\nskip = x\n"}.items():
         repo.write(rel, text)
-    repo.write("Makefile", "check:\n" + "".join(f"\t{c}\n" for c in [*_NODE_STEPS[:-1], "codespell"]))
+    repo.write("justfile", "check:\n" + "".join(f"\t{c}\n" for c in [*_NODE_STEPS[:-1], "codespell"]))
     rows = _rows(repo, "node")
     assert rows["stack.node.spelling"] is Verdict.PASSING
     assert rows["stack.node.hooks"] is Verdict.PASSING
@@ -254,7 +216,7 @@ def test_the_node_spelling_and_hooks_rows_accept_blueprints_lint_changed_as_code
     files[_HOOKS_FILE] = "biome\n  entry: uv run blueprint gate lint --changed\n"
     for rel, text in {**files, ".codespellrc": "[codespell]\nskip = x\n"}.items():
         repo.write(rel, text)
-    repo.write("Makefile", "check:\n" + "".join(f"\t{c}\n" for c in [*_NODE_STEPS[:-1], "uv run blueprint gate lint --changed"]))
+    repo.write("justfile", "check:\n" + "".join(f"\t{c}\n" for c in [*_NODE_STEPS[:-1], "uv run blueprint gate lint --changed"]))
     rows = _rows(repo, "node")
     assert rows["stack.node.spelling"] is Verdict.PASSING
     assert rows["stack.node.hooks"] is Verdict.PASSING

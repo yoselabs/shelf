@@ -17,7 +17,6 @@ config = [
     { any = [{ path = "flake.lock" }, { path = "*/flake.lock" }, { path = "*/*/flake.lock" }] },
     # The Nix that runs the gate is never an unpinned image (homelab's check-host.sh ran nixos/nix:latest, shelf-2hs).
     { path = "justfile", lacks = "nixos/nix:latest" },
-    { path = "Makefile", lacks = "nixos/nix:latest" },
     { path = "tools/*.sh", lacks = "nixos/nix:latest" },
     { path = "scripts/*.sh", lacks = "nixos/nix:latest" },
 ]
@@ -27,7 +26,7 @@ gate = "--no-update-lock-file"
 role = "formatter"
 tool = """nixfmt 1.5.0 (the official RFC 166 formatter, NixOS/nixfmt, released 2026-09, in nixpkgs as `nixfmt`): `nixfmt --check` over every .nix file. Refused: nixpkgs-fmt (archived 2024-07); alejandra 4.0.0 (maintained, but not the official style, so a second opinion on layout nobody else shares)"""
 install = "run through the flake's pinned nixpkgs: `nix shell nixpkgs/<locked rev>#nixfmt -c nixfmt --check $(git ls-files '*.nix')`; just fmt runs `nixfmt` without --check. Seen on homelab: 27 of 28 files are not nixfmt-clean (hand-formatted), so adoption is one reformat commit"
-config = [{ any = [{ path = ".pre-commit-config.yaml", contains = "nixfmt" }, { any = [{ path = "justfile", contains = "nixfmt" }, { path = "Makefile", contains = "nixfmt" }] }, { path = "flake.nix", contains = "nixfmt" }] }]
+config = [{ any = [{ path = ".pre-commit-config.yaml", contains = "nixfmt" }, { any = [{ path = "justfile", contains = "nixfmt" }] }, { path = "flake.nix", contains = "nixfmt" }] }]
 gate = "nixfmt --check"
 
 [[role]]
@@ -36,15 +35,15 @@ tool = """statix (anti-pattern lints, `statix check`, exit 1 on any finding) AND
 Findings are fixed or switched off in statix.toml `disabled = [...]` with a reason; never a blanket disable"""
 install = """justfile: `statix check .` and `deadnix --fail .`, both through the same pinned nixpkgs as the formatter. Seen on homelab: statix 7 warnings (empty pattern `{ ... }:`, repeated attribute keys), deadnix unused lambda patterns (`{ config, lib, pkgs, ... }:` with config unused), exit 1 on both. \
 Open: for module files that take `{ config, lib, pkgs, ... }:` by convention, decide between `deadnix --no-lambda-pattern-names` (-L) and trimming the arguments; trimming is the strict answer"""
-config = [{ any = [{ path = "justfile", contains = "deadnix --fail" }, { path = "Makefile", contains = "deadnix --fail" }] }]
+config = [{ any = [{ path = "justfile", contains = "deadnix --fail" }] }]
 gate = "statix check"
 
 [[role]]
 role = "types"
 tool = """evaluating every output the repo deploys: `nix eval "path:<repo>?dir=hosts/<h>#nixosConfigurations.<h>.config.system.build.toplevel.drvPath" --raw` per host. The module system type-checks every option value, rejects unknown/misspelled options, fires module assertions and undefined variables; evaluation is architecture-independent, so an x86_64 host evaluates on an arm64 Mac. Seen red on a planted misspelled option (exit 1, `The option services.avahi.<typo> does not exist`), green on the real host. A `path:` flake ref checks the working tree, a `git+file:` ref misses uncommitted files"""
-install = """a `just check-hosts` that loops over hosts/*/flake.nix and runs the eval (inside the pinned nixos/nix image when Nix is not installed), and is reached by `just check`. homelab has the command (tools/check-host.sh, `make check-host HOST=` (homelab is still on make)) but `just check` never reaches it. \
+install = """a `just check-hosts` that loops over hosts/*/flake.nix and runs the eval (inside the pinned nixos/nix image when Nix is not installed), and is reached by `just check`. homelab has the command (tools/check-host.sh, `just check-host`) but `just check` never reaches it. \
 Cost: 40 s warm to 3 min cold per host. `nix flake check --no-build "path:<repo>?dir=hosts/<h>"` is the equal alternative (tested green on bee: it evaluates `nixosConfigurations.bee`, 2 min cold; not seen red) and also runs `checks.*` if the flake defines any"""
-config = [{ any = [{ path = "tools/check-host.sh" }, { any = [{ path = "justfile", contains = "nixosConfigurations" }, { path = "Makefile", contains = "nixosConfigurations" }] }, { path = "flake.nix", contains = "checks" }] }]
+config = [{ any = [{ path = "tools/check-host.sh" }, { any = [{ path = "justfile", contains = "nixosConfigurations" }] }, { path = "flake.nix", contains = "checks" }] }]
 gate = "nixosConfigurations"
 [[role.alternative]]
 label = "tools/check-host.sh evaluates each host"

@@ -92,7 +92,7 @@ _SET_UP = {
     ".pre-commit-config.yaml": "biome typos\n",
     "docs/agents/node.md": "node\n",
     "AGENTS.md": "docs/agents/node.md\n",
-    "Makefile": (
+    "justfile": (
         "check:\n\tpnpm install --frozen-lockfile\n\tbiome ci .\n\tknip\n\tdepcruise src --config .dependency-cruiser.cjs\n\ttypos\n"
     ),
 }

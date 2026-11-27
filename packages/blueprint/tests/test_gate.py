@@ -29,7 +29,7 @@ def _verdict(repo: Repo, check_id: str, *, audit: bool = True) -> tuple[Verdict,
 
 
 def test_one_command_passes_when_check_resolves(repo: Repo) -> None:
-    repo.write("Makefile", "check: lint\nlint:\n\ttrue\n")
+    repo.write("justfile", "check: lint\nlint:\n\ttrue\n")
     assert _verdict(repo, "gate.one-command")[0] is Verdict.PASSING
 
 
@@ -38,7 +38,7 @@ def test_one_command_is_not_set_up_without_a_makefile(repo: Repo) -> None:
 
 
 def test_one_command_fails_when_check_names_a_missing_target(repo: Repo) -> None:
-    repo.write("Makefile", "check: lint preset\nlint:\n\ttrue\n")
+    repo.write("justfile", "check: lint preset\nlint:\n\ttrue\n")
     verdict, evidence = _verdict(repo, "gate.one-command")
     assert verdict is Verdict.FAILING
     assert "preset" in evidence
@@ -208,7 +208,7 @@ def test_installed_hooks_are_left_out_of_the_gate_run(repo: Repo) -> None:
 
 
 def test_guard_scripts_pass_when_a_test_names_each(repo: Repo) -> None:
-    repo.write("Makefile", "check: guard\nguard:\n\tpython3 tools/no-secrets.py\n")
+    repo.write("justfile", "check: guard\nguard:\n\tpython3 tools/no-secrets.py\n")
     repo.write("tools/no-secrets.py", "")
     repo.write("tests/test_no_secrets.py", "# runs tools/no_secrets against a planted secret\n")
     assert _verdict(repo, "gate.guards-have-red-tests")[0] is Verdict.PASSING
@@ -216,7 +216,7 @@ def test_guard_scripts_pass_when_a_test_names_each(repo: Repo) -> None:
 
 def test_guard_scripts_fail_when_one_has_no_test(repo: Repo) -> None:
     repo.write(
-        "Makefile", "check: guard\nguard:\n\t@g=tools/no-secrets.py; python3 $$g\nother:\n\tpython3 tools/untested-but-unreached.py\n"
+        "justfile", "check: guard\nguard:\n\t@g=tools/no-secrets.py; python3 $$g\nother:\n\tpython3 tools/untested-but-unreached.py\n"
     )
     repo.write("tools/no-secrets.py", "")
     repo.write("tools/untested-but-unreached.py", "")
@@ -227,7 +227,7 @@ def test_guard_scripts_fail_when_one_has_no_test(repo: Repo) -> None:
 
 
 def test_guard_scripts_do_not_apply_when_check_runs_none(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     assert _verdict(repo, "gate.guards-have-red-tests")[0] is Verdict.NOT_APPLICABLE
 
 
@@ -237,7 +237,7 @@ def test_clean_clone_is_audit_only_and_left_out_of_the_gate_run(repo: Repo) -> N
 
 
 def test_clean_clone_passes_within_its_budget(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
     repo.commit()
     assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.PASSING
@@ -251,7 +251,7 @@ def _runaway_clock(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_clean_clone_over_budget_reports_this_machines_load_average(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
     _runaway_clock(monkeypatch)
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
     repo.commit()
     repo.fake_tool(repo.bin_dir / "uptime", " 12:00  up 2 days, 1 user, load averages: 2.31 2.05 1.90")
@@ -263,7 +263,7 @@ def test_clean_clone_over_budget_reports_this_machines_load_average(repo: Repo, 
 
 def test_clean_clone_over_budget_without_a_load_reading_still_fails_and_says_so(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
     _runaway_clock(monkeypatch)
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
     repo.commit()
     (repo.bin_dir / "uptime").write_text("#!/bin/sh\nexit 1\n")
@@ -276,7 +276,7 @@ def test_clean_clone_over_budget_without_a_load_reading_still_fails_and_says_so(
 
 def test_clean_clone_never_passes_on_an_uncommitted_file_and_names_it(repo: Repo) -> None:
     # HEAD fails, the working tree passes: the row says what to commit (a2kay, shelf-83g), and never passes on it.
-    repo.write("Makefile", "check:\n\ttest -f generated.txt\n")
+    repo.write("justfile", "check:\n\ttest -f generated.txt\n")
     repo.commit()
     repo.write("generated.txt", "only on this machine")
     verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
@@ -286,24 +286,24 @@ def test_clean_clone_never_passes_on_an_uncommitted_file_and_names_it(repo: Repo
 
 
 def test_clean_clone_still_fails_when_the_working_tree_fails_too(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\tfalse\n")
+    repo.write("justfile", "check:\n\tfalse\n")
     repo.commit()
     repo.write("notes.txt", "x")
     assert _verdict(repo, "gate.clean-clone", audit=True)[0] is Verdict.FAILING
 
 
-def test_clean_clone_evidence_is_the_failing_line_not_makes_own_error_trailer(repo: Repo) -> None:
-    # a2kay: "make: *** [check] Error 2" at 12s said nothing; the cause was the line make printed before it.
-    repo.write("Makefile", "include missing-config.mk\ncheck:\n\ttrue\n")
+def test_clean_clone_evidence_is_the_cause_not_the_runners_own_trailer(repo: Repo) -> None:
+    # a2kay: the runner's "recipe `check` failed" trailer said nothing; the cause was the line printed before it.
+    repo.write("justfile", "check:\n\t@echo 'cannot read missing-config.toml' >&2\n\t@exit 3\n")
     repo.commit()
     verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
     assert verdict is Verdict.FAILING
-    assert "missing-config.mk" in evidence
-    assert "make: ***" not in evidence
+    assert "missing-config.toml" in evidence
+    assert "recipe `check` failed" not in evidence
 
 
 def test_clean_clone_evidence_names_the_command_that_failed(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\t@echo compiling\n\t@echo 'lint: 3 errors' >&2; exit 1\n")
+    repo.write("justfile", "check:\n\t@echo compiling\n\t@echo 'lint: 3 errors' >&2; exit 1\n")
     repo.commit()
     assert "lint: 3 errors" in _verdict(repo, "gate.clean-clone", audit=True)[1]
 
@@ -316,7 +316,7 @@ _HOOKS_OVERRIDE = (
 
 def _owner_hooks_shaped(repo: Repo) -> None:
     """A repo with a settled decision: a gate, no hook config."""
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
 
 
 def test_a_decided_gap_is_judged_as_before_without_an_override(repo: Repo) -> None:
@@ -392,7 +392,7 @@ def test_a_passing_gate_row_and_a_branch_with_no_gate_files_are_left_alone(repo:
     row = {r.id: r for r in run_audit(repo.root, concern="gate", env=repo.env).rows}["gate.one-command"]
     assert "origin/feature" not in row.evidence
     assert "merge that branch" not in row.remediation
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\t@true\n")
     repo.commit()
     repo.git("update-ref", "refs/remotes/origin/main", "main")
     _remote_branch(repo, "wip/gate", {"justfile": "check:\n\ttrue\n"})
@@ -436,7 +436,7 @@ _HOMELAB_HOOKS = """repos:
 
 def _homelab_shaped(repo: Repo) -> None:
     """`make check` runs no script itself: it runs pre-commit, whose local hooks run the repo's guards."""
-    repo.write("Makefile", "check: lint\nlint:\n\tuvx pre-commit run --all-files\n")
+    repo.write("justfile", "check: lint\nlint:\n\tuvx pre-commit run --all-files\n")
     repo.write(".pre-commit-config.yaml", _HOMELAB_HOOKS)
     repo.write("tools/doctor.py", "")
     repo.write("tools/check-lock-age.py", "")
@@ -458,12 +458,12 @@ def test_guards_run_through_pre_commit_hooks_are_judged_for_a_naming_test(repo: 
 
 def test_hook_scripts_are_not_followed_when_the_gate_never_runs_the_hooks(repo: Repo) -> None:
     _homelab_shaped(repo)
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     assert _verdict(repo, "gate.guards-have-red-tests")[0] is Verdict.NOT_APPLICABLE
 
 
-def test_a_make_variable_in_the_recipe_is_expanded_before_scripts_are_found(repo: Repo) -> None:
-    repo.write("Makefile", "PY := uv run python\ncheck:\n\t$(PY) tools/check_design.py\n")
+def test_a_just_variable_in_the_recipe_is_expanded_before_scripts_are_found(repo: Repo) -> None:
+    repo.write("justfile", "PY := 'uv run python'\ncheck:\n\t{{PY}} tools/check_design.py\n")
     repo.write("tools/check_design.py", "")
     verdict, evidence = _verdict(repo, "gate.guards-have-red-tests")
     assert verdict is Verdict.FAILING
@@ -471,7 +471,7 @@ def test_a_make_variable_in_the_recipe_is_expanded_before_scripts_are_found(repo
 
 
 def test_a_checker_script_the_gate_never_runs_is_flagged(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\tpython3 tools/check_text.py\n")
+    repo.write("justfile", "check:\n\tpython3 tools/check_text.py\n")
     repo.write("tools/check_text.py", "")
     repo.write("tools/check_design.py", "")
     repo.write("scripts/lint-docs.sh", "")
@@ -485,7 +485,7 @@ def test_a_checker_script_the_gate_never_runs_is_flagged(repo: Repo) -> None:
 
 
 def test_checker_scripts_run_by_the_gate_or_its_hooks_pass(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\tpython3 tools/check_text.py\n\tprek run --all-files\n")
+    repo.write("justfile", "check:\n\tpython3 tools/check_text.py\n\tprek run --all-files\n")
     repo.write(
         ".pre-commit-config.yaml", "repos:\n  - repo: local\n    hooks:\n      - id: d\n        entry: uv run tools/check_design.py\n"
     )
@@ -495,7 +495,7 @@ def test_checker_scripts_run_by_the_gate_or_its_hooks_pass(repo: Repo) -> None:
 
 
 def test_no_checker_scripts_means_the_check_does_not_apply(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     assert _verdict(repo, "gate.checkers-wired")[0] is Verdict.NOT_APPLICABLE
 
 
@@ -503,7 +503,7 @@ def test_the_hooks_fix_merges_into_an_existing_config_and_never_overwrites_it(re
     # homelab (shelf-3gl): ~20 hooks of its own, and the fix said `blueprint recipe hooks > .pre-commit-config.yaml`.
     repo.write(".beads/config.yaml", "")
     repo.write(".pre-commit-config.yaml", "repos:\n- repo: local\n  hooks:\n  - id: doctor\n    entry: uv run tools/doctor.py\n")
-    repo.write("Makefile", "check: lint\nlint:\n\tuvx pre-commit run --all-files\n")
+    repo.write("justfile", "check: lint\nlint:\n\tuvx pre-commit run --all-files\n")
     row = next(r for r in run(repo.root, concern="gate", env=repo.env).rows if r.id == "gate.hooks-recipe")
     assert row.verdict is Verdict.FAILING
     assert "> .pre-commit-config.yaml" not in row.remediation
@@ -521,7 +521,7 @@ def _recording_tool(repo: Repo, name: str) -> None:
 
 def test_clean_clone_runs_the_fresh_clone_steps_before_the_gate(repo: Repo) -> None:
     # a2kay (shelf-45k, shelf-8q7): an untrusted mise.toml and a clone with no bd database failed every fresh clone.
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write("mise.toml", '[tools]\nprek = "0.5.5"\n')
     repo.write(".beads/config.yaml", "")
     repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
@@ -534,7 +534,7 @@ def test_clean_clone_runs_the_fresh_clone_steps_before_the_gate(repo: Repo) -> N
 
 
 def test_clean_clone_ignores_the_injected_homes_mise_config(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write("mise.toml", '[tools]\nprek = "0.5.5"\n')
     repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
     repo.commit()
@@ -547,7 +547,7 @@ def test_clean_clone_ignores_the_injected_homes_mise_config(repo: Repo) -> None:
 
 
 def test_clean_clone_names_a_fresh_clone_step_that_failed(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write(".beads/config.yaml", "")
     repo.commit()
     repo.fake_tool(repo.bin_dir / "bd", "Error: no remote")
@@ -559,7 +559,7 @@ def test_clean_clone_names_a_fresh_clone_step_that_failed(repo: Repo) -> None:
 
 def test_clean_clone_retries_bd_bootstrap_over_the_other_transport(repo: Repo) -> None:
     # a2kay: its committed remote is https, the devbox has only an SSH key; CI is the reverse.
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write(".beads/config.yaml", "")
     repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
     repo.commit()
@@ -592,7 +592,7 @@ def _pins_recipe() -> str:
 
 
 def test_an_interpreter_flag_does_not_hide_a_gate_script(repo: Repo) -> None:
-    repo.write("Makefile", "check: images\nimages:\n\tpython3 -I tools/own_guard.py\n")
+    repo.write("justfile", "check: images\nimages:\n\tpython3 -I tools/own_guard.py\n")
     repo.write("tools/own_guard.py", "")
     verdict, evidence = _verdict(repo, "gate.guards-have-red-tests")
     assert verdict is Verdict.FAILING
@@ -600,7 +600,7 @@ def test_an_interpreter_flag_does_not_hide_a_gate_script(repo: Repo) -> None:
 
 
 def test_an_unchanged_blueprint_recipe_counts_as_tested_in_the_shelf(repo: Repo) -> None:
-    repo.write("Makefile", "check: images\nimages:\n\tpython3 -I tools/check_dockerfile_pins.py\n")
+    repo.write("justfile", "check: images\nimages:\n\tpython3 -I tools/check_dockerfile_pins.py\n")
     repo.write("tools/check_dockerfile_pins.py", _pins_recipe())
     verdict, evidence = _verdict(repo, "gate.guards-have-red-tests")
     assert verdict is Verdict.PASSING
@@ -608,7 +608,7 @@ def test_an_unchanged_blueprint_recipe_counts_as_tested_in_the_shelf(repo: Repo)
 
 
 def test_an_edited_copy_of_a_recipe_needs_its_own_test(repo: Repo) -> None:
-    repo.write("Makefile", "check: images\nimages:\n\tpython3 -I tools/check_dockerfile_pins.py\n")
+    repo.write("justfile", "check: images\nimages:\n\tpython3 -I tools/check_dockerfile_pins.py\n")
     repo.write("tools/check_dockerfile_pins.py", _pins_recipe() + "\n# local change\n")
     assert _verdict(repo, "gate.guards-have-red-tests")[0] is Verdict.FAILING
 
@@ -623,7 +623,7 @@ def test_clean_clone_does_not_count_a_dirty_submodule_as_uncommitted(repo: Repo,
     subprocess.run(["git", "add", "."], cwd=vendor, check=True)
     subprocess.run(["git", "commit", "-qm", "v"], cwd=vendor, check=True)
     repo.git("-c", "protocol.file.allow=always", "submodule", "add", "-q", str(vendor), "third_party/uma")
-    repo.write("Makefile", "check:\n\ttest -f generated.txt\n")
+    repo.write("justfile", "check:\n\ttest -f generated.txt\n")
     repo.commit()
     repo.write("third_party/uma/mat.txt", "rewritten by the import")
     repo.write("generated.txt", "only on this machine")
@@ -644,7 +644,7 @@ def test_clean_clone_is_not_failed_by_an_lfs_smudge_filter(repo: Repo, tmp_path:
     repo.write(".gitattributes", "*.bin filter=lfs\n")
     repo.write("a.bin", "x")
     repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.git("-c", "filter.lfs.clean=cat", "add", "-A")
     repo.git("-c", "filter.lfs.clean=cat", "commit", "-qm", "x")
     verdict, evidence = _verdict(repo, "gate.clean-clone", audit=True)
@@ -683,7 +683,7 @@ def _lfs_gate_repo(repo: Repo, lfs_script: str | None) -> None:
         (repo.bin_dir / "git-lfs").chmod(0o755)
     repo.write(".gitattributes", "*.bin filter=lfs diff=lfs merge=lfs -text\n")
     repo.write("docs/blueprint/blueprint.toml", "[settings]\nclean-clone-seconds = 60\n")
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.commit()
 
 
@@ -752,7 +752,7 @@ def test_non_repository_reports_missing_repository(tmp_path: Path) -> None:
 
 
 def test_a_copied_gate_script_the_shelf_now_ships_as_a_package_is_flagged(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write("tools/gate_state.py", "# a2kay's copy\n")
     repo.write("scripts/changed.py", "")
     repo.write("tools/check_images.py", "")  # the repo's own, not a retired shelf script
@@ -765,13 +765,13 @@ def test_a_copied_gate_script_the_shelf_now_ships_as_a_package_is_flagged(repo: 
 
 
 def test_a_repo_with_none_of_the_retired_scripts_passes(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write("tools/check_images.py", "")
     assert _verdict(repo, "gate.superseded-scripts")[0] is Verdict.PASSING
 
 
 def test_a_retired_script_kept_on_purpose_is_excused_by_a_scoped_override(repo: Repo) -> None:
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     repo.write("tools/gate_state.py", "")
     repo.write(
         "docs/blueprint/blueprint.toml",

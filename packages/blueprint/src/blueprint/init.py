@@ -23,7 +23,7 @@ import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from blueprint import preset, render, shelf_sources
+from blueprint import facts, preset, render, shelf_sources
 from blueprint.concerns.mise import tool_pins
 from blueprint.concerns.stacks.profile_data import load_profiles, profile_for
 from blueprint.model import Context, Verdict
@@ -138,8 +138,9 @@ def _write_recipes(repo: Path, names: tuple[str, ...]) -> list[str]:
 
 
 def _kinds(profile: Profile) -> tuple[str, ...]:
-    """The stacks and frameworks whose recipe files a repo may need."""
-    return (*profile.stacks, *(name for name, _ in profile.frameworks))
+    """The stacks and frameworks whose recipe files a repo may need; the compose policy only for a deployed repo (the rows that read it)."""
+    names = (*profile.stacks, *(name for name, _ in profile.frameworks))
+    return names if facts.is_deployed(profile) else tuple(n for n in names if n != "compose")
 
 
 _SAID = re.compile(r"\d+\.\d+\.\d+")

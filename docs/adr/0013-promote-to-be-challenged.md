@@ -1,11 +1,11 @@
 ---
 id: 0013
 title: Promote to be challenged
-statement: Unproven shape and unfinished verification are not reasons to hold a promotion; promote real substrate so a second consumer can challenge it, and ship its verification lane in the same change.
+statement: Unproven shape and unfinished verification do not hold a promotion; promote real substrate so a second consumer can challenge it, with its verification lane in the local gate. Amended 2026-11-28.
 concerns: [workflow]
 status: accepted
 decided_by: owner
-updated: 2026-07-26
+updated: 2026-11-28
 expires: 2028-01-26
 distilled_into: agent-loop.md `WORKFLOW: SEAM` (PROMOTE gains the "verifiability is not a gate" clause and the verification-travels-with-the-code rule; ADOPT/EVOLVE gain "the second consumer is the abstraction's first challenge")
 ---
@@ -24,7 +24,7 @@ distilled_into: agent-loop.md `WORKFLOW: SEAM` (PROMOTE gains the "verifiability
   forfeits the one event that would say what right is.
 - **Verification travels with the promotion.** If a piece needs a real-substrate lane (browser
   launch, container boot, live call), that lane ships *in the same change*, ported into the shelf's
-  CI. "Promote without the gate" and "promote with the gate ported alongside" are different acts.
+  local gate. "Promote without the gate" and "promote with the gate ported alongside" are different acts.
 - **Why safe (asymmetry).** Wrong early promotion: RECONCILE demotes it (duplicate back into its one
   consumer, retire the package); tags are immutable and evolution ships as a NEW tag, so no pinner
   breaks. Bounded and cheap. Forfeited challenge: the abstraction never learns it was over-fit and the
@@ -61,3 +61,4 @@ outnumber the generalizations they buy, tighten the plausible-second-consumer gu
   acknowledged shape-uncertainty has been bent by a second consumer at least twice; if early
   promotion only produced churn, the asymmetry is wrong and this should be cut). Track: governance /
   the promotion model.
+- 2026-11-28: amended by ADR 0027: the verification lane is ported into the local gate (`just check`), not CI; no repository has CI.
