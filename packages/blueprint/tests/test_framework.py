@@ -34,7 +34,7 @@ def test_missing_godot_hygiene_is_not_set_up(repo: Repo) -> None:
 
 def test_headless_build_outside_the_gate_fails(repo: Repo) -> None:
     _godot(repo)
-    repo.write("Makefile", "check:\n\ttrue\nimport:\n\tgodot --headless --import | grep ERROR: ; godot --headless --build-solutions\n")
+    repo.write("justfile", "check:\n\ttrue\nimport:\n\tgodot --headless --import | grep ERROR: ; godot --headless --build-solutions\n")
     assert _rows(repo)["framework.godot.build"][0] is Verdict.FAILING
 
 
@@ -142,7 +142,7 @@ def _a2kay_shaped(repo: Repo) -> None:
     repo.write("tests/test_stdio.py", "t = StdioTransport\n")
     repo.write("tests/contracts/test_tool_list.py", "tools = list_tools()\nhint = 'readOnlyHint'\n")
     repo.write("tests/contracts/tools.snapshot.json", "[]\n")
-    repo.write("Makefile", "check:\n\tuv run pytest\n")
+    repo.write("justfile", "check:\n\tuv run pytest\n")
 
 
 def test_a_repo_shaped_like_a2kay_passes_the_configured_roles(repo: Repo) -> None:
@@ -156,7 +156,7 @@ def test_a_repo_shaped_like_a2kay_passes_the_configured_roles(repo: Repo) -> Non
 def test_the_rendered_test_step_counts_as_running_pytest_for_the_mcp_rows(repo: Repo) -> None:
     # The standard step is `uv run blueprint gate test`, which runs pytest without the word (a2kay, 2026-11-23).
     _a2kay_shaped(repo)
-    repo.write("Makefile", "check:\n\tuv run blueprint gate test\n")
+    repo.write("justfile", "check:\n\tuv run blueprint gate test\n")
     rows = _rows(repo)
     for role in ("build", "tests", "surface-integrity"):
         assert rows[f"framework.mcp.{role}"][0] is Verdict.PASSING, role
@@ -164,7 +164,7 @@ def test_the_rendered_test_step_counts_as_running_pytest_for_the_mcp_rows(repo: 
 
 def test_the_mcp_rows_still_fail_when_the_gate_runs_no_tests(repo: Repo) -> None:
     _a2kay_shaped(repo)
-    repo.write("Makefile", "check:\n\ttrue\n")
+    repo.write("justfile", "check:\n\ttrue\n")
     rows = _rows(repo)
     for role in ("build", "tests", "surface-integrity"):
         assert rows[f"framework.mcp.{role}"][0] is Verdict.FAILING, role
@@ -247,7 +247,7 @@ def test_the_mcp_architecture_row_wants_a_contract_keeping_the_framework_out_of_
     assert verdict is Verdict.NOT_SET_UP
     assert "include_external_packages" in evidence
     repo.write("pyproject.toml", (repo.root / "pyproject.toml").read_text() + _NO_MCP_IN_CORE)
-    repo.write("Makefile", "check:\n\tuv run pytest\n\tuv run lint-imports\n")
+    repo.write("justfile", "check:\n\tuv run pytest\n\tuv run lint-imports\n")
     assert _rows(repo)["framework.mcp.architecture"][0] is Verdict.PASSING
 
 

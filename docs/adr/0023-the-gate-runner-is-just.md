@@ -1,11 +1,11 @@
 ---
 id: 0023
 title: The gate runner is just
-statement: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`.
+statement: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`. A Makefile is not read.
 concerns: [gate]
 status: accepted
 decided_by: owner
-updated: 2026-11-05
+updated: 2026-11-28
 distilled_into: blueprint gate.runner, gate_graph.py; the shelf justfile; tools/onboard/linter_preset.py
 ---
 
@@ -17,7 +17,7 @@ distilled_into: blueprint gate.runner, gate_graph.py; the shelf justfile; tools/
   (`check`, `check-all`, `lint`, `typecheck`, `arch`, `spell`, `deps`, `test`, `guard`, `preset`, `blueprint`, `bootstrap`, ...).
   Gate recipes carry `[group('gate')]`.
 - **Pinned per repo:** Python repos `uv add --dev rust-just` and run `uv run just check` (1.58.0 was tested). Other stacks:
-  `uvx rust-just@<version>`, brew, or a CI setup action. CI and the gate image run it the same way.
+  `uvx rust-just@<version>`, brew. A Makefile is not read: the runner row fails a repo that has one and no justfile.
 - **Blueprint reads the graph, not the syntax:** `just --dump --dump-format json` gives `recipes{name: dependencies,
   body, parameters, attributes}` and `assignments`. Walk from `check` through dependencies; an argument equal to a
   recipe name is an edge (`check: (gate "check-host")`); `{{var}}` in a body is resolved from the simple assignments.
@@ -28,7 +28,7 @@ distilled_into: blueprint gate.runner, gate_graph.py; the shelf justfile; tools/
   (a fallback in `gate_graph.py`), so a repo not yet migrated is judged, not skipped. The row is a new checkpoint, so by
   ADR 0018 it only warns until the repo's next audit.
 
-Why: the gate is read by agents, hooks, CI and blueprint. Make gave blueprint a regex over tab-indented text and a
+Why: the gate is read by agents, hooks and blueprint. Make gave blueprint a regex over tab-indented text and a
 dry-run that is unsafe by construction; just gives a JSON graph and a safe dry-run for one pinned dependency.
 
 ## Rejected
@@ -56,3 +56,4 @@ works on any clone with uv; `gate.one-command` reports "not checked" (never a pa
 - 2026-10-11: decided by the owner after a runner comparison (make, just, Taskfile, mise, poe against the same
   gate); the shelf's Makefile became a justfile, and blueprint, onboarding and CI moved with it.
 - 2026-11-05: the container dispatch and `SHELF_HOST_CHECK` left the justfile with the Docker gate (ADR 0027).
+- 2026-11-28: amended: blueprint no longer reads a Makefile at all (the fallback is deleted, ADR 0028: no backward compatibility); CI is gone (ADR 0027).

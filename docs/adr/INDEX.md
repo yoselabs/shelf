@@ -10,20 +10,20 @@ the file holds the reasons, the rejected options and the history.
 
 ## doctrine
 
-- [0002](0002-doctrine-homes-in-the-shelf.md) **Doctrine homes in the shelf**: The shelf is the single self-contained home of its own operating model; consumers only point to it, and no external knowledge base is needed to use it.
+- [0002](0002-doctrine-homes-in-the-shelf.md) **Doctrine homes in the shelf**: The shelf is the single self-contained home of its own operating model; consumers only point to it, and no external knowledge base is needed to use it. Amended 2026-11-28 (ADR 0027): no CI.
 - [0003](0003-ontology-lives-as-flat-files.md) **The ontology lives as flat files**: The shelf's catalog, use-cases and ledger are plain files under version control, one per instance, with every rollup derived; they are never a2kay EntityTypes.
 - [0028](0028-hard-opinions.md) **The shelf and everything built on it are hard opinionated**: No optionality, no backward compatibility in code, no redundancy; behaviour is decomposed behind owners, injected as instances, and checked against the shelf first. Constitution Articles II and III.
 - [0030](0030-tolerance-and-destructive-flags-are-debt.md) **Tolerance and destructive flags are debt, converted to exceptions and verbs**: force, missing_ok, ignore_errors, overwrite and kin are not a justified exception; the call raises a typed exception and the caller that tolerates it catches it.
 
 ## gate
 
-- [0004](0004-linters-are-a-config-preset.md) **Linters are a config-preset, not a CLI**: The shelf's own pyproject [tool.*] blocks and justfile recipes are the lint reference; a consumer copies them and owns the copy. No lint CLI, no runtime dependency.
+- [0004](0004-linters-are-a-config-preset.md) **Linters are a config-preset, not a CLI**: The shelf's pyproject [tool.*] blocks are the lint reference; consumers copy and own them. Amended 2026-11-28: the engine runs the standard steps (`blueprint gate lint`); no other lint CLI.
 - [0005](0005-architecture-rules-are-native-fitness-tests.md) **Architecture rules run in the toolchain; AST facts are native tests**: Import-graph rules run in-toolchain (import-linter in pyproject; ruff TID251 for banned APIs); AST-fact rules stay pure-stdlib pytest, body duplication blocking across packages too; no policy engine.
 - [0018](0018-new-checkpoints-warn-until-the-next-audit.md) **A new blueprint checkpoint warns until the repo's next audit**: Each audit records the checkpoints it judged in docs/blueprint/checkpoints.txt; between audits the gate enforces that set and a newer checkpoint only warns (🆕).
 - [0020](0020-prek-runs-every-hook.md) **prek runs every git hook, bd's included**: prek is the one hook manager; bd's events run from .pre-commit-config.yaml via `bd hooks run`; bd never installs hooks itself and core.hooksPath stays unset.
-- [0021](0021-affected-tests-stay-on-affected-py.md) **The gate core is the shelf's own, one adapter per stack; moon is rejected**: Affected selection, receipts and the run guard live in a shelf-owned neutral core with one adapter per stack (Python first, via uv export). No external build tool.
+- [0021](0021-affected-tests-stay-on-affected-py.md) **The gate core is the shelf's own, one adapter per stack; moon is rejected**: Affected selection, receipts and the run guard live in a shelf-owned core, one adapter per stack. Amended 2026-11-28: steps declare their inputs (ADR 0031); the engine owns the standard steps (0033).
 - [0022](0022-every-exception-is-justified.md) **Every exception to a blueprint rule is justified**: An override or ignored path in blueprint.toml needs a reason and either an expires date or an adr naming the accepted ADR that records the durable decision; the gate reports one without.
-- [0023](0023-the-gate-runner-is-just.md) **The gate runner is just**: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`.
+- [0023](0023-the-gate-runner-is-just.md) **The gate runner is just**: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`. A Makefile is not read.
 - [0027](0027-no-repository-has-ci.md) **No repository has GitHub Actions CI; the local gate is the gate**: No repository holds GitHub Actions configuration. Done is the local `just check` green on the tree pushed and on a merged tree; blueprint's `gate.no-ci` fails a repo with workflows.
 - [0029](0029-the-justfile-imports-blueprint-rendered-parts.md) **A repo's justfile imports blueprint-rendered parts; `import`, not `mod`**: The gate's common recipes are files `blueprint gate render` writes per stack; the repo's justfile imports them (`import`, not `mod`) and owns the rest; `render --check` is the drift check.
 - [0031](0031-gate-steps-declare-their-inputs.md) **Every gate step declares the files it reads; a step whose inputs did not change is not started**: gate-inputs.toml lists each step's input globs; any-gate does not start a step none of whose inputs changed; blueprint checkpoints stay one step reading the whole repo.
@@ -47,7 +47,7 @@ the file holds the reasons, the rejected options and the history.
 - [0016](0016-python-and-uv-pins.md) **Python and uv are pinned once each, and images read the pins**: one X.Y in .python-version; requires-python ">=X.Y", uncapped, pin inside; uv floored by required-version; images install the pinned uv.
 - [0024](0024-mise-pins-every-repo-tool.md) **mise pins every repo tool, locked**: Each repo pins the tools that build or test it exactly in mise.toml, locked in mise.lock; agent CLIs are never pinned, git gets a floor; uv keeps Python, global.json the .NET SDK.
 - [0025](0025-every-cli-answers-help.md) **every command answers --help and refuses what it does not know**: Every command and script answers `--help` with its usage and changes nothing, refuses an unknown flag, and acts only on the action given; built on a CLI library.
-- [0026](0026-checkpoints-follow-facts.md) **checkpoints follow facts about the repo, never its size; one override format**: Checkpoints apply because of facts (technology, surface, trait, what happens to a file), never file counts; the agent classifies the rest; every exception is one override.
+- [0026](0026-checkpoints-follow-facts.md) **checkpoints follow facts about the repo, never its size; one override format**: Checkpoints apply because of facts (technology, surface, trait, what happens to a file), never file counts; the agent classifies the rest; every exception is one override. Amended 2026-11-28.
 
 ## workflow
 
@@ -57,7 +57,7 @@ the file holds the reasons, the rejected options and the history.
 - [0010](0010-generic-first-specific-second.md) **Generic first, consumer second**: Define a package's capability across the whole class of inputs first, then let the live consumer only rank what ships by default versus opt-in; never narrow the grid to one consumer's diet.
 - [0011](0011-benchmarking-is-a-named-workflow.md) **Benchmarking is a named workflow (BENCH)**: Contested keep-vs-replace and build-vs-adopt calls between tools are decided by the BENCH workflow on isolated, model-free, dated evidence, not by reputation or inheritance.
 - [0012](0012-sharp-edges-are-a-promotion-trigger.md) **Sharp edges are a promotion trigger**: A bug rooted in a dependency's behaviour is a promotion trigger fired at bugfix time; the lesson ships as a feature of a capability package, never as a library-shaped package.
-- [0013](0013-promote-to-be-challenged.md) **Promote to be challenged**: Unproven shape and unfinished verification are not reasons to hold a promotion; promote real substrate so a second consumer can challenge it, and ship its verification lane in the same change.
+- [0013](0013-promote-to-be-challenged.md) **Promote to be challenged**: Unproven shape and unfinished verification do not hold a promotion; promote real substrate so a second consumer can challenge it, with its verification lane in the local gate. Amended 2026-11-28.
 - [0015](0015-ergonomics-is-a-capability.md) **Ergonomics is a capability**: A verbose-but-correct dependency is a promotion trigger; any-* promises a whole domain, not a backend swap, and where a domain has a thing, promote the thing, not a bag of functions.
 
 ## Proposed, not in force

@@ -77,10 +77,10 @@ _RESEARCH = (
 
 
 def gate_text(ctx: Context) -> str:
-    """Everything `just check` reaches (a Makefile's `check`, for one not yet migrated), the hook config it runs, lefthook's."""
+    """Everything `just check` reaches, the hook config it runs, lefthook's."""
     gate = gate_graph.load(ctx)
     parts = [gate.gate_recipes() if gate else ""]
-    # Hooks the gate runs (`make lint` -> `pre-commit run --all-files`) are the gate's checks too (homelab, shelf-0kz).
+    # Hooks the gate runs (`just lint` -> `pre-commit run --all-files`) are the gate's checks too (homelab, shelf-0kz).
     if gate_graph.HOOK_RUN.search(parts[0]):
         parts.append(ctx.read(gate_graph.HOOK_CONFIG) or "")
     parts += [ctx.read(f) or "" for f in ("lefthook.yml", "lefthook.yaml")]
@@ -388,7 +388,7 @@ def roles(ctx: Context) -> list[Sub]:
     """Per detected stack: one profile row, then one row per role."""
     if not ctx.profile.stacks:
         finding = not_checked(
-            "no stack detected: no manifest the engine knows (pyproject.toml, *.csproj, go.mod, Cargo.toml, package.json)",
+            "no stack detected: no manifest the engine knows (pyproject.toml, *.csproj, package.json)",
             "add the stack's detection to blueprint/profile.py in the shelf",
             blueprint_gap=True,
         )

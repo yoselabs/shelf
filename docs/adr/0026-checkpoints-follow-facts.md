@@ -1,11 +1,11 @@
 ---
 id: 0026
 title: checkpoints follow facts about the repo, never its size; one override format
-statement: Checkpoints apply because of facts (technology, surface, trait, what happens to a file), never file counts; the agent classifies the rest; every exception is one override.
+statement: Checkpoints apply because of facts (technology, surface, trait, what happens to a file), never file counts; the agent classifies the rest; every exception is one override. Amended 2026-11-28.
 concerns: [stack, gate, workflow]
 status: accepted
 decided_by: owner
-updated: 2026-11-20
+updated: 2026-11-28
 distilled_into: blueprint facts.py (facts, evidence, closed lists, classification), profile.py ([[override]] with scope, [profile] classified/rejected), checkpoints.py (`blueprint check --list`), stack.py (requires = shipped-image | deployed), tools/changed.py and the justfile (changed-file linting); bead shelf-6q1
 ---
 
@@ -38,7 +38,7 @@ distilled_into: blueprint facts.py (facts, evidence, closed lists, classificatio
   what to declare or override.
 - **Per-file linters run on changed files.** A detected technology's per-file linters (hadolint, dockerfmt,
   shellcheck, shfmt, compose config, nix fmt, ruff) run on the files changed against the base branch; checks that
-  read across files (type checking, architecture, dependencies) run whole-repo; CI runs everything.
+  read across files (type checking, architecture, dependencies) run whole-repo; `just check-all` runs everything.
 
 Why: size tiers (shell-scripts, dockerfile-lite, compose-lite, 2026-10-11/12) picked rules by counting files, so
 the count said nothing about what the repo is, and crossing it flipped a set of rules at once. Exceptions had grown
@@ -63,3 +63,4 @@ five shapes in two days.
   shelf. Consumers' changed-file recipe is shelf-6q1.9.
 - 2026-11-05: the shelf itself no longer pins hadolint or dockerfmt (its Docker gate is gone, ADR 0027); the Dockerfile checkpoints above stay for consumer repos that have Dockerfiles, via blueprint's dockerfile profile.
 - 2026-11-20: ADR 0027 (no repository has CI): no workflow is read, so `ships-image`, `deployed` and `scheduled-jobs` are classified by the agent, not detected; `ship-smoke` is gone and `ship-updater` applies once `ships-image` is classified; high-confidence `deployed` evidence no longer exists.
+- 2026-11-28: amended by ADR 0027: the whole-repo run is `just check-all`, not CI. The compose policy file `policy/compose.rego` is no longer written by `blueprint init` (nothing ran it in a consumer).

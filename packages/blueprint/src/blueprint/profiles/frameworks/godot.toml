@@ -54,8 +54,8 @@ install = """Godot binary on the agent's machine, the .NET build of the version 
 `! grep -q 'ERROR:' import.log` (import exits 0 even on broken scene references), then `"{{godot}}" --headless --path {root} --build-solutions --quit` \
 (exit 1 on a C# compile error), then `git diff --exit-code && test -z "$(git status --porcelain)"`; no backticks in the justfile (`just --dry-run` runs them); add godot-build to the `check` dependencies"""
 config = [
-    { any = [{ path = "justfile", contains = "--build-solutions" }, { path = "Makefile", contains = "--build-solutions" }] },
-    { any = [{ path = "justfile", contains = "ERROR:" }, { path = "Makefile", contains = "ERROR:" }] },
+    { any = [{ path = "justfile", contains = "--build-solutions" }] },
+    { any = [{ path = "justfile", contains = "ERROR:" }] },
 ]
 gate = "--build-solutions"
 
@@ -71,7 +71,7 @@ GdUnit4Net, tested: its VSTest adapter makes `dotnet test --solution` refuse the
 config = [
     { path = "Directory.Packages.props", contains = "Chickensoft.GoDotTest" },
     { path = "{root}/viewtests/TestEntry.cs", contains = "ShouldRunTests" },
-    { any = [{ path = "justfile", contains = "--run-tests" }, { path = "Makefile", contains = "--run-tests" }] },
+    { any = [{ path = "justfile", contains = "--run-tests" }] },
 ]
 gate = "--run-tests"
 
@@ -83,7 +83,7 @@ Known gap: the script cannot see a wrong resource type or an unknown node class;
 install = """`blueprint init` writes tools/check_godot.py; justfile: `godot-surface:` `python3 -I tools/check_godot.py {root} {root}/Game.Godot.csproj`, in `check` (needs no Godot binary, so it also runs where the editor is absent). Run with `python3 -I` so a stray module in the folder cannot shadow the stdlib"""
 config = [
     { path = "tools/check_godot.py" },
-    { any = [{ path = "justfile", contains = "check_godot" }, { path = "Makefile", contains = "check_godot" }] },
+    { any = [{ path = "justfile", contains = "check_godot" }] },
 ]
 gate = "check_godot"
 

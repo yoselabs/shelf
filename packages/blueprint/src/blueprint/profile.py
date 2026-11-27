@@ -294,9 +294,9 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
         found["compose"] = sorted(p.relative_to(repo).as_posix() for p in composes)
     if images := dockerfiles(repo, skip):
         found["dockerfile"] = [p.relative_to(repo).as_posix() for p in images]
-    for stack, manifest in (("node", "package.json"), ("go", "go.mod"), ("rust", "Cargo.toml")):
+    for stack, manifest in (("node", "package.json"),):
         # Node manifests may sit two folders down (apps/web/package.json); never descend into dependency folders.
-        if manifests := walk(repo, manifest, 3 if stack == "node" else 2, skip):
+        if manifests := walk(repo, manifest, 3, skip):
             files = sorted((p.relative_to(repo).as_posix() for p in manifests), key=lambda rel: (rel.count("/"), rel))
             found["node-tooling" if stack == "node" and _builds_tooling_only(repo / files[0]) else stack] = files
     if scripts := _shell_scripts(repo, skip):
@@ -306,7 +306,7 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
 
 def _stack_roots(found: dict[str, list[str]]) -> tuple[tuple[str, str], ...]:
     """The folder each stack's first manifest sits in; a stack that is not a single manifest (dotnet, nix, ...) is rooted at the repo."""
-    return tuple((s, str(Path(files[0]).parent)) for s, files in found.items() if s in {"node", "node-tooling", "go", "rust"})
+    return tuple((s, str(Path(files[0]).parent)) for s, files in found.items() if s in {"node", "node-tooling"})
 
 
 def detect_stacks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[str, ...]:
