@@ -1,5 +1,7 @@
 """`python -m any_gate_python`: `plan` names the package suites a change reaches; `run` is the pytest runner `any-gate test` calls.
 
+`packages [--all]` prints the package directories the change reaches (the changed ones, their dependents, the lock read per package).
+
 `plan [--plan] [--explain] [--reach N]` prints the pytest paths the change reaches, or with `--plan` one `path<TAB>key` per suite.
 
 `run [--workers auto|N] [--wall S] [--idle S] [--nice N] [--pytest-args "ARGS"] PATH...` runs the paths in pytest stages (parallel, serial,
@@ -17,7 +19,7 @@ from pathlib import Path
 
 from any_gate_python.compact import Compact
 from any_gate_python.graph import lock_touched, workspace
-from any_gate_python.select import affected, changed_files, everything, merge_base, plan, reach, wide_alarm
+from any_gate_python.select import affected, affected_packages, changed_files, everything, merge_base, plan, reach, wide_alarm
 from any_gate_python.stages import run_tests
 
 
@@ -63,6 +65,9 @@ def main(argv: list[str] | None = None) -> int:
     sel.add_argument("--plan", action="store_true", help="print `path<TAB>key` per suite (the input of `any-gate test`)")
     sel.add_argument("--all", action="store_true", help="every suite, whatever changed (the release run)")
     sel.add_argument("--reach", type=int, metavar="N", help="print how many suites each of the last N commits reaches, then exit")
+    pk = sub.add_parser("packages", help="the package directories a change reaches (for a step that runs once per package)")
+    pk.add_argument("--repo", default=".", help="the repo (default: cwd)")
+    pk.add_argument("--all", action="store_true", help="every package, whatever changed")
     run = sub.add_parser("run", help="run pytest paths in stages (the runner `any-gate test` calls)")
     run.add_argument(
         "--workers", default="auto", help="xdist workers for the parallel stage: a number, or auto (sized to the tests and box)"
@@ -81,6 +86,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         return _run(args)
     repo = Path(args.repo).resolve()
+    if args.command == "packages":
+        names = (
+            sorted(workspace(repo)[0])
+            if args.all
+            else sorted(affected_packages(repo, changed_files(repo), lambda: lock_touched(repo, merge_base(repo))))
+        )
+        sys.stdout.write("".join(f"{name}\n" for name in names))
+        return 0
     if args.reach:
         rows = reach(repo, args.reach)
         for sha, files, suites in rows:

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The python `deps` recipe checks only the packages the change reaches (`any_gate_python packages`; every package where the adapter is absent); `deps-all` is every package and the release gate (`check-all`) runs it.
+
 - **`blueprint gate hook`** (shelf-3rm8): one commit-hook process runs the secret scan, the guard, preset drift (when pyproject.toml is staged) and ruff check and format over the staged files, so a commit starts one `uv run` instead of five. The pre-commit template has one `blueprint-hook`; the python-uv `hooks` row and `secrets.scanner` accept it.
 - **Breaking: go and rust profiles removed** (shelf-rofp): no consumer used them; a `go.mod` or `Cargo.toml` no longer makes a stack. **Makefile support removed:** no profile row looks for a Makefile and `gate_graph` no longer parses one; a Makefile-only repo still fails `gate.runner`. `node-tooling` now extends `node` (`extends = "node"` in a profile file: the base's roles, with its own rows replacing the same-named ones).
 - **`check --write` writes the reports to `.blueprint/reports/`** (a self-ignoring folder), not `docs/blueprint/`; `docs/blueprint/checkpoints.txt` is the only tracked output (shelf-rabg). **`blueprint init` writes `policy/compose.rego` only for a deployed repo.**
