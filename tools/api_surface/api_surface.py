@@ -374,7 +374,7 @@ def learning_cost(repo: Path, rev: str, packages: Sequence[str]) -> list[str]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0] if __doc__ else None)
-    parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parent.parent, help="the git repository (default: this one)")
+    parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[2], help="the git repository (default: this one)")
     commands = parser.add_subparsers(dest="command", required=True)
     one = commands.add_parser("diff", help="public API changes of a package between two tags")
     one.add_argument("package")

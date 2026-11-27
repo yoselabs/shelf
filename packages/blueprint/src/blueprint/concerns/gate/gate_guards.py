@@ -68,13 +68,14 @@ def runs_blueprint(ctx: Context) -> Finding:
     gate = gate_graph.load(ctx)
     if gate is None:
         return not_applicable("no justfile: gate.one-command reports the missing gate")
-    if "blueprint check" not in gate.gate_recipes():
+    recipes = gate.gate_recipes()
+    if "blueprint check" not in recipes and "blueprint gate blueprint" not in recipes:  # the second runs the checkpoints in one process
         return not_set_up(
             "`just check` never runs blueprint",
             "copy the shelf's `blueprint` recipe into the justfile and add it to `check` (`blueprint init` does both)",
             FixedBy.AUTO,
         )
-    return passing("`just check` reaches `blueprint check --brief`")
+    return passing("`just check` reaches the blueprint checkpoints (`blueprint check --brief`, or `blueprint gate blueprint`)")
 
 
 def guards_have_red_tests(ctx: Context) -> Finding:

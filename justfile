@@ -44,28 +44,34 @@ scripts scope="changed":
 [group('gate')]
 scripts-all: (scripts "all")
 
-# No locked dependency has a known vulnerability, except those tools/dep_audit_exceptions.toml allows until a date. `check` runs it when uv.lock or
+# No locked dependency has a known vulnerability, except those .config/dep-audit/exceptions.toml allows until a date. `check` runs it when uv.lock or
 # a pyproject.toml changed (gate-inputs.toml); `check-all` always. Needs the network: offline it says so and passes.
 [group('gate')]
 dep-audit:
-    python3 -I tools/dep_audit.py
+    python3 -I tools/dep_audit/dep_audit.py
 
 [group('gate')]
 tag-check:
-    python3 -I tools/tag_check.py
+    python3 -I tools/tag_check/tag_check.py
 
 # No tracked `*.py` file or package folder is named like a standard library module where a script run puts it first on sys.path (a consumer's
-# `queue.py` in scripts/ broke 729 jobs, 2026-11: `module 'queue' has no attribute 'SimpleQueue'`). Reasoned exceptions: tools/stdlib_shadow_allow.toml.
+# `queue.py` in scripts/ broke 729 jobs, 2026-11: `module 'queue' has no attribute 'SimpleQueue'`). Reasoned exceptions: .config/stdlib-shadow/allow.toml.
 [group('gate')]
 stdlib-shadow:
-    python3 -I tools/stdlib_shadow.py
+    python3 -I tools/stdlib_shadow/stdlib_shadow.py
 
 # the import graph against the contracts in [tool.importlinter] (pyproject.toml): no package
 # imports a consumer app, packages stay independent except their declared workspace edges.
-# Banned APIs are ruff's TID251 and ride `lint`. A violation prints the importing line.
+# Banned APIs are ruff's TID251 and ride `lint`. A violation prints the importing line. Also runs `stdlib-shadow` (both read the Python
+# file tree and finish in seconds): both always run, the step fails when either does.
 [group('gate')]
 arch:
-    uv run lint-imports
+    #!/usr/bin/env bash
+    set -uo pipefail
+    rc=0
+    uv run lint-imports || rc=1
+    python3 -I tools/stdlib_shadow/stdlib_shadow.py || rc=1
+    exit "$rc"
 
 # The real-launch browser gate (any-browser), deselected from the default `test`.
 # Launches each real engine against a local JS page and asserts a render. Run
@@ -95,4 +101,4 @@ eval *args:
 # The files are truth; the READMEs are projected (constitution I). A freshness
 # test in `just test` fails if they drift.
 catalog:
-    uv run python tools/catalog.py
+    uv run python tools/catalog/catalog.py

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""No locked dependency has a known vulnerability, except the ones `tools/dep_audit_exceptions.toml` allows until a date.
+"""No locked dependency has a known vulnerability, except the ones `.config/dep-audit/exceptions.toml` allows until a date.
 
 Runs `pip-audit` over the exported `uv.lock` (workspace packages left out: they are ours). An advisory fails the step unless an
 `[[exception]]` names its package and id, with a reason, and its `until` date has not passed. Past the date the entry covers nothing and
@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-EXCEPTIONS = Path(__file__).with_name("dep_audit_exceptions.toml")
+EXCEPTIONS = Path(__file__).resolve().parents[2] / ".config" / "dep-audit" / "exceptions.toml"
 TIMEOUT = 600.0  # seconds one tool may take: the advisory service on a dead network must not hang a push
 
 

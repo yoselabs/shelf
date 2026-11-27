@@ -8,12 +8,12 @@
 # The gate: every step at once (`steps`), one timing line, a warning for a step over its budget. A green run records the tree it
 # checked (any-gate), so the pre-push hook does not run it again on that tree.
 [group('gate')]
-check: gate-start beads-lint (steps "guard" "preset" "render" "blueprint" "secrets" "lint-changed" "typecheck" "spell-changed" "deps" "test" "scripts" "arch" "tag-check" "stdlib-shadow" "dep-audit") check-extra
+check: gate-start beads-lint (steps "blueprint" "secrets" "lint-changed" "typecheck" "deps" "test" "scripts" "arch" "tag-check" "dep-audit") check-extra
     uv run python -m any_gate passed --gate check
 
 # Opt-in release gate (`[tool.blueprint.gate] release-gate = true`): every step over everything before a tag.
 [group('gate')]
-check-all: beads-lint (steps-all "guard" "preset" "render" "blueprint" "secrets-all" "lint" "typecheck" "spell" "deps" "test-all" "scripts-all" "arch" "tag-check" "stdlib-shadow" "dep-audit") check-extra
+check-all: beads-lint (steps-all "blueprint" "secrets-all" "lint" "typecheck" "deps" "test-all" "scripts-all" "arch" "tag-check" "dep-audit") check-extra
 
 # Extension point: a repo defines `check-extra` in its own justfile to run one more thing in the gate (after the steps, before the record).
 [private]
@@ -53,10 +53,11 @@ steps +names:
 steps-all +names:
     uv run python -m any_gate steps --all --runner {{ just_executable() }} {{ names }}
 
-# The blueprint's per-commit checkpoints: one line per one that is not passing.
+# The blueprint's gate step, one process: the commit guard (HEAD), the linter preset, the render check, then every per-commit
+# checkpoint, one line per one that is not passing. `guard`, `preset` and `render` below are the same checks one at a time.
 [group('gate')]
 blueprint:
-    uv run blueprint check --repo . --brief
+    uv run blueprint gate blueprint --repo .
 
 # Secrets in the code this branch changed: gitleaks (pinned in mise.toml) over the commits since the upstream merge-base plus the staged,
 # unstaged and untracked work. The commit hook scans only the index and a hook can be skipped; this is the enforcement.

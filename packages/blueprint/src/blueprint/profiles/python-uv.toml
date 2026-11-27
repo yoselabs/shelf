@@ -127,6 +127,10 @@ gate = "codespell"
 label = "blueprint's own `gate spell`, which runs codespell over the repo's [tool.blueprint.gate] paths"
 gate = 'blueprint gate spell'
 
+[[role.alternative]]
+label = "blueprint's own `gate lint`, which runs ruff and codespell over the repo's [tool.blueprint.gate] paths"
+gate = 'blueprint gate lint'
+
 [[role]]
 role = "dependencies"
 tool = "deptry (unused, missing, transitive)"

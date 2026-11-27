@@ -1,4 +1,4 @@
-# Packages allowed to sit at a version with no tag on origin (tools/tag_check.py). Every entry needs its reason, and an entry may carry `until` (tools/exemption.py: the last day it holds); an entry whose package
+# Packages allowed to sit at a version with no tag on origin (tools/tag_check/tag_check.py). Every entry needs its reason, and an entry may carry `until` (tools/exemption/exemption.py: the last day it holds); an entry whose package
 # gets tagged, or goes away, fails the check until it is deleted. Tag a package when it is first released, then delete its line.
 [allow]
 any-breaker = { reason = "candidate, never released: catalog status candidate, no tag yet", until = 2026-12-27 }
@@ -8,6 +8,6 @@ any-plugin-cache = { reason = "candidate, never released: catalog status candida
 any-shell-policy = { reason = "candidate, never released: catalog status candidate, no tag yet", until = 2026-12-27 }
 task-spec = { reason = "candidate, never released: catalog status candidate, no tag yet", until = 2026-12-27 }
 
-# Tags cut on a commit that declares another version (tools/tag_check.py). Tags are never moved or deleted; each entry names why it stays.
+# Tags cut on a commit that declares another version (tools/tag_check/tag_check.py). Tags are never moved or deleted; each entry names why it stays.
 [mismatched-tag]
 "blueprint-v0.14.0" = "cut on a commit whose pyproject still said 0.13.2; blueprint-v0.14.1 carries the same code with the right version"

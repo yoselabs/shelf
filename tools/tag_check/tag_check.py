@@ -10,7 +10,7 @@ A tag must also hold what its name says: `<name>-v<version>` points at a commit 
 (`blueprint-v0.14.0` was cut on a commit that still said 0.13.2). A tag already cut wrongly is never deleted or moved; it is listed under
 `[mismatched-tag]` with its reason.
 
-`tools/tag_check_allow.toml` lists packages allowed to stay untagged, each with its reason. An entry for a package that is tagged, gone, or
+`.config/tag-check/allow.toml` lists packages allowed to stay untagged, each with a reason. An entry for a package that is tagged, gone, or
 not a package fails too, so the list never outlives the need. Tags come from `git ls-remote --tags origin`; offline, local tags are used and
 that is said. Stdlib only, so it runs as bare `python3 -I`.
 """
@@ -29,10 +29,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))  # `python3 -I` leaves this folder off the path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "exemption"))  # `python3 -I` leaves the shared module's folder off the path
 from exemption import lapsed, reason_of
 
-ALLOW_FILE = Path(__file__).with_name("tag_check_allow.toml")
+ALLOW_FILE = Path(__file__).resolve().parents[2] / ".config" / "tag-check" / "allow.toml"
 GIT_TIMEOUT = 60.0  # seconds one git call may take: `ls-remote` on a dead network must not hang a push
 
 
@@ -48,14 +48,9 @@ def git(repo: Path, *args: str) -> str | None:
 def versions(repo: Path, rev: str) -> dict[str, str]:
     """{package: version} of every `packages/*/pyproject.toml` at `rev`."""
     listing = git(repo, "ls-tree", "--name-only", rev, "packages/") or ""
-    out: dict[str, str] = {}
-    for path in listing.splitlines():
-        name = path.removeprefix("packages/")
-        text = git(repo, "show", f"{rev}:{path}/pyproject.toml")
-        version = tomllib.loads(text)["project"].get("version") if text else None
-        if isinstance(version, str):
-            out[name] = version
-    return out
+    names = [path.removeprefix("packages/") for path in listing.splitlines()]
+    read = versions_at(repo, [(rev, name) for name in names])
+    return {name: version for name in names if (version := read[(rev, name)]) is not None}
 
 
 def remote_tags(repo: Path, remote: str) -> tuple[set[str], bool]:
@@ -86,21 +81,41 @@ def problems(found: dict[str, str], tags: set[str], allow: dict[str, object], to
 _TAG = re.compile(r"(?P<name>.+)-v(?P<version>\d+\.\d+\.\d+)")
 
 
-def version_at(repo: Path, rev: str, name: str) -> str | None:
-    """The version `packages/<name>/pyproject.toml` declares at `rev`, or None when it cannot be read."""
-    text = git(repo, "show", f"{rev}:packages/{name}/pyproject.toml")
-    version = tomllib.loads(text)["project"].get("version") if text else None
-    return version if isinstance(version, str) else None
+def versions_at(repo: Path, specs: list[tuple[str, str]]) -> dict[tuple[str, str], str | None]:
+    """The version `packages/<name>/pyproject.toml` declares at each `(rev, name)`, read through one `git cat-file --batch`.
+
+    One process for all of them: a call per tag was 343 `git show` runs, ten seconds of the gate (measured 2026-11-27).
+    """
+    if not specs:
+        return {}
+    wanted = "".join(f"{rev}:packages/{name}/pyproject.toml\n" for rev, name in specs).encode()
+    try:
+        done = subprocess.run(["git", "cat-file", "--batch"], cwd=repo, input=wanted, capture_output=True, check=False, timeout=GIT_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        return dict.fromkeys(specs)
+    out: dict[tuple[str, str], str | None] = {}
+    at = 0
+    for spec in specs:
+        end = done.stdout.index(b"\n", at)
+        header = done.stdout[at:end].split()
+        at = end + 1
+        text = None
+        if len(header) == 3 and header[1] == b"blob":
+            size = int(header[2])
+            text = done.stdout[at : at + size].decode("utf-8", errors="replace")  # lossy-ok: display: a pyproject read for its version
+            at += size + 1
+        version = tomllib.loads(text)["project"].get("version") if text else None
+        out[spec] = version if isinstance(version, str) else None
+    return out
 
 
 def mismatched_tags(repo: Path, tags: set[str], found: dict[str, str], allow: dict[str, object], today: date) -> list[str]:
     """Tags of current packages whose commit declares another version, minus the ones allowed; stale allowances fail too."""
     wrong: dict[str, str] = {}
-    for tag in sorted(tags):
-        m = _TAG.fullmatch(tag)
-        if m is None or m["name"] not in found:
-            continue
-        declared = version_at(repo, f"refs/tags/{tag}", m["name"])
+    named = [(tag, m) for tag in sorted(tags) if (m := _TAG.fullmatch(tag)) is not None and m["name"] in found]
+    declared_at = versions_at(repo, [(f"refs/tags/{tag}", m["name"]) for tag, m in named])
+    for tag, m in named:
+        declared = declared_at[(f"refs/tags/{tag}", m["name"])]
         if declared is not None and declared != m["version"]:
             wrong[tag] = declared
     out = [

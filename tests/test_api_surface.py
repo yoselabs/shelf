@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from tools import api_surface
+from tools.api_surface import api_surface
 
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"]
 

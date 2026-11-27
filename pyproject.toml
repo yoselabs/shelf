@@ -107,7 +107,7 @@ dev = [
     "rust-just>=1.58,<2",  # the gate runner (ADR 0023): `uv run just check`
     "vulture>=2.14,<3",        # dead private code (tests/test_arch_no_dead_private_code.py)
     "pytest-randomly>=3.15,<5",
-    "pip-audit>=2.7,<3",         # known vulnerabilities in the lock (tools/dep_audit.py)
+    "pip-audit>=2.7,<3",         # known vulnerabilities in the lock (tools/dep_audit/dep_audit.py)
 ]
 
 # ── The reference linter preset ───────────────────────────────────────────────
@@ -241,11 +241,11 @@ runtime-evaluated-base-classes = ["pydantic.BaseModel"]
 # and a module docstring is enough (no per-function D).
 "tools/**" = ["T201"]
 # the pytest plugin the root conftest loads as `tools.blueprint_fitness` (implicit namespace package, like the tests).
-"tools/blueprint_fitness.py" = ["INP001"]
+"tools/blueprint_fitness/blueprint_fitness.py" = ["INP001"]
 # the per-test time budget plugin, loaded the same way as `tools.test_budget`.
-"tools/test_budget.py" = ["INP001"]
+"tools/test_budget/test_budget.py" = ["INP001"]
 # the exemption helper the stdlib-only tools put on their own path (they run as `python3 -I`).
-"tools/exemption.py" = ["INP001"]
+"tools/exemption/exemption.py" = ["INP001"]
 # package benches (convert-md's engine-comparison harnesses, D4): throwaway CLI
 # probe scripts + fixture generators, not shipped library code — same shape as
 # tools/**, plus INP001 (deliberately not a package), PLC0415 (isolated engines
@@ -842,7 +842,7 @@ project-includes = ["packages", "tools"]
 # (an excluded path Claude Code adds) it matched no file and passed (homelab, 2026-10-11).
 use-ignore-files = false
 # tools/ scripts import their siblings by path (onboard.*).
-search-path = ["tools", "packages/git-porcelain/tests"]
+search-path = ["tools/exemption", "packages/git-porcelain/tests"]
 preset = "strict"
 
 # convert-md's bench probe runners for marker/unstructured/docling/pandoc (D4):
@@ -1002,7 +1002,7 @@ exclude_lines = [
 release-gate = true
 lint-paths = ["packages", "tests", "tools", "conftest.py"]
 spell-paths = ["packages", "tests", "tools", "docs", "catalog", "use-cases", "ledger", "README.md", "AGENTS.md", "conftest.py"]
-steps = ["scripts", "arch", "tag-check", "stdlib-shadow", "dep-audit"]
+steps = ["scripts", "arch", "tag-check", "dep-audit"]
 
 [tool.blueprint.test]
 floor = 65

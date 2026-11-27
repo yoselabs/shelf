@@ -1,4 +1,4 @@
-"""tools/test_budget.py: a test over its call-time budget fails; its own `slow` mark raises the ceiling."""
+"""tools/test_budget/test_budget.py: a test over its call-time budget fails; its own `slow` mark raises the ceiling."""
 
 from __future__ import annotations
 
@@ -27,13 +27,13 @@ def small_budget(pytester: pytest.Pytester) -> None:
 
 def test_an_unmarked_test_over_budget_fails_and_a_marked_one_passes(pytester: pytest.Pytester, small_budget: None) -> None:
     pytester.makepyfile(_SLEEPY)
-    result = pytester.runpytest_inprocess("-p", "tools.test_budget")
+    result = pytester.runpytest_inprocess("-p", "tools.test_budget.test_budget")
     result.assert_outcomes(passed=2, failed=1)
     result.stdout.fnmatch_lines(["*over its time budget*"])
 
 
 def test_the_budget_is_not_charged_to_a_test_that_fails_for_its_own_reason(pytester: pytest.Pytester, small_budget: None) -> None:
     pytester.makepyfile("import time\n\ndef test_broken():\n    time.sleep(0.3)\n    assert False, 'its own failure'\n")
-    result = pytester.runpytest_inprocess("-p", "tools.test_budget")
+    result = pytester.runpytest_inprocess("-p", "tools.test_budget.test_budget")
     result.assert_outcomes(failed=1)
     result.stdout.fnmatch_lines(["*its own failure*"])

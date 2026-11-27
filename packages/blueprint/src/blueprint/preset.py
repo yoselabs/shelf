@@ -25,7 +25,7 @@ file's `[lint]` is compared), and a shadowed block fails unless `ruff-config-sha
 Deliberately NOT compared: `per-file-ignores` keys and `sub-config` matches. Those are paths, and a consumer's tree is not the shelf's.
 
 The reference is `preset.toml` beside this file: a snapshot of the shelf's own config, so a consumer needs no shelf clone. The shelf
-regenerates it with `tools/preset_refresh.py` (not shipped) and a test fails when it is stale.
+regenerates it with `tools/preset_refresh/preset_refresh.py` (not shipped) and a test fails when it is stale.
 
 Exit codes: 0 no undeclared drift · 1 drift · 2 could not check (unreadable reference or config). A check that cannot run is never a pass.
 """

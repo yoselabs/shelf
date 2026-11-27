@@ -2,28 +2,22 @@
 # fnmatch on the whole path, `*` crosses `/`. A step with no entry always runs. `["*"]` means any change: the step reads the whole repo
 # (checkpoints read repo-wide facts; tests and secrets select their own narrower scope inside the step). Change to this file, the justfile
 # or .blueprint/ runs everything; so does `just check-all`.
-guard = ["*pyproject.toml"]
-preset = ["*.toml", ".codespellrc", ".shellcheckrc"]
-render = ["*"]
 blueprint = ["*"]
 secrets = ["*"]
-lint-changed = ["*.py", "*.toml"]
+lint-changed = ["*"]
 typecheck = ["*.py", "*.toml", "uv.lock"]
 scripts = ["*.sh", ".shellcheckrc"]
 arch = ["*.py", "*.toml"]
-spell-changed = ["*"]
 deps = ["*.py", "*.toml", "uv.lock"]
-stdlib-shadow = ["*.py", "*stdlib_shadow_allow.toml"]
 tag-check = ["*"]
 test = ["*"]
-dep-audit = ["uv.lock", "*pyproject.toml", "*dep_audit.py", "*dep_audit_exceptions.toml"]
+dep-audit = ["uv.lock", "*pyproject.toml", "*dep_audit/*", "*.config/dep-audit/*"]
 
 # Why a step runs on any change (blueprint's gate.wide-inputs-have-a-reason): `<kind>: <why>`, kind one of change-set, self-keyed,
 # reads-everything, outside-files.
 [wide]
-render = "reads-everything: the rendered gate is made from the detected profile, which reads the file tree"
-blueprint = "reads-everything: the audit reads repo-wide facts"
+blueprint = "reads-everything: guard, preset, the render check and the audit read repo-wide facts"
 secrets = "change-set: scans the commits since the base"
-spell-changed = "change-set: spell-checks the changed files, whatever they are"
+lint-changed = "change-set: codespell checks the changed files, whatever they are"
 tag-check = "outside-files: compares versions with the tags on origin"
 test = "self-keyed: each unit and the reach selection key their own inputs"

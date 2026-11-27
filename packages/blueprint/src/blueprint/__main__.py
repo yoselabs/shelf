@@ -27,11 +27,13 @@ from blueprint.runner import run, run_audit
 _GATE_HELP = """\
 The steps of `just check`. The justfile and the git hooks run them; each one is also a recipe (`just guard`, `just preset`, ...).
 
+  blueprint  guard, preset, the render check and every checkpoint, in one process (`just blueprint`): the gate's one step for them
   guard      refuse a local shelf path in [tool.uv.sources] (the commit hook, and `just guard`)
   preset     compare the repo's ruff and pyrefly config with the shelf's preset, or with the differences it declares (`just preset`)
   render     write the justfile parts blueprint owns (.blueprint/*.just); with --check, fail on any difference (`just render`)
   test       run the tests the change reaches, through any-gate (`just test`)
-  lint, format, spell, test-all   the python stack's steps; a repo's paths and extra steps are data in `[tool.blueprint.gate]`
+  lint (ruff and codespell), format, spell, test-all   the python stack's steps; a repo's paths and extra steps are data
+                                                       in `[tool.blueprint.gate]`
 """
 
 
@@ -76,6 +78,8 @@ def _parser() -> argparse.ArgumentParser:
     rnd = steps.add_parser("render", help="write the justfile parts the blueprint owns (.blueprint/*.just), or with --check fail on drift")
     rnd.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     rnd.add_argument("--check", action="store_true", help="change nothing; exit 1 when the committed parts differ from what is rendered")
+    bpt = steps.add_parser("blueprint", help="guard, preset, the render check and the checkpoints in one process (`just blueprint`)")
+    bpt.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     tst = steps.add_parser("test", help="run the tests the change reaches, through any-gate (`just test`)")
     tst.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     tst.add_argument("--receipts", type=Path, help="any-gate's receipts file (default: gate-receipts.json in the git directory)")
@@ -151,6 +155,14 @@ def _render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _blueprint(args: argparse.Namespace) -> int:
+    repo = args.repo.expanduser().resolve()
+    codes = [guard.check(committed=True), preset.check(repo), render.check(repo)]
+    result = run(repo)
+    sys.stdout.write(report.gate(result) + "\n")
+    return max(*codes, result.exit_code)
+
+
 def _test(args: argparse.Namespace) -> int:
     return gate_test.run(
         args.repo.expanduser().resolve(),
@@ -180,6 +192,7 @@ def _test_all(args: argparse.Namespace) -> int:
 
 
 _GATE_STEPS = {
+    "blueprint": _blueprint,
     "guard": _guard,
     "preset": _preset,
     "render": _render,

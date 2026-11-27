@@ -5,7 +5,7 @@ A new or changed checkpoint can fail dozens of repos at once; that was learned a
 This runs before the tag: `--base` is a rev (default: the newest `blueprint-v*` tag), `--head` another rev or, by default, the working
 tree. Both engines are the stdlib-only source of `packages/blueprint/src` at that rev, so nothing is installed. Only changes are printed:
 a repo whose verdicts did not move costs one count in the footer. A repo missing on this machine, or one the engine cannot judge, is named
-and skipped. `tools/corpus.toml` lists the repositories. Stdlib only.
+and skipped. `.config/corpus-diff/corpus.toml` lists the repositories. Stdlib only.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-CORPUS = Path(__file__).with_name("corpus.toml")
+CORPUS = Path(__file__).resolve().parents[2] / ".config" / "corpus-diff" / "corpus.toml"
 SRC = "packages/blueprint/src"
 RUN_TIMEOUT = 300.0  # seconds one repo may take: a hung audit must not hang the release
 JOBS = 4

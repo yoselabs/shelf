@@ -1,12 +1,12 @@
 # Rendered by `blueprint gate render` -- never edit; a recipe of the same name in the repo's justfile replaces it only through a declared override (gate.recipe-shadowing).
-# The python+uv stack: its linter, type, spelling, dependency and test steps.
+# The python+uv stack: its linter (ruff and codespell), type, dependency and test steps.
 
 # Paths and extra steps are data in pyproject.toml `[tool.blueprint.gate]` (blueprint gate --help): a repo defines no recipe of its own.
 [group('gate')]
 lint:
     uv run blueprint gate lint
 
-# `lint` over the files changed against the base (any-gate changed), for `check`; `lint` itself is the whole repo.
+# `lint` (ruff, then codespell) over the files changed against the base (any-gate changed), for `check`; `lint` itself is the whole repo.
 [group('gate')]
 lint-changed:
     uv run blueprint gate lint --changed
@@ -19,12 +19,12 @@ format:
 typecheck:
     uv run pyrefly check
 
-# Typos in code, docstrings and docs.
+# Typos in code, docstrings and docs (`lint` runs this too; here it is alone).
 [group('gate')]
 spell:
     uv run blueprint gate spell
 
-# `spell` over the files changed against the base, for `check`.
+# `spell` alone over the files changed against the base (`lint-changed` runs it too).
 [group('gate')]
 spell-changed:
     uv run blueprint gate spell --changed

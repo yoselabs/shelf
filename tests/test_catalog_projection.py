@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_ROOT / "tools"))
+sys.path.insert(0, str(_ROOT / "tools" / "catalog"))
 
 import catalog  # noqa: E402  -- path-injected tool module, imported after sys.path setup
 

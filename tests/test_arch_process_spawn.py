@@ -47,7 +47,7 @@ _UNBOUNDED_ALLOWED = {
     **rows(
         "kept: Popen runs up to four audits at once, each read through communicate(timeout=RUN_TIMEOUT) and killed on expiry; "
         "Popen itself has no timeout argument",
-        "tools/corpus_diff.py",
+        "tools/corpus_diff/corpus_diff.py",
     ),
     **rows(
         "kept: the run wrapper waits on an arbitrary user command, a deadline would kill it",

@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
-_ROOT = Path(__file__).resolve().parent.parent
+_ROOT = Path(__file__).resolve().parents[2]
 _PACKAGES = _ROOT / "packages"
 _ALLOWLIST = _ROOT / "tests" / "arch_allowlist.toml"
 

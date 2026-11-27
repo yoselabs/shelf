@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from tools import blueprint_fitness as fit
+from tools.blueprint_fitness import blueprint_fitness as fit
 
 if TYPE_CHECKING:
     from pathlib import Path

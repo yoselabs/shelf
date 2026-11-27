@@ -102,8 +102,8 @@ def test_an_empty_change_set_no_gate_passed_runs_every_declared_step(fresh: Path
 
 def test_a_step_with_a_matching_changed_file_runs_and_one_without_is_skipped(clone: Path, tmp_path: Path) -> None:
     (clone / "b.py").write_text("y\n")
-    runs, _ = _steps(clone, tmp_path, "typecheck", "guard")
-    assert runs == ["typecheck"]  # guard reads only pyproject.toml files
+    runs, _ = _steps(clone, tmp_path, "typecheck", "scripts")
+    assert runs == ["typecheck"]  # scripts reads only shell files
 
 
 def test_a_step_with_no_declaration_always_runs(clone: Path, tmp_path: Path) -> None:
@@ -137,7 +137,7 @@ def test_a_skipped_step_is_reported_as_a_skipped_line(clone: Path, tmp_path: Pat
     fake.write_text(FAKE)
     fake.chmod(0o755)
     done = subprocess.run(
-        [sys.executable, "-m", "any_gate", "steps", "--runner", str(fake), "--repo", str(clone), "guard"],
+        [sys.executable, "-m", "any_gate", "steps", "--runner", str(fake), "--repo", str(clone), "scripts"],
         cwd=clone,
         env={**os.environ, "RUNS": str(tmp_path / "r")},
         capture_output=True,
@@ -145,7 +145,7 @@ def test_a_skipped_step_is_reported_as_a_skipped_line(clone: Path, tmp_path: Pat
         check=False,
     )
     assert done.returncode == 0
-    assert "skipped guard: none of its declared inputs changed" in done.stderr
+    assert "skipped scripts: none of its declared inputs changed" in done.stderr
 
 
 def test_moving_a_file_out_of_a_steps_folder_still_starts_that_step(clone: Path) -> None:

@@ -4,7 +4,7 @@ import subprocess
 import sys
 from datetime import date
 
-from tools import dep_audit
+from tools.dep_audit import dep_audit
 
 TODAY = date(2026, 11, 26)
 
@@ -58,6 +58,8 @@ def test_an_exception_without_a_reason_fails():
 
 
 def test_help_exits_zero_and_prints_usage():
-    done = subprocess.run([sys.executable, "-I", "tools/dep_audit.py", "--help"], capture_output=True, text=True, check=False, timeout=60)
+    done = subprocess.run(
+        [sys.executable, "-I", "tools/dep_audit/dep_audit.py", "--help"], capture_output=True, text=True, check=False, timeout=60
+    )
     assert done.returncode == 0
     assert "usage" in done.stdout

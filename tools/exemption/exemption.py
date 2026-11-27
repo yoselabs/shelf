@@ -2,7 +2,7 @@
 
 An entry is a bare string (the reason, no deadline: the exemption is permanent by nature) or a table
 `{ reason = "...", until = 2026-12-27 }`. The day after `until` the entry covers nothing and the check names it. Stdlib only;
-the tools that use it run as `python3 -I tools/<name>.py`, which keeps this folder off `sys.path`, so they add it themselves.
+the tools that use it run as `python3 -I tools/<name>/<name>.py`, which keeps this folder off `sys.path`, so they add it themselves.
 """
 
 from __future__ import annotations

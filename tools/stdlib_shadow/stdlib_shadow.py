@@ -16,7 +16,7 @@ run as `python -m <pkg>`, which leads with the working directory, so it never ma
 checked, being on the path of an editable install. `__main__.py` is never a shadow. A namespace folder (no `__init__.py`) loses to the
 standard library, so it is not one.
 
-`tools/stdlib_shadow_allow.toml` lists the paths allowed to stay, each with its one-line reason. An entry with no reason, or for a path
+`.config/stdlib-shadow/allow.toml` lists the paths allowed to stay, each with its one-line reason. An entry with no reason, or for a path
 that no longer shadows, fails too, so the list never outlives the need. Stdlib only, so it runs as bare `python3 -I`.
 """
 
@@ -34,10 +34,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))  # `python3 -I` leaves this folder off the path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "exemption"))  # `python3 -I` leaves the shared module's folder off the path
 from exemption import lapsed, reason_of
 
-ALLOW_FILE = Path(__file__).with_name("stdlib_shadow_allow.toml")
+ALLOW_FILE = Path(__file__).resolve().parents[2] / ".config" / "stdlib-shadow" / "allow.toml"
 ROOT = PurePosixPath()  # the repo root, spelled as a folder
 GIT_TIMEOUT = 60.0
 SCRIPT_DIRS = frozenset({"scripts", "tools", "bin", "src", "tests", "test"})  # run from, an editable install's path, put first by pytest
