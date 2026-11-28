@@ -1,6 +1,6 @@
 [project]
 name = "stream-proc"
-version = "0.18.0"
+version = "0.19.0"
 description = "Run a child in its own session and stream its stdout and stderr lines to callbacks, under a wall timeout, an idle timeout and a stop flag; stop its whole tree (SIGTERM, grace, SIGKILL, sweep of descendants that left the group) and prove it dead; pid-reuse-safe liveness and a process table (pid, ppid, pgid, uid, resident bytes, start token; group_rss(pgid)) on Linux (/proc) and macOS (libproc via ctypes); group_alive(pgid); capture() to the end as one Captured value (exact bytes with a text view), a required timeout, exit 124 on timeout, stdin input, and run_inherited() for inherited stdio; stop_pid(pid, start) stops a process we did not spawn only while its start token matches; popen_registered/run_registered execute a command only after a callback durably registered its identity (run_registered: stdin /dev/null, stderr merged into one log, exec failure after registration as a Result); a SIGTERM or SIGINT (Ctrl-C) that lands during the spawn still stops the child; spawn_detached starts a child that outlives the caller (own session, stdin /dev/null, output appended to a log file) and returns its (pid, start)."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

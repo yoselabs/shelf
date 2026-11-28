@@ -144,3 +144,13 @@ def test_a_dated_mismatched_tag_past_its_day_fails(repo, capsys):
     assert check(repo, entry, today="2026-12-01") == 0
     assert check(repo, entry, today="2026-12-02") == 1
     assert "[mismatched-tag] b-v0.9.0 ran out on 2026-12-01" in capsys.readouterr().err
+
+
+def test_a_check_that_read_only_local_tags_passes_but_marks_the_gate_unjudged(repo):
+    from any_gate.state import UNJUDGED  # noqa: PLC0415
+
+    run(repo, "remote", "set-url", "origin", str(repo / "nowhere.git"))
+    run(repo, "tag", "a-v0.1.0")
+    run(repo, "tag", "b-v0.2.0")
+    assert check(repo) == 0
+    assert (repo / ".git" / UNJUDGED).is_file()

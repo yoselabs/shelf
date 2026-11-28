@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import os
 import sys
 import textwrap
 import threading
@@ -12,6 +13,7 @@ from typing import TYPE_CHECKING
 import pytest
 from any_gate.cli import main
 from any_gate.receipts import Receipts
+from any_gate.state import GateState
 from any_lease import Leases
 
 if TYPE_CHECKING:
@@ -104,6 +106,21 @@ def test_nothing_to_run_is_a_pass_that_starts_no_runner(root: Path, capsys: pyte
     assert "nothing to run" in err
 
 
+def test_the_notice_descriptor_does_not_reach_the_runners_tree(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # `GATE_NOTICE_FD` is a descriptor number of the gate's own process. Inherited, it named a pipe of an xdist worker in the runner's
+    # tree, a notice written there corrupted the worker's link to its controller, and the run hung until the idle limit (2026-11-28).
+    (root / "probe.py").write_text('import os\nopen("seen.log", "w").write(os.environ.get("GATE_NOTICE_FD", "absent"))\n')
+    read, write = os.pipe()  # our own descriptor: this test's notices must never land on a number it did not open
+    try:
+        monkeypatch.setenv("GATE_NOTICE_FD", str(write))
+        args = ["test", "--receipts", str(root / "r.json"), "--lease-root", str(root / "leases"), "--cwd", str(root)]
+        code = main([*args, "--", sys.executable, "probe.py"], stdin=io.StringIO("a\tk\n"))
+    finally:
+        os.close(read)
+        os.close(write)
+    assert (code, (root / "seen.log").read_text()) == (0, "absent")
+
+
 def test_the_runners_output_reaches_the_caller(root: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert "output from the runner" in _go(root, "chatty\t\n", capsys=capsys)[1]
 
@@ -165,3 +182,50 @@ def test_a_run_ends_with_one_line_saying_what_ran_what_was_skipped_and_how_long(
     assert any(
         line.startswith("any-gate: test: ran 1 of 2 suite(s)") and "1 unchanged" in line and line.endswith("s") for line in err.splitlines()
     )
+
+
+def test_a_test_step_with_an_empty_plan_marks_the_gate_unjudged_so_no_pass_is_recorded(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The incident: the gate said run, the plan held 0 suites, and the tree was recorded green."""
+    import subprocess  # noqa: PLC0415
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
+    (repo / "a.py").write_text("x = 1\n")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "c"], check=True)
+    receipts = str(tmp_path / "receipts.json")
+    assert main(["start", "--repo", str(repo), "--receipts", receipts]) == 0
+    assert (
+        main(["test", "--receipts", receipts, "--lease-root", str(tmp_path / "l"), "--cwd", str(repo), "--", "true"], stdin=io.StringIO(""))
+        == 0
+    )
+    assert main(["passed", "--repo", str(repo), "--receipts", receipts]) == 0
+    assert "judged nothing" in capsys.readouterr().err
+    assert not GateState(repo, Receipts(tmp_path / "receipts.json"), dict(os.environ)).green("check")  # the push still runs the gate
+
+
+def test_the_steps_command_takes_the_gate_lease_before_it_decides_what_to_skip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from contextlib import contextmanager  # noqa: PLC0415
+
+    from any_gate import cli  # noqa: PLC0415
+
+    order: list[str] = []
+
+    @contextmanager
+    def fake_hold(*_a: object, **_k: object):
+        order.append("lease")
+        yield dict(__import__("os").environ)
+
+    def fake_decide(*_a: object, **_k: object) -> tuple[dict[str, str], dict[str, str]]:
+        order.append("decide")
+        return {}, {}
+
+    monkeypatch.setattr(cli, "hold", fake_hold)
+    monkeypatch.setattr(cli, "_decide", fake_decide)
+    monkeypatch.setattr(cli, "run_and_report", lambda *_a, **_k: 0)
+    assert main(["steps", "--repo", str(tmp_path), "--lease-root", str(tmp_path / "l"), "one"]) == 0
+    assert order == ["lease", "decide"]

@@ -11,7 +11,9 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from any_gate import changed as gate_changed
 from any_gate.plan import too_wide
+from any_gate.state import working_tree
 from stream_proc import capture
 
 from any_gate_python.graph import (
@@ -24,11 +26,12 @@ from any_gate_python.graph import (
     touched_between,
     workspace,
 )
-from any_gate_python.rules import Rules, matches
+from any_gate_python.rules import SKIPPED_DIRS, Rules, matches
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
+LOCK_FILES_HASHED = ("uv.lock", "pyproject.toml", "conftest.py")
 GIT_TIMEOUT = 600.0  # seconds one git call may take
 
 
@@ -40,24 +43,36 @@ def _fitness(repo: Path, changed: list[str], rules: Rules) -> list[str]:
     if any(matches(p, rules.gated_inputs) for p in changed):
         return [root]
 
-    def runs(name: str) -> bool:
-        reads = (f"{root}/{name}", *rules.gated_reads.get(name, ()))
+    prefix = f"{root}/"
+    if any(p.startswith(prefix) and not Path(p).name.startswith("test_") and not rules.star_covers(p) for p in changed):
+        return [root]  # a helper, fixture or conftest no key names: any repo test may import it
+
+    def runs(rel: str) -> bool:
+        name = Path(rel).name
+        reads = (f"{root}/{rel}", *rules.gated_reads.get(name, ()))
         if rules.is_gated(name):
             return any(p.startswith(reads) for p in changed)
-        return not rules.keyed(name) or rules.reads_changed(name, f"{root}/{name}", changed)
+        return not rules.keyed(name) or rules.reads_changed(name, f"{root}/{rel}", changed)
 
-    every = sorted((repo / root).glob("test_*.py"))
-    return [p.relative_to(repo).as_posix() for p in every if runs(p.name)] if every else [root]
+    base = repo / root
+    every = sorted(p for p in base.rglob("test_*.py") if not SKIPPED_DIRS & set(p.relative_to(base).parts))
+    return [p.relative_to(repo).as_posix() for p in every if runs(p.relative_to(base).as_posix())] if every else [root]
 
 
 def affected_packages(
-    repo: Path, changed: list[str], lock: Callable[[], set[str] | None] | None = None, rules: Rules | None = None
+    repo: Path, changed: list[str] | None, lock: Callable[[], set[str] | None] | None = None, rules: Rules | None = None
 ) -> set[str]:
     """The package directories `changed` reaches: the changed ones and, through the graph, everything depending on them.
 
     `lock` answers which packages the lock files changed for (see `lock_touched`); without it a lock change selects everything.
+    A `changed` of None (the base is unknown) selects every package.
     """
-    rules = rules or Rules.load(repo)
+    if changed is None:
+        return set(workspace(repo)[0])
+    return _reached(repo, changed, lock, rules or Rules.load(repo))
+
+
+def _reached(repo: Path, changed: list[str], lock: Callable[[], set[str] | None] | None, rules: Rules) -> set[str]:
     graph, plugins = workspace(repo)
     every = sorted(graph)
     touched: set[str] = set()
@@ -92,9 +107,13 @@ def affected_packages(
     return seen
 
 
-def affected(repo: Path, changed: list[str], lock: Callable[[], set[str] | None] | None = None, rules: Rules | None = None) -> list[str]:
-    """The pytest paths to run for `changed` (repo-relative paths)."""
+def affected(
+    repo: Path, changed: list[str] | None, lock: Callable[[], set[str] | None] | None = None, rules: Rules | None = None
+) -> list[str]:
+    """The pytest paths to run for `changed` (repo-relative paths); every suite when `changed` is None (unknown)."""
     rules = rules or Rules.load(repo)
+    if changed is None:
+        return everything(repo, rules)
     seen = affected_packages(repo, changed, lock, rules)
     tests = (f"packages/{d}/tests" for d in sorted(seen) if (repo / "packages" / d / "tests").is_dir())
     return [*_fitness(repo, changed, rules), *tests]
@@ -116,8 +135,11 @@ def reach(repo: Path, count: int, exporter: Exporter = package_exports, rules: R
     gate runs, so a rule that quietly widens it (a lock rule once selected every package for 45 of 50 commits) shows up.
     """
     rows: list[tuple[str, int, int]] = []
-    for sha in _git(repo, "log", "--first-parent", f"-{count}", "--format=%h").split():
-        changed = _git(repo, "diff", "--name-only", f"{sha}^", sha).splitlines()
+    for line in _git(repo, "log", "--first-parent", f"-{count}", "--format=%h %p").splitlines():
+        sha, _, parents = line.partition(" ")
+        if not parents:  # a root commit has no parent to diff against
+            continue
+        changed = _git(repo, "diff", "--name-only", "--no-renames", f"{sha}^", sha).splitlines()
         with tempfile.TemporaryDirectory() as old, tempfile.TemporaryDirectory() as new:
             try:
                 extract_base(repo, f"{sha}^", Path(old))
@@ -151,41 +173,97 @@ def _exports(repo: Path, graph: dict[str, set[str]], exporter: Exporter) -> dict
         return None
 
 
-def fingerprint(repo: Path, graph: dict[str, set[str]], package: str, exports: dict[str, str] | None, rules: Rules | None = None) -> str:
+def _wanted(graph: dict[str, set[str]], rules: Rules | None, repo: Path) -> list[str]:
+    """Every repo path a key can hash: each package folder, the root files the reads map names, the lock, the root pyproject, conftest."""
+    mapped = {rel for name in graph for rel in (rules.read_files(repo, name) if rules else ())}
+    return [*(f"packages/{name}" for name in sorted(graph)), *sorted(mapped), *LOCK_FILES_HASHED]
+
+
+def _tree_ids(repo: Path, wanted: list[str], env: Mapping[str, str] | None) -> dict[str, str] | None:
+    """`{path: git object id}` for the `wanted` paths of the working tree (one temp index, one `ls-tree`; no file is opened by us).
+
+    None when `repo` is not a git repository or git fails: the caller then hashes the files themselves.
+    """
+    if env is None:
+        return None
+    tree = working_tree(repo, env)
+    if tree is None:
+        return None
+    done = capture(["git", "ls-tree", "-z", tree, "--", *wanted], cwd=repo, env=env, timeout=GIT_TIMEOUT)
+    if done.exit != 0:
+        return None
+    ids: dict[str, str] = {}
+    for entry in done.text.split("\0"):
+        meta, _, path = entry.partition("\t")
+        if path:
+            ids[path] = meta.split()[2]
+    return ids
+
+
+def fingerprint(
+    repo: Path,
+    graph: dict[str, set[str]],
+    package: str,
+    exports: dict[str, str] | None,
+    rules: Rules | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> str:
     """Hash of everything `package`'s tests can see: its files, its dependencies' files and resolved sets, the root inputs.
 
     The root files a package (or a dependency of it) is mapped to in `reads` are hashed too: a mapped file selects its readers, and
     a key blind to it would let them pass again unrun.
 
     With no exports (uv cannot answer) the whole lock and root pyproject stand in: any change to them invalidates every package.
+
+    In a git repository the files are read as git's tree and blob ids of the working tree (tracked and untracked, not ignored), so
+    nothing is opened per file; ignored files are not part of the key. Outside git, or with no `env` to run git in, every file is hashed.
     """
+    return _fingerprint(repo, graph, package, exports, rules, ids=_tree_ids(repo, _wanted(graph, rules, repo), env))
+
+
+def _fingerprint(
+    repo: Path, graph: dict[str, set[str]], package: str, exports: dict[str, str] | None, rules: Rules | None, *, ids: dict[str, str] | None
+) -> str:
     digest = hashlib.sha256()
+
+    def file(rel: str) -> None:
+        if ids is not None:
+            digest.update(ids.get(rel, "").encode())
+        elif (repo / rel).is_file():
+            digest.update((repo / rel).read_bytes())
+
     for name in sorted(_closure(graph, package)):
-        _hash_tree(digest, repo / "packages" / name, repo)
+        if ids is not None:
+            digest.update(f"{name}@{ids.get(f'packages/{name}', '')}".encode())
+        else:
+            _hash_tree(digest, repo / "packages" / name, repo)
         if exports is not None:
             digest.update(f"{name}:{exports[name]}".encode())
         for rel in rules.read_files(repo, name) if rules else ():
             digest.update(f"root:{rel}".encode())
-            digest.update((repo / rel).read_bytes())
+            file(rel)
     if exports is None:
         for rel in ("uv.lock", "pyproject.toml"):
-            if (repo / rel).is_file():
-                digest.update(rel.encode())
-                digest.update((repo / rel).read_bytes())
+            if ids is None and not (repo / rel).is_file():
+                continue
+            digest.update(rel.encode())
+            file(rel)
     else:
         digest.update(root_config(repo / "pyproject.toml").encode())
-    if (repo / "conftest.py").is_file():
+    if (repo / "conftest.py").is_file() if ids is None else "conftest.py" in ids:
         digest.update(b"conftest.py")
-        digest.update((repo / "conftest.py").read_bytes())
+        file("conftest.py")
     return digest.hexdigest()
 
 
-def plan(repo: Path, paths: list[str], exporter: Exporter = package_exports) -> list[tuple[str, str]]:
+def plan(repo: Path, paths: list[str], exporter: Exporter = package_exports, env: Mapping[str, str] | None = None) -> list[tuple[str, str]]:
     """`(path, key)` for each of `paths`: a package suite's key is its fingerprint; any other path has none and always runs."""
     graph, _ = workspace(repo)
     exports = _exports(repo, graph, exporter)
     rules = Rules.load(repo)
-    return [(p, fingerprint(repo, graph, p.split("/")[1], exports, rules) if p.startswith("packages/") else "") for p in paths]
+    ids = _tree_ids(repo, _wanted(graph, rules, repo), env) if any(p.startswith("packages/") for p in paths) else None
+    return [(p, _fingerprint(repo, graph, p.split("/")[1], exports, rules, ids=ids) if p.startswith("packages/") else "") for p in paths]
 
 
 def wide_alarm(repo: Path, paths: list[str]) -> str | None:
@@ -198,16 +276,22 @@ def wide_alarm(repo: Path, paths: list[str]) -> str | None:
 
 
 def _git(repo: Path, *args: str) -> str:
-    return capture(["git", *args], cwd=repo, timeout=GIT_TIMEOUT).text
+    """What git prints; a failed git raises (it never means "no changes")."""
+    done = capture(["git", *args], cwd=repo, timeout=GIT_TIMEOUT)
+    if done.exit != 0:
+        message = f"git {' '.join(args)} failed ({done.exit}): {done.text.strip()[:200]}"
+        raise RuntimeError(message)
+    return done.text
 
 
-def merge_base(repo: Path) -> str:
-    """The upstream merge-base, or HEAD when there is no upstream."""
-    return _git(repo, "merge-base", "HEAD", "@{upstream}").strip() or "HEAD"
+def merge_base(repo: Path) -> str | None:
+    """The upstream merge-base; None when it is unknown (no upstream, git failed): the caller then takes everything."""
+    return gate_changed.base(repo)
 
 
-def changed_files(repo: Path) -> list[str]:
-    """Files changed since the upstream merge-base (or HEAD), tracked and untracked."""
-    tracked = _git(repo, "diff", "--name-only", merge_base(repo)).splitlines()
-    untracked = _git(repo, "ls-files", "--others", "--exclude-standard").splitlines()
-    return sorted(set(tracked) | set(untracked))
+def changed_files(repo: Path) -> list[str] | None:
+    """Files changed since the upstream merge-base, tracked and untracked, both paths of a move; None when the base is unknown.
+
+    The one answer `any_gate.changed` gives every step: an unknown base is "everything", never "nothing changed".
+    """
+    return gate_changed.changed(repo)

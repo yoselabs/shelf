@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import any_gate_python as affected
 import pytest
-from any_gate_python import graph
+from any_gate_python import Rules, graph, select
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -192,7 +192,7 @@ def test_a_package_the_base_did_not_have_counts_as_changed(committed: Path) -> N
 
 
 def _plan(repo: Path, paths: list[str]) -> dict[str, str]:
-    return dict(affected.plan(repo, paths, pins_exporter))
+    return dict(affected.plan(repo, paths, pins_exporter, os.environ))
 
 
 def _no_uv(_repo: Path, _packages: list[str]) -> dict[str, str]:
@@ -406,6 +406,118 @@ def test_the_packages_command_names_every_package_when_asked_or_when_no_package_
 
     assert cli.main(["packages", "--repo", str(repo), "--all"]) == 0
     assert capsys.readouterr().out.split() == ["base", "leaf", "middle", "plug", "top"]
+
+
+# --- an unknown base or a failed git is never "nothing changed" ---
+
+
+def test_a_clean_tree_with_no_upstream_selects_every_suite(committed: Path) -> None:
+    """The incident: a merge on a branch with no upstream left a clean tree; the diff against HEAD was empty and nothing ran."""
+    assert select.changed_files(committed) is None
+    assert _pkgs(affected.affected(committed, select.changed_files(committed))) == {"base", "leaf", "middle", "plug", "top"}
+    assert affected.affected_packages(committed, None) == {"base", "leaf", "middle", "plug", "top"}
+
+
+def test_the_packages_command_names_every_package_when_the_base_is_unknown(committed: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from any_gate_python import cli  # noqa: PLC0415
+
+    assert cli.main(["packages", "--repo", str(committed)]) == 0
+    assert capsys.readouterr().out.split() == ["base", "leaf", "middle", "plug", "top"]
+
+
+def test_a_failing_git_selects_every_suite_never_none(repo: Path) -> None:
+    """Not a git repo at all: git fails; that is not an empty change."""
+    assert select.changed_files(repo) is None
+
+
+def _with_upstream(repo: Path) -> Path:
+    _git(repo, "branch", "-q", "upstream-copy")
+    _git(repo, "branch", "-q", "--set-upstream-to=upstream-copy")
+    return repo
+
+
+def test_a_file_moved_out_of_a_package_selects_the_package_it_left(committed: Path) -> None:
+    _with_upstream(committed)
+    (committed / "packages" / "leaf" / "src").mkdir(parents=True)
+    (committed / "packages" / "leaf" / "src" / "m.py").write_text("x = 1\n")
+    _git(committed, "add", "-A")
+    _git(committed, "commit", "-q", "-m", "m")
+    _git(committed, "branch", "-q", "-f", "upstream-copy")
+    (committed / "packages" / "base" / "src").mkdir(parents=True)
+    _git(committed, "mv", "packages/leaf/src/m.py", "packages/base/src/m.py")
+    changed = select.changed_files(committed)
+    assert changed is not None
+    assert {"packages/leaf/src/m.py", "packages/base/src/m.py"} <= set(changed)
+    assert {"leaf", "base"} <= _pkgs(affected.affected(committed, changed))
+
+
+def test_the_merge_base_is_none_without_an_upstream(committed: Path) -> None:
+    assert select.merge_base(committed) is None
+
+
+# --- repo tests below subfolders, helpers, and a leading-glob `reads` pattern ---
+
+
+def test_a_repo_test_in_a_subfolder_is_selected_like_any_other(keyed: Path) -> None:
+    (keyed / "tests" / "sub").mkdir()
+    (keyed / "tests" / "sub" / "test_deep.py").write_text("")
+    ran = _ran(keyed, ["ci.yaml"])
+    assert "sub/test_deep.py" in ran  # unkeyed: always
+
+
+def test_a_changed_helper_no_key_names_runs_every_repo_test(keyed: Path) -> None:
+    (keyed / "tests" / "newhelper.py").write_text("")
+    assert affected.affected(keyed, ["tests/newhelper.py"]) == [
+        "tests",
+        *[p for p in affected.affected(keyed, []) if p.startswith("packages")],
+    ]
+
+
+def test_a_changed_helper_a_star_key_names_runs_the_keyed_tests_only(keyed: Path) -> None:
+    assert "tests" not in affected.affected(keyed, ["tests/helper.py"])
+
+
+def test_a_leading_glob_reads_pattern_does_not_walk_the_virtualenv_or_git(repo: Path) -> None:
+    (repo / ".venv" / "lib").mkdir(parents=True)
+    (repo / ".venv" / "lib" / "x.toml").write_text("")
+    (repo / ".git").mkdir()
+    (repo / ".git" / "y.toml").write_text("")
+    (repo / "a.toml").write_text("")
+    rules = Rules(reads={"*.toml": ("base",)})
+    found = rules.read_files(repo, "base")
+    assert "a.toml" in found
+    assert not [f for f in found if f.startswith((".venv", ".git"))]
+
+
+# --- the key is read from git's tree ids, not by opening every file of every closure ---
+
+
+def test_a_suites_key_in_a_git_repo_opens_no_package_file(committed: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Under Defender each open costs ~20 ms: the fingerprint asks git (one temp-index tree) instead of reading the closure per package."""
+
+    def boom(*_a: object) -> None:
+        message = "a package file was read"
+        raise AssertionError(message)
+
+    monkeypatch.setattr(select, "_hash_tree", boom)
+    paths = ["packages/base/tests", "packages/middle/tests", "packages/top/tests"]
+    before = _plan(committed, paths)
+    (committed / "packages" / "base" / "mod.py").write_text("x = 1\n")  # untracked, uncommitted: still part of the key
+    after = _plan(committed, paths)
+    assert after["packages/base/tests"] != before["packages/base/tests"]
+    assert after["packages/top/tests"] != before["packages/top/tests"]  # a dependent's key moves with it
+    assert after["packages/middle/tests"] != before["packages/middle/tests"]
+
+
+def test_the_key_is_the_same_in_a_second_planning_of_an_unchanged_tree(committed: Path) -> None:
+    paths = ["packages/base/tests", "packages/leaf/tests"]
+    assert _plan(committed, paths) == _plan(committed, paths)
+
+
+def test_an_edit_to_a_package_outside_the_closure_leaves_the_key(committed: Path) -> None:
+    before = _plan(committed, ["packages/base/tests"])
+    (committed / "packages" / "leaf" / "mod.py").write_text("x = 1\n")
+    assert _plan(committed, ["packages/base/tests"]) == before
 
 
 def test_the_explain_line_caps_the_file_list() -> None:

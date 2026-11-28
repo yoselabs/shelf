@@ -2,7 +2,7 @@
 name = "any-knowledge"
 kind = "primitive"
 tier = "T1"
-release = "any-knowledge-v0.1.0"
+release = "any-knowledge-v0.2.0"
 capability = "Keep decision records, the glossary and the agent docs apart from the gate — `index [--write]` prints or writes docs/adr/INDEX.md (one line per decision in force), `check [--glossary]` exits 1 on a malformed ADR, a stale index or a missing CONTEXT.md, `seed` copies the missing docs/agents files and the AGENTS.md managed block. A repo with no docs/adr/ is not judged."
 implementation = "ours"
 status = "candidate"

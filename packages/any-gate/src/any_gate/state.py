@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from any_gate.receipts import Receipts
 
 START = "gate-green.start"
+UNJUDGED = "gate-unjudged"  # a step that judged nothing writes why here; `passed` records nothing while it stands
 GIT_TIMEOUT = 600.0  # seconds one git call may take: `add -A` on a large tree is the slow one
 
 
@@ -50,8 +51,8 @@ def _base(repo: Path, env: Mapping[str, str]) -> str:
     return _git(repo, env, "merge-base", "HEAD", "@{upstream}") or "none"
 
 
-def working_key(repo: Path, env: Mapping[str, str]) -> str | None:
-    """`<tree> <base>` for the working tree as `git add -A` would commit it; None when git cannot say."""
+def working_tree(repo: Path, env: Mapping[str, str]) -> str | None:
+    """The tree id of the working tree as `git add -A` would commit it (a temp index, the real one untouched); None when git cannot say."""
     index = _own_path(repo, env, "index")
     if index is None:
         return None
@@ -64,7 +65,12 @@ def working_key(repo: Path, env: Mapping[str, str]) -> str | None:
         scratch_env = {**env, "GIT_INDEX_FILE": str(temp_index)}
         if _git(repo, scratch_env, "add", "-A") is None:
             return None
-        tree = _git(repo, scratch_env, "write-tree")
+        return _git(repo, scratch_env, "write-tree")
+
+
+def working_key(repo: Path, env: Mapping[str, str]) -> str | None:
+    """`<tree> <base>` for the working tree as `git add -A` would commit it; None when git cannot say."""
+    tree = working_tree(repo, env)
     return f"{tree} {_base(repo, env)}" if tree else None
 
 
@@ -86,6 +92,9 @@ class GateState:
 
     def start(self) -> None:
         """Note the working tree's key as the gate begins; a repo git cannot read notes nothing."""
+        marker = _own_path(self._repo, self._env, UNJUDGED)
+        if marker is not None:
+            marker.unlink(missing_ok=True)
         path, key = _own_path(self._repo, self._env, START), working_key(self._repo, self._env)
         if path is None or key is None:
             return
@@ -94,9 +103,30 @@ class GateState:
         except OSError:
             path.unlink(missing_ok=True)
 
+    def unjudged(self, reason: str) -> None:
+        """Note that a step of this gate judged nothing (0 suites planned, a check that could not ask): the run records no pass."""
+        marker = _own_path(self._repo, self._env, UNJUDGED)
+        if marker is None:
+            return
+        try:
+            marker.write_text(reason + "\n")
+        except OSError:  # cannot note it: take the safe side and drop the start note, so `passed` records nothing
+            start = _own_path(self._repo, self._env, START)
+            if start is not None:
+                start.unlink(missing_ok=True)
+
+    def unjudged_reason(self) -> str | None:
+        """Why this gate's run judged nothing, or None."""
+        marker = _own_path(self._repo, self._env, UNJUDGED)
+        return marker.read_text().strip() if marker is not None and marker.is_file() else None
+
     def passed(self, gate: str) -> bool:
-        """Record the working tree as green for `gate` when it is the tree `start` noted. Never raises; True when recorded."""
+        """Record the working tree as green for `gate` when it is the tree `start` noted and no step judged nothing. Never raises."""
         begun = _own_path(self._repo, self._env, START)
+        if self.unjudged_reason() is not None:
+            if begun is not None:
+                begun.unlink(missing_ok=True)
+            return False
         if begun is None or not begun.is_file():
             return False
         noted = begun.read_text().strip()

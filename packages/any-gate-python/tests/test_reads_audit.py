@@ -124,3 +124,57 @@ def test_a_package_folder_beside_src_needs_its_own_pattern(tmp_path: Path) -> No
     repo = _repo_tests(tmp_path, '"test_a.py" = ["packages/*/src/*", "tests/*"]\n', **{"test_a.py": 'p / "packages" / "src"; q = "tests"'})
     [problem] = reads_audit.audit_repo_tests(repo)
     assert "packages/x/tests/x.py" in problem
+
+
+# --- a path declared `no-effect` is a claim too: no package test may read it ---
+
+
+def test_a_package_test_reading_a_no_effect_path_is_reported(tmp_path: Path) -> None:
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.md").write_text("")
+    (tmp_path / "pyproject.toml").write_text('[tool.any-gate.python]\nno-effect = ["docs/"]\n')
+    _member(tmp_path, "a", test='(Path(__file__).parents[3] / "docs/guide.md").read_text()')
+    _member(tmp_path, "b", test="print(1)")
+    [problem] = [p for p in reads_audit.audit(tmp_path) if p.startswith("no-effect")]
+    assert "docs/guide.md" in problem
+    assert "packages/a/tests/test_x.py" in problem
+
+
+# --- an unnamed walk of the repo is read-everything ---
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'list(ROOT.rglob("*.py"))',
+        "list(repo.iterdir())",
+        'Path(__file__).parents[1].glob("*")',
+        "import os\nlist(os.walk(root))",
+    ],
+)
+def test_a_repo_test_walking_the_repo_without_naming_a_path_needs_a_star_or_a_bang(tmp_path: Path, text: str) -> None:
+    repo = _repo_tests(tmp_path, '"test_a.py" = ["packages/*/src/*"]\n', **{"test_a.py": text})
+    [problem] = reads_audit.audit_repo_tests(repo)
+    assert "walks the repo" in problem
+
+
+def test_an_unnamed_walk_is_covered_by_a_star_pattern_or_declared_with_a_bang(tmp_path: Path) -> None:
+    repo = _repo_tests(
+        tmp_path,
+        '"test_a.py" = ["*"]\n"test_b.py" = ["!*"]\n',
+        **{"test_a.py": "list(repo.iterdir())", "test_b.py": "list(repo.rglob('x'))"},
+    )
+    assert reads_audit.audit_repo_tests(repo) == []
+
+
+def test_a_walk_below_a_named_folder_is_named_by_it(tmp_path: Path) -> None:
+    repo = _repo_tests(tmp_path, '"test_a.py" = ["docs/*"]\n', **{"test_a.py": 'list((ROOT / "docs").rglob("*.md"))'})
+    assert reads_audit.audit_repo_tests(repo) == []
+
+
+def test_a_no_effect_name_in_a_test_that_never_finds_the_repo_root_is_its_own_temp_file(tmp_path: Path) -> None:
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.md").write_text("")
+    (tmp_path / "pyproject.toml").write_text('[tool.any-gate.python]\nno-effect = ["docs/"]\n')
+    _member(tmp_path, "a", test='(tmp_path / "docs/guide.md").write_text("x")')
+    assert reads_audit.audit(tmp_path) == []

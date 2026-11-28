@@ -318,6 +318,10 @@ def test_a_unit_repo_runs_its_slow_pass_through_the_unit_runner_without_keeping_
     assert any(a.startswith("--keys=") for a in slow)
 
 
+@pytest.mark.slow(
+    budget=60,
+    reason="five real gate runs, one pytest process per unit each: 16 s alone, 21 s on clean main; a fake runner proves nothing",
+)
 def test_editing_a_slow_test_runs_it_in_check_and_a_docs_change_does_not(repo: Repo, tmp_path: Path) -> None:
     """shelf-nqal: the slow tests of a suite run when its key changed since they last passed, never for a change its tests cannot see."""
     count = tmp_path / "count"

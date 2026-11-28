@@ -56,3 +56,4 @@ def _private_gate_lease(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     """A test that runs `steps` queues behind its own lease folder, never the real gate that may be running this suite."""
     monkeypatch.setenv("GATE_LEASE_ROOT", str(tmp_path / "gate-leases"))
     monkeypatch.delenv("ANY_GATE_LEASED", raising=False)
+    monkeypatch.delenv("GATE_NOTICE_FD", raising=False)  # the outer gate's descriptor number is an xdist worker's pipe in here
