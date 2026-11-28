@@ -339,3 +339,48 @@ def test_unity_ignores_missing_everywhere_still_fail(repo: Repo) -> None:
     _unity(repo, "client")
     repo.write(".gitignore", "*.log\n")
     assert "Library/" in _hygiene(repo)[1]
+
+
+# --- shelf-meqv: the Python stack in backend/ (ADR 0034) ----------------------------------------------------------------------
+
+
+def _a2kay_in_backend(repo: Repo) -> None:
+    """`_a2kay_shaped`, with every file the mcp rows read moved into backend/ and a frontend/ beside it."""
+    _mcp(repo, dependency=_DEPENDS + '\n[tool.ruff.lint]\nselect = ["T20"]', root="backend")
+    repo.write("backend/uv.lock", '[[package]]\nname = "fastmcp"\n')
+    repo.write(
+        "backend/tests/test_server.py",
+        'async def t(c):\n    r = await c.initialize_result\n    assert r.protocolVersion == "2025-11-25"\n'
+        "    assert Client(s) and r.is_error\n",
+    )
+    repo.write("backend/tests/test_stdio.py", "t = StdioTransport\n")
+    repo.write("backend/tests/contracts/test_tool_list.py", "tools = list_tools()\nhint = 'readOnlyHint'\n")
+    repo.write("backend/tests/contracts/tools.snapshot.json", "[]\n")
+    repo.write("frontend/package.json", '{"name": "web", "scripts": {"test": "vitest run"}, "devDependencies": {"vitest": "1"}}')
+    repo.write("justfile", "check:\n\tuv run pytest\n")
+
+
+def test_the_mcp_rows_read_the_python_folder_when_the_server_is_in_backend(repo: Repo) -> None:
+    _a2kay_in_backend(repo)
+    rows = _rows(repo)
+    for role in ("framework-version", "project-hygiene", "build", "tests", "surface-integrity"):
+        assert rows[f"framework.mcp.{role}"][0] is Verdict.PASSING, (role, rows[f"framework.mcp.{role}"])
+
+
+def test_the_mcp_architecture_row_reads_backends_pyproject(repo: Repo) -> None:
+    _a2kay_in_backend(repo)
+    repo.write(
+        "backend/pyproject.toml",
+        '[project]\nname = "demo"\nversion = "0"\n' + _DEPENDS + "\n[tool.importlinter]\ninclude_external_packages = true\n"
+        '[[tool.importlinter.contracts]]\nforbidden_modules = ["fastmcp"]\n',
+    )
+    repo.write("justfile", "check:\n\tlint-imports\n")
+    assert _rows(repo)["framework.mcp.architecture"][0] is Verdict.PASSING
+
+
+def test_the_mcp_rows_in_backend_still_fail_when_the_files_are_missing(repo: Repo) -> None:
+    _a2kay_in_backend(repo)
+    (repo.root / "backend/tests/contracts/tools.snapshot.json").unlink()
+    (repo.root / "backend/uv.lock").unlink()
+    rows = _rows(repo)
+    assert rows["framework.mcp.surface-integrity"][0] is Verdict.NOT_SET_UP

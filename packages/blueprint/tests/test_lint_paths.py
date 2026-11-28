@@ -69,3 +69,36 @@ def test_a_file_ruff_excludes_is_not_unlinted(repo: Repo) -> None:
 def test_dot_slash_and_trailing_slash_spellings_cover_like_the_plain_ones(repo: Repo) -> None:
     _setup(repo, '["./packages", "tools/", "./conftest.py"]')
     assert _row(repo).verdict is Verdict.PASSING
+
+
+# --- shelf-meqv: with the Python stack in backend/ the recipe runs ruff there, so entries are backend-relative ------------------
+
+
+def _backend(repo: Repo, paths: str) -> None:
+    repo.write("backend/pyproject.toml", f'[project]\nname = "x"\n[tool.blueprint.gate]\nlint-paths = {paths}\n')
+    repo.write("backend/uv.lock", "version = 1\n")
+    repo.write("backend/src/a/m.py", "x = 1\n")
+    repo.write("backend/tests/t.py", "x = 1\n")
+    repo.write(".a2kay/jobs/j.py", "x = 1\n")
+    repo.write("frontend/package.json", "{}")
+    repo.commit()
+
+
+def test_in_backend_an_entry_names_a_folder_below_backend(repo: Repo) -> None:
+    _backend(repo, '["src", "tests", "../.a2kay/jobs"]')
+    assert _row(repo).verdict is Verdict.PASSING
+
+
+def test_in_backend_dot_covers_backend_only_not_the_repo(repo: Repo) -> None:
+    _backend(repo, '["."]')
+    row = _row(repo)
+    assert row.verdict is Verdict.FAILING
+    assert ".a2kay/jobs" in row.evidence
+
+
+def test_in_backend_a_missing_entry_is_named_as_the_entry_to_write(repo: Repo) -> None:
+    _backend(repo, '["src", "../.a2kay/jobs"]')
+    row = _row(repo)
+    assert row.verdict is Verdict.FAILING
+    assert "backend/tests" in row.evidence
+    assert "'tests'" in row.remediation
