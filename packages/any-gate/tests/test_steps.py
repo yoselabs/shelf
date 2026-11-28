@@ -32,7 +32,7 @@ FAKE = textwrap.dedent(
       fail) echo "boom: the reason"; exit 3 ;;
       skip) echo "skipped lint: no file changed" ;;
       wait) [ -n "$GATE_NOTICE_FD" ] && echo "gate-lock: waiting for a slot" >&"$GATE_NOTICE_FD"; echo "quiet log line" ;;
-      env) echo "fd=$GATE_NOTICE_FD" ;;
+      env) echo "fd=$GATE_NOTICE_FD id=$GATE_NOTICE_ID"; exit 3 ;;
     esac
     """
 )
@@ -236,3 +236,11 @@ def test_every_step_says_in_one_line_why_it_runs(fake: str) -> None:
     done = _steps(fake, "ok", "skip")
     assert "ok   ok 0s | declares no inputs\n" in done.stderr
     assert "skipped lint: no file changed\n" in done.stderr
+
+
+def test_a_step_is_told_its_gates_descriptor_and_its_identity_whatever_the_outer_environment_said(fake: str) -> None:
+    done = _steps(fake, "env", GATE_NOTICE_FD="99", GATE_NOTICE_ID="1:2")  # a stale pair from an enclosing gate
+    told = re.search(r"fd=(\d+) id=(\d+:\d+)", done.stderr)
+    assert told is not None, done.stderr
+    assert told.group(1) != "99"
+    assert told.group(2) != "1:2"

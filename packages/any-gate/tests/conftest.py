@@ -51,9 +51,16 @@ def repo(tmp_path: Path) -> Git:
     return made
 
 
+# What a gate, a hook runner or a git hook leaves in the environment of the suite it runs. `PRE_COMMIT_TO_REF` is the sha being pushed:
+# `GateState.green` reads it, so under the pre-push hook every throwaway clone's "this tree already passed" answered no and 13 tests of
+# test_inputs.py failed (2026-11-28); `GATE_FAIL_FAST`, `GATE_SLOTS` and the budgets change what `any_gate steps` does the same way.
+_OUTER = ("PRE_COMMIT", "GATE_", "ANY_GATE")
+
+
 @pytest.fixture(autouse=True)
 def _private_gate_lease(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A test that runs `steps` queues behind its own lease folder, never the real gate that may be running this suite."""
+    """A test that runs `steps` queues behind its own lease folder, never the real gate that may be running this suite, and decides
+    as if no hook ran it: the outer gate's and hook's variables are dropped (the descriptor number is an xdist worker's pipe in here)."""
+    for name in [name for name in os.environ if name.startswith(_OUTER)]:
+        monkeypatch.delenv(name)
     monkeypatch.setenv("GATE_LEASE_ROOT", str(tmp_path / "gate-leases"))
-    monkeypatch.delenv("ANY_GATE_LEASED", raising=False)
-    monkeypatch.delenv("GATE_NOTICE_FD", raising=False)  # the outer gate's descriptor number is an xdist worker's pipe in here
