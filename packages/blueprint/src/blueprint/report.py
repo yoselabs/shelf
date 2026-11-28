@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 from blueprint import facts
 from blueprint.model import FixedBy, Verdict, without_git_location
-from blueprint.runner import ACCEPTED, active
+from blueprint.runner import active
 
 if TYPE_CHECKING:
     from blueprint.runner import Row, Run
@@ -77,7 +77,7 @@ class Batch:
 
 def converge_batch(rows: list[Row] | tuple[Row, ...]) -> Batch:
     """All the run's remediation as ONE batch in a stable order (concern, id), never one batch per checkpoint."""
-    bad = sorted((r for r in rows if r.verdict in {Verdict.FAILING, Verdict.NOT_SET_UP} and not r.new), key=lambda r: (r.concern, r.id))
+    bad = sorted((r for r in rows if r.verdict in {Verdict.FAILING, Verdict.NOT_SET_UP}), key=lambda r: (r.concern, r.id))
     agent = tuple(r for r in bad if r.fixed_by is not FixedBy.OWNER)
     owner = tuple(r for r in bad if r.fixed_by is FixedBy.OWNER)
     return Batch(agent, owner, f"blueprint converge: {', '.join(r.id for r in agent)}" if agent else "blueprint converge: nothing to fix")
@@ -225,10 +225,8 @@ def gate(run: Run) -> str:
     lines = [f"blueprint: {p}" for p in run.problems]
     lines += [f"blueprint: warning: {n}" for n in run.notices]
     lines += [
-        f"blueprint: {'🆕' if r.new else mark(r)} {r.id} -- {r.verdict}"
-        + (" (new since the last audit: warns until /blueprint runs)" if r.new else "")
-        + f": {clip(r.evidence, _BRIEF_EVIDENCE)}"
-        + (f" -> {clip(r.remediation, _BRIEF_FIX)}" if r.remediation else "")
+        f"blueprint: {mark(r)} {r.id} -- {r.verdict}"
+        f": {clip(r.evidence, _BRIEF_EVIDENCE)}" + (f" -> {clip(r.remediation, _BRIEF_FIX)}" if r.remediation else "")
         for r in run.rows
         if r.verdict not in _QUIET
     ]
@@ -272,7 +270,7 @@ def as_json(run: Run) -> str:
 
 
 # Where `check --write` puts the narrative reports: ignored by git (its own `.gitignore`), so they never show in a diff or go stale in a
-# commit. The audit record stays tracked (runner.ACCEPTED).
+# commit. Nothing the audit writes is tracked (ADR 0018).
 REPORTS_DIR = ".blueprint/reports"
 _STAMP_OPENING = "Written by `blueprint check --write` on "
 
@@ -311,13 +309,6 @@ def _write(run: Run, repo: Path, today: date, *, prune: bool) -> list[Path]:
 
     head = f"{_header(run)}\n\n{overrides_section(run, today)}"
     emit(out_dir / "README.md", run.rows, f"# Blueprint\n\n{{stamp}}\n\n{head}\n\n{summary(run)}\n")
-    # The audit record: what the gate enforces until the next audit (runner.ACCEPTED).
-    accepted = repo / ACCEPTED
-    record = "".join(f"{r.key}\n" for r in sorted(run.rows, key=lambda r: r.key))
-    if not accepted.is_file() or accepted.read_text() != record:
-        accepted.parent.mkdir(parents=True, exist_ok=True)
-        accepted.write_text(record)
-    written.append(accepted)
     for layer, concern in _concerns(run):
         rows = [r for r in run.rows if r.concern == concern]
         path = out_dir / f"{concern.replace('/', '-')}.md"

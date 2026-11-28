@@ -135,7 +135,7 @@ def test_write_produces_one_table_per_concern(repo: Repo) -> None:
     result = run(repo.root, env=repo.env)
     paths = report.write(result, repo.root, date(2026, 10, 10))
     concerns = ("gate", "backlog", "secrets", "hooks", "stack", "agents")
-    assert {p.name for p in paths} == {"README.md", "checkpoints.txt", *(f"{c}.md" for c in concerns)}
+    assert {p.name for p in paths} == {"README.md", *(f"{c}.md" for c in concerns)}
     text = (repo.root / ".blueprint/reports/gate.md").read_text()
     assert "| | checkpoint | set up | working | evidence | remediation | fixed by |" in text
     assert "`gate.one-command`" in text
@@ -217,37 +217,6 @@ def test_the_summary_without_audit_says_it_omits_audit_rows_and_matches_the_read
     assert "audit-only checkpoints not run: 1" in bare
     assert "--audit" in bare
     assert "not run" not in audited
-
-
-def test_a_checkpoint_new_since_the_last_audit_warns_but_does_not_fail_the_gate(repo: Repo) -> None:
-    first = run(repo.root, env=repo.env)
-    report.write(first, repo.root, date(2026, 10, 10))
-    accepted = repo.root / "docs/blueprint/checkpoints.txt"
-    failing_ids = [r.id for r in first.rows if r.verdict in {Verdict.FAILING, Verdict.NOT_SET_UP}]
-    assert failing_ids
-    kept = [line for line in accepted.read_text().splitlines() if not line.startswith(f"{failing_ids[0]}@")]
-    accepted.write_text("\n".join(kept) + "\n")
-    later = run(repo.root, env=repo.env)
-    new = [r for r in later.rows if r.new]
-    assert [r.id for r in new] == [failing_ids[0]]
-    assert "new since the last audit" in report.gate(later)
-
-
-def test_without_an_audit_record_every_checkpoint_is_enforced(repo: Repo) -> None:
-    assert not any(r.new for r in run(repo.root, env=repo.env).rows)
-
-
-def test_new_rows_alone_do_not_fail_the_exit_code(repo: Repo) -> None:
-    result = run(repo.root, env=repo.env)
-    report.write(result, repo.root, date(2026, 10, 10))
-    (repo.root / "docs/blueprint/checkpoints.txt").write_text("")
-    assert run(repo.root, env=repo.env).exit_code in {0, 2}
-
-
-def test_an_audit_from_before_the_record_counts_as_an_empty_record(repo: Repo) -> None:
-    repo.write("docs/blueprint/README.md", "# Blueprint\n")
-    rows = run(repo.root, env=repo.env).rows
-    assert all(r.new for r in rows if r.verdict is not Verdict.PASSING)
 
 
 def _red_override(repo: Repo, fields: str) -> None:
@@ -502,10 +471,10 @@ def test_a_hooks_git_variables_never_reach_the_repo_they_name(repo: Repo, tmp_pa
     assert (victim / ".git/config").read_text() == before
 
 
-def test_write_leaves_git_status_clean_apart_from_the_audit_record(repo: Repo) -> None:
-    # shelf-rabg: the narrative reports go to an ignored folder; only docs/blueprint/checkpoints.txt (the audit baseline) is tracked output.
+def test_write_leaves_git_status_clean(repo: Repo) -> None:
+    # shelf-rabg, ADR 0018: the narrative reports go to an ignored folder; the audit writes nothing tracked.
     repo.write("README.md", "x\n")
     repo.commit()
     report.write(run(repo.root, env=repo.env), repo.root, date(2026, 10, 10))
     assert (repo.root / ".blueprint/reports/README.md").is_file()
-    assert repo.git("status", "--porcelain", "--untracked-files=all").splitlines() == ["?? docs/blueprint/checkpoints.txt"]
+    assert repo.git("status", "--porcelain", "--untracked-files=all").splitlines() == []

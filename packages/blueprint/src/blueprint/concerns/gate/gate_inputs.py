@@ -5,6 +5,7 @@ from __future__ import annotations
 import tomllib
 
 from blueprint import gate_graph
+from blueprint.concerns.gate import gate_unreadable
 from blueprint.model import Context, Finding, failing, not_applicable, passing
 
 FILE = "gate-inputs.toml"
@@ -21,6 +22,8 @@ def step_inputs(ctx: Context) -> Finding:
     The repo file holds only its exceptions: a repo's own step (no default) declares its globs there; a known step needs nothing.
     No network. New checkpoints warn first (ADR 0018).
     """
+    if (blind := gate_unreadable.unreadable(ctx, "the gate's step inputs")) is not None:
+        return blind
     gate = gate_graph.load(ctx)
     if gate is None or not gate.stepped:
         return not_applicable("the gate runs no `steps`")
@@ -55,7 +58,7 @@ def narrowed_inputs(ctx: Context) -> Finding:
 
 
 def _narrow_fault(step: str, reason: object, lists: dict[str, list[object]], defaults: dict[str, list[object]]) -> str:
-    if not isinstance(reason, str) or len(reason.strip()) < _MIN_REASON:
+    if not isinstance(reason, str) or len(reason.strip()) < _MIN_REASON or _trivial(reason):
         return "no reason (a sentence saying which files the step cannot read)"
     if step not in lists:
         return f"no `{step} = [...]` list to replace the default with"
@@ -65,6 +68,19 @@ def _narrow_fault(step: str, reason: object, lists: dict[str, list[object]], def
 
 
 _MIN_REASON = 12
+_PLACEHOLDERS = frozenset(
+    {"todo", "tbd", "fixme", "wip", "na", "n/a", "none", "nothing", "no reason", "same", "same as above", "because", "reason", "later",
+     "to be decided", "to be decided later", "not applicable", "unknown", "yes", "no", "ok", "x"}
+)  # fmt: skip
+
+
+def _trivial(reason: str) -> bool:
+    """A reason that only looks like one: a placeholder, a word repeated, or no letters worth reading."""
+    text = " ".join(reason.lower().split()).strip(" .-:;,!?")
+    words = text.split()
+    return text in _PLACEHOLDERS or (len(set(words)) == 1 and words[0] in _PLACEHOLDERS) or len(set(text.replace(" ", ""))) <= 2
+
+
 _NARROW_REMEDY = (
     f'a narrowed step is `<step> = ["<glob>", ...]` plus `[narrow] <step> = "<why the step cannot read the files it drops>"` in {FILE}. '
     "Narrowing can skip a change that breaks the step, so say what makes it safe; to only add files, drop the [narrow] entry"
@@ -86,6 +102,8 @@ def wide_inputs(ctx: Context) -> Finding:
     The row does not judge what a recipe reads (free-form shell hides tool config files: narrowing from what a script seems to read is
     the worse error). It makes the owner of a `*` say why it is not narrower, from a closed list.
     """
+    if (blind := gate_unreadable.unreadable(ctx, "which steps run on any change")) is not None:
+        return blind
     gate = gate_graph.load(ctx)
     text = ctx.read(FILE)
     if gate is None or not gate.stepped or text is None:
@@ -108,7 +126,7 @@ def wide_inputs(ctx: Context) -> Finding:
 
 def _has_kind(reason: object) -> bool:
     return isinstance(reason, str) and any(
-        reason.startswith(f"{kind}: ") and reason.removeprefix(f"{kind}: ").strip() for kind in WIDE_KINDS
+        reason.startswith(f"{kind}: ") and not _trivial(reason.removeprefix(f"{kind}: ")) for kind in WIDE_KINDS
     )
 
 

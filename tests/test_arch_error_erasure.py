@@ -209,6 +209,7 @@ _ALLOWED = {
         ("packages/blueprint/src/blueprint/gate_py.py:settings", 1),
         ("packages/blueprint/src/blueprint/gate_units.py:_project_part", 1),
         ("packages/blueprint/src/blueprint/profile.py:_builds_tooling_only", 1),
+        ("packages/blueprint/src/blueprint/waivers.py:_is_iso", 1),
         ("packages/git-porcelain/src/git_porcelain/porcelain.py:_head_from_files", 1),
         ("packages/git-porcelain/src/git_porcelain/porcelain.py:git_dir", 1),
         ("packages/git-porcelain/src/git_porcelain/real_cache.py:rev_files", 1),

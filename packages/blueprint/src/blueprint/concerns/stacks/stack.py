@@ -14,7 +14,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from blueprint import gate_graph, gate_test, gate_units
+from blueprint import gate_graph, gate_test, gate_units, ruff_rules
 from blueprint.concerns.stacks.profile_data import Role, StackProfile, load_profiles
 from blueprint.model import (
     Finding,
@@ -92,6 +92,8 @@ def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
         return any(_config_holds(ctx, alt, root) for alt in spec["any"])
     if spec.get("test-coverage"):
         return bool(gate_units.read_config(ctx.repo).coverage)
+    if "ruff-selects" in spec:
+        return ruff_rules.selects(ctx, str(spec["ruff-selects"]))
     path = spec["path"].replace("{root}", root).removeprefix("./")
     if any(ch in path for ch in "*?["):
         hits = (p.relative_to(ctx.repo) for p in sorted(ctx.repo.glob(path)))
@@ -157,6 +159,8 @@ def _purpose(ctx: Context, requires: str) -> tuple[bool, str]:
 def _describe(spec: dict[str, Any]) -> str:
     if "any" in spec:
         return " or ".join(_describe(alt) for alt in spec["any"])
+    if "ruff-selects" in spec:
+        return f'a ruff lint config that selects "{spec["ruff-selects"]}" or "ALL" and does not ignore it'
     return str(spec["path"]) + (f" with {spec['contains']!r}" if "contains" in spec else "")
 
 

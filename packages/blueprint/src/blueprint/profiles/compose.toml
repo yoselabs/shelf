@@ -53,8 +53,14 @@ role = "dependencies"
 tool = """every `image:` is `name:tag@sha256:<64 hex>` (tag for the human, digest for the machine): `docker compose -f <file> config --no-interpolate --format json | jq -e '[.services[].image // empty | select(test("@sha256:[0-9a-f]{64}$") | not)] | length == 0'`. Seen red on a planted `nginx:latest`, green on two real stacks; homelab has 0 unpinned images across its 19 files and already enforces the same rule in tools/doctor.py (DIGEST_RE), which CI runs but `just check` does not. \
 Staying current is a separate, reported job (homelab: tools/check-updates.py, read-only report of images behind upstream) so a pin never means a frozen stack"""
 install = "justfile recipe looping over compose files with the jq filter above (jq is preinstalled on macOS and the GitHub runners); an updater (Renovate's docker-compose manager or the repo's own check-updates) proposes digest bumps as reviewable commits"
-config = [{ any = [{ any = [{ path = "justfile", contains = "@sha256" }] }, { path = "tools/check-updates.py" }, { path = "renovate.json" }, { path = ".github/renovate.json" }] }]
+config = [{ any = [{ any = [{ path = "justfile", contains = "@sha256" }, { path = ".blueprint/images.just", contains = "blueprint.compose_pins" }] }, { path = "tools/check-updates.py" }, { path = "renovate.json" }, { path = ".github/renovate.json" }] }]
 gate = "sha256"
+[[role.alternative]]
+label = "blueprint's rendered `images` step (`[tool.blueprint.gate] image-pins = true`) runs `blueprint.compose_pins` over every tracked compose file"
+gate = 'blueprint\.compose_pins'
+path = ".blueprint/images.just"
+contains = "blueprint.compose_pins"
+
 [[role.alternative]]
 label = "tools/doctor.py refuses an image not pinned by digest (DIGEST_RE)"
 gate = "doctor"

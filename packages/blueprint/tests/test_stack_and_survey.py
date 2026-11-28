@@ -609,3 +609,34 @@ def test_go_and_rust_manifests_make_no_stack(repo: Repo) -> None:
     repo.write("go.mod", "module x\n")
     repo.write("Cargo.toml", "[package]\n")
     assert set(detect_stacks(repo.root)) == set()
+
+
+def _lint_config(repo: Repo, table: str) -> None:
+    _python_repo(repo)
+    repo.write("pyproject.toml", f'[project]\nname = "x"\nrequires-python = ">=3.12"\n\n[tool.ruff.lint]\n{table}\n')
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        'select = ["ALL"]\nignore = ["S"]',
+        'select = ["ALL"]\nignore = ["ALL"]',
+        'select = ["E", "C90"]',  # no security rules
+        'select = ["S"]',  # no complexity rule
+        'select = ["S", "C90"]\nignore = ["C90"]',
+        'select = ["S", "C90"]\nignore = ["C901"]',
+        'select = ["ALL"]\n# select = ["S", "C90"] only as a comment\nignore = ["S"]',
+    ],
+)
+def test_the_linter_row_reads_the_rule_set_not_the_text(repo: Repo, table: str) -> None:
+    _lint_config(repo, table)
+    assert _rows(repo)["stack.python-uv.linter"][0] is Verdict.NOT_SET_UP
+
+
+@pytest.mark.parametrize(
+    "table",
+    ['select = ["ALL"]', 'select = ["ALL"]\nignore = ["S101", "D"]', 'select = ["E"]\nextend-select = ["S", "C90"]', 'select = ["S", "C"]'],
+)
+def test_the_linter_row_accepts_a_rule_set_that_holds_security_and_complexity(repo: Repo, table: str) -> None:
+    _lint_config(repo, table)
+    assert _rows(repo)["stack.python-uv.linter"][0] is Verdict.PASSING

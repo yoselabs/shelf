@@ -230,6 +230,7 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
         ("gate.one-command", 1, False),
         ("gate.runner", 1, False),
         ("gate.no-ci", 1, False),
+        ("gate.no-audit-leftovers", 1, False),
         ("gate.step-inputs", 1, False),
         ("gate.narrowed-inputs-have-a-reason", 1, False),
         ("gate.wide-inputs-have-a-reason", 1, False),
@@ -247,6 +248,7 @@ def test_gate_rows_keep_their_order_metadata_and_audit_selection(repo: Repo) -> 
         ("gate.lfs-installed", 1, True),
         ("gate.recipe-calls", 1, False),
         ("gate.recipe-shadowing", 1, False),
+        ("gate.lint-paths-cover-python", 1, False),
     )
     audited = run_audit(repo.root, concern="gate", env=repo.env)
     gated = run(repo.root, concern="gate", env=repo.env)
@@ -379,3 +381,18 @@ def test_a_narrow_entry_with_no_list_or_no_default_fails(repo: Repo) -> None:
     assert verdict is Verdict.FAILING
     assert "no `lint = [...]` list" in evidence
     assert "no default to narrow" in evidence
+
+
+@pytest.mark.parametrize("why", ["todo", "TBD", "n/a", "xxxx", "...", "same as above", "none", "todo todo todo"])
+def test_a_wide_reason_that_is_a_placeholder_fails(repo: Repo, why: str) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write("gate-inputs.toml", f'lint = ["*.py"]\ntest = ["*"]\n[wide]\ntest = "self-keyed: {why}"\n')
+    assert _row(repo, "gate.wide-inputs-have-a-reason")[0] is Verdict.FAILING
+
+
+@pytest.mark.parametrize("why", ["todo todo todo", "xxxxxxxxxxxxxxxx", "to be decided later", "not applicable", "............"])
+def test_a_narrow_reason_that_is_a_placeholder_fails(repo: Repo, why: str) -> None:
+    repo.write("justfile", _STEPS)
+    repo.write(".blueprint/step-inputs.toml", _DEFAULTS)
+    repo.write("gate-inputs.toml", f'lint = ["src/*.py"]\n[narrow]\nlint = "{why}"\n')
+    assert _row(repo, "gate.narrowed-inputs-have-a-reason")[0] is Verdict.FAILING
