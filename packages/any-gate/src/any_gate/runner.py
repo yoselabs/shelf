@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Literal
 from stream_proc import run as run_process
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
     from pathlib import Path
 
 __all__ = ["RunResult", "run_runner"]
@@ -32,8 +32,15 @@ class RunResult:
 
 
 def run_runner(
-    runner: Sequence[str], units: Sequence[str], *, cwd: Path, wall: float, idle: float, on_output: Callable[[str], None] | None = None
+    runner: Sequence[str],
+    units: Sequence[str],
+    *,
+    cwd: Path,
+    wall: float,
+    idle: float,
+    on_output: Callable[[str], None] | None = None,
+    env: Mapping[str, str] | None = None,
 ) -> RunResult:
-    """Run `runner UNIT...` in `cwd`; its output lines (newline kept) go to `on_output`."""
-    result = run_process([*runner, *units], cwd=cwd, on_stdout=on_output, on_stderr=on_output, timeout=wall, idle=idle)
+    """Run `runner UNIT...` in `cwd` with `env` (None: ours); its output lines (newline kept) go to `on_output`."""
+    result = run_process([*runner, *units], cwd=cwd, env=env, on_stdout=on_output, on_stderr=on_output, timeout=wall, idle=idle)
     return RunResult(result.returncode, result.timed_out)

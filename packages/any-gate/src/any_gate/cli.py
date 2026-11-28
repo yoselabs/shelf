@@ -131,7 +131,10 @@ def _run_under_lease(args: argparse.Namespace, left: Callable[[], list[tuple[str
         todo = left()
         if not todo:
             return todo, None
-        return todo, run_runner(args.runner, [path for path, _ in todo], cwd=cwd, wall=args.wall, idle=args.idle, on_output=_show)
+        # `$GATE_NOTICE_FD` names a descriptor of this process only: in the runner's tree that number is some other pipe (an xdist worker's
+        # link to its controller), and a notice written to it corrupts that link and hangs the run.
+        env = {name: value for name, value in os.environ.items() if name != "GATE_NOTICE_FD"}
+        return todo, run_runner(args.runner, [path for path, _ in todo], cwd=cwd, wall=args.wall, idle=args.idle, on_output=_show, env=env)
 
 
 def _test(args: argparse.Namespace, stdin: TextIO) -> int:

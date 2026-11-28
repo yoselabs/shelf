@@ -106,6 +106,21 @@ def test_nothing_to_run_is_a_pass_that_starts_no_runner(root: Path, capsys: pyte
     assert "nothing to run" in err
 
 
+def test_the_notice_descriptor_does_not_reach_the_runners_tree(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # `GATE_NOTICE_FD` is a descriptor number of the gate's own process. Inherited, it named a pipe of an xdist worker in the runner's
+    # tree, a notice written there corrupted the worker's link to its controller, and the run hung until the idle limit (2026-11-28).
+    (root / "probe.py").write_text('import os\nopen("seen.log", "w").write(os.environ.get("GATE_NOTICE_FD", "absent"))\n')
+    read, write = os.pipe()  # our own descriptor: this test's notices must never land on a number it did not open
+    try:
+        monkeypatch.setenv("GATE_NOTICE_FD", str(write))
+        args = ["test", "--receipts", str(root / "r.json"), "--lease-root", str(root / "leases"), "--cwd", str(root)]
+        code = main([*args, "--", sys.executable, "probe.py"], stdin=io.StringIO("a\tk\n"))
+    finally:
+        os.close(read)
+        os.close(write)
+    assert (code, (root / "seen.log").read_text()) == (0, "absent")
+
+
 def test_the_runners_output_reaches_the_caller(root: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert "output from the runner" in _go(root, "chatty\t\n", capsys=capsys)[1]
 
