@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Compact test output keeps the red run's full log: it is written beside its name and takes it only when the run failed (a green retry no longer overwrites it), and the held-back note shows the first failure's head, so the gate's kept log carries a real assertion.
+
 ## 0.4.0
 
 - **Selection never answers "nothing changed" for "I do not know".** `changed_files(repo) -> list | None` and `merge_base(repo) -> str | None` come from `any_gate.changed` (one answer for every step): no upstream, or git failing, is None, and `affected`/`affected_packages(None)` select every suite (the `packages` command every package, a lock change none to read). A move counts both paths (`--no-renames`). `select._git` raises on a failed git. Before: no upstream fell back to HEAD, a clean merged tree selected nothing and `check` went green.
