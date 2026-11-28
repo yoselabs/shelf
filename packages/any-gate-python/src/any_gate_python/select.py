@@ -7,12 +7,14 @@ cannot see (an unknown path, or a pytest plugin package that loads into every ru
 from __future__ import annotations
 
 import hashlib
+import os
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from any_gate import changed as gate_changed
 from any_gate.plan import too_wide
+from any_gate.state import working_tree
 from stream_proc import capture
 
 from any_gate_python.graph import (
@@ -30,6 +32,7 @@ from any_gate_python.rules import SKIPPED_DIRS, Rules, matches
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+LOCK_FILES_HASHED = ("uv.lock", "pyproject.toml", "conftest.py")
 GIT_TIMEOUT = 600.0  # seconds one git call may take
 
 
@@ -171,6 +174,31 @@ def _exports(repo: Path, graph: dict[str, set[str]], exporter: Exporter) -> dict
         return None
 
 
+def _wanted(graph: dict[str, set[str]], rules: Rules | None, repo: Path) -> list[str]:
+    """Every repo path a key can hash: each package folder, the root files the reads map names, the lock, the root pyproject, conftest."""
+    mapped = {rel for name in graph for rel in (rules.read_files(repo, name) if rules else ())}
+    return [*(f"packages/{name}" for name in sorted(graph)), *sorted(mapped), *LOCK_FILES_HASHED]
+
+
+def _tree_ids(repo: Path, wanted: list[str]) -> dict[str, str] | None:
+    """`{path: git object id}` for the `wanted` paths of the working tree (one temp index, one `ls-tree`; no file is opened by us).
+
+    None when `repo` is not a git repository or git fails: the caller then hashes the files themselves.
+    """
+    tree = working_tree(repo, os.environ)
+    if tree is None:
+        return None
+    done = capture(["git", "ls-tree", "-z", tree, "--", *wanted], cwd=repo, timeout=GIT_TIMEOUT)
+    if done.exit != 0:
+        return None
+    ids: dict[str, str] = {}
+    for entry in done.text.split("\0"):
+        meta, _, path = entry.partition("\t")
+        if path:
+            ids[path] = meta.split()[2]
+    return ids
+
+
 def fingerprint(repo: Path, graph: dict[str, set[str]], package: str, exports: dict[str, str] | None, rules: Rules | None = None) -> str:
     """Hash of everything `package`'s tests can see: its files, its dependencies' files and resolved sets, the root inputs.
 
@@ -178,25 +206,45 @@ def fingerprint(repo: Path, graph: dict[str, set[str]], package: str, exports: d
     a key blind to it would let them pass again unrun.
 
     With no exports (uv cannot answer) the whole lock and root pyproject stand in: any change to them invalidates every package.
+
+    In a git repository the files are read as git's tree and blob ids of the working tree (tracked and untracked, not ignored), so
+    nothing is opened per file; ignored files are not part of the key. Outside git every file is hashed.
     """
+    return _fingerprint(repo, graph, package, exports, rules, ids=_tree_ids(repo, _wanted(graph, rules, repo)))
+
+
+def _fingerprint(
+    repo: Path, graph: dict[str, set[str]], package: str, exports: dict[str, str] | None, rules: Rules | None, *, ids: dict[str, str] | None
+) -> str:
     digest = hashlib.sha256()
+
+    def file(rel: str) -> None:
+        if ids is not None:
+            digest.update(ids.get(rel, "").encode())
+        elif (repo / rel).is_file():
+            digest.update((repo / rel).read_bytes())
+
     for name in sorted(_closure(graph, package)):
-        _hash_tree(digest, repo / "packages" / name, repo)
+        if ids is not None:
+            digest.update(f"{name}@{ids.get(f'packages/{name}', '')}".encode())
+        else:
+            _hash_tree(digest, repo / "packages" / name, repo)
         if exports is not None:
             digest.update(f"{name}:{exports[name]}".encode())
         for rel in rules.read_files(repo, name) if rules else ():
             digest.update(f"root:{rel}".encode())
-            digest.update((repo / rel).read_bytes())
+            file(rel)
     if exports is None:
         for rel in ("uv.lock", "pyproject.toml"):
-            if (repo / rel).is_file():
-                digest.update(rel.encode())
-                digest.update((repo / rel).read_bytes())
+            if ids is None and not (repo / rel).is_file():
+                continue
+            digest.update(rel.encode())
+            file(rel)
     else:
         digest.update(root_config(repo / "pyproject.toml").encode())
-    if (repo / "conftest.py").is_file():
+    if (repo / "conftest.py").is_file() if ids is None else "conftest.py" in ids:
         digest.update(b"conftest.py")
-        digest.update((repo / "conftest.py").read_bytes())
+        file("conftest.py")
     return digest.hexdigest()
 
 
@@ -205,7 +253,8 @@ def plan(repo: Path, paths: list[str], exporter: Exporter = package_exports) -> 
     graph, _ = workspace(repo)
     exports = _exports(repo, graph, exporter)
     rules = Rules.load(repo)
-    return [(p, fingerprint(repo, graph, p.split("/")[1], exports, rules) if p.startswith("packages/") else "") for p in paths]
+    ids = _tree_ids(repo, _wanted(graph, rules, repo)) if any(p.startswith("packages/") for p in paths) else None
+    return [(p, _fingerprint(repo, graph, p.split("/")[1], exports, rules, ids=ids) if p.startswith("packages/") else "") for p in paths]
 
 
 def wide_alarm(repo: Path, paths: list[str]) -> str | None:

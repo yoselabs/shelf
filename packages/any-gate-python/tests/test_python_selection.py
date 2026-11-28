@@ -487,3 +487,34 @@ def test_a_leading_glob_reads_pattern_does_not_walk_the_virtualenv_or_git(repo: 
     found = rules.read_files(repo, "base")
     assert "a.toml" in found
     assert not [f for f in found if f.startswith((".venv", ".git"))]
+
+
+# --- the key is read from git's tree ids, not by opening every file of every closure ---
+
+
+def test_a_suites_key_in_a_git_repo_opens_no_package_file(committed: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Under Defender each open costs ~20 ms: the fingerprint asks git (one temp-index tree) instead of reading the closure per package."""
+
+    def boom(*_a: object) -> None:
+        message = "a package file was read"
+        raise AssertionError(message)
+
+    monkeypatch.setattr(select, "_hash_tree", boom)
+    paths = ["packages/base/tests", "packages/middle/tests", "packages/top/tests"]
+    before = _plan(committed, paths)
+    (committed / "packages" / "base" / "mod.py").write_text("x = 1\n")  # untracked, uncommitted: still part of the key
+    after = _plan(committed, paths)
+    assert after["packages/base/tests"] != before["packages/base/tests"]
+    assert after["packages/top/tests"] != before["packages/top/tests"]  # a dependent's key moves with it
+    assert after["packages/middle/tests"] != before["packages/middle/tests"]
+
+
+def test_the_key_is_the_same_in_a_second_planning_of_an_unchanged_tree(committed: Path) -> None:
+    paths = ["packages/base/tests", "packages/leaf/tests"]
+    assert _plan(committed, paths) == _plan(committed, paths)
+
+
+def test_an_edit_to_a_package_outside_the_closure_leaves_the_key(committed: Path) -> None:
+    before = _plan(committed, ["packages/base/tests"])
+    (committed / "packages" / "leaf" / "mod.py").write_text("x = 1\n")
+    assert _plan(committed, ["packages/base/tests"]) == before

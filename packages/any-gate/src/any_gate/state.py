@@ -51,8 +51,8 @@ def _base(repo: Path, env: Mapping[str, str]) -> str:
     return _git(repo, env, "merge-base", "HEAD", "@{upstream}") or "none"
 
 
-def working_key(repo: Path, env: Mapping[str, str]) -> str | None:
-    """`<tree> <base>` for the working tree as `git add -A` would commit it; None when git cannot say."""
+def working_tree(repo: Path, env: Mapping[str, str]) -> str | None:
+    """The tree id of the working tree as `git add -A` would commit it (a temp index, the real one untouched); None when git cannot say."""
     index = _own_path(repo, env, "index")
     if index is None:
         return None
@@ -65,7 +65,12 @@ def working_key(repo: Path, env: Mapping[str, str]) -> str | None:
         scratch_env = {**env, "GIT_INDEX_FILE": str(temp_index)}
         if _git(repo, scratch_env, "add", "-A") is None:
             return None
-        tree = _git(repo, scratch_env, "write-tree")
+        return _git(repo, scratch_env, "write-tree")
+
+
+def working_key(repo: Path, env: Mapping[str, str]) -> str | None:
+    """`<tree> <base>` for the working tree as `git add -A` would commit it; None when git cannot say."""
+    tree = working_tree(repo, env)
     return f"{tree} {_base(repo, env)}" if tree else None
 
 
