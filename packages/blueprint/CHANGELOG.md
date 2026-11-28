@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.18.0
 
 - One `lint-paths` reading (`gate_py.norm`, `gate_py.under`) for `lint-changed`'s globs, the commit hook and `gate.lint-paths-cover-python`: `.`, `./src` and `src/` no longer build globs that match nothing (lint-changed said "skipped lint: no Python file changed" forever; the hook never linted).
 - `[tool.blueprint.test.units]` `reads` globs ending in `**` key every file below the folder (on Python 3.12 `glob("dir/**")` matches folders only).
@@ -10,7 +10,7 @@
 
 - Commit hook (`blueprint gate hook`): a git failure reading the index now fails the hook (exit 2) instead of skipping ruff and the preset check and passing; the rendered entry is `uv run --frozen blueprint gate hook` (no re-resolve per commit, as the old ruff hooks had). With no `lint-paths` every staged `.py` is still linted (documented).
 
-- Corpus diff against 0.17.0 (42 repos): 24 Makefile-only repos moved passing -> not set up on the gate-reading rows (`gate.one-command`, `gate.recipe-calls`; four more rows not applicable -> not set up), 3 more were already failing; the 15 justfile repos did not move on any old row. New rows: `gate.no-audit-leftovers` fails 5 repos (those tracking `checkpoints.txt` or a report; `blueprint gate clean-reports` fixes each), `gate.lint-paths-cover-python` fails a2kay.
+- Corpus diff against 0.17.0 (42 repos): 24 Makefile-only repos moved passing -> not set up on the gate-reading rows (`gate.one-command`, `gate.recipe-calls`; four more rows not applicable -> not set up), 3 more were already failing; the 15 justfile repos did not move on any old row except `stack.python-uv.linter` on homelab (passing -> not set up: its `ignore` holds `C901`, which cancels the `C90` complexity selection; the row now parses the ruff TOML instead of matching text). New rows: `gate.no-audit-leftovers` fails 5 repos (those tracking `checkpoints.txt` or a report; `blueprint gate clean-reports` fixes each), `gate.lint-paths-cover-python` fails a2kay.
 
 - `test_a_second_run_starts_no_test_process` is marked `slow` with a reason (shelf-q40b): three real gate runs, 11 s alone, over the 3.5 s rule; it runs in `check` when the suite's key changed and always in `check-all`.
 - `secret_scan range` with no upstream (shelf-fycm) starts at the merge-base with the default branch (`origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`; never HEAD's own branch), or covers HEAD's own history on the default branch itself: it no longer scans every ref of the shared git dir, so a sibling worktree's unpushed fixture fails nobody else. Uncommitted work is scanned in that case too. `full` (`secrets-all`) still scans every ref.
