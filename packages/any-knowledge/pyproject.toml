@@ -1,6 +1,6 @@
 [project]
 name = "any-knowledge"
-version = "0.1.0"
+version = "0.2.0"
 description = "Decision records (format, generated index, check), the glossary check and the agent-docs templates: knowledge a repo keeps, apart from the blueprint gate. Temporary home: the owner decides the name and where it lives."
 readme = "README.md"
 authors = [{ name = "yoselabs" }]

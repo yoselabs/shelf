@@ -2,7 +2,7 @@
 
 AI-facing only: one line per contract-shape change, arrow notation.
 
-## Unreleased
+## 0.8.0
 
 - `any_gate test` strips `GATE_NOTICE_FD` from its runner's environment (`run_runner(..., env=)`): the number is a descriptor of the gate's own process, and in the runner's tree it named an xdist worker's pipe to its controller; a notice written there stalled the run until the idle limit (600 s).
 - A gate that judged nothing records no green: `any_gate unjudged --reason R` (`GateState.unjudged`, `unjudged_reason`, marker `gate-unjudged` in the git dir, `state.UNJUDGED`) makes `passed` record nothing and say why; `start` clears it. `any_gate test` with an empty plan marks it (0 suites planned although the gate said run). A step that passes on the network's word (offline `dep-audit`, `tag-check` on local tags) marks it too.

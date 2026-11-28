@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - **Selection never answers "nothing changed" for "I do not know".** `changed_files(repo) -> list | None` and `merge_base(repo) -> str | None` come from `any_gate.changed` (one answer for every step): no upstream, or git failing, is None, and `affected`/`affected_packages(None)` select every suite (the `packages` command every package, a lock change none to read). A move counts both paths (`--no-renames`). `select._git` raises on a failed git. Before: no upstream fell back to HEAD, a clean merged tree selected nothing and `check` went green.
 - Repo tests below subfolders of `repo-tests` are selected (`rglob`); a changed helper, fixture or conftest no `*` key names runs every repo test; `Rules.star_covers`.

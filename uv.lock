@@ -498,7 +498,7 @@ dev = [
 
 [[package]]
 name = "any-gate"
-version = "0.7.0"
+version = "0.8.0"
 source = { editable = "packages/any-gate" }
 dependencies = [
     { name = "any-lease" },
@@ -531,7 +531,7 @@ dev = [
 
 [[package]]
 name = "any-gate-python"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/any-gate-python" }
 dependencies = [
     { name = "any-gate" },
@@ -606,7 +606,7 @@ dev = [
 
 [[package]]
 name = "any-knowledge"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/any-knowledge" }
 
 [package.dev-dependencies]
@@ -1503,7 +1503,7 @@ wheels = [
 
 [[package]]
 name = "blueprint"
-version = "0.17.0"
+version = "0.18.0"
 source = { editable = "packages/blueprint" }
 
 [package.dev-dependencies]
@@ -6656,7 +6656,7 @@ dev = [
 
 [[package]]
 name = "stream-proc"
-version = "0.18.0"
+version = "0.19.0"
 source = { editable = "packages/stream-proc" }
 dependencies = [
     { name = "async-scope" },
