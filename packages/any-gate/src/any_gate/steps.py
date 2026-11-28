@@ -323,6 +323,7 @@ def run_and_report(
     halt: threading.Event | None = None,
     opens: Path | None = None,
     why: Mapping[str, str] | None = None,
+    show_opens: bool = True,
 ) -> int:
     """Run the steps, say each failure as it lands and the rest after; 0 when every step passed, else 1.
 
@@ -341,7 +342,7 @@ def run_and_report(
     report = run_steps(names, env=env, runner=runner, cwd=cwd, skip=skip, step_limit=step_limit, halt=halt, on_done=land, opens=opens)
     for line in render(report, step_budget=step_budget, gate_budget=gate_budget, shown=shown, why=why):
         say(line)
-    if opens is not None:
+    if opens is not None and show_opens:
         for line in step_opens.lines(step_opens.collect(opens, names)):
             say(line)
     return 1 if report.failed or report.not_judged else 0
