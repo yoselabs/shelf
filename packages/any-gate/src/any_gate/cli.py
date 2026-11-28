@@ -3,6 +3,8 @@
 `steps [--runner just] [--fail-fast] [--step-limit S] STEP...` runs the gate's steps at once, each into its own log, shows a failed
 step's log the moment it ends, then prints one timing line (see `any_gate.steps`); exit 1 when one failed.
 `--opens` prints, after the timing line, the file opens and process starts each step's Python processes made (`any_gate.opens`).
+`--reads` judges each step's declared inputs against the files its Python processes read, and says what it cannot see (`any_gate.reads`);
+exit 1 when a step reads a file its inputs omit. Use it with `--all`, so no step is skipped unjudged.
 `$GATE_STEP_BUDGET` (default 60) and `$GATE_BUDGET` (default 180) are seconds.
 
 A step that declares its input files in `gate-inputs.toml` and whose inputs did not change is not started (`any_gate.inputs`);
@@ -44,7 +46,7 @@ from typing import TYPE_CHECKING, TextIO
 from any_lease import Leases
 
 from any_gate import changed as changed_files
-from any_gate import inputs
+from any_gate import inputs, reads
 from any_gate import opens as step_opens
 from any_gate.gate_lease import REPEAT_WAIT_NOTICE, WAIT_LIMIT, default_root, hold, wait_message
 from any_gate.notice import descriptor, scrub
@@ -243,10 +245,12 @@ def _steps(args: argparse.Namespace) -> int:
         tempfile.TemporaryDirectory() as folder,
     ):
         skip, why = _decide(args, repo)  # after the wait: what changed while queued is judged too
-        counted = step_opens.prepare(Path(folder)) if args.opens else None
-        return run_and_report(
+        hooked = step_opens.prepare(Path(folder)) if args.opens or args.reads else None
+        counted = hooked if args.opens else None
+        step_env = {**env, "GATE_READS_ROOT": reads.root_env(repo)} if args.reads else env
+        code = run_and_report(
             args.names,
-            env=env,
+            env=step_env,
             runner=args.runner,
             step_budget=args.step_budget,
             gate_budget=args.gate_budget,
@@ -256,7 +260,14 @@ def _steps(args: argparse.Namespace) -> int:
             step_limit=args.step_limit,
             halt=threading.Event() if fail_fast else None,
             opens=counted,
+            hook=hooked,
         )
+        if args.reads and hooked is not None:
+            report, under = reads.audit(repo, [n for n in args.names if n not in skip], hooked, args.runner)
+            for line in report:
+                _say(line)
+            return 1 if under else code
+        return code
 
 
 def _exec(cmd: Sequence[str]) -> int:
@@ -348,6 +359,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
     st.add_argument(
         "--opens", action="store_true", help="count each step's file opens and process starts (python only; see any_gate.opens)"
     )
+    st.add_argument("--reads", action="store_true", help="judge each step's inputs against the files it read (any_gate.reads); 1 on UNDER")
     st.add_argument(
         "--gate-slots",
         type=int,

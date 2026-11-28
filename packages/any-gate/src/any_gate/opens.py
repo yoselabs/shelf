@@ -26,16 +26,60 @@ _HOOK = """\
 import atexit, os, sys
 
 _log = os.environ.get("GATE_OPENS_LOG")
+_roots = tuple(r.rstrip("/") + "/" for r in os.environ.get("GATE_READS_ROOT", "").split(os.pathsep) if r)
 _n = {"open": 0, "spawn": 0}
 _SPAWN = {"subprocess.Popen", "os.posix_spawn", "os.fork", "os.system"}
+_seen = {"r": set(), "d": set(), "s": set()}
+
+
+def _inside(path):
+    try:
+        path = os.fsdecode(path)
+    except TypeError:
+        return None
+    if not os.path.isabs(path):
+        path = os.path.join(os.getcwd(), path)
+    return path if (path + "/").startswith(_roots) else None
+
+
+def _spawned(event, args):
+    if event == "os.system":
+        return "sh\\t-c"
+    exe, argv = args[0], args[1]
+    argv = [os.fsdecode(a) for a in argv][1:5] if isinstance(argv, (list, tuple)) else []
+    return f"{os.fsdecode(exe) if exe else ''}\\t{' '.join(argv)}"
+
+
+def _importing():
+    frame = sys._getframe(2)
+    for _ in range(8):
+        if frame is None:
+            return False
+        if frame.f_code.co_filename.startswith("<frozen importlib"):
+            return True
+        frame = frame.f_back
+    return False
 
 
 def _hook(event, args):
     if event == "open":
         if isinstance(args[0], (str, bytes, os.PathLike)):
             _n["open"] += 1
+            if _roots and not (len(args) > 2 and isinstance(args[2], int) and args[2] & os.O_ACCMODE == os.O_WRONLY):
+                found = _inside(args[0])
+                if found:
+                    _seen["r"].add(found)
     elif event in _SPAWN or event.startswith("os.exec"):
         _n["spawn"] += 1
+        if _roots and event != "os.fork":
+            try:
+                _seen["s"].add(_spawned(event, args))
+            except (TypeError, ValueError, IndexError):
+                _seen["s"].add("?\\t")
+    elif _roots and event in ("os.listdir", "os.scandir") and args and isinstance(args[0], (str, bytes, os.PathLike)):
+        found = _inside(args[0])
+        if found and not _importing():  # the import system lists folders to find a module: not a read of the folder
+            _seen["d"].add(found)
 
 
 def _write():
@@ -44,6 +88,16 @@ def _write():
             out.write(f"{os.getpid()} {_n['open']} {_n['spawn']}\\n")
     except OSError:
         pass
+    reads = os.environ.get("GATE_READS_LOG")
+    if _roots and reads:
+        try:
+            with open(reads, "a") as out:
+                for kind, items in _seen.items():
+                    for item in sorted(items):
+                        if "\\n" not in item:
+                            out.write(f"{kind}\\t{item}\\n")
+        except OSError:
+            pass
 
 
 if _log:
@@ -76,6 +130,7 @@ def env_for(step: str, folder: Path, env: Mapping[str, str]) -> dict[str, str]:
         **env,
         "PYTHONPATH": f"{folder}{os.pathsep}{existing}" if existing else str(folder),
         "GATE_OPENS_LOG": str(folder / f"{step}.opens"),
+        "GATE_READS_LOG": str(folder / f"{step}.reads"),
     }
 
 

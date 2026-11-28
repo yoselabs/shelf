@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 FILE = "gate-inputs.toml"
 DEFAULTS = ".blueprint/step-inputs.toml"
 # The gate's own definition: a change to it can change what any step does, so every step runs.
-_DEFINITION = (FILE, DEFAULTS, "justfile", "Justfile", ".blueprint/*")
+DEFINITION = (FILE, DEFAULTS, "justfile", "Justfile", ".blueprint/*")
 
 
 def _load(path: Path) -> dict[str, object]:
@@ -76,7 +76,7 @@ def explain(repo: Path, names: Sequence[str], recorded: Callable[[], bool] = lam
         "changed files unknown"
         if moved is None
         else "gate definition changed"
-        if any(fnmatch.filter(moved, d) for d in _DEFINITION)
+        if any(fnmatch.filter(moved, d) for d in DEFINITION)
         else "no gate passed this tree"
         if not moved and not recorded()
         else None
