@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from blueprint.model import Verdict
 from blueprint.runner import Row, run
+from blueprint.testing import run_cli
 
 if TYPE_CHECKING:
     from blueprint.testing import Repo
@@ -57,3 +58,29 @@ def test_an_untracked_ignored_file_is_not_a_leftover(repo: Repo) -> None:
     repo.write("docs/blueprint/checkpoints.txt", "x@1\n")
     repo.commit()
     assert _row(repo).verdict is Verdict.PASSING
+
+
+def test_the_remediation_names_the_one_command(repo: Repo) -> None:
+    repo.write("docs/blueprint/checkpoints.txt", "gate.ci@1\n")
+    repo.commit()
+    assert "blueprint gate clean-reports" in _row(repo).remediation
+
+
+def test_clean_reports_removes_exactly_the_leftovers_and_says_so(repo: Repo) -> None:
+    repo.write("docs/blueprint/checkpoints.txt", "gate.ci@1\n")
+    repo.write("docs/blueprint/README.md", "# Blueprint\n")
+    repo.write("docs/blueprint/notes.md", "keep me\n")
+    repo.write("docs/blueprint/blueprint.toml", "")
+    repo.commit()
+    done = run_cli(["gate", "clean-reports", "--repo", str(repo.root)])
+    assert done.returncode == 0
+    assert "git rm docs/blueprint/checkpoints.txt" in done.stdout
+    assert "git rm docs/blueprint/README.md" in done.stdout
+    assert not (repo.root / "docs/blueprint/checkpoints.txt").exists()
+    assert (repo.root / "docs/blueprint/notes.md").exists()
+    assert (repo.root / "docs/blueprint/blueprint.toml").exists()
+    repo.git("commit", "-qm", "clean", "--no-verify")
+    assert _row(repo).verdict is Verdict.PASSING
+    again = run_cli(["gate", "clean-reports", "--repo", str(repo.root)])
+    assert again.returncode == 0
+    assert "nothing to remove" in again.stdout

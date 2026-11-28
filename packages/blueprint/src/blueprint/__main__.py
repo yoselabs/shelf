@@ -23,6 +23,7 @@ from datetime import date
 from pathlib import Path
 
 from blueprint import checkpoints, gate_hook, gate_py, gate_test, guard, init, preset, render, report
+from blueprint.concerns.gate import gate_audit_leftovers
 from blueprint.runner import run, run_audit
 
 _GATE_HELP = """\
@@ -78,6 +79,8 @@ def _parser() -> argparse.ArgumentParser:
     grd.add_argument("--committed", action="store_true", help="check HEAD (the gate's question); the default checks the index (the hook's)")
     hk = steps.add_parser("hook", help="the commit hook: one process over the staged files")
     hk.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
+    cr = steps.add_parser("clean-reports", help="git rm the tracked audit leftovers in docs/blueprint (checkpoints.txt, narrative reports)")
+    cr.add_argument("--repo", default=".", type=Path, help="the repository (default: cwd)")
     pre = steps.add_parser("preset", help="compare the repo's linter config with the shelf's preset (`just preset`)")
     pre.add_argument("--repo", default=".", type=Path, help="the repository to check (default: cwd)")
     pre.add_argument("--reference", type=Path, help="compare with this snapshot instead of the packaged one")
@@ -164,6 +167,10 @@ def _hook(args: argparse.Namespace) -> int:
     return gate_hook.run(args.repo.expanduser().resolve())
 
 
+def _clean_reports(args: argparse.Namespace) -> int:
+    return gate_audit_leftovers.clean(args.repo.expanduser().resolve())
+
+
 def _preset(args: argparse.Namespace) -> int:
     return preset.check(args.repo.expanduser().resolve(), args.reference)
 
@@ -228,6 +235,7 @@ _GATE_STEPS = {
     "blueprint": _blueprint,
     "guard": _guard,
     "hook": _hook,
+    "clean-reports": _clean_reports,
     "preset": _preset,
     "render": _render,
     "test": _test_changed,

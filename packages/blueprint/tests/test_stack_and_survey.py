@@ -604,11 +604,15 @@ def test_tests_are_not_set_up_without_a_timeout(repo: Repo) -> None:
     assert "timeout" in evidence
 
 
-def test_go_and_rust_manifests_make_no_stack(repo: Repo) -> None:
-    # shelf-rofp: no consumer ever used the go or rust profiles; their manifests are not detected.
+def test_go_and_rust_manifests_are_found_and_reported_unjudged(repo: Repo) -> None:
+    # 0.18 dropped the go and rust profiles, not their detection: no profile means "unjudged", never silence.
     repo.write("go.mod", "module x\n")
     repo.write("Cargo.toml", "[package]\n")
-    assert set(detect_stacks(repo.root)) == set()
+    assert set(detect_stacks(repo.root)) == {"go", "rust"}
+    rows = _rows(repo)
+    assert rows["stack.go.profile"][0] is Verdict.FAILING
+    assert "unjudged" in rows["stack.go.profile"][1]
+    assert rows["stack.rust.profile"][0] is Verdict.FAILING
 
 
 def _lint_config(repo: Repo, table: str) -> None:

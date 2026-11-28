@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from blueprint import report
-from blueprint.model import REGISTRY, Finding, Verdict, check, failing
+from blueprint.model import REGISTRY, Finding, Verdict, check, failing, not_checked, passing
 from blueprint.runner import Run, run
 
 if TYPE_CHECKING:
@@ -31,7 +31,8 @@ def red_check() -> Iterator[None]:
 
 
 def _waive(repo: Repo, fields: str, wid: str = "scratch.red") -> None:
-    repo.write("docs/blueprint/blueprint.toml", f'[[tool.blueprint.waivers]]\nid = "{wid}"\n{fields}\n')
+    since = "" if "since" in fields else 'since = "2026-12-01"\n'
+    repo.write("docs/blueprint/blueprint.toml", f'[[tool.blueprint.waivers]]\nid = "{wid}"\n{since}{fields}\n')
 
 
 def _scratch(repo: Repo) -> Run:
@@ -51,13 +52,13 @@ def test_a_waiver_passes_the_row_and_shows_the_days_left(repo: Repo, red_check: 
 def test_the_waiver_table_form_in_the_toml_also_loads(repo: Repo, red_check: None) -> None:
     repo.write(
         "docs/blueprint/blueprint.toml",
-        '[tool.blueprint]\nwaivers = [{ id = "scratch.red", reason = "r", until = 2026-12-31 }]\n',
+        '[tool.blueprint]\nwaivers = [{ id = "scratch.red", reason = "r", since = 2026-12-01, until = 2026-12-31 }]\n',
     )
     assert _scratch(repo).rows[0].verdict is Verdict.PASSING
 
 
 def test_an_expired_waiver_fails_the_run_and_excuses_nothing(repo: Repo, red_check: None) -> None:
-    _waive(repo, 'reason = "r"\nuntil = "2026-11-30"')
+    _waive(repo, 'reason = "r"\nsince = "2026-10-01"\nuntil = "2026-11-30"')
     result = _scratch(repo)
     assert result.rows[0].verdict is Verdict.FAILING
     assert any("expired 2026-11-30" in p for p in result.problems)
@@ -125,3 +126,68 @@ def test_write_no_longer_records_a_baseline(repo: Repo) -> None:
     paths = report.write(run(repo.root, env=repo.env), repo.root, TODAY)
     assert "checkpoints.txt" not in {p.name for p in paths}
     assert not (repo.root / "docs/blueprint/checkpoints.txt").exists()
+
+
+def test_a_datetime_until_parses_instead_of_crashing(repo: Repo, red_check: None) -> None:
+    _waive(repo, 'reason = "r"\nuntil = 2026-12-31T00:00:00Z')
+    result = _scratch(repo)
+    assert result.rows[0].verdict is Verdict.PASSING
+    assert "until 2026-12-31" in result.rows[0].evidence
+
+
+def test_a_waiver_without_since_fails(repo: Repo, red_check: None) -> None:
+    repo.write("docs/blueprint/blueprint.toml", '[[tool.blueprint.waivers]]\nid = "scratch.red"\nreason = "r"\nuntil = "2026-12-31"\n')
+    result = _scratch(repo)
+    assert result.rows[0].verdict is Verdict.FAILING
+    assert any("since" in p for p in result.problems)
+
+
+def test_a_renewal_cannot_stretch_past_ninety_days_from_since(repo: Repo, red_check: None) -> None:
+    _waive(repo, 'reason = "r"\nsince = "2026-10-01"\nuntil = "2027-01-15"')  # 106 days from since, 45 from today
+    result = _scratch(repo)
+    assert result.rows[0].verdict is Verdict.FAILING
+    assert any("since" in p and "90" in p for p in result.problems)
+
+
+def test_a_since_in_the_future_or_after_until_fails(repo: Repo, red_check: None) -> None:
+    _waive(repo, 'reason = "r"\nsince = "2026-12-20"\nuntil = "2026-12-31"')
+    result = _scratch(repo)
+    assert result.rows[0].verdict is Verdict.FAILING
+    assert any("future" in p for p in result.problems)
+
+
+def test_a_waiver_does_not_turn_not_checked_into_a_pass(repo: Repo) -> None:
+    before = list(REGISTRY)
+
+    @check("scratch.blind", "cannot judge")
+    def _blind(_ctx: object) -> Finding:
+        return not_checked("tool missing")
+
+    try:
+        _waive(repo, 'reason = "r"\nuntil = "2026-12-31"', wid="scratch.blind")
+        row = _scratch(repo).rows[0]
+    finally:
+        REGISTRY[:] = before
+    assert row.verdict is Verdict.NOT_CHECKED
+    assert "waiver ignored" in row.evidence
+
+
+def test_a_waiver_on_a_passing_row_is_reported_unused(repo: Repo) -> None:
+    before = list(REGISTRY)
+
+    @check("scratch.green", "always green")
+    def _green(_ctx: object) -> Finding:
+        return passing("fine")
+
+    try:
+        _waive(repo, 'reason = "r"\nuntil = "2026-12-31"', wid="scratch.green")
+        result = run(repo.root, env=repo.env, today=TODAY)
+    finally:
+        REGISTRY[:] = before
+    assert any("waiver `scratch.green` is unused" in n for n in result.notices)
+
+
+def test_a_waiver_in_a_toml_the_audit_does_not_read_is_named(repo: Repo, red_check: None) -> None:
+    repo.write("sub/pyproject.toml", '[[tool.blueprint.waivers]]\nid = "scratch.red"\n')
+    result = run(repo.root, env=repo.env, today=TODAY)
+    assert any("sub/pyproject.toml" in n and "not read" in n for n in result.notices)
