@@ -802,6 +802,7 @@ ignore_imports = [
     "git_porcelain.porcelain -> child_env",
     "git_porcelain.lfs -> child_env",
     "any_gate.cli -> any_lease",
+    "any_gate.gate_lease -> any_lease",
     "any_gate.receipts -> atomic_io",
     "any_gate.receipts -> content_digest",
     "any_gate.runner -> stream_proc",

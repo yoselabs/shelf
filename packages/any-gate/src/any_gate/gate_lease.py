@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from any_lease import Leases, LeaseTimeoutError
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator, Mapping
+    from collections.abc import Callable, Generator, Mapping
     from pathlib import Path
 
     from any_lease import Waiting
@@ -50,7 +50,7 @@ def hold(
     env: Mapping[str, str],
     say: Callable[[str], None],
     poll: float = 0.5,
-) -> Iterator[dict[str, str]]:
+) -> Generator[dict[str, str]]:
     """Hold one of `slots` gate slots for the block; yields the environment the gate's steps run in.
 
     No slot is taken when `slots` is 0 or `env` says an enclosing gate holds one. After `wait_limit` seconds in the queue the block
