@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.19.0
 
 - **Root `blueprint.toml`** (ADR 0034): a repo's blueprint config (waivers, overrides, `[[edge]]`, classification) may live in `blueprint.toml` at the root, the one home for a multi-stack repo; `docs/blueprint/blueprint.toml` is still read, and both files at once is a problem naming the `git mv`. Each stack's own `[tool.*]` stays in its manifest. `stack.tool-pins` reads `rust-just` only from the root `pyproject.toml`: with the Python stack in `backend/` just must be pinned in mise.toml (ADR 0023 amended).
 - **Repo layout (ADR 0034, shelf-e722).** New row `layout.stacks-in-own-folders` (waivable, ADR 0018): with two code bases (language stacks; `node-tooling` is a tool; a stack deeper than one folder or hidden is no code base of the repo) each lives in `backend/` or `frontend/`; a code base at the root or in another folder fails and the remedy names the `git mv`. Corpus diff against the pre-change engine (42 repos): the row is the only change; it fails a2kay and full-stack-fastapi-template (both have Python and node at the root or in `ui/`), passes 32, not applicable 8 (no code base).
