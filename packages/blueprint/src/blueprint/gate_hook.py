@@ -9,7 +9,10 @@ Every check still runs after one fails, so a commit shows everything to fix at o
 | secret scan | the index | always |
 | guard | the staged pyproject.toml | always (a clean pass when none is staged) |
 | preset drift | the repo's lint config | only when pyproject.toml is staged |
-| ruff check, ruff format --check | the staged Python files under `[tool.blueprint.gate] lint-paths` | only when one is staged |
+| ruff check, ruff format --check | staged `.py` under `lint-paths` (none set: all) | when one is staged |
+
+A git failure reading the index fails the hook (exit 2): a hook that cannot see the staged files must not pass. With no `lint-paths`
+every staged `.py` is linted, so the hook may refuse a scratch file the gate does not lint: set `lint-paths` to narrow both alike.
 """
 
 from __future__ import annotations
@@ -27,8 +30,12 @@ _GIT_TIMEOUT = 60
 _RUFF_TIMEOUT = 600
 
 
+class _GitFailedError(Exception):
+    """`git diff --cached` failed: the staged set is unknown, so no check may be skipped for want of files."""
+
+
 def _staged(repo: Path) -> list[str]:
-    """Paths added, copied, modified or renamed in the index (never a deleted one)."""
+    """Paths added, copied, modified or renamed in the index (never a deleted one); raises `_GitFailedError`."""
     done = subprocess.run(
         ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"],
         cwd=repo,
@@ -37,7 +44,9 @@ def _staged(repo: Path) -> list[str]:
         check=False,
         timeout=_GIT_TIMEOUT,
     )
-    return [p for p in done.stdout.split("\0") if p] if done.returncode == 0 else []
+    if done.returncode != 0:
+        raise _GitFailedError(done.stderr.strip() or f"exit {done.returncode}")
+    return [p for p in done.stdout.split("\0") if p]
 
 
 def _under(path: str, roots: list[str]) -> bool:
@@ -76,7 +85,11 @@ def _run_ruff(repo: Path, files: list[str]) -> int:
 
 def run(repo: Path) -> int:
     """The worst exit code of the checks the staged files call for."""
-    staged = _staged(repo)
+    try:
+        staged = _staged(repo)
+    except (_GitFailedError, OSError, subprocess.SubprocessError) as error:
+        sys.stderr.write(f"hook: git diff --cached failed ({error}): the staged files are unknown, so the commit is refused\n")
+        return 2
     codes = [_secrets(repo), guard.check(committed=False)]
     if "pyproject.toml" in staged:
         codes.append(preset.check(repo))

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Commit hook (`blueprint gate hook`): a git failure reading the index now fails the hook (exit 2) instead of skipping ruff and the preset check and passing; the rendered entry is `uv run --frozen blueprint gate hook` (no re-resolve per commit, as the old ruff hooks had). With no `lint-paths` every staged `.py` is still linted (documented).
+
 - Corpus diff against 0.17.0 (42 repos): 24 Makefile-only repos moved passing -> not set up on the gate-reading rows (`gate.one-command`, `gate.recipe-calls`; four more rows not applicable -> not set up), 3 more were already failing; the 15 justfile repos did not move on any old row. New rows: `gate.no-audit-leftovers` fails 5 repos (those tracking `checkpoints.txt` or a report; `blueprint gate clean-reports` fixes each), `gate.lint-paths-cover-python` fails a2kay.
 
 - `test_a_second_run_starts_no_test_process` is marked `slow` with a reason (shelf-q40b): three real gate runs, 11 s alone, over the 3.5 s rule; it runs in `check` when the suite's key changed and always in `check-all`.
