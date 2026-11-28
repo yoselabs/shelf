@@ -8,6 +8,7 @@ import shlex
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph, render
+from blueprint.concerns.gate import gate_unreadable
 from blueprint.model import Context, Finding, failing, not_applicable, not_checked, passing
 
 if TYPE_CHECKING:
@@ -77,6 +78,8 @@ def calls(ctx: Context) -> Finding:
     """A recipe runs `blueprint` with a flag it no longer has, or runs it from a shelf clone."""
     from blueprint.__main__ import known_flags  # noqa: PLC0415 -- __main__ imports every check, so it cannot be imported at load time
 
+    if (blind := gate_unreadable.unreadable(ctx, "its calls of blueprint")) is not None:
+        return blind
     gate = gate_graph.load(ctx)
     if gate is None or not gate.recipes:
         return not_applicable("no gate recipes to read")

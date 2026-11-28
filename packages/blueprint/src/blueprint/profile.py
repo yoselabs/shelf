@@ -14,6 +14,8 @@ from typing import Any
 from blueprint.facts import KINDS, SURFACES, TRAITS, Judgement, detect_facts, judgement_problem, package_json
 from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, is_skipped, override_toml, walk
 from blueprint.names import canonical_name
+from blueprint.waivers import Waiver
+from blueprint.waivers import load as load_waivers
 
 STATE_DIR = "docs/blueprint"
 STATE_FILE = f"{STATE_DIR}/blueprint.toml"
@@ -122,6 +124,8 @@ class State:
     edges: tuple[tuple[str, str, str], ...] = ()
     # `[plugins]`: one switch per plugin, `beads = false` (mission blueprint-plugins). Absent means the plugin's default.
     plugins: tuple[tuple[str, bool], ...] = ()
+    # `[[tool.blueprint.waivers]]` (ADR 0018): the dated waits; a waiver that does not count carries its `problem`.
+    waivers: tuple[Waiver, ...] = ()
 
 
 def _load_plugin_switches(data: dict[str, Any], problems: list[str]) -> tuple[tuple[str, bool], ...]:
@@ -210,14 +214,17 @@ def _legacy_ignore(raw: dict[str, Any], today: date, problems: list[str]) -> tup
 def load_state(repo: Path, today: date | None = None) -> State:
     """Read `docs/blueprint/blueprint.toml`; an absent file is an empty state."""
     path = repo / STATE_FILE
+    today = today or date.today()  # noqa: DTZ011 -- a calendar date in the owner's zone
     if not path.is_file():
-        return State({}, (), {}, ())
+        waivers = load_waivers(repo, {}, today)
+        return State({}, (), {}, tuple(w.problem for w in waivers if w.problem), waivers=waivers)
     try:
         data = tomllib.loads(path.read_text())
     except tomllib.TOMLDecodeError as exc:
         return State({}, (), {}, (f"{STATE_FILE} is not valid TOML: {exc}",))
-    today = today or date.today()  # noqa: DTZ011 -- a calendar date in the owner's zone
-    problems: list[str] = []
+    waivers = load_waivers(repo, data, today)
+    problems_w = [w.problem for w in waivers if w.problem]
+    problems: list[str] = list(problems_w)
     overrides = [o for raw in data.get("override", []) if (o := _load_override(raw, problems)) is not None]
     declared = data.get("profile", {})
     notices: list[str] = []
@@ -236,7 +243,17 @@ def load_state(repo: Path, today: date | None = None) -> State:
     edges = _load_edges(data, problems)
     switches = _load_plugin_switches(data, problems)
     return State(
-        declared, tuple(overrides), data.get("settings", {}), tuple(problems), skip, tuple(notices), classified, rejected, edges, switches
+        declared,
+        tuple(overrides),
+        data.get("settings", {}),
+        tuple(problems),
+        skip,
+        tuple(notices),
+        classified,
+        rejected,
+        edges,
+        switches,
+        waivers,
     )
 
 

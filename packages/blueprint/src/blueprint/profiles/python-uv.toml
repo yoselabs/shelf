@@ -67,22 +67,8 @@ config = [
     { path = "ruff.toml", contains = "[lint]" },
     { path = ".ruff.toml", contains = "[lint]" },
 ] },
-    { any = [
-    { path = "pyproject.toml", contains = '"ALL"' },
-    { path = "pyproject.toml", contains = '"S"' },
-    { path = "ruff.toml", contains = '"ALL"' },
-    { path = "ruff.toml", contains = '"S"' },
-    { path = ".ruff.toml", contains = '"ALL"' },
-    { path = ".ruff.toml", contains = '"S"' },
-    ] },
-    { any = [
-    { path = "pyproject.toml", contains = '"ALL"' },
-    { path = "pyproject.toml", contains = '"C90"' },
-    { path = "ruff.toml", contains = '"ALL"' },
-    { path = "ruff.toml", contains = '"C90"' },
-    { path = ".ruff.toml", contains = '"ALL"' },
-    { path = ".ruff.toml", contains = '"C90"' },
-    ] },
+  { ruff-selects = "S" },  # parsed from the lint table: `ignore = ["S"]` fails
+  { ruff-selects = "C90" },
 ]
 gate = "ruff check"
 

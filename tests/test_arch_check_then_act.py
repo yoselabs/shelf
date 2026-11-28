@@ -156,7 +156,6 @@ _ALLOWED = {
     **rows(
         "outcome: read, compare, write the same bytes: the check only skips a redundant idempotent write, and the file has one writer",
         ("packages/blueprint/src/blueprint/render.py:write", 1),
-        ("packages/blueprint/src/blueprint/report.py:_write", 1),
     ),
 }
 
