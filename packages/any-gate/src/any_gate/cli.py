@@ -3,6 +3,8 @@
 `steps [--runner just] [--fail-fast] [--step-limit S] STEP...` runs the gate's steps at once, each into its own log, shows a failed
 step's log the moment it ends, then prints one timing line (see `any_gate.steps`); exit 1 when one failed.
 `--opens` prints, after the timing line, the file opens and process starts each step's Python processes made (`any_gate.opens`).
+`--reads` judges each step's declared inputs against the files its Python processes read, and says what it cannot see (`any_gate.reads`);
+exit 1 when a step reads a file its inputs omit. Use it with `--all`, so no step is skipped unjudged.
 `$GATE_STEP_BUDGET` (default 60) and `$GATE_BUDGET` (default 180) are seconds.
 
 A step that declares its input files in `gate-inputs.toml` and whose inputs did not change is not started (`any_gate.inputs`);
@@ -24,9 +26,9 @@ The plan arrives on stdin, one unit per line: `unit<TAB>key`. The unit is what t
 depends on (empty: never skip it). A unit whose key is in the receipts file already passed on exactly that input and is skipped. The rest
 are passed to `RUNNER` (any command taking the units as its last arguments and exiting 0 when they are green) under a lease, so gates
 started at once queue instead of thrashing the box; when it exits 0, each is recorded. Exit 0: green or nothing to run; 1: the runner
-failed or was stopped by the wall or idle limit; 2: usage. Notices go to the descriptor in `$GATE_NOTICE_FD` when open (the gate's
-parallel runner points it at its terminal), else to stderr. The core knows no language: the plan, the receipts and the runner contract
-are all it uses.
+failed or was stopped by the wall or idle limit; 2: usage. Notices go to the descriptor in `$GATE_NOTICE_FD`
+while it is still the one the gate announced (`any_gate.notice`), else to stderr.
+The core knows no language: the plan, the receipts and the runner contract are all it uses.
 """
 
 from __future__ import annotations
@@ -44,9 +46,10 @@ from typing import TYPE_CHECKING, TextIO
 from any_lease import Leases
 
 from any_gate import changed as changed_files
-from any_gate import inputs
+from any_gate import inputs, reads
 from any_gate import opens as step_opens
 from any_gate.gate_lease import REPEAT_WAIT_NOTICE, WAIT_LIMIT, default_root, hold, wait_message
+from any_gate.notice import descriptor, scrub
 from any_gate.receipts import Receipts
 from any_gate.runner import RunResult, run_runner
 from any_gate.state import GateState, common_dir
@@ -67,10 +70,10 @@ class PlanError(ValueError):
 def notice(text: str) -> None:
     """One line to `$GATE_NOTICE_FD` when that descriptor is open, else to stderr."""
     line = f"any-gate: {text}\n".encode()
-    fd = os.environ.get("GATE_NOTICE_FD", "")
-    if fd.isdigit():
+    fd = descriptor(os.environ)  # a number that is no longer the gate's own descriptor is never written to
+    if fd is not None:
         try:
-            os.write(int(fd), line)
+            os.write(fd, line)
         except OSError:
             pass
         else:
@@ -133,7 +136,7 @@ def _run_under_lease(args: argparse.Namespace, left: Callable[[], list[tuple[str
             return todo, None
         # `$GATE_NOTICE_FD` names a descriptor of this process only: in the runner's tree that number is some other pipe (an xdist worker's
         # link to its controller), and a notice written to it corrupts that link and hangs the run.
-        env = {name: value for name, value in os.environ.items() if name != "GATE_NOTICE_FD"}
+        env = scrub(os.environ)
         return todo, run_runner(args.runner, [path for path, _ in todo], cwd=cwd, wall=args.wall, idle=args.idle, on_output=_show, env=env)
 
 
@@ -242,10 +245,12 @@ def _steps(args: argparse.Namespace) -> int:
         tempfile.TemporaryDirectory() as folder,
     ):
         skip, why = _decide(args, repo)  # after the wait: what changed while queued is judged too
-        counted = step_opens.prepare(Path(folder)) if args.opens else None
-        return run_and_report(
+        hooked = step_opens.prepare(Path(folder)) if args.opens or args.reads else None
+        counted = hooked if args.opens else None
+        step_env = {**env, "GATE_READS_ROOT": reads.root_env(repo)} if args.reads else env
+        code = run_and_report(
             args.names,
-            env=env,
+            env=step_env,
             runner=args.runner,
             step_budget=args.step_budget,
             gate_budget=args.gate_budget,
@@ -255,7 +260,14 @@ def _steps(args: argparse.Namespace) -> int:
             step_limit=args.step_limit,
             halt=threading.Event() if fail_fast else None,
             opens=counted,
+            hook=hooked,
         )
+        if args.reads and hooked is not None:
+            report, under = reads.audit(repo, [n for n in args.names if n not in skip], hooked, args.runner)
+            for line in report:
+                _say(line)
+            return 1 if under else code
+        return code
 
 
 def _exec(cmd: Sequence[str]) -> int:
@@ -347,6 +359,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
     st.add_argument(
         "--opens", action="store_true", help="count each step's file opens and process starts (python only; see any_gate.opens)"
     )
+    st.add_argument("--reads", action="store_true", help="judge each step's inputs against the files it read (any_gate.reads); 1 on UNDER")
     st.add_argument(
         "--gate-slots",
         type=int,

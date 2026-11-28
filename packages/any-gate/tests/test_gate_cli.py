@@ -11,7 +11,9 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
+from any_gate import notice as descriptors
 from any_gate.cli import main
+from any_gate.cli import notice as cli_notice
 from any_gate.receipts import Receipts
 from any_gate.state import GateState
 from any_lease import Leases
@@ -109,16 +111,19 @@ def test_nothing_to_run_is_a_pass_that_starts_no_runner(root: Path, capsys: pyte
 def test_the_notice_descriptor_does_not_reach_the_runners_tree(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # `GATE_NOTICE_FD` is a descriptor number of the gate's own process. Inherited, it named a pipe of an xdist worker in the runner's
     # tree, a notice written there corrupted the worker's link to its controller, and the run hung until the idle limit (2026-11-28).
-    (root / "probe.py").write_text('import os\nopen("seen.log", "w").write(os.environ.get("GATE_NOTICE_FD", "absent"))\n')
+    (root / "probe.py").write_text(
+        'import os\nopen("seen.log", "w").write(os.environ.get("GATE_NOTICE_FD", "absent") + os.environ.get("GATE_NOTICE_ID", "absent"))\n'
+    )
     read, write = os.pipe()  # our own descriptor: this test's notices must never land on a number it did not open
     try:
         monkeypatch.setenv("GATE_NOTICE_FD", str(write))
+        monkeypatch.setenv("GATE_NOTICE_ID", "1:2")
         args = ["test", "--receipts", str(root / "r.json"), "--lease-root", str(root / "leases"), "--cwd", str(root)]
         code = main([*args, "--", sys.executable, "probe.py"], stdin=io.StringIO("a\tk\n"))
     finally:
         os.close(read)
         os.close(write)
-    assert (code, (root / "seen.log").read_text()) == (0, "absent")
+    assert (code, (root / "seen.log").read_text()) == (0, "absentabsent")
 
 
 def test_the_runners_output_reaches_the_caller(root: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -229,3 +234,22 @@ def test_the_steps_command_takes_the_gate_lease_before_it_decides_what_to_skip(t
     monkeypatch.setattr(cli, "run_and_report", lambda *_a, **_k: 0)
     assert main(["steps", "--repo", str(tmp_path), "--lease-root", str(tmp_path / "l"), "one"]) == 0
     assert order == ["lease", "decide"]
+
+
+def test_a_notice_is_dropped_to_stderr_when_its_descriptor_number_names_another_pipe(
+    monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    read, write = os.pipe()
+    other_read, other_write = os.pipe()
+    try:
+        for name, value in descriptors.announce({}, write).items():
+            monkeypatch.setenv(name, value)
+        os.dup2(other_write, write)  # the announced number now names a pipe the gate never opened
+        cli_notice("reused number")
+        os.set_blocking(other_read, False)
+        with pytest.raises(BlockingIOError):
+            os.read(other_read, 100)
+    finally:
+        for fd in (read, write, other_read, other_write):
+            os.close(fd)
+    assert "reused number" in capfd.readouterr().err

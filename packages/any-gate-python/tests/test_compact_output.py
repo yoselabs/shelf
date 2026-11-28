@@ -36,7 +36,7 @@ def test_many_failures_print_ids_totals_and_the_log_path(tmp_path: Path) -> None
     assert shown.count("FAILED tests/test_x.py::") == 57
     assert "57 failed, 10 passed" in shown
     assert str(log) in shown
-    assert "traceback line" not in shown
+    assert shown.count("traceback line") < 15  # the first failure's head only, never all 57
     assert len(shown) < len(full) / 10
     assert log.read_text(encoding="utf-8") == full
 
@@ -55,3 +55,21 @@ def test_a_green_run_prints_everything_it_got(tmp_path: Path) -> None:
         compact.feed(line)
     compact.finish()
     assert "".join(out) == "....... [100%]\n7 passed in 0.10s\n"
+
+
+def test_a_green_run_after_a_red_one_leaves_the_red_ones_log_in_place(tmp_path: Path) -> None:
+    # 2026-11-28: the push that failed 13 tests was retried; the green run overwrote the one log that held the assertion text.
+    _, full, log = _run(tmp_path, 13)
+    compact = Compact(lambda _line: None, log)
+    for line in ("....... [100%]\n", "7 passed in 0.10s\n"):
+        compact.feed(line)
+    compact.finish()
+    assert log.read_text(encoding="utf-8") == full
+    assert not [p for p in tmp_path.iterdir() if p != log]  # no scratch file left behind
+
+
+def test_the_held_back_note_shows_the_first_failures_assertion(tmp_path: Path) -> None:
+    shown, _, log = _run(tmp_path, 13)
+    assert "E   AssertionError: boom" in shown
+    assert str(log) in shown
+    assert shown.count("traceback line") <= 15
