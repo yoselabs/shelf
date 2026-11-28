@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from any_gate import changed as gate_changed
 from any_gate.plan import too_wide
 from stream_proc import capture
 
@@ -51,13 +52,19 @@ def _fitness(repo: Path, changed: list[str], rules: Rules) -> list[str]:
 
 
 def affected_packages(
-    repo: Path, changed: list[str], lock: Callable[[], set[str] | None] | None = None, rules: Rules | None = None
+    repo: Path, changed: list[str] | None, lock: Callable[[], set[str] | None] | None = None, rules: Rules | None = None
 ) -> set[str]:
     """The package directories `changed` reaches: the changed ones and, through the graph, everything depending on them.
 
     `lock` answers which packages the lock files changed for (see `lock_touched`); without it a lock change selects everything.
+    A `changed` of None (the base is unknown) selects every package.
     """
-    rules = rules or Rules.load(repo)
+    if changed is None:
+        return set(workspace(repo)[0])
+    return _reached(repo, changed, lock, rules or Rules.load(repo))
+
+
+def _reached(repo: Path, changed: list[str], lock: Callable[[], set[str] | None] | None, rules: Rules) -> set[str]:
     graph, plugins = workspace(repo)
     every = sorted(graph)
     touched: set[str] = set()
@@ -92,9 +99,13 @@ def affected_packages(
     return seen
 
 
-def affected(repo: Path, changed: list[str], lock: Callable[[], set[str] | None] | None = None, rules: Rules | None = None) -> list[str]:
-    """The pytest paths to run for `changed` (repo-relative paths)."""
+def affected(
+    repo: Path, changed: list[str] | None, lock: Callable[[], set[str] | None] | None = None, rules: Rules | None = None
+) -> list[str]:
+    """The pytest paths to run for `changed` (repo-relative paths); every suite when `changed` is None (unknown)."""
     rules = rules or Rules.load(repo)
+    if changed is None:
+        return everything(repo, rules)
     seen = affected_packages(repo, changed, lock, rules)
     tests = (f"packages/{d}/tests" for d in sorted(seen) if (repo / "packages" / d / "tests").is_dir())
     return [*_fitness(repo, changed, rules), *tests]
@@ -117,7 +128,10 @@ def reach(repo: Path, count: int, exporter: Exporter = package_exports, rules: R
     """
     rows: list[tuple[str, int, int]] = []
     for sha in _git(repo, "log", "--first-parent", f"-{count}", "--format=%h").split():
-        changed = _git(repo, "diff", "--name-only", f"{sha}^", sha).splitlines()
+        try:
+            changed = _git(repo, "diff", "--name-only", "--no-renames", f"{sha}^", sha).splitlines()
+        except RuntimeError:  # a root commit has no parent
+            continue
         with tempfile.TemporaryDirectory() as old, tempfile.TemporaryDirectory() as new:
             try:
                 extract_base(repo, f"{sha}^", Path(old))
@@ -198,16 +212,22 @@ def wide_alarm(repo: Path, paths: list[str]) -> str | None:
 
 
 def _git(repo: Path, *args: str) -> str:
-    return capture(["git", *args], cwd=repo, timeout=GIT_TIMEOUT).text
+    """What git prints; a failed git raises (it never means "no changes")."""
+    done = capture(["git", *args], cwd=repo, timeout=GIT_TIMEOUT)
+    if done.exit != 0:
+        message = f"git {' '.join(args)} failed ({done.exit}): {done.text.strip()[:200]}"
+        raise RuntimeError(message)
+    return done.text
 
 
-def merge_base(repo: Path) -> str:
-    """The upstream merge-base, or HEAD when there is no upstream."""
-    return _git(repo, "merge-base", "HEAD", "@{upstream}").strip() or "HEAD"
+def merge_base(repo: Path) -> str | None:
+    """The upstream merge-base; None when it is unknown (no upstream, git failed): the caller then takes everything."""
+    return gate_changed.base(repo)
 
 
-def changed_files(repo: Path) -> list[str]:
-    """Files changed since the upstream merge-base (or HEAD), tracked and untracked."""
-    tracked = _git(repo, "diff", "--name-only", merge_base(repo)).splitlines()
-    untracked = _git(repo, "ls-files", "--others", "--exclude-standard").splitlines()
-    return sorted(set(tracked) | set(untracked))
+def changed_files(repo: Path) -> list[str] | None:
+    """Files changed since the upstream merge-base, tracked and untracked, both paths of a move; None when the base is unknown.
+
+    The one answer `any_gate.changed` gives every step: an unknown base is "everything", never "nothing changed".
+    """
+    return gate_changed.changed(repo)

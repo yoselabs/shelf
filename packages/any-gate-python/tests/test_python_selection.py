@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import any_gate_python as affected
 import pytest
-from any_gate_python import graph
+from any_gate_python import graph, select
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -406,3 +406,50 @@ def test_the_packages_command_names_every_package_when_asked_or_when_no_package_
 
     assert cli.main(["packages", "--repo", str(repo), "--all"]) == 0
     assert capsys.readouterr().out.split() == ["base", "leaf", "middle", "plug", "top"]
+
+
+# --- an unknown base or a failed git is never "nothing changed" ---
+
+
+def test_a_clean_tree_with_no_upstream_selects_every_suite(committed: Path) -> None:
+    """The incident: a merge on a branch with no upstream left a clean tree; the diff against HEAD was empty and nothing ran."""
+    assert select.changed_files(committed) is None
+    assert _pkgs(affected.affected(committed, select.changed_files(committed))) == {"base", "leaf", "middle", "plug", "top"}
+    assert affected.affected_packages(committed, None) == {"base", "leaf", "middle", "plug", "top"}
+
+
+def test_the_packages_command_names_every_package_when_the_base_is_unknown(committed: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from any_gate_python import cli  # noqa: PLC0415
+
+    assert cli.main(["packages", "--repo", str(committed)]) == 0
+    assert capsys.readouterr().out.split() == ["base", "leaf", "middle", "plug", "top"]
+
+
+def test_a_failing_git_selects_every_suite_never_none(repo: Path) -> None:
+    """Not a git repo at all: git fails; that is not an empty change."""
+    assert select.changed_files(repo) is None
+
+
+def _with_upstream(repo: Path) -> Path:
+    _git(repo, "branch", "-q", "upstream-copy")
+    _git(repo, "branch", "-q", "--set-upstream-to=upstream-copy")
+    return repo
+
+
+def test_a_file_moved_out_of_a_package_selects_the_package_it_left(committed: Path) -> None:
+    _with_upstream(committed)
+    (committed / "packages" / "leaf" / "src").mkdir(parents=True)
+    (committed / "packages" / "leaf" / "src" / "m.py").write_text("x = 1\n")
+    _git(committed, "add", "-A")
+    _git(committed, "commit", "-q", "-m", "m")
+    _git(committed, "branch", "-q", "-f", "upstream-copy")
+    (committed / "packages" / "base" / "src").mkdir(parents=True)
+    _git(committed, "mv", "packages/leaf/src/m.py", "packages/base/src/m.py")
+    changed = select.changed_files(committed)
+    assert changed is not None
+    assert {"packages/leaf/src/m.py", "packages/base/src/m.py"} <= set(changed)
+    assert {"leaf", "base"} <= _pkgs(affected.affected(committed, changed))
+
+
+def test_the_merge_base_is_none_without_an_upstream(committed: Path) -> None:
+    assert select.merge_base(committed) is None

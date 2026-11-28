@@ -56,6 +56,18 @@ def _run(args: argparse.Namespace) -> int:
     return 0 if outcome.ok else 1
 
 
+def _lock(repo: Path) -> set[str] | None:
+    """The packages the lock files changed for; None (every package) when there is no base to read them against."""
+    start = merge_base(repo)
+    return None if start is None else lock_touched(repo, start)
+
+
+def _summary(changed: list[str] | None) -> str:
+    if changed is None:
+        return "base unknown: every suite"
+    return f"{len(changed)} changed file(s): {' '.join(changed) or '-'}"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="any_gate_python", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -87,11 +99,7 @@ def main(argv: list[str] | None = None) -> int:
         return _run(args)
     repo = Path(args.repo).resolve()
     if args.command == "packages":
-        names = (
-            sorted(workspace(repo)[0])
-            if args.all
-            else sorted(affected_packages(repo, changed_files(repo), lambda: lock_touched(repo, merge_base(repo))))
-        )
+        names = sorted(workspace(repo)[0]) if args.all else sorted(affected_packages(repo, changed_files(repo), lambda: _lock(repo)))
         sys.stdout.write("".join(f"{name}\n" for name in names))
         return 0
     if args.reach:
@@ -102,10 +110,10 @@ def main(argv: list[str] | None = None) -> int:
         median, top = (sizes[len(sizes) // 2], sizes[-1]) if sizes else (0, 0)
         sys.stdout.write(f"commits={len(rows)} median={median} max={top} of {len(workspace(repo)[0])} packages\n")
         return 0
-    changed = [] if args.all else changed_files(repo)
-    paths = everything(repo) if args.all else affected(repo, changed, lambda: lock_touched(repo, merge_base(repo)))
+    changed = [] if args.all else changed_files(repo)  # None: the base is unknown, every suite
+    paths = everything(repo) if args.all else affected(repo, changed, lambda: _lock(repo))
     if args.explain:
-        sys.stderr.write(f"affected: {len(changed)} changed file(s): {' '.join(changed) or '-'}\n")
+        sys.stderr.write(f"affected: {_summary(changed)}\n")
     if (alarm := wide_alarm(repo, paths)) is not None:
         sys.stderr.write(f"any-gate-python: {alarm}\n")
     lines = [f"{path}\t{key}" for path, key in plan(repo, paths)] if args.plan else paths
