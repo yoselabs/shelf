@@ -406,3 +406,13 @@ def test_the_packages_command_names_every_package_when_asked_or_when_no_package_
 
     assert cli.main(["packages", "--repo", str(repo), "--all"]) == 0
     assert capsys.readouterr().out.split() == ["base", "leaf", "middle", "plug", "top"]
+
+
+def test_the_explain_line_caps_the_file_list() -> None:
+    from any_gate_python.cli import explain_line  # noqa: PLC0415 -- only this test needs the command line
+
+    assert explain_line([]) == "affected: 0 changed file(s): -"
+    assert explain_line(["a", "b"]) == "affected: 2 changed file(s): a b"
+    line = explain_line([f"packages/p/f{i}.py" for i in range(400)])
+    assert line.endswith("f4.py (+395 more)")
+    assert len(line) < 200
