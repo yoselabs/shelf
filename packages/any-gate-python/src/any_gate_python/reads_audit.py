@@ -96,6 +96,40 @@ def _naming(repo: Path, package: str, tokens: set[str], reached: set[str]) -> st
     return None
 
 
+def _literals(source: str) -> str:
+    """The string constants of Python `source` that are not docstrings, one per line."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return ""
+    docs = {
+        id(n.body[0].value)
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        and n.body
+        and isinstance(n.body[0], ast.Expr)
+        and isinstance(n.body[0].value, ast.Constant)
+    }
+    return "\n".join(n.value for n in ast.walk(tree) if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs)
+
+
+def _reads_by(repo: Path, package: str, tokens: set[str]) -> str | None:
+    """The first Python test of `package` holding a string that names one of `tokens`, as a problem line.
+
+    Only a package whose tests find the repo root (`parents[3]` or deeper) can read the real repo; a name in the tests of one that cannot
+    is a file the test writes into its own temp tree.
+    """
+    texts = {where: text for where, text in _texts(repo / "packages" / package / "tests").items() if where.endswith(".py")}
+    if not any(_ROOT_HOP.search(text) for text in texts.values()):
+        return None
+    for where, text in texts.items():
+        literals = _literals(text)
+        named = next((t for t in sorted(tokens) if _names(t, literals)), None)
+        if named:
+            return f"{where} names {named}, but a change there selects no suite (no-effect)"
+    return None
+
+
 def audit(repo: Path, rules: Rules | None = None) -> list[str]:
     """What is wrong with the `reads` map, one line each; empty when every test that names a mapped file is covered by it."""
     rules = rules or Rules.load(repo)
@@ -112,6 +146,12 @@ def audit(repo: Path, rules: Rules | None = None) -> list[str]:
         ]
         reached = _covered(graph, readers)
         problems += [f"{pattern}: {found}" for package in sorted(graph) if (found := _naming(repo, package, tokens, reached))]
+    for token_source in rules.no_effect:
+        # `no-effect` says no suite reads the path; a package test naming it is a suite that would be skipped when it changes
+        # Only a whole file's path counts as naming it, and only in a string a test runs (not a comment or docstring: "see docs/x.md").
+        # A root file by its bare name (`README.md`) is what a test writes into its own temp repo: only a path below a folder counts.
+        tokens = {t for t in Rules(reads={token_source: ("*",)}).read_files(repo, "*") if "/" in t}
+        problems += [f"no-effect {token_source}: {found}" for package in sorted(graph) if (found := _reads_by(repo, package, tokens))]
     mapped_anywhere = {n for names in rules.reads.values() for n in names}
     for package in sorted(graph.keys() - mapped_anywhere):
         for where, text in _texts(repo / "packages" / package / "tests").items():
@@ -134,7 +174,10 @@ def _probes(repo: Path, source: str) -> set[str]:
     modules = {m.name for m in sorted(repo.glob("packages/*/src/*")) if m.is_dir()}
     constants: set[str] = set()
     found: set[str] = set()
-    for node in ast.walk(ast.parse(source)):
+    tree = ast.parse(source)
+    names = _named_names(tree)
+    walks = any(_unnamed_walk(node, names) for node in ast.walk(tree))
+    for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             constants.add(node.value)
             top = re.split(r"[/\\]", node.value)[0]
@@ -150,12 +193,58 @@ def _probes(repo: Path, source: str) -> set[str]:
         found.update("packages" for h in heads if h in modules)
         found.update("tools" for h in heads if h == "tools")
     probes = {_probe(repo, top) for top in found}
+    if walks:
+        probes.add(WALK)
     if "packages" in found:
         probes.update(
             f"packages/x/{part}/x.py" for part, name in _PACKAGE_PARTS.items() if any(name in re.split(r"[/\\]", c) for c in constants)
         )
         probes.update(f"packages/x/{name}" for name in _PACKAGE_FILES if name in constants)
     return probes
+
+
+WALK = "(a walk of the repo)"  # what an unnamed `rglob`/`iterdir`/`os.walk` reads: only a `*` (or `!*`) pattern covers it
+_WALKERS = frozenset({"rglob", "glob", "iterdir", "scandir"})
+
+
+def _named(node: ast.AST, names: frozenset[str] = frozenset()) -> bool:
+    """`node` holds a string constant, or a name assigned one (`DOCS = ROOT / "docs"`)."""
+    return any(
+        (isinstance(n, ast.Constant) and isinstance(n.value, str)) or (isinstance(n, ast.Name) and n.id in names) for n in ast.walk(node)
+    )
+
+
+def _named_names(tree: ast.AST) -> frozenset[str]:
+    """Names the module binds to an expression holding a string constant (an assignment, a loop or comprehension over one): a walk from
+    one still names a path."""
+    # A parameter takes the path its caller names (the module's constants), and a `tmp_path` is the test's own folder.
+    found: set[str] = {a.arg for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) for a in n.args.args}
+    found |= {"tmp_path", "tmp_path_factory", "tmpdir"}
+    for _ in range(3):  # a loop variable over a name bound above it: a few passes settle the chain
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and _named(node.value, frozenset(found)):
+                found.update(t.id for t in node.targets if isinstance(t, ast.Name))
+            elif isinstance(node, (ast.For, ast.comprehension)) and _named(node.iter, frozenset(found)):
+                found.update(n.id for n in ast.walk(node.target) if isinstance(n, ast.Name))
+    return frozenset(found)
+
+
+def _pattern_names_a_path(call: ast.Call) -> bool:
+    """A `glob`/`rglob` pattern that starts with a literal folder (`packages/*/src`) names where it looks."""
+    first = call.args[0] if call.args else None
+    return isinstance(first, ast.Constant) and isinstance(first.value, str) and "/" in first.value and first.value[0] not in "*?[/"
+
+
+def _unnamed_walk(node: ast.AST, names: frozenset[str]) -> bool:
+    """A call listing a folder whose own path names no string (`ROOT.rglob(...)`, `repo.iterdir()`, `os.walk(root)`)."""
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if isinstance(func, ast.Attribute) and func.attr in _WALKERS:
+        return not _named(func.value, names) and not _pattern_names_a_path(node)
+    if isinstance(func, ast.Attribute) and func.attr == "walk" and isinstance(func.value, ast.Name) and func.value.id == "os":
+        return not any(_named(arg, names) for arg in node.args)
+    return False
 
 
 def _probe(repo: Path, top: str) -> str:
@@ -170,7 +259,7 @@ def audit_repo_tests(repo: Path, rules: Rules | None = None) -> list[str]:
     if not rules.repo_tests:
         return []
     problems: list[str] = []
-    for test in sorted((repo / rules.repo_tests).glob("test_*.py")):
+    for test in sorted((repo / rules.repo_tests).rglob("test_*.py")):
         patterns = [p for key, paths in rules.repo_reads.items() if key == "*" or fnmatch.fnmatchcase(test.name, key) for p in paths]
         if not rules.keyed(test.name):
             problems.append(f"{test.name} is not keyed in [tool.any-gate.python.repo-reads]: it runs on every change")
@@ -181,6 +270,9 @@ def audit_repo_tests(repo: Path, rules: Rules | None = None) -> list[str]:
             if not any(_glob(probe, p.removeprefix("!")) for p in patterns)
         ]
         problems.extend(
-            f"{test.name} names {probe.split('/')[0]!r} ({probe}), which no pattern of its repo-reads key covers" for probe in uncovered
+            f"{test.name} walks the repo without naming a path ({probe}): key it `*` (reads all) or `!*` (declared not read)"
+            if probe == WALK
+            else f"{test.name} names {probe.split('/')[0]!r} ({probe}), which no pattern of its repo-reads key covers"
+            for probe in uncovered
         )
     return problems

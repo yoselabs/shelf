@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import any_gate_python as affected
 import pytest
-from any_gate_python import graph, select
+from any_gate_python import Rules, graph, select
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -453,3 +453,37 @@ def test_a_file_moved_out_of_a_package_selects_the_package_it_left(committed: Pa
 
 def test_the_merge_base_is_none_without_an_upstream(committed: Path) -> None:
     assert select.merge_base(committed) is None
+
+
+# --- repo tests below subfolders, helpers, and a leading-glob `reads` pattern ---
+
+
+def test_a_repo_test_in_a_subfolder_is_selected_like_any_other(keyed: Path) -> None:
+    (keyed / "tests" / "sub").mkdir()
+    (keyed / "tests" / "sub" / "test_deep.py").write_text("")
+    ran = _ran(keyed, ["ci.yaml"])
+    assert "sub/test_deep.py" in ran  # unkeyed: always
+
+
+def test_a_changed_helper_no_key_names_runs_every_repo_test(keyed: Path) -> None:
+    (keyed / "tests" / "newhelper.py").write_text("")
+    assert affected.affected(keyed, ["tests/newhelper.py"]) == [
+        "tests",
+        *[p for p in affected.affected(keyed, []) if p.startswith("packages")],
+    ]
+
+
+def test_a_changed_helper_a_star_key_names_runs_the_keyed_tests_only(keyed: Path) -> None:
+    assert "tests" not in affected.affected(keyed, ["tests/helper.py"])
+
+
+def test_a_leading_glob_reads_pattern_does_not_walk_the_virtualenv_or_git(repo: Path) -> None:
+    (repo / ".venv" / "lib").mkdir(parents=True)
+    (repo / ".venv" / "lib" / "x.toml").write_text("")
+    (repo / ".git").mkdir()
+    (repo / ".git" / "y.toml").write_text("")
+    (repo / "a.toml").write_text("")
+    rules = Rules(reads={"*.toml": ("base",)})
+    found = rules.read_files(repo, "base")
+    assert "a.toml" in found
+    assert not [f for f in found if f.startswith((".venv", ".git"))]

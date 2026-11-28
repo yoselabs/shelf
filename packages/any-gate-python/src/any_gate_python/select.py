@@ -25,7 +25,7 @@ from any_gate_python.graph import (
     touched_between,
     workspace,
 )
-from any_gate_python.rules import Rules, matches
+from any_gate_python.rules import SKIPPED_DIRS, Rules, matches
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -41,14 +41,20 @@ def _fitness(repo: Path, changed: list[str], rules: Rules) -> list[str]:
     if any(matches(p, rules.gated_inputs) for p in changed):
         return [root]
 
-    def runs(name: str) -> bool:
-        reads = (f"{root}/{name}", *rules.gated_reads.get(name, ()))
+    prefix = f"{root}/"
+    if any(p.startswith(prefix) and not Path(p).name.startswith("test_") and not rules.star_covers(p) for p in changed):
+        return [root]  # a helper, fixture or conftest no key names: any repo test may import it
+
+    def runs(rel: str) -> bool:
+        name = Path(rel).name
+        reads = (f"{root}/{rel}", *rules.gated_reads.get(name, ()))
         if rules.is_gated(name):
             return any(p.startswith(reads) for p in changed)
-        return not rules.keyed(name) or rules.reads_changed(name, f"{root}/{name}", changed)
+        return not rules.keyed(name) or rules.reads_changed(name, f"{root}/{rel}", changed)
 
-    every = sorted((repo / root).glob("test_*.py"))
-    return [p.relative_to(repo).as_posix() for p in every if runs(p.name)] if every else [root]
+    base = repo / root
+    every = sorted(p for p in base.rglob("test_*.py") if not SKIPPED_DIRS & set(p.relative_to(base).parts))
+    return [p.relative_to(repo).as_posix() for p in every if runs(p.relative_to(base).as_posix())] if every else [root]
 
 
 def affected_packages(

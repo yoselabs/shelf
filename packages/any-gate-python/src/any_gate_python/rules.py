@@ -29,12 +29,15 @@ The reads map is a claim about the tests: `reads_audit` fails the gate when a te
 from __future__ import annotations
 
 import fnmatch
+import os
 import tomllib
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import Any
 
-if TYPE_CHECKING:
-    from pathlib import Path
+SKIPPED_DIRS = frozenset(
+    {".git", ".venv", ".pytest_cache", ".ruff_cache", ".hypothesis", ".import_linter_cache", "node_modules", "__pycache__"}
+)
 
 
 def matches(path: str, entries: tuple[str, ...]) -> bool:
@@ -89,6 +92,10 @@ class Rules:
         ]
         return any(path == own or any(_glob(path, p) for p in patterns) for path in changed)
 
+    def star_covers(self, path: str) -> bool:
+        """Whether a `*` repo-reads entry names `path`: a change to it runs the keyed tests, which is the whole claim about a helper."""
+        return any(_glob(path, p) for p in self.repo_reads.get("*", ()) if not p.startswith("!"))
+
     def is_gated(self, name: str) -> bool:
         return any(fnmatch.fnmatchcase(name, g) for g in self.gated_tests)
 
@@ -119,8 +126,12 @@ def _glob(path: str, pattern: str) -> bool:
 
 
 def _walk(repo: Path, base: str, pattern: str) -> list[str]:
+    """The files under `base` (repo-relative) `pattern` matches; never the virtualenv, git or cache folders."""
     start = repo / base if base else repo
     if not start.is_dir():
         return []
-    rels = (p.relative_to(repo).as_posix() for p in sorted(start.rglob("*")) if p.is_file())
-    return [r for r in rels if _glob(r, pattern)]
+    found: list[str] = []
+    for folder, dirs, names in os.walk(start):
+        dirs[:] = sorted(d for d in dirs if d not in SKIPPED_DIRS)
+        found += [rel for n in sorted(names) if _glob(rel := (Path(folder) / n).relative_to(repo).as_posix(), pattern)]
+    return found
