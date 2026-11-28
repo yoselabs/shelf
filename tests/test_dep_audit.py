@@ -63,3 +63,13 @@ def test_help_exits_zero_and_prints_usage():
     )
     assert done.returncode == 0
     assert "usage" in done.stdout
+
+
+def test_an_audit_that_could_not_ask_passes_but_marks_the_gate_unjudged(tmp_path, monkeypatch):
+    """Offline passes the step, but the tree must not be recorded green: the verdict depends on the network, not the tree."""
+    from any_gate.state import UNJUDGED  # noqa: PLC0415
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    monkeypatch.setattr(dep_audit, "audit", lambda _repo: None)
+    assert dep_audit.main(["--repo", str(tmp_path), "--exceptions", str(tmp_path / "none.toml")]) == 0
+    assert (tmp_path / ".git" / UNJUDGED).is_file()

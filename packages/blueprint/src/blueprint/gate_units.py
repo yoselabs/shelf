@@ -356,6 +356,11 @@ def keys(repo: Path, config: Config) -> dict[str, str]:
     return {unit.name: key(repo, unit, reader, config) for unit in config.units}
 
 
+def _files_glob(glob: str) -> str:
+    """`dir/**` as every file below `dir`: on Python 3.12 `Path.glob("dir/**")` matches folders only."""
+    return f"{glob}/*" if glob.endswith("**") else glob
+
+
 def key(repo: Path, unit: Unit, reader: Reader | None = None, config: Config | None = None) -> str:
     """The hash of everything `unit`'s tests can see (see the module doc)."""
     reader = reader or Reader()
@@ -363,7 +368,7 @@ def key(repo: Path, unit: Unit, reader: Reader | None = None, config: Config | N
     own = [f for p in unit.paths for f in _files(repo, p)]
     folders = {repo, *(d for p in unit.paths for d in [repo / p, *(repo / p).parents] if d == repo or repo in d.parents)}
     starts = [*own, *(d / name for d in sorted(folders) for name in ("conftest.py", "__init__.py") if (d / name).is_file())]
-    read = sorted(f for glob in unit.reads for f in repo.glob(glob) if f.is_file())
+    read = sorted({f for glob in unit.reads for f in repo.glob(_files_glob(glob)) if f.is_file()})
     code = reached(repo, starts, reader)
     # Fail closed where the import graph cannot see: files that sit beside reached code (templates, SQL, JS) change the key, and a
     # module imported by a computed name widens it to its whole package.

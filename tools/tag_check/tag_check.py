@@ -137,6 +137,20 @@ def mismatched_tags(repo: Path, tags: set[str], found: dict[str, str], allow: di
     return out
 
 
+def _mark_unjudged(repo: Path, reason: str) -> None:
+    """Tell the gate this pass depends on the network, not on the tree: `any_gate passed` then records nothing (any_gate.state.UNJUDGED)."""
+    found = subprocess.run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-path", "gate-unjudged"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    if found.returncode == 0 and found.stdout.strip():
+        Path(found.stdout.strip()).write_text(reason + "\n", encoding="utf-8")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", maxsplit=1)[0])
     parser.add_argument("--repo", type=Path, default=Path.cwd())
@@ -153,6 +167,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     tags, from_remote = remote_tags(repo, args.remote)
     if not from_remote:
         sys.stderr.write(f"tag-check: {args.remote} unreachable; checked the local tags\n")
+        _mark_unjudged(repo, "tag-check could not reach the remote")
     table = tomllib.loads(args.allow.read_text(encoding="utf-8")) if args.allow.is_file() else {}
     found = versions(repo, args.rev)
     allow: dict[str, object] = table.get("allow", {})

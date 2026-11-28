@@ -56,11 +56,19 @@ def _run(args: argparse.Namespace) -> int:
     return 0 if outcome.ok else 1
 
 
+def _lock(repo: Path) -> set[str] | None:
+    """The packages the lock files changed for; None (every package) when there is no base to read them against."""
+    start = merge_base(repo)
+    return None if start is None else lock_touched(repo, start)
+
+
 EXPLAIN_FILES = 5
 
 
-def explain_line(changed: list[str]) -> str:
-    """`affected: N changed file(s): a b c d e (+M more)`: the count and the first few, never a 20 KB line."""
+def explain_line(changed: list[str] | None) -> str:
+    """`affected: N changed file(s): a b c d e (+M more)`: the count and the first few, never a 20 KB line; None: the base is unknown."""
+    if changed is None:
+        return "affected: base unknown: every suite"
     shown = " ".join(changed[:EXPLAIN_FILES]) or "-"
     more = f" (+{len(changed) - EXPLAIN_FILES} more)" if len(changed) > EXPLAIN_FILES else ""
     return f"affected: {len(changed)} changed file(s): {shown}{more}"
@@ -97,11 +105,7 @@ def main(argv: list[str] | None = None) -> int:
         return _run(args)
     repo = Path(args.repo).resolve()
     if args.command == "packages":
-        names = (
-            sorted(workspace(repo)[0])
-            if args.all
-            else sorted(affected_packages(repo, changed_files(repo), lambda: lock_touched(repo, merge_base(repo))))
-        )
+        names = sorted(workspace(repo)[0]) if args.all else sorted(affected_packages(repo, changed_files(repo), lambda: _lock(repo)))
         sys.stdout.write("".join(f"{name}\n" for name in names))
         return 0
     if args.reach:
@@ -112,12 +116,12 @@ def main(argv: list[str] | None = None) -> int:
         median, top = (sizes[len(sizes) // 2], sizes[-1]) if sizes else (0, 0)
         sys.stdout.write(f"commits={len(rows)} median={median} max={top} of {len(workspace(repo)[0])} packages\n")
         return 0
-    changed = [] if args.all else changed_files(repo)
-    paths = everything(repo) if args.all else affected(repo, changed, lambda: lock_touched(repo, merge_base(repo)))
+    changed = [] if args.all else changed_files(repo)  # None: the base is unknown, every suite
+    paths = everything(repo) if args.all else affected(repo, changed, lambda: _lock(repo))
     if args.explain:
         sys.stderr.write(explain_line(changed) + "\n")
     if (alarm := wide_alarm(repo, paths)) is not None:
         sys.stderr.write(f"any-gate-python: {alarm}\n")
-    lines = [f"{path}\t{key}" for path, key in plan(repo, paths)] if args.plan else paths
+    lines = [f"{path}\t{key}" for path, key in plan(repo, paths, env=os.environ)] if args.plan else paths
     sys.stdout.write("".join(f"{line}\n" for line in lines))
     return 0

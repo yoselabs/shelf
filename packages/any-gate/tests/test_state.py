@@ -159,3 +159,21 @@ def test_the_pushed_ref_comes_from_the_environment_the_state_was_given(repo: Git
     _green(GateState(repo.root, receipts, repo.env))
     assert GateState(repo.root, receipts, {**repo.env, "PRE_COMMIT_TO_REF": repo.git("rev-parse", "HEAD")}).green("check")
     assert not GateState(repo.root, receipts, {**repo.env, "PRE_COMMIT_TO_REF": "0" * 40}).green("check")
+
+
+def test_a_gate_that_judged_nothing_records_no_pass(state: GateState) -> None:
+    """A step that ran nothing (0 suites planned, a check that could not ask the network) leaves the tree unrecorded."""
+    state.start()
+    state.unjudged("test planned 0 suites")
+    assert state.passed("check") is False
+    assert not state.green("check")
+    assert state.unjudged_reason() == "test planned 0 suites"
+
+
+def test_the_next_start_clears_an_earlier_unjudged_note(state: GateState) -> None:
+    state.start()
+    state.unjudged("offline")
+    state.passed("check")
+    state.start()
+    assert state.unjudged_reason() is None
+    assert state.passed("check") is True

@@ -78,6 +78,20 @@ def audit(repo: Path) -> dict[str, Any] | None:
     return report if isinstance(report, dict) else None
 
 
+def _mark_unjudged(repo: Path, reason: str) -> None:
+    """Tell the gate this pass depends on the network, not on the tree: `any_gate passed` then records nothing (any_gate.state.UNJUDGED)."""
+    found = subprocess.run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-path", "gate-unjudged"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    if found.returncode == 0 and found.stdout.strip():
+        Path(found.stdout.strip()).write_text(reason + "\n", encoding="utf-8")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", maxsplit=1)[0])
     parser.add_argument("--repo", type=Path, default=Path.cwd())
@@ -87,6 +101,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     report = audit(args.repo)
     if report is None:
         sys.stderr.write("dep-audit: could not ask the advisory service (offline?); nothing checked\n")
+        _mark_unjudged(args.repo, "dep-audit could not ask the advisory service")
         return 0
     table = tomllib.loads(args.exceptions.read_text(encoding="utf-8")) if args.exceptions.is_file() else {}
     bad = problems(advisories(report), table.get("exception", []), args.today)

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Selection never answers "nothing changed" for "I do not know".** `changed_files(repo) -> list | None` and `merge_base(repo) -> str | None` come from `any_gate.changed` (one answer for every step): no upstream, or git failing, is None, and `affected`/`affected_packages(None)` select every suite (the `packages` command every package, a lock change none to read). A move counts both paths (`--no-renames`). `select._git` raises on a failed git. Before: no upstream fell back to HEAD, a clean merged tree selected nothing and `check` went green.
+- Repo tests below subfolders of `repo-tests` are selected (`rglob`); a changed helper, fixture or conftest no `*` key names runs every repo test; `Rules.star_covers`.
+- `reads_audit.audit` also checks each `no-effect` entry: a package test that finds the repo root and names a file below it in a string (not a comment or docstring) is a suite skipped on that file's change. `audit_repo_tests` reads tests in subfolders and reports an unnamed repo walk (`rglob`/`glob`/`iterdir`/`os.walk` on a path no string names) unless its key has `*` or `!*`.
+- `reads` patterns that start with a glob no longer walk `.venv`, `.git` or cache folders (`rules.SKIPPED_DIRS`).
+- **Key change (one-time rerun of every suite after the upgrade):** `fingerprint`/`plan` read a package's files as git tree and blob ids of the working tree (`any_gate.state.working_tree`: one temp index, one `ls-tree`) instead of opening every file of every closure per package. Outside git every file is still hashed. Gitignored files are no longer part of a key (before: any non-`__pycache__` file). Needs `any-gate` with `state.working_tree`.
 - `plan --explain` prints `affected: N changed file(s): <first 5> (+M more)`, not every path.
 
 - `packages [--all]`: the package directories a change reaches (the changed ones, their dependents, the lock read per package), for a step that runs once per package.

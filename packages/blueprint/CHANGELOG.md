@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- One `lint-paths` reading (`gate_py.norm`, `gate_py.under`) for `lint-changed`'s globs, the commit hook and `gate.lint-paths-cover-python`: `.`, `./src` and `src/` no longer build globs that match nothing (lint-changed said "skipped lint: no Python file changed" forever; the hook never linted).
+- `[tool.blueprint.test.units]` `reads` globs ending in `**` key every file below the folder (on Python 3.12 `glob("dir/**")` matches folders only).
 - Step output carries `gate-note: <text>` lines (the protocol of `any_gate.note`; blueprint writes the line itself, it does not import any-gate): `lint`/`lint-changed` note the file count, `deps` the packages reached of all.
 
 - `secret_scan range` scans every untracked file in one gitleaks process (a temp copy; findings keep the file's own path), not one process per file.
