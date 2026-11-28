@@ -3,6 +3,7 @@ ruff format) over the staged files, so a commit starts one `uv run`; every refus
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint.testing import run_cli
@@ -85,3 +86,14 @@ def test_the_worst_exit_code_wins_and_every_check_still_reports(repo: Repo) -> N
     assert result.returncode == 1
     assert "anyllm" in result.stderr
     assert "F401" in result.stdout + result.stderr
+
+
+def test_a_git_failure_fails_the_hook_instead_of_skipping_ruff(tmp_path: Path) -> None:
+    result = run_cli(["gate", "hook", "--repo", str(tmp_path)])
+    assert result.returncode != 0
+    assert "git diff --cached failed" in result.stderr
+
+
+def test_the_rendered_hook_entry_runs_frozen() -> None:
+    text = (Path(__file__).parents[1] / "src/blueprint/recipes/pre-commit-config.yaml").read_text()
+    assert "entry: uv run --frozen blueprint gate hook" in text

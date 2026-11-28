@@ -54,8 +54,9 @@ def _steps(fake: str, *names: str, flags: tuple[str, ...] = (), **env: str) -> s
 def test_every_step_passing_makes_a_pass_and_one_timing_line(fake: str) -> None:
     done = _steps(fake, "ok", "skip")
     assert done.returncode == 0
-    assert "gate: ok skip (in parallel)" in done.stderr
-    assert re.search(r"gate: ok \d+s · skip \d+s -- total \d+s", done.stderr)
+    assert re.search(r"^gate base=\S+ files=\S+: ok skip$", done.stderr, re.MULTILINE)
+    assert re.search(r"^ok   ok \d+s \| declares no inputs$", done.stderr, re.MULTILINE)
+    assert re.search(r"^gate ok \| 1 ok 1 skipped \| \d+s$", done.stderr, re.MULTILINE)
 
 
 def test_the_steps_run_at_once(fake: str, tmp_path: Path) -> None:
@@ -68,9 +69,9 @@ def test_the_steps_run_at_once(fake: str, tmp_path: Path) -> None:
 def test_a_failing_step_fails_the_gate_and_prints_its_log_and_marks_it(fake: str) -> None:
     done = _steps(fake, "ok", "fail")
     assert done.returncode == 1
-    assert re.search(r"--- fail ✗ \d+s\nboom: the reason", done.stderr)
-    assert re.search(r"fail \d+s ✗", done.stderr)
-    assert "gate: failed: fail" in done.stderr
+    assert re.search(r"--- fail ✗ \d+s\nboom: the reason\nlog: \S+gate-logs/fail\.log", done.stderr)
+    assert re.search(r"^FAIL fail \d+s", done.stderr, re.MULTILINE)
+    assert "gate FAIL fail |" in done.stderr
     assert "ok output" not in done.stderr  # a passing step's output stays in its log
 
 
@@ -110,7 +111,7 @@ def test_the_runner_defaults_to_just_and_a_missing_one_is_an_error() -> None:
         [sys.executable, "-m", "any_gate", "steps", "--runner", "/nonexistent/just", "ok"], capture_output=True, text=True, check=False
     )
     assert done.returncode == 1
-    assert "failed: ok" in done.stderr
+    assert "gate FAIL ok" in done.stderr
 
 
 def test_no_step_names_is_a_usage_error(fake: str) -> None:
@@ -131,7 +132,7 @@ def test_a_failure_is_shown_while_the_other_steps_are_still_running(fake: str) -
         rest = proc.stderr.read()
         assert proc.wait() == 1
     assert "boom: the reason" in rest
-    assert "gate: failed: fail" in rest
+    assert "gate FAIL fail" in rest
 
 
 def test_a_step_over_its_limit_has_its_whole_tree_stopped_and_is_named(fake: str) -> None:
@@ -139,16 +140,16 @@ def test_a_step_over_its_limit_has_its_whole_tree_stopped_and_is_named(fake: str
     assert done.returncode == 1
     assert "hang" in done.stderr
     assert "ran over its 1s limit" in done.stderr
-    assert re.search(r"hang \d+s ✗", done.stderr)
+    assert re.search(r"^FAIL hang \d+s", done.stderr, re.MULTILINE)
 
 
 def test_fail_fast_stops_the_others_and_never_calls_them_passed(fake: str) -> None:
     done = _steps(fake, "hang", "fail", flags=("--fail-fast",))
     assert done.returncode == 1
-    assert re.search(r"hang \d+s ○", done.stderr)
-    assert "gate: failed: fail" in done.stderr
+    assert re.search(r"^stop hang \d+s", done.stderr, re.MULTILINE)
+    assert "gate FAIL fail" in done.stderr
     assert "not judged" in done.stderr
-    assert "gate: failed: fail hang" not in done.stderr
+    assert "gate FAIL fail hang" not in done.stderr
 
 
 def test_the_release_gate_refuses_fail_fast(fake: str) -> None:
@@ -158,13 +159,13 @@ def test_the_release_gate_refuses_fail_fast(fake: str) -> None:
 
 def test_fail_fast_is_reachable_through_the_environment(fake: str) -> None:
     done = _steps(fake, "hang", "fail", GATE_FAIL_FAST="1")
-    assert re.search(r"hang \d+s ○", done.stderr)
+    assert re.search(r"^stop hang \d+s", done.stderr, re.MULTILINE)
 
 
 def test_a_recipe_that_itself_exits_125_is_a_failure_not_a_stop(fake: str) -> None:
     done = _steps(fake, "x125", "ok")
     assert done.returncode == 1
-    assert "gate: failed: x125" in done.stderr
+    assert "gate FAIL x125" in done.stderr
     assert "not judged" not in done.stderr
 
 
@@ -233,5 +234,5 @@ def test_a_step_named_twice_is_refused(fake: str) -> None:
 
 def test_every_step_says_in_one_line_why_it_runs(fake: str) -> None:
     done = _steps(fake, "ok", "skip")
-    assert "run ok: declares no inputs\n" in done.stderr
-    assert "run skip: declares no inputs\n" in done.stderr
+    assert "ok   ok 0s | declares no inputs\n" in done.stderr
+    assert "skipped lint: no file changed\n" in done.stderr

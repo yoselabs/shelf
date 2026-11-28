@@ -96,7 +96,7 @@ def test_golden_an_unchanged_tree_starts_no_process_for_a_step_and_asks_git_at_m
 ) -> None:
     runs, gits = _steps(clone, tmp_path, step)
     assert runs == []
-    assert len(gits) <= 7  # the change set (3), the git dir, and the green tree record (status, tree key)
+    assert len(gits) <= 11  # change set 3, git dir, green record 2, header 4
 
 
 def test_an_empty_change_set_no_gate_passed_runs_every_declared_step(fresh: Path, tmp_path: Path) -> None:
@@ -250,4 +250,4 @@ def test_all_says_every_step_runs_because_of_it(clone: Path, tmp_path: Path) -> 
         text=True,
         check=False,
     )
-    assert "run typecheck: --all" in done.stderr
+    assert "| --all" in done.stderr

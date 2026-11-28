@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `plan --explain` prints `affected: N changed file(s): <first 5> (+M more)`, not every path.
+
 - `packages [--all]`: the package directories a change reaches (the changed ones, their dependents, the lock read per package), for a step that runs once per package.
 
 - `[tool.any-gate.python.repo-reads]`: each repo test file keyed by the paths it reads; a change runs only the tests whose reads it touched (unkeyed tests always run). `reads_audit.audit_repo_tests` keeps the keys true.

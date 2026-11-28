@@ -46,7 +46,7 @@ from any_lease import Leases
 from any_gate import changed as changed_files
 from any_gate import inputs
 from any_gate import opens as step_opens
-from any_gate.gate_lease import REPEAT_WAIT_NOTICE, WAIT_LIMIT, hold, wait_message
+from any_gate.gate_lease import REPEAT_WAIT_NOTICE, WAIT_LIMIT, default_root, hold, wait_message
 from any_gate.receipts import Receipts
 from any_gate.runner import RunResult, run_runner
 from any_gate.state import GateState, common_dir
@@ -109,8 +109,7 @@ def _show(line: str) -> None:
 def _lease_root(given: str | None) -> Path:
     if given:
         return Path(given)
-    cache = os.environ.get("XDG_CACHE_HOME", "") or str(Path.home() / ".cache")
-    return Path(os.environ.get("GATE_LEASE_ROOT") or Path(cache) / "gate-leases")
+    return default_root(os.environ)
 
 
 def _run_under_lease(args: argparse.Namespace, left: Callable[[], list[tuple[str, str]]]) -> tuple[list[tuple[str, str]], RunResult | None]:
@@ -344,7 +343,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
         "--gate-wait",
         type=float,
         default=float(os.environ.get("GATE_WAIT") or WAIT_LIMIT),
-        help="seconds a gate queues for its slot before it runs anyway (default $GATE_WAIT, else 900)",
+        help="seconds between re-judging a live holder; dead or stale ($GATE_STALE_AFTER, 7200s) ones are overridden",
     )
     st.add_argument("--lease-root", help="the lease folder (default $GATE_LEASE_ROOT, else ~/.cache/gate-leases)")
     st.add_argument("--all", action="store_true", help="run every step, whatever changed (the release gate)")

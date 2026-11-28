@@ -41,6 +41,7 @@ deps scope="changed":
         every=$(cd packages && printf '%s\n' */ | tr -d /)
         if [ "{{ scope }}" = all ]; then pkgs=$every; else pkgs=$(uv run python -m any_gate_python packages 2>/dev/null) || pkgs=$every; fi
         [ -n "$pkgs" ] || { echo "skipped deps: no package reached"; exit 0; }
+        echo "gate-note: $(echo $pkgs | wc -w | tr -d ' ')/$(echo $every | wc -w | tr -d ' ') packages"
         printf 'packages/%s/\0' $pkgs | xargs -0 -P "$(getconf _NPROCESSORS_ONLN)" -I{} bash -c \
             'p={}; imp=$(ls "$p/src"); out=$(cd "$p" && uv run deptry . --known-first-party "$imp" 2>&1) || { printf -- "-- deptry %s\n%s\n" "$p" "$out"; exit 1; }'
     else

@@ -46,7 +46,7 @@ change). `blueprint init` writes `.pre-commit-config.yaml` and runs `prek instal
 | entry | stage | what it does |
 |---|---|---|
 | bd's five events (`bd hooks run <event>`) | each git event | beads' own hook work; bd never installs hooks itself (`bd init --skip-hooks`) |
-| `blueprint-hook` (`uv run blueprint gate hook`) | pre-commit | one process over the staged files: secret scan, the local-shelf-source guard, preset drift (when `pyproject.toml` is staged), `ruff check` and `ruff format --check` |
+| `blueprint-hook` (`uv run --frozen blueprint gate hook`) | pre-commit | one process over the staged files: secret scan, the local-shelf-source guard, preset drift (when `pyproject.toml` is staged), `ruff check` and `ruff format --check` |
 | `just check` | pre-push | the whole gate before code leaves the machine |
 
 Print the recipe with `uv run blueprint recipe hooks`. A consumer recipe runs the pinned engine (`uv run blueprint ...`), never a shelf clone: `gate.recipe-calls` (ADR 0033).

@@ -100,6 +100,7 @@ _ALLOWED = {
         "answer is unchanged and the reader of the by-product already gets None for it (an exported transcript file, "
         "a derived probe-cache row that the next call re-probes for, a second scroll snapshot beside the first paint)",
         ("any-agent/src/any_agent/harnesses/opencode.py", 1),
+        ("any-gate/src/any_gate/gate_lease.py", 1),
         ("any-net/src/any_net/probe.py", 1),
     ),
     **_rows(

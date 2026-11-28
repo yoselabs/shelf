@@ -56,6 +56,16 @@ def _run(args: argparse.Namespace) -> int:
     return 0 if outcome.ok else 1
 
 
+EXPLAIN_FILES = 5
+
+
+def explain_line(changed: list[str]) -> str:
+    """`affected: N changed file(s): a b c d e (+M more)`: the count and the first few, never a 20 KB line."""
+    shown = " ".join(changed[:EXPLAIN_FILES]) or "-"
+    more = f" (+{len(changed) - EXPLAIN_FILES} more)" if len(changed) > EXPLAIN_FILES else ""
+    return f"affected: {len(changed)} changed file(s): {shown}{more}"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="any_gate_python", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -105,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     changed = [] if args.all else changed_files(repo)
     paths = everything(repo) if args.all else affected(repo, changed, lambda: lock_touched(repo, merge_base(repo)))
     if args.explain:
-        sys.stderr.write(f"affected: {len(changed)} changed file(s): {' '.join(changed) or '-'}\n")
+        sys.stderr.write(explain_line(changed) + "\n")
     if (alarm := wide_alarm(repo, paths)) is not None:
         sys.stderr.write(f"any-gate-python: {alarm}\n")
     lines = [f"{path}\t{key}" for path, key in plan(repo, paths)] if args.plan else paths
