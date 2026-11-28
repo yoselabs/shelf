@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -148,7 +149,7 @@ def test_a_skipped_step_is_reported_as_a_skipped_line(clone: Path, tmp_path: Pat
         check=False,
     )
     assert done.returncode == 0
-    assert "skipped scripts: none of its declared inputs changed" in done.stderr
+    assert re.search(r"skipped scripts: none of .+ changed", done.stderr)
 
 
 def test_moving_a_file_out_of_a_steps_folder_still_starts_that_step(clone: Path) -> None:
@@ -217,3 +218,36 @@ def test_a_changed_defaults_file_runs_every_step(tmp_path: Path) -> None:
     work = _repo_with(tmp_path, 'typecheck = ["*.py"]\nscripts = ["*.sh"]\n', None)
     (work / inputs.DEFAULTS).write_text('typecheck = ["*.py"]\nscripts = ["*.sh"]\n# edited\n')
     assert sorted(_steps(work, tmp_path, "typecheck", "scripts")[0]) == ["scripts", "typecheck"]
+
+
+def test_a_step_says_in_one_line_why_it_runs_and_a_skipped_one_why_not(clone: Path) -> None:
+    (clone / "b.py").write_text("y\n")
+    (clone / "c.py").write_text("z\n")
+    skips, runs = inputs.explain(clone, ["typecheck", "scripts"])
+    assert re.fullmatch(r"run typecheck: 2 changed \(.*\.py.*\)", runs["typecheck"])
+    assert skips["scripts"].startswith("skipped scripts: none of ")
+    assert "scripts" not in runs
+
+
+def test_a_step_with_no_declaration_says_so(clone: Path) -> None:
+    assert inputs.explain(clone, ["unlisted"])[1] == {"unlisted": "run unlisted: declares no inputs"}
+
+
+def test_a_fresh_tree_says_no_gate_passed_it(fresh: Path) -> None:
+    assert inputs.explain(fresh, ["typecheck"])[1] == {"typecheck": "run typecheck: no gate passed this tree"}
+
+
+def test_a_changed_gate_definition_says_so(clone: Path) -> None:
+    (clone / inputs.FILE).write_text((clone / inputs.FILE).read_text() + "\n# edited\n")
+    assert inputs.explain(clone, ["typecheck"])[1] == {"typecheck": "run typecheck: gate definition changed"}
+
+
+def test_all_says_every_step_runs_because_of_it(clone: Path, tmp_path: Path) -> None:
+    done = subprocess.run(
+        [sys.executable, "-m", "any_gate", "steps", "--all", "--runner", "true", "--repo", str(clone), "typecheck"],
+        cwd=clone,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert "run typecheck: --all" in done.stderr

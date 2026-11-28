@@ -157,3 +157,11 @@ def test_a_malformed_plan_line_is_a_usage_error(root: Path, capsys: pytest.Captu
     code, _out, err = _go(root, "a\tb\tc\n", capsys=capsys)
     assert code == 2
     assert "plan line" in err
+
+
+def test_a_run_ends_with_one_line_saying_what_ran_what_was_skipped_and_how_long(root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _go(root, "a\tk1\n", capsys=capsys)
+    _code, _out, err = _go(root, "a\tk1\nb\tk2\n", capsys=capsys)
+    assert any(
+        line.startswith("any-gate: test: ran 1 of 2 suite(s)") and "1 unchanged" in line and line.endswith("s") for line in err.splitlines()
+    )

@@ -229,3 +229,9 @@ def test_a_false_value_leaves_fail_fast_off(fake: str) -> None:
 
 def test_a_step_named_twice_is_refused(fake: str) -> None:
     assert _steps(fake, "ok", "ok").returncode == 2
+
+
+def test_every_step_says_in_one_line_why_it_runs(fake: str) -> None:
+    done = _steps(fake, "ok", "skip")
+    assert "run ok: declares no inputs\n" in done.stderr
+    assert "run skip: declares no inputs\n" in done.stderr

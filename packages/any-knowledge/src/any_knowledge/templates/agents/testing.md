@@ -29,11 +29,11 @@ Stack-neutral doctrine. The stack file names the tools.
 
 ## Slow tests
 
-A test that costs seconds (a real build, a wheel, a browser) carries the `slow` marker; the per-commit run leaves it out, the release run keeps it.
+A test that costs seconds (a real build, a wheel, a browser) carries the `slow` marker; the per-commit pass leaves it out, and a second pass runs it only for a suite whose key changed since it last passed (editing the slow test, or code it reaches; a docs-only change runs none). The release run keeps it always.
 
 | run | what runs | how |
 |---|---|---|
-| `just check` | every test but `slow` | `[tool.blueprint.test] marks = "not slow"` in `pyproject.toml` (never in pytest's `addopts`: `check-all` would skip them too) |
+| `just check` | every test but `slow`; plus the `slow` tests of each suite whose key changed since they last passed | `[tool.blueprint.test] marks = "not slow"` in `pyproject.toml` (never in pytest's `addopts`: `check-all` would skip them too) |
 | `just check-all` | every test, `slow` too, with the coverage floor | `test-all` ignores `marks` |
 | only the slow ones | `just test-all -m slow` (floor off: a partial run cannot meet a whole-repo floor) | arguments go to pytest |
 | a name | `just test -k name`, `just test -m "not net"` | the later `-m` wins over the configured one |
