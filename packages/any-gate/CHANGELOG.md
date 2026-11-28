@@ -4,7 +4,7 @@ AI-facing only: one line per contract-shape change, arrow notation.
 
 ## Unreleased
 
-- Soundness check of step inputs: `any_gate steps --reads` (use with `--all`) judges each step's declared globs against the files its Python processes read, new module `any_gate.reads` (`judge`, `opaque_commands`, `audit`, `lines`; `Trace`, `Verdict`). Statuses `UNDER` (proven read outside the globs; exit 1), `SOUND`, `CANNOT` (an opaque command ran: any non-Python program, `python -I/-E/-S`, `uv`, shells; never a green), `WHOLE` (`*`), `ALWAYS` (no declaration). Over-wide globs are one `wide` line, information only. The audit hook (`opens`) also writes `<step>.reads` (reads, listed folders, spawned programs) when `GATE_READS_ROOT` is set; `opens.env_for` sets `GATE_READS_LOG`; the import system's folder listings are not counted. `run_and_report(show_opens=)`; `inputs.DEFINITION` is now public.
+- Soundness check of step inputs: `any_gate steps --reads` (use with `--all`) judges each step's declared globs against the files its Python processes read, new module `any_gate.reads` (`judge`, `opaque_commands`, `audit`, `lines`; `Trace`, `Verdict`). Statuses `UNDER` (proven read outside the globs; exit 1), `SOUND`, `CANNOT` (an opaque command ran: any non-Python program, `python -I/-E/-S`, `uv`, shells; never a green), `WHOLE` (`*`), `ALWAYS` (no declaration). Over-wide globs are one `wide` line, information only. The audit hook (`opens`) also writes `<step>.reads` (reads, listed folders, spawned programs) when `GATE_READS_ROOT` is set; `opens.env_for` sets `GATE_READS_LOG`; the import system's folder listings are not counted. `run_and_report(hook=)`; `inputs.DEFINITION` is now public.
 
 ## 0.8.0
 

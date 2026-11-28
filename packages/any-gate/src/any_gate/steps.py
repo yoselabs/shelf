@@ -323,12 +323,13 @@ def run_and_report(
     halt: threading.Event | None = None,
     opens: Path | None = None,
     why: Mapping[str, str] | None = None,
-    show_opens: bool = True,
+    hook: Path | None = None,
 ) -> int:
     """Run the steps, say each failure as it lands and the rest after; 0 when every step passed, else 1.
 
     `why` maps a step to the one line saying why it runs (`run test: 3 changed (*.py)`), shown on the step's line.
 
+    With a `hook` folder (made by `opens.prepare`) the hook runs but nothing is printed (`reads` reads it afterwards).
     With an `opens` folder (made by `opens.prepare`) each step's file opens and process starts are counted and printed last.
     """
     say(header(cwd or Path.cwd(), names, why))
@@ -339,10 +340,12 @@ def run_and_report(
         for line in failure_lines(step):
             say(line)
 
-    report = run_steps(names, env=env, runner=runner, cwd=cwd, skip=skip, step_limit=step_limit, halt=halt, on_done=land, opens=opens)
+    report = run_steps(
+        names, env=env, runner=runner, cwd=cwd, skip=skip, step_limit=step_limit, halt=halt, on_done=land, opens=opens or hook
+    )
     for line in render(report, step_budget=step_budget, gate_budget=gate_budget, shown=shown, why=why):
         say(line)
-    if opens is not None and show_opens:
+    if opens is not None:
         for line in step_opens.lines(step_opens.collect(opens, names)):
             say(line)
     return 1 if report.failed or report.not_judged else 0

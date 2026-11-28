@@ -25,10 +25,11 @@ import json
 import os
 import re
 import shlex
-import subprocess
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import TYPE_CHECKING
+
+from stream_proc import capture
 
 from any_gate import inputs
 from any_gate import opens as step_opens
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
 NOT_SEEN = "reads by non-python programs, python -I/-E/-S, files a killed process had open, stat/exists checks, untracked files"
 _HARMLESS = {"echo", "exit", "set", "true", "false", ":"}
 _SHOWN = 5
+_GIT_TIMEOUT = 60.0
 _ASSIGN = re.compile(r"[A-Za-z_]\w*=")
 
 
@@ -212,20 +214,19 @@ def judge(step: str, globs: Sequence[str], tracked: frozenset[str], trace: Trace
 
 
 def _tracked(repo: Path) -> frozenset[str]:
-    done = subprocess.run(["git", "ls-files", "-z"], cwd=repo, capture_output=True, check=False)
-    return frozenset(p for p in os.fsdecode(done.stdout).split("\0") if p)
+    done = capture(["git", "ls-files", "-z"], cwd=repo, timeout=_GIT_TIMEOUT)
+    return frozenset(p for p in done.text.split("\0") if p)
 
 
-def _recipes(repo: Path, runner: str) -> dict[str, object]:
-    """The runner's recipes (`just --dump --dump-format json`); empty when it is not just or cannot say."""
+def _recipes(repo: Path, runner: str) -> dict[str, object] | None:
+    """The runner's recipes (`just --dump --dump-format json`); None when it is not just or would not say."""
     if PurePath(runner).name != "just":
-        return {}
-    done = subprocess.run([runner, "--dump", "--dump-format", "json"], cwd=repo, capture_output=True, check=False)
-    try:
-        recipes = json.loads(done.stdout).get("recipes", {})
-    except (ValueError, AttributeError):
-        return {}
-    return recipes if isinstance(recipes, dict) else {}
+        return None
+    done = capture([runner, "--dump", "--dump-format", "json"], cwd=repo, timeout=_GIT_TIMEOUT)
+    if done.exit != 0:
+        return None
+    recipes = json.loads(done.out).get("recipes")
+    return recipes if isinstance(recipes, dict) else None
 
 
 def root_env(repo: Path) -> str:
@@ -270,7 +271,7 @@ def audit(repo: Path, names: Sequence[str], folder: Path, runner: str) -> tuple[
     """Judge each of `names` (the steps that ran under the hook): the report lines, and whether any step is UNDER."""
     declared = inputs.declared(repo)
     tracked = _tracked(repo)
-    dump = _recipes(repo, runner)
+    dump = _recipes(repo, runner) or {}
     verdicts = []
     for name in names:
         if name not in declared:

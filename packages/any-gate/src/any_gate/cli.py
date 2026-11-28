@@ -244,7 +244,8 @@ def _steps(args: argparse.Namespace) -> int:
         tempfile.TemporaryDirectory() as folder,
     ):
         skip, why = _decide(args, repo)  # after the wait: what changed while queued is judged too
-        counted = step_opens.prepare(Path(folder)) if args.opens or args.reads else None
+        hooked = step_opens.prepare(Path(folder)) if args.opens or args.reads else None
+        counted = hooked if args.opens else None
         step_env = {**env, "GATE_READS_ROOT": reads.root_env(repo)} if args.reads else env
         code = run_and_report(
             args.names,
@@ -258,10 +259,10 @@ def _steps(args: argparse.Namespace) -> int:
             step_limit=args.step_limit,
             halt=threading.Event() if fail_fast else None,
             opens=counted,
-            show_opens=args.opens,
+            hook=hooked,
         )
-        if args.reads and counted is not None:
-            report, under = reads.audit(repo, [n for n in args.names if n not in skip], counted, args.runner)
+        if args.reads and hooked is not None:
+            report, under = reads.audit(repo, [n for n in args.names if n not in skip], hooked, args.runner)
             for line in report:
                 _say(line)
             return 1 if under else code
@@ -357,11 +358,7 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
     st.add_argument(
         "--opens", action="store_true", help="count each step's file opens and process starts (python only; see any_gate.opens)"
     )
-    st.add_argument(
-        "--reads",
-        action="store_true",
-        help="judge each step's declared inputs against the files its python processes read (see any_gate.reads); exit 1 on UNDER",
-    )
+    st.add_argument("--reads", action="store_true", help="judge each step's inputs against the files it read (any_gate.reads); 1 on UNDER")
     st.add_argument(
         "--gate-slots",
         type=int,

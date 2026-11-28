@@ -1148,7 +1148,7 @@ repo-tests = "tests"
 # Left unmapped on purpose: `pyproject.toml`/`uv.lock` (the lock rule), `conftest.py` (loads into every suite), CONTEXT.md, .codex/, .task-loop.json.
 [tool.any-gate.python.reads]
 ".pre-commit-config.yaml" = ["blueprint"]
-"justfile" = ["blueprint", "any-gate-python"]
+"justfile" = ["blueprint", "any-gate", "any-gate-python"]
 ".blueprint/*" = ["blueprint", "any-gate"]
 "gate-inputs.toml" = ["blueprint", "any-gate"]
 "mise.toml" = ["blueprint"]
