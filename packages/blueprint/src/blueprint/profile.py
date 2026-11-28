@@ -296,12 +296,31 @@ def _builds_tooling_only(manifest: Path) -> bool:
     return not _NODE_CODE_TOOLS & deps and not any(_NODE_TEST_SCRIPT.search(f"{k} {v}") for k, v in scripts.items())
 
 
+# Folders one level down that never hold the repo's own code base: fixtures and samples, workspace members, docs.
+_NOT_STACK_FOLDERS = frozenset(
+    {"packages", "tests", "test", "fixtures", "examples", "example", "docs", "vendor", "third_party", "testdata"}
+)
+
+
+def python_folder(repo: Path, skip: tuple[str, ...] = ()) -> str | None:
+    """The folder holding the Python code base's `pyproject.toml`: "." at the root, else the one folder below it that does (ADR 0034).
+
+    A root manifest wins. Below the root a folder counts only when it is the only one with a manifest (two Python folders are two
+    projects, not a backend) and is no workspace member (`packages/*`), fixture, example or dependency folder.
+    """
+    if (repo / "pyproject.toml").is_file():
+        return "."
+    below = sorted({p.parent.name for p in walk(repo, "pyproject.toml", 2, skip) if p.parent != repo} - _NOT_STACK_FOLDERS)
+    return below[0] if len(below) == 1 else None
+
+
 def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
     """Each stack present with the files that set it, from their manifests."""
     found: dict[str, list[str]] = {}
-    if (repo / "pyproject.toml").is_file():
-        locked = (repo / "uv.lock").is_file()
-        found["python-uv" if locked else "python"] = ["pyproject.toml", *(["uv.lock"] if locked else [])]
+    if (folder := python_folder(repo, skip)) is not None:
+        prefix = "" if folder == "." else f"{folder}/"
+        locked = (repo / prefix / "uv.lock").is_file()
+        found["python-uv" if locked else "python"] = [f"{prefix}pyproject.toml", *([f"{prefix}uv.lock"] if locked else [])]
     dotnet = [*walk(repo, "*.sln", 2, skip), *walk(repo, "*.slnx", 2, skip), *walk(repo, "*.csproj", 3, skip)]
     if dotnet:
         found["dotnet"] = [p.relative_to(repo).as_posix() for p in dotnet]
@@ -323,8 +342,8 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
 
 
 def _stack_roots(found: dict[str, list[str]]) -> tuple[tuple[str, str], ...]:
-    """The folder each stack's first manifest sits in; a stack that is not a single manifest (dotnet, nix, ...) is rooted at the repo."""
-    return tuple((s, str(Path(files[0]).parent)) for s, files in found.items() if s in {"node", "node-tooling"})
+    """The folder each code stack's first manifest sits in; a stack with no single manifest (dotnet, nix, ...) is rooted at the repo."""
+    return tuple((s, str(Path(files[0]).parent)) for s, files in found.items() if s in {"node", "node-tooling", "python", "python-uv"})
 
 
 def detect_stacks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[str, ...]:
@@ -412,7 +431,7 @@ def detect_frameworks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[tuple[str
 
 
 def _detect_kind(repo: Path, skip: tuple[str, ...] = ()) -> str:
-    pyproject = repo / "pyproject.toml"
+    pyproject = repo / (python_folder(repo, skip) or ".") / "pyproject.toml"
     if pyproject.is_file():
         data = tomllib.loads(pyproject.read_text())
         if "workspace" in data.get("tool", {}).get("uv", {}) and not data.get("project", {}).get("scripts"):
