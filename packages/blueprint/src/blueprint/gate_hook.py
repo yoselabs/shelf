@@ -41,7 +41,7 @@ def _staged(repo: Path) -> list[str]:
 
 
 def _under(path: str, roots: list[str]) -> bool:
-    return not roots or any(path == r or path.startswith(r.rstrip("/") + "/") for r in roots)
+    return gate_py.under(path, roots)
 
 
 def _secrets(repo: Path) -> int:

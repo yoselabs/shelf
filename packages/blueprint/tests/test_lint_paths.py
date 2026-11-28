@@ -64,3 +64,8 @@ def test_a_file_ruff_excludes_is_not_unlinted(repo: Repo) -> None:
     repo.write("tools/gen/t.py", "x = 1\n")
     repo.commit()
     assert _row(repo).verdict is Verdict.PASSING
+
+
+def test_dot_slash_and_trailing_slash_spellings_cover_like_the_plain_ones(repo: Repo) -> None:
+    _setup(repo, '["./packages", "tools/", "./conftest.py"]')
+    assert _row(repo).verdict is Verdict.PASSING

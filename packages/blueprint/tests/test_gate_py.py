@@ -126,3 +126,23 @@ def test_the_cli_exposes_the_steps(repo: Repo) -> None:
     _repo(repo)
     assert main(["gate", "format", "--repo", str(repo.root)]) == 0
     assert main(["gate", "lint", "--repo", str(repo.root)]) == 0
+
+
+@pytest.mark.parametrize("spelling", [".", "./", "./src", "src/", "src//", "./src/"])
+def test_a_lint_path_spelled_any_way_matches_the_files_it_names(repo: Repo, spelling: str) -> None:
+    """`.`, `./x` and `x/` once built globs that matched nothing: lint-changed skipped, forever."""
+    import fnmatch  # noqa: PLC0415
+
+    (repo.root / "src").mkdir(exist_ok=True)
+    globs = gate_py._globs(repo.root, [spelling], ".py")
+    wanted = "a.py" if spelling in {".", "./"} else "src/a.py"
+    assert any(fnmatch.fnmatchcase(wanted, g) for g in globs)
+    assert not any(fnmatch.fnmatchcase("other/a.py", g) for g in globs) or spelling in {".", "./"}
+
+
+@pytest.mark.parametrize(("path", "roots", "under"), [
+    ("a.py", ["."], True), ("src/a.py", ["./src"], True), ("src/a.py", ["src/"], True), ("srcx/a.py", ["src"], False),
+    ("a.py", [], True), ("tools/a.py", ["src", "tools/a.py"], True), ("b/a.py", ["src"], False),
+])  # fmt: skip
+def test_under_is_one_reading_for_the_hook_and_the_audit(path: str, roots: list[str], under: bool) -> None:
+    assert gate_py.under(path, roots) is under

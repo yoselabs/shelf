@@ -16,10 +16,9 @@ def lint_paths_cover(ctx: Context) -> Finding:
     listed = ctx.git("ls-files", "-z", "--", "*.py")
     if listed is None:
         return not_checked("git cannot list the tracked files")
-    roots = [p.strip("/").removeprefix("./") for p in paths]
     files = [f for f in listed.split("\0") if f]
     skipped = ruff_rules.excluded(ctx)
-    outside = [f for f in files if not is_skipped(f, skipped) and not any(r in {"", "."} or f == r or f.startswith(f"{r}/") for r in roots)]
+    outside = [f for f in files if not is_skipped(f, skipped) and not gate_py.under(f, paths)]
     if not outside:
         return passing(f"{len(files)} tracked .py files, all under lint-paths ({', '.join(paths)})")
     folders = sorted({f.rsplit("/", 1)[0] if "/" in f else f for f in outside})

@@ -13,6 +13,7 @@ base, selects everything. `test-all` is `blueprint gate test` over every suite (
 
 from __future__ import annotations
 
+import posixpath
 import subprocess
 import sys
 import tomllib
@@ -62,11 +63,31 @@ def release_gate(repo: Path) -> bool:
     return isinstance(gate, dict) and gate.get("release-gate") is True
 
 
+def norm(path: str) -> str:
+    """A `lint-paths` entry as a repo-relative POSIX path: `./src`, `src/` and `src//` are `src`; the root (`.`, `./`, empty) is `""`."""
+    clean = posixpath.normpath(path.strip() or ".")
+    return "" if clean == "." else clean.removeprefix("./")
+
+
+def under(path: str, roots: list[str]) -> bool:
+    """Whether `path` is inside a `lint-paths` entry (a folder holds what is below it, a file is itself); no entries means the whole repo.
+
+    The one reading shared by `lint-changed`'s globs, the commit hook and the `gate.lint-paths-cover-python` row.
+    """
+    if not roots:
+        return True
+    return any(not r or path == r or path.startswith(f"{r}/") for r in map(norm, roots))
+
+
 def _globs(repo: Path, paths: list[str], suffix: str) -> list[str]:
     """`any_gate changed` patterns for `paths`: a folder is everything below it (with `suffix`), a file is itself."""
     if not paths:
         return [f"*{suffix}"]
-    return [f"{p}/*{suffix}" if (repo / p).is_dir() else p for p in paths]
+    globs = []
+    for raw in paths:
+        p = norm(raw)
+        globs.append(f"{p}/*{suffix}" if p and (repo / p).is_dir() else p or f"*{suffix}")
+    return globs
 
 
 def changed(repo: Path, globs: list[str], configs: tuple[str, ...], *, scope: str) -> list[str] | None:
