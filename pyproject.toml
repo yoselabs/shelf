@@ -813,6 +813,7 @@ ignore_imports = [
     "any_gate_python.stages -> stream_proc",
     "any_gate.changed -> stream_proc.capture",
     "any_gate.plan -> stream_proc.capture",
+    "any_gate.reads -> stream_proc.capture",
     "any_gate.state -> stream_proc.capture",
     "any_gate_python.graph -> stream_proc.capture",
     "any_gate_python.select -> stream_proc.capture",
