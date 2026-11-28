@@ -2,6 +2,10 @@
 
 AI-facing only: one line per contract-shape change, arrow notation.
 
+## Unreleased
+
+- `any_gate.notice` (`announce`, `descriptor`, `scrub`): `steps` announces `GATE_NOTICE_FD` (still a bare number, shell recipes write to it) with `GATE_NOTICE_ID` = `dev:ino`; the receiver (`cli.notice`) writes only while `fstat` of the number matches, else stderr; `test` strips both from its runner's tree. Spawn sites that inherit the pair: step children (intended), anything below them (harmless: a reused or closed number fails the check).
+
 ## 0.8.0
 
 - `any_gate test` strips `GATE_NOTICE_FD` from its runner's environment (`run_runner(..., env=)`): the number is a descriptor of the gate's own process, and in the runner's tree it named an xdist worker's pipe to its controller; a notice written there stalled the run until the idle limit (600 s).

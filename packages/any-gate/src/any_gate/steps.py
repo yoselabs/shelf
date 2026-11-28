@@ -29,6 +29,7 @@ import stream_proc
 
 from any_gate import changed
 from any_gate import opens as step_opens
+from any_gate.notice import announce
 from any_gate.state import common_dir
 
 if TYPE_CHECKING:
@@ -149,7 +150,7 @@ def run_steps(
     """
     own = terminal is None
     tty = os.dup(2) if own else terminal
-    child_env = {**env, "GATE_NOTICE_FD": str(tty)}
+    child_env = announce(env, tty)
     results: dict[str, Step] = {}
     skipped = dict(skip or {})
     began = time.monotonic()
