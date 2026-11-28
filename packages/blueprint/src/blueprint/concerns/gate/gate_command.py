@@ -66,8 +66,8 @@ def _migration(ctx: Context) -> str:
     else:
         pin, run_it = '`just = "<version>"` under [tools] in mise.toml, then `mise lock` (ADR 0024)', "run it as `just check`"
     return (
-        f"move the Makefile to a justfile (ADR 0023): pin just with {pin}, {_PORT}, {run_it}, "
-        "delete the Makefile; the shelf's own justfile is the reference"
+        f"move the Makefile to a justfile (ADR 0023; `blueprint init` writes the justfile parts, then edit the recipes): "
+        f"pin just with {pin}, {_PORT}, {run_it}, delete the Makefile; the shelf's own justfile is the reference"
     )
 
 

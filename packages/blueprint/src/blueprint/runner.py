@@ -180,7 +180,11 @@ def _row(chk: Check, sub: Sub, state: State, today: date, dead: list[str]) -> Ro
         else:
             evidence = f"{evidence}; {problem}"
     waiver = next((w for w in state.waivers if w.id == sub.id and w.problem is None and w.until is not None), None)
-    if waiver is not None and verdict not in {Verdict.PASSING, Verdict.NOT_APPLICABLE}:
+    if waiver is not None and verdict in {Verdict.PASSING, Verdict.NOT_APPLICABLE}:
+        dead.append(f"waiver `{waiver.id}` is unused: its checkpoint passes without it; delete it")
+    elif waiver is not None and verdict is Verdict.NOT_CHECKED:
+        evidence = f"waiver ignored: a waiver cannot excuse a check that could not judge ({evidence})"
+    elif waiver is not None:
         evidence = (
             f"waived until {waiver.until.isoformat()} ({waiver.days_left(today)} days left): {waiver.reason.strip()} (saw: {evidence})"  # type: ignore[union-attr]
         )
@@ -261,6 +265,7 @@ def _run_checks(repo: Path, *, concern: str | None, audit: bool, today: date | N
             *expiry_notices(state.overrides, today),
             *dead,
             *waiver_notices(state.waivers, today),
+            *(waivers.stray(repo) if concern is None else ()),
             *scoped_dead_notices(ctx, {r.id for r in rows}),
             *orphans,
         ),

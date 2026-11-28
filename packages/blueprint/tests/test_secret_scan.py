@@ -7,6 +7,7 @@ import sys
 from typing import TYPE_CHECKING
 
 import pytest
+from blueprint import secret_scan
 from blueprint.secret_scan import ScanError, scan_full, scan_range, scan_staged
 
 if TYPE_CHECKING:
@@ -151,3 +152,16 @@ def test_the_command_line_exits_one_on_a_finding_and_zero_when_clean(repo: Repo)
     assert done.returncode == 1
     assert "leak.py:1 aws-access-token" in done.stderr
     assert "AKIAZ7VRSQ2WKNBTXPLM" not in done.stderr
+
+
+def test_untracked_files_are_scanned_in_one_process_and_named_by_their_own_path(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
+    _branch(repo)
+    for name in ("a.py", "b.py", "sub/c.py"):
+        repo.write(name, "x = 1\n")
+    repo.write("sub/leaky.py", _LEAK)
+    starts: list[list[str]] = []
+    real = secret_scan._exec
+    monkeypatch.setattr(secret_scan, "_exec", lambda argv, *rest: (starts.append(list(argv)), real(argv, *rest))[1])
+    found = scan_range(repo.root, env=repo.env)
+    assert [(f.file, f.rule) for f in found] == [("sub/leaky.py", "aws-access-token")]
+    assert sum(1 for argv in starts if argv[0] == "gitleaks" and "dir" in argv) == 1

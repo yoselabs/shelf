@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -111,10 +112,36 @@ def scan_range(repo: Path, *, env: Mapping[str, str] | None = None) -> list[Leak
     leaks = _run(repo, env, ["git", "--log-opts", f"{base}..HEAD" if base else "HEAD"])
     leaks += scan_staged(repo, env=env)
     leaks += _run(repo, env, ["git", "--pre-commit"])
-    untracked = (_git(repo, env, "ls-files", "-z", "--others", "--exclude-standard") or "").split("\0")
-    for rel in filter(None, untracked):
-        leaks += _run(repo, env, ["dir", rel])
+    leaks += _scan_untracked(repo, env)
     return sorted(set(leaks), key=lambda leak: (leak.file, leak.line, leak.rule))
+
+
+def _scan_untracked(repo: Path, env: Mapping[str, str] | None) -> list[Leak]:
+    """Every untracked, unignored file in one gitleaks process (one start per file is an antivirus scan per start)."""
+    untracked = [p for p in (_git(repo, env, "ls-files", "-z", "--others", "--exclude-standard") or "").split("\0") if p]
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        copied = 0
+        for rel in untracked:
+            source = repo / rel
+            if not source.is_file() or source.is_symlink():
+                continue
+            target = root / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            copied += 1
+        if not copied:
+            return []
+        found = _run(repo, env, ["dir", str(root)])
+    return [Leak(_relative(leak.file, root), leak.line, leak.rule) for leak in found]
+
+
+def _relative(name: str, root: Path) -> str:
+    path = Path(name)
+    for base in (root, root.resolve()):
+        if path.is_relative_to(base):
+            return path.relative_to(base).as_posix()
+    return name
 
 
 _SCANS = {"staged": scan_staged, "range": scan_range, "full": scan_full}

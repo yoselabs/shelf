@@ -128,6 +128,7 @@ def _run_lint(repo: Path, *, only_changed: bool) -> int:
                 sys.stdout.write("skipped lint: no Python file changed\n")
                 return 0
             targets = files
+    sys.stdout.write(f"gate-note: {len(targets)} {'files' if only_changed else 'paths'}\n")  # the gate's step line shows it (any_gate.note)
     ruff = [sys.executable, "-m", "ruff"]
     check = [*ruff, "check", *(["--force-exclude"] if only_changed else []), *targets]
     form = [*ruff, "format", "--check", *(["--force-exclude"] if only_changed else []), *targets]

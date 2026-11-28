@@ -518,3 +518,13 @@ def test_an_edit_to_a_package_outside_the_closure_leaves_the_key(committed: Path
     before = _plan(committed, ["packages/base/tests"])
     (committed / "packages" / "leaf" / "mod.py").write_text("x = 1\n")
     assert _plan(committed, ["packages/base/tests"]) == before
+
+
+def test_the_explain_line_caps_the_file_list() -> None:
+    from any_gate_python.cli import explain_line  # noqa: PLC0415 -- only this test needs the command line
+
+    assert explain_line([]) == "affected: 0 changed file(s): -"
+    assert explain_line(["a", "b"]) == "affected: 2 changed file(s): a b"
+    line = explain_line([f"packages/p/f{i}.py" for i in range(400)])
+    assert line.endswith("f4.py (+395 more)")
+    assert len(line) < 200

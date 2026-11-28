@@ -6,5 +6,6 @@ from any_gate.plan import Resources, detect, too_wide, workers
 from any_gate.receipts import Receipts, key
 from any_gate.runner import RunResult, run_runner
 from any_gate.state import GateState
+from any_gate.steps import note
 
-__all__ = ["GateState", "Receipts", "Resources", "RunResult", "detect", "key", "run_runner", "too_wide", "workers"]
+__all__ = ["GateState", "Receipts", "Resources", "RunResult", "detect", "key", "note", "run_runner", "too_wide", "workers"]
