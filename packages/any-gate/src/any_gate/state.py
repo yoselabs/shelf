@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from any_gate.receipts import Receipts
 
 START = "gate-green.start"
+UNJUDGED = "gate-unjudged"  # a step that judged nothing writes why here; `passed` records nothing while it stands
 GIT_TIMEOUT = 600.0  # seconds one git call may take: `add -A` on a large tree is the slow one
 
 
@@ -86,6 +87,9 @@ class GateState:
 
     def start(self) -> None:
         """Note the working tree's key as the gate begins; a repo git cannot read notes nothing."""
+        marker = _own_path(self._repo, self._env, UNJUDGED)
+        if marker is not None:
+            marker.unlink(missing_ok=True)
         path, key = _own_path(self._repo, self._env, START), working_key(self._repo, self._env)
         if path is None or key is None:
             return
@@ -94,9 +98,30 @@ class GateState:
         except OSError:
             path.unlink(missing_ok=True)
 
+    def unjudged(self, reason: str) -> None:
+        """Note that a step of this gate judged nothing (0 suites planned, a check that could not ask): the run records no pass."""
+        marker = _own_path(self._repo, self._env, UNJUDGED)
+        if marker is None:
+            return
+        try:
+            marker.write_text(reason + "\n")
+        except OSError:  # cannot note it: take the safe side and drop the start note, so `passed` records nothing
+            start = _own_path(self._repo, self._env, START)
+            if start is not None:
+                start.unlink(missing_ok=True)
+
+    def unjudged_reason(self) -> str | None:
+        """Why this gate's run judged nothing, or None."""
+        marker = _own_path(self._repo, self._env, UNJUDGED)
+        return marker.read_text().strip() if marker is not None and marker.is_file() else None
+
     def passed(self, gate: str) -> bool:
-        """Record the working tree as green for `gate` when it is the tree `start` noted. Never raises; True when recorded."""
+        """Record the working tree as green for `gate` when it is the tree `start` noted and no step judged nothing. Never raises."""
         begun = _own_path(self._repo, self._env, START)
+        if self.unjudged_reason() is not None:
+            if begun is not None:
+                begun.unlink(missing_ok=True)
+            return False
         if begun is None or not begun.is_file():
             return False
         noted = begun.read_text().strip()

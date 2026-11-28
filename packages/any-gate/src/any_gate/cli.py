@@ -148,6 +148,9 @@ def _test(args: argparse.Namespace, stdin: TextIO) -> int:
     if receipts is None:
         notice("not in a git repository: give --receipts")
         return 2
+    if not plan:  # the gate said run, and nothing was planned: nothing is judged, so no green record
+        notice("test: the plan holds 0 suites: nothing judged, so this run records no pass")
+        GateState(Path(args.cwd).resolve(), receipts, os.environ).unjudged("test planned 0 suites")
     return _run_planned(args, plan, receipts)
 
 
@@ -225,7 +228,6 @@ def _steps(args: argparse.Namespace) -> int:
         except ValueError:  # not the main thread: the caller owns signals
             break
     repo = Path(args.repo).resolve()
-    skip, why = _decide(args, repo)
     with (
         hold(
             _lease_root(args.lease_root),
@@ -237,6 +239,7 @@ def _steps(args: argparse.Namespace) -> int:
         ) as env,
         tempfile.TemporaryDirectory() as folder,
     ):
+        skip, why = _decide(args, repo)  # after the wait: what changed while queued is judged too
         counted = step_opens.prepare(Path(folder)) if args.opens else None
         return run_and_report(
             args.names,
@@ -280,6 +283,11 @@ def _state(args: argparse.Namespace) -> int:
     gate = GateState(repo, receipts, os.environ)
     if args.command == "start":
         gate.start()
+    elif args.command == "unjudged":
+        gate.unjudged(args.reason)
+    elif (reason := gate.unjudged_reason()) is not None:
+        gate.passed(args.gate)
+        notice(f"judged nothing ({reason}): nothing recorded for `{args.gate}`")
     elif not gate.passed(args.gate):
         notice(f"the tree did not stay as `start` noted it, or no start was noted: nothing recorded for `{args.gate}`")
     return 0
@@ -302,12 +310,15 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
         ("start", "note the working tree as a gate begins"),
         ("passed", "record the noted tree as green for a gate, if it is unchanged"),
         ("pre-push", "run CMD unless HEAD's tree is recorded green for the gate"),
+        ("unjudged", "note that a step judged nothing: `passed` then records nothing"),
     ):
         sp = sub.add_parser(verb, help=help_text)
         sp.add_argument("--repo", default=".", help="the repo (default: here)")
         sp.add_argument("--receipts", help="the receipts file (default: gate-receipts.json in the git directory)")
-        if verb != "start":
+        if verb in {"passed", "pre-push"}:
             sp.add_argument("--gate", default="check", help="the gate (default: check)")
+        if verb == "unjudged":
+            sp.add_argument("--reason", required=True, help="why nothing was judged")
         if verb == "pre-push":
             sp.add_argument("cmd", nargs=argparse.REMAINDER, metavar="-- CMD")
     ch = sub.add_parser("changed", help="print the files a per-file linter must check, NUL-separated")
