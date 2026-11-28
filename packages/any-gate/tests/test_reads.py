@@ -223,3 +223,38 @@ def test_a_long_list_of_files_is_shown_as_the_folders_they_sit_in() -> None:
     text = reads.lines([reads.Verdict("lint", "UNDER", files)])[0]
     assert "31 files: 30 under packages/x/src" in text
     assert "config/rules.toml" in text
+
+
+def _contract_repo(root: Path, inputs: str) -> None:
+    """The a2kay-cydc shape: backend `test` validates contract/schema.json, but the default gives it only backend/*."""
+    files = {
+        "justfile": f"test:\n    {sys.executable} backend/tests/check_contract.py\n",
+        "backend/tests/check_contract.py": (
+            "from pathlib import Path\nPath('contract/schema.json').read_text()\nPath('backend/app.py').read_text()\n"
+        ),
+        "backend/app.py": "x = 1\n",
+        "contract/schema.json": "{}\n",
+        ".blueprint/step-inputs.toml": inputs,
+    }
+    for rel, text in files.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text)
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]
+    subprocess.run([*git, "init", "-q"], cwd=root, check=True)
+    subprocess.run([*git, "add", "-A"], cwd=root, check=True)
+    subprocess.run([*git, "commit", "-q", "-m", "c"], cwd=root, check=True)
+
+
+@needs_just
+def test_a_backend_test_step_that_validates_contract_files_but_declares_only_backend_is_caught(tmp_path: Path) -> None:
+    _contract_repo(tmp_path, 'test = ["backend/*"]\n')
+    env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", "GATE_READS_ROOT"}}
+    cmd = [sys.executable, "-m", "any_gate", "steps", "--all", "--reads", "--gate-slots", "0", "test"]
+    done = subprocess.run(cmd, cwd=tmp_path, capture_output=True, text=True, check=False, env=env)
+    assert done.returncode == 1, done.stderr
+    assert "UNDER test" in done.stderr
+    assert "contract/schema.json" in done.stderr
+    (tmp_path / ".blueprint/step-inputs.toml").write_text('test = ["backend/*", "contract/*"]\n')
+    fixed = subprocess.run(cmd, cwd=tmp_path, capture_output=True, text=True, check=False, env=env)
+    assert fixed.returncode == 0, fixed.stderr
+    assert "SOUND test" in fixed.stderr
