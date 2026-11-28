@@ -79,6 +79,43 @@ def test_range_mode_without_an_upstream_scans_everything(repo: Repo) -> None:
     assert [f.file for f in scan_range(repo.root, env=repo.env)] == ["leak.py"]
 
 
+def _two_unpushed_branches(repo: Repo) -> None:
+    """main holds one clean commit; `other` (a sibling worktree's branch) holds a leak; `work` has no upstream."""
+    repo.write("README.md", "hello\n")
+    repo.commit()
+    repo.git("checkout", "-q", "-b", "other")
+    repo.write("other_leak.py", _LEAK)
+    repo.commit()
+    repo.git("checkout", "-q", "main")
+    repo.git("checkout", "-q", "-b", "work")
+
+
+def test_range_mode_without_an_upstream_ignores_another_branchs_leak(repo: Repo) -> None:
+    _two_unpushed_branches(repo)
+    repo.write("fine.py", "x = 1\n")
+    repo.commit()
+    assert scan_range(repo.root, env=repo.env) == []
+    assert [f.file for f in scan_full(repo.root, env=repo.env)] == ["other_leak.py"]
+
+
+def test_range_mode_without_an_upstream_still_sees_this_branchs_leak(repo: Repo) -> None:
+    _two_unpushed_branches(repo)
+    repo.write("leak.py", _LEAK_TOO)
+    repo.commit()
+    assert [f.file for f in scan_range(repo.root, env=repo.env)] == ["leak.py"]
+
+
+def test_range_mode_on_the_default_branch_without_an_upstream_scans_its_own_history_only(repo: Repo) -> None:
+    repo.write("old.py", _LEAK)
+    repo.commit()
+    repo.git("branch", "other")
+    repo.git("checkout", "-q", "other")
+    repo.write("other_leak.py", _LEAK_TOO)
+    repo.commit()
+    repo.git("checkout", "-q", "main")
+    assert [f.file for f in scan_range(repo.root, env=repo.env)] == ["old.py"]
+
+
 def test_a_finding_never_carries_the_secret(repo: Repo) -> None:
     repo.write("leak.py", _LEAK)
     repo.commit()

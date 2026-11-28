@@ -3,7 +3,9 @@
 Three scans: `staged` (the index, for a pre-commit hook), `range` (every commit since the upstream merge-base, plus the
 uncommitted work: staged, unstaged and untracked; the gate's scan, like `any-gate changed`), `full` (all history, before a tag):
 `scan_staged`, `scan_range`, `scan_full`.
-A range with no upstream is the full scan: run too much, never too little. A finding names the file, line and rule and
+A range with no upstream starts at the merge-base with the default branch (or, on the default branch itself, covers HEAD's own
+history): never another branch's commits, since a shared git dir holds every sibling worktree's unpushed work. `full` is the only
+scan of every ref. A finding names the file, line and rule and
 never the secret (`--redact`). A missing scanner is an error, never a pass.
 
 `python -m blueprint.secret_scan staged|range|full [--repo DIR]`; exit 1 on findings, 2 when the scan could not run.
@@ -73,9 +75,24 @@ def _run(repo: Path, env: Mapping[str, str] | None, args: Sequence[str]) -> list
     return [Leak(str(f["File"]), int(str(f["StartLine"])), str(f["RuleID"])) for f in found]
 
 
-def _base(repo: Path, env: Mapping[str, str] | None) -> str | None:
-    found = _git(repo, env, "merge-base", "HEAD", "@{upstream}")
+_DEFAULT_BRANCHES = ("origin/HEAD", "origin/main", "origin/master", "main", "master")
+
+
+def _merge_base(repo: Path, env: Mapping[str, str] | None, other: str) -> str | None:
+    found = _git(repo, env, "merge-base", "HEAD", other)
     return found.strip() or None if found else None
+
+
+def _base(repo: Path, env: Mapping[str, str] | None) -> str | None:
+    """The upstream merge-base, else the merge-base with the default branch (not HEAD's own branch); None when neither exists."""
+    upstream = _merge_base(repo, env, "@{upstream}")
+    if upstream:
+        return upstream
+    current = (_git(repo, env, "symbolic-ref", "--quiet", "--short", "HEAD") or "").strip()
+    for name in _DEFAULT_BRANCHES:
+        if name != current and (base := _merge_base(repo, env, name)):
+            return base
+    return None
 
 
 def scan_staged(repo: Path, *, env: Mapping[str, str] | None = None) -> list[Leak]:
@@ -89,11 +106,9 @@ def scan_full(repo: Path, *, env: Mapping[str, str] | None = None) -> list[Leak]
 
 
 def scan_range(repo: Path, *, env: Mapping[str, str] | None = None) -> list[Leak]:
-    """The findings since the upstream merge-base plus the uncommitted work; with no upstream, :func:`scan_full`."""
+    """The findings since the upstream (or default-branch) merge-base plus the uncommitted work; never another branch's commits."""
     base = _base(repo, env)
-    if base is None:
-        return scan_full(repo, env=env)
-    leaks = _run(repo, env, ["git", "--log-opts", f"{base}..HEAD"])
+    leaks = _run(repo, env, ["git", "--log-opts", f"{base}..HEAD" if base else "HEAD"])
     leaks += scan_staged(repo, env=env)
     leaks += _run(repo, env, ["git", "--pre-commit"])
     untracked = (_git(repo, env, "ls-files", "-z", "--others", "--exclude-standard") or "").split("\0")

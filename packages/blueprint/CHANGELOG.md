@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `secret_scan range` with no upstream (shelf-fycm) starts at the merge-base with the default branch (`origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`; never HEAD's own branch), or covers HEAD's own history on the default branch itself: it no longer scans every ref of the shared git dir, so a sibling worktree's unpushed fixture fails nobody else. Uncommitted work is scanned in that case too. `full` (`secrets-all`) still scans every ref.
 - The python `deps` recipe checks only the packages the change reaches (`any_gate_python packages`; every package where the adapter is absent); `deps-all` is every package and the release gate (`check-all`) runs it.
 
 - **`blueprint gate hook`** (shelf-3rm8): one commit-hook process runs the secret scan, the guard, preset drift (when pyproject.toml is staged) and ruff check and format over the staged files, so a commit starts one `uv run` instead of five. The pre-commit template has one `blueprint-hook`; the python-uv `hooks` row and `secrets.scanner` accept it.
