@@ -45,8 +45,11 @@ _INSTALL = 'a recipe (`just tools`) that runs `MISE_IGNORED_CONFIG_PATHS="$HOME/
 
 
 def _rust_just(ctx: Context) -> bool:
-    """Whether just comes from uv: `rust-just` in a dependency group of the root pyproject."""
-    groups = toml_table(ctx.toml(ctx.py("pyproject.toml")), "dependency-groups")
+    """Whether just comes from uv: `rust-just` in a dependency group of the ROOT pyproject (`uv run just` runs at the root, ADR 0023).
+
+    A repo whose Python stack lives in `backend/` has no root project to run it from: its `just` is pinned in mise.toml (ADR 0034).
+    """
+    groups = toml_table(ctx.toml("pyproject.toml"), "dependency-groups")
     return any(isinstance(deps, list) and any(str(d).startswith("rust-just") for d in deps) for deps in groups.values())
 
 

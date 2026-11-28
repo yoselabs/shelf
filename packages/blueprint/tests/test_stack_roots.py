@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from blueprint.profile import load_state
 from blueprint.runner import run
 
 if TYPE_CHECKING:
@@ -225,3 +227,42 @@ def test_the_preset_check_finds_the_backend_pyproject_instead_of_refusing_to_ver
 
     _python(repo, "backend/")
     assert preset.check(repo.root) in {0, 1}  # 2 is "cannot verify, not a pass"
+
+
+# --- repo-level config of a multi-stack repo: the root blueprint.toml -------------------------------------------------------------
+
+
+def test_the_root_blueprint_toml_holds_the_repo_level_config(repo: Repo) -> None:
+    _python(repo, "backend/")
+    repo.write(
+        "blueprint.toml",
+        '[[tool.blueprint.waivers]]\nid = "layout.stacks-in-own-folders"\nreason = "r"\nsince = "2026-12-01"\nuntil = "2026-12-31"\n'
+        '[[override]]\nid = "detection"\nscope = "fixtures"\nreason = "samples"\nexpires = 2099-01-01\n',
+    )
+    result = run(repo.root, concern="stack", env=repo.env, today=date(2026, 12, 1))
+    assert result.problems == ()
+    assert "fixtures" in result.profile.ignore
+    assert [w.id for w in load_state(repo.root, date(2026, 12, 1)).waivers] == ["layout.stacks-in-own-folders"]
+
+
+def test_both_blueprint_toml_files_is_a_problem_that_names_the_move(repo: Repo) -> None:
+    repo.write("blueprint.toml", "")
+    repo.write("docs/blueprint/blueprint.toml", "")
+    problems = run(repo.root, concern="stack", env=repo.env).problems
+    assert any("git mv docs/blueprint/blueprint.toml blueprint.toml" in p for p in problems), problems
+
+
+def test_just_must_be_pinned_in_mise_when_the_python_stack_is_not_at_the_root(repo: Repo) -> None:
+    from blueprint.concerns.mise import tool_pins  # noqa: PLC0415 -- the engine imports every check
+
+    _python(repo, "backend/")
+    repo.write("backend/pyproject.toml", _PYPROJECT + '[dependency-groups]\ndev = ["rust-just>=1.58"]\n')
+    repo.write("justfile", "check:\n\t@:\n")
+    ctx = run(repo.root, concern="stack", env=repo.env)
+    assert "just" in tool_pins.needed(_context(repo, ctx))
+
+
+def _context(repo: Repo, result):
+    from blueprint.model import Context  # noqa: PLC0415 -- the engine imports every check
+
+    return Context(repo.root, result.profile, env=repo.env)

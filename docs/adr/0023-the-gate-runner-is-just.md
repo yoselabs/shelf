@@ -1,7 +1,7 @@
 ---
 id: 0023
 title: The gate runner is just
-statement: Every repo's gate is a justfile run by a pinned `just` (`uv add --dev rust-just`, `uv run just check`); blueprint reads the gate graph from `just --dump --dump-format json`. A Makefile is not read.
+statement: Every repo's gate is a justfile run by a pinned `just` (rust-just at the root pyproject, else mise.toml); blueprint reads the gate graph from `just --dump --dump-format json`. A Makefile is not read.
 concerns: [gate]
 status: accepted
 decided_by: owner
@@ -16,7 +16,7 @@ distilled_into: blueprint gate.runner, gate_graph.py; the shelf justfile; tools/
 - **One runner for every repo:** a root `justfile`, recipes with the names the Makefile had
   (`check`, `check-all`, `lint`, `typecheck`, `arch`, `spell`, `deps`, `test`, `guard`, `preset`, `blueprint`, `bootstrap`, ...).
   Gate recipes carry `[group('gate')]`.
-- **Pinned per repo:** Python repos `uv add --dev rust-just` and run `uv run just check` (1.58.0 was tested). Other stacks:
+- **Pinned per repo:** a repo with a root `pyproject.toml` may `uv add --dev rust-just` and run `uv run just check` (1.58.0 was tested). A repo with no root `pyproject.toml` (its Python stack lives in `backend/`, ADR 0034) pins `just` in `mise.toml` (ADR 0024) and runs `just check`; blueprint's `stack.tool-pins` wants it pinned there. Other stacks:
   `uvx rust-just@<version>`, brew. A Makefile is not read: the runner row fails a repo that has one and no justfile.
 - **Blueprint reads the graph, not the syntax:** `just --dump --dump-format json` gives `recipes{name: dependencies,
   body, parameters, attributes}` and `assignments`. Walk from `check` through dependencies; an argument equal to a
@@ -57,3 +57,4 @@ works on any clone with uv; `gate.one-command` reports "not checked" (never a pa
   gate); the shelf's Makefile became a justfile, and blueprint, onboarding and CI moved with it.
 - 2026-11-05: the container dispatch and `SHELF_HOST_CHECK` left the justfile with the Docker gate (ADR 0027).
 - 2026-11-28: amended: blueprint no longer reads a Makefile at all (the fallback is deleted, ADR 0028: no backward compatibility); CI is gone (ADR 0027).
+- 2026-11-28: `uv run just` needs a root project; with the Python stack in `backend/` there is none, so `just` comes from mise.toml (ADR 0034, shelf-e722).

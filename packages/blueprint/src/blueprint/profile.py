@@ -19,6 +19,8 @@ from blueprint.waivers import load as load_waivers
 
 STATE_DIR = "docs/blueprint"
 STATE_FILE = f"{STATE_DIR}/blueprint.toml"
+# A multi-stack repo keeps its repo-level config here, beside the justfile; each stack's `[tool.*]` stays in its manifest (ADR 0034).
+ROOT_STATE_FILE = "blueprint.toml"
 OVERRIDE_CODES = ("test-data", "remediated", "not-applicable", "not-supported", "not-detected")
 
 
@@ -212,16 +214,18 @@ def _legacy_ignore(raw: dict[str, Any], today: date, problems: list[str]) -> tup
 
 
 def load_state(repo: Path, today: date | None = None) -> State:
-    """Read `docs/blueprint/blueprint.toml`; an absent file is an empty state."""
-    path = repo / STATE_FILE
+    """Read the repo's `blueprint.toml` (the root one, else `docs/blueprint/blueprint.toml`); an absent file is an empty state."""
+    path = repo / (ROOT_STATE_FILE if (repo / ROOT_STATE_FILE).is_file() else STATE_FILE)
     today = today or date.today()  # noqa: DTZ011 -- a calendar date in the owner's zone
+    if (repo / ROOT_STATE_FILE).is_file() and (repo / STATE_FILE).is_file():
+        return State({}, (), {}, (f"{ROOT_STATE_FILE} and {STATE_FILE} both exist: keep one (git mv {STATE_FILE} {ROOT_STATE_FILE})",))
     if not path.is_file():
         waivers = load_waivers(repo, {}, today)
         return State({}, (), {}, tuple(w.problem for w in waivers if w.problem), waivers=waivers)
     try:
         data = tomllib.loads(path.read_text())
     except tomllib.TOMLDecodeError as exc:
-        return State({}, (), {}, (f"{STATE_FILE} is not valid TOML: {exc}",))
+        return State({}, (), {}, (f"{path.relative_to(repo).as_posix()} is not valid TOML: {exc}",))
     waivers = load_waivers(repo, data, today)
     problems_w = [w.problem for w in waivers if w.problem]
     problems: list[str] = list(problems_w)
