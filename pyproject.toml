@@ -819,6 +819,8 @@ ignore_imports = [
     "any_gate_python.graph -> content_digest",
     "any_gate_python.stages -> any_gate.plan",
     "any_gate_python.select -> any_gate.plan",
+    "any_gate_python.select -> any_gate.changed",
+    "any_gate_python.select -> any_gate.state",
     "jsonl_log._rewrite -> atomic_io",
     "jsonl_log -> process_lock",
     "sqlite_store.* -> sqlite_sidecar",

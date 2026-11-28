@@ -131,7 +131,9 @@ def _walk(repo: Path, base: str, pattern: str) -> list[str]:
     if not start.is_dir():
         return []
     found: list[str] = []
-    for folder, dirs, names in os.walk(start):
-        dirs[:] = sorted(d for d in dirs if d not in SKIPPED_DIRS)
-        found += [rel for n in sorted(names) if _glob(rel := (Path(folder) / n).relative_to(repo).as_posix(), pattern)]
-    return found
+    pending = [start]
+    while pending:
+        entries = sorted(os.scandir(pending.pop()), key=lambda e: e.name)  # an exhausted scandir is closed
+        found += [rel for e in entries if e.is_file() and _glob(rel := Path(e.path).relative_to(repo).as_posix(), pattern)]
+        pending += [Path(e.path) for e in reversed(entries) if e.is_dir() and e.name not in SKIPPED_DIRS]
+    return sorted(found)

@@ -7,7 +7,6 @@ cannot see (an unknown path, or a pytest plugin package that loads into every ru
 from __future__ import annotations
 
 import hashlib
-import os
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -30,7 +29,7 @@ from any_gate_python.graph import (
 from any_gate_python.rules import SKIPPED_DIRS, Rules, matches
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
 LOCK_FILES_HASHED = ("uv.lock", "pyproject.toml", "conftest.py")
 GIT_TIMEOUT = 600.0  # seconds one git call may take
@@ -136,11 +135,11 @@ def reach(repo: Path, count: int, exporter: Exporter = package_exports, rules: R
     gate runs, so a rule that quietly widens it (a lock rule once selected every package for 45 of 50 commits) shows up.
     """
     rows: list[tuple[str, int, int]] = []
-    for sha in _git(repo, "log", "--first-parent", f"-{count}", "--format=%h").split():
-        try:
-            changed = _git(repo, "diff", "--name-only", "--no-renames", f"{sha}^", sha).splitlines()
-        except RuntimeError:  # a root commit has no parent
+    for line in _git(repo, "log", "--first-parent", f"-{count}", "--format=%h %p").splitlines():
+        sha, _, parents = line.partition(" ")
+        if not parents:  # a root commit has no parent to diff against
             continue
+        changed = _git(repo, "diff", "--name-only", "--no-renames", f"{sha}^", sha).splitlines()
         with tempfile.TemporaryDirectory() as old, tempfile.TemporaryDirectory() as new:
             try:
                 extract_base(repo, f"{sha}^", Path(old))
@@ -180,15 +179,17 @@ def _wanted(graph: dict[str, set[str]], rules: Rules | None, repo: Path) -> list
     return [*(f"packages/{name}" for name in sorted(graph)), *sorted(mapped), *LOCK_FILES_HASHED]
 
 
-def _tree_ids(repo: Path, wanted: list[str]) -> dict[str, str] | None:
+def _tree_ids(repo: Path, wanted: list[str], env: Mapping[str, str] | None) -> dict[str, str] | None:
     """`{path: git object id}` for the `wanted` paths of the working tree (one temp index, one `ls-tree`; no file is opened by us).
 
     None when `repo` is not a git repository or git fails: the caller then hashes the files themselves.
     """
-    tree = working_tree(repo, os.environ)
+    if env is None:
+        return None
+    tree = working_tree(repo, env)
     if tree is None:
         return None
-    done = capture(["git", "ls-tree", "-z", tree, "--", *wanted], cwd=repo, timeout=GIT_TIMEOUT)
+    done = capture(["git", "ls-tree", "-z", tree, "--", *wanted], cwd=repo, env=env, timeout=GIT_TIMEOUT)
     if done.exit != 0:
         return None
     ids: dict[str, str] = {}
@@ -199,7 +200,15 @@ def _tree_ids(repo: Path, wanted: list[str]) -> dict[str, str] | None:
     return ids
 
 
-def fingerprint(repo: Path, graph: dict[str, set[str]], package: str, exports: dict[str, str] | None, rules: Rules | None = None) -> str:
+def fingerprint(
+    repo: Path,
+    graph: dict[str, set[str]],
+    package: str,
+    exports: dict[str, str] | None,
+    rules: Rules | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> str:
     """Hash of everything `package`'s tests can see: its files, its dependencies' files and resolved sets, the root inputs.
 
     The root files a package (or a dependency of it) is mapped to in `reads` are hashed too: a mapped file selects its readers, and
@@ -208,9 +217,9 @@ def fingerprint(repo: Path, graph: dict[str, set[str]], package: str, exports: d
     With no exports (uv cannot answer) the whole lock and root pyproject stand in: any change to them invalidates every package.
 
     In a git repository the files are read as git's tree and blob ids of the working tree (tracked and untracked, not ignored), so
-    nothing is opened per file; ignored files are not part of the key. Outside git every file is hashed.
+    nothing is opened per file; ignored files are not part of the key. Outside git, or with no `env` to run git in, every file is hashed.
     """
-    return _fingerprint(repo, graph, package, exports, rules, ids=_tree_ids(repo, _wanted(graph, rules, repo)))
+    return _fingerprint(repo, graph, package, exports, rules, ids=_tree_ids(repo, _wanted(graph, rules, repo), env))
 
 
 def _fingerprint(
@@ -248,12 +257,12 @@ def _fingerprint(
     return digest.hexdigest()
 
 
-def plan(repo: Path, paths: list[str], exporter: Exporter = package_exports) -> list[tuple[str, str]]:
+def plan(repo: Path, paths: list[str], exporter: Exporter = package_exports, env: Mapping[str, str] | None = None) -> list[tuple[str, str]]:
     """`(path, key)` for each of `paths`: a package suite's key is its fingerprint; any other path has none and always runs."""
     graph, _ = workspace(repo)
     exports = _exports(repo, graph, exporter)
     rules = Rules.load(repo)
-    ids = _tree_ids(repo, _wanted(graph, rules, repo)) if any(p.startswith("packages/") for p in paths) else None
+    ids = _tree_ids(repo, _wanted(graph, rules, repo), env) if any(p.startswith("packages/") for p in paths) else None
     return [(p, _fingerprint(repo, graph, p.split("/")[1], exports, rules, ids=ids) if p.startswith("packages/") else "") for p in paths]
 
 

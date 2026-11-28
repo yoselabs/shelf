@@ -192,7 +192,7 @@ def test_a_package_the_base_did_not_have_counts_as_changed(committed: Path) -> N
 
 
 def _plan(repo: Path, paths: list[str]) -> dict[str, str]:
-    return dict(affected.plan(repo, paths, pins_exporter))
+    return dict(affected.plan(repo, paths, pins_exporter, os.environ))
 
 
 def _no_uv(_repo: Path, _packages: list[str]) -> dict[str, str]:

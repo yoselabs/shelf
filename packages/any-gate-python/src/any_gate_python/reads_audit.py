@@ -98,10 +98,7 @@ def _naming(repo: Path, package: str, tokens: set[str], reached: set[str]) -> st
 
 def _literals(source: str) -> str:
     """The string constants of Python `source` that are not docstrings, one per line."""
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return ""
+    tree = ast.parse(source)
     docs = {
         id(n.body[0].value)
         for n in ast.walk(tree)

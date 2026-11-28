@@ -116,6 +116,6 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"affected: {_summary(changed)}\n")
     if (alarm := wide_alarm(repo, paths)) is not None:
         sys.stderr.write(f"any-gate-python: {alarm}\n")
-    lines = [f"{path}\t{key}" for path, key in plan(repo, paths)] if args.plan else paths
+    lines = [f"{path}\t{key}" for path, key in plan(repo, paths, env=os.environ)] if args.plan else paths
     sys.stdout.write("".join(f"{line}\n" for line in lines))
     return 0
