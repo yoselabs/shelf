@@ -66,6 +66,11 @@ images:
 """
 
 
+def _flag(repo: Path, tool: str, flag: str, rel: str) -> str:
+    """`tool`, with `flag rel` when the repo keeps its config in `.config/` (ADR 0035): these tools look in the working folder only."""
+    return f"{tool} {flag} {rel}" if (repo / rel).is_file() else tool
+
+
 def _dockerfile_lines(repo: Path) -> list[str]:
     files = f"git ls-files -z {_DOCKERFILES} | {{ grep -zv '\\.dockerignore$' || true; }}"
     gate = gate_py.settings(repo).get("gate", {})
@@ -75,7 +80,7 @@ def _dockerfile_lines(repo: Path) -> list[str]:
         flags = "".join(f" --context {shlex.quote(str(c))}" for c in contexts) if isinstance(contexts, list) else ""
         lines.append(f"uv run python -I -m blueprint.recipes.check_dockerfile_pins{flags} || rc=1")
     lines += [
-        f"{files} | xargs -0 -r hadolint || rc=1",
+        f"{files} | xargs -0 -r {_flag(repo, 'hadolint', '-c', '.config/hadolint.yaml')} || rc=1",
         f"{files} | xargs -0 -r -n1 dockerfmt --check -n || rc=1",
         f'while IFS= read -r -d "" f; do docker build --check -f "$f" "$(dirname "$f")" || rc=1; done < <({files})',
     ]
@@ -92,8 +97,8 @@ def _compose_lines(repo: Path) -> list[str]:
         pins.append(f"uv run python -I -m blueprint.compose_pins{flags} || rc=1")
     return [
         *pins,
-        f"{files} | xargs -0 -r dclint --max-warnings 0 || rc=1",
-        f"{files} | xargs -0 -r yamlfmt -lint || rc=1",
+        f"{files} | xargs -0 -r {_flag(repo, 'dclint', '-c', '.config/dclintrc.json')} --max-warnings 0 || rc=1",
+        f"{files} | xargs -0 -r {_flag(repo, 'yamlfmt', '-conf', '.config/yamlfmt.yaml')} -lint || rc=1",
         'compose() { if command -v docker-compose >/dev/null; then docker-compose "$@"; else docker compose "$@"; fi; }',
         f'while IFS= read -r -d "" f; do compose -f "$f" config --no-interpolate -q || rc=1; done < <({files})',
     ]

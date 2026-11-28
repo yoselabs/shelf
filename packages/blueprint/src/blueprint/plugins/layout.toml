@@ -2,5 +2,5 @@ id = "layout"
 title = "Repo layout: one code base at the root, two in backend/ and frontend/ (ADR 0034)"
 default = "on"
 requires = ["stacks"]
-rows = ["layout.stacks-in-own-folders"]
-modules = ["layout.layout"]
+rows = ["layout.stacks-in-own-folders", "layout.root-files-in-config", "layout.one-config-per-tool"]
+modules = ["layout.layout", "layout.root_files", "layout.one_config"]

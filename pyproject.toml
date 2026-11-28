@@ -118,6 +118,7 @@ dev = [
 # ruff upgrade that adds a rule. Every family below earns its place; every ignore
 # below states why. Keep it legible — this file teaches the convention.
 [tool.ruff]
+cache-dir = ".cache/ruff"
 target-version = "py311"
 line-length = 140
 output-format = "concise"
@@ -989,6 +990,7 @@ check-filenames = ""
 
 # ── coverage — measured on every `just test`; floor enforced (no silent rot) ───
 [tool.coverage.run]
+data_file = ".cache/coverage"
 branch = true
 source = ["packages", "tools"]
 omit = ["*/tests/*"]
@@ -1154,7 +1156,6 @@ repo-tests = "tests"
 "mise.toml" = ["blueprint"]
 "mise.lock" = ["blueprint"]
 ".python-version" = ["blueprint"]
-".gitleaks.toml" = ["blueprint"]
 ".config/*" = ["blueprint"]
 
 # What each repo test (tests/test_*.py) reads, as fnmatch globs (`*` crosses `/`): a test runs when a path it reads changed, else it is skipped.

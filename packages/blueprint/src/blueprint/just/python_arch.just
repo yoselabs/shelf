@@ -3,4 +3,4 @@
 [working-directory('@PY@')]
 [group('gate')]
 arch:
-    uv run lint-imports
+    uv run lint-imports --cache-dir {{ justfile_directory() }}/.cache/import_linter

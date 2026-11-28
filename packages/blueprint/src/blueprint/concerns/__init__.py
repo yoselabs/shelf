@@ -14,6 +14,8 @@ MODULES = (
     "git_hooks.hooks",
     "stacks.stack",
     "layout.layout",
+    "layout.root_files",
+    "layout.one_config",
     "python.python_pin",
     "stacks.cli_parse",
     "shell.shell",
