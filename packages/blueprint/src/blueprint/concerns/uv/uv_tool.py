@@ -46,7 +46,7 @@ def _single(finding: Finding) -> list[Sub]:
 @check_each(_ID, _STATEMENT, audit_only=True, applies=_applies, layer="stack")
 def uv_tool(ctx: Context) -> list[Sub]:
     """Compare the installed tool's environment with uv.lock, package by package."""
-    project = ctx.toml("pyproject.toml").get("project")
+    project = ctx.toml(ctx.py("pyproject.toml")).get("project")
     meta = project if isinstance(project, dict) else {}
     name = str(meta.get("name", ""))
     if not meta.get("scripts") or not name:

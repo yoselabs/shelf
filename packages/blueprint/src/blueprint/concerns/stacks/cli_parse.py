@@ -28,7 +28,7 @@ def _uses_python_uv(profile: Profile) -> bool:
 
 def _scripts(ctx: Context) -> dict[str, str]:
     """`[project.scripts]` of the root and each uv workspace member: each console script and the module it runs."""
-    root = ctx.toml("pyproject.toml")
+    root = ctx.toml(ctx.py("pyproject.toml"))
     members = toml_table(root, "tool", "uv", "workspace").get("members", [])
     dirs = [
         d.relative_to(ctx.repo).as_posix() for m in (members if isinstance(members, list) else []) for d in sorted(ctx.repo.glob(str(m)))

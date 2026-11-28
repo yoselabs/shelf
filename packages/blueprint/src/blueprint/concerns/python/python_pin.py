@@ -26,14 +26,15 @@ _UV_IMAGE = re.compile(r"--from=ghcr\.io/astral-sh/uv(?::([^\s@/]+))?")
 
 def _ranges(ctx: Context) -> dict[str, str]:
     """`requires-python` per pyproject: the root's, and each workspace member's, by folder."""
-    root = ctx.toml("pyproject.toml")
+    root = ctx.toml(ctx.py("pyproject.toml"))
     found = {".": str(toml_table(root, "project").get("requires-python", ""))}
     members = toml_table(root, "tool", "uv", "workspace").get("members", [])
     patterns: list[str] = [str(m) for m in members] if isinstance(members, list) else []
-    for path in sorted(ctx.repo.glob("**/pyproject.toml")):
-        folder = path.parent.relative_to(ctx.repo).as_posix()
+    base = ctx.path(ctx.py_folder())
+    for path in sorted(base.glob("**/pyproject.toml")):
+        folder = path.parent.relative_to(base).as_posix()
         if folder != "." and any(fnmatch.fnmatch(folder, p) for p in patterns):
-            found[folder] = str(toml_table(ctx.toml(f"{folder}/pyproject.toml"), "project").get("requires-python", ""))
+            found[folder] = str(toml_table(ctx.toml(ctx.py(f"{folder}/pyproject.toml")), "project").get("requires-python", ""))
     return {folder: spec for folder, spec in found.items() if spec or folder == "."}
 
 
@@ -43,7 +44,7 @@ def _lower(spec: str) -> tuple[int, int] | None:
 
 
 def _pin(ctx: Context) -> tuple[tuple[int, int] | None, Finding]:
-    text = ctx.read(".python-version")
+    text = ctx.read(ctx.py(".python-version"))
     if text is None:
         return None, not_set_up("no .python-version", "uv python pin 3.12 (X.Y or X.Y.Z, the version you run); commit it", FixedBy.AUTO)
     lines = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.startswith("#")]
@@ -78,7 +79,7 @@ def _range(ctx: Context) -> Finding:
 
 def _uv_version(ctx: Context) -> Finding:
     for rel in ("uv.toml", "pyproject.toml"):
-        data = ctx.toml(rel)
+        data = ctx.toml(ctx.py(rel))
         floor = (data if rel == "uv.toml" else toml_table(data, "tool", "uv")).get("required-version")
         if floor:
             return passing(f"{rel}: required-version {floor}")
@@ -150,12 +151,12 @@ def python_pin(ctx: Context) -> list[Sub]:
 )
 def python_installed(ctx: Context) -> Finding:
     """Ask uv for the interpreter the pin names, the way every `uv run` will find it; needs this machine's own state, so audit-only."""
-    if _STACK not in ctx.profile.stacks or ctx.read(".python-version") is None:
+    if _STACK not in ctx.profile.stacks or ctx.read(ctx.py(".python-version")) is None:
         return not_applicable("no python-uv pin to look for")
     done = ctx.run("uv", "python", "find", timeout=30)
     if done is None:
         return failing("uv is not installed, so the pinned Python cannot be found", "run `just tools` (mise install --locked)")
-    pinned = (ctx.read(".python-version") or "").strip().splitlines()[0]
+    pinned = (ctx.read(ctx.py(".python-version")) or "").strip().splitlines()[0]
     if done.returncode != 0:
         return failing(
             f"no Python {pinned} on this machine (uv python find: {done.stderr.strip() or 'nothing'})", f"run `uv python install {pinned}`"

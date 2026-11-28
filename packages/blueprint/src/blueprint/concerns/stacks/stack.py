@@ -87,14 +87,20 @@ def gate_text(ctx: Context) -> str:
     return gate_graph.executable("\n".join(parts))
 
 
+def _resolve(ctx: Context, path: str, root: str) -> str:
+    """A profile path with its placeholders filled: `{root}` is the stack's folder, `{py}` the Python stack's folder with its slash."""
+    folder = ctx.py_folder()
+    return path.replace("{root}", root).replace("{py}", "" if folder == "." else f"{folder}/").removeprefix("./")
+
+
 def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
     if "any" in spec:
         return any(_config_holds(ctx, alt, root) for alt in spec["any"])
     if spec.get("test-coverage"):
-        return bool(gate_units.read_config(ctx.repo).coverage)
+        return bool(gate_units.read_config(ctx.path(ctx.py_folder())).coverage)
     if "ruff-selects" in spec:
         return ruff_rules.selects(ctx, str(spec["ruff-selects"]))
-    path = spec["path"].replace("{root}", root).removeprefix("./")
+    path = _resolve(ctx, spec["path"], root)
     if any(ch in path for ch in "*?["):
         hits = (p.relative_to(ctx.repo) for p in sorted(ctx.repo.glob(path)))
         return any(_config_holds(ctx, {**spec, "path": str(rel)}) for rel in hits if not is_skipped(rel.as_posix(), ctx.profile.ignore))
@@ -106,7 +112,7 @@ def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
 
 def _offenders(ctx: Context, spec: dict[str, Any], root: str = ".") -> list[str]:
     """For a `lacks` entry: each file `path` matches that holds the forbidden text (an unpinned `:latest` image)."""
-    path = spec["path"].replace("{root}", root).removeprefix("./")
+    path = _resolve(ctx, spec["path"], root)
     hits = sorted(ctx.repo.glob(path)) if any(ch in path for ch in "*?[") else [ctx.path(path)]
     rels = [h.relative_to(ctx.repo).as_posix() for h in hits if h.is_file()]
     return [r for r in rels if not is_skipped(r, ctx.profile.ignore) and spec["lacks"] in (ctx.read(r) or "")]
@@ -156,12 +162,13 @@ def _purpose(ctx: Context, requires: str) -> tuple[bool, str]:
     return is_deployed(ctx.profile), "classified trait" if is_deployed(ctx.profile) else ""
 
 
-def _describe(spec: dict[str, Any]) -> str:
+def _describe(spec: dict[str, Any], ctx: Context | None = None) -> str:
     if "any" in spec:
-        return " or ".join(_describe(alt) for alt in spec["any"])
+        return " or ".join(_describe(alt, ctx) for alt in spec["any"])
     if "ruff-selects" in spec:
         return f'a ruff lint config that selects "{spec["ruff-selects"]}" or "ALL" and does not ignore it'
-    return str(spec["path"]) + (f" with {spec['contains']!r}" if "contains" in spec else "")
+    path = str(spec["path"]) if ctx is None else str(spec["path"]).replace("{py}", "" if ctx.py_folder() == "." else f"{ctx.py_folder()}/")
+    return path + (f" with {spec['contains']!r}" if "contains" in spec else "")
 
 
 def _alternative_runs(ctx: Context, alt: dict[str, Any], gate_text: str, root: str) -> bool:
@@ -201,7 +208,7 @@ def judge_role(ctx: Context, stack: str, profile: StackProfile | None, role: str
 
 def _judge_set_up(ctx: Context, stack: str, spec: Role, role: str, gate_text: str, *, root: str) -> _Judged:
     plain = [c for c in spec.config if not {"lacks", "built"} & c.keys()]
-    missing = [_describe(c).replace("{root}", root) for c in plain if not _config_holds(ctx, c, root)]
+    missing = [_describe(c, ctx).replace("{root}", root) for c in plain if not _config_holds(ctx, c, root)]
     missing += [f"nothing builds {r}" for c in spec.config if "built" in c for r in _unbuilt(ctx)]
     forbidden = [f"{hit} has {c['lacks']!r}" for c in spec.config if "lacks" in c for hit in _offenders(ctx, c, root)]
     if missing or forbidden:
@@ -316,8 +323,8 @@ def _gate_verdict(ctx: Context, stack: str, spec: Role, gate_text: str, root: st
 
 def _floor_holds(ctx: Context, floor: dict[str, Any], gate_text: str, root: str) -> bool:
     if floor.get("units"):
-        config = gate_units.load(ctx.repo)
-        if gate_test.is_workspace(ctx.repo) or config is None or not config.coverage or config.floor is None:
+        config = gate_units.load(ctx.path(ctx.py_folder()))
+        if gate_test.is_workspace(ctx.path(ctx.py_folder())) or config is None or not config.coverage or config.floor is None:
             return False
     return bool(re.search(floor["gate"], gate_text)) and ("path" not in floor or _config_holds(ctx, floor, root))
 

@@ -46,7 +46,7 @@ _INSTALL = 'a recipe (`just tools`) that runs `MISE_IGNORED_CONFIG_PATHS="$HOME/
 
 def _rust_just(ctx: Context) -> bool:
     """Whether just comes from uv: `rust-just` in a dependency group of the root pyproject."""
-    groups = toml_table(ctx.toml("pyproject.toml"), "dependency-groups")
+    groups = toml_table(ctx.toml(ctx.py("pyproject.toml")), "dependency-groups")
     return any(isinstance(deps, list) and any(str(d).startswith("rust-just") for d in deps) for deps in groups.values())
 
 
@@ -127,7 +127,7 @@ def _cross_file(ctx: Context, pins: dict[str, tuple[str, str]]) -> list[str]:
     problems: list[str] = []
     if "just" in pins and _rust_just(ctx):
         problems.append("just is pinned twice: in mise.toml and as the rust-just dev dependency; keep one")
-    floor = _FLOOR.search(str(toml_table(ctx.toml("pyproject.toml"), "tool", "uv").get("required-version", "")))
+    floor = _FLOOR.search(str(toml_table(ctx.toml(ctx.py("pyproject.toml")), "tool", "uv").get("required-version", "")))
     if "uv" in pins and floor and _numbers(pins["uv"][1]) < _numbers(floor.group(1)):
         problems.append(f"uv {pins['uv'][1]} is below [tool.uv] required-version {floor.group()}")
     sdk = _godot_sdk(ctx)

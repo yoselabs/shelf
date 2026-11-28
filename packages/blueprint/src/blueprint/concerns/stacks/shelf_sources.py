@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 )
 def shelf_sources_agree(ctx: Context) -> Finding:
     """Judge pyproject.toml against shelf_sources.toml; no network. New checkpoints warn first (ADR 0018)."""
-    pyproject = ctx.toml("pyproject.toml")
+    pyproject = ctx.toml(ctx.py("pyproject.toml"))
     shelf = shelf_sources.sources(pyproject)
     if not shelf:
         return not_applicable("no shelf git source in pyproject.toml")

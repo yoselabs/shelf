@@ -27,9 +27,9 @@ role = "toolchain"
 tool = "uv, with a committed lockfile and a declared Python range"
 install = "uv init; uv lock; commit uv.lock"
 config = [
-    { path = "uv.lock" },
+    { path = "{py}uv.lock" },
     # A virtual workspace root has no [project]; .python-version pins it instead.
-    { any = [{ path = "pyproject.toml", contains = "requires-python" }, { path = ".python-version" }] },
+    { any = [{ path = "{py}pyproject.toml", contains = "requires-python" }, { path = "{py}.python-version" }] },
 ]
 # `uv run` and `uv sync --frozen` never notice a stale lock; only this check does.
 gate = "uv lock --check"
@@ -39,9 +39,9 @@ role = "formatter"
 tool = "ruff format"
 install = "uv add --dev ruff; copy [tool.ruff] from the shelf (`blueprint init` writes it)"
 config = [{ any = [
-    { path = "pyproject.toml", contains = "[tool.ruff" },
-    { path = "ruff.toml" },
-    { path = ".ruff.toml" },
+    { path = "{py}pyproject.toml", contains = "[tool.ruff" },
+    { path = "{py}ruff.toml" },
+    { path = "{py}.ruff.toml" },
 ] }]
 gate = "ruff format --check"
 
@@ -63,9 +63,9 @@ tool = "ruff check, the shelf's rule set"
 install = "copy [tool.ruff.lint] from the shelf (`blueprint init` writes it); it selects `S` (security) and `C90` (complexity), or `ALL`"
 config = [
   { any = [
-    { path = "pyproject.toml", contains = "[tool.ruff.lint]" },
-    { path = "ruff.toml", contains = "[lint]" },
-    { path = ".ruff.toml", contains = "[lint]" },
+    { path = "{py}pyproject.toml", contains = "[tool.ruff.lint]" },
+    { path = "{py}ruff.toml", contains = "[lint]" },
+    { path = "{py}.ruff.toml", contains = "[lint]" },
 ] },
   { ruff-selects = "S" },  # parsed from the lint table: `ignore = ["S"]` fails
   { ruff-selects = "C90" },
@@ -90,14 +90,14 @@ tool = "pyrefly, strict preset"
 install = "uv add --dev pyrefly; copy [tool.pyrefly] from the shelf (`blueprint init` writes it)"
 # use-ignore-files = false: with ignore files on, a worktree under an ignored path (.claude/worktrees/) checks no file and passes.
 config = [
-    { any = [{ path = "pyproject.toml", contains = "[tool.pyrefly]" }, { path = "pyrefly.toml" }] },
+    { any = [{ path = "{py}pyproject.toml", contains = "[tool.pyrefly]" }, { path = "{py}pyrefly.toml" }] },
     { any = [
-        { path = "pyproject.toml", contains = 'preset = "strict"' },
-        { path = "pyrefly.toml", contains = 'preset = "strict"' },
+        { path = "{py}pyproject.toml", contains = 'preset = "strict"' },
+        { path = "{py}pyrefly.toml", contains = 'preset = "strict"' },
     ] },
     { any = [
-        { path = "pyproject.toml", contains = "use-ignore-files = false" },
-        { path = "pyrefly.toml", contains = "use-ignore-files = false" },
+        { path = "{py}pyproject.toml", contains = "use-ignore-files = false" },
+        { path = "{py}pyrefly.toml", contains = "use-ignore-files = false" },
     ] },
 ]
 gate = "pyrefly check"
@@ -106,7 +106,7 @@ gate = "pyrefly check"
 role = "spelling"
 tool = "codespell"
 install = "uv add --dev codespell; copy [tool.codespell] from the shelf"
-config = [{ path = "pyproject.toml", contains = "[tool.codespell]" }]
+config = [{ path = "{py}pyproject.toml", contains = "[tool.codespell]" }]
 gate = "codespell"
 
 [[role.alternative]]
@@ -128,12 +128,12 @@ role = "tests"
 tool = "pytest, strict markers"
 install = "uv add --dev pytest pytest-xdist pytest-timeout; set `timeout = 900` (seconds, generous) in [tool.pytest.ini_options]: with no CI a hung test otherwise hangs the gate; `--strict-markers` in `addopts`; `filterwarnings = [\"error\", ...]` (list a third party's own warning as a scoped ignore, never drop the error) so a typo in a marker fails instead of silently selecting nothing"
 config = [
-    { path = "pyproject.toml", contains = "[tool.pytest.ini_options]" },
-    { path = "pyproject.toml", contains = "pytest-timeout" },
-    { path = "pyproject.toml", contains = "timeout =" },
-    { path = "pyproject.toml", contains = "strict-markers" },
+    { path = "{py}pyproject.toml", contains = "[tool.pytest.ini_options]" },
+    { path = "{py}pyproject.toml", contains = "pytest-timeout" },
+    { path = "{py}pyproject.toml", contains = "timeout =" },
+    { path = "{py}pyproject.toml", contains = "strict-markers" },
     # `filterwarnings = ["error", ...]`: a leaked process, file or stream fails the test that made it (shelf-uaub).
-    { path = "pyproject.toml", contains = "filterwarnings" },
+    { path = "{py}pyproject.toml", contains = "filterwarnings" },
 ]
 # Outcome (shelf-jc7r.3): the gate reaches a test runner, whichever one: pytest itself, or the shared runners that run it.
 outcome = "runs"
@@ -145,9 +145,9 @@ tool = "pytest-cov with a floor"
 install = "uv add --dev pytest-cov; run pytest with --cov-fail-under=65 (the default floor: low on purpose, a backstop; set it higher only when the owner asks)"
 # Coverage is set up when something measures it; a gate that measures without a floor is the failing case.
 config = [{ any = [
-    { path = "pyproject.toml", test-coverage = true },
-    { path = "pyproject.toml", contains = "pytest-cov" },
-    { path = "pyproject.toml", contains = "[tool.coverage" },
+    { path = "{py}pyproject.toml", test-coverage = true },
+    { path = "{py}pyproject.toml", contains = "pytest-cov" },
+    { path = "{py}pyproject.toml", contains = "[tool.coverage" },
     { path = "justfile", contains = "coverage run" },
     { path = "justfile", contains = "--cov" },
 ] }]
@@ -172,7 +172,7 @@ units = true
 [[role.floor]]
 label = "`fail_under` in [tool.coverage.report], read by `coverage report` or `pytest --cov`"
 gate = '\bcoverage report\b|--cov\b'
-path = "pyproject.toml"
+path = "{py}pyproject.toml"
 contains = "fail_under"
 
 # Tool-agnostic: any script that compares measured coverage to a committed floor file.
@@ -186,7 +186,7 @@ role = "architecture"
 tool = "import-linter (layers, forbidden, independence, acyclic_siblings, protected) for import edges; ruff TID251 banned-api for banned APIs; both read pyproject.toml, one declaration each"
 install = "uv add --dev 'import-linter>=2.15,<3'; [tool.importlinter] root_package(s) + [[tool.importlinter.contracts]] in pyproject.toml: a layers contract with containers and exhaustive = true, acyclic_siblings, forbidden (not-installed apps/frameworks via include_external_packages = true); banned APIs in [tool.ruff.lint.flake8-tidy-imports.banned-api] with a msg each, scoped to the core; `arch: uv run lint-imports` in just check; plant a forbidden edge and see it fail"
 config = [
-    { any = [{ path = "pyproject.toml", contains = "[tool.importlinter" }, { path = ".importlinter" }] },
+    { any = [{ path = "{py}pyproject.toml", contains = "[tool.importlinter" }, { path = "{py}.importlinter" }] },
 ]
 # The banned-api half rides the linter role's `ruff check` gate. Banned APIs are not required in config for
 # every repo: a library collection with no core has no clock or random bans; architecture.md says when a list is needed.

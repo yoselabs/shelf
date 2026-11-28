@@ -9,6 +9,8 @@ import pytest
 from blueprint.runner import run
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from blueprint.testing import Repo
 
 _PYPROJECT = '[project]\nname = "app"\nversion = "0"\nrequires-python = ">=3.12"\n'
@@ -73,3 +75,33 @@ def test_two_python_folders_are_two_projects_not_a_backend(repo: Repo) -> None:
     _python(repo, "proxy-api/")
     _python(repo, "health-checker/")
     assert _profile(repo).stacks == ()
+
+
+_CONFIG = (
+    '[project]\nname = "app"\nversion = "0"\nrequires-python = ">=3.12"\n'
+    '[tool.ruff]\nline-length = 100\n[tool.ruff.lint]\nselect = ["ALL"]\n'
+    '[tool.pyrefly]\nproject-includes = ["src"]\n[tool.codespell]\nskip = "x"\n'
+    '[tool.pytest.ini_options]\naddopts = "--strict-markers"\n'
+)
+_GATE = "lint:\n\tuv run blueprint gate lint\ntypecheck:\n\tuv run pyrefly check\ncheck: lint typecheck\n\tuv lock --check\n"
+
+
+def _stack_verdicts(repo: Repo, folder: str) -> dict[str, str]:
+    prefix = "" if folder == "." else f"{folder}/"
+    repo.write(f"{prefix}pyproject.toml", _CONFIG)
+    repo.write(f"{prefix}uv.lock", "version = 1\n")
+    repo.write(f"{prefix}.python-version", "3.12\n")
+    repo.write("justfile", _GATE)
+    rows = run(repo.root, concern="stack", env=repo.env).rows
+    return {r.id: r.verdict.value for r in rows if r.id.startswith("stack.python-uv.")}
+
+
+def test_a_python_stack_in_backend_is_judged_as_it_is_at_the_root(repo: Repo, tmp_path: Path) -> None:
+    from blueprint.testing import Repo as Fresh  # noqa: PLC0415 -- a second repo in the same test
+
+    (tmp_path / "second").mkdir()
+
+    at_root = _stack_verdicts(repo, ".")
+    below = _stack_verdicts(Fresh.create(tmp_path / "second" / "repo", tmp_path / "second" / "bin"), "backend")
+    assert at_root == below
+    assert {"passing", "not set up"} <= set(at_root.values()), at_root

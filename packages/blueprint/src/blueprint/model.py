@@ -274,6 +274,16 @@ class Context:
         """`rel` inside the repo."""
         return self.repo / rel
 
+    def py_folder(self) -> str:
+        """The folder of the Python stack ("." at the root, `backend` below it; ADR 0034)."""
+        roots = dict(self.profile.stack_roots)
+        return roots.get("python-uv") or roots.get("python") or "."
+
+    def py(self, name: str) -> str:
+        """`name` inside the Python stack's folder, repo-relative: `pyproject.toml`, or `backend/pyproject.toml` in `backend/`."""
+        folder = self.py_folder()
+        return name if folder == "." else f"{folder}/{name}"
+
     def read(self, rel: str) -> str | None:
         """The text of `rel`, or None when it is not a file. Read once per run: the repo does not change while a run reads it."""
         key = f"read:{rel}"
