@@ -121,6 +121,8 @@ dev = [
 target-version = "py311"
 line-length = 140
 output-format = "concise"
+# Eval fixtures are inputs the evals judge, deliberately not clean code: no linter reads them (gate.lint-paths-cover-python honours this).
+extend-exclude = ["evals/*/*/fixture"]
 
 [tool.ruff.format]
 # ruff 0.17 formats the python fenced in markdown. The READMEs' snippets are hand-aligned prose

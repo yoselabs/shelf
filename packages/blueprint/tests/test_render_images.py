@@ -114,6 +114,26 @@ def test_the_pins_row_passes_when_the_rendered_images_recipe_runs_the_check(repo
     assert rows["stack.dockerfile.dependencies"] is Verdict.PASSING
 
 
+def test_the_compose_dependencies_row_passes_when_the_rendered_images_recipe_runs_compose_pins(repo: Repo) -> None:
+    # shelf-0lv1: a2kay on 0.17.0 got "not set up" for a gate that pins images by the rendered step.
+    repo.write("compose.yml", "services:\n  db:\n    image: postgres:17@sha256:" + "a" * 64 + "\n")
+    repo.write("pyproject.toml", '[project]\nname = "x"\n[tool.blueprint.gate]\nimage-pins = true\n')
+    repo.commit()
+    render.write(repo.root)
+    repo.commit()
+    rows = {r.id: r.verdict for r in run(repo.root, concern="stack", env=repo.env).rows}
+    assert rows["stack.compose.dependencies"] is Verdict.PASSING
+
+
+def test_the_compose_dependencies_row_still_wants_a_pin_check_without_image_pins(repo: Repo) -> None:
+    repo.write("compose.yml", COMPOSE)
+    repo.commit()
+    render.write(repo.root)
+    repo.commit()
+    rows = {r.id: r.verdict for r in run(repo.root, concern="stack", env=repo.env).rows}
+    assert rows["stack.compose.dependencies"] is Verdict.NOT_SET_UP
+
+
 def _module(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, "-I", "-m", "blueprint.recipes.check_dockerfile_pins", *args], cwd=cwd, capture_output=True, text=True, check=False

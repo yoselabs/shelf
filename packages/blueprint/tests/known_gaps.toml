@@ -62,11 +62,6 @@ direction = "passing"
 bead = "shelf-fkx.11"
 
 [[gap]]
-id = "stack.compose.dependencies"
-direction = "passing"
-bead = "shelf-fkx.11"
-
-[[gap]]
 id = "stack.compose.hooks"
 direction = "passing"
 bead = "shelf-fkx.11"

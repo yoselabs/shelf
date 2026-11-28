@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from datetime import date
 from typing import TYPE_CHECKING
 
-from blueprint import concerns
+from blueprint import concerns, waivers
 from blueprint.concerns.gate import gate_git
 from blueprint.model import REGISTRY, Check, Context, Finding, FixedBy, Profile, Sub, Verdict, not_checked
 from blueprint.plugins import load_plugins, notices_for, plugin_of, resolve
@@ -36,9 +36,6 @@ class Row:
     blueprint_gap: bool = False
     layer: str = "generic"
     version: int = 1
-    # Not in the set the repo's last audit judged: reported, never failing the gate, until the next
-    # audit takes it in. A shelf change must not turn every consumer's pre-push red mid-task.
-    new: bool = False
 
     @property
     def key(self) -> str:
@@ -69,7 +66,7 @@ class Run:
         A row the blueprint itself cannot judge yet (`blueprint_gap`) counts for neither: it is the
         shelf's gap, filed there, not the repo's.
         """
-        verdicts = {r.verdict for r in self.rows if not r.blueprint_gap and not r.new}
+        verdicts = {r.verdict for r in self.rows if not r.blueprint_gap}
         if verdicts & {Verdict.FAILING, Verdict.NOT_SET_UP} or self.problems:
             return 1
         return 2 if Verdict.NOT_CHECKED in verdicts else 0
@@ -91,6 +88,22 @@ def expiry_notices(overrides: tuple[Override, ...], today: date, days: int = EXP
         elif (o.expires - today).days <= days:
             out.append(f"override `{o.id}`{scope} expires {o.expires.isoformat()} (within {days} days): renew it or fix the checkpoint")
     return tuple(out)
+
+
+def waiver_notices(ws: tuple[waivers.Waiver, ...], today: date) -> tuple[str, ...]:
+    """One line per waiver that counts: what waits, until when, the days left. Never silent."""
+    return tuple(
+        f"waiver `{w.id}` until {w.until.isoformat()} ({w.days_left(today)} days left): {w.reason.strip()}"
+        for w in ws
+        if w.problem is None and w.until is not None
+    )
+
+
+def known_ids() -> set[str]:
+    """Every checkpoint id the pinned engine has: registered checks and the per-profile stack and framework rows."""
+    from blueprint.checkpoints import listing  # noqa: PLC0415 -- checkpoints.py imports this module's registry users
+
+    return {c.id for c in listing()}
 
 
 _GLOB = re.compile(r"[*?\[]")
@@ -121,21 +134,6 @@ def orphan_override_notices(overrides: tuple[Override, ...], row_ids: set[str], 
         for o in {o.id: o for o in overrides}.values()
         if o.id != DETECTION and o.id not in row_ids and o.id not in skipped_ids
     )
-
-
-ACCEPTED = "docs/blueprint/checkpoints.txt"
-
-
-def _accepted(repo: Path) -> set[str] | None:
-    """The `id@version` lines the last audit wrote; None before the first audit, so all is enforced.
-
-    An audit from before the record existed (a README, no record) counts as an empty record: every
-    row it did not see passing is new, so consumers audited earlier are not turned red by an upgrade.
-    """
-    path = repo / ACCEPTED
-    if path.is_file():
-        return set(path.read_text().split())
-    return set() if (repo / ACCEPTED).with_name("README.md").is_file() else None
 
 
 def active(profile: Profile, concern: str | None = None, not_asked: dict[str, str] | None = None) -> list[Check]:
@@ -181,6 +179,12 @@ def _row(chk: Check, sub: Sub, state: State, today: date, dead: list[str]) -> Ro
             evidence = f"override{kind} {override.lasts}, decided by {override.decided_by}: {override.reason} (saw: {evidence})"
         else:
             evidence = f"{evidence}; {problem}"
+    waiver = next((w for w in state.waivers if w.id == sub.id and w.problem is None and w.until is not None), None)
+    if waiver is not None and verdict not in {Verdict.PASSING, Verdict.NOT_APPLICABLE}:
+        evidence = (
+            f"waived until {waiver.until.isoformat()} ({waiver.days_left(today)} days left): {waiver.reason.strip()} (saw: {evidence})"  # type: ignore[union-attr]
+        )
+        verdict = Verdict.PASSING
     return Row(
         sub.id,
         sub.concern,
@@ -234,9 +238,6 @@ def _run_checks(repo: Path, *, concern: str | None, audit: bool, today: date | N
         for sub in _judge(c, ctx)
         if plugin_of(sub.id) not in not_asked
     )
-    accepted = _accepted(repo)
-    if accepted is not None:
-        rows = tuple(replace(r, new=True) if r.key not in accepted and r.verdict is not Verdict.PASSING else r for r in rows)
     if audit and (branches := gate_git.unmerged_gate_branches(ctx)):
         rows = tuple(_branch_aware(r, branches) for r in rows)
     skipped = 0 if audit else sum(c.audit_only for c in checks)
@@ -250,7 +251,7 @@ def _run_checks(repo: Path, *, concern: str | None, audit: bool, today: date | N
         profile=profile,
         set_hash=set_hash(active(profile, None, not_asked)),
         rows=rows,
-        problems=state.problems,
+        problems=(*state.problems, *waivers.unknown(state.waivers, known_ids())),
         skipped_audit=skipped,
         overrides=state.overrides,
         notices=(
@@ -259,6 +260,7 @@ def _run_checks(repo: Path, *, concern: str | None, audit: bool, today: date | N
             *ctx.notices,
             *expiry_notices(state.overrides, today),
             *dead,
+            *waiver_notices(state.waivers, today),
             *scoped_dead_notices(ctx, {r.id for r in rows}),
             *orphans,
         ),

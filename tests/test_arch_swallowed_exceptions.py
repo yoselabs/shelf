@@ -117,6 +117,8 @@ _ALLOWED = {
         ("any-speech/src/any_speech/defaults.py", 1),
         ("anyllm/src/anyllm/select.py", 1),
         ("blueprint/src/blueprint/concerns/stacks/cli_parse.py", 1),
+        ("blueprint/src/blueprint/ruff_rules.py", 2),
+        ("blueprint/src/blueprint/waivers.py", 1),
         ("convert-md/src/convert_md/dispatch.py", 1),
         ("launchd-agent/src/launchd_agent/__init__.py", 1),
     ),

@@ -69,9 +69,10 @@ what passed, a lease queues runs); `check --brief` is the per-commit step. A rep
    desktop app, library versus application). One numbered question round, grouped, each with your recommended answer.
 4. Show the owner the plan (§4) and stop.
 
-The audit writes `docs/blueprint/checkpoints.txt`, the set it judged. Between audits the repo's gate
-enforces that set; a checkpoint the shelf added later shows as 🆕 and warns without failing, until
-the next audit takes it in. So rerun the audit whenever the shelf moves.
+The audit writes nothing tracked (ADR 0018). The pinned tag decides which checkpoints judge the repo, so a
+checkpoint the shelf added fails right after a pin bump. A repo that cannot fix one yet waives it in its config:
+`[[tool.blueprint.waivers]]` with `id`, `reason`, `until` (at most 90 days out). An expired, reasonless or
+unknown-id waiver fails. A leftover `docs/blueprint/checkpoints.txt` or tracked report fails `gate.no-audit-leftovers`.
 
 ## 3. Remediate (after the owner's yes)
 

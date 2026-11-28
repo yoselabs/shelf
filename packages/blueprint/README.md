@@ -20,7 +20,7 @@ PYTHONPATH=../shelf/packages/blueprint/src python3 -m blueprint check --repo .
 | `--brief` | one line per checkpoint that is not passing; what `just blueprint` prints |
 | `--list [PREFIX]` | list the checkpoints instead (id, statement, the fact that turns each on), with `--json` as JSON |
 | `--json` | the run as JSON, for agents and evals |
-| `--write` | `.blueprint/reports/README.md` (one row per concern, grouped by layer) and `<concern>.md`, one table per concern: a git-ignored folder; the tracked output is the audit record `docs/blueprint/checkpoints.txt` |
+| `--write` | `.blueprint/reports/README.md` (one row per concern, grouped by layer) and `<concern>.md`, one table per concern: a git-ignored folder; the audit writes nothing tracked (ADR 0018) |
 | `--audit` | also the audit-only checkpoints: slow ones (a fresh clone running `just check`) and ones that read this machine's bd database, which a bare clone does not have |
 | `--concern X` | one concern only |
 

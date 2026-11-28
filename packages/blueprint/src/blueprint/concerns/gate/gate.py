@@ -2,13 +2,28 @@
 
 from __future__ import annotations
 
-from blueprint.concerns.gate import gate_clone, gate_command, gate_git, gate_guards, gate_inputs, gate_lfs, gate_no_ci, gate_recipes
+from blueprint.concerns.gate import (
+    gate_audit_leftovers,
+    gate_clone,
+    gate_command,
+    gate_git,
+    gate_guards,
+    gate_inputs,
+    gate_lfs,
+    gate_lint_paths,
+    gate_no_ci,
+    gate_recipes,
+)
 from blueprint.concerns.git_hooks import gate_hooks
 from blueprint.model import check
 
 check("gate.one-command", "`just check` exists and every recipe it names resolves")(gate_command.one_command)
 check("gate.runner", "the gate runner is just: a justfile holds the gate, not a Makefile")(gate_command.runner)
 check("gate.no-ci", "the repo holds no GitHub Actions configuration (no repository has CI, ADR 0027)")(gate_no_ci.no_ci)
+check(
+    "gate.no-audit-leftovers",
+    "docs/blueprint holds no tracked audit baseline (checkpoints.txt) or narrative report: the audit writes nothing tracked (ADR 0018)",
+)(gate_audit_leftovers.audit_leftovers)
 check(
     "gate.step-inputs",
     "every `check` step has inputs: the blueprint default or the repo exception in gate-inputs.toml, so an unaffected commit does no work",
@@ -57,3 +72,6 @@ check(
     "gate.recipe-shadowing",
     "the justfile redefines no recipe blueprint renders unless an [[override]] declares why (a shadowed step is unchecked)",
 )(gate_recipes.shadowing)
+check("gate.lint-paths-cover-python", "`lint-paths` in [tool.blueprint.gate], when set, covers every tracked .py file")(
+    gate_lint_paths.lint_paths_cover
+)

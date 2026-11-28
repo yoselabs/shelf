@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from blueprint import gate_graph
+from blueprint.concerns.gate import gate_unreadable
 from blueprint.concerns.git_hooks.gate_hooks import HOOK_CONFIG
 from blueprint.concerns.git_hooks.hooks import hooks_in
 from blueprint.model import (
@@ -65,6 +66,8 @@ def _gate_scripts(ctx: Context, gate: Gate) -> list[str]:
 
 def runs_blueprint(ctx: Context) -> Finding:
     """Gaps come back between audits unless the repo's own gate re-checks them on every commit."""
+    if (blind := gate_unreadable.unreadable(ctx, "whether the gate runs blueprint")) is not None:
+        return blind
     gate = gate_graph.load(ctx)
     if gate is None:
         return not_applicable("no justfile: gate.one-command reports the missing gate")
@@ -83,6 +86,8 @@ def guards_have_red_tests(ctx: Context) -> Finding:
 
     A guard never seen red is a hypothesis.
     """
+    if (blind := gate_unreadable.unreadable(ctx, "its guard scripts")) is not None:
+        return blind
     gate = gate_graph.load(ctx)
     if gate is None:
         return not_applicable("no justfile, so no guard scripts")
@@ -133,6 +138,8 @@ def _checker_scripts(ctx: Context) -> list[str]:
 
 def checkers_wired(ctx: Context) -> Finding:
     """A checker nothing runs guards nothing: its name says check, and the repo's own docs may say run it before a commit."""
+    if (blind := gate_unreadable.unreadable(ctx, "whether its checkers are wired")) is not None:
+        return blind
     gate = gate_graph.load(ctx)
     if gate is None:
         return not_applicable("no justfile: gate.one-command reports the missing gate")
