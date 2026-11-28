@@ -30,10 +30,6 @@ _GIT_TIMEOUT = 60
 _RUFF_TIMEOUT = 600
 
 
-class _GitFailedError(Exception):
-    """`git diff --cached` failed: the staged set is unknown, so no check may be skipped for want of files."""
-
-
 def _staged(repo: Path) -> list[str]:
     """Paths added, copied, modified or renamed in the index (never a deleted one); raises `_GitFailedError`."""
     done = subprocess.run(
@@ -45,7 +41,7 @@ def _staged(repo: Path) -> list[str]:
         timeout=_GIT_TIMEOUT,
     )
     if done.returncode != 0:
-        raise _GitFailedError(done.stderr.strip() or f"exit {done.returncode}")
+        raise secret_scan.ScanError(done.stderr.strip() or f"exit {done.returncode}")
     return [p for p in done.stdout.split("\0") if p]
 
 
@@ -87,7 +83,7 @@ def run(repo: Path) -> int:
     """The worst exit code of the checks the staged files call for."""
     try:
         staged = _staged(repo)
-    except (_GitFailedError, OSError, subprocess.SubprocessError) as error:
+    except (secret_scan.ScanError, OSError, subprocess.SubprocessError) as error:
         sys.stderr.write(f"hook: git diff --cached failed ({error}): the staged files are unknown, so the commit is refused\n")
         return 2
     codes = [_secrets(repo), guard.check(committed=False)]

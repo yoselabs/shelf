@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from any_lease import Leases, LeaseTimeoutError
+from stream_proc import alive
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Mapping
@@ -53,27 +54,13 @@ def default_root(env: Mapping[str, str]) -> Path:
         return Path(env["GATE_LEASE_ROOT"])
     if env.get("XDG_CACHE_HOME"):
         return Path(env["XDG_CACHE_HOME"]) / "gate-leases"
-    try:
-        home = Path(pwd.getpwuid(os.getuid()).pw_dir)
-    except KeyError:
-        home = Path.home()
-    return home / ".cache" / "gate-leases"
-
-
-def _alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except OSError:  # EPERM: it exists
-        return True
-    return True
+    return Path(pwd.getpwuid(os.getuid()).pw_dir) / ".cache" / "gate-leases"
 
 
 def _enclosing(env: Mapping[str, str]) -> bool:
     """True when `ANY_GATE_LEASED` names a live gate: a value left behind by a dead one (or a bare `1`) waives nothing."""
     value = env.get(LEASED_ENV, "")
-    return value.isdigit() and int(value) > 1 and _alive(int(value))
+    return value.isdigit() and int(value) > 1 and alive(int(value))
 
 
 def _visible(say: Callable[[str], None]) -> Callable[[str], None]:
@@ -137,8 +124,8 @@ def hold(
         except LeaseTimeoutError as timeout:
             holder = timeout.occupants[0].holder if timeout.occupants else None
             age = time.time() - holder.created if holder is not None and holder.created else 0.0
-            if holder is None or not _alive(holder.pid) or age > stale_after:
-                why = "its holder is gone" if holder is None or not _alive(holder.pid) else f"its holder is {age / 60:.0f} min old"
+            if holder is None or not alive(holder.pid) or age > stale_after:
+                why = "its holder is gone" if holder is None or not alive(holder.pid) else f"its holder is {age / 60:.0f} min old"
                 say(f"gate: no gate slot after {wait_limit:.0f}s and {why}: running anyway, the box is shared")
                 yield child
                 return

@@ -22,7 +22,7 @@ def audit_leftovers(ctx: Context) -> Finding:
     if listed is None:
         return ctx.not_a_repository()
     tracked = [p for p in listed.split("\0") if p]
-    stale = _stale(tracked, lambda p: _is_report(ctx, p))
+    stale = _leftovers(tracked, lambda p: _is_report(ctx, p))
     if not stale:
         return passing(f"{_DIR} holds no tracked baseline or audit report")
     return failing(
@@ -32,7 +32,7 @@ def audit_leftovers(ctx: Context) -> Finding:
     )
 
 
-def _stale(tracked: list[str], is_report: Callable[[str], bool]) -> list[str]:
+def _leftovers(tracked: list[str], is_report: Callable[[str], bool]) -> list[str]:
     return [p for p in tracked if p == BASELINE or (p.count("/") == _DIR.count("/") + 1 and p.endswith(".md") and is_report(p))]
 
 
@@ -56,7 +56,7 @@ def clean(repo: Path) -> int:
         except (OSError, UnicodeDecodeError):
             return False
 
-    stale = _stale([p for p in listed.stdout.split("\0") if p], report)
+    stale = _leftovers([p for p in listed.stdout.split("\0") if p], report)
     if not stale:
         sys.stdout.write(f"clean-reports: nothing to remove in {_DIR}\n")
         return 0

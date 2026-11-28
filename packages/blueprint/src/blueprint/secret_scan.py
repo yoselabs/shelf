@@ -137,11 +137,10 @@ def _scan_untracked(repo: Path, env: Mapping[str, str] | None) -> list[Leak]:
 
 
 def _relative(name: str, root: Path) -> str:
+    path = Path(name)
     for base in (root, root.resolve()):
-        try:
-            return Path(name).relative_to(base).as_posix()
-        except ValueError:
-            continue
+        if path.is_relative_to(base):
+            return path.relative_to(base).as_posix()
     return name
 
 

@@ -58,7 +58,7 @@ def test_a_stale_holder_is_overridden_at_the_limit(tmp_path: Path) -> None:
 
 
 def test_a_holder_whose_pid_is_gone_is_overridden(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("any_gate.gate_lease._alive", lambda _pid: False)
+    monkeypatch.setattr("any_gate.gate_lease.alive", lambda _pid: False)
     with Leases(tmp_path).acquire(GATE_LEASE, 1, label="orphan"):
         _, said = _hold(tmp_path, limit=0.1)
     assert any("holder is gone" in line for line in said)

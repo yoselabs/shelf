@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Step output carries `gate-note: <text>` lines (the protocol of `any_gate.note`; blueprint writes the line itself, it does not import any-gate): `lint`/`lint-changed` note the file count, `deps` the packages reached of all.
+
 - `secret_scan range` scans every untracked file in one gitleaks process (a temp copy; findings keep the file's own path), not one process per file.
 
 - Commit hook (`blueprint gate hook`): a git failure reading the index now fails the hook (exit 2) instead of skipping ruff and the preset check and passing; the rendered entry is `uv run --frozen blueprint gate hook` (no re-resolve per commit, as the old ruff hooks had). With no `lint-paths` every staged `.py` is still linted (documented).
