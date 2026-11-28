@@ -220,3 +220,47 @@ def test_the_node_spelling_and_hooks_rows_accept_blueprints_lint_changed_as_code
     rows = _rows(repo, "node")
     assert rows["stack.node.spelling"] is Verdict.PASSING
     assert rows["stack.node.hooks"] is Verdict.PASSING
+
+
+# --- shelf-meqv: the codespell config sits in the Python stack's folder -------------------------------------------------------
+
+
+def _backend_spell(repo: Repo, spell_paths: str) -> None:
+    for rel, text in _NODE_FILES.items():
+        repo.write(rel if rel.startswith("docs/") or rel in {"AGENTS.md", _HOOKS_FILE} else f"frontend/{rel}", text)
+    repo.write(
+        "backend/pyproject.toml",
+        f'[project]\nname = "x"\n[tool.codespell]\nskip = "x"\n[tool.blueprint.gate]\nspell-paths = {spell_paths}\n',
+    )
+    repo.write("backend/uv.lock", "version = 1\n")
+    repo.write("compose.yml", "services: {}\n")
+    repo.write("justfile", "check:\n\tblueprint gate spell\n")
+
+
+def _spelling(repo: Repo) -> dict[str, Verdict]:
+    return {r.id: r.verdict for r in run(repo.root, concern="stack", env=repo.env).rows if r.id.endswith(".spelling")}
+
+
+def test_node_and_compose_spelling_accept_the_python_folders_codespell_when_its_paths_reach_them(repo: Repo) -> None:
+    _backend_spell(repo, '["src", "../frontend", "../compose.yml"]')
+    rows = _spelling(repo)
+    assert rows["stack.node.spelling"] is Verdict.PASSING
+    assert rows["stack.compose.spelling"] is Verdict.PASSING
+
+
+def test_node_spelling_fails_when_the_python_folders_spell_paths_miss_the_frontend(repo: Repo) -> None:
+    _backend_spell(repo, '["src", "../compose.yml"]')
+    rows = _spelling(repo)
+    assert rows["stack.node.spelling"] is Verdict.NOT_SET_UP
+    assert rows["stack.compose.spelling"] is Verdict.PASSING
+
+
+def test_compose_spelling_fails_when_the_spell_paths_miss_the_compose_file(repo: Repo) -> None:
+    _backend_spell(repo, '["src", "../frontend"]')
+    rows = _spelling(repo)
+    assert rows["stack.compose.spelling"] is Verdict.NOT_SET_UP
+
+
+def test_no_spell_paths_means_codespell_reads_only_its_own_folder(repo: Repo) -> None:
+    _backend_spell(repo, "[]")
+    assert _spelling(repo)["stack.node.spelling"] is Verdict.NOT_SET_UP

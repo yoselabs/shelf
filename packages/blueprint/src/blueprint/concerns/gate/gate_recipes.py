@@ -5,14 +5,12 @@ from __future__ import annotations
 import json
 import re
 import shlex
-from typing import TYPE_CHECKING
+import tempfile
+from pathlib import Path
 
 from blueprint import gate_graph, render
 from blueprint.concerns.gate import gate_unreadable
 from blueprint.model import Context, Finding, failing, not_applicable, not_checked, passing
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 ID = "gate.recipe-shadowing"
 FOLDER = ".blueprint"
@@ -28,6 +26,19 @@ def _dump_recipe_names(ctx: Context, path: str) -> set[str] | None:
     return set(json.loads(done.stdout)["recipes"])
 
 
+def _dump_parts(ctx: Context, parts: list[Path]) -> set[str] | None:
+    """The recipe names of every rendered part, read through one justfile that imports them all (the repo is not touched)."""
+    with tempfile.TemporaryDirectory(prefix="blueprint-parts-") as tmp:
+        joined = Path(tmp) / "justfile"
+        joined.write_text(
+            "set allow-duplicate-recipes\n" + "".join(f"import '{part.resolve().as_posix()}'\n" for part in parts), encoding="utf-8"
+        )
+        done = ctx.run(gate_graph.just_command(ctx), "--justfile", str(joined), "--dump", "--dump-format", "json", timeout=60)
+    if done is None or done.returncode != 0:
+        return None
+    return set(json.loads(done.stdout)["recipes"])
+
+
 def shadowing(ctx: Context) -> Finding:
     """The justfile imports blueprint's rendered parts and defines a recipe of the same name."""
     own = next((n for n in gate_graph.JUSTFILES if ctx.path(n).is_file()), None)
@@ -37,12 +48,10 @@ def shadowing(ctx: Context) -> Finding:
     definitions = _dump_recipe_names(ctx, own)
     if definitions is None:
         return not_checked("just could not dump the repo's recipe definitions; fix the justfile or install its pinned just")
-    owned: set[str] = set()
-    for part in parts:
-        baseline = _dump_recipe_names(ctx, part.relative_to(ctx.repo).as_posix())
-        if baseline is None:
-            return not_checked(f"just could not dump rendered recipe definitions in {part.name}")
-        owned |= baseline
+    # The parts are dumped together: one may need a recipe another defines (`generated-ui-css: ui-install`), so none parses alone.
+    owned = _dump_parts(ctx, parts)
+    if owned is None:
+        return not_checked("just could not dump the rendered recipe definitions in .blueprint; fix a part or install the pinned just")
     # The dump flattens imports and loses source locations. Attribute its validated names to consumer declarations; do not interpret
     # parameter/default syntax. Assignments have a separate := token and indented lines belong to recipe bodies.
     consumer: set[str] = set()

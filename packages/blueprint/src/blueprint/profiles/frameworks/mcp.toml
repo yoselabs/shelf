@@ -1,6 +1,6 @@
 # Framework profile (see ../python-uv.toml for the format). Layers on python-uv.toml for a Python MCP server built on the
 # standalone `fastmcp` package: every python-uv rule applies; the rows here add what is the MCP surface's.
-# `{root}` is the folder holding the pyproject.toml that declares fastmcp (usually "."). Paths may be globs (`tests/*.py`, no `**`).
+# Paths are inside the Python stack's folder (`{py}`: empty at the root, `backend/` below it, ADR 0034). Paths may be globs (`tests/*.py`, no `**`).
 # Detection (profile.py FRAMEWORK_DEPENDENCIES): a `fastmcp` dependency in [project].dependencies AND a `FastMCP(` call in src.
 # Research: docs/research/blueprint-skill/research/mcp-profile.md
 stack = "mcp"
@@ -15,15 +15,15 @@ Never `mcp.server.fastmcp` (frozen v1 copy; gone in mcp 2.x) and never `from mcp
 One test reads `client.initialize_result` and asserts `.protocolVersion` equals the pinned revision string"""
 config = [
     { any = [
-        { path = "pyproject.toml", contains = "fastmcp>=" },
-        { path = "pyproject.toml", contains = "fastmcp==" },
-        { path = "pyproject.toml", contains = "fastmcp~=" },
+        { path = "{py}pyproject.toml", contains = "fastmcp>=" },
+        { path = "{py}pyproject.toml", contains = "fastmcp==" },
+        { path = "{py}pyproject.toml", contains = "fastmcp~=" },
     ] },
-    { path = "uv.lock", contains = 'name = "fastmcp"' },
+    { path = "{py}uv.lock", contains = 'name = "fastmcp"' },
     # The assertion itself, not a read of initialize_result for something else (a2kay read .instructions: shelf-n6i).
     { any = [
-        { path = "tests/*.py", contains = "protocolVersion" },
-        { path = "tests/*/*.py", contains = "protocolVersion" },
+        { path = "{py}tests/*.py", contains = "protocolVersion" },
+        { path = "{py}tests/*/*.py", contains = "protocolVersion" },
     ] },
 ]
 
@@ -32,7 +32,7 @@ role = "project-hygiene"
 tool = "stdout belongs to the protocol: no print() in server code (ruff T20 on, per-file ignore only for tests and the CLI module), logging goes to stderr; a stdio subprocess test proves the stream holds only JSON-RPC"
 install = """pyproject [tool.ruff.lint] select has "T20" (the shelf preset already has it); logging.basicConfig(stream=sys.stderr) or none (FastMCP's own logger writes to stderr, read in fastmcp/utilities/logging.py); \
 the stdio test is the `build` row. Server entrypoint `mcp.run()` has no `print` before it, no banner on stdout (FastMCP's banner goes to stderr)"""
-config = [{ path = "pyproject.toml", contains = "T20" }]
+config = [{ path = "{py}pyproject.toml", contains = "T20" }]
 
 [[role]]
 role = "binary-assets"
@@ -49,8 +49,8 @@ install = """tests/test_stdio_serves.py: `Client(StdioTransport(command=sys.exec
 Pattern: a2kay tests/test_serve_stdio_e2e.py. A server with a Streamable HTTP mode gets the same test over a loopback port (shelf package async-scope[asgi] owns the uvicorn traps)"""
 config = [
     { any = [
-        { path = "tests/*.py", contains = "StdioTransport" },
-        { path = "tests/*/*.py", contains = "StdioTransport" },
+        { path = "{py}tests/*.py", contains = "StdioTransport" },
+        { path = "{py}tests/*/*.py", contains = "StdioTransport" },
     ] },
 ]
 gate = "pytest"
@@ -67,12 +67,12 @@ Cover: the tool set equals the frozen set; one call per tool round-trips; a call
 a failing tool body comes back as the catalogued error, never a masked 'Error calling tool'. `raise_on_error=False` to inspect the error result"""
 config = [
     { any = [
-        { path = "tests/*.py", contains = "Client(" },
-        { path = "tests/*/*.py", contains = "Client(" },
+        { path = "{py}tests/*.py", contains = "Client(" },
+        { path = "{py}tests/*/*.py", contains = "Client(" },
     ] },
     { any = [
-        { path = "tests/*.py", contains = "is_error" },
-        { path = "tests/*/*.py", contains = "is_error" },
+        { path = "{py}tests/*.py", contains = "is_error" },
+        { path = "{py}tests/*/*.py", contains = "is_error" },
     ] },
 ]
 gate = "pytest"
@@ -90,19 +90,19 @@ Property asserts: description non-empty; `annotations` present with all of readO
 Pattern: a2kay tests/contracts/test_mcp_tool_list.py"""
 config = [
     { any = [
-        { path = "tests/*.snapshot.json" },
-        { path = "tests/*/*.snapshot.json" },
-        { path = "tests/*/*/*.snapshot.json" },
+        { path = "{py}tests/*.snapshot.json" },
+        { path = "{py}tests/*/*.snapshot.json" },
+        { path = "{py}tests/*/*/*.snapshot.json" },
     ] },
     { any = [
-        { path = "tests/*.py", contains = "list_tools" },
-        { path = "tests/*/*.py", contains = "list_tools" },
+        { path = "{py}tests/*.py", contains = "list_tools" },
+        { path = "{py}tests/*/*.py", contains = "list_tools" },
     ] },
     { any = [
-        { path = "tests/*.py", contains = "readOnlyHint" },
-        { path = "tests/*/*.py", contains = "readOnlyHint" },
-        { path = "tests/*.py", contains = "read_only_hint" },
-        { path = "tests/*/*.py", contains = "read_only_hint" },
+        { path = "{py}tests/*.py", contains = "readOnlyHint" },
+        { path = "{py}tests/*/*.py", contains = "readOnlyHint" },
+        { path = "{py}tests/*.py", contains = "read_only_hint" },
+        { path = "{py}tests/*/*.py", contains = "read_only_hint" },
     ] },
 ]
 gate = "pytest"
@@ -120,8 +120,8 @@ fastmcp (the server entry point, the tool registration, the transport) stay out 
 Proposed by a2kay's audit (shelf-pt0, 2026-10-11): a2kay keeps fastmcp out of its core with its own layer contracts; not yet proven by a second server"""
 # A "fastmcp" in quotes is a module name in a contract (a dependency spec reads "fastmcp>=...").
 config = [
-    { path = "pyproject.toml", contains = "include_external_packages = true" },
-    { path = "pyproject.toml", contains = '"fastmcp"' },
+    { path = "{py}pyproject.toml", contains = "include_external_packages = true" },
+    { path = "{py}pyproject.toml", contains = '"fastmcp"' },
 ]
 gate = "lint-imports"
 

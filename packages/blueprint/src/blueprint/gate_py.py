@@ -50,6 +50,16 @@ def _paths(repo: Path, key: str) -> list[str]:
     return [str(p) for p in raw] if isinstance(raw, list) else []
 
 
+def spell_paths(repo: Path) -> list[str]:
+    """The `spell-paths` of the Python stack in `repo` (relative to its folder, where the recipe runs codespell)."""
+    return _paths(repo, "spell-paths")
+
+
+def lint_paths(repo: Path) -> list[str]:
+    """The `lint-paths` of the Python stack in `repo` (relative to its folder, where the recipe runs ruff)."""
+    return _paths(repo, "lint-paths")
+
+
 def extra_steps(repo: Path) -> tuple[str, ...]:
     """The steps `[tool.blueprint.gate] steps` adds to `check`, in order."""
     return tuple(_paths(repo, "steps"))

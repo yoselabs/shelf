@@ -89,7 +89,7 @@ na = "a compose file has no executable lines to cover"
 role = "spelling"
 tool = "typos (crate-ci) or codespell with a committed config; it reads comments and service names in compose files"
 install = "brew install typos-cli; typos.toml with [default.extend-words] for image and host names; just check runs `typos`"
-config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }, { path = ".codespellrc" }, { path = "pyproject.toml", contains = "[tool.codespell]" }] }]
+config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }, { path = ".codespellrc" }, { path = "pyproject.toml", contains = "[tool.codespell]" }, { codespell-covers = "compose" }] }]
 gate = "typos"
 
 [[role.alternative]]

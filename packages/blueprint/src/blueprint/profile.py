@@ -337,6 +337,11 @@ def detect_stacks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[str, ...]:
     return tuple(_stack_files(repo, skip))
 
 
+def stack_file_list(repo: Path, stack: str, skip: tuple[str, ...] = ()) -> list[str]:
+    """Every manifest file of `stack` (repo-relative), where `Profile.stack_files` only shows the first few."""
+    return _stack_files(repo, skip).get(stack, [])
+
+
 def detected_stack_roots(repo: Path) -> tuple[tuple[str, str], ...]:
     """The same manifest folders used by profile detection, for commands run in those stacks."""
     return _stack_roots(_stack_files(repo, ()))

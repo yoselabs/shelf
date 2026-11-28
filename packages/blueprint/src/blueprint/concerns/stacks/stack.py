@@ -8,13 +8,14 @@ shelf, then the role rows can judge it.
 from __future__ import annotations
 
 import json
+import posixpath
 import re
 import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from blueprint import gate_graph, gate_test, gate_units, ruff_rules
+from blueprint import gate_graph, gate_py, gate_test, gate_units, profile, ruff_rules
 from blueprint.concerns.stacks.profile_data import Role, StackProfile, load_profiles
 from blueprint.model import (
     Finding,
@@ -93,13 +94,22 @@ def _resolve(ctx: Context, path: str, root: str) -> str:
     return path.replace("{root}", root).replace("{py}", "" if folder == "." else f"{folder}/").removeprefix("./")
 
 
-def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
-    if "any" in spec:
-        return any(_config_holds(ctx, alt, root) for alt in spec["any"])
+def _computed_config(ctx: Context, spec: dict[str, Any], root: str) -> bool | None:
+    """A config entry judged by code, not by a file's text; None when `spec` is a plain path entry."""
     if spec.get("test-coverage"):
         return bool(gate_units.read_config(ctx.path(ctx.py_folder())).coverage)
     if "ruff-selects" in spec:
         return ruff_rules.selects(ctx, str(spec["ruff-selects"]))
+    if "codespell-covers" in spec:
+        return _codespell_covers(ctx, str(spec["codespell-covers"]), root)
+    return None
+
+
+def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
+    if "any" in spec:
+        return any(_config_holds(ctx, alt, root) for alt in spec["any"])
+    if (computed := _computed_config(ctx, spec, root)) is not None:
+        return computed
     path = _resolve(ctx, spec["path"], root)
     if any(ch in path for ch in "*?["):
         hits = (p.relative_to(ctx.repo) for p in sorted(ctx.repo.glob(path)))
@@ -108,6 +118,22 @@ def _config_holds(ctx: Context, spec: dict[str, Any], root: str = ".") -> bool:
     if text is None:
         return ctx.path(path).is_dir() and "contains" not in spec
     return spec.get("contains", "") in text
+
+
+def _codespell_covers(ctx: Context, stack: str, root: str) -> bool:
+    """The Python stack's own codespell config, when its `spell-paths` reach every file of `stack` (ADR 0034: the config sits in backend/).
+
+    The paths are relative to the Python folder, where the rendered recipe runs codespell. No spell-paths means codespell's default:
+    the folder it runs in, which reaches nothing outside the Python stack.
+    """
+    folder = ctx.py_folder()
+    if folder == "." or "[tool.codespell]" not in (ctx.read(ctx.py("pyproject.toml")) or ""):
+        return False  # at the root the plain pyproject.toml alternative already judges it
+    reached = [gate_py.norm(posixpath.join(folder, p)) for p in gate_py.spell_paths(ctx.repo)]
+    files = profile.stack_file_list(ctx.repo, stack, ctx.profile.ignore)
+    if not files and root != ".":
+        files = [root]
+    return bool(files) and bool(reached) and all(gate_py.under(f, reached) for f in files)
 
 
 def _offenders(ctx: Context, spec: dict[str, Any], root: str = ".") -> list[str]:
@@ -167,6 +193,8 @@ def _describe(spec: dict[str, Any], ctx: Context | None = None) -> str:
         return " or ".join(_describe(alt, ctx) for alt in spec["any"])
     if "ruff-selects" in spec:
         return f'a ruff lint config that selects "{spec["ruff-selects"]}" or "ALL" and does not ignore it'
+    if "codespell-covers" in spec:
+        return f"the Python folder's [tool.codespell] with spell-paths reaching the {spec['codespell-covers']} files"
     path = str(spec["path"]) if ctx is None else str(spec["path"]).replace("{py}", "" if ctx.py_folder() == "." else f"{ctx.py_folder()}/")
     return path + (f" with {spec['contains']!r}" if "contains" in spec else "")
 

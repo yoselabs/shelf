@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.1
+
+- **The Python stack in `backend/` (shelf-meqv, a2kay: 8 rows read the repo root).** The six `framework.mcp.*` rows read `pyproject.toml`, `uv.lock` and `tests/` through the Python folder (`{py}` in `profiles/frameworks/mcp.toml`). `stack.node.spelling` and `stack.compose.spelling` accept the Python folder's `[tool.codespell]` when its `spell-paths` (relative to that folder) reach every file of the stack (`codespell-covers` in the profile); no `spell-paths`, or paths that miss the frontend or the compose file, still fail. `gate.lint-paths-cover-python` reads `lint-paths` relative to the Python folder, as the rendered recipe (`[working-directory]`) and the commit hook run ruff: `src` is `backend/src`, `../.a2kay/jobs` is `.a2kay/jobs`, `.` is `backend/` only; the remediation names entries in that form. A repo with the Python stack at the root reads the same as before.
+- **`gate.recipe-shadowing` no longer returns not checked when a rendered part needs a recipe of another part** (shelf-1r07: `generated-ui-css: ui-install`): the parts are dumped together through one temporary justfile (the repo is not touched).
+- Corpus diff against 0.19.0 (42 repos): no verdict moved. No corpus repo has its Python stack in a folder, so the folder-reading changes are covered by the fixture tests (Python in `backend/`, node in `frontend/`), not the corpus.
+
 ## 0.19.0
 
 - **Root `blueprint.toml`** (ADR 0034): a repo's blueprint config (waivers, overrides, `[[edge]]`, classification) may live in `blueprint.toml` at the root, the one home for a multi-stack repo; `docs/blueprint/blueprint.toml` is still read, and both files at once is a problem naming the `git mv`. Each stack's own `[tool.*]` stays in its manifest. `stack.tool-pins` reads `rust-just` only from the root `pyproject.toml`: with the Python stack in `backend/` just must be pinned in mise.toml (ADR 0023 amended).
