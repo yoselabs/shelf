@@ -46,6 +46,7 @@ from any_lease import Leases
 from any_gate import changed as changed_files
 from any_gate import inputs
 from any_gate import opens as step_opens
+from any_gate.gate_lease import REPEAT_WAIT_NOTICE, WAIT_LIMIT, hold, wait_message
 from any_gate.receipts import Receipts
 from any_gate.runner import RunResult, run_runner
 from any_gate.state import GateState, common_dir
@@ -61,20 +62,6 @@ LEASE_NAME = "tests"
 
 class PlanError(ValueError):
     """A plan line that is not `path` or `path<TAB>key`."""
-
-
-REPEAT_WAIT_NOTICE = 300.0  # seconds between "still waiting" notices: a hung holder shows as a growing age, not as silence
-
-
-def wait_message(wait: Waiting, *, now: float | None = None) -> str:
-    """Who holds the slot, since when, and how to free it: a holder that hangs never releases (the kernel frees only a dead one)."""
-    holder = wait.occupants[0].holder if wait.occupants else None
-    if holder is None:
-        return "waiting for a test slot, held by an unnamed run"
-    age = (time.time() if now is None else now) - holder.created if holder.created else None
-    held = f", held for {age / 60:.0f} min" if age is not None else ""
-    hint = f"; if it hangs (no output, idle CPU): kill {holder.pid}" if age is not None and age > 600 else ""
-    return f"waiting for a test slot, held by {holder.label or 'an unnamed run'} (pid {holder.pid}{held}){hint}"
 
 
 def notice(text: str) -> None:
@@ -179,10 +166,13 @@ def _run_planned(args: argparse.Namespace, plan: list[tuple[str, str]], receipts
     if not left():  # nothing to run: no reason to queue
         notice("nothing to run")
         return 0
+    began = time.monotonic()
     todo, outcome = _run_under_lease(args, left)
     if outcome is None:
         notice("nothing to run")
         return 0
+    skipped, secs = len(plan) - len(todo), time.monotonic() - began
+    notice(f"test: ran {len(todo)} of {len(plan)} suite(s), {skipped} unchanged since they passed -- {secs:.0f}s")
     if outcome.stopped:
         notice(f"the runner was stopped by the {outcome.stopped} limit")
     if not outcome.ok:
@@ -209,16 +199,16 @@ def _stop_on_signal(_number: int, _frame: object) -> None:
     raise KeyboardInterrupt
 
 
-def _skips(args: argparse.Namespace, repo: Path) -> dict[str, str]:
-    """The steps not to start: those whose inputs did not change (see `inputs.unaffected`); none under --all."""
+def _decide(args: argparse.Namespace, repo: Path) -> tuple[dict[str, str], dict[str, str]]:
+    """`(skips, runs)` for the steps: those not to start (see `inputs.explain`) and why each other one runs; all run under --all."""
     if args.all:
-        return {}
+        return {}, {name: f"run {name}: --all" for name in args.names}
 
     def recorded() -> bool:
         receipts = _receipts(None, repo)
         return receipts is not None and GateState(repo, receipts, os.environ).green("check")
 
-    return inputs.unaffected(repo, args.names, recorded)
+    return inputs.explain(repo, args.names, recorded)
 
 
 def _steps(args: argparse.Namespace) -> int:
@@ -234,16 +224,29 @@ def _steps(args: argparse.Namespace) -> int:
             signal.signal(number, _stop_on_signal)
         except ValueError:  # not the main thread: the caller owns signals
             break
-    with tempfile.TemporaryDirectory() as folder:
+    repo = Path(args.repo).resolve()
+    skip, why = _decide(args, repo)
+    with (
+        hold(
+            _lease_root(args.lease_root),
+            slots=args.gate_slots,
+            wait_limit=args.gate_wait,
+            label=f"gate in {repo}",
+            env=os.environ,
+            say=_say,
+        ) as env,
+        tempfile.TemporaryDirectory() as folder,
+    ):
         counted = step_opens.prepare(Path(folder)) if args.opens else None
         return run_and_report(
             args.names,
-            env=os.environ,
+            env=env,
             runner=args.runner,
             step_budget=args.step_budget,
             gate_budget=args.gate_budget,
             say=_say,
-            skip=_skips(args, Path(args.repo).resolve()),
+            skip=skip,
+            why=why,
             step_limit=args.step_limit,
             halt=threading.Event() if fail_fast else None,
             opens=counted,
@@ -331,6 +334,19 @@ def main(argv: Sequence[str] | None = None, *, stdin: TextIO | None = None) -> i
     st.add_argument(
         "--opens", action="store_true", help="count each step's file opens and process starts (python only; see any_gate.opens)"
     )
+    st.add_argument(
+        "--gate-slots",
+        type=int,
+        default=int(os.environ.get("GATE_SLOTS") or 1),
+        help="gates allowed at once on this box (default $GATE_SLOTS, else 1; 0: no lease): a second gate waits",
+    )
+    st.add_argument(
+        "--gate-wait",
+        type=float,
+        default=float(os.environ.get("GATE_WAIT") or WAIT_LIMIT),
+        help="seconds a gate queues for its slot before it runs anyway (default $GATE_WAIT, else 900)",
+    )
+    st.add_argument("--lease-root", help="the lease folder (default $GATE_LEASE_ROOT, else ~/.cache/gate-leases)")
     st.add_argument("--all", action="store_true", help="run every step, whatever changed (the release gate)")
     st.add_argument("--repo", default=".", help="the repo whose gate-inputs.toml and changes decide what is skipped")
     st.add_argument("names", nargs="+", metavar="STEP")

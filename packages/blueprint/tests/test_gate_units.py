@@ -384,6 +384,10 @@ def test_parallel_coverage_data_is_joined_into_the_units_one_file(repo: Repo, tm
     assert unit_runner.combine(repo.root, cache, config) == 0
 
 
+@pytest.mark.slow(
+    budget=60,
+    reason="three real gate runs, one pytest process per unit each: 11 s alone, 26 s beside a gate; a fake runner proves nothing",
+)
 def test_a_second_run_starts_no_test_process(repo: Repo, tmp_path: Path) -> None:
     _app(repo)
     count = tmp_path / "count"

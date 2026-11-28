@@ -2,6 +2,11 @@
 
 AI-facing only: one line per contract-shape change, arrow notation.
 
+## Unreleased
+
+- `any_gate steps` holds one machine-wide gate slot (`gate_lease.hold`, lease `gate`, `--gate-slots`/`$GATE_SLOTS` default 1, 0 = off): a second gate prints one `gate: waiting for a gate slot, held by ... (pid N, held M min)` line (repeated every 5 min) and waits, at most `--gate-wait`/`$GATE_WAIT` 900 s, then runs anyway and says so. Steps inherit `ANY_GATE_LEASED=1` so a gate inside a gate never waits on its parent. `wait_message(wait, what=)` and `REPEAT_WAIT_NOTICE` moved to `any_gate.gate_lease` (still importable from `any_gate.cli`). (shelf-7aqn)
+- Gate output says why (log-driven): `inputs.explain(repo, names, recorded) -> (skips, runs)`; `steps` prints `run NAME: N changed (GLOBS)` / `run NAME: no gate passed this tree | gate definition changed | changed files unknown | declares no inputs | --all` before the steps, and `skipped NAME: none of GLOBS changed` after; `run_and_report(..., why=)`. `any_gate test` ends with `test: ran N of M suite(s), K unchanged since they passed -- Ss`. `inputs.unaffected` unchanged in shape, its text now names the globs.
+
 - 0.6.0: `inputs.declared(repo)` = `.blueprint/step-inputs.toml` (blueprint's defaults) widened by the repo's `gate-inputs.toml`; a `[narrow]` step takes the repo's list alone; a change to the defaults file runs every step; `inputs.DEFAULTS`.
 
 - 0.5.0: SIGTERM/SIGHUP stop every step tree; `Step.stopped` replaces exit 125 as "stopped by the gate"; a crashed step thread is a failed step (70); `GATE_FAIL_FAST`; `inputs.unaffected(repo, names, recorded)` runs everything on an empty change set no gate passed; a step named twice is refused. Contract otherwise unchanged.

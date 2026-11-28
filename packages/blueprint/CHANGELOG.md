@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `test_a_second_run_starts_no_test_process` is marked `slow` with a reason (shelf-q40b): three real gate runs, 11 s alone, over the 3.5 s rule; it runs in `check` when the suite's key changed and always in `check-all`.
 - `secret_scan range` with no upstream (shelf-fycm) starts at the merge-base with the default branch (`origin/HEAD`, `origin/main`, `origin/master`, `main`, `master`; never HEAD's own branch), or covers HEAD's own history on the default branch itself: it no longer scans every ref of the shared git dir, so a sibling worktree's unpushed fixture fails nobody else. Uncommitted work is scanned in that case too. `full` (`secrets-all`) still scans every ref.
 - The python `deps` recipe checks only the packages the change reaches (`any_gate_python packages`; every package where the adapter is absent); `deps-all` is every package and the release gate (`check-all`) runs it.
 

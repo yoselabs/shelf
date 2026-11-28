@@ -55,20 +55,49 @@ def declared(repo: Path) -> dict[str, list[str]]:
     return effective
 
 
-def unaffected(repo: Path, names: Sequence[str], recorded: Callable[[], bool] = lambda: False) -> dict[str, str]:
-    """The steps among `names` that declare inputs none of which changed, each with the reason to print.
+def _globs(globs: Sequence[str]) -> str:
+    """The globs a reason names: the first three, then an ellipsis."""
+    return " ".join(globs[:3]) + (" …" if len(globs) > 3 else "")
 
-    An empty change set skips them only when `recorded()` says a gate already passed this tree: a clean tree no gate judged (a fresh
-    clone, a merge, a reset) has nothing "changed" and so would judge nothing.
+
+def explain(repo: Path, names: Sequence[str], recorded: Callable[[], bool] = lambda: False) -> tuple[dict[str, str], dict[str, str]]:
+    """`(skips, runs)`: the steps among `names` not to start, each with the `skipped ...` line to print, and the others each with a
+    one-line reason they run (`run test: 3 changed (*.py)`).
+
+    A step declaring inputs none of which changed is skipped. An empty change set skips them only when `recorded()` says a gate
+    already passed this tree: a clean tree no gate judged (a fresh clone, a merge, a reset) has nothing "changed".
     """
     wanted = declared(repo)
-    if not any(name in wanted for name in names):
-        return {}  # nothing declared: ask git nothing
+    blind = {name: f"run {name}: declares no inputs" for name in names if name not in wanted}
+    if len(blind) == len(names):
+        return {}, blind  # nothing declared: ask git nothing
     moved = changed.changed(repo)
-    if moved is None or any(fnmatch.filter(moved, d) for d in _DEFINITION) or (not moved and not recorded()):
-        return {}
-    return {
-        name: f"{changed.SKIPPED_PREFIX}{name}: none of its declared inputs changed"
-        for name in names
-        if name in wanted and not any(fnmatch.filter(moved, glob) for glob in wanted[name])
-    }
+    everything = (
+        "changed files unknown"
+        if moved is None
+        else "gate definition changed"
+        if any(fnmatch.filter(moved, d) for d in _DEFINITION)
+        else "no gate passed this tree"
+        if not moved and not recorded()
+        else None
+    )
+    skips: dict[str, str] = {}
+    runs = dict(blind)
+    for name in names:
+        if name in blind:
+            continue
+        if everything is not None or moved is None:
+            runs[name] = f"run {name}: {everything}"
+            continue
+        hits = [glob for glob in wanted[name] if fnmatch.filter(moved, glob)]
+        if hits:
+            count = len({path for glob in hits for path in fnmatch.filter(moved, glob)})
+            runs[name] = f"run {name}: {count} changed ({_globs(hits)})"
+        else:
+            skips[name] = f"{changed.SKIPPED_PREFIX}{name}: none of {_globs(wanted[name])} changed"
+    return skips, {name: runs[name] for name in names if name in runs}
+
+
+def unaffected(repo: Path, names: Sequence[str], recorded: Callable[[], bool] = lambda: False) -> dict[str, str]:
+    """The steps among `names` that declare inputs none of which changed, each with the reason to print (`explain`'s skips)."""
+    return explain(repo, names, recorded)[0]

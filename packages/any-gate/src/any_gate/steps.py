@@ -236,12 +236,18 @@ def run_and_report(
     step_limit: float = STEP_LIMIT,
     halt: threading.Event | None = None,
     opens: Path | None = None,
+    why: Mapping[str, str] | None = None,
 ) -> int:
     """Run the steps, say each failure as it lands and the rest after; 0 when every step passed, else 1.
+
+    `why` maps a step to the one line saying why it runs (`run test: 3 changed (*.py)`), said before the steps start.
 
     With an `opens` folder (made by `opens.prepare`) each step's file opens and process starts are counted and printed last.
     """
     say(f"gate: {' '.join(names)} (in parallel)")
+    for name in names:
+        if why and name in why:
+            say(why[name])
     shown: list[str] = []
 
     def land(step: Step) -> None:
