@@ -1,7 +1,7 @@
 ---
 id: 0034
 title: Repo layout: one code base at the root, two in backend/ and frontend/
-statement: One code base stays at the repo root; two code bases each live in backend/ and frontend/ with the root holding repo-level files only; a workspace needs a second package; the contract between stacks is a file.
+statement: One code base stays at the repo root; two live in backend/ and frontend/, the root holding repo-level files only; a workspace needs a second package; the stacks' contract is a committed file.
 concerns: [gate, packaging]
 status: accepted
 decided_by: owner

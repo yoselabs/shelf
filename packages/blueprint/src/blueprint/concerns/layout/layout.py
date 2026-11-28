@@ -6,7 +6,6 @@ base is the backend, a node one the frontend. A node folder that only runs build
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -52,18 +51,24 @@ def _wanted(stack: str) -> str:
     return "frontend" if stack in _NODE else "backend"
 
 
+def _has_source(folder: Path, suffixes: tuple[str, ...], depth: int) -> bool:
+    """Whether `folder` holds a file with one of `suffixes`, looking at most `depth` folders down (never into SKIP_DIRS)."""
+    entries = sorted(folder.iterdir())
+    if any(e.is_file() and e.name.endswith(suffixes) for e in entries):
+        return True
+    return depth > 1 and any(e.is_dir() and e.name not in SKIP_DIRS and _has_source(e, suffixes, depth - 1) for e in entries)
+
+
 def _source_folders(repo: Path, suffixes: tuple[str, ...], skip: set[str]) -> list[str]:
     """Root folders (not hidden, not skipped, not repo-level) holding a file with one of `suffixes`, within three levels."""
-    found: list[str] = []
-    for entry in sorted(repo.iterdir()):
-        if not entry.is_dir() or entry.name.startswith(".") or entry.name in SKIP_DIRS | _REPO_LEVEL | skip:
-            continue
-        for here, dirs, files in os.walk(entry):
-            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
-            if len(Path(here).relative_to(entry).parts) < 3 and any(f.endswith(suffixes) for f in files):
-                found.append(entry.name)
-                break
-    return found
+    return [
+        entry.name
+        for entry in sorted(repo.iterdir())
+        if entry.is_dir()
+        and not entry.name.startswith(".")
+        and entry.name not in SKIP_DIRS | _REPO_LEVEL | skip
+        and _has_source(entry, suffixes, 3)
+    ]
 
 
 def _root_move(ctx: Context, stack: str, taken: set[str]) -> str:

@@ -28,7 +28,7 @@ the file holds the reasons, the rejected options and the history.
 - [0029](0029-the-justfile-imports-blueprint-rendered-parts.md) **A repo's justfile imports blueprint-rendered parts; `import`, not `mod`**: The gate's common recipes are files `blueprint gate render` writes per stack; the repo's justfile imports them (`import`, not `mod`) and owns the rest; `render --check` is the drift check.
 - [0031](0031-gate-steps-declare-their-inputs.md) **Every gate step declares the files it reads; a step whose inputs did not change is not started**: gate-inputs.toml lists each step's input globs; any-gate does not start a step none of whose inputs changed; blueprint checkpoints stay one step reading the whole repo.
 - [0033](0033-blueprint-owns-the-standard-gate-steps.md) **Blueprint owns the standard gate steps; a repo that differs declares it, and nothing it runs goes unchecked**: Test units, node-tooling, recipe shadowing and calls, docker build --check, and worktree scope: gaps a2kay and homelab found are fixed in blueprint, never by weakening a checkpoint or silent override.
-- [0034](0034-repo-layout.md) **Repo layout: one code base at the root, two in backend/ and frontend/**: One code base stays at the repo root; two code bases each live in backend/ and frontend/ with the root holding repo-level files only; a workspace needs a second package; the contract between stacks is a file.
+- [0034](0034-repo-layout.md) **Repo layout: one code base at the root, two in backend/ and frontend/**: One code base stays at the repo root; two live in backend/ and frontend/, the root holding repo-level files only; a workspace needs a second package; the stacks' contract is a committed file.
 
 ## knowledge
 
