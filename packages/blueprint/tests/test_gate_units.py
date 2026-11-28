@@ -589,3 +589,14 @@ def test_a_rest_unit_whose_files_are_all_claimed_is_no_unit(repo: Repo) -> None:
 def test_only_one_rest_unit_is_allowed(repo: Repo) -> None:
     config = _loose(repo, "[tool.blueprint.test.units.a]\nrest = true\n[tool.blueprint.test.units.b]\nrest = true\n")
     assert any("rest" in p for p in config.problems)
+
+
+def test_a_reads_glob_ending_in_double_star_keys_every_file_below_it(repo: Repo) -> None:
+    """The module doc's own example: on Python 3.12 `glob("dir/**")` yields folders only, so such a glob keyed nothing."""
+    _app(repo)
+    repo.write("pyproject.toml", _PYPROJECT.replace('reads = ["src/app/ui/*.js"]', 'reads = ["fixtures/**"]'))
+    repo.write("fixtures/deep/sample.json", "{}\n")
+    before = _keys(repo)
+    repo.write("fixtures/deep/sample.json", '{"a": 1}\n')
+    assert _keys(repo)["ui"] != before["ui"]
+    assert _keys(repo)["core"] == before["core"]
