@@ -14,7 +14,7 @@ _FILES = (".ruff.toml", "ruff.toml", "pyproject.toml")
 
 def _lint_table(ctx: Context) -> dict[str, Any] | None:
     for rel in _FILES:
-        text = ctx.read(rel)
+        text = ctx.read(ctx.py(rel))
         if text is None:
             continue
         try:
@@ -49,7 +49,7 @@ def selects(ctx: Context, code: str) -> bool:
 def excluded(ctx: Context) -> tuple[str, ...]:
     """The path patterns ruff skips: `exclude` and `extend-exclude` of the first config that sets either."""
     for rel in _FILES:
-        text = ctx.read(rel)
+        text = ctx.read(ctx.py(rel))
         if text is None:
             continue
         try:

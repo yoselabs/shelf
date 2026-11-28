@@ -69,6 +69,11 @@ what passed, a lease queues runs); `check --brief` is the per-commit step. A rep
    desktop app, library versus application). One numbered question round, grouped, each with your recommended answer.
 4. Show the owner the plan (§4) and stop.
 
+The layout row `layout.stacks-in-own-folders` (ADR 0034) fails a repo with two code bases where one sits at the root or in a folder not
+named `backend/` or `frontend/`. Its remediation names the `git mv`; the move is the owner's (it touches every path a recipe, hook and
+Dockerfile names), so show the list of broken paths with the plan, run `blueprint gate render` after the move, and never weaken the row.
+One code base at the root, with a node folder that only runs build tools, passes.
+
 The audit writes nothing tracked (ADR 0018). The pinned tag decides which checkpoints judge the repo, so a
 checkpoint the shelf added fails right after a pin bump. A repo that cannot fix one yet waives it in its config:
 `[[tool.blueprint.waivers]]` with `id`, `reason`, `until` (at most 90 days out). An expired, reasonless or

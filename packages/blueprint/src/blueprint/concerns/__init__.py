@@ -13,6 +13,7 @@ MODULES = (
     "secret_scan.secrets_scanner",
     "git_hooks.hooks",
     "stacks.stack",
+    "layout.layout",
     "python.python_pin",
     "stacks.cli_parse",
     "shell.shell",

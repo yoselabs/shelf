@@ -2,29 +2,35 @@
 # The python+uv stack: its linter (ruff and codespell), type, dependency and test steps.
 
 # Paths and extra steps are data in pyproject.toml `[tool.blueprint.gate]` (blueprint gate --help): a repo defines no recipe of its own.
+[working-directory('@PY@')]
 [group('gate')]
 lint:
     uv run blueprint gate lint
 
 # `lint` (ruff, then codespell) over the files changed against the base (any-gate changed), for `check`; `lint` itself is the whole repo.
+[working-directory('@PY@')]
 [group('gate')]
 lint-changed:
     uv run blueprint gate lint --changed
 
+[working-directory('@PY@')]
 format:
     uv run blueprint gate format
 
 # A type warning fails the build (pyrefly's config). No slow rot.
+[working-directory('@PY@')]
 [group('gate')]
 typecheck:
     uv run pyrefly check
 
 # Typos in code, docstrings and docs (`lint` runs this too; here it is alone).
+[working-directory('@PY@')]
 [group('gate')]
 spell:
     uv run blueprint gate spell
 
 # `spell` alone over the files changed against the base (`lint-changed` runs it too).
+[working-directory('@PY@')]
 [group('gate')]
 spell-changed:
     uv run blueprint gate spell --changed
@@ -32,6 +38,7 @@ spell-changed:
 # Dependency hygiene: the lockfile matches pyproject, then unused, missing and transitive (deptry), once per package in a workspace. A
 # package is checked when the change reaches it: its own files, a package it depends on (a dependency's modules and requirements decide what
 # deptry calls missing or transitive), or the lock read per package (`any_gate_python packages`); where that adapter is absent, every package.
+[working-directory('@PY@')]
 [group('gate')]
 deps scope="changed":
     #!/usr/bin/env bash
@@ -57,6 +64,7 @@ deps-all: (deps "all")
 # `[tool.blueprint.test] marks = "not slow"` a suite's `slow` tests run in a second pass, only when that suite's key changed since they last
 # passed (a docs-only change runs none). Arguments go to pytest: `just test -m slow`, `just test -k name`.
 # A run with arguments is an override: it writes no receipt, so a later plain run cannot skip a unit this one never ran in full.
+[working-directory('@PY@')]
 [group('gate')]
 [positional-arguments]
 test *args:
@@ -65,14 +73,17 @@ test *args:
 # `test` over every suite and every mark, receipts ignored (the release gate's test step): the same runner, plan and test slot. A coverage
 # floor applies only when the repo declares one (`[tool.blueprint.test] floor`, else `[tool.coverage.report] fail_under`); a whole-repo
 # measure cannot ride on a partial run, so with arguments (`just test-all -m slow`) the floor is off.
+[working-directory('@PY@')]
 [group('gate')]
 [positional-arguments]
 test-all *args:
     uv run blueprint gate test-all -- "$@"
 
 # Coverage report only (human view).
+[working-directory('@PY@')]
 cov:
     uv run pytest --cov --cov-report=term-missing
 
+[working-directory('@PY@')]
 sync:
     uv sync

@@ -20,6 +20,7 @@ from blueprint.model import (
     not_checked,
     not_set_up,
     passing,
+    python_folder,
 )
 
 if TYPE_CHECKING:
@@ -128,13 +129,15 @@ def _fresh_clone_steps(ctx: Context, clone: Path) -> Finding | None:
     """Run each step the clone's files call for; the first that fails is the finding."""
     env = {**ctx.env, "MISE_IGNORED_CONFIG_PATHS": str(Path(ctx.env["HOME"]) / ".config" / "mise"), "BD_DISABLE_METRICS": "1"}
     for marker, argv in _FRESH_CLONE_STEPS:
-        if not (clone / marker).is_file():
+        # The stack's own steps run where its manifest sits: `backend/` for a Python stack below the root (ADR 0034).
+        folder = clone / (python_folder(clone) or ".") if marker == "uv.lock" else clone
+        if not (folder / marker).is_file():
             continue
-        done = ctx.run(*argv, cwd=clone, timeout=600, env=env)
+        done = ctx.run(*argv, cwd=folder, timeout=600, env=env)
         if argv[0] == "bd" and done is not None and done.returncode != 0:
             # The committed sync.remote may name the transport this machine lacks (https on an SSH-only box, ssh in CI).
             for rewrite in _OTHER_TRANSPORT:
-                done = ctx.run(*argv, cwd=clone, timeout=600, env={**env, **rewrite})
+                done = ctx.run(*argv, cwd=folder, timeout=600, env={**env, **rewrite})
                 if done is not None and done.returncode == 0:
                     break
         if done is None or done.returncode != 0:

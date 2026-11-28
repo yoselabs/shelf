@@ -25,12 +25,14 @@ import tempfile
 import tomllib
 from pathlib import Path
 
+from blueprint.gate_py import manifest
+
 _TIMEOUT = 3600.0  # seconds a generator may take
 
 
 def entries(repo: Path) -> dict[str, dict[str, object]]:  # object: parsed TOML values
     """The declared generators by name."""
-    data = tomllib.loads((repo / "pyproject.toml").read_text(encoding="utf-8"))
+    data = tomllib.loads(manifest(repo).read_text(encoding="utf-8"))
     declared = data.get("tool", {}).get("blueprint", {}).get("gate", {}).get("generated", [])
     return {str(e["name"]): e for e in declared if isinstance(e, dict) and "name" in e}
 

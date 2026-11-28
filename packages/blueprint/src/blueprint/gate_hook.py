@@ -87,10 +87,14 @@ def run(repo: Path) -> int:
         sys.stderr.write(f"hook: git diff --cached failed ({error}): the staged files are unknown, so the commit is refused\n")
         return 2
     codes = [_secrets(repo), guard.check(committed=False)]
-    if "pyproject.toml" in staged:
+    base = gate_py.manifest(repo).parent.relative_to(repo).as_posix()
+    prefix = "" if base == "." else f"{base}/"
+    if f"{prefix}pyproject.toml" in staged:
         codes.append(preset.check(repo))
     roots = gate_py.settings(repo).get("gate", {}).get("lint-paths", [])
-    python = [p for p in staged if p.endswith(".py") and _under(p, [str(r) for r in roots])]
+    python = [
+        p for p in staged if p.endswith(".py") and _under(p, [f"{prefix}{r}" for r in roots] or ([prefix.rstrip("/")] if prefix else []))
+    ]
     if python:
         codes.append(_run_ruff(repo, python))
     return max(codes)

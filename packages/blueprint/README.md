@@ -157,11 +157,36 @@ Every report starts, after its header, with the list of all overrides (id, scope
 A written report's header names the shelf commit and package version that produced it, the checkpoint-set hash,
 and the scope: concerns checked, concerns not run, and whether the audit-only checkpoints ran.
 
+## Repo layout and stack roots (ADR 0034)
+
+One code base (node only as a tool) stays at the repo root. Two code bases (own dependencies, tests, build) each live in `backend/` and
+`frontend/`; the root holds repo-level files only (justfile, AGENTS.md, mise.toml, `.blueprint/`, docs, deploy files). A workspace appears
+when a stack gets its second package, never for one; `packages/` holds libraries, never an app; the contract between stacks is a
+committed file (an `[[edge]]`).
+
+The engine finds each stack's root, from its manifest at the repo root or one folder down (never `packages/*`, `tests`, `fixtures`,
+`examples`, dependency folders, or a second folder with its own `pyproject.toml`: two Python folders are two projects, not a backend):
+
+- A stack is judged with its own profile; the python-uv profile's file paths use `{py}` for the Python stack's folder, so a stack in `backend/`
+  gets the same rows with the same verdicts as one at the root.
+- `blueprint gate render` writes each Python recipe with `[working-directory('backend')]`, and the repo-level recipes (`check`, `steps`,
+  `blueprint`, `secrets`, `guard`, `preset`, `render`) as `uv run --project backend ...` from the root, so the root justfile stays the one
+  entry. The node recipes already run in their folder (`cd frontend && ...`). A stack at the root renders what it always did, byte for byte.
+- `step-inputs.toml` scopes the Python steps (`lint-changed`, `typecheck`, `deps`, `arch`, `test`) to `backend/`, so a frontend edit starts
+  none of them. A step that reads outside its folder (a test unit that reads `frontend/*`, a root document to spell-check) is widened in
+  the repo's own `gate-inputs.toml`.
+- The commit guard, preset-drift, the commit hook, `gate lint`/`spell` (their changed-file selection asks git from the top level), the
+  clean-clone `uv sync` and the `generated` steps read and run in the Python folder.
+
+Not read from the Python folder yet: a waiver in `pyproject.toml` (put it in `docs/blueprint/blueprint.toml`), `blueprint init`'s writes
+to `pyproject.toml`, and a test unit's `reads` that name files outside the folder.
+
 ## Concerns in v0.1
 
 | layer | concern | checkpoints |
 |---|---|---|
 | generic | gate | `one-command` · `runner` (a Makefile-only gate fails: the runner is just, ADR 0023; the graph is read from `just --dump --dump-format json`; a Makefile is not read) · `runs-blueprint` · `no-ci` (no repository has GitHub Actions configuration, ADR 0027) · `hooks-recipe` · `hooks-installed` (audit only) · `guards-have-red-tests` (follows `just check` into pre-commit hooks) · `checkers-wired` · `lfs-binaries` (a repo with LFS patterns: every binary blob is a pointer, read from the blob since `--eol` cannot judge a `-text` file) · `lfs-installed` (audit only: git-lfs and its filter in this clone) · `default-branch` (audit only) · `git-remote` (audit only) · `clean-clone` (audit only) |
+| stack | layout | `stacks-in-own-folders` (ADR 0034): with two code bases (language stacks; a node folder that only runs build tools is a tool) each lives in `backend/` or `frontend/`, never one at the root; the evidence names the stacks, the remedy names the `git mv`; waivable (ADR 0018) |
 | generic | backlog | `tracker` · `strict-config` (audit only) · `no-tracked-export` · `no-local-override` · `lint` (audit only) · `no-tracker-file` |
 | stack | stack/`<stack>` | `profile`, then one row per role: `toolchain` · `formatter` · `linter` · `types` · `dependencies` · `tests` · `coverage` · `spelling` · `architecture`, judged from `profiles/<stack>.toml` (python-uv evidenced, dotnet provisional; the toolchain row also checks every dotnet install against global.json); `python-uv.uv-tool` (audit only): an application's installed uv tool matches uv.lock; `tool-pins`: every tool the repo runs (uv, just, prek, bd, git-lfs, godot) is pinned exactly in mise.toml, locked in mise.lock and installed by a `mise install --locked` recipe, with no second pin beside .python-version, global.json or rust-just (ADR 0024); `agent-cli-pins`: mise.toml pins no self-updating agent CLI (codex, claude code, opencode, gemini; the list is `tools.toml`), and a machine-owned tool such as git takes a floor (`>=`) instead of a pin; `tools-installed` (audit only): each pinned tool on PATH is its pinned version |
 | framework | framework/`<name>` | `profile`, then one row per role its profile names (godot, unity, mcp, provisional: framework-version · project-hygiene · binary-assets · build · tests · surface-integrity · architecture · hooks; `embedded-script-lint` projects no row); paths may use `{root}` (the project folder) and globs |

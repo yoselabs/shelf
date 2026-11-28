@@ -109,7 +109,7 @@ def unknown(waivers: Iterable[Waiver], known: set[str]) -> tuple[str, ...]:
     )
 
 
-READ_FILES = ("docs/blueprint/blueprint.toml", "pyproject.toml")
+READ_FILES = ("blueprint.toml", "docs/blueprint/blueprint.toml", "pyproject.toml")
 
 
 def stray(repo: Path) -> tuple[str, ...]:

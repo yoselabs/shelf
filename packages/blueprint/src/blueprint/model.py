@@ -206,6 +206,24 @@ class Profile:
     rejected: tuple[Judgement, ...] = ()
 
 
+# Folders one level down that never hold the repo's own code base: fixtures and samples, workspace members, docs.
+_NOT_STACK_FOLDERS = frozenset(
+    {"packages", "tests", "test", "fixtures", "examples", "example", "docs", "vendor", "third_party", "testdata"}
+)
+
+
+def python_folder(repo: Path, skip: tuple[str, ...] = ()) -> str | None:
+    """The folder holding the Python code base's `pyproject.toml`: "." at the root, else the one folder below it that does (ADR 0034).
+
+    A root manifest wins. Below the root a folder counts only when it is the only one with a manifest (two Python folders are two
+    projects, not a backend) and is no workspace member (`packages/*`), fixture, example or dependency folder.
+    """
+    if (repo / "pyproject.toml").is_file():
+        return "."
+    below = sorted({p.parent.name for p in walk(repo, "pyproject.toml", 2, skip) if p.parent != repo} - _NOT_STACK_FOLDERS)
+    return below[0] if len(below) == 1 else None
+
+
 def uses_beads(profile: Profile) -> bool:
     """Whether the repo tracks its work in beads (an `applies` predicate)."""
     return profile.tracker == "beads"
@@ -273,6 +291,16 @@ class Context:
     def path(self, rel: str) -> Path:
         """`rel` inside the repo."""
         return self.repo / rel
+
+    def py_folder(self) -> str:
+        """The folder of the Python stack ("." at the root, `backend` below it; ADR 0034)."""
+        roots = dict(self.profile.stack_roots)
+        return roots.get("python-uv") or roots.get("python") or "."
+
+    def py(self, name: str) -> str:
+        """`name` inside the Python stack's folder, repo-relative: `pyproject.toml`, or `backend/pyproject.toml` in `backend/`."""
+        folder = self.py_folder()
+        return name if folder == "." else f"{folder}/{name}"
 
     def read(self, rel: str) -> str | None:
         """The text of `rel`, or None when it is not a file. Read once per run: the repo does not change while a run reads it."""

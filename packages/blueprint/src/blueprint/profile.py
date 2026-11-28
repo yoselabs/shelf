@@ -12,13 +12,15 @@ from pathlib import Path
 from typing import Any
 
 from blueprint.facts import KINDS, SURFACES, TRAITS, Judgement, detect_facts, judgement_problem, package_json
-from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, is_skipped, override_toml, walk
+from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, is_skipped, override_toml, python_folder, walk
 from blueprint.names import canonical_name
 from blueprint.waivers import Waiver
 from blueprint.waivers import load as load_waivers
 
 STATE_DIR = "docs/blueprint"
 STATE_FILE = f"{STATE_DIR}/blueprint.toml"
+# A multi-stack repo keeps its repo-level config here, beside the justfile; each stack's `[tool.*]` stays in its manifest (ADR 0034).
+ROOT_STATE_FILE = "blueprint.toml"
 OVERRIDE_CODES = ("test-data", "remediated", "not-applicable", "not-supported", "not-detected")
 
 
@@ -212,16 +214,18 @@ def _legacy_ignore(raw: dict[str, Any], today: date, problems: list[str]) -> tup
 
 
 def load_state(repo: Path, today: date | None = None) -> State:
-    """Read `docs/blueprint/blueprint.toml`; an absent file is an empty state."""
-    path = repo / STATE_FILE
+    """Read the repo's `blueprint.toml` (the root one, else `docs/blueprint/blueprint.toml`); an absent file is an empty state."""
+    path = repo / (ROOT_STATE_FILE if (repo / ROOT_STATE_FILE).is_file() else STATE_FILE)
     today = today or date.today()  # noqa: DTZ011 -- a calendar date in the owner's zone
+    if (repo / ROOT_STATE_FILE).is_file() and (repo / STATE_FILE).is_file():
+        return State({}, (), {}, (f"{ROOT_STATE_FILE} and {STATE_FILE} both exist: keep one (git mv {STATE_FILE} {ROOT_STATE_FILE})",))
     if not path.is_file():
         waivers = load_waivers(repo, {}, today)
         return State({}, (), {}, tuple(w.problem for w in waivers if w.problem), waivers=waivers)
     try:
         data = tomllib.loads(path.read_text())
     except tomllib.TOMLDecodeError as exc:
-        return State({}, (), {}, (f"{STATE_FILE} is not valid TOML: {exc}",))
+        return State({}, (), {}, (f"{path.relative_to(repo).as_posix()} is not valid TOML: {exc}",))
     waivers = load_waivers(repo, data, today)
     problems_w = [w.problem for w in waivers if w.problem]
     problems: list[str] = list(problems_w)
@@ -299,9 +303,10 @@ def _builds_tooling_only(manifest: Path) -> bool:
 def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
     """Each stack present with the files that set it, from their manifests."""
     found: dict[str, list[str]] = {}
-    if (repo / "pyproject.toml").is_file():
-        locked = (repo / "uv.lock").is_file()
-        found["python-uv" if locked else "python"] = ["pyproject.toml", *(["uv.lock"] if locked else [])]
+    if (folder := python_folder(repo, skip)) is not None:
+        prefix = "" if folder == "." else f"{folder}/"
+        locked = (repo / prefix / "uv.lock").is_file()
+        found["python-uv" if locked else "python"] = [f"{prefix}pyproject.toml", *([f"{prefix}uv.lock"] if locked else [])]
     dotnet = [*walk(repo, "*.sln", 2, skip), *walk(repo, "*.slnx", 2, skip), *walk(repo, "*.csproj", 3, skip)]
     if dotnet:
         found["dotnet"] = [p.relative_to(repo).as_posix() for p in dotnet]
@@ -323,8 +328,8 @@ def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:
 
 
 def _stack_roots(found: dict[str, list[str]]) -> tuple[tuple[str, str], ...]:
-    """The folder each stack's first manifest sits in; a stack that is not a single manifest (dotnet, nix, ...) is rooted at the repo."""
-    return tuple((s, str(Path(files[0]).parent)) for s, files in found.items() if s in {"node", "node-tooling"})
+    """The folder each code stack's first manifest sits in; a stack with no single manifest (dotnet, nix, ...) is rooted at the repo."""
+    return tuple((s, str(Path(files[0]).parent)) for s, files in found.items() if s in {"node", "node-tooling", "python", "python-uv"})
 
 
 def detect_stacks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[str, ...]:
@@ -412,7 +417,7 @@ def detect_frameworks(repo: Path, skip: tuple[str, ...] = ()) -> tuple[tuple[str
 
 
 def _detect_kind(repo: Path, skip: tuple[str, ...] = ()) -> str:
-    pyproject = repo / "pyproject.toml"
+    pyproject = repo / (python_folder(repo, skip) or ".") / "pyproject.toml"
     if pyproject.is_file():
         data = tomllib.loads(pyproject.read_text())
         if "workspace" in data.get("tool", {}).get("uv", {}) and not data.get("project", {}).get("scripts"):
