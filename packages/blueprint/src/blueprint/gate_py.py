@@ -16,19 +16,24 @@ from __future__ import annotations
 import subprocess
 import sys
 import tomllib
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import Any
 
-if TYPE_CHECKING:
-    from pathlib import Path
+from blueprint.model import python_folder
 
 LINT_CONFIGS = ("pyproject.toml", "ruff.toml", ".ruff.toml")
 SPELL_CONFIGS = ("pyproject.toml", ".codespellrc")
 _TIMEOUT = 3600.0  # seconds one tool may take
 
 
+def manifest(repo: Path) -> Path:
+    """The Python stack's `pyproject.toml`: the repo's own at the root, else the one in the folder below it (ADR 0034)."""
+    return repo / (python_folder(repo) or ".") / "pyproject.toml"
+
+
 def settings(repo: Path) -> dict[str, Any]:  # Any: parsed TOML
     try:
-        data = tomllib.loads((repo / "pyproject.toml").read_text(encoding="utf-8"))
+        data = tomllib.loads(manifest(repo).read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
         return {}
     table = data.get("tool", {}).get("blueprint", {})
@@ -69,16 +74,31 @@ def _globs(repo: Path, paths: list[str], suffix: str) -> list[str]:
     return [f"{p}/*{suffix}" if (repo / p).is_dir() else p for p in paths]
 
 
+def _anchor(repo: Path) -> tuple[Path, str]:
+    """The git top level `repo` sits in, and `repo`'s folder below it as a prefix (`backend/`; empty at the top).
+
+    `any_gate changed` reports git-root paths for tracked changes and folder-relative ones for untracked files, so a folder below the
+    top is asked through the top, never through itself: asked from `backend/` it would find nothing and report "no file changed".
+    """
+    if (repo / ".git").exists():
+        return repo, ""
+    done = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=repo, capture_output=True, text=True, check=False, timeout=60)
+    top = Path(done.stdout.strip()).resolve() if done.returncode == 0 and done.stdout.strip() else repo
+    here = repo.resolve()
+    return (top, "") if top == here or top not in here.parents else (top, f"{here.relative_to(top).as_posix()}/")
+
+
 def changed(repo: Path, globs: list[str], configs: tuple[str, ...], *, scope: str) -> list[str] | None:
-    """The files to check, or None when git or any_gate failed (the caller then checks everything)."""
+    """The files to check (paths relative to `repo`), or None when git or any_gate failed (the caller then checks everything)."""
+    top, prefix = _anchor(repo)
     cmd = [sys.executable, "-m", "any_gate", "changed", "--scope", scope]
     for config in configs:
         if (repo / config).is_file():
-            cmd += ["--config", config]
-    done = subprocess.run(cmd + globs, cwd=repo, capture_output=True, check=False, timeout=_TIMEOUT)
+            cmd += ["--config", f"{prefix}{config}"]
+    done = subprocess.run(cmd + [f"{prefix}{g}" for g in globs], cwd=top, capture_output=True, check=False, timeout=_TIMEOUT)
     if done.returncode != 0:
         return None
-    return [f for f in done.stdout.decode().split("\0") if f]
+    return [f.removeprefix(prefix) for f in done.stdout.decode().split("\0") if f and f.startswith(prefix)]
 
 
 def _call(cmd: list[str], repo: Path) -> int:

@@ -34,6 +34,9 @@ from __future__ import annotations
 import subprocess
 import sys
 import tomllib
+from pathlib import Path
+
+from blueprint.model import python_folder
 
 SHELF_MARKER = "shelf"
 COULD_NOT_CHECK = 2
@@ -48,9 +51,16 @@ def _git(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["git", *args], capture_output=True, text=True, check=False, timeout=_GIT_TIMEOUT)
 
 
+def _pyproject_path() -> str:
+    """The Python stack's `pyproject.toml` as a path from the git top level: `pyproject.toml`, or `backend/pyproject.toml` (ADR 0034)."""
+    top = _git("rev-parse", "--show-toplevel")
+    folder = python_folder(Path(top.stdout.strip())) if top.returncode == 0 and top.stdout.strip() else None
+    return "pyproject.toml" if folder in {None, "."} else f"{folder}/pyproject.toml"
+
+
 def _staged_pyproject() -> str | None:
     """The pyproject.toml content as it would be committed (staged), or None."""
-    result = _git("show", ":pyproject.toml")
+    result = _git("show", f":{_pyproject_path()}")
     return result.stdout if result.returncode == 0 else None
 
 
@@ -61,7 +71,7 @@ def _committed_pyproject() -> str | None:
     """
     if _git("rev-parse", "HEAD").returncode != 0:
         return None
-    result = _git("show", "HEAD:pyproject.toml")
+    result = _git("show", f"HEAD:{_pyproject_path()}")
     return result.stdout if result.returncode == 0 else None
 
 

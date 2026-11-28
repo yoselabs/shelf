@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from blueprint.facts import KINDS, SURFACES, TRAITS, Judgement, detect_facts, judgement_problem, package_json
-from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, is_skipped, override_toml, walk
+from blueprint.model import SKIP_DIRS, Context, Profile, dockerfiles, is_skipped, override_toml, python_folder, walk
 from blueprint.names import canonical_name
 from blueprint.waivers import Waiver
 from blueprint.waivers import load as load_waivers
@@ -294,24 +294,6 @@ def _builds_tooling_only(manifest: Path) -> bool:
         return False
     deps = {k for table in ("dependencies", "devDependencies") if isinstance(data.get(table), dict) for k in data[table]}
     return not _NODE_CODE_TOOLS & deps and not any(_NODE_TEST_SCRIPT.search(f"{k} {v}") for k, v in scripts.items())
-
-
-# Folders one level down that never hold the repo's own code base: fixtures and samples, workspace members, docs.
-_NOT_STACK_FOLDERS = frozenset(
-    {"packages", "tests", "test", "fixtures", "examples", "example", "docs", "vendor", "third_party", "testdata"}
-)
-
-
-def python_folder(repo: Path, skip: tuple[str, ...] = ()) -> str | None:
-    """The folder holding the Python code base's `pyproject.toml`: "." at the root, else the one folder below it that does (ADR 0034).
-
-    A root manifest wins. Below the root a folder counts only when it is the only one with a manifest (two Python folders are two
-    projects, not a backend) and is no workspace member (`packages/*`), fixture, example or dependency folder.
-    """
-    if (repo / "pyproject.toml").is_file():
-        return "."
-    below = sorted({p.parent.name for p in walk(repo, "pyproject.toml", 2, skip) if p.parent != repo} - _NOT_STACK_FOLDERS)
-    return below[0] if len(below) == 1 else None
 
 
 def _stack_files(repo: Path, skip: tuple[str, ...]) -> dict[str, list[str]]:

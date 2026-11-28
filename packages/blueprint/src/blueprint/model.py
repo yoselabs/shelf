@@ -206,6 +206,24 @@ class Profile:
     rejected: tuple[Judgement, ...] = ()
 
 
+# Folders one level down that never hold the repo's own code base: fixtures and samples, workspace members, docs.
+_NOT_STACK_FOLDERS = frozenset(
+    {"packages", "tests", "test", "fixtures", "examples", "example", "docs", "vendor", "third_party", "testdata"}
+)
+
+
+def python_folder(repo: Path, skip: tuple[str, ...] = ()) -> str | None:
+    """The folder holding the Python code base's `pyproject.toml`: "." at the root, else the one folder below it that does (ADR 0034).
+
+    A root manifest wins. Below the root a folder counts only when it is the only one with a manifest (two Python folders are two
+    projects, not a backend) and is no workspace member (`packages/*`), fixture, example or dependency folder.
+    """
+    if (repo / "pyproject.toml").is_file():
+        return "."
+    below = sorted({p.parent.name for p in walk(repo, "pyproject.toml", 2, skip) if p.parent != repo} - _NOT_STACK_FOLDERS)
+    return below[0] if len(below) == 1 else None
+
+
 def uses_beads(profile: Profile) -> bool:
     """Whether the repo tracks its work in beads (an `applies` predicate)."""
     return profile.tracker == "beads"

@@ -37,6 +37,8 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from blueprint.model import python_folder
+
 REFERENCE = Path(__file__).resolve().parent / "preset.toml"
 
 # Every axis this compares, and the `[tool.shelf-preset]` keys that excuse a difference on it. `omitted` = the shelf has it and the
@@ -162,6 +164,7 @@ def _shadow(consumer: dict[str, Any], ruff_file: str | None, declared: dict[str,
 
 def check(repo: Path, reference_file: Path | None = None) -> int:
     """Compare `repo` with the preset; the exit code of `blueprint gate preset`."""
+    repo = repo / (python_folder(repo) or ".")  # the Python stack's folder (ADR 0034): its pyproject.toml, ruff config and uv.lock
     consumer_toml = repo / "pyproject.toml"
     if not consumer_toml.is_file():
         sys.stderr.write(f"preset-drift: no pyproject.toml at {repo} -- CANNOT VERIFY, not a pass\n")

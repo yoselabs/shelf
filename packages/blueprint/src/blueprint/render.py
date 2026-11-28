@@ -60,6 +60,32 @@ def _stack_parts(repo: Path) -> list[tuple[str, tuple[str, ...]]]:
     return sorted(seen.items())
 
 
+def _python_folder(repo: Path) -> str:
+    """The folder of the Python stack ("." at the root, `backend` below it; ADR 0034), as detection finds it."""
+    roots = dict(detected_stack_roots(repo))
+    return roots.get("python-uv") or roots.get("python") or "."
+
+
+_UV_RUN = re.compile(r"\buv run (?!--project)")
+
+
+def _in_python_folder(rendered: dict[str, str], folder: str) -> dict[str, str]:
+    """The parts of a repo whose Python stack lives in `folder` (ADR 0034).
+
+    The Python recipes run in the folder (`[working-directory]`: just resolves it from the justfile's folder, imports included). Every
+    other `uv run` stays at the repo root and names the project, so the repo-level steps (`any_gate`, `blueprint gate blueprint`) use
+    the folder's environment: `--project` finds it without changing the directory.
+    """
+    marker = "[working-directory('@PY@')]\n"
+    out: dict[str, str] = {}
+    for name, text in rendered.items():
+        if folder == ".":
+            out[name] = text.replace(marker, "")
+        else:
+            out[name] = text.replace("@PY@", folder) if marker in text else _UV_RUN.sub(f"uv run --project {shlex.quote(folder)} ", text)
+    return out
+
+
 def parts(repo: Path) -> dict[str, str]:
     """`{path relative to the repo: text}` of every part this repo's stacks call for."""
     stack_parts = _stack_parts(repo)
@@ -94,7 +120,8 @@ def parts(repo: Path) -> dict[str, str]:
         rendered[f"{FOLDER}/images.just"] = images
     if generated:
         rendered[f"{FOLDER}/generated.just"] = _generated_part(generated)
-    if inputs := _step_inputs(steps, node.folder if node else ".", generated):
+    py_folder = _python_folder(repo)
+    if inputs := _step_inputs(steps, node.folder if node else ".", generated, py_folder):
         rendered[INPUTS_PART] = inputs
     for name, _ in stack_parts:
         text = (_TEMPLATES / f"{name}.just").read_text()
@@ -103,7 +130,7 @@ def parts(repo: Path) -> dict[str, str]:
         )
     if not gate_py.release_gate(repo):
         rendered = _without_release_recipes(repo, rendered, steps)
-    return rendered
+    return _in_python_folder(rendered, py_folder)
 
 
 def _generated_inputs(entry: dict[str, Any]) -> list[str]:
@@ -136,18 +163,35 @@ def _generated_part(generated: list[dict[str, Any]]) -> str:
     )
 
 
+def _python_root(repo: Path) -> Path:
+    return repo / _python_folder(repo)
+
+
 def _import_contracts(repo: Path) -> bool:
     """Whether the repo declares import-linter contracts: `[tool.importlinter]` in the root pyproject.toml, or a `.importlinter` file."""
-    if (repo / ".importlinter").is_file():
+    if (_python_root(repo) / ".importlinter").is_file():
         return True
-    pyproject = repo / "pyproject.toml"
+    pyproject = gate_py.manifest(repo)
     if not pyproject.is_file():
         return False
     tool = tomllib.loads(pyproject.read_text()).get("tool", {})
     return isinstance(tool, dict) and "importlinter" in tool
 
 
-def _step_inputs(steps: list[str], node_folder: str = ".", generated: list[dict[str, Any]] | None = None) -> str:
+# The steps that read only the Python stack's own folder: with the stack in `backend/` their globs are scoped to it, so an edit in the
+# frontend starts none of them. `lint-changed` and `test` are `*` by default and scope to the folder too: a repo whose Python steps read
+# files outside it (a unit that reads `frontend/*`, a root document to spell-check) widens them in its own `gate-inputs.toml`.
+_PYTHON_STEPS = frozenset({"lint-changed", "typecheck", "deps", "arch", "test"})
+
+
+def _scoped(step: str, globs: list[str], py_folder: str) -> list[str]:
+    """`globs` of a Python step with the stack in `py_folder`: each under that folder (`*` becomes `backend/*`)."""
+    if py_folder == "." or step not in _PYTHON_STEPS:
+        return globs
+    return [f"{py_folder}/{g}" for g in globs]
+
+
+def _step_inputs(steps: list[str], node_folder: str = ".", generated: list[dict[str, Any]] | None = None, py_folder: str = ".") -> str:
     """The default input globs of the steps this gate runs that the blueprint knows, in the shape of the repo's `gate-inputs.toml`."""
     table = tomllib.loads(_STEP_DEFAULTS.read_text())
     wide = table.pop("wide", {})
@@ -162,10 +206,11 @@ def _step_inputs(steps: list[str], node_folder: str = ".", generated: list[dict[
         "# The repo's gate-inputs.toml holds only its exceptions: a list there widens a step, `[narrow]` with a reason narrows it.",
     ]
     glob = node_gate.inputs_folder(node_folder)
+    scoped = {s: _scoped(s, list(dict.fromkeys(glob if g == "@NODE@/*" else g for g in table[s])), py_folder) for s in known}
     for s in known:
-        globs = list(dict.fromkeys(glob if g == "@NODE@/*" else g for g in table[s]))
+        globs = scoped[s]
         lines.append(f"{s} = [{', '.join(_quote(g) for g in (['*'] if '*' in globs else globs))}]")
-    reasons = [s for s in known if s in wide]
+    reasons = [s for s in known if s in wide and "*" in scoped[s]]
     if reasons:
         lines += ["", "[wide]", *(f"{s} = {_quote(wide[s])}" for s in reasons)]
     return "\n".join(lines) + "\n"
