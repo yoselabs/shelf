@@ -165,3 +165,19 @@ def test_untracked_files_are_scanned_in_one_process_and_named_by_their_own_path(
     found = scan_range(repo.root, env=repo.env)
     assert [(f.file, f.rule) for f in found] == [("sub/leaky.py", "aws-access-token")]
     assert sum(1 for argv in starts if argv[0] == "gitleaks" and "dir" in argv) == 1
+
+
+_ALLOW = '[extend]\nuseDefault = true\n[allowlist]\npaths = ["fixtures/"]\n'
+
+
+@pytest.mark.parametrize("where", [".gitleaks.toml", ".config/gitleaks.toml"])
+def test_the_repos_gitleaks_config_is_read_from_the_root_or_from_dot_config(repo: Repo, where: str) -> None:
+    """ADR 0035: `.config/gitleaks.toml` is passed with `--config`; a copy of untracked files is scanned with it too."""
+    repo.write(where, _ALLOW)
+    repo.write("fixtures/leak.py", _LEAK)
+    repo.commit()
+    repo.write("fixtures/more.py", _LEAK_TOO)
+    assert scan_full(repo.root, env=repo.env) == []
+    assert scan_range(repo.root, env=repo.env) == []
+    repo.write("src/leak.py", _LEAK)
+    assert [f.file for f in scan_range(repo.root, env=repo.env)] == ["src/leak.py"]

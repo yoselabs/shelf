@@ -27,6 +27,15 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
 _BASE = ("gitleaks", "--no-banner", "--no-color", "--redact", "--log-level", "error")
+# The repo's gitleaks config, in the order gitleaks itself would look, plus `.config/` (ADR 0035). Passed by path: a scan of a copy of the
+# untracked files finds no config in its own root.
+_CONFIGS = (".config/gitleaks.toml", ".gitleaks.toml")
+
+
+def _config(repo: Path) -> list[str]:
+    """`--config <file>` for the repo's own gitleaks config, nothing when it has none (gitleaks then uses its default rules)."""
+    found = next((repo / rel for rel in _CONFIGS if (repo / rel).is_file()), None)
+    return ["--config", str(found)] if found else []
 
 
 class ScanError(RuntimeError):
@@ -68,7 +77,7 @@ def _run(repo: Path, env: Mapping[str, str] | None, args: Sequence[str]) -> list
     """One gitleaks run; its JSON report holds the findings (exit 1 is "leaks found", anything else above 1 is a failure)."""
     with tempfile.TemporaryDirectory() as tmp:
         report = Path(tmp) / "report.json"
-        done = _exec([*_BASE, *args, "--report-format", "json", "--report-path", str(report)], repo, env, _GITLEAKS_TIMEOUT)
+        done = _exec([*_BASE, *_config(repo), *args, "--report-format", "json", "--report-path", str(report)], repo, env, _GITLEAKS_TIMEOUT)
         if done.returncode not in (0, 1):
             failed = f"gitleaks failed ({done.returncode}): {done.stderr.strip()[:300]}"
             raise ScanError(failed)
@@ -160,7 +169,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     for leak in leaks:
         sys.stderr.write(f"secret scan: {leak}\n")
     if leaks:
-        sys.stderr.write("secret scan: rotate what leaked (it is in git history once committed); a false positive goes in .gitleaks.toml\n")
+        sys.stderr.write(
+            "secret scan: rotate what leaked (it is in git history once committed); a false positive goes in .config/gitleaks.toml\n"
+        )
     return 1 if leaks else 0
 
 

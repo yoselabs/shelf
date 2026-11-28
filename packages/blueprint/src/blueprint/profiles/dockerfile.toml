@@ -30,7 +30,7 @@ Exit 1 on any warning (the default threshold); seen red on four real files (DL30
 and on a planted `FROM ubuntu:latest` with a bare `apt-get install` (DL3007, DL3008, DL3014, DL3015). Never `--failure-threshold error`: it passed a file with real warnings"""
 install = """mise.toml: hadolint = "2.15.1"; justfile: an `images` recipe, `git ls-files -z '*Dockerfile' '*Dockerfile.*' '*Containerfile' | grep -zv '\\.dockerignore$' | xargs -0 -r hadolint`, a dependency of `check`; \
 .hadolint.yaml with an `ignored:` list, each rule with a comment saying why. DL3022 is a false positive for `COPY --from=<name>` where <name> is a `docker build --build-context`: ignore it with that reason"""
-config = [{ path = ".hadolint.yaml" }, { any = [{ path = "justfile", contains = "hadolint" }, { path = ".blueprint/images.just", contains = "hadolint" }, { path = ".pre-commit-config.yaml", contains = "hadolint" }] }]
+config = [{ any = [{ path = ".hadolint.yaml" }, { path = ".config/hadolint.yaml" }] }, { any = [{ path = "justfile", contains = "hadolint" }, { path = ".blueprint/images.just", contains = "hadolint" }, { path = ".pre-commit-config.yaml", contains = "hadolint" }] }]
 gate = "hadolint"
 
 [[role]]

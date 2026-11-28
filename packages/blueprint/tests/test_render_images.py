@@ -7,6 +7,7 @@ is optional: `[tool.blueprint.gate] image-pins = true` adds it, run as
 
 from __future__ import annotations
 
+import fnmatch
 import re
 import shutil
 import subprocess
@@ -232,3 +233,42 @@ def test_the_compose_pin_pass_honours_the_exemption_by_prefix_only(tmp_path: Pat
 
 def test_a_digest_must_be_64_hex_at_the_end(tmp_path: Path) -> None:
     assert _pins(tmp_path, "services:\n  a:\n    image: x:1@sha256:abc\n")[0] == 1
+
+
+_PY_CONFIGS = {
+    ".config/hadolint.yaml": "hadolint -c .config/hadolint.yaml",
+    ".config/yamlfmt.yaml": "yamlfmt -conf .config/yamlfmt.yaml -lint",
+    ".config/dclintrc.json": "dclint -c .config/dclintrc.json --max-warnings 0",
+}
+
+
+def test_a_config_in_dot_config_is_passed_to_its_tool_by_flag(repo: Repo) -> None:
+    """ADR 0035: hadolint, yamlfmt and dclint do not look in `.config/`; the rendered recipe names the file."""
+    repo.write("Dockerfile", PINNED)
+    repo.write("compose.yml", COMPOSE)
+    for name in _PY_CONFIGS:
+        repo.write(name, "{}\n")
+    repo.commit()
+    images = _images(repo)
+    for flagged in _PY_CONFIGS.values():
+        assert flagged in images
+
+
+def test_a_repo_with_its_config_at_the_root_renders_no_flag(repo: Repo) -> None:
+    repo.write("Dockerfile", PINNED)
+    repo.write("compose.yml", COMPOSE)
+    repo.write(".hadolint.yaml", "ignored: []\n")
+    repo.commit()
+    images = _images(repo)
+    assert "hadolint -c" not in images
+    assert "yamlfmt -conf" not in images
+    assert "dclint -c" not in images
+
+
+def test_the_images_inputs_include_the_configs_in_dot_config(repo: Repo) -> None:
+    repo.write("Dockerfile", PINNED)
+    repo.commit()
+    globs = tomllib.loads(render.parts(repo.root)[render.INPUTS_PART])["images"]
+    assert any(fnmatch.fnmatch(".config/hadolint.yaml", g) for g in globs)
+    assert any(fnmatch.fnmatch(".config/yamlfmt.yaml", g) for g in globs)
+    assert any(fnmatch.fnmatch(".config/dclintrc.json", g) for g in globs)

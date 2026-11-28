@@ -276,7 +276,8 @@ def test_a_python_repo_with_import_linter_contracts_renders_the_arch_step(repo: 
     repo.write("pyproject.toml", _IMPORTLINTER)
     repo.write("uv.lock", "")
     parts = render.parts(repo.root)
-    assert "\narch:\n    uv run lint-imports" in parts[".blueprint/python.just"]
+    assert "\narch:\n    uv run lint-imports --cache-dir {{ justfile_directory() }}/.cache/import_linter" in parts[".blueprint/python.just"]
+    assert 'export HYPOTHESIS_STORAGE_DIRECTORY := justfile_directory() / ".cache/hypothesis"' in parts[".blueprint/python.just"]
     assert '"arch"' in parts[".blueprint/base.just"]
     assert "*.py" in tomllib.loads(parts[render.INPUTS_PART])["arch"]
 

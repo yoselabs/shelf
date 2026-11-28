@@ -71,7 +71,7 @@ na = "Nix has no line or branch coverage tool; evaluation of every deployed outp
 role = "spelling"
 tool = "typos (crate-ci) with a committed config; it splits identifiers and reads .nix comments and strings"
 install = "brew install typos-cli (or via the flake's pinned nixpkgs); typos.toml with [default.extend-words] for hostnames and domain terms; just check runs `typos`"
-config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }] }]
+config = [{ any = [{ path = "typos.toml" }, { path = "_typos.toml" }, { path = ".typos.toml" }, { path = ".config/typos.toml" }] }]
 gate = "typos"
 
 [[role]]

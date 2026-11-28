@@ -1,6 +1,9 @@
 # Rendered by `blueprint gate render` -- never edit; a recipe of the same name in the repo's justfile replaces it only through a declared override (gate.recipe-shadowing).
 # The python+uv stack: its linter (ruff and codespell), type, dependency and test steps.
 
+# Caches live in .cache/ (ADR 0035): ruff and coverage by pyproject.toml settings (audit row layout.root-files-in-config), the two below by environment.
+export HYPOTHESIS_STORAGE_DIRECTORY := justfile_directory() / ".cache/hypothesis"
+
 # Paths and extra steps are data in pyproject.toml `[tool.blueprint.gate]` (blueprint gate --help): a repo defines no recipe of its own.
 [group('gate')]
 lint:
@@ -81,4 +84,4 @@ sync:
 # Rendered only when the repo declares contracts: the node twin of this slot is `ui-arch` (dependency-cruiser).
 [group('gate')]
 arch:
-    uv run lint-imports
+    uv run lint-imports --cache-dir {{ justfile_directory() }}/.cache/import_linter

@@ -58,7 +58,9 @@ def _secrets(repo: Path) -> int:
     for leak in leaks:
         sys.stderr.write(f"secret scan: {leak}\n")
     if leaks:
-        sys.stderr.write("secret scan: rotate what leaked (it is in git history once committed); a false positive goes in .gitleaks.toml\n")
+        sys.stderr.write(
+            "secret scan: rotate what leaked (it is in git history once committed); a false positive goes in .config/gitleaks.toml\n"
+        )
     return 1 if leaks else 0
 
 

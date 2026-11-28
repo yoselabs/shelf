@@ -12,7 +12,7 @@ arch = ["*.py", "*.pyi", "*pyproject.toml", "*uv.lock", "*.importlinter"]
 scripts = ["*.sh", "*.shellcheckrc"]
 # The node steps: the node folder (`@NODE@/*`, rendered) and the pinned node and tools (mise.toml, mise.lock).
 # The image tools read the Dockerfiles, the compose files, their configs and the pinned tools (mise.toml, mise.lock).
-images = ["*Dockerfile*", "*Containerfile*", "*compose*", ".dockerignore", "*.hadolint.yaml", "*.dclintrc*", "*dclint.config.js", "*.yamlfmt*", "mise.*"]
+images = ["*Dockerfile*", "*Containerfile*", "*compose*", ".dockerignore", "*.hadolint.yaml", "*.dclintrc*", "*dclint.config.js", "*.yamlfmt*", "*config/hadolint.yaml", "*config/yamlfmt.yaml", "*config/dclintrc*", "mise.*"]
 ui-lint = ["@NODE@/*", "mise.*"]
 ui-types = ["@NODE@/*", "mise.*"]
 ui-deps = ["@NODE@/*", "mise.*"]

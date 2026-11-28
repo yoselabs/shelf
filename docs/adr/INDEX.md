@@ -29,6 +29,7 @@ the file holds the reasons, the rejected options and the history.
 - [0031](0031-gate-steps-declare-their-inputs.md) **Every gate step declares the files it reads; a step whose inputs did not change is not started**: gate-inputs.toml lists each step's input globs; any-gate does not start a step none of whose inputs changed; blueprint checkpoints stay one step reading the whole repo.
 - [0033](0033-blueprint-owns-the-standard-gate-steps.md) **Blueprint owns the standard gate steps; a repo that differs declares it, and nothing it runs goes unchecked**: Test units, node-tooling, recipe shadowing and calls, docker build --check, and worktree scope: gaps a2kay and homelab found are fixed in blueprint, never by weakening a checkpoint or silent override.
 - [0034](0034-repo-layout.md) **Repo layout: one code base at the root, two in backend/ and frontend/**: One code base stays at the repo root; two live in backend/ and frontend/, the root holding repo-level files only; a workspace needs a second package; the stacks' contract is a committed file.
+- [0035](0035-tool-config-lives-in-dot-config.md) **Tool config lives in .config/, caches in .cache/, deploy files in deploy/**: Tool config leaves the repo root for .config/, caches for .cache/, deploy files for deploy/, unless the tool cannot, moving breaks it, or it is an IDE or ecosystem file.
 
 ## knowledge
 
